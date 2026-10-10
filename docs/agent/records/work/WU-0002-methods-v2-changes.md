@@ -295,6 +295,23 @@ Existing tests edited (argv only, assertions unchanged, none removed):
 7. Output: wrapper default `-q --tb=short -rfE`.
 8. Commands: `tools/run_tests.sh unit <the 14 unit files>` and `tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`.
 
+#### 2026-10-10 developer (claude-sonnet-5-5), WU-0002.1: radius results and the smoke regression (a)-(c)
+
+Radius results (each set run once): `tools/run_tests.sh unit` on the 14 unit files `test___main__ test_allocation test_analysis test_config test_data test_dynamics test_embedding test_ensemble test_oracle test_provenance test_report test_seeds test_systems test_tools_run_preset`: `209 passed in 15.69s`. `tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`: `10 passed in 137.52s (0:02:17)`. No failure, no `--lf` run.
+
+Self-check of the diff: no `clip|nan_to_num|isfinite|where(|try:|except` added (only deletions in those files); no `default_rng|random.|PRNGKey` added in `lpcstudy/` (the tests use fixed `np.random.default_rng(7)` for a manufactured input); no tolerance in an existing assert changed; the only new tolerance is `abs=1e-12` in the H2d test, justified in its docstring.
+
+Smoke regression (a). Clean committed tree at `696b3b367acc1bc7e682df03bcb233cfe739d8cf` (`git status --porcelain` empty; no `lpcstudy --preset` run active). Baseline `/home/brianm/projects/physics/chaos/lpcstudy/runs/baseline/smoke/results.json` read-only, sha256 re-checked `0da48771ee967525f71518d4bb6e7aec675349ff175a2d4544234d4f8f084b79` (matches). Run once, CPU, via the wrapper: `tools/run_preset.sh smoke DEV-0 runs/dev/wu0002-1` (exit 0, 62 s study time, 65 s wall; output under `runs/dev/wu0002-1/smoke/`, gitignored). Comparison: a one-off script (session scratchpad, not committed), WU-0001.5 method.
+
+- Deleted from both (counted): `seconds` 5 in each; new only: `provenance` 1 and `config.seed_id` 1; `handling` 0.
+- Deleted from the baseline only (leaf counts; the run changed no number outside these): `config.transfer_targets` and `config.transfer_sources` (empty lists in the smoke preset, 0 leaves, 2 keys); `systems.lorenz63.shift` 20; `scores.A4f` 14; `km_curves.A4f` 240; `oracle_recovery.mse_at_href.A4f` 1; `H2d.shift_wins_A4_over_A3` 1; `H2d.shift_cells` 1; `H2d.shift_pass` 1. Total 278 leaves (plus the 2 empty-list keys).
+- Intended value change: `H2d.pass` baseline `false` (= `in_distribution_pass` `false`), new `false`. The script asserts new `pass` equals the baseline `in_distribution_pass`; the baseline value is set to it before the comparison.
+- Result: `json.dumps(sort_keys=True, allow_nan=True)` texts are **equal** (56984 characters each). The 3316 remaining leaves (3238 numbers, 52 booleans, 26 strings, 0 null) are bitwise equal; no path differs. No tolerance.
+
+(b) Gate: `validation.gate` of `lorenz63` is `{V1: true, V2: true, V4: true, V5: true, V6: true, gate_pass: true}`. (c) Greps: `grep -rn "lorenz96\|transfer\|A4f\|shift" lpcstudy/` returns nothing; `grep -rn "delay_scale\|delay/2\|lorenz96" lpcstudy/ tools/ tests/` returns only the three new tests that name the removed symbols as strings (`test_systems.py`, `test_data.py`, `test_config.py`). `tests/unit/wrapper_helpers.py` contains a shell `shift` outside `lpcstudy/` (not in the grep scope). The provenance block of the new file: `seed_id` DEV-0, `complete` true, `dirty` false, commit `696b3b36`.
+
+Open for the reviewer: the owner checkpoint of the plan applies (`__main__` option set, `tools/run_preset.sh`, the T1 branch, H2d `pass`). The sweep cells now run `with_evals=False`: the bitwise equality shows the moments are unaffected by that.
+
 ## Review
 
 ## Audit
