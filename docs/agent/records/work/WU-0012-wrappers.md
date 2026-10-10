@@ -117,7 +117,21 @@ Planner: claude-opus-5-5, 2026-10-10, on `wu/0012-wrappers` from `main` 70e19b7.
 
 ## Log
 
-<dated entries: what was done, commands, results, commits>
+**2026-10-10, developer claude-sonnet-5-5: WU-0012.1 written** (`tools/run_tests.sh`, mode 755; `tests/unit/test_tools_run_tests.py`; helper `tests/unit/wrapper_helpers.py`, a new support module with the fake-root builder shared by the three tool test files, because the plan's Q4 split needs one builder; it is not on the plan's file list and is reported to the main session).
+
+§4.9 checklist before the .1 run:
+1. Change set: `?? tools/run_tests.sh`, `?? tests/unit/test_tools_run_tests.py`, `?? tests/unit/wrapper_helpers.py` (`git diff --name-only main...HEAD`: only this unit file).
+2. Radius (`python3 tools/test_impact.py --explain`): `unit: tests/unit/test_tools_run_tests.py` (tool maps `tools/run_tests.sh` to its test file; the helper selects the test that names it). Smaller than the whole suite; no gate.
+3. Already run: no (first run of this set on this code).
+4. Device: `JAX_PLATFORMS=cpu` (settings default and forced by the wrapper); no GPU, and the tests use a fake lock in `tmp_path`, never `/tmp/lpcstudy-gpu.lock`.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s; each test expected well under 5 s.
+6. Contention: no pilot/full/slow/gpu run started by this unit; other agents share the 4 cores.
+7. Output: `-q --tb=short -rfE` (added by the wrapper); only the summary line and failures recorded.
+8. Command: `tools/run_tests.sh unit tests/unit/test_tools_run_tests.py`.
+
+Result of run 1: `40 passed in 1.67s` (exit 0). After the run, a manual probe showed that an unopenable lock path printed two stderr lines (bash's own message and the refusal). Fixed with `{ exec 9>>"$lock"; } 2>/dev/null`, and `test_unopenable_lock_file_is_refused` added. Code changed, so the radius runs once more (same checklist answers, except 3: the code differs from run 1; command identical).
+
+Result of run 2: `41 passed in 1.66s` (exit 0). Self-check: no `clip|nan_to_num|isfinite|where(|try:|except` and no randomness in the diff; no tolerance exists (discrete outcomes). Criterion (a) to (e) each have a test. Not set (DEC-0005 Q3): the XLA thread flag. Commit: WU-0012.1 (see git log).
 
 ## Review
 
