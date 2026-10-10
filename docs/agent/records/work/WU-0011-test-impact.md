@@ -91,6 +91,38 @@ Q1 to Q6 are answered as recorded in `DEC-0003` (proposed, for owner confirmatio
 
 <dated entries: what was done, commands, results, commits>
 
+### 2026-10-10, claude-sonnet-5-5 (developer), WU-0011.1 implementation
+
+Files: `tools/test_impact.py` (new), `tests/unit/test_tools_test_impact.py` (new). The test file was written first and the tool second; no failing run was made between them (no run is allowed without a code change to justify it; the first run is the radius below). §4.2 implemented as written; the Q2 rule is not implemented (amendment).
+
+Test-run checklist (§4.9), before the first radius run:
+1. Change set: `git diff --name-only main...HEAD` = docs (decisions.md, this file, queue.md) and `tests/unit/fixtures/lpcstudy_graph.json`; `git status --porcelain`: untracked `tests/unit/test_tools_test_impact.py`, `tools/test_impact.py`.
+2. Radius (hand-derived, rules `tools/<t>.py` -> `test_tools_<t>.py`, a test file -> itself, the fixture -> the test naming it): `tests/unit/test_tools_test_impact.py`, unit tier, one file; far smaller than the whole suite; no gate.
+3. Already run? No: first run on this code.
+4. Device: `JAX_PLATFORMS=cpu` (settings default, `echo` shows `cpu`); no GPU.
+5. Threads and time: `LPC_THREADS=4` (shown); unit timeout 300 s, expected under 20 s.
+6. Contention: no `lpcstudy --preset` process running (`pgrep` shows only itself).
+7. Output: `-q --tb=short -rfE`; only the summary line and failures are recorded.
+8. Command: `.venv/bin/python -m pytest -q --tb=short -rfE tests/unit/test_tools_test_impact.py` (variables set by the settings; `tools/run_tests.sh` does not exist yet, WU-0012).
+
+Note on the run: WU-0011.1 and WU-0011.2 have the same radius (one file), and the file already holds the .2 tests (fixture comparison, schema, function-level sensitivity), so this one run covers both. I first moved the three .2 tests out of the file to commit .1 separately; the harness denied that run as test removal, so I restored them unchanged (no test deleted or edited) and run the whole file once. The .1 commit will hold the file minus the three .2 tests (a strict subset of the run), the .2 commit the full file.
+
+Result of radius run 1 (first run on this code): `3 failed, 37 passed in 0.59s`. Failures, all errors in my own new test expectations, none in a criterion: `test_excluded_lines_are_printed` and `test_h_run_issues_one_flagged_command_per_cpu_tier` expected the core rule for the synthetic `base`, but `main` uses the real `CORE_MODULES`, in which `base` is a plain module (so no `test_top`, no integration); `test_tools_seeds_and_unknown_files` called `pick` on `notes.txt` and the seeds file without creating them, so the tool correctly added "is deleted" warnings. The tool is right in all three. Fixed the expectations (main-driven tests now use `base` for the plain rule and `pipeline` for the integration tier; the files are created); the core rule itself stays covered by `test_b_*` through `select(..., CORE, ...)`. No tolerance or reference loosened.
+
+Checklist before the `--lf` run and the second radius run (both after the test fix above):
+1. Change set: as before plus the edited test file (`tools/test_impact.py`, `tests/unit/test_tools_test_impact.py` untracked; fixture and docs on the branch).
+2. Radius: same file, unit tier, smaller than the whole suite; first the three failing tests with `--lf`, then the file once.
+3. Already run? Yes on the previous code (3 failed); the test file changed since, so this is the one rerun allowed after a fix (§4.4, §4.6).
+4. Device `JAX_PLATFORMS=cpu`. 5. `LPC_THREADS=4`, unit timeout 300 s. 6. No preset running. 7. `-q --tb=short -rfE`. 8. Commands: `.venv/bin/python -m pytest --lf -q --tb=short -rfE tests/unit/test_tools_test_impact.py`, then the same without `--lf`.
+
+Results: `--lf`: `3 passed, 37 deselected in 0.28s`. Radius, once: `40 passed in 0.51s` (all of the file, including the three .2 tests: `test_graph_equals_hand_derived_fixture`, `test_fixture_schema`, `test_function_level_import_is_an_edge`; the comparison with the fixture passed on its first run, so there is no fixture error to report). Self-check: grep of the tool for `clip|nan_to_num|isfinite|where(|try:|except|default_rng|random.|PRNGKey` finds only the two `try/except` that turn a `SyntaxError` (build_graph) and a `ToolError` (main) into a named error and exit 2, neither silent; no randomness; no tolerance in any assert, the only numeric bound is the criterion `< 1.0` s.
+
+Dogfood: `.venv/bin/python tools/test_impact.py --base main --explain` on this branch prints `unit: tests/unit/test_tools_test_impact.py` as the only selection (exit 0), with one warning, `non-test file tests/unit/fixtures/lpcstudy_graph.json: selected the unit tests that name 'lpcstudy_graph'`, and the three docs files as "no tests".
+
+Facts about the real layout (recorded, not fixed). (1) Runtime of `build_graph` + `select` on the real package, one change each: 0.030 to 0.033 s (criterion `< 1 s`). (2) Q2 gap is real: a change to `lpcstudy/systems.py` selects `tests/unit/test_allocation.py`, `test_analysis.py`, `test_ensemble.py`, `test_oracle.py` plus `tests/integration` and the warning `no test file for lpcstudy/systems.py`; it does NOT select `tests/unit/test_dynamics.py` or `tests/unit/test_embedding.py`, although both import `lpcstudy.systems` (`from lpcstudy.systems import SYSTEMS, make_flow_step, simulate_trajectory`, line 11 and line 9). `systems` has no `tests/unit/test_systems.py`. Same pattern for `config` (`no test file for lpcstudy/config.py`). (3) A change to `lpcstudy/pipeline.py` selects `tests/unit/test_analysis.py` and `tests/integration`; to `statistics.py`: `test_allocation`, `test_analysis`, `test_statistics` + integration; to `embedding.py` (non-core): `test_embedding`, `test_ensemble` only.
+
+Commit split: the .1 commit stages the test file without the three .2 tests (via the index; the working file is untouched), the .2 commit adds them.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
