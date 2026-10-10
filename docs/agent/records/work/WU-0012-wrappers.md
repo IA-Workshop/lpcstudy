@@ -281,6 +281,25 @@ Scope: R1 to R4 only, on commit 6330c78 (`git show 6330c78`). Tests were not rer
 - **Owner checkpoint unchanged:** needs owner review before freeze (seed check, `run.meta.json`, the LPC.AUTH.3 enforcement). R5 stays routed to the owner.
 - **Verdict: approve.** R1 to R4 fixed; no new findings.
 
+### Review of gate-failure fixes F1-F2, 2026-10-10, `reviewer`, claude-opus-5-5, fresh context
+
+Scope: commit 8dd726c only. I read the diff, the newest `## Log` entries, `lpcstudy/provenance.py`, the `lpcstudy/__main__.py` call site, the WU-0001.5 criterion and DEC-0005 Q1. I ran no tests, because the main session is running the gate.
+
+- **F1: correct.**
+  - `git diff main HEAD -- tests/unit/test_tools_test_impact.py` shows only this test (22+/3−). Nothing else in the WU-0011 file changed.
+  - `test_commands_for_a_tier_directory_are_allowed` now uses an empty `tmp_path` root and asserts that the wrapper is absent. Its exact-equality argv is unchanged in substance.
+  - The new `…_use_the_wrapper_when_it_exists` writes a dummy `tools/run_tests.sh`, never runs it, and asserts the exact argv `[<tmp>/tools/run_tests.sh, "unit", "tests/unit"]`. That argv matches `pytest_commands` (`wrapper.is_file()` → `[str(wrapper), tier, *paths]`), so it is a real check, not a self-comparison.
+- **F2: correct, and still a real test of criterion (k).**
+  - `canonical` asserts that `provenance` exists, then removes only the top-level `provenance` and the `seconds` keys. The rest is still compared bitwise, including `handling` and `config.seed_id`. That is stricter than WU-0001.5, which also removes `handling`.
+  - The provenance block is then compared on its own:
+    - the key sets must be equal;
+    - every key outside `RUN_SPECIFIC` must be equal: `schema`, `seed_id`, `seed_kind`, `label`, `promoted`, `commit`, `dirty`, `git_error`, `preset`, `config`, `python`, `packages`, `platform`, `device`, `jax_x64`, `jax_matmul_precision`, `env`, `complete`;
+    - `argv` must be equal with the `--out` value masked.
+  - Checked against `provenance.collect`/`finish`, `RUN_SPECIFIC` holds exactly the fields that differ by construction: `argv` (out-dir), `start_utc`, `end_utc`, `wall_seconds`, `peak_rss_bytes` (the wrapper's `timeout` parent changes the inherited `ru_maxrss`) and `device_peak_bytes`. No stable field is left uncompared, and no run-specific field is compared. `dirty` and `commit` could only differ if someone commits or edits during the roughly 1 min test; that would fail the test, not hide a defect.
+  - This reading matches DEC-0005 Q1 and plan (k): the WU-0001.4 timestamp, wall-clock and peak-memory fields are removed, and `argv` masking is the one addition, needed because the two out-dirs differ.
+  - A wrapper that passed a different seed or preset would still be caught four times: by `seed_id`, `preset`, `config` (which carries the seed value), the masked `argv`, and the results text itself. A different thread or platform environment would be caught by `env`.
+- **Verdict: approve.** No findings.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
