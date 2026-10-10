@@ -83,6 +83,10 @@ Planner: claude-opus-5-5, 2026-10-10, at `main` = `d6abaa7` (no `tools/test_impa
   - Q5. If a test file under `tests/slow/` or `tests/gpu/` changes, (d) and (g) conflict. The plan lets (g) win and prints an `excluded` line. Confirm.
   - Q6. Two possible owner edits: §4.2 says `--run` goes "through `tools/run_tests.sh`" (the plan delegates when the wrapper exists, else uses the env by hand), and the skill's fallback message would hide tool errors.
 
+### Plan amendment 2026-10-10, claude-sonnet-5-5 (main session), before execution (VV.3)
+
+Q1 to Q6 are answered as recorded in `DEC-0003` (proposed, for owner confirmation): the tool follows DEVELOPMENT_WORKFLOW §4.2 as written; Q2 (also select a test file when a module it imports changes) is NOT implemented and is recommended to the owner; Q3 to Q5 are the planner's readings; Q6 needs no code. No acceptance criterion is changed. The fixture `tests/unit/fixtures/lpcstudy_graph.json` was committed at 37def38 before any tool code.
+
 ## Log
 
 <dated entries: what was done, commands, results, commits>
