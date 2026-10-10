@@ -189,6 +189,14 @@ Result of the .3 run: `46 passed in 8.86s` (exit 0). Self-check: `try`/`except` 
 
 Results of the fix round: unit `152 passed in 20.45s` (exit 0; 139 earlier + 13 net new: hidden modes x7, structure x1, front-end checks x1, unreadable directory x1, PYTEST_* refusals x3, exit 137 x1, minus the replaced `__record` test); integration `2 passed in 119.11s` (exit 0; shared cores, the smoke results.json through the wrapper still equals the direct run after removing `seconds`; `runs/` empty afterwards). Self-check: the `try`/`except` sites are unchanged except the new `onerror` handler (counts and names the directory); no clipping, no randomness, no tolerance changed. No pilot/full/GPU job and no real lock. Commit: "WU-0012 fix R1-R4" (see git log). The Review section is the reviewer's and is untouched; R1 to R4 resolution: fixed in that commit; R5 recorded above for the owner.
 
+### Resolution of findings, 2026-10-10, claude-sonnet-5-5 (main session)
+
+- **R1 (high), R2, R3, R4: fixed in 6330c78** (re-review: all fixed, approve; the reviewer read the whole script and probed it in a scratch root).
+- **R5 (for the owner, no code change here):** `.claude/settings.json` and the hook still allow the old `flock ... python -m lpcstudy --preset` command form, and GPU-tier test runs are not counted in the weekly 60 GPU-hours. Both are `.claude/` edits.
+- **Residual risk the reviewer noted for the owner's review before the freeze:** someone who controls the environment can still get around the wrapper (a fake `flock` or `python3` on PATH, `BASH_ENV`, exported functions, `LPC_GPU_LOCK`, `LPC_PYTHON`). The plan allows these and the tests rely on them.
+- **Owner review needed before the freeze** (the seed check, `run.meta.json`, and the 60 h enforcement in `gpu_hours.py`). `DEC-0005` is **proposed**.
+- **Merge gate not yet run.** It runs once, on the tree that includes the merged WU-0001 (so the whole unit and integration set runs on what will be on `main`), after the owner authorizes the merges.
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-10. Reviewed diff `main...HEAD` (557e074, dbca55e, c831aa6 on plan 1639d96), against the plan, DEC-0005, DEVELOPMENT_WORKFLOW §2.3/§4.5/§4.6/§4.9, settings.json, test_gate.py, skill dev-run and `tools/test_impact.py`.
