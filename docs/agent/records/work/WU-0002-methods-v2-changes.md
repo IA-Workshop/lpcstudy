@@ -374,6 +374,30 @@ Before the smoke run I refined one report string (found while reading the smoke 
 4. Device: `JAX_PLATFORMS=cpu`. 5. Threads: 4; unit 300 s, integration 900 s. 6. Contention: no preset run. 7. Output: `-q --tb=short -rfE`.
 8. Commands: `tools/run_tests.sh unit tests/unit/test_report.py tests/unit/test___main__.py`; `tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`.
 
+#### 2026-10-10 developer (claude-sonnet-5-5), WU-0002.2: radius re-run and the smoke regression (d), (e)
+
+Re-run after the report wording change: `tools/run_tests.sh unit tests/unit/test_report.py tests/unit/test___main__.py`: `41 passed in 1.55s`; integration (`test_cli_seeds.py`, `test_preset_wrapper.py`): `10 passed in 137.25s (0:02:17)`. Summary of the .2 evidence: unit radius `201 passed, 1 failed` (the failing test fixed with `--lf`, `1 passed`), then `41 passed`; integration `10 passed` twice (once per code state). No test removed. Edited existing tests in .2: `tests/unit/test_tools_test_impact.py::test_fixture_schema` (module count 20 -> 21 and its docstring, as the plan says: a count of modules, not a tolerance; the independent part, `sorted(graph) == stems`, is unchanged). `test_report.py` and `test_identifiers.py` only gained new tests.
+
+Smoke regression (d). Clean committed tree at `5cd25e97` (`git status --porcelain` empty; no preset run active; the first smoke run of this sub-task, at `ce92c610`, was discarded because the report wording changed after it; this is the single retained run). Baseline sha256 re-checked `0da48771ee967525f71518d4bb6e7aec675349ff175a2d4544234d4f8f084b79` (matches). Run once, CPU, `tools/run_preset.sh smoke DEV-0 runs/dev/wu0002-2` (exit 0, 64 s study time). Comparison: one-off script (scratchpad, not committed) that applies, to the baseline only, the .1 deletions and then `lpcstudy.identifiers.V1_KEY_MAP` to `systems.*` and `verdicts`:
+
+- Stripped as before: `seconds` 5 in each file; `provenance` 1 and `config.seed_id` 1 in the new file only.
+- Deleted from the baseline (leaves; 286 in all): the 278 of .1 (`systems.lorenz63.shift` 20, `scores.A4f` 14, `km_curves.A4f` 240, `oracle_recovery.mse_at_href.A4f` 1, `H2d.shift_wins_A4_over_A3`, `shift_cells`, `shift_pass` 1 each; the `config.transfer_*` keys hold empty lists, 0 leaves); plus v1 `H3b.{loglog_slope, p_eff, threshold, pass}` 4; verdict v1 `H1a` (now `V7`, no verdict) 2; verdict v1 `H3b` 2.
+- Moved: v1 `H3b.{regret_ratio_by_K, realized_K}` to `regime_curve`, 6 leaves.
+- Renamed keys only (121 leaf positions, values compared): `systems.lorenz63` v1 `H1a` to `V7` (8), `H1b` to `H1a` (11), `H1c` to `H1b` (11), `H1d` to `H1c` (17), `H1e` to `H1d` (7), `H1f` to `Q-N` (27), `H2e` to `gain_bound` (6), `H3c` to `H3b` (10), `H3d` to `H3c` (3); verdicts `H1b`..`H1f`, `H2e`, `H3c`, `H3d` to their v3 keys (16); the `n_lib` keys `mean_seed_by_N` (2), `median_w_by_N` (2), `median_at_largest_N` (1) (these are nested inside the H1a/H2b results and counted again in their rows).
+- Text excluded from both sides: `systems.lorenz63.H2b.threshold` (old: "... for N at each rho; median w*(N_max) < 0.95 ..."; new: the same with `n_lib`, `n_lib max`).
+- `H2d.pass`: baseline `false` = `in_distribution_pass` `false`; new `false` (asserted equal).
+- Result: `json.dumps(sort_keys=True, allow_nan=True)` texts **equal** (56646 characters each). The remaining 3307 leaves (3236 numbers, 49 booleans, 22 strings) are bitwise equal; no path differs; no tolerance.
+
+(e) Key check on the smoke output: the hypothesis-shaped keys of `systems.lorenz63` are `H1a H1b H1c H1d H2a H2b H2c H2d H3a H3b H3c Q-N`, all keys of the table; `V7`, `regime_curve` and `gain_bound` are present; `H2e` is absent (not computed). The `verdicts` keys are the 13 table keys that have a result (no `H2e`, no `V7`). The 14 first-column ids of the `RESULTS.md` verdict table equal the table's v3 ids in order (`H1a H1b H1c H1d Q-N H2a H2b H2c H2d H2e (reported) H3a H3b H3c`); the `H2e` row reads `[not computed until WU-0002.7] | n/a: no result | no result`. Gate `gate_pass` true; the four figures are written; `run.log` cell lines read `n_lib=10000`. Provenance: `seed_id` DEV-0, `complete` true, `dirty` false, commit `5cd25e97`.
+
+Greps: `grep -rn "H1f\|H3d\|H1e\|H2f\|T1" lpcstudy/` finds only `identifiers.py` (the table rows, `V1_KEY_MAP` and the `check_keys` docstring and code: historical data of the map, DEC-0007 answer 1). The `N` that is noise sensitivity and `oracle.py:50` are unchanged. Self-check of the diff `develop...HEAD`: no `clip|nan_to_num|isfinite|where(|try:|except` and no `default_rng|random.|PRNGKey` added in `lpcstudy/`; no tolerance in an existing assert grew; new tolerances: `abs=1e-12` in the H2d test only.
+
+Open points for the reviewer and the owner (unit status not set):
+1. The `pending` marks cover only the rows a ROADMAP row names (H1c, H2a, H2c, v3 H3b and the gain bound are unmarked although their statistics or verdicts may change under the concordance referral).
+2. The `check_keys` guard and the `(reported)` v3 id of the gain bound are my choices within the plan (Log above).
+3. WU-0002.8's "no `H3b` key exists anywhere in results" now collides with v3 `H3b` (ruling A2 pending, DEC-0007).
+4. Owner checkpoint: `__main__` option set and `tools/run_preset.sh` (.1); T1 branch, H2d `pass`, verdict code (.1, .2).
+
 ## Review
 
 ## Audit
