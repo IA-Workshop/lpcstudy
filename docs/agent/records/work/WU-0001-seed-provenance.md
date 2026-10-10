@@ -492,6 +492,29 @@ The fixture matches. `lpcstudy/*.py` has 20 stems, so the count edit 18→20 rec
 
 **Verdict: approve with fixes** (R1 to R4; R1 needs the applied-mathematician's confirmation).
 
+### Re-review, 2026-10-10, reviewer (claude-opus-5-5), fix round 1 (commit `80dbb57`)
+
+This round covers R1 to R4 only. I read the diff `dae50c5..80dbb57` and the logs and ran no tests, as instructed. The developer's log records the radius run `97 passed in 11.43s`.
+
+- **R1 fixed.** `tests/unit/test_provenance.py` asserts exactly what the applied-mathematician recommended (Log, "Mathematics review of the peak-RSS tolerance"):
+  - `peak > 0` is kept;
+  - `peak % page == 0` is exact;
+  - the bracket is `1024·before − 2T ≤ peak ≤ 1024·after + 2T`, with `T = 3·online·(max(32, 2·online) − 1)·pagesize` and `online = os.sysconf("SC_NPROCESSORS_ONLN")`.
+
+  The launcher-peak limitation is documented in the test docstring and in the `provenance.peak_rss_bytes` docstring. The provenance schema is unchanged: only a docstring changed in `provenance.py`. The choice is recorded as DEC-0006 (proposed) on `main`. My ratio-bracket suggestion was weighed there and declined with a reason (it misses factor-2 errors), which I accept.
+- **R2 fixed.** `lpcstudy/__main__.py:58-64` echoes a dash token's name only if it is one of the parser's own option strings, and prints `<value>` otherwise. The part after `=` is never shown. The new parametrized test covers `-424242424242`, `--424242424242`, `--conf`, `--conf=424242` and `--seed-i`. It asserts one stderr line with the refusal prefix and that no part of the token appears in it. The order is unchanged: `choose_seed` still runs before `out_dir.mkdir` and logging, and returns 64.
+- **R3 fixed.** The 1% bound now applies to `provenance.finish(block, clock)["wall_seconds"]`, with `collect` on the same clock and the reference span around the `finish` call. The 1% tolerance is unchanged.
+- **R4 fixed.** In the fixture, `source_commit` is now `ed6dacb` and the description gains a dated note on the hand edit. The `graph` object is identical to `dae50c5`, which I compared as parsed JSON. Its new-module edges were verified against the imports in round 1.
+
+**Other checks.**
+
+- **Scope.** Only the files these fixes need were changed (`__main__.py`, `provenance.py`, the fixture, `test___main__.py`, `test_provenance.py` and this unit file). The only assertions removed are the two that were replaced (the RSS slack and the `RunClock.elapsed` check). In this unit file, the developer added lines and deleted none, so the round-1 review is untouched.
+- **Safety.** The new diff contains only synthetic numeric literals, introduces no new seed or salt echo, and adds no read of `LPC_CONF_*`. The safety properties from round 1 still hold.
+
+**Owner checkpoint.** These items still stand: **needs owner review before freeze**, owner confirmation of DEC-0004 (on which .5 depends), and owner confirmation of DEC-0006.
+
+**Verdict: approve.**
+
 ## Audit
 
 ### Plan amendment 2026-10-10 (answers to the plan's questions), claude-sonnet-5-5 (main session), before execution (VV.3)
