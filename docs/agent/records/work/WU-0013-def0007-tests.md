@@ -87,10 +87,75 @@
 | #14 partial correlation | `< 0.05` | `< 0.05` |
 | new tests | none | `rel=1e-14`; `atol=1e-12` (Spearman, regret, delay map); `rel=1e-11`, `rel=1e-12` (observability); `rtol=0` with `atol=1e-15` (Holm); `rel=1e-12`, `rel=1e-10` (log-rank); `abs=0.03` (partial correlation); exact equality (clip, horizon) |
 
+- **2026-10-10, WU-0013.2 fix round 1 (R2), pre-run checklist (4.9), run 2** (claude-sonnet-5-5).
+  1. **Change set:** `git status --porcelain`: `M tests/unit/test_embedding.py` (docstring of `test_regression_ami_delay_lorenz_band` only) and this unit file (the uncommitted review section plus this entry). No `lpcstudy/` file.
+  2. **Radius:** rule "test file: that file only": `tests/unit/test_embedding.py`, unit tier; smaller than the whole suite.
+  3. **Already run?** The file ran in run 1 on the previous docstring; this is a changed file (docstring only, no code or assertion change), so one run is allowed.
+  4. **Device:** `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`.
+  5. **Threads and time:** 4 threads; unit timeout 300 s.
+  6. **Contention:** none (no GPU, preset or slow run).
+  7. **Output:** `-q --tb=short -rfE`.
+  8. **Command:** `JAX_PLATFORMS=cpu XLA_PYTHON_CLIENT_PREALLOCATE=false OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 timeout 300 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit/test_embedding.py`.
+  - **Result (R2 fixed, docstring only).** `3 passed in 0.41s`. The docstring of `test_regression_ami_delay_lorenz_band` now says it is a deliberately loose guard that the delay stays within [3, 8] steps, that `select_delay` currently returns 5 steps (0.184 time units), that the band is uncited and wider than the 0.15-0.2 time-unit claim, and that a cited reference (from the `researcher`) would allow tightening and renaming back. Assertion `3 <= delay <= 8` and the test name are unchanged. Committed as "WU-0013.2 fix R2" (test file only; this unit file stays uncommitted because it holds the uncommitted review section).
+
+### Resolution of findings and merge-gate checklist, 2026-10-10, claude-sonnet-5-5 (main session)
+
+- **R1: resolved on `main` at the merge** (the unit branch may not edit `defects.md`): a dated `resolved` line under DEF-0007 naming `docs/agent/records/audits/2026-10-10-def-0007-tests.md`.
+- **R2: fixed in 2e050eb** (docstring wording only). Checked by the main session, not by a second reviewer round: `git show 2e050eb` changes no `assert`, `def`, decorator or assignment line, and an `ast` comparison of `tests/unit/test_embedding.py` before and after, with docstrings stripped, is identical. The AMI delay citation is still missing; it needs the `researcher` (see the Audit notes).
+- **R3: recorded** as a dated status line under DEF-0001 on `main` (commit 1ac0698): `statistics.py:61` and `:95-96` are uncounted silent cases for WU-0002.11. Not fixed here: statistics code needs owner review.
+
+Merge-gate checklist (§4.9, §4.3):
+
+1. **Change set:** `git diff --name-only main...HEAD`: the audit file, this unit file, and `tests/unit/test_{allocation,analysis,dynamics,embedding,ensemble,oracle,statistics}.py`. `git status --porcelain` is empty after the commit that carries this entry.
+2. **Radius:** the merge gate of §4.3, tiers `unit` and `integration`, by the main session: `tests/unit tests/integration`.
+3. **Already run?** The 7 edited files ran 3 times in all (developer 29 passed; reviewer 29 passed; the R2 docstring fix 3 passed). The full unit and integration set has not run on this code. This gate is that run, once.
+4. **Device:** `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`.
+5. **Threads and time:** `LPC_THREADS=4`, `OMP/MKL/OPENBLAS_NUM_THREADS=4`, `timeout 900` (other agents share the 4 cores).
+6. **Contention:** no preset running; no GPU use.
+7. **Output:** `-q --tb=short -rfE`.
+8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
+
 ## Review
 
-- **Reviewer:** <actor, not the author>
+- **Reviewer:** `reviewer`, claude-opus-5-5, a fresh context (not the WU-0013.2 author, and not the WU-0013.1 audit context, although it is the same model id). 2026-10-10, worktree `wu/0013-def0007-audit` at `752b0a5` against `main`.
+  - **Radius run (once, independent).** The 7 edited files under `tests/unit`, unit tier, run on CPU with 4 threads and no `LPC_GATE`: `29 passed in 4.66s`. The slowest test is the pre-existing `test_regression_observability_matches_ad_jacobians` at 3.07 s, so every test is under 5 s.
+  - **Literals (criterion 2), checked line by line in `git diff main...HEAD`.** No numeric literal in an `assert` or `approx` of the 14 original tests changed, and none grew. The same holds for the seeds (2, 5, 0, 1, 8, 3, 4, 6), sample sizes, ranges, `3 <= delay <= 8`, `== 500`, `max_lag` 60/500, grid 2001 and `rel=1e-8`. The developer's table is correct.
+  - **Bodies (criterion 3).** Apart from the docstrings, the only changes are the following:
+    - #1: the reference is now the inline `delta**2 / (eps**2 + delta**2)`, numerically the same value as before.
+    - #4: renamed `test_regression_*`, with the body unchanged.
+    - #6: split into two tests. Both original assertions are kept verbatim, with the same setup.
+    - Imports were added.
+  - **#6a classification.** Labeling it a regression guard is correct under the plan's rule and audit item 2, because the band has no verifiable source.
+  - **Error figures (criterion 1), recomputed by me in scratch NumPy.** All agree with the docstrings.
+    - #1: delta-method SE 8.30e-4 (Monte Carlo check 8.2e-4), so the tolerance is 6.0 SE.
+    - #2: SE 5.80e-4 and 1.72e-3, so the tolerances are 34.5 and 29.0 SE. They are loose, but true and not grown.
+    - #7: relative SE 1.89e-3, so the tolerance is 10.6 SE; bias -2.5e-5.
+    - #11: Greenwood SE peaks at 2.34e-3 at H = 8 and is 1.74e-3 at H = 40, with 20.5 at risk.
+    - #12: expected chi-square 112.6, p 2e-26.
+    - #14: SE 0.01415, so the tolerance is 3.5 SE; the nonzero case is 4.24 SE.
+    - Lorenz states, via `jax.jacfwd` as in the test: cond(A^T A) = 21.3, 28.3, 30.3 and cond(Q) = 6.6e7, 4.6e7, 3.0e7. The observed agreement is 1.5e-16, 0, 3.4e-16, i.e. same-formula agreement, as the docstring now states. The explicit J_G-and-pinv route differs from it by 3e-10 to 2e-9 because of cond(Q).
+    - The linear pinv system: cond(A) 2.85, cond(A^T A) 8.11, cond(J_G) 1.58, cond(Q) 1.90, rank 3.
+    - Clip test: w* = -0.362, with SE 0.0077.
+  - **Hand log-rank check.** I redid it by hand:
+    - t = 1: O-E 1/2, V 1/4.
+    - t = 2: O-E 5/7, V 24/49.
+    - t = 3: O-E -1/2, V 1/4. A's censored subject is at risk at t = 3 but is not an event.
+    - t = 4: n = 1, skipped.
+    - So the sum of O-E is 5/7, the sum of V is 97/98 and chi2 = 50/97. chi2.sf(x, 1) = erfc(sqrt(x/2)) = erfc(sqrt(25/97)) = 0.47278. Without the tie factor, p = 0.540. The derivation is correct.
+  - **SciPy reference.** `scipy.stats.logrank` (pinned 1.18.1, already a dependency) computes its variance as n_x n_y d (n - d) / (n^2 (n - 1)) from `ecdf`. It skips n = 1, as the code does, and so is an independent implementation of the same statistic.
+  - **New tests (criterion 4).** They use closed forms, hand values, brute force, `matrix_power`/`pinv`, raw draws and SciPy. None copies the code's formula, and their tolerances are justified.
+  - **Scope (criterion 5).** The change touches only the 7 test files, the audit and this unit file. Nothing under `lpcstudy/` changed. The commit names the unit and carries the `Agent:` trailer. No owner checkpoint is needed: no verdict, statistics, seed, provenance or dependency code changed.
 - **Findings and resolution:**
+  - **R1 (medium; plan acceptance criterion).** `docs/agent/records/defects.md:55-61` (DEF-0007) has no dated `resolved` line with the audit path. The WU-0013.2 criterion requires one ("DEF-0007 gets a dated `resolved` line with the audit path"), and the diff does not touch `defects.md`. **Fix:** before closing, append `- 2026-10-10: resolved by WU-0013 (audit docs/agent/records/audits/2026-10-10-def-0007-tests.md; #6a left as a regression guard pending citation)`. The line is append-only.
+  - **R2 (low; LPC.PC.21a, `.claude/rules/tests.md` tolerance justification). Owner note.** At `tests/unit/test_embedding.py:279-299`, the docstring of `test_regression_ami_delay_lorenz_band` says the test "pins the current behaviour" (5 steps). The band [3, 8] in fact accepts any change of the selected delay between 3 and 8 steps, and the only justification given for the width is "unchanged". The open citation is recorded only in this unit's Log, with no queue entry and no referral, so it can be lost. **Fix:**
+    - Reword the docstring to say what the guard detects: a selected delay outside 3..8 steps. Do not widen the band. Pinning `== 5`, as audit item 2 suggested ("a pin of the current value"), is a permitted tightening and is the owner's or developer's choice.
+    - Add a queue item or `/refer` so that the `researcher` can obtain the published AMI first-minimum delay for Lorenz-63 x, with its estimator and bin count. Once it is cited, tighten the band to that value and restore the `reference` name.
+  - **R3 (low; PRIME.4, gap in the WU-0013.1 audit). For the main session to triage; no WU-0013.2 action.** The audit's list of silent handling in the code under test misses two cases, and no test covers either branch:
+    - `lpcstudy/statistics.py:95-96`: `logrank_test` returns p = 1.0 when the variance is <= 0 and reports nothing.
+    - `lpcstudy/statistics.py:61`: `kaplan_meier` sets the hazard to 0 when no subject is at risk, and does not count it.
+
+    These belong with the other three observations in the audit's Notes, to be triaged against LPC.PC.21d and DEF-0001. `logrank_test` is statistics code, so any fix needs owner review before the freeze.
+  - **Verdict: approve with fixes.** R1 must be done before the unit closes. R2 is a docstring change plus tracking. R3 needs triage only. Once R1 and R2 are resolved, no re-review of the test code is needed. I found no test among the 14 that still checks the code against itself without being labeled a regression guard.
 
 ## Audit
 
