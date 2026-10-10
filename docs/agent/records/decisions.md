@@ -101,3 +101,18 @@ Dissent and resolution (REPRO.8):
 **Affects:** WU-0012 only. The seed check and `run.meta.json` need owner review before the freeze (planner's note).
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0006: Peak-RSS test tolerance in WU-0001 is derived, not tuned  (2026-10-10, proposed by claude-sonnet-5-5 (main session) on the applied-mathematician's analysis; for owner confirmation)
+
+**Decision.** The fixed criterion for `peak_rss_bytes` is `> 0` (ROADMAP WU-0001.4). The extra bracket against the kernel's `VmHWM` in `tests/unit/test_provenance.py` uses the bound derived by the applied-mathematician (claude-opus-5-5; derivation, probes and assumptions in the `## Log` of `docs/agent/records/work/WU-0001-seed-provenance.md`):
+
+- `peak % pagesize == 0`, exact (the kernel reports whole pages);
+- `1024*before - 2*T <= peak <= 1024*after + 2*T`, where `T = 3 * online * (max(32, 2*online) - 1) * pagesize` is the worst-case error of the kernel's three per-CPU RSS counters (about 24.8 MB on this 32-CPU machine), with `online = os.sysconf("SC_NPROCESSORS_ONLN")`.
+
+This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB), which the applied-mathematician found not valid: it covers one counter, not three, and uses `os.cpu_count()`, which an environment variable can override. The new bracket is wider than the developer's, but narrower than nothing: the planner's zero-slack bracket was never true of the kernel. It still catches a KiB-for-bytes error (1024x), a 4096x error and any factor-2 error; it cannot catch a one-page additive error (the kernel's own noise is about a thousand pages).
+
+**Alternatives weighed.** *The reviewer's ratio bracket 0.5x to 2x:* valid on this machine, but misses factor-2 errors and also depends on the counters. *Only `peak > 0`:* what the criterion requires, but it would not catch a unit error.
+
+**Affects:** WU-0001.4's test only. Separate finding, not a decision: a child process inherits its parent's peak in `ru_maxrss` (a child of a 200 MB Python reported 218 MB against its own `VmHWM` of 11 MB), so a recorded `peak_rss_bytes` can reflect the launcher's peak. WU-0001 documents this limitation; whether to also record `VmHWM` is for the owner (it changes the provenance schema).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
