@@ -253,6 +253,8 @@ Checklist for run 2 (§4.9):
 7. Output: `-q --tb=short -rfE`.
 8. Command: `tools/run_tests.sh integration tests/integration/test_preset_wrapper.py::test_smoke_through_the_wrapper_matches_a_direct_run`.
 
+Result of the F3 run: `1 passed in 93.89s` (exit 0; the three `git status --porcelain` snapshots were identical, with the edited test file as the only change, and all earlier comparisons held). Nothing else was run. Commit: "WU-0012 fix gate F3" (see git log).
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-10. Reviewed diff `main...HEAD` (557e074, dbca55e, c831aa6 on plan 1639d96), against the plan, DEC-0005, DEVELOPMENT_WORKFLOW §2.3/§4.5/§4.6/§4.9, settings.json, test_gate.py, skill dev-run and `tools/test_impact.py`.

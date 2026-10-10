@@ -54,6 +54,13 @@ def canonical(path: Path) -> str:
     return json.dumps(strip_wall_clock(document), sort_keys=True)
 
 
+def tree_state() -> list[str]:
+    """Return ``git status --porcelain`` (untracked files included) of the repository, as lines."""
+    done = subprocess.run(["git", "-C", str(REPO), "status", "--porcelain"], capture_output=True,
+                          text=True, timeout=60, check=True)
+    return done.stdout.splitlines()
+
+
 def mask_out(argv: list[str]) -> list[str]:
     """Return argv with the value after ``--out`` replaced by a placeholder."""
     masked = list(argv)
@@ -73,8 +80,10 @@ def test_smoke_through_the_wrapper_matches_a_direct_run() -> None:
     """The smoke preset on CPU through the wrapper gives the same results.json as a direct run.
 
     The wrapper must also return 0 and write a ``run.meta.json`` with exit code 0 and device
-    ``cpu``. Seed: DEV-0 (the CLI default, 20261005); if the CLI already has ``--seed-id``, both
-    invocations pass ``--seed-id DEV-0``.
+    ``cpu``. The test also records ``git status --porcelain`` before the direct run, after it and
+    after the wrapped run and fails with that difference if the working tree changed meanwhile
+    (the provenance ``dirty`` flag would differ for a reason outside the code). Seed: DEV-0 (the CLI default, 20261005); if the CLI
+    already has ``--seed-id``, both invocations pass ``--seed-id DEV-0``.
     """
     suffix = uuid.uuid4().hex[:8]
     base = REPO / "runs" / f"test-preset-wrapper-{suffix}"
@@ -88,16 +97,24 @@ def test_smoke_through_the_wrapper_matches_a_direct_run() -> None:
             [sys.executable, "-m", "lpcstudy", "--help"], cwd=REPO, env=env, capture_output=True,
             text=True, timeout=120, check=True).stdout
         seed_args = ["--seed-id", "DEV-0"] if "--seed-id" in help_text else []
+        state_before = tree_state()
         direct = subprocess.run(
             [sys.executable, "-m", "lpcstudy", "--preset", "smoke", "--out", str(direct_out),
              *seed_args], cwd=REPO, env=env, capture_output=True, text=True,
             timeout=RUN_LIMIT_SECONDS, check=False)
         assert direct.returncode == 0, direct.stderr[-2000:]
+        state_direct = tree_state()
         wrapped = subprocess.run(
             [str(REPO / "tools" / "run_preset.sh"), "smoke", "DEV-0", str(wrapped_out)],
             cwd=REPO, env=env, capture_output=True, text=True, timeout=RUN_LIMIT_SECONDS,
             check=False)
         assert wrapped.returncode == 0, (wrapped.stdout[-1000:], wrapped.stderr[-2000:])
+        state_wrapped = tree_state()
+        assert state_before == state_direct == state_wrapped, (
+            "the working tree changed during the test, so the provenance fields 'commit' and "
+            "'dirty' of the two runs cannot be compared; rerun with a quiet tree. "
+            f"before the direct run: {state_before}; after it: {state_direct}; "
+            f"after the wrapped run: {state_wrapped}")
         direct_text = canonical(direct_out / "smoke" / "results.json")
         wrapped_text = canonical(wrapped_out / "smoke" / "results.json")
         assert wrapped_text == direct_text
