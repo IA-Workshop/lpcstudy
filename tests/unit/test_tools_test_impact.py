@@ -17,7 +17,9 @@ through) so that the tool is checked for what it would run.
 from __future__ import annotations
 
 import importlib.util
+import json
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -26,6 +28,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+FIXTURE = ROOT / "tests" / "unit" / "fixtures" / "lpcstudy_graph.json"
 
 _SPEC = importlib.util.spec_from_file_location("test_impact", ROOT / "tools" / "test_impact.py")
 assert _SPEC is not None and _SPEC.loader is not None
@@ -515,7 +518,51 @@ def test_syntax_error_in_package_exits_two(repo: Path, capsys) -> None:  # noqa:
     assert "leaf.py" in capsys.readouterr().err
 
 
-# ---------- the real package ----------
+# ------------------------------------------------------------ WU-0011.2: the real package
+
+
+def test_graph_equals_hand_derived_fixture() -> None:
+    """The tool's graph of ``lpcstudy/`` equals the hand-derived fixture exactly (WU-0011.2).
+
+    Reference: ``tests/unit/fixtures/lpcstudy_graph.json``, the independent reference
+    (LPC.PC.21a): derived by the planner by reading the ``from .x import`` statements of each
+    module, including function-level imports, before the tool existed (git history: the
+    fixture is committed before the tool). Update the fixture by hand in the same change as any
+    import edit, never from tool output. A change to the import graph fails this test until
+    then. Tolerance: none, exact equality of a discrete mapping.
+    """
+    expected = json.loads(FIXTURE.read_text())["graph"]
+    assert tool.build_graph(ROOT / "lpcstudy") == expected
+
+
+def test_fixture_schema() -> None:
+    """The fixture has the 18 module stems as keys and sorted lists of keys as values.
+
+    Reference: the file listing of ``lpcstudy/`` (``*.py`` stems) and the schema of the plan.
+    """
+    data = json.loads(FIXTURE.read_text())
+    assert set(data) == {"description", "source_commit", "graph"}
+    graph = data["graph"]
+    stems = sorted(path.stem for path in (ROOT / "lpcstudy").glob("*.py"))
+    assert sorted(graph) == stems and len(stems) == 18
+    for deps in graph.values():
+        assert deps == sorted(set(deps)) and set(deps) <= set(stems)
+
+
+def test_function_level_import_is_an_edge(tmp_path: Path) -> None:
+    """The comparison is sensitive: a function-level import adds exactly one edge.
+
+    Reference: the fixture. A copy of the package gets
+    ``def _probe(): from .config import StudyConfig`` appended to ``embedding.py``; the graph
+    must then differ from the fixture by exactly ``embedding -> config``. Exact equality.
+    """
+    pkg = tmp_path / "lpcstudy"
+    shutil.copytree(ROOT / "lpcstudy", pkg, ignore=shutil.ignore_patterns("__pycache__"))
+    with (pkg / "embedding.py").open("a") as handle:
+        handle.write("\n\ndef _probe():\n    from .config import StudyConfig\n    return StudyConfig\n")
+    expected = json.loads(FIXTURE.read_text())["graph"]
+    expected["embedding"] = ["config"]
+    assert tool.build_graph(pkg) == expected
 
 
 def test_selection_runtime_on_the_real_package_is_under_one_second() -> None:
