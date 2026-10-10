@@ -197,6 +197,19 @@ Results of the fix round: unit `152 passed in 20.45s` (exit 0; 139 earlier + 13 
 - **Owner review needed before the freeze** (the seed check, `run.meta.json`, and the 60 h enforcement in `gpu_hours.py`). `DEC-0005` is **proposed**.
 - **Merge gate not yet run.** It runs once, on the tree that includes the merged WU-0001 (so the whole unit and integration set runs on what will be on `main`), after the owner authorizes the merges.
 
+### Merge gate, 2026-10-10, claude-sonnet-5-5 (main session), checklist before the run (§4.9, §4.3)
+
+Merges to `main` authorized by the owner (this session). `main` (with WU-0001, WU-0010, WU-0011, WU-0013, WU-0014) merged into the branch so the gate runs on what will be merged.
+
+1. **Change set:** `git diff --name-only main...HEAD`: `tools/run_tests.sh`, `tools/run_preset.sh`, `tools/gpu_hours.py`, `tests/unit/test_tools_run_tests.py`, `test_tools_run_preset.py`, `test_tools_gpu_hours.py`, `tests/unit/wrapper_helpers.py`, `tests/integration/test_preset_wrapper.py`, this unit file. `git status --porcelain` is empty after the commit that carries this entry.
+2. **Radius:** the merge gate of §4.3, tiers `unit` and `integration`, by the main session: `tests/unit tests/integration`.
+3. **Already run?** The wrapper test files ran as radius sets (developer 152 and 2 passed; reviewer 139 passed), but never together with the rest of the unit and integration set on this merged tree. This gate is that run, once.
+4. **Device:** `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`.
+5. **Threads and time:** `LPC_THREADS=4`, `OMP/MKL/OPENBLAS_NUM_THREADS=4`, `timeout 900`.
+6. **Contention:** no other agent running; no preset running; no GPU use; the real lock is never taken by the tests.
+7. **Output:** `-q --tb=short -rfE`.
+8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-10. Reviewed diff `main...HEAD` (557e074, dbca55e, c831aa6 on plan 1639d96), against the plan, DEC-0005, DEVELOPMENT_WORKFLOW §2.3/§4.5/§4.6/§4.9, settings.json, test_gate.py, skill dev-run and `tools/test_impact.py`.
