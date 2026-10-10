@@ -108,6 +108,11 @@ Each is one commit: "WU-0005.k: …", ending `Agent: <model id>`.
 
 **Open question for the researcher:** which normalization does Levina & Bickel (2005) use: 1/(k − 1) or k − 2 (MacKay–Ghahramani)? And is the global estimate a mean of m̂ or the inverse of a mean of inverses? v3 cites LB 2005 [U], and the code uses k − 2 and the median. This does not block .3 at ±10%, but it bears on Q2.
 
+
+### Plan amendment 2026-10-10 (before the fix round), claude-sonnet-5-5 (main session), on review finding R2
+
+Two tests go beyond the applied-mathematician's confirmed assertions, and the review asked for a recorded decision: (1) the nonlinear scalar RK4 test (y' = y², y0 = 0.5, T = 1), which the mathematician offered as an addition ("could add") and left to the main session; (2) the characterization of the median of the per-query Levina-Bickel estimates (the code's aggregator over states is a median, not the published arithmetic mean). **Both are accepted** as additional checks; neither loosens or replaces a criterion, both use tolerances the mathematician justified, and both were found sound in review. The median test's docstring is to claim only what it does: it pins the median of the per-query distribution against the exact Gamma law, not the callers' aggregation. See also the review's note on `lpcstudy/oracle.py:62` (an uncounted clamp), now a status line under DEF-0001 on `develop`.
+
 ## Log
 
 <dated entries: what was done, commands, results, commits>
@@ -186,8 +191,46 @@ Tolerances fixed before the run: mean `abs(mean/m - 1) <= 0.03`; median `abs(med
 
 ## Review
 
-- **Reviewer:** <actor, not the author>
+- **Reviewer:** reviewer (claude-opus-5-5), fresh context, 2026-10-10. Scope: WU-0005.1 to .3 (commits 40cf427, d6db030, 52e8a2a, 718580a) against `develop`. The unit stays open for .4 and .5.
+- **Blast radius (hand-derived, rule "test file: that file only", no `lpcstudy/` change), run once:** `tools/run_tests.sh unit --durations=8 tests/unit/test_ensemble.py tests/unit/test_systems.py tests/unit/test_oracle.py` gives `19 passed in 2.27s` (slowest 0.33 s; every case is under 5 s).
+- **Independent recomputation (scratch script outside the repo, not a test run).**
+  - **RK4.** A pure-NumPy RK4 against `expm` gives errors 6.94e-5, 4.21e-6 and 2.59e-7, orders 4.042 and 4.024, and a leading-term residual of 0.0425.
+  - **y' = y².** Errors 2.90e-6, 1.84e-7 and 1.16e-8, orders 3.975 and 3.993.
+  - **Levina-Bickel and the tree.** The constant is 18/med Γ(19) = 0.96423. At seed 50053, mean/m − 1 = −0.0043, −0.0026 and +0.0067. The smallest relative gap in the tree test is 1.75e-4.
+  - **Agreement.** All of these match the docstrings and the log.
+- **Mutation probes** (monkeypatched in the scratch script; nothing in the repo changed). Every mutant is caught by at least one test in the radius:
+  - substeps + 1: caught by both order tests;
+  - `floor` for `ceil`, and dt = max_dt: caught by `test_flow_step_respects_max_dt`;
+  - k4 built from k2: caught by both order tests;
+  - LB numerator k − 1, skipping the nearest neighbour, and k − 1 neighbours: caught by the mean test and the median test, for every m;
+  - tree, skipping the nearest neighbour, and index + 1: caught for k = 1, 2 and 5.
+- **Checks that pass.**
+  - The references are independent: `expm`, the closed form 1/(1/y0 − t), brute force with `argsort(kind="stable")`, and the exact Gamma law with `scipy.stats`.
+  - The tolerances are exactly the confirmed ones or tighter: [3.9, 4.1] for both pairs, the vector leading-term check within 10%, exact indices, rtol 1e-12 with atol 0, and 3% on the mean.
+  - Seeds are literal `default_rng`, used for test data only. float64 is asserted.
+  - Only three test files changed, and no lines were removed. Nothing changed under `lpcstudy/`, and no `lpcstudy` imports changed.
+  - d6db030 changes only docstring text, with no code or tolerance change.
+  - The commits name the unit and carry `Agent:`.
+  - The y' = y² test is legitimate: it uses a lambda `field_fn` in a test-built `SystemSpec`, and its band is the mathematician's.
+  - The claim that the published aggregator is the arithmetic mean (eq. 9) agrees with the research note.
+  - The median test is correctly not named `test_regression_*`, because its reference is the exact Gamma law and not the code's own output. Its docstring says honestly that a 3% bound about 0.964m does not separate the median from m (+3.7%, about 1 sd beyond).
+  - No owner checkpoint: the change is test-only.
 - **Findings and resolution:**
+  - **R1 (low, accuracy of evidence). `tests/unit/test_systems.py:81-83` (and the "Limitation" sentence at :59-61).**
+    - **What.** The docstring says that y' = y² exercises "the nonlinear conditions ... all".
+    - **Why it matters.** For f = y², f''' ≡ 0, so the elementary differential of the bush tree, f'''(f, f, f), vanishes. The condition Σ bᵢcᵢ³ = 1/4 therefore never enters the error. The other three order-4 trees all have F(t) ∝ y⁵, so a single scalar ODE checks only one weighted sum of their defects. The equivalence "scalar = system up to order 4" holds for the class of scalar ODEs, not for one f. The applied-mathematician's log entry carries the same overstatement.
+    - **Fix.** Reword both docstrings to say the test exercises Σ bc² = 1/3 and one combination of the non-tall order-4 conditions, and not Σ bc³ = 1/4. No assertion or tolerance changes. A field with f''' ≠ 0 would need the mathematician's confirmation first and is optional.
+  - **R2 (low, scope and records, LPC.PC.1).** Two tests are beyond the confirmed assertions, with no recorded decision.
+    - **What.**
+      - `test_rk4_observed_order_nonlinear_scalar` (`test_systems.py:78`) was marked "Optional (main session decides)", and no decision is in `## Log`.
+      - `test_local_dimension_median_poisson_value` (`test_oracle.py:229`): the mathematician's Q2 answer was "Use the mean", and the final assertion is the mean only. The median bound is the planner's proposal, supported by the mathematician's numbers.
+    - **Why it matters.** The definition of done says "the three tests below". The additions are sound and tighten nothing wrongly, but the plan does not cover them.
+    - **Fix.** The main session adds a dated plan amendment or log decision accepting both tests, with their tolerances, before close. Also trim the median docstring's first sentence: the test computes `np.median` itself and pins the median of the per-query law. It does not exercise the callers' (H1b, `analysis.py:102`) aggregation.
+  - **R3 (low, provenance wording). `tests/unit/test_ensemble.py:48-49`.**
+    - **What.** The docstring says the 1.8e-4 gap was "measured before the test was fixed". The developer's log says it was measured by a scratch script after the run, and the docstring was corrected in d6db030.
+    - **Fix.** Reword it as "measured after the first run; the premise threshold 1e-9 was fixed in the plan".
+- **Observation (not a finding, outside this diff).** `lpcstudy/oracle.py:62`, `np.maximum(dist, 1e-300)`, is an uncounted clip (PRIME.4). It is pre-existing, and the interior premise of these tests never triggers it. It belongs to the main session's queue, not to this unit.
+- **Verdict: approve with fixes** (3 findings, all low; no code defect; no criterion loosened).
 
 ## Audit
 
