@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | in progress |
+| Status | done |
 | Class | CSQ3 development |
 | Agent(s) | claude-sonnet-5-5 (main session) under governance ledger entry 5 (authorizations 4, 6) |
 | Estimate | 3 sub-tasks, each S (ROADMAP.md §2) |
@@ -228,6 +228,8 @@ DEC-0002 confirmed by the human owner in chat (recorded in `decisions.md`); R4 i
 7. **Output:** `-q --tb=short -rfE`.
 8. **Command:** `LPC_GATE=merge timeout 600 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration` with the variables above set by hand.
 
+Result (same entry): `LPC_GATE=merge`, command as in item 8, committed tree (`git status --porcelain` empty): **`20 passed in 75.57s (0:01:15)`** = 14 moved tests + 5 marker tests + 1 smoke integration test. Run once; no failures; no retry.
+
 ## Review
 
 - **Reviewer:** reviewer, claude-opus-5-5, fresh context, 2026-10-10. Reviewed `git diff main...HEAD` (8045928, 0bd0b1c, 3cae35c, 6e306b3 on top of plan 4ea348c and merge 8967757) against the plan, amendment Q1–Q4, ROADMAP §2 rows and DEVELOPMENT_WORKFLOW §2.3, §4.
@@ -274,9 +276,17 @@ Scope: R1–R3 only, as of commit ff945e9 (`git show ff945e9`) and the developer
 
 ## Audit
 
-- Is the definition of done met? Give the evidence.
-- Defects recorded:
+- Is the definition of done met? Yes, with the evidence below (ROADMAP.md §2 criteria as amended by DEC-0002, confirmed by the owner):
+  - **WU-0010.1:** `pytest.ini` registers `unit`, `integration`, `slow`, `gpu` with `--strict-markers`; `tests/conftest.py` applies the tier from the directory, rejects a marker that differs from the directory (R1), and refuses explicit GPU requests outside `tests/gpu/`; collect check in the Q1 form: 18 collected at that point (developer log); 5 marker tests in `tests/unit/test_conftest_markers.py` (k = 5).
+  - **WU-0010.2:** 14 tests collected from the seven moved files; ast and AST identical to `main:tests/test_core.py` for all 14 tests and the helper, by the developer and, independently, by the reviewer (twice); `tests/test_core.py` removed; `tests/unit` passes.
+  - **WU-0010.3:** `tests/integration/test_smoke_pipeline.py`: smoke preset on CPU into `tmp_path`, default seed DEV-0, asserts the four outputs and that `systems.<sys>.validation.gate.gate_pass` is a bool; wall-clock about 67 s (limit 5 min); excluded from the unit tier by marker.
+  - **Gate:** `20 passed in 75.57s` at the merge gate; independent review approved after one fix round (R1 to R3 fixed in ff945e9, R4 closed by DEC-0002).
+- Defects recorded: none opened. Known limits of the GPU guard are documented in `tests/conftest.py` and the review (R1, R2 of the plan: implicit default-device use and names bound at import are not caught; `JAX_PLATFORMS=cpu` is the primary control).
 - Notes for successors:
+  - Text that still names `tests/test_core.py` as the live suite is now stale: `.claude/rules/test-discipline.md:18`, `.claude/skills/test-impact/SKILL.md:27`, DEVELOPMENT_WORKFLOW.md lines 89 and 138, ROADMAP.md line 11. Agents cannot edit these; the owner updates them.
+  - The smoke integration test depends on DEV-0 staying the default seed; WU-0001.1 must keep that or update the test in the same change (plan risk R4).
+  - The hook `test_gate.py` blocks any Bash command that contains the word `pytest` outside a test invocation, such as inside a heredoc or a `pgrep` pattern; write log text with the Edit tool.
+  - Optional comment-only improvement to the guard docstring (name the only wrapped entry points, `jax.devices` and `jax.local_devices`, and that child processes are unguarded): do it in the next change to `tests/conftest.py`.
 
 ## Referral
 
