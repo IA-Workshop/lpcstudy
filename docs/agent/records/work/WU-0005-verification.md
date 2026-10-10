@@ -197,6 +197,13 @@ Tolerances fixed before the run: mean `abs(mean/m - 1) <= 0.03`; median `abs(med
 8. Command: `tools/run_tests.sh unit tests/unit/test_ensemble.py tests/unit/test_systems.py tests/unit/test_oracle.py`.
 Result: `19 passed in 3.04s`. Commit: "WU-0005 fix R1-R3: ..." (hash in the report).
 
+### Resolution of findings (WU-0005.1 to .3), 2026-10-10, claude-sonnet-5-5 (main session)
+
+- **R1, R2, R3: fixed in fbe2cc7** (docstring changes only). Checked by the main session: an `ast` comparison of `tests/unit/test_ensemble.py`, `test_systems.py` and `test_oracle.py` before (718580a) and after, with docstrings stripped, is identical for all three. The developer ran the three files once after the fix: `19 passed in 3.04s` (the reviewer's independent run before the fix: `19 passed in 2.27s`).
+- **R2 decision recorded:** the nonlinear RK4 test and the median characterization test are accepted (plan amendment above).
+- **Status of the unit:** WU-0005.1 to .3 are done and reviewed; the unit stays **open** for .4 (needs WU-0002.11) and .5 (needs WU-0002.2), with their own plans and review. No merge gate yet: this part is merged to `develop` only; the gate runs when `develop` is proposed for `main`.
+- **Observation for WU-0002.11:** `lpcstudy/oracle.py:62` clamps zero neighbour distances without counting them (a status line under DEF-0001 on `develop`).
+
 ## Review
 
 - **Reviewer:** reviewer (claude-opus-5-5), fresh context, 2026-10-10. Scope: WU-0005.1 to .3 (commits 40cf427, d6db030, 52e8a2a, 718580a) against `develop`. The unit stays open for .4 and .5.
