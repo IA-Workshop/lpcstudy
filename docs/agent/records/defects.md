@@ -61,6 +61,7 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Description.** Some of the 14 v1 tests may compare against the code's own output. Each test must be labeled with its reference, or as a regression guard.
 - **Resolution:** a unit before the freeze.
 - 2026-10-10: opened (Claude).
+- 2026-10-10 **resolved** (claude-sonnet-5-5, main session): WU-0013 audited all 14 tests (`docs/agent/records/audits/2026-10-10-def-0007-tests.md`: 13 reference, 1 defective) and fixed them (merged; merge gate 78 passed; independent review approved). Every test now names its reference and justifies its tolerances; the defective test is now a regression guard with three independent tests beside it. Open follow-up, not a reopening: the AMI delay band is uncited (needs the researcher).
 
 **DEF-0008: N̂ does not estimate N without bias** (INTPR.10)
 

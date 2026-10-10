@@ -71,3 +71,5 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
 
 - 2026-10-10, claude-sonnet-5-5 (main session): WU-0014.1 and .2 **done** and merged (concordance reviewed, approve after one fix round; 28 discrepancies: 18 code, 4 gap, 6 document, 1 resolved). WU-0014.3 **waits for the owner's rulings** on the referral (five items).
 - 2026-10-10, claude-sonnet-5-5 (main session): in progress in worktrees under `../lpcstudy-wt/wu/`: WU-0001.1-.5 (`wu/0001-seeds-provenance`), WU-0012.1-.3 (`wu/0012-wrappers`), WU-0013.2 (`wu/0013-def0007-audit`; WU-0013.1 audit done: 13 reference, 1 defective). New defects: DEF-0010 (seeds of 2**32 or more crash scikit-learn; blocks WU-0003), DEF-0011 (fixed literal seed in oracle.py). New proposed decisions awaiting the owner: DEC-0003 to DEC-0005.
+
+- 2026-10-10, claude-sonnet-5-5 (main session): WU-0013 (.1 and .2) **done** and merged (audit: 13 reference, 1 defective; gate 78 passed; DEF-0007 resolved). WU-0001.1-.5 and WU-0012.1-.3 are implemented and in review (fix rounds in progress). New proposed decisions awaiting the owner: DEC-0004 (WU-0001), DEC-0005 (WU-0012), DEC-0006 (RSS test bound).
