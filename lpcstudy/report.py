@@ -86,7 +86,7 @@ def _key_number(key: str, res: dict) -> str:
     r = res[key]
     match key:
         case "H1a":
-            parts = [f"rho={k}: 1/d={_fmt(v['fitted_inverse_dim'])}"
+            parts = [f"rho={k}: 1/d (n_lib fit)={_fmt(v['fitted_inverse_dim'])}"
                      for k, v in r["by_noise"].items()]
             return "; ".join(parts) + f" (1/d_LB={_fmt(1 / r['local_dimension_median'])})"
         case "H1b":
@@ -109,7 +109,7 @@ def _key_number(key: str, res: dict) -> str:
             return f"range {_fmt(r['median_range'])} (CI hi {_fmt(r['range_ci'][1])}); " \
                    f"partial r {_fmt(r['partial_corr'], 2)}"
         case "H2b":
-            lib = "; ".join(f"N@{k}: w*(Nmax)={_fmt(v['median_at_largest_N'], 2)}"
+            lib = "; ".join(f"n_lib@{k}: w*(n_lib max)={_fmt(v['median_at_largest_n_lib'], 2)}"
                             for k, v in r["library"].items())
             return f"rho rank corr {_fmt(r['noise']['mean_state_spearman'], 2)}; {lib}"
         case "H2c":
@@ -350,10 +350,10 @@ def make_figures(results: dict, config: StudyConfig, out_dir: Path) -> list[Path
     for ax, s in zip(axes[0], systems):
         lib = results["systems"][s]["H2b"]["library"]
         for color, (rho, v) in zip(SERIES, lib.items()):
-            sizes = np.array(list(map(int, v["median_w_by_N"])))
-            ax.semilogx(sizes, list(v["median_w_by_N"].values()), color=color, linewidth=2,
+            sizes = np.array(list(map(int, v["median_w_by_n_lib"])))
+            ax.semilogx(sizes, list(v["median_w_by_n_lib"].values()), color=color, linewidth=2,
                         marker="o", markersize=5, label=f"rho = {float(rho) * 100:g}% sigma_x")
-        ax.set(xlabel="Library size N", ylabel="Median w*(H_ref)", ylim=(0, 1),
+        ax.set(xlabel="Library size n_lib", ylabel="Median w*(H_ref)", ylim=(0, 1),
                title=f"{s}: weight vs library size")
         ax.legend(frameon=False, fontsize=7, labelcolor=INK_2)
         _style(ax)

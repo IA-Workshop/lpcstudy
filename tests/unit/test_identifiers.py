@@ -12,7 +12,9 @@ import ast
 import re
 from pathlib import Path
 
-from lpcstudy.identifiers import HYPOTHESIS_TABLE, V1_KEY_MAP
+import pytest
+
+from lpcstudy.identifiers import HYPOTHESIS_TABLE, V1_KEY_MAP, check_keys
 
 ROOT = Path(__file__).resolve().parents[2]
 DECISION_LOG = ROOT / "docs" / "study" / "decision_log_lpc.md"
@@ -151,3 +153,16 @@ def test_no_stale_identifier_in_the_package() -> None:
                     found.append((path.name, "not a table key", node.value))
             found += [(path.name, "stale", n[:60]) for n in names if stale.search(n)]
     assert found == []
+
+
+def test_check_keys_accepts_table_keys_and_refuses_stale_ids() -> None:
+    """``check_keys`` passes the 14 table keys, V7 and ordinary keys; it raises on v1/v2 ids.
+
+    Reference: the decision-log map. The ids that left the code are the v1/v2 ids that are not
+    v3 keys: H1e, H1f, H2f, H3d, T1 (and a made-up H9z). Exact: ``ValueError`` naming the keys.
+    """
+    fine = {h.key: 1 for h in HYPOTHESIS_TABLE} | {"V7": 1, "scores": 2, "H2a_median_range": 3}
+    check_keys(fine)
+    for stale in ("H1e", "H1f", "H2f", "H3d", "T1", "H9z"):
+        with pytest.raises(ValueError, match=stale):
+            check_keys({"H1a": 1, stale: 2})

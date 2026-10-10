@@ -5,9 +5,9 @@ Vocabulary
 cell
     One (system, noise level, library size, variant) combination.
 core cell
-    ``rho = 1% sigma_x``, ``N = 10^4``: all splits, all horizons ``1..H_max``.
+    ``rho = 1% sigma_x``, ``n_lib = 10^4``: all splits, all horizons ``1..H_max``.
 sweep cell
-    Any other (rho, N): test-sweep states only, evaluation horizons only.
+    Any other (rho, n_lib): test-sweep states only, evaluation horizons only.
 """
 
 from __future__ import annotations
@@ -269,7 +269,7 @@ class Study:
             full_oracles = self.state_oracles(ctx, split)
             oracles[split] = full_oracles if core else full_oracles.subset(
                 np.arange(cfg.n_test_sweep))
-        LOG.info("cell %s rho=%.3f N=%d core=%s label=%s done in %.1fs", system, noise,
+        LOG.info("cell %s rho=%.3f n_lib=%d core=%s label=%s done in %.1fs", system, noise,
                  library_size, core, label, time.time() - start)
         return Cell(system=system, noise=noise, library_size=library_size, label=label,
                     setup=setup, splits=splits, oracles=oracles, horizons=horizons)

@@ -132,7 +132,7 @@ class SystemContext:
         Parameters
         ----------
         size : int
-            Library size ``N``.
+            Library size ``n_lib``.
         horizon_max : int
             Largest forecast horizon; analogs need that many future values.
 

@@ -61,7 +61,7 @@ class AnalogLibrary:
         noise : float
             Observation-noise level (fraction of ``sigma_x``).
         size : int
-            Library size ``N`` (the first ``N`` admissible points; libraries
+            Library size ``n_lib`` (the first ``n_lib`` admissible points; libraries
             are nested across sizes).
         horizon_max : int
             Largest forecast horizon.

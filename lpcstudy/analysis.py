@@ -73,7 +73,7 @@ def _floor_power_law(log_n: np.ndarray, log_c2: float, exponent: float,
 
 
 def _fit_seed_law(sizes: np.ndarray, mean_sq: np.ndarray) -> tuple[float, float]:
-    """Fit ``eps^2 = c^2 N^{-2/d} + f^2``; return ``(2/d, f^2)``."""
+    """Fit ``eps^2 = c^2 n_lib^{-2/d} + f^2``; return ``(2/d, f^2)``."""
     log_n = np.log(sizes)
     guess = (np.log(mean_sq[0]) + 2 * 0.5 * log_n[0], 1.0, np.log(mean_sq[-1] * 0.5))
     try:
@@ -86,12 +86,12 @@ def _fit_seed_law(sizes: np.ndarray, mean_sq: np.ndarray) -> tuple[float, float]
 
 def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
                         config: StudyConfig) -> dict:
-    """H1a: ``eps_s^2 ~ c^2 N^{-2/d} + f^2`` with ``1/d`` within 25% of Levina-Bickel.
+    """H1a: ``eps_s^2 ~ c^2 n_lib^{-2/d} + f^2`` with ``1/d`` within 25% of Levina-Bickel.
 
     Parameters
     ----------
     library_cells : dict[tuple[float, int], Cell]
-        Cells keyed by ``(rho, N)``.
+        Cells keyed by ``(rho, n_lib)``.
     config : StudyConfig
         Study configuration.
 
@@ -117,7 +117,7 @@ def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
         out["by_noise"][f"{rho:g}"] = {
             "fitted_inverse_dim": two_over_d / 2.0, "ci_inverse_dim": [lo / 2, hi / 2],
             "relative_error_vs_local_dim": rel, "floor_rms": float(np.sqrt(floor_sq)),
-            "mean_seed_by_N": {str(int(n)): float(np.sqrt(v))
+            "mean_seed_by_n_lib": {str(int(n)): float(np.sqrt(v))
                                for n, v in zip(sizes, sq.mean(axis=0))}}
     rel_ok = all(v["relative_error_vs_local_dim"] <= 0.25 for v in out["by_noise"].values())
     floor_ok = all(floors[b] > floors[a] for a, b in zip(noises[:-1], noises[1:])) \
@@ -412,7 +412,7 @@ def _per_state_spearman(levels: np.ndarray, values: np.ndarray) -> np.ndarray:
 def h2b_knob_response(noise_cells: dict[float, Cell],
                       library_cells: dict[tuple[float, int], Cell],
                       config: StudyConfig) -> dict:
-    """H2b (primary): ``w*`` rises with ``N`` (saturating below 1) and with ``rho``.
+    """H2b (primary): ``w*`` rises with ``n_lib`` (saturating below 1) and with ``rho``.
 
     Parameters
     ----------
@@ -454,13 +454,13 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
         med = np.median(w_n, axis=0)
         ok = bool(lo > 0 and med[-1] < 0.95)
         res["library"][f"{rho:g}"] = {
-            "median_w_by_N": dict(zip(map(str, sizes.astype(int)), med.tolist())),
+            "median_w_by_n_lib": dict(zip(map(str, sizes.astype(int)), med.tolist())),
             "mean_state_spearman": est, "ci": [lo, hi],
             "monotone_medians": bool(np.all(np.diff(med) > 0)),
-            "median_at_largest_N": float(med[-1]), "pass": ok}
+            "median_at_largest_n_lib": float(med[-1]), "pass": ok}
         passes.append(ok)
-    res["threshold"] = ("per-state Spearman CI lower bound > 0 for rho and for N at each "
-                        "rho; median w*(N_max) < 0.95 (monotone medians reported)")
+    res["threshold"] = ("per-state Spearman CI lower bound > 0 for rho and for n_lib at "
+                        "each rho; median w*(n_lib max) < 0.95 (monotone medians reported)")
     res["pass"] = bool(all(passes))
     return res
 

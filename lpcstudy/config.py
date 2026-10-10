@@ -33,7 +33,7 @@ class StudyConfig:
     noise_levels : tuple[float, ...]
         Observation-noise standard deviations, as fractions of ``sigma_x``.
     library_sizes : tuple[int, ...]
-        Analog-library sizes ``N``.
+        Analog-library sizes ``n_lib``.
     core_noise : float
         Noise level of the core cell.
     core_library : int

@@ -10,12 +10,15 @@ import dataclasses
 import json
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pytest
 
 from lpcstudy import provenance
 from lpcstudy.config import SMOKE, StudyConfig
 from lpcstudy.identifiers import HYPOTHESIS_TABLE
-from lpcstudy.report import HYPOTHESES, header_lines, save_json, verdicts, write_markdown
+from lpcstudy import report
+from lpcstudy.report import (HYPOTHESES, _key_number, header_lines, make_figures, save_json,
+                             verdicts, write_markdown)
 from lpcstudy.seeds import with_seed
 
 SYNTHETIC_SEED = 987654321987654321
@@ -140,7 +143,8 @@ def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
                 "oracle": {"verdict": "adds information"}},
         "H2a": {"median_range": 0.05, "range_ci": [0.01, 0.08], "partial_corr": 0.02},
         "H2b": {"noise": {"mean_state_spearman": 0.9},
-                "library": {"0.01": {"median_at_largest_N": 0.8}}},
+                "library": {"0.01": {"median_at_largest_n_lib": 0.8,
+                                         "median_w_by_n_lib": {"1000": 0.7, "10000": 0.8}}}},
         "H2c": {"A4_minus_A2": {"relative": -0.1}, "best_single": "A1",
                 "A4_minus_A1": {"relative": -0.05}},
         "H2d": {"in_distribution_excess": 0.05},
@@ -162,6 +166,11 @@ def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
                                "agreement_href": 0.5, "km_median_lyapunov": 1.0,
                                "rmst_lyapunov": 1.0}}
     system["oracle_recovery"] = {"A4_vs_A4o": 0.5, "A5_vs_Astar": 0.5}
+    system["weight_profile"] = {"horizons": [30, 60], "q25": [0.2, 0.3], "median": [0.4, 0.5],
+                                "q75": [0.6, 0.7]}
+    system["km_curves"] = {"A0": [1.0, 0.8, 0.5]}
+    system["regime_curve"] = {"regret_ratio_by_K": {"2": 0.1, "3": 0.05},
+                              "realized_K": {"2": 2, "3": 3}}
     return system
 
 
@@ -213,3 +222,54 @@ def test_verdicts_skip_a_row_without_results_and_raise_on_a_partial_one() -> Non
     partial = {"lorenz63": fake_system(config), "rossler": fake_system(config, skip=("H2e",))}
     with pytest.raises(KeyError):
         verdicts({"systems": partial}, config)
+
+
+def test_key_numbers_are_exact_for_every_v3_key() -> None:
+    """``_key_number`` returns the formatted numbers of each result, keyed by the table key.
+
+    Reference: hand formatting of the synthetic values of ``fake_system`` with the ``.3g`` rule of
+    ``_fmt`` (``.2g`` where the report asks for two digits, ``.4g`` for A5/A4), worked out from
+    the values, e.g. 100 * 0.05 = 5 so "5%". The H1a and H2b strings name ``n_lib``. Exact.
+    The v3 H2e has no number yet (it is not computed), so it is not in the table below.
+    """
+    system = fake_system(SMOKE)
+    expected = {
+        "H1a": "rho=0.01: 1/d (n_lib fit)=0.5 (1/d_LB=0.5)",
+        "H1b": "CP 1, PLP 0.9",
+        "H1c": "PLP 1, CP 0.5",
+        "H1d": "eps 0.8, delta 0.9, Lambda 0.7, N 0.6",
+        "Q-N": "redundant: dR2 w 0.01 [0, 0.02], T 0.02 [0.01, 0.03]; oracle: adds information",
+        "H2a": "range 0.05 (CI hi 0.08); partial r 0.02",
+        "H2b": "rho rank corr 0.9; n_lib@0.01: w*(n_lib max)=0.8",
+        "H2c": "A4-A2 -10%; A4-A1 -5%",
+        "H2d": "A4/A3-1 = 5%",
+        "gain_bound": "within bound 0.95 (n=40, max gain 1.5 LT)",
+        "H3a": "K=3: regret 4%, IQR 0.4 LT",
+        "H3b": "Lambda imp: weight 0.1, horizon 0.6",
+        "H3c": "A5/A4 1.012",
+    }
+    assert {key: _key_number(key, system) for key in expected} == expected
+    assert set(expected) == {h.key for h in HYPOTHESIS_TABLE} - {"H2e"}
+
+
+def test_library_figure_axis_reads_n_lib(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The library-size figure's x-label is "Library size n_lib" and the regime figure is drawn.
+
+    Reference: the WU-0002.2 acceptance (every figure axis for library size reads ``n_lib``). The
+    figures are kept open by replacing ``plt.close`` for the call (restored by ``monkeypatch``),
+    then read through matplotlib's ``get_xlabel``. The regret-vs-K figure reads ``regime_curve``,
+    so it exists and is labelled "Number of regimes K". Exact string checks.
+    """
+    real_close = plt.close
+    monkeypatch.setattr(report.plt, "close", lambda fig=None: None)
+    results, config = fake_results("DEV-0")
+    results["systems"] = {"lorenz63": fake_system(config)}
+    try:
+        written = make_figures(results, config, tmp_path)
+        labels = [fig.axes[0].get_xlabel() for fig in map(plt.figure, plt.get_fignums())]
+    finally:
+        real_close("all")
+    assert [path.name for path in written] == [
+        "separation_weight_vs_horizon.png", "kaplan_meier_by_rule.png",
+        "regret_vs_regimes.png", "knob_response_library.png"]
+    assert labels[2] == "Number of regimes K" and labels[3] == "Library size n_lib"
