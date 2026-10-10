@@ -147,6 +147,28 @@ Result of run 2: `41 passed in 1.66s` (exit 0). Self-check: no `clip|nan_to_num|
 
 Results of the .2 runs: unit `93 passed in 10.63s` (exit 0; the 41 tests of the run_tests file and 52 of the preset file); integration `2 passed in 69.26s` (exit 0; the real smoke preset on CPU through the wrapper and directly, identical `results.json` after removing the `seconds` keys, per DEC-0005 Q1; `runs/` left empty, the test removes its directories). No pilot or full preset and no GPU lock were used; no leftover process (`pgrep` clean). Self-check: the diff has no `clip|nan_to_num|isfinite|where(|except` and no randomness; the one `try:` is the test cleanup `finally` and the `try/except` in the embedded registry helper reports the failure as the refusal reason (never skips). No tolerance exists. Not yet covered here, by design: criterion (n) (in .3) and the real tally (.3). Commit: WU-0012.2 (see git log).
 
+**2026-10-10, developer claude-sonnet-5-5: WU-0012.3 written** (`tools/gpu_hours.py`, mode 755; `tests/unit/test_tools_gpu_hours.py`, which also carries criterion (n), the wrapper-calls-the-tally tests). Definitions fixed in the tool and its docstring: `runs` = GPU runs overlapping the current week, `open` = those without an end, `cpu_excluded` = non-GPU runs overlapping the week, `unreadable` = files that are invalid in any way (counted, named on stderr, refused by `check`); an open run that starts after `now` counts as unreadable; a symlinked `run.meta.json` is not followed and counts as unreadable; stdout is one `key=value` line, notes and names go to stderr; H is parsed as a `Decimal`, so the 60 h boundary is exact.
+
+§4.9 checklist before the .3 run:
+1. Change set (working tree vs HEAD): `?? tools/gpu_hours.py`, `?? tests/unit/test_tools_gpu_hours.py`. The log edit is docs only.
+2. Radius: `tests/unit/test_tools_gpu_hours.py` (unit; `tools/gpu_hours.py` maps to it). `python3 tools/test_impact.py` over `main...HEAD` also lists the .1/.2 sets, which are not selected by this change: `run_preset.sh`, `run_tests.sh` and `wrapper_helpers.py` are unchanged since their runs, and `gpu_hours.py` is replaced by the recording fake in every `FakeRoot` test except the ones in the new file. The integration test is not affected (the smoke run calls no tally). Smaller than the whole suite; no gate.
+3. Already run: no (the new file never ran); the .1/.2 sets ran on this exact code and are not rerun.
+4. Device: `JAX_PLATFORMS=cpu`; fake lock under `tmp_path`; no GPU.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s; each test expected under 5 s (git worktree test about 1 s).
+6. Contention: nothing heavy started by this unit.
+7. Output: `-q --tb=short -rfE`; summary and failures only.
+8. Command: `tools/run_tests.sh unit tests/unit/test_tools_gpu_hours.py`.
+
+Result of the .3 run: `46 passed in 8.86s` (exit 0). Self-check: `try`/`except` sites in `tools/gpu_hours.py` are (1) the reader of one meta file, which turns every failure into a `BadMeta` that is counted, named on stderr and refused by `check`, (2) the git call, which prints a note and falls back, (3) `Decimal` parsing of H, which exits 64; nothing is clipped, replaced or skipped without a count; no randomness; no tolerance (exact integer seconds). Criterion mapping: (l) `test_weekly_sum_matches_a_hand_sum`, `test_run_crossing_the_end_boundary_is_split`, `test_iso_week_53_and_year_boundary`; (m) `test_check_boundary_at_exactly_60_hours`, `test_check_rejects_hours_outside_0_to_12`, `test_unusable_file_is_counted_named_and_refuses_check`; (n) `test_wrapper_calls_the_tally_before_pilot_and_stops_on_65`, `test_wrapper_tally_hours_per_device_and_preset`, plus the real-tool wrapper tests. Commit: WU-0012.3 (see git log).
+
+**Open points for the main session / reviewer (developer, 2026-10-10):**
+- `tests/unit/wrapper_helpers.py` is a new support module not on the plan's file list (shared fake-root builder for the three tool test files).
+- The tally cannot be tested end to end near the cap through the wrapper with the real clock (the wrapper never passes `--now`); (n) uses a recording fake as the plan says, and the real tool is exercised through the wrapper only on an empty tree and with a corrupt file (both date-independent).
+- `run_tests.sh --background` is accepted for every tier, not only slow and gpu; `LPC_GPU_LOCK` is expected to be an absolute path (settings set one).
+- The XLA CPU thread flag is not set (DEC-0005 Q3); the "observed CPU use within the cap" check of 4.5 is therefore not covered.
+- `timeout` exit 137 (kill after 30 s) is returned as is, without the TIMEOUT line; only 124 prints it.
+- The integration test (k) wrote under the worktree `runs/` (the wrapper accepts only `runs/`) and removed its directories afterwards.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
