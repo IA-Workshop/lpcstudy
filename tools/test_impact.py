@@ -291,7 +291,7 @@ def _map_file(path: str, graph: Mapping[str, list[str]], reverse: Mapping[str, l
         return "tool: its test file", _exists(root, test)
     tier = _tier_of(path)
     if tier is not None and Path(path).name.startswith("test_") and path.endswith(".py"):
-        return "test file: that file only", [path]
+        return "test file: that file only", _exists(root, path)
     if tier is not None:
         return "test helper: tests naming it", _helper_paths(path, tier, root, warnings)
     if len(parts) == 2 and parts[0] == PACKAGE and path.endswith(".py"):

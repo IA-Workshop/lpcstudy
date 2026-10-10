@@ -590,3 +590,62 @@ def test_command_line_text_is_shell_quoted(repo: Path, capsys) -> None:  # noqa:
     argv = [sys.executable, "-m", "pytest", "-q", "--tb=short", "-rfE",
             "tests/unit/test_leaf.py", "tests/unit/test_mid.py"]
     assert line == "command: " + shlex.join(argv)
+
+
+# ------------------------------------------------------------- fix round 1 (R1 to R3)
+
+
+def test_deleted_and_renamed_test_files_are_not_selected(repo: Path) -> None:
+    """A deleted test file selects nothing; a renamed one selects only its new path (R1).
+
+    Reference: the plan ("a deleted path is kept and mapped by name, own test file if
+    present") and pytest's behavior (a path that does not exist is an error), set up by hand
+    with ``git mv`` and ``git rm`` on the synthetic repository. Exact equality.
+    """
+    graph = tool.build_graph(repo / "lpcstudy")
+    git(repo, "mv", "tests/unit/test_top.py", "tests/unit/test_top2.py")
+    changed = tool.changed_files(repo, "main")
+    assert changed == ["tests/unit/test_top.py", "tests/unit/test_top2.py"]
+    sel = tool.select(changed, graph, repo, CORE, False, False)
+    assert sel.tiers["unit"] == ["tests/unit/test_top2.py"]
+    assert "tests/unit/test_top.py is deleted; mapped by name" in sel.warnings
+    git(repo, "rm", "-q", "-f", "tests/unit/test_top2.py")
+    removed = tool.changed_files(repo, "main")
+    assert removed == ["tests/unit/test_top.py"]
+    sel = tool.select(removed, graph, repo, CORE, False, False)
+    assert all(paths == [] for paths in sel.tiers.values()) and sel.excluded == []
+
+
+def test_gpu_files_are_listed_but_never_run(repo: Path, monkeypatch, capsys) -> None:  # noqa: ANN001
+    """With ``--run --include-gpu`` a changed gpu file is selected and printed, never run (R2).
+
+    Reference: the plan's ``--run`` bullet (gpu files are printed, never run by the tool).
+    ``mid`` is a plain module in ``main`` (own file and ``top``'s), and ``test_mid_repro.py``
+    belongs to ``mid``. Exact equality on the recorded argv; a gpu-only change runs nothing.
+    """
+    write(repo, "lpcstudy/mid.py", FILES["lpcstudy/mid.py"] + "# edit\n")
+    recorder = Recorder(monkeypatch)
+    assert tool.main(["--root", str(repo), "--run", "--include-gpu"]) == 0
+    out = capsys.readouterr().out
+    assert "gpu: tests/gpu/test_mid_repro.py" in out
+    assert [argv for argv, _ in recorder.calls] == [
+        [sys.executable, "-m", "pytest", "-q", "--tb=short", "-rfE", "tests/unit/test_mid.py",
+         "tests/unit/test_top.py"]]
+    git(repo, "checkout", "-q", "lpcstudy/mid.py")
+    write(repo, "tests/gpu/test_mid_repro.py", FILES["tests/gpu/test_mid_repro.py"] + "# edit\n")
+    gpu_only = Recorder(monkeypatch)
+    assert tool.main(["--root", str(repo), "--run", "--include-gpu"]) == 0
+    assert gpu_only.calls == []
+    assert "no CPU tests to run" in capsys.readouterr().out
+
+
+def test_core_and_pipeline_constants_equal_the_workflow_lists() -> None:
+    """``CORE_MODULES`` and ``PIPELINE_MODULES`` equal the lists of DEVELOPMENT_WORKFLOW 4.2 (R3).
+
+    Reference: section 4.2, mapping rules: core modules ``config``, ``data``, ``systems``,
+    ``dynamics``, ``statistics``, ``ensemble``, ``oracle``; the pipeline row ``pipeline``,
+    ``experiments``, ``report``, ``__main__``. Lists copied by hand from the text. Exact equality.
+    """
+    assert tool.CORE_MODULES == frozenset(
+        {"config", "data", "systems", "dynamics", "statistics", "ensemble", "oracle"})
+    assert tool.PIPELINE_MODULES == frozenset({"pipeline", "experiments", "report", "__main__"})

@@ -127,6 +127,35 @@ Commit 164b5bb is WU-0011.1. WU-0011.2 adds the three fixture tests to `tests/un
 
 Commit split: the .1 commit stages the test file without the three .2 tests (via the index; the working file is untouched), the .2 commit adds them.
 
+### 2026-10-10, claude-sonnet-5-5 (developer), fix round 1 (R1 to R4)
+
+Changes: `tools/test_impact.py` (test-file branch of `_map_file` returns `_exists(root, path)`, so a deleted or renamed-away test file is not selected; the "is deleted; mapped by name" warning stays); `tests/unit/test_tools_test_impact.py` (three tests appended, no existing assertion changed: `test_deleted_and_renamed_test_files_are_not_selected` (R1), `test_gpu_files_are_listed_but_never_run` (R2), `test_core_and_pipeline_constants_equal_the_workflow_lists` (R3, literals copied by hand from §4.2)).
+
+Checklist before the radius run:
+1. Change set: branch diff = docs, fixture, `tools/test_impact.py`, the test file (commits 164b5bb, e9552ec, b2bb46b); working tree: modified `tools/test_impact.py`, `tests/unit/test_tools_test_impact.py`.
+2. Radius: `tests/unit/test_tools_test_impact.py`, unit tier (rules: `tools/<t>.py` -> its test file; a test file -> itself); one file, smaller than the whole suite, no gate.
+3. Already run? Not on this code (tool and tests changed since the 40-passed run).
+4. Device `JAX_PLATFORMS=cpu`. 5. `LPC_THREADS=4`, unit timeout 300 s. 6. No preset running. 7. `-q --tb=short -rfE`, summary and failures only.
+8. Command: `.venv/bin/python -m pytest -q --tb=short -rfE tests/unit/test_tools_test_impact.py` (no `tools/run_tests.sh` yet).
+
+Result: `43 passed in 1.47s` (40 earlier tests unchanged and passing, 3 new). Self-check: the diff of `tools/` has no `clip|nan_to_num|isfinite|where(|try:|except|default_rng|random.|PRNGKey` line; no tolerance touched; no existing assertion changed or removed.
+
+R4, dogfood output, verbatim, after the fixes (`.venv/bin/python tools/test_impact.py --base main --explain`, run before the fix commit, so the working-tree files appear):
+
+```
+docs/agent/records/decisions.md -> no tests (docs, .claude, readme) -> nothing
+docs/agent/records/work/WU-0011-test-impact.md -> no tests (docs, .claude, readme) -> nothing
+docs/agent/records/work/queue.md -> no tests (docs, .claude, readme) -> nothing
+tests/unit/fixtures/lpcstudy_graph.json -> test helper: tests naming it -> tests/unit/test_tools_test_impact.py
+tests/unit/test_tools_test_impact.py -> test file: that file only -> tests/unit/test_tools_test_impact.py
+tools/test_impact.py -> tool: its test file -> tests/unit/test_tools_test_impact.py
+unit: tests/unit/test_tools_test_impact.py
+warning: non-test file tests/unit/fixtures/lpcstudy_graph.json: selected the unit tests that name 'lpcstudy_graph'
+command: /home/brianm/projects/physics/chaos/lpcstudy/.venv/bin/python -m pytest -q --tb=short -rfE tests/unit/test_tools_test_impact.py
+exit 0
+```
+
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-10, at `e9552ec` (branch `wu/0011-test-impact`; working tree clean before this edit).
