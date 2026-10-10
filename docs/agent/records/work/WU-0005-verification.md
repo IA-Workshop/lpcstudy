@@ -158,6 +158,19 @@ Each is one commit: "WU-0005.k: …", ending `Agent: <model id>`.
 
 **2026-10-10, developer (claude-sonnet-5-5): WU-0005.2 result.** `tools/run_tests.sh unit tests/unit/test_ensemble.py --durations=5`: `4 passed in 0.84s` (slowest new case 0.24 s). Measured by a scratch script after the run (not a test run): smallest relative gap 1.8e-4 (premise 1e-9); max relative distance difference k-d tree vs brute force 0.0 (tolerance 1e-12); indices identical; copies at exactly 0.0. After the run, only the docstring sentence quoting the minimum gap was corrected (1.8e-4 measured here, not the mathematician's 2.2e-5 from another draw order); no code or tolerance changed. No code defect.
 
+**2026-10-10, developer (claude-sonnet-5-5): WU-0005.1, run 1 (§4.9 checklist).**
+1. Change set: new `tests/unit/test_systems.py` (`test_rk4_observed_order_is_four`, `test_rk4_observed_order_nonlinear_scalar`, `test_flow_step_respects_max_dt`); nothing under `lpcstudy/`.
+2. Radius: `python3 tools/test_impact.py --explain` maps `test_systems.py` -> "test file: that file only"; it also lists `test_ensemble.py` (branch diff), which already ran at the same code (WU-0005.2 result above), so only `tests/unit/test_systems.py` runs. No `lpcstudy/` change, so `test_dynamics.py`, `test_embedding.py` are not added.
+3. Already run: no (new file).
+4. Device: wrapper sets `JAX_PLATFORMS=cpu`.
+5. Threads: `LPC_THREADS` default 4; unit timeout 300 s.
+6. Contention: none started by me.
+7. Output: `-q --tb=short -rfE`.
+8. Command: `tools/run_tests.sh unit tests/unit/test_systems.py --durations=5`.
+Note: the nonlinear check is feasible without touching `lpcstudy/`: `make_flow_step` takes any `field_fn(state, params)` from the spec, so `lambda s, p: s * s` with dim = 1 works.
+
+**2026-10-10, developer (claude-sonnet-5-5): WU-0005.1 result.** `tools/run_tests.sh unit tests/unit/test_systems.py --durations=5`: `3 passed in 0.69s` (slowest 0.21 s). Values measured by a scratch script after the run (not a test run), matching the mathematician's: linear errors 6.94e-5, 4.21e-6, 2.59e-7; orders 4.042 and 4.024 (band [3.9, 4.1]); leading-constant residual 0.0425 (bound 0.10); nonlinear errors 2.90e-6, 1.84e-7, 1.16e-8, orders 3.975 and 3.993 (band [3.9, 4.1]); `max_dt` 0.3 vs 0.25 max abs difference 0.0 exactly (atol 1e-15); `max_dt` 0.5 differs from 0.25 by 1.7e-2. No code defect.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
