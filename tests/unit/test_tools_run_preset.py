@@ -369,16 +369,59 @@ def test_background_sigterm_is_recorded_as_143(fake: FakeRoot) -> None:
     assert lock_is_free(fake)
 
 
-def test_record_refuses_without_the_lock_on_fd_9(fake: FakeRoot) -> None:
-    """The internal ``__record`` mode needs the lock on fd 9 and a meta file; else 64, no run."""
-    meta = meta_path(fake, "pilot")
-    meta.parent.mkdir(parents=True)
-    meta.write_text("{}")
-    done = fake.run("run_preset.sh", "__record", str(meta), "--", str(fake.python), "x")
-    assert done.returncode == 64
+HIDDEN_MODES = ["__record", "record", "--record", "__run", "__internal", "--internal", "-c"]
+
+
+@pytest.mark.parametrize("mode", HIDDEN_MODES)
+def test_no_hidden_mode_runs_a_command(fake: FakeRoot, mode: str) -> None:
+    """Any hidden mode name is refused with 64 and runs nothing (R1a; reference: the plan's CLI).
+
+    The wrapper has one entry point: ``<preset> <seed-id> <out-dir> [options]``. ``__record`` was
+    an internal re-entry in the first version; it is gone. The test passes the reviewer's probe
+    shape, ``<mode> <file> -- sh -c 'touch MARK'``, with the lock file open on fd 9 as the
+    reviewer did, and checks that the marker is never created and no fake is called.
+    """
+    marker = fake.base / "marker"
+    meta = fake.base / "plain.txt"
+    meta.write_text("")
+    for extra in ([str(meta), "--", "sh", "-c", f"touch {marker}"], [str(meta), "x"], []):
+        done = subprocess.run(
+            ["bash", "-c", 'exec "$@" 9>>"$LPC_GPU_LOCK"', "x",
+             str(fake.root / "tools" / "run_preset.sh"), mode, *extra],
+            cwd=fake.root, env=fake.environment(), capture_output=True, text=True, timeout=20,
+            check=False)
+        assert done.returncode == 64, (extra, done.stdout, done.stderr)
+        assert len(done.stderr.strip().splitlines()) == 1
+    assert not marker.exists()
+    assert fake.calls() == [] and fake.timeout_calls() == [] and fake.tally_calls() == []
+
+
+def test_script_has_no_second_entry_point() -> None:
+    """The script text has no ``__record`` mode and no ``nohup`` re-entry (R1; reference: grep).
+
+    A structural guard: the background run is a subshell of the checked front end, so no
+    argument can reach the recorder without passing the lock, seed, registry and tally checks.
+    """
+    text = (REPO / "tools" / "run_preset.sh").read_text()
+    assert "__record" not in text
+    assert "nohup" not in text.replace("like nohup", "")
+
+
+def test_background_run_has_the_checks_of_the_front_end(fake: FakeRoot) -> None:
+    """The background child exists only after the lock, tally and registry checks (R1c).
+
+    With a busy lock nothing starts at all (see ``test_lock_held_exits_75_at_once``); with an
+    unregistered seed nothing starts; with the lock free a pilot starts and the only child is
+    the checked command (``timeout ... 12h``), run under the recorder with the meta pid equal to
+    the printed pid.
+    """
+    refused = fake.run("run_preset.sh", "pilot", "DEV-9", "runs/dev/DEV-9")
+    assert refused.returncode == 64
     assert fake.calls() == []
-    done = fake.run("run_preset.sh", "__record", str(meta.parent / "absent.json"), "--", "true")
-    assert done.returncode == 64
+    done, pid = start_pilot(fake)
+    assert wait_until(lambda: not alive(pid))
+    assert len(cli_calls(fake)) == 1
+    assert json.loads(meta_path(fake, "pilot").read_text())["pid"] == pid
 
 
 @pytest.mark.parametrize("tally_exit", [None, 7])

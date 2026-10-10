@@ -17,10 +17,10 @@ Week. The current ISO week in UTC, ``[Monday 00:00Z, next Monday 00:00Z)``. Only
 
 Contribution. The integer-second overlap of ``[start, end)`` with the week. A run that crosses a
 week boundary is split. A run with ``end_utc`` null or missing (running, killed or rebooted) is
-counted with ``end = min(now, start + 12 h)``, the timeout bound (conservative). A file that is
-unreadable, has another schema, a malformed field, an end before the start, or an open run that
-starts after ``now`` is counted as unreadable and named on stderr (PRIME.4): ``sum`` reports it and
-``check`` refuses with exit 65.
+counted with ``end = min(now, start + 12 h)``, the timeout bound (conservative). A directory that
+cannot be listed, a file that is unreadable, has another schema, a malformed field or an end before
+the start, and an open run that starts after ``now`` are counted as unreadable and named on stderr
+(PRIME.4): ``sum`` reports them and ``check`` refuses with exit 65.
 
 Output (stdout, one line): ``week=2026-W42 gpu_hours=23.5000 gpu_seconds=84600 runs=4 open=2
 cpu_excluded=1 unreadable=0``. ``runs`` counts the GPU runs that overlap the week, ``open`` those
@@ -161,18 +161,31 @@ def load_run(path: Path) -> Run:
     return Run(path, device, start, end)
 
 
-def find_meta_files(roots: list[Path]) -> list[Path]:
-    """Return every ``run.meta.json`` under the roots (symlinked directories not followed), once each."""
+def find_meta_files(roots: list[Path]) -> tuple[list[Path], list[tuple[Path, str]]]:
+    """Return every ``run.meta.json`` under the roots (symlinked directories not followed), once each.
+
+    Returns
+    -------
+    tuple
+        The meta files, and the directories that could not be listed as ``(path, reason)``: those
+        are counted as unreadable by the caller, never skipped silently (PRIME.4).
+    """
     seen: dict[Path, Path] = {}
+    errors: dict[Path, str] = {}
+
+    def on_error(error: OSError) -> None:
+        errors.setdefault(Path(error.filename or "?"), f"directory not readable ({type(error).__name__})")
+
     for root in roots:
-        for directory, _, names in os.walk(root, followlinks=False):
+        for directory, _, names in os.walk(root, followlinks=False, onerror=on_error):
             if META_NAME in names:
                 path = Path(directory) / META_NAME
                 seen.setdefault(path.resolve(), path)
-    return sorted(seen.values())
+    return sorted(seen.values()), sorted(errors.items())
 
 
-def tally_week(files: list[Path], now: int) -> Tally:
+def tally_week(files: list[Path], now: int,
+               walk_errors: list[tuple[Path, str]] | None = None) -> Tally:
     """Sum the GPU seconds of the ISO week of ``now`` over the given meta files.
 
     Parameters
@@ -181,10 +194,12 @@ def tally_week(files: list[Path], now: int) -> Tally:
         Meta files, each counted once.
     now : int
         Epoch seconds; bounds the week and the open runs.
+    walk_errors : list, optional
+        Directories that could not be listed; they start the ``unreadable`` list.
     """
     week, week_start, week_end = week_bounds(now)
     total = runs = open_runs = cpu_excluded = 0
-    unreadable: list[tuple[Path, str]] = []
+    unreadable: list[tuple[Path, str]] = list(walk_errors or [])
     for path in files:
         try:
             run = load_run(path)
@@ -287,14 +302,15 @@ def main(argv: list[str] | None = None) -> int:
         roots = existing_roots(args.root)
     else:
         roots = existing_roots(default_roots(Path(__file__).resolve().parents[1]))
-    result = tally_week(find_meta_files(roots), now)
+    files, walk_errors = find_meta_files(roots)
+    result = tally_week(files, now, walk_errors)
     print(result.line())
     for path, reason in result.unreadable:
-        print(f"unreadable run.meta.json: {path}: {reason}", file=sys.stderr)
+        print(f"unreadable: {path}: {reason}", file=sys.stderr)
     if args.command == "sum":
         return 0
     if result.unreadable:
-        print(f"refused: {len(result.unreadable)} unreadable run.meta.json file(s), named above: "
+        print(f"refused: {len(result.unreadable)} unreadable file(s) or directory(ies), named above: "
               "the tally is not trustworthy (fail closed)", file=sys.stderr)
         return EXIT_CAP
     needed = Decimal(result.seconds) + hours * 3600

@@ -255,6 +255,32 @@ def test_symlinked_meta_is_not_followed_and_is_reported(tmp_path: Path) -> None:
     assert str(link) in done.stderr
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions, so chmod 000 hides nothing")
+def test_unreadable_directory_is_counted_named_and_refuses_check(tmp_path: Path) -> None:
+    """A directory that cannot be listed is counted as unreadable, named, and refused by ``check`` (R2).
+
+    Reference: PRIME.4 and the tool's own contract (never skipped silently). Hand sums: two
+    gpu runs of 10 h (36000 s each) inside the week; with one directory at mode 000 only the other
+    is visible, 36000 s, with unreadable=1 (before the fix: 36000 s and unreadable=0, exit 0 on
+    ``check --hours 12``, a silent under-count of 10 h). Permissions are restored afterwards.
+    """
+    write_meta(tmp_path / "seen" / "run.meta.json", "2026-10-12T00:00:00Z", "2026-10-12T10:00:00Z")
+    hidden = tmp_path / "hidden"
+    write_meta(hidden / "run.meta.json", "2026-10-13T00:00:00Z", "2026-10-13T10:00:00Z")
+    options = ["--root", str(tmp_path), "--now", NOW]
+    hidden.chmod(0)
+    try:
+        summed = gpu_hours(*options, "sum")
+        checked = gpu_hours(*options, "check", "--hours", "12")
+    finally:
+        hidden.chmod(0o755)
+    assert summed.returncode == 0
+    assert (fields(summed)["gpu_seconds"], fields(summed)["unreadable"]) == ("36000", "1")
+    assert str(hidden) in summed.stderr
+    assert checked.returncode == 65
+    assert str(hidden) in checked.stderr
+
+
 def run_git(cwd: Path, *args: str) -> None:
     """Run git offline with a fixed identity and no global configuration."""
     env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,

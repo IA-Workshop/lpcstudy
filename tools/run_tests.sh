@@ -19,7 +19,8 @@
 # LPC_GPU_LOCK is the lock file (default /tmp/lpcstudy-gpu.lock); LPC_GPU_WAIT shortens the wait.
 #
 # Timeouts (4.5): unit 300 s, integration 900 s, slow 3600 s, gpu 1800 s, then SIGKILL after 30 s.
-# Exit codes: 64 usage or refusal, 75 GPU lock busy, 124 timeout, otherwise pytest's code.
+# Exit codes: 64 usage or refusal, 75 GPU lock busy, 124 timeout (137 if it had to be killed),
+# otherwise pytest's code. PYTEST_ADDOPTS and PYTEST_PLUGINS must be unset (64).
 #
 # --background (for slow and gpu): runs detached, logs to runs/tests/<tier>-<UTC stamp>.log and
 # writes the exit code to <log>.exit; prints "pid=... log=..." and exits 0.
@@ -45,6 +46,10 @@ case "$tier" in
     gpu) limit=1800 ;;
     *) refuse "unknown tier '$tier' (unit, integration, slow or gpu)" ;;
 esac
+
+# pytest also reads options and plugins from the environment, past the argument whitelist below.
+[ -z "${PYTEST_ADDOPTS:-}" ] || refuse "PYTEST_ADDOPTS is set; unset it (options are whitelisted, 4.6)"
+[ -z "${PYTEST_PLUGINS:-}" ] || refuse "PYTEST_PLUGINS is set; unset it (no extra plugins, 4.6)"
 
 threads="${LPC_THREADS:-4}"
 [[ "$threads" =~ ^[1-9][0-9]?$ ]] || refuse "LPC_THREADS must be an integer from 1 to 99, got '$threads'"
@@ -116,9 +121,12 @@ else
     export JAX_PLATFORMS=cpu
 fi
 
+started="$SECONDS"
 timeout --kill-after=30 "$limit" "$py" -m pytest -q --tb=short -rfE "${extras[@]}" "${paths[@]}"
 code=$?
 if [ "$code" -eq 124 ]; then
     echo "TIMEOUT after $limit s (4.5): investigate, do not raise" >&2
+elif [ "$code" -eq 137 ]; then
+    echo "TIMEOUT (exit 137, SIGKILL) after $((SECONDS - started)) s; the limit is $limit s plus a 30 s kill grace (4.5), an external kill gives the same code: investigate, do not raise" >&2
 fi
 exit "$code"

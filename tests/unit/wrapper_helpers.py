@@ -115,7 +115,7 @@ class FakeRoot:
     def environment(self, **extra: str) -> dict[str, str]:
         """Return a clean environment: real PATH behind the fakes, no inherited LPC_*/JAX_* values."""
         env = {k: v for k, v in os.environ.items()
-               if not k.startswith(("LPC_", "FAKE_", "JAX_", "XLA_", "OMP_", "MKL_", "OPENBLAS_"))}
+               if not k.startswith(("LPC_", "FAKE_", "JAX_", "XLA_", "OMP_", "MKL_", "OPENBLAS_", "PYTEST_"))}
         env.update(PATH=f"{self.bin}:{env['PATH']}", FAKE_DIR=str(self.fake_dir),
                    LPC_PYTHON=str(self.python), LPC_GPU_LOCK=str(self.lock),
                    GIT_CEILING_DIRECTORIES=str(self.base.parent))

@@ -27,7 +27,7 @@
 # the start (end_utc, wall_seconds, exit_code null) and again at the end.
 # Run: `timeout --kill-after=300 12h <python> -m lpcstudy --preset P --out OUT [...]`. Smoke runs
 # in the foreground and returns the CLI's exit code. Pilot and full always start in the
-# background (nohup, console.log) and print "started pid=... console=... run_log=... meta=...".
+# background (a subshell that ignores SIGHUP, console.log) and print "started pid=... console=... run_log=... meta=...".
 # Exit codes: 64 refusal, 65 weekly GPU hours (or tally failure), 75 lock busy, else the CLI's.
 # LPC_PYTHON selects the interpreter (else <root>/.venv/bin/python, else python3).
 
@@ -110,10 +110,10 @@ on_signal() {
 run_recorded() {
     meta="$1"
     shift
-    meta_call pid "$meta" "$$" || echo "run_preset.sh: WARNING: could not record the pid in $meta" >&2
+    meta_call pid "$meta" "$BASHPID" || echo "run_preset.sh: WARNING: could not record the pid in $meta" >&2
     "$@" &
     child=$!
-    trap 'on_signal 129' HUP
+    if [ "${ignore_hup:-0}" = 1 ]; then trap '' HUP; else trap 'on_signal 129' HUP; fi
     trap 'on_signal 130' INT
     trap 'on_signal 143' TERM
     wait "$child"
@@ -127,18 +127,6 @@ for arg in "$@"; do
     lower="${arg,,}"
     [[ "$lower" != *confirmatory* ]] || refuse "an argument names the confirmatory path, which is owner-only (LPC.PC.7)"
 done
-
-if [ "${1:-}" = __record ]; then
-    # Internal: the background recorder started by this script. It must hold the lock on fd 9.
-    shift
-    meta="${1:-}"
-    [ "$#" -ge 3 ] && [ "$2" = -- ] && [ -f "$meta" ] || refuse "__record is internal (needs <meta> -- <command>)"
-    shift 2
-    [ "$(readlink -f /proc/self/fd/9 2>/dev/null)" = "$lock" ] \
-        || refuse "__record needs the GPU lock on file descriptor 9"
-    run_recorded "$meta" "$@"
-    exit "$?"
-fi
 
 [ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-transfer] [--skip-robustness]"
 preset="$1"
@@ -279,6 +267,13 @@ if [ "$preset" = smoke ]; then
     exit "$?"
 fi
 
-nohup bash "$self" __record "$meta" -- "${command[@]}" >"$out/$preset/console.log" 2>&1 </dev/null &
+# Background: a subshell of this already-checked front end (no second entry point). It inherits
+# the lock on fd 9 and the validated argv, ignores SIGHUP like nohup, and outlives this process.
+(
+    ignore_hup=1
+    trap '' HUP
+    run_recorded "$meta" "${command[@]}"
+) >"$out/$preset/console.log" 2>&1 </dev/null &
+disown
 echo "started pid=$! console=$out/$preset/console.log run_log=$out/$preset/run.log meta=$meta"
 exit 0

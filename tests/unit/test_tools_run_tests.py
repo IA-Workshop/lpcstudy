@@ -158,6 +158,19 @@ def test_timeout_exit_124_is_reported(fake: FakeRoot) -> None:
     assert "do not raise" in done.stderr
 
 
+def test_timeout_kill_exit_137_is_reported(fake: FakeRoot) -> None:
+    """A child that exits 137 (what timeout returns after its kill grace) is reported (R4).
+
+    Reference: coreutils timeout, which exits 137 when it had to SIGKILL after ``--kill-after``.
+    The fake interpreter exits 137; the wrapper returns 137 and prints a TIMEOUT line that names
+    the tier's limit (300 s) and the code.
+    """
+    done = fake.run("run_tests.sh", "unit", "tests/unit/test_x.py",
+                    env=fake.environment(FAKE_EXIT="137"))
+    assert done.returncode == 137
+    assert "TIMEOUT" in done.stderr and "137" in done.stderr and "300 s" in done.stderr
+
+
 def test_pytest_exit_code_is_returned(fake: FakeRoot) -> None:
     """pytest's own failure code (1) is returned, so ``tools/test_impact.py --run`` sees it."""
     done = fake.run("run_tests.sh", "unit", "tests/unit/test_x.py",
@@ -214,6 +227,9 @@ def test_relative_path_from_another_directory(fake: FakeRoot) -> None:
         (["gpu", "tests/gpu/test_x.py"], {"LPC_GPU_WAIT": "31"}),
         (["gpu", "tests/gpu/test_x.py"], {"LPC_GPU_WAIT": "-1"}),
         (["gpu", "tests/gpu/test_x.py"], {"LPC_GPU_WAIT": "abc"}),
+        (["unit", "tests/unit/test_x.py"], {"PYTEST_ADDOPTS": "-n 2"}),
+        (["unit", "tests/unit/test_x.py"], {"PYTEST_ADDOPTS": "-s"}),
+        (["unit", "tests/unit/test_x.py"], {"PYTEST_PLUGINS": "xdist.plugin"}),
     ],
 )
 def test_refusals_exit_64_with_one_line(fake: FakeRoot, args: list[str],
