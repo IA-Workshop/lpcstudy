@@ -255,6 +255,46 @@ The owner questions above are answered in `DEC-0007` (proposed, on `develop`) by
 
 ## Log
 
+### 2026-10-10 developer (claude-sonnet-5-5), WU-0002.1: removals (four commits, before the radius run)
+
+Branch `wu/0002-removals-ids` from `develop` 5889058. Commits (each with the trailers `Agent: claude-sonnet-5-5` and `Co-Authored-By`):
+
+| Commit | Content |
+| --- | --- |
+| `c011e9e` | A4f: `allocation.full_form_weight`, `RULE_LABELS["A4f"]`, the A4f entry of `pipeline.rule_weights`, `FittedRules.n_analogs` and `.state_dim`, the `state_dim` parameter of `rule_weights` (grep confirmed A4f was its only user; `analysis.py:146` reads `cell.setup.n_analogs`, not `FittedRules`); README row. New test `test_allocation.py::test_rule_set_is_the_v3_rule_set`. |
+| `4f70254` | Lorenz-96 (`lorenz96_field`, `SYSTEMS["lorenz96"]`), `transfer_targets`/`transfer_sources` (docstring, fields, SMOKE `replace`), `run_transfer`, `run_transfer_target`, the transfer block and `--skip-transfer` in `__main__`, the T1 branch of `report.verdicts` and the T1 Markdown section, `--skip-transfer` in `tools/run_preset.sh` (header, usage, case); README. New tests: `test_systems.py` (new file), `test_config.py::test_config_has_no_transfer_fields`, `test___main__.py::test_removed_skip_transfer_option_is_refused`, `test_tools_run_preset.py::test_removed_skip_transfer_option_is_refused`. |
+| `309b84f` | `"delay/2"` variant; `delay_scale` in `build_context`, `Study.context` (cache key now `(system, dim)`), `Study.run_cell`. `int(round(min(..) * 1.0))` became `int(round(min(..)))`. New test `test_data.py::test_no_delay_scale_parameter_remains` (placement: `test_data.py`, as the plan allows). |
+| `e644653` | Shift: `shift_scores`, `extreme_sizes`, `shifted`, `core_sub_scores`, `res["shift"]`, `analysis.shift_gaps`; H2d signature now `(scores, config)`, keys `shift_wins_A4_over_A3`, `shift_cells`, `shift_pass` removed, `pass = bool(in_dist_ok)`; `report.py` H2d text and key number lose the shift clause. Noise- and library-sweep cells now run `with_evals=False`: the grep shows no consumer of their `evals` (`h1a`, `h1b`, `h2b` read `moments` and `oracles` only; `_sweep_subset` reads the core cell, which keeps its evals). New test `test_analysis.py::test_h2d_is_the_in_distribution_part_only`. |
+
+Decisions within the plan (no criterion changed):
+
+- Plan row `experiments.py:7` says docstrings "say robustness": module docstring stage (v) now reads "robustness"; `run_system`'s Returns note says "for robustness".
+- `pipeline.fit_rules` docstring "several for pooled transfer" reworded (a transfer mention the plan's table did not list).
+- `gain_proxy` kept (core `ensemble`; DEC-0007 answer 4). `_sweep_subset` still slices it.
+- Experiment-id labels such as "(E5)" in the stage (iv) docstring are not touched (out of scope: relabels).
+- The pure-removal commits did not touch the import graph (no module added or removed), so the fixture is unchanged in .1.
+- `ruff check --select F lpcstudy` (an unused-import check, read-only) passes after the removals.
+- Greps after the last commit: `grep -rn "lorenz96\|transfer\|A4f\|shift" lpcstudy/` returns nothing; `grep -rn "delay_scale\|delay/2\|lorenz96" lpcstudy/ tools/ tests/` returns only the three new tests that name the removed symbols as strings.
+
+Existing tests edited (argv only, assertions unchanged, none removed):
+
+| Test | Edit | Reason |
+| --- | --- | --- |
+| `tests/unit/test___main__.py::run_with_fakes` (helper used by the fake-study tests) | `"--skip-transfer"` dropped from argv | The option no longer exists; `choose_seed` would now refuse it. The assertions (`main(...) == 0`, saves) are unchanged. |
+| `tests/unit/test_tools_run_preset.py::test_pass_through_arguments_follow_the_seed` | `--skip-transfer` dropped from argv and from the expected tail; docstring updated | The wrapper now refuses it. The assertions are the same checks on the remaining arguments. |
+| (`tests/unit/test_tools_test_impact.py` is not touched in .1) | | |
+
+#### §4.9 checklist, WU-0002.1 radius run (unit tier, then integration)
+
+1. Change set: `git diff --name-only develop...HEAD` plus status: `README.md`, `lpcstudy/{__main__,allocation,analysis,config,data,experiments,pipeline,report,systems}.py`, `tools/run_preset.sh`, `tests/unit/test_{__main__,allocation,analysis,config,data,tools_run_preset}.py`, `tests/unit/test_systems.py` (new), this unit file.
+2. Radius: `python3 tools/test_impact.py --base develop --explain` selects 12 unit files (`test___main__ test_allocation test_analysis test_config test_data test_ensemble test_oracle test_provenance test_report test_seeds test_systems test_tools_run_preset`) and `tests/integration`. Hand additions per the plan: `test_dynamics.py`, `test_embedding.py` (they import `systems`; the known graph gap). Integration narrowed to `test_cli_seeds.py` and `test_preset_wrapper.py`: the plan replaces `test_smoke_pipeline.py` by the hand smoke run of (a)-(c). Smaller than the suite; no gate.
+3. Already run: no (all new code).
+4. Device: `JAX_PLATFORMS=cpu` (set by `tools/run_tests.sh`).
+5. Threads and time: `LPC_THREADS=4`; unit tier timeout 300 s, integration 900 s.
+6. Contention: `pgrep -fa "lpcstudy --preset"` shows no run; no GPU use.
+7. Output: wrapper default `-q --tb=short -rfE`.
+8. Commands: `tools/run_tests.sh unit <the 14 unit files>` and `tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`.
+
 ## Review
 
 ## Audit
