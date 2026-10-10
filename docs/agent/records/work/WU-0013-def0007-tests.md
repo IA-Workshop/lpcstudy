@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | in progress |
+| Status | done |
 | Class | CSQ3 development |
 | Agent(s) | claude-sonnet-5-5 (main session) under governance ledger entry 5 (authorizations 4, 6) |
 | Estimate | WU-0013.1 M, .2 S (ROADMAP.md §2) |
@@ -115,6 +115,8 @@ Merge-gate checklist (§4.9, §4.3):
 7. **Output:** `-q --tb=short -rfE`.
 8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
 
+Result (same entry): **`78 passed in 54.00s`** = the 63 tests on `main` + 15 new or split tests. Run once; no failures; no retry.
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, a fresh context (not the WU-0013.2 author, and not the WU-0013.1 audit context, although it is the same model id). 2026-10-10, worktree `wu/0013-def0007-audit` at `752b0a5` against `main`.
@@ -159,9 +161,16 @@ Merge-gate checklist (§4.9, §4.3):
 
 ## Audit
 
-- Is the definition of done met? Give the evidence.
-- Defects recorded:
+- Is the definition of done met? Yes.
+  - **WU-0013.1:** `docs/agent/records/audits/2026-10-10-def-0007-tests.md` classifies all 14 tests: 13 `reference`, 0 `regression guard`, 1 `defective` (the dynamics observability test, which copied the code's formula); each `reference` row names its LPC.PC.21a kind; the audit touched no test.
+  - **WU-0013.2:** every one of the 14 tests has a docstring naming its reference and justifying each tolerance (reviewer recomputed 5+ of the figures and the log-rank hand case); no numeric literal in an assert or approx of the original tests grew (reviewer checked every literal in `git diff main...HEAD`); the defective test is renamed `test_regression_observability_matches_ad_jacobians` with body and tolerance unchanged and three independent tests were added; the AMI band test is split and renamed `test_regression_ami_delay_lorenz_band` with the assertion unchanged; independent log-rank references (hand case, `scipy.stats.logrank`) added. No disagreement with `lpcstudy/` code was found.
+  - **Gate:** `78 passed in 54.00s`; independent review approved after one fix round (R1 and R3 recorded on `main`, R2 fixed in 2e050eb).
+  - **DEF-0007:** resolved line appended on `main` at the merge.
+- Defects recorded: none new from this unit. Two uncounted silent cases added to DEF-0001 (status line, commit 1ac0698), on the reviewer's R3.
 - Notes for successors:
+  - The AMI delay band `[3, 8]` is uncited and wider than its own 0.15 to 0.2 time-unit claim: the `researcher` should retrieve a cited AMI delay for Lorenz-63 (blocked behind the retrieval authorization), after which the band can be tightened and the test renamed back.
+  - The very loose tolerances the audit flagged (about 30 standard errors in the seed-proxy test, about 11 in `retrieval_spread`) were kept and documented, not tightened; tightening is allowed later.
+  - If a future change tightens a tolerance, justify it in the docstring; never widen.
 
 ## Referral
 
