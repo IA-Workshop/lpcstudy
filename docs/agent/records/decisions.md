@@ -116,3 +116,20 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0001.4's test only. Separate finding, not a decision: a child process inherits its parent's peak in `ru_maxrss` (a child of a 200 MB Python reported 218 MB against its own `VmHWM` of 11 MB), so a recorded `peak_rss_bytes` can reflect the launcher's peak. WU-0001 documents this limitation; whether to also record `VmHWM` is for the owner (it changes the provenance schema).
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0007: WU-0002.1 and .2 plan: answers to the planner's questions and work pulled forward  (2026-10-10, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** The plan amendment for WU-0002.1 and .2 (`docs/agent/records/work/WU-0002-methods-v2-changes.md`, branch `wu/0002-removals-ids`) depends on no owner ruling and decides no criterion, band, verdict rule or definition; it only removes and renames. Answers to its four questions (the plan's defaults):
+
+- *Q1.* The v2 and v1 ids stored in `identifiers.py` and its v1-to-v3 key map are historical data, not live code symbols, for the .2 criterion "grep finds no live code symbol".
+- *Q2.* Key names `gain_bound`, `regime_curve`, and a top-level `V7` until WU-0002.10.
+- *Q3.* Criterion text stays v3 verbatim, including v3's own `N_lib`; library size elsewhere (config labels, report text, figure axes) reads `n_lib`. An agent does not respell criterion text.
+- *Q4.* `gain_proxy` is kept for now (removing it is a separate, later change in a core module); no effect on the regression.
+
+**Work pulled forward from later sub-tasks (the plan's reason: the item's only input is removed code, or a figure reads it):** H2d part (ii) is removed in .1 (WU-0002.8 would have done it); the v1 H3b (p_eff) statistic is removed in .2 and its regret-vs-K curve moves to `regime_curve` (WU-0002.8); the v1 H1a to `V7` key rename is done in .2 (WU-0002.10). Each follows the decision log. Consequence for the owner's ruling A2 in `docs/agent/notes/2026-10-10-rulings-for-owner.md`: after .2 a v3 `H3b` key exists (renamed from v1 H3c), so the ROADMAP's literal WU-0002.8 check "no `H3b` key exists anywhere in results" cannot pass until the owner adopts the changed wording ("no key for v1 H3b (p_eff)").
+
+**Alternatives weighed.** *Hold .1 and .2 until the owner rules on the referral:* rejected, since nothing in them depends on a ruling. *Leave the pulled-forward items to .8 and .10:* rejected by the planner because the figure code and the key collisions (H1b to H1a, H3c to H3b, the old H2e) make sequential renames impossible.
+
+**Affects:** WU-0002.1 and .2 only. Marked "needs owner review before freeze" (verdict code is touched by renames; `__main__` options and `tools/run_preset.sh` behind the seed refusal are touched by the removals).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
