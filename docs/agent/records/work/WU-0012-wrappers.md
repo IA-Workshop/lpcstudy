@@ -241,6 +241,18 @@ Checklist for run 2 (§4.9):
 7. **Output:** `-q --tb=short -rfE`.
 8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
 
+**2026-10-10, developer claude-sonnet-5-5: gate fix F3 written, not yet run.** Gate run 2 failed `test_smoke_through_the_wrapper_matches_a_direct_run` with `dirty: True != False`: a reviewer appended to the tracked unit file while the test ran, so the working tree changed between the direct and the wrapped run (not a product defect). The test now records `git status --porcelain` (untracked included) before the direct run, after it and after the wrapped run, and fails with a message that says the working tree changed during the test and shows the three snapshots if they differ. It does not skip, does not ignore `dirty`, and no existing comparison changed.
+
+§4.9 checklist before the F3 run:
+1. Change set: `M tests/integration/test_preset_wrapper.py` (and this log).
+2. Radius: that one test by node id (instructed by the main session); nothing else.
+3. Already run: yes, the old form failed in gate run 2 for a cause outside the code; the test code has changed, so one rerun is allowed (4.4).
+4. Device: `JAX_PLATFORMS=cpu`; no GPU or real lock.
+5. Threads and time: `LPC_THREADS=4`; integration timeout 900 s.
+6. Contention: nothing heavy running; nobody writes to this worktree (main session).
+7. Output: `-q --tb=short -rfE`.
+8. Command: `tools/run_tests.sh integration tests/integration/test_preset_wrapper.py::test_smoke_through_the_wrapper_matches_a_direct_run`.
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-10. Reviewed diff `main...HEAD` (557e074, dbca55e, c831aa6 on plan 1639d96), against the plan, DEC-0005, DEVELOPMENT_WORKFLOW §2.3/§4.5/§4.6/§4.9, settings.json, test_gate.py, skill dev-run and `tools/test_impact.py`.
