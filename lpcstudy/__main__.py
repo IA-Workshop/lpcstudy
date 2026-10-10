@@ -6,6 +6,7 @@ import argparse
 import dataclasses
 import json
 import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -14,11 +15,12 @@ from .config import PRESETS
 from .experiments import run_robustness, run_system, run_transfer, run_transfer_target
 from .pipeline import Study
 from .report import make_figures, save_json, verdicts, write_markdown
-from .seeds import (LEDGER_PATH, REGISTRY_PATH, SeedRefusal, load_registry, resolve_dev_seed,
-                    with_seed)
+from .seeds import (LEDGER_PATH, REGISTRY_PATH, SeedRefusal, confirmatory_seed, load_registry,
+                    resolve_dev_seed, with_seed)
 
 REFUSAL_EXIT = 64
 DEFAULT_SEED_ID = "DEV-0"
+CONFIRMATORY_SEED_ID = "CONF-1"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -26,6 +28,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--seed-id", default=None, metavar="DEV-n",
                         help=f"Registered development seed (default {DEFAULT_SEED_ID}).")
+    parser.add_argument("--confirmatory", action="store_true",
+                        help="Owner-only (LPC.AUTH.6): seed and salt from LPC_CONF_SEED and "
+                             "LPC_CONF_SALT, verified against the ledger commitment.")
     parser.add_argument("--seed", nargs="*", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--preset", default="pilot", choices=sorted(PRESETS))
     parser.add_argument("--out", default="results", type=Path)
@@ -38,12 +43,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def choose_seed(args: argparse.Namespace, extras: list[str],
-                registry_path: Path) -> tuple[str, int]:
+def choose_seed(args: argparse.Namespace, extras: list[str], registry_path: Path,
+                ledger_path: Path = LEDGER_PATH) -> tuple[str, int]:
     """Return ``(seed_id, seed)`` for the parsed arguments or raise ``SeedRefusal``.
 
     Refused: a raw ``--seed``, an unrecognized option (including an abbreviation of a real
-    one), and a seed id that is not in the registry. Values are never echoed.
+    one), the confirmatory flag together with ``--seed-id``, a seed id that is not in the
+    registry, and a confirmatory request without the environment variables or with a seed
+    and salt that do not match the ledger commitment. Values are never echoed.
     """
     if args.seed is not None:
         raise SeedRefusal("a raw integer seed (--seed) is never accepted; use --seed-id DEV-n")
@@ -52,6 +59,10 @@ def choose_seed(args: argparse.Namespace, extras: list[str],
         what = (f"unrecognized option(s) {', '.join(options)} (abbreviations are disabled)"
                 if options else "unexpected positional argument(s)")
         raise SeedRefusal(what)
+    if args.confirmatory:
+        if args.seed_id is not None:
+            raise SeedRefusal("the confirmatory flag and --seed-id are mutually exclusive")
+        return CONFIRMATORY_SEED_ID, confirmatory_seed(os.environ, ledger_path)
     seed_id = args.seed_id if args.seed_id is not None else DEFAULT_SEED_ID
     return seed_id, resolve_dev_seed(seed_id, load_registry(registry_path))
 
@@ -77,7 +88,7 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     parser = build_parser()
     args, extras = parser.parse_known_args(argv)
     try:
-        seed_id, seed = choose_seed(args, extras, registry_path)
+        seed_id, seed = choose_seed(args, extras, registry_path, ledger_path)
     except SeedRefusal as refusal:
         print(f"lpcstudy: refused (LPC.PC.7): {refusal.reason}", file=sys.stderr)
         return REFUSAL_EXIT
@@ -101,7 +112,10 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
         logging.getLogger("lpcstudy").info("seed id defaulted to %s", DEFAULT_SEED_ID)
     start = time.time()
     study = Study(config, out_dir)
-    results: dict = {"config": dataclasses.asdict(config), "systems": {}}
+    record = dataclasses.asdict(config)
+    if config.seed_id.startswith("CONF-"):
+        record["seed"] = None  # the confirmatory value is never written to an output
+    results: dict = {"config": record, "systems": {}}
     for system in config.core_systems:
         results["systems"][system] = run_system(study, system)
         save_json(results, out_dir / "results.json")

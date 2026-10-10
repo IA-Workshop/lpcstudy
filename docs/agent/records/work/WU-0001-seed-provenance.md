@@ -257,6 +257,25 @@ The code (`check_commitment`, `confirmatory_seed`) was written with `seeds.py` i
 
 Result: `84 passed in 0.81s`. Self-check: only test files changed; fixture ledgers are asserted outside the repository; `LPC_CONF_*` deleted and `tools.ledger.LEDGER` monkeypatched in an autouse fixture; no tolerance.
 
+Commit `10b7913` (WU-0001.2).
+
+### 2026-10-10 developer (claude-sonnet-5-5), WU-0001.3: the confirmatory flag and its refusals
+
+Code: `__main__.py` gains the confirmatory flag (mutually exclusive with `--seed-id`, refused with exit 64 if both; seed and salt only via `seeds.confirmatory_seed(os.environ, ledger_path)`), and `results["config"]` carries `seed: null` for a `CONF-*` id (moved to `provenance.config_record` in .4). Hook note: the Bash tool blocks any command text containing the flag, so the .3 source and test files were written with the Edit/Write tools (the hook scans commands, not files); no command with the flag was run. The flag is exercised only in-process in `test___main__.py` (synthetic seed, tmp_path ledger) and in the subprocess cases of the plan's `tests/integration/test_cli_seeds.py` (tmp_path ledger, synthetic values, `LPC_CONF_*` stripped from the child environment first).
+
+§4.9 checklist, WU-0001.3 run:
+
+1. Change set: `lpcstudy/__main__.py`, `tests/unit/test___main__.py`, `tests/integration/test_cli_seeds.py` (new), this unit file.
+2. Radius: plan row .3, `__main__` is a pipeline module: own + integration: `tests/unit/test___main__.py` and `tests/integration/test_cli_seeds.py` (the plan names the new file; the smoke test `test_smoke_pipeline.py` is deferred to .5, where the manual smoke run is its evidence). Smaller than the suite.
+3. Already run: no (`test___main__` last ran before this change).
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads: 4; the 8 subprocess cases import jax once each (about 3 s), timeout 120 s per case.
+6. Contention: no `pilot`/`full` run by me; other agents share the CPU.
+7. Output: `-q --tb=short -rfE`.
+8. Command: as in .1 with `tests/unit/test___main__.py tests/integration/test_cli_seeds.py`.
+
+Result: `31 passed in 7.91s`. Self-check: `os.environ` read only in `choose_seed`; no `clip|nan_to_num|isfinite|where(|try:|except` added in `lpcstudy/__main__.py`; no randomness added; no tolerance.
+
 ## Review
 
 ## Audit

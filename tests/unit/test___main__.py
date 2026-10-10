@@ -104,3 +104,72 @@ def test_registry_path_is_a_python_parameter_only() -> None:
     """
     options = {s for action in build_parser()._actions for s in action.option_strings}
     assert not {o for o in options if "ledger" in o or "registry" in o}
+
+
+# ------------------------------------------------------------ WU-0001.3: the confirmatory flag
+# In-process only, with a throwaway ledger in tmp_path and synthetic seeds (LPC.PC.7).
+
+SEED = 123456789012345
+SALT = "0f" * 16
+FLAG = "--confirmatory"
+
+
+def ledger_with(path: Path, seed: int) -> Path:
+    """A one-entry hash-chained ledger holding the ``CONF-1`` commitment of ``seed``."""
+    import hashlib
+    digest = hashlib.sha256(f"{seed}:{SALT}".encode()).hexdigest()
+    record = {"seq": 1, "prev_sha256": "0" * 64, "utc": "2026-01-01T00:00:00+00:00",
+              "type": "commitment", "actor": "test", "role": "test", "authority": "",
+              "summary": "synthetic", "files": {},
+              "data": {"seed_id": "CONF-1", "sha256": digest}}
+    path.write_text(json.dumps(record, sort_keys=True) + "\n")
+    return path
+
+
+def test_confirmatory_flag_returns_the_verified_seed_under_conf_1(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """With matching synthetic variables the flag resolves to ``("CONF-1", seed)``.
+
+    Reference: the synthetic seed literal; the ledger is built in the test with hashlib.
+    Exact. The study is not run.
+    """
+    monkeypatch.setenv("LPC_CONF_SEED", str(SEED))
+    monkeypatch.setenv("LPC_CONF_SALT", SALT)
+    args, extras = build_parser().parse_known_args([FLAG])
+    assert choose_seed(args, extras, REGISTRY_PATH,
+                       ledger_with(tmp_path / "l.jsonl", SEED)) == ("CONF-1", SEED)
+
+
+@pytest.mark.parametrize("argv, set_env", [
+    ([FLAG, "--seed-id", "DEV-0"], True),     # mutually exclusive, even with valid variables
+    ([FLAG], False),                          # no variables
+    ([FLAG, "--seed", "5"], True),            # raw integer beside the flag
+])
+def test_confirmatory_refusals_in_process(argv: list[str], set_env: bool, tmp_path: Path,
+                                          monkeypatch: pytest.MonkeyPatch,
+                                          capsys: pytest.CaptureFixture[str]) -> None:
+    """The flag with ``--seed-id`` or a raw seed, or without variables, is refused (64).
+
+    Reference: the refusal contract. One stderr line, nothing created, no seed or salt echoed.
+    """
+    if set_env:
+        monkeypatch.setenv("LPC_CONF_SEED", str(SEED))
+        monkeypatch.setenv("LPC_CONF_SALT", SALT)
+    out = tmp_path / "out"
+    code = main([*argv, "--out", str(out)], ledger_path=ledger_with(tmp_path / "l.jsonl", SEED))
+    err = capsys.readouterr().err
+    assert code == 64 and len(err.splitlines()) == 1 and err.startswith(PREFIX)
+    assert not out.exists()
+    assert str(SEED) not in err and SALT not in err
+
+
+def test_mismatched_commitment_in_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                          capsys: pytest.CaptureFixture[str]) -> None:
+    """A seed that differs from the committed one is refused (64) with one line."""
+    monkeypatch.setenv("LPC_CONF_SEED", str(SEED + 1))
+    monkeypatch.setenv("LPC_CONF_SALT", SALT)
+    out = tmp_path / "out"
+    code = main([FLAG, "--out", str(out)], ledger_path=ledger_with(tmp_path / "l.jsonl", SEED))
+    err = capsys.readouterr().err
+    assert code == 64 and len(err.splitlines()) == 1 and err.startswith(PREFIX)
+    assert not out.exists() and str(SEED + 1) not in err and SALT not in err
