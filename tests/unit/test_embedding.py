@@ -28,14 +28,17 @@ def test_regression_ami_delay_lorenz_band() -> None:
     REGRESSION GUARD (WU-0013.2, DEF-0007 audit item 2), not correctness evidence. The
     band's source ("0.15-0.2 time units") is uncited, so LPC.PC.21a is not met for
     it: a published value must be cited in the code, and no source has been verified
-    (needs ``/verify-citation`` or the ``researcher``). Until it is, the test pins the
-    current behaviour: ``select_delay`` returns 5 steps = 0.184 time units at
-    Delta t = 0.0368, inside the docstring's 0.15-0.2 band (4.08-5.43 steps).
+    (needs ``/verify-citation`` or the ``researcher``). Until it is, the test is a
+    deliberately loose guard that the selected delay stays within [3, 8] steps. It
+    does not pin the current value: ``select_delay`` currently returns 5 steps =
+    0.184 time units at Delta t = 0.0368, but any value from 3 to 8 passes.
 
-    Tolerance: integer band [3, 8] steps (0.110-0.294 time units), unchanged. It is
-    wider than the docstring's own 0.15-0.2 band (4.08-5.43 steps); tightening it
-    needs the cited value (the audit does not allow tightening without a source), so
-    it is kept and not widened. The estimator is the default 32-equiprobable-bin
+    Tolerance: integer band [3, 8] steps (0.110-0.294 time units), unchanged. The band
+    is uncited and wider than the docstring's own 0.15-0.2 time-unit claim
+    (4.08-5.43 steps). It is kept, neither widened nor tightened: the audit does not
+    allow tightening without a source. A cited reference, to be retrieved by the
+    ``researcher``, would let the band be tightened and the test renamed back
+    (dropping ``regression``). The estimator is the default 32-equiprobable-bin
     histogram AMI with the first local minimum of a 3-point smoothed curve, on
     55 000 normalized samples (60 000 steps, 5 000 burn-in).
     """
