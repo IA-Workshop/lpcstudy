@@ -112,6 +112,40 @@ Each is one commit: "WU-0005.k: …", ending `Agent: <model id>`.
 
 <dated entries: what was done, commands, results, commits>
 
+**2026-10-10, applied-mathematician (claude-opus-5-5): answers to Q1 to Q3 (before any test is written).** Scratch scripts run CPU-only with 2 threads, outside the repository: no test suite, no preset, no study or DEV seed. The Levina-Bickel numbers use the code's own `local_dimension`, with `cKDTree` patched to `workers=2`.
+
+- **Q1 (WU-0005.1). Confirmed, and tightened.**
+  - **Setup.** `make_flow_step` uses `substeps = max(1, ceil(interval/max_dt))` and `dt = interval/substeps`. For T = 1 and h = 1/8, 1/16, 1/32 these are exactly 8, 16 and 32 steps with dt = h. `max_dt` is the only step control.
+  - **A.** A = S B S⁻¹ = [[0.75436893, −2.42718447, 0.72815534], [1.96504854, −1.08252427, 0.17475728], [0.05436893, −0.42718447, −0.37184466]]. Its eigenvalues are −0.1 ± 2i and −0.5, and cond(S) = 1.70. x0 = (1, 0.5, −0.3).
+  - **Reference.** `scipy.linalg.expm(A)` agrees with a 50-digit Taylor series to 1.2e-15. The code's output is float64 and equals the RK4 stability polynomial R(hA)^N x0 to within 2.2e-15.
+  - **Measured errors.** ‖x_ref − x_h‖₂ = 6.94e-5, 4.21e-6 and 2.59e-7 (≈ 0.27 h⁴). The planner's 1.4e-4, 8.6e-6 and 5.3e-7 are upper bounds. The coarsest error is below 1e-3 and the finest is above 1e-11, with a factor of 1e8 over round-off.
+  - **Observed orders.** 4.042 for (1/8, 1/16) and 4.024 for (1/16, 1/32). The deviation from 4 is O(h): 0.042, 0.024, 0.013, 0.007 as h halves. The run is deterministic, so round-off moves p by about 1e-8.
+  - **Correction to the derivation.** The sign of the leading term is now verified: x_ref − x_h = +(T h⁴/120) A⁵ e^{AT} x0 + O(h⁵).
+  - **Final assertions.**
+    1. Premises: `np.allclose(sorted eigvals, [−0.5, −0.1−2j, −0.1+2j])`, `e(1/8) < 1e-3`, `e(1/32) > 1e-11`, output dtype float64.
+    2. For both pairs, `3.9 <= log2(e_h/e_{h/2}) <= 4.1`. This tightens the roadmap's [3.8, 4.2].
+    3. Leading term at h = 1/32: ‖(x_ref − x_h) − L h⁴‖₂ ≤ 0.10 ‖L h⁴‖₂, with L = (T/120) A⁵ expm(AT) x0. The measured value is 0.043. This vector form also checks the direction and sign; the norm ratio alone is 1.019. This is an added check, so it tightens the criterion.
+  - **`test_flow_step_respects_max_dt`.** Sound: max_dt = 0.3 and 0.25 both give 4 substeps of 0.25, so the arithmetic is identical. `atol=1e-15` stands.
+  - **Limitation.** A linear field tests only the stability polynomial, which is the same for every 4-stage order-4 method. It cannot see an error in the nonlinear order conditions.
+  - **Optional (main session decides).** A scalar autonomous ODE has the same order conditions as a system up to order 4, so it checks all of them. Take y′ = y², y0 = 0.5, T = 1, exact value 1. The measured errors are 2.90e-6, 1.84e-7 and 1.16e-8, with orders 3.975 and 3.993, inside [3.9, 4.1].
+- **Q2 (WU-0005.3). Law confirmed, with corrections. Statistic: the mean. Tolerance tightened to ±3%.**
+  - **Law.** Draws are iid, so given T_k the k − 1 inner neighbors are iid uniform in the ball. When the ball lies inside the set, S = Σ log(T_k/T_j) ~ Gamma(19, rate m) exactly for any n. Then (k − 2)/S has mean m and sd m/√(k − 3) = 0.2425m (exact). Its median is 18m/18.6677 = 0.9642m.
+  - **Correction 1: normalization.** k − 1 instead of k − 2 multiplies *every* estimate by 19/18, which is **+5.56%**, not +5.9%. The planner's "median +1.8%" is relative to m. Against its own target 0.9642m the median also moves by +5.56%.
+  - **Correction 2: boundary fraction.** The boundary fraction of the cube is **32%**, not 37% (measured 0.318: T₂₀ has mean 0.062 and max 0.078). For the square it is 6.9%, and for the segment 0.1%.
+  - **Dependence.** 200 seeds were run for each m, with n = 2e4, k = 20 and 2000 interior queries. The sd of mean/m was 0.0054, 0.0057 and 0.0057 for m = 1, 2, 3. The iid value is 0.00542, so the inflation is 1.00–1.06 (sd of the estimate ≈ 5%): none detectable. The mean of mean/m was 0.9997, 0.9999 and 1.0007. The median/m averaged 0.9641, 0.9643 and 0.9653, with sd 0.006–0.0066.
+  - **What ±10% about m catches.** It catches gross errors only: log10 (×0.43), a sign error, a query contained in the reference (estimate ≈ 0), or a factor of 2. It **cannot** catch k − 1 versus k − 2, with either statistic. It barely catches a numerator of k (+11.1% on the mean), and the median misses it (+7.1%).
+  - **What ±3% catches.** k − 1 lies 2.56% beyond the bound, which is 4.5σ, so a miss has probability below 1e-5. A false alarm is 5.3σ away, with probability about 1e-6 over the three m. 3% sits near the balanced point of 2.78%.
+  - **Boundary.** The exclusion is endorsed. A boundary-inclusive test measures the estimator's truncated-ball bias, not the code. For m = 3 that bias is −2.2% on the mean (median −5.6%), so it would push m = 3 against a ±3% bound. Its reference value would have to come from simulation, so it would not be independent.
+  - **Mean or median.** Use the mean. It has an exact reference with no constant, a smaller Monte Carlo sd, and the same sensitivity to the normalization. The median describes H1b's aggregation, which is not the code under test.
+  - **Final assertion.** For m ∈ {1, 2, 3}: `abs(est.mean()/m - 1) <= 0.03`, plus the premise `local_dimension.__defaults__ == (20,)`. This tightens the roadmap's ±10%.
+  - **Reference run.** With seed 50053 and my draw order, mean/m was 0.9957, 0.9974 and 1.0067.
+- **Q3 (WU-0005.2). Confirmed. Assertions unchanged.**
+  - **Round-off.** Each of the two computations rounds the difference (u), the square (2u + u) and the 6 additions of nonnegative terms (6u), with no cancellation, for 9u. The sqrt gives 4.5u + u. Each is therefore ≤ 5.5u, and their difference ≤ 11u ≈ 1.2e-15 relative. The planner's 1.8e-15 is consistent. `rtol=1e-12` leaves a factor of about 800.
+  - **Measured.** Over 31 seeds, including 50052, 6200 queries gave a relative difference of exactly 0, because the summation order is the same. The 10 copies give exactly 0.0.
+  - **Ties.** The smallest relative gap was 1.2e-6 over 37,200 gaps, which implies a gap density near 0 of about 22. That gives P(some gap < 1e-9 in one test) ≈ 3e-5, and an exact float tie about 1e-12.
+  - **Premise.** Keep the gap > 1e-9 premise as a hard assert, not a skip: at the fixed seed the minimum gap is 2.2e-5. Use `np.argsort(..., kind="stable")` so that the reference order is deterministic.
+  - **Tightening.** Not needed. A wrong neighbor is caught by the exact index check, and any bug in a distance is O(1).
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
