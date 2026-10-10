@@ -48,7 +48,7 @@ On a CUDA machine, `pip install "jax[cuda12]"`; the code runs unchanged. All com
 | `dynamics.py` | batched forecasts; amplifier g_H; growth exponents; observability ν (forward formula) |
 | `ensemble.py` | CP library; per-draw forecasts; oracle moments; evaluation draws with deployable features |
 | `oracle.py` | oracle state quantities; w*, curvature; characteristic and realized horizons |
-| `allocation.py` | rules A0–A5, A4f, A4o, A*; seed proxies; regime trees |
+| `allocation.py` | rules A0–A5, A4o, A*; seed proxies; regime trees |
 | `pipeline.py` | `Study` (caches, cells), rule fitting, scoring |
 | `analysis.py` | statistics behind every hypothesis |
 | `experiments.py` | stage orchestration; transfer; robustness |

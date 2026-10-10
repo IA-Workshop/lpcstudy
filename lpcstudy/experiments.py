@@ -104,8 +104,7 @@ def convergence_check(study: Study, cell: Cell) -> dict:
 def _evaluate(cell: Cell, rules: FittedRules, config: StudyConfig, split: str = "test"):
     """Rule weights and scores on one split of a cell."""
     data = cell.splits[split]
-    weights = rule_weights(rules, data, cell.noise, config, cell.horizons,
-                           cell.ctx.spec.dim)
+    weights = rule_weights(rules, data, cell.noise, config, cell.horizons)
     return weights, score_rules(weights, data, cell.horizons, config,
                                 config.primary_threshold)
 

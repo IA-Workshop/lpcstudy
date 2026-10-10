@@ -27,7 +27,6 @@ RULE_LABELS: dict[str, str] = {
     "A2": "Global fixed weight",
     "A3": "Error-predictor allocator (Heuer-inspired)",
     "A4": "LPC closed form (deployable)",
-    "A4f": "LPC full form with amplifier (deployable)",
     "A5": "LPC regimes (deployable)",
     "A4o": "LPC closed form (oracle seeds)",
     "A*": "Oracle state-optimal weight",
@@ -187,36 +186,6 @@ def deployable_profile(ev: EvaluationDraws, proxies: ProfileProxies, noise: floa
 def closed_form_weight(eps_sq: np.ndarray, delta_sq: np.ndarray) -> np.ndarray:
     """FW Corollary 1: ``w = delta^2 / (eps^2 + delta^2)``."""
     return delta_sq / np.maximum(eps_sq + delta_sq, 1e-300)
-
-
-def full_form_weight(eps_sq: np.ndarray, delta_sq: np.ndarray, gains: np.ndarray,
-                     noise: float, n_analogs: int, state_dim: int) -> np.ndarray:
-    """FW Proposition 3 with isotropic, uncorrelated seeds and the copied-noise term.
-
-    ``w = g^2 delta^2/m / (g^2 eps^2/m + rho^2/k + g^2 delta^2/m)``.
-
-    Parameters
-    ----------
-    eps_sq, delta_sq : np.ndarray
-        Squared seeds ``(n, E)``.
-    gains : np.ndarray
-        Amplification ``g_H`` ``(n, E, nH)``.
-    noise : float
-        ``rho``.
-    n_analogs : int
-        ``k``.
-    state_dim : int
-        ``m``.
-
-    Returns
-    -------
-    np.ndarray
-        Weights ``(n, E, nH)``.
-    """
-    amp = np.minimum(gains, 1e150) ** 2 / state_dim
-    v_a = amp * eps_sq[..., None]
-    v_s = amp * delta_sq[..., None]
-    return v_s / (v_a + noise**2 / n_analogs + v_s)
 
 
 @dataclass

@@ -20,8 +20,8 @@ from pathlib import Path
 import numpy as np
 
 from .allocation import ErrorPredictor, ProfileProxies, RegimeMap, calibrate_regimes, \
-    closed_form_weight, deployable_profile, fit_regime_tree, full_form_weight, \
-    global_weight, regime_regret, state_horizon_target
+    closed_form_weight, deployable_profile, fit_regime_tree, global_weight, regime_regret, \
+    state_horizon_target
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, build_context, make_rng
 from .ensemble import AnalogLibrary, EnsembleMoments, EvaluationDraws, ForecastSetup, \
@@ -93,8 +93,6 @@ class FittedRules:
     predictor: ErrorPredictor
     regimes: dict[int, RegimeMap]
     chosen_regimes: int
-    n_analogs: int
-    state_dim: int
 
 
 def allocator_grid(config: StudyConfig) -> np.ndarray:
@@ -331,9 +329,7 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
                                            config.primary_threshold, a2)
     chosen = _choose_regimes(regimes, cal_profile, cal_moments, href_col, config)
     return FittedRules(proxies=proxies, global_weights=a2, predictor=predictor,
-                       regimes=regimes, chosen_regimes=chosen,
-                       n_analogs=cells[0].setup.n_analogs,
-                       state_dim=cells[0].ctx.spec.dim)
+                       regimes=regimes, chosen_regimes=chosen)
 
 
 def _choose_regimes(regimes: dict[int, RegimeMap], profile: np.ndarray,
@@ -370,7 +366,7 @@ def _concat_evals(parts: list[EvaluationDraws]) -> EvaluationDraws:
 
 # ------------------------------------------------------------------- evaluation
 def rule_weights(rules: FittedRules, split: SplitData, noise: float,
-                 config: StudyConfig, horizons: np.ndarray, state_dim: int
+                 config: StudyConfig, horizons: np.ndarray
                  ) -> dict[str, np.ndarray]:
     """Weights of every rule on one split's evaluation draws.
 
@@ -386,8 +382,6 @@ def rule_weights(rules: FittedRules, split: SplitData, noise: float,
         Study configuration.
     horizons : np.ndarray
         Horizons of the split's arrays.
-    state_dim : int
-        State dimension ``m`` of the evaluated system (used by A4f).
 
     Returns
     -------
@@ -409,8 +403,6 @@ def rule_weights(rules: FittedRules, split: SplitData, noise: float,
         "A3": rules.predictor.weights(ev.inputs, horizons),
         "A4": np.broadcast_to(closed_form_weight(eps_hat**2, delta_hat**2)[..., None],
                               shape).copy(),
-        "A4f": full_form_weight(eps_hat**2, delta_hat**2, ev.gain_proxy, noise,
-                                rules.n_analogs, state_dim),
         "A5": regime_map.weights[regime][..., horizons - 1],
         "A4o": np.broadcast_to(oracle_cf[:, None, None], shape).copy(),
         "A*": np.broadcast_to(oracle_weight(moments)[:, None, :], shape).copy(),
