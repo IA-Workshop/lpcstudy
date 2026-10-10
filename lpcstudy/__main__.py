@@ -6,18 +6,33 @@ import argparse
 import dataclasses
 import json
 import logging
+import os
+import sys
 import time
 from pathlib import Path
 
+from . import provenance
 from .config import PRESETS
 from .experiments import run_robustness, run_system, run_transfer, run_transfer_target
 from .pipeline import Study
 from .report import make_figures, save_json, verdicts, write_markdown
+from .seeds import (LEDGER_PATH, REGISTRY_PATH, SeedRefusal, confirmatory_seed, load_registry,
+                    resolve_dev_seed, with_seed)
+
+REFUSAL_EXIT = 64
+DEFAULT_SEED_ID = "DEV-0"
+CONFIRMATORY_SEED_ID = "CONF-1"
 
 
-def main() -> None:
-    """Run the study for a preset and write results, report and figures."""
-    parser = argparse.ArgumentParser(description=__doc__)
+def build_parser() -> argparse.ArgumentParser:
+    """Return the argument parser; abbreviations are off so no flag can be guessed (LPC.PC.7)."""
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
+    parser.add_argument("--seed-id", default=None, metavar="DEV-n",
+                        help=f"Registered development seed (default {DEFAULT_SEED_ID}).")
+    parser.add_argument("--confirmatory", action="store_true",
+                        help="Owner-only (LPC.AUTH.6): seed and salt from LPC_CONF_SEED and "
+                             "LPC_CONF_SALT, verified against the ledger commitment.")
+    parser.add_argument("--seed", nargs="*", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--preset", default="pilot", choices=sorted(PRESETS))
     parser.add_argument("--out", default="results", type=Path)
     parser.add_argument("--systems", nargs="*", default=None,
@@ -26,12 +41,69 @@ def main() -> None:
     parser.add_argument("--skip-robustness", action="store_true")
     parser.add_argument("--report-only", action="store_true",
                         help="Rebuild RESULTS.md and figures from an existing results.json.")
-    args = parser.parse_args()
+    return parser
 
-    config = PRESETS[args.preset]
+
+def choose_seed(args: argparse.Namespace, extras: list[str], registry_path: Path,
+                ledger_path: Path = LEDGER_PATH) -> tuple[str, int]:
+    """Return ``(seed_id, seed)`` for the parsed arguments or raise ``SeedRefusal``.
+
+    Refused: a raw ``--seed``, an unrecognized option (including an abbreviation of a real
+    one; the token is never echoed), the confirmatory flag together with ``--seed-id``, a seed id that is not in the
+    registry, and a confirmatory request without the environment variables or with a seed
+    and salt that do not match the ledger commitment. Values are never echoed.
+    """
+    if args.seed is not None:
+        raise SeedRefusal("a raw integer seed (--seed) is never accepted; use --seed-id DEV-n")
+    if extras:
+        known = {name for action in build_parser()._actions for name in action.option_strings}
+        names = sorted({e.split("=", 1)[0] if e.split("=", 1)[0] in known else "<value>"
+                        for e in extras if e.startswith("-")})
+        what = (f"unrecognized option(s) {', '.join(names)} (abbreviations are disabled)"
+                if names else "unexpected positional argument(s)")
+        raise SeedRefusal(what)
+    if args.confirmatory:
+        if args.seed_id is not None:
+            raise SeedRefusal("the confirmatory flag and --seed-id are mutually exclusive")
+        return CONFIRMATORY_SEED_ID, confirmatory_seed(os.environ, ledger_path)
+    seed_id = args.seed_id if args.seed_id is not None else DEFAULT_SEED_ID
+    return seed_id, resolve_dev_seed(seed_id, load_registry(registry_path))
+
+
+def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
+         registry_path: Path = REGISTRY_PATH) -> int:
+    """Run the study for a preset and write results, report and figures.
+
+    Parameters
+    ----------
+    argv : list[str], optional
+        Arguments (default ``sys.argv[1:]``).
+    ledger_path, registry_path : Path
+        Ledger and seed registry. Python-only: no flag or environment variable
+        can redirect them, so the commitment cannot be redirected from the command line.
+
+    Returns
+    -------
+    int
+        0 on success; 64 after a seed refusal, with exactly one stderr line
+        ``lpcstudy: refused (LPC.PC.7): <reason>`` and before any output is created.
+    """
+    parser = build_parser()
+    args, extras = parser.parse_known_args(argv)
+    try:
+        seed_id, seed = choose_seed(args, extras, registry_path, ledger_path)
+    except SeedRefusal as refusal:
+        print(f"lpcstudy: refused (LPC.PC.7): {refusal.reason}", file=sys.stderr)
+        return REFUSAL_EXIT
+
+    config = with_seed(PRESETS[args.preset], seed_id, seed)
     if args.systems:
         config = dataclasses.replace(config, core_systems=tuple(args.systems))
     out_dir = args.out / config.name
+    if not args.report_only:  # read once, before any output exists (LPC.PC.18)
+        clock = provenance.RunClock()
+        block = provenance.collect(config, seed_id, sys.argv[1:] if argv is None else argv,
+                                   clock)
     out_dir.mkdir(parents=True, exist_ok=True)
     if args.report_only:
         results = json.loads((out_dir / "results.json").read_text())
@@ -39,13 +111,25 @@ def main() -> None:
         save_json(results, out_dir / "results.json")
         write_markdown(results, config, out_dir / "RESULTS.md")
         make_figures(results, config, out_dir / "figures")
-        return
+        return 0
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.FileHandler(out_dir / "run.log"),
                                   logging.StreamHandler()])
+    log = logging.getLogger("lpcstudy")
+    if args.seed_id is None and not args.confirmatory:
+        log.info("seed id defaulted to %s", DEFAULT_SEED_ID)
+    log.info("provenance: seed id %s, commit %s, dirty %s", block["seed_id"], block["commit"],
+             block["dirty"])
+    if block["git_error"]:
+        log.warning("git state unavailable, recorded as null: %s", block["git_error"])
+    missing = [name for name, version in block["packages"].items() if version is None]
+    if missing:
+        log.warning("%d package(s) not installed, recorded as null: %s", len(missing),
+                    ", ".join(missing))
     start = time.time()
     study = Study(config, out_dir)
-    results: dict = {"config": dataclasses.asdict(config), "systems": {}}
+    results: dict = {"config": provenance.config_record(config), "systems": {},
+                     "provenance": block}
     for system in config.core_systems:
         results["systems"][system] = run_system(study, system)
         save_json(results, out_dir / "results.json")
@@ -62,11 +146,13 @@ def main() -> None:
     results["verdicts"] = verdicts(results, config)
     results["estimators"] = study.estimator_log
     results["seconds"] = time.time() - start
+    results["provenance"] = provenance.finish(block, clock)
     save_json(results, out_dir / "results.json")
     write_markdown(results, config, out_dir / "RESULTS.md")
     make_figures(results, config, out_dir / "figures")
-    logging.getLogger("lpcstudy").info("study finished in %.0fs", results["seconds"])
+    log.info("study finished in %.0fs", results["seconds"])
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -106,6 +106,10 @@ class StudyConfig:
         Systems on which the robustness sweep is run.
     seed : int
         Master random seed.
+    seed_id : str
+        Id of the seed in ``seeds/development_seeds.json`` (``DEV-n``), or ``CONF-1``
+        for a confirmatory run (LPC.PC.7). The presets use ``DEV-0``, whose value is
+        ``seed``.
     """
 
     name: str = "full"
@@ -155,6 +159,7 @@ class StudyConfig:
     perturbation_dirs: int = 20
     robustness_systems: tuple[str, ...] = ("lorenz63", "rossler")
     seed: int = 20261005
+    seed_id: str = "DEV-0"
 
     @property
     def horizon_max(self) -> int:
