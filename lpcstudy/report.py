@@ -21,11 +21,17 @@ SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a
 INK, INK_2, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 PLOTTED_RULES = ["A0", "A1", "A2", "A3", "A4", "A5", "A*"]
 
-def _hypothesis_text(row: Hypothesis) -> str:
-    """Report text of a table row: role mark, v3 criterion, and the pending note if any."""
+def _hypothesis_text(row: Hypothesis, computed: bool = True) -> str:
+    """Report text of a table row: role mark, v3 criterion, and the pending note if any.
+
+    ``computed`` is false for a row with no result: its note then says "not computed" instead
+    of "computed with the v1 statistic".
+    """
     text = ("[primary] " if row.role == "primary" else "") + row.criterion
     if row.pending:
-        text += f" [computed with the v1 statistic until {', '.join(row.pending)}]"
+        until = ", ".join(row.pending)
+        text += (f" [computed with the v1 statistic until {until}]" if computed
+                 else f" [not computed until {until}]")
     return text
 
 
@@ -198,8 +204,8 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
     for row in HYPOTHESIS_TABLE:
         if row.key not in ver:  # a table row without a result is listed, not dropped
             cells = ["n/a: no result" for _ in systems]
-            lines.append(f"| {row.v3_id} | {HYPOTHESES[row.key]} | " + " | ".join(cells)
-                         + " | no result |")
+            lines.append(f"| {row.v3_id} | {_hypothesis_text(row, computed=False)} | "
+                         + " | ".join(cells) + " | no result |")
             continue
         cells = []
         for s in systems:

@@ -360,6 +360,20 @@ Map of old to new function names (analysis.py), for the concordance D-rows that 
 7. Output: wrapper default `-q --tb=short -rfE`.
 8. Commands: `tools/run_tests.sh unit <the 14 unit files above for .2>` and `tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`.
 
+#### 2026-10-10 developer (claude-sonnet-5-5), WU-0002.2: radius results (first pass)
+
+Unit set (14 files, listed in the checklist above): `1 failed, 201 passed in 11.17s`. The failure: `test_identifiers.py::test_check_keys_accepts_table_keys_and_refuses_stale_ids`, "DID NOT RAISE". Diagnosis: my own new test used the made-up id `H9z`; `check_keys` treats an id as hypothesis-shaped only when the letter is in `a`-`f` (the pattern `^(H\d[a-f]|Q-N|T1)$` of the ROADMAP grep), so `H9z` is correctly not refused. The code is as designed; the example in the test was wrong. Fix (test only): `H9z` becomes `H9f`. `--lf` on the failing test: `1 passed, 6 deselected in 0.30s`. The other 13 files were not re-run (no code or test change in them). Integration (`test_cli_seeds.py`, `test_preset_wrapper.py`): `10 passed in 137.28s (0:02:17)`.
+
+Before the smoke run I refined one report string (found while reading the smoke `RESULTS.md`): the v3 `H2e` row has no result, but its text read "[computed with the v1 statistic until WU-0002.7]", which is false for a row that is not computed. `report.write_markdown` now writes "[not computed until WU-0002.7]" for a row without a result (`_hypothesis_text(row, computed=False)`); rows with a result and a pending sub-task are unchanged. The test (vii) expectation changed with it (my own new test; the changed expectation is the new wording, nothing was loosened).
+
+§4.9 checklist for the re-run after this report change (`report.py` is a pipeline module):
+
+1. Change set: `lpcstudy/report.py`, `tests/unit/test_report.py`, this file.
+2. Radius: `report` -> own unit test `test_report.py` and the direct dependent `test___main__.py`, plus `tests/integration` (narrowed as above to `test_cli_seeds.py` and `test_preset_wrapper.py`; the hand smoke of (d) is its replacement). Smaller than the suite; no gate.
+3. Already run: not on this code (the earlier run was before the change).
+4. Device: `JAX_PLATFORMS=cpu`. 5. Threads: 4; unit 300 s, integration 900 s. 6. Contention: no preset run. 7. Output: `-q --tb=short -rfE`.
+8. Commands: `tools/run_tests.sh unit tests/unit/test_report.py tests/unit/test___main__.py`; `tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`.
+
 ## Review
 
 ## Audit

@@ -179,7 +179,9 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
 
     Reference: the 14 rows of the identifier table (decision-log map, order of v3 section 2) and
     the ROADMAP pending sub-tasks, written out below. The fake results have no ``H2e``, so that
-    row reads "no result" and its cell "n/a: no result". Exact string checks.
+    row reads "[not computed until WU-0002.7]", its cell "n/a: no result" and its verdict
+    "no result"; the rows with a result and a pending sub-task read "computed with the v1
+    statistic". Exact string checks.
     """
     results, config = fake_results("DEV-0")
     system = fake_system(config, skip=("H2e",))
@@ -196,9 +198,9 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
     marked = {row.split(" | ")[0][2:]: "[computed with the v1 statistic until " in row
               for row in rows}
     assert {i for i, m in marked.items() if m} == {"H1a", "H1b", "H1d", "Q-N", "H2b", "H2d",
-                                                   "H2e", "H3a", "H3c"}
+                                                   "H3a", "H3c"}
     h2e = rows[ids.index("H2e")]
-    assert h2e.endswith("| n/a: no result | no result |") and "WU-0002.7" in h2e
+    assert h2e.endswith("[not computed until WU-0002.7] | n/a: no result | no result |")
     gain = rows[ids.index("(reported)")]
     assert "within bound 0.95 (n=40, max gain 1.5 LT)" in gain and "PASS" in gain
 
