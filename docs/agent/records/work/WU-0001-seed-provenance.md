@@ -240,6 +240,23 @@ Decisions of the developer within the plan (no criterion changed):
 
 Result: `103 passed in 1.30s`. Self-check of the diff: no `clip|nan_to_num|isfinite|where(|try:|except` outside `seeds.py` (`try/except` there converts `OSError`/`ValueError`/`ImportError` into a loud `SeedRefusal`; nothing is swallowed); no `default_rng|random.|PRNGKey` in `lpcstudy/` changes (the tests use `np.random.default_rng([v, crc32])` as the stated reference); no tolerance in any assert.
 
+Commit `b2c7b44` (WU-0001.1).
+
+### 2026-10-10 developer (claude-sonnet-5-5), WU-0001.2: commitment check tests
+
+The code (`check_commitment`, `confirmatory_seed`) was written with `seeds.py` in .1 and is first tested here. §4.9 checklist:
+
+1. Change set: `tests/unit/test_seeds.py` (additions), this unit file. No `lpcstudy/` or `tools/` change in .2 (Q5: `tools/ledger.py` is not edited).
+2. Radius: per the plan table row .2 without `tools/ledger.py`: `test_seeds` (changed test file) and `test___main__` (direct dependent of `seeds`); `test_tools_ledger` does not exist because `read_lines` is not changed. `test_seeds` imports `tools.ledger` (the Q2 gap, handled by hand: it is in the set). Far smaller than the suite.
+3. Already run: no (the .1 run did not contain these tests).
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads: 4; unit tier.
+6. Contention: none.
+7. Output: `-q --tb=short -rfE`.
+8. Command: as in .1 with files `tests/unit/test_seeds.py tests/unit/test___main__.py`.
+
+Result: `84 passed in 0.81s`. Self-check: only test files changed; fixture ledgers are asserted outside the repository; `LPC_CONF_*` deleted and `tools.ledger.LEDGER` monkeypatched in an autouse fixture; no tolerance.
+
 ## Review
 
 ## Audit
