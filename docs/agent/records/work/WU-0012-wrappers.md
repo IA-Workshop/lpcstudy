@@ -255,6 +255,21 @@ Checklist for run 2 (§4.9):
 
 Result of the F3 run: `1 passed in 93.89s` (exit 0; the three `git status --porcelain` snapshots were identical, with the edited test file as the only change, and all earlier comparisons held). Nothing else was run. Commit: "WU-0012 fix gate F3" (see git log).
 
+### Merge gate, run 3, 2026-10-10, claude-sonnet-5-5 (main session)
+
+Run 2: **`1 failed, 361 passed in 129.20s`**. The one failure, `test_smoke_through_the_wrapper_matches_a_direct_run` (`dirty: True != False`), was caused by the main session itself: a reviewer appended its review block to the tracked unit file while the gate ran, so `git status --porcelain` changed between the direct and the wrapped run. Not a product defect. The test now fails with an explicit message when the working tree changes during the test (ad9199f, F3), which is a code change; the developer ran that one test once (`1 passed in 93.89s`).
+
+Checklist for run 3 (§4.9):
+
+1. **Change set:** as before plus ad9199f (the test's tree-change guard). `git status --porcelain` is empty after the commit that carries this entry, and no agent writes to this worktree during the run.
+2. **Radius:** the merge gate of §4.3, `unit` and `integration`, by the main session.
+3. **Already run?** Yes: run 1 failed (F1, F2: fixed in 8dd726c), run 2 failed (F3: cause outside the code, test improved in ad9199f). The code changed after each failure; this is the third and last gate run for this branch.
+4. **Device:** `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`.
+5. **Threads and time:** `LPC_THREADS=4`, `OMP/MKL/OPENBLAS_NUM_THREADS=4`, `timeout 900`.
+6. **Contention:** the applied-mathematician runs small scratch computations in the `develop` worktree; no preset; no GPU.
+7. **Output:** `-q --tb=short -rfE`.
+8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-10. Reviewed diff `main...HEAD` (557e074, dbca55e, c831aa6 on plan 1639d96), against the plan, DEC-0005, DEVELOPMENT_WORKFLOW §2.3/§4.5/§4.6/§4.9, settings.json, test_gate.py, skill dev-run and `tools/test_impact.py`.
