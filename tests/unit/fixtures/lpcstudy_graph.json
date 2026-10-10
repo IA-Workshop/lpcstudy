@@ -1,0 +1,24 @@
+{
+  "description": "Independent reference (LPC.PC.21a) for the import graph built by tools/test_impact.py. Derived by hand by the planner (claude-opus-5-5, WU-0011.2, 2026-10-10) from the import statements of lpcstudy/*.py, including function-level imports and 'from . import x', before the tool existed. Key: module stem; value: sorted lpcstudy modules it imports directly, at any scope. Update by hand in the same change as any import edit; never from tool output.",
+  "source_commit": "d6abaa7511e6e7db8ec377dd59d9b91c6d54b83a",
+  "graph": {
+    "__init__": [],
+    "__main__": ["config", "experiments", "pipeline", "report"],
+    "allocation": ["ensemble", "networks", "oracle", "statistics"],
+    "analysis": ["allocation", "config", "oracle", "pipeline", "statistics"],
+    "config": [],
+    "data": ["config", "embedding", "systems"],
+    "dynamics": [],
+    "embedding": [],
+    "ensemble": ["data", "dynamics", "embedding", "estimation"],
+    "estimation": ["data", "dynamics", "networks"],
+    "experiments": ["allocation", "analysis", "config", "dynamics", "ensemble", "oracle", "pipeline", "statistics", "validation"],
+    "networks": [],
+    "oracle": ["data", "dynamics", "ensemble", "systems"],
+    "pipeline": ["allocation", "config", "data", "ensemble", "estimation", "networks", "oracle", "statistics", "systems"],
+    "report": ["allocation", "config"],
+    "statistics": [],
+    "systems": [],
+    "validation": ["data", "dynamics", "ensemble", "oracle", "statistics", "systems"]
+  }
+}

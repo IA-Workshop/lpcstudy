@@ -48,3 +48,20 @@ Dissent and resolution (REPRO.8):
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed; the merge to `main` waits for the owner to confirm or override.
 
 - 2026-10-10, recorded by claude-sonnet-5-5 (main session) at the human owner's instruction: the human owner confirmed DEC-0002 as written, in the session chat ("I agree, confirmed as written"). Status: **confirmed**. This line records the owner's statement and is not itself a ledger `ruling`; the owner MAY append one.
+
+## DEC-0003: WU-0011 blast-radius tool follows DEVELOPMENT_WORKFLOW §4.2 as written  (2026-10-10, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** `tools/test_impact.py` implements the §4.2 change classes as the adopted text states them. The planner's six questions (WU-0011 plan, `### Questions for the owner`) are answered so that the tool never selects fewer tests than §4.2 does:
+
+- *Q1.* The core-module list is a designated constant, as §4.2 lists it. It cannot be derived from the import graph (`embedding`, `networks` and `estimation` reach more modules than `statistics` and `oracle` but are not core). Proposal for the owner, not implemented: say in §4.2 that the list is designated.
+- *Q2.* **Not implemented; recommended for the owner.** A test file is not also selected when a module it imports directly changes. Consequence under §4.2 as written: a change to `systems` (a core module) does not select `test_dynamics.py` or `test_embedding.py`, which import `lpcstudy.systems`. The extra rule would only add tests (about 1 s of selection), so I recommend adopting it by a dated amendment to §4.2; until then the tool follows §4.2, and the gap is recorded in the WU-0011 log.
+- *Q3.* A `description` field in the JSON fixture plus the comparison test's docstring satisfy "fixture docstring names it as the independent reference".
+- *Q4.* "Leaf module" in criterion (a) means "not a core module" (§4.2).
+- *Q5.* When a changed test file is under `tests/slow/` or `tests/gpu/`, criterion (g) wins: it is not selected without `--include-slow` or `--include-gpu`, and the tool prints an `excluded` line.
+- *Q6.* `--run` delegates to `tools/run_tests.sh` when it exists (WU-0012.1) and otherwise sets the environment by hand. The skill's `2>/dev/null || echo` fallback hides the tool's errors; the owner may edit it (`.claude/` is not mine to change).
+
+**Alternatives weighed and why rejected.** *Derive the core list from the graph:* every graph rule tried gives either a list unlike §4.2 or 11 core modules (integration run on almost every change). *Implement Q2 now:* it changes §4.2's behavior, which is adopted governance (GOV.49).
+
+**Affects:** WU-0011 only. The risk in Q2 is under-selection, not over-selection.
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
