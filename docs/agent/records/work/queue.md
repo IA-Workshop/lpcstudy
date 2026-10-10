@@ -63,3 +63,5 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
 | WU-0017 | WU-0017.1 ← WU-0015.4, WU-0016.4; WU-0017.2 ← WU-0017.1; WU-0017.3 ← WU-0017.1 |
 | WU-0018 | WU-0018.1 ← WU-0017.2; WU-0018.2 ← WU-0018.1; WU-0018.3 ← WU-0018.2 |
 | WU-0019 | WU-0019.1 ← WU-0018.3; WU-0019.2 ← WU-0018.3 |
+
+- 2026-10-10, claude-sonnet-5-5 (main session): WU-0010 (.1 to .3) **done** on branch `wu/0010-test-tiers`: independent review approved, merge gate `20 passed in 75.57s`, DEC-0002 confirmed by the owner; merge to `main` follows. Dependent sub-tasks (WU-0011, WU-0012, WU-0013, WU-0001, WU-0002, WU-0005) are unblocked once the merge lands.
