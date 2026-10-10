@@ -16,6 +16,7 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
   - the regime-count fallback.
 - **Resolution:** WU-0002, item 11.
 - 2026-10-10: opened (Claude).
+- 2026-10-10 (claude-sonnet-5-5, main session, on the WU-0013.2 reviewer's finding R3; both sites checked): two further silent cases that WU-0002.11 must count and report: `lpcstudy/statistics.py:61` (`kaplan_meier` sets the hazard to 0 where no subject is at risk) and `lpcstudy/statistics.py:95-96` (`logrank_test` returns p = 1.0 when the variance is not positive). Both feed H3a. Any fix is statistics code and needs owner review before the freeze.
 
 **DEF-0002: Excess MSE uses c(w − w\*)² with clipped w\*** (VV.1)
 
