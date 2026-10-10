@@ -194,6 +194,27 @@ File: `tests/integration/test_smoke_pipeline.py` (new). It runs `python -m lpcst
 - Outputs asserted present: `results.json`, `RESULTS.md`, `run.log`, `figures/` with at least one `.png`; `validation.gate.gate_pass` is a `bool` for `lorenz63`. The seed is the default DEV-0 (20261005); no seed argument is passed.
 - Self-check: no clip, replacement or fallback; no tolerance (only the 300 s timeout from §4.1); no randomness in the test; the subprocess env sets `JAX_PLATFORMS=cpu` and `XLA_PYTHON_CLIENT_PREALLOCATE=false` explicitly.
 
+### 2026-10-10, claude-sonnet-5-5 (developer): fix round 1 (R1-R3), before the run
+
+Changes: `tests/conftest.py` (R1: `pytest_collection_modifyitems` raises a `UsageError` when an item's own tier markers differ from its directory tier, and `_refuse_gpu` decides from `tier_of(request.node.path, ...)`, not from the marker; R2: a "Limits" paragraph in the guard's docstring); `tests/unit/test_conftest_markers.py` (R3: test (c) also sets `CUDA_VISIBLE_DEVICES=""` and `ROCR_VISIBLE_DEVICES=""`; R1: new test (e) `test_tier_marker_that_differs_from_directory_fails_collection`, so k becomes 5). No assertion or tolerance changed; the ast check still reports `not byte-identical: []` for the 14 moved tests and the helper. No clip, replacement or fallback added; the new `UsageError` counts and names every mismatched item.
+
+§4.9 checklist before the run:
+
+1. Change set: `tests/conftest.py`, `tests/unit/test_conftest_markers.py` (modified, uncommitted); nothing under `lpcstudy/`.
+2. Radius: rule "`tests/conftest.py` -> the whole `unit` tier" (§4.2, gate-sized by rule), plus `tests/integration/` because the conftest applies to it. Not the whole suite: no `slow` or `gpu` test exists.
+3. Already run: the files changed since the reviewer's run, so this is a new run; nothing has run on this code.
+4. Device: `JAX_PLATFORMS=cpu` from the settings, not overridden.
+5. Threads and time: `LPC_THREADS=4`; unit 300 s, integration 900 s; expected about 70 s.
+6. Contention: no preset, `slow` or `gpu` run active.
+7. Output: `-q --tb=short -rfE`, summary and failures only.
+8. Command: `python -m pytest -q --tb=short -rfE tests/unit tests/integration`, once; expect 14 + 5 + 1 = 20 passed.
+
+### 2026-10-10, claude-sonnet-5-5 (developer): fix round 1 results
+
+- `python -m pytest -q --tb=short -rfE tests/unit tests/integration`: `20 passed in 68.34s (0:01:08)` (14 moved + k = 5 marker tests + 1 smoke). No failure, no rerun.
+- **k is now 5** (was 4 at .1); the earlier "18 passed" for `tests/unit` becomes 19.
+- Self-check: grep for `clip|nan_to_num|isfinite|where(|try:|except` in the diff finds only the existing `try/except ValueError` in `tier_of` and the word "except" in a docstring; no randomness; no tolerance changed. Resolution text in `## Review` is left to the main session.
+
 ## Review
 
 - **Reviewer:** reviewer, claude-opus-5-5, fresh context, 2026-10-10. Reviewed `git diff main...HEAD` (8045928, 0bd0b1c, 3cae35c, 6e306b3 on top of plan 4ea348c and merge 8967757) against the plan, amendment Q1–Q4, ROADMAP §2 rows and DEVELOPMENT_WORKFLOW §2.3, §4.

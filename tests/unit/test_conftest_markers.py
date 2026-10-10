@@ -61,6 +61,9 @@ def test_gpu_request_outside_gpu_tier_fails_with_clear_message(
     (tests / "unit").mkdir()
     (tests / "unit" / "test_gpu_call.py").write_text(GPU_CALL)
     monkeypatch.delenv("JAX_PLATFORMS", raising=False)
+    # Hide the devices so a regressed guard cannot initialize CUDA or ROCm outside the lock.
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setenv("ROCR_VISIBLE_DEVICES", "")
     result = pytester.runpytest_subprocess()
     assert result.ret == pytest.ExitCode.TESTS_FAILED
     result.stdout.fnmatch_lines(["*GPU device requested outside tests/gpu/*"])
@@ -79,3 +82,17 @@ def test_gpu_tier_is_not_guarded(pytester: pytest.Pytester,
     output = result.stdout.str() + result.stderr.str()
     assert "GPU device requested outside tests/gpu/" not in output
     assert "Unknown backend: 'gpu'" in output
+
+
+def test_tier_marker_that_differs_from_directory_fails_collection(
+        pytester: pytest.Pytester) -> None:
+    """A @pytest.mark.gpu test under tests/unit/ makes collection fail, so it can neither
+    lift the guard nor carry two tier markers."""
+    tests = _tree(pytester)
+    (tests / "unit").mkdir()
+    (tests / "unit" / "test_marked.py").write_text(
+        "import pytest\n\n\n@pytest.mark.gpu\ndef test_marked() -> None:\n    pass\n")
+    result = pytester.runpytest_subprocess("--collect-only", "-q")
+    assert result.ret == pytest.ExitCode.USAGE_ERROR
+    result.stderr.fnmatch_lines(
+        ["*Tier marker differs from the directory tier*test_marked*directory tier 'unit'*gpu*"])

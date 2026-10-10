@@ -34,20 +34,32 @@ def tier_of(path: str | Path, tests_root: str | Path) -> str | None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Mark every item with its tier, and refuse items outside a tier directory."""
+    """Mark every item with its tier from its directory; refuse misplaced or mismatched items.
+
+    An item outside a tier directory, or one carrying a tier marker that differs from its
+    directory's tier (for example ``@pytest.mark.gpu`` under ``tests/unit/``), raises a
+    ``UsageError``: the directory is the only source of the tier (4.1).
+    """
     root = Path(__file__).parent
-    misplaced = []
+    misplaced, mismatched = [], []
     for item in items:
         tier = tier_of(item.path, root)
         if tier is None:
             misplaced.append(item.nodeid)
-        else:
-            item.add_marker(getattr(pytest.mark, tier))
+            continue
+        own = sorted({m.name for m in item.iter_markers()} & set(TIERS))
+        if own and own != [tier]:
+            mismatched.append(f"{item.nodeid} (directory tier '{tier}', markers {own})")
+        item.add_marker(getattr(pytest.mark, tier))
     if misplaced:
         raise pytest.UsageError(
             "Tests outside a tier directory (tests/unit, tests/integration, tests/slow, "
             "tests/gpu): place a test by cost and device (.claude/rules/tests.md): "
             + ", ".join(misplaced))
+    if mismatched:
+        raise pytest.UsageError(
+            "Tier marker differs from the directory tier: move the test to the directory of "
+            "its tier instead of marking it (.claude/rules/tests.md): " + ", ".join(mismatched))
 
 
 @pytest.fixture(autouse=True)
@@ -56,13 +68,20 @@ def _refuse_gpu(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch)
 
     The check runs before jax is called, so CUDA is never initialized, and does
     not depend on ``JAX_PLATFORMS``. ``Failed`` is a ``BaseException``, so a test's
-    own ``except Exception`` does not swallow it.
+    own ``except Exception`` does not swallow it. The tier is the directory's
+    (``tier_of``), not a marker, so a ``gpu`` marker on a test elsewhere does not lift the
+    guard (collection rejects it anyway).
+
+    Limits. This guard is a backstop; ``JAX_PLATFORMS=cpu`` (settings, then
+    ``tools/run_tests.sh``, WU-0012.1) is the primary control. It does not catch implicit
+    default-device use (jnp operations with ``JAX_PLATFORMS`` unset on a GPU machine), a
+    name bound at import before the fixture runs (``from jax import devices``), or a
+    backend given as a non-string object (a client instance).
     """
-    if request.node.get_closest_marker("gpu") is not None:
+    tier = tier_of(request.node.path, Path(__file__).parent)
+    if tier == "gpu":
         return
     import jax
-
-    tier = next((t for t in TIERS if request.node.get_closest_marker(t)), None)
 
     def guard(backend: object) -> None:
         if isinstance(backend, str) and backend.lower() in GPU_BACKENDS:
