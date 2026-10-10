@@ -297,6 +297,36 @@ Result of run 1: `1 failed, 89 passed in 3.59s`. Failure: `test_peak_rss_is_posi
 
 `--lf` on the failing test: `1 passed, 15 deselected in 0.21s`. Radius once more after the test change: `90 passed in 2.34s`. Self-check: each `try/except` in the diff is listed above and reports (git_error, null package) or refuses (seeds); no `clip|nan_to_num|isfinite|where(`; no `default_rng|random.|PRNGKey` in `lpcstudy/`; the only tolerances are the existing-by-plan 1% wall-clock check and the RSS slack flagged above.
 
+Commit `ed6dacb` (WU-0001.4).
+
+### 2026-10-10 developer (claude-sonnet-5-5), WU-0001.5: smoke regression against the v1 baseline
+
+Method as in the plan. Clean committed tree at `ed6dacb0ed5714a122c7c85fcb3ca5a53453043d` (`git status --porcelain` empty, no `lpcstudy --preset` run active). Reference `/home/brianm/projects/physics/chaos/lpcstudy/runs/baseline/smoke/results.json` read-only, sha256 re-checked: `0da48771ee967525f71518d4bb6e7aec675349ff175a2d4544234d4f8f084b79` (matches `0da48771…4b79`).
+
+Run, once, CPU, in the foreground (about 30 s wall, so no background needed): `JAX_PLATFORMS=cpu XLA_PYTHON_CLIENT_PREALLOCATE=false LPC_THREADS=4 OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 .venv/bin/python -m lpcstudy --preset smoke --seed-id DEV-0 --out <worktree>/runs/dev/wu0001-5` -> exit 0, "study finished in 25s", output under `runs/dev/wu0001-5/smoke/` (gitignored).
+
+Comparison (one-off `python` script, scratchpad, not committed): load both files; delete the top-level `provenance`, every `seconds` and `handling` key at any depth and (DEC-0004 Q1) `config.seed_id`, counting each; compare `json.dumps(obj, sort_keys=True, allow_nan=True)`.
+
+- Removed in the baseline: `seconds` 5, `handling` 0, `provenance` 0, `config.seed_id` 0 (absent in v1).
+- Removed in the new file: `provenance` 1, `seconds` 5, `handling` 0, `config.seed_id` 1.
+- Result: **equal** (both canonical texts 61786 characters). No differing path. Nothing else was removed.
+- Provenance of the new file: `seed_id` DEV-0, `complete` true, `dirty` false, `git_error` null, `commit` `ed6dacb0…`, `device` `{backend: cpu, kind: cpu, count: 1}`, `jax_x64` true, all seven package versions equal the `requirements.txt` pins, `wall_seconds` 25.30, `peak_rss_bytes` 1298530304, 24 keys, parses as JSON. `RESULTS.md` line 3 is `**DEVELOPMENT (DEV-0): not a hypothesis test** · **UNPROMOTED**`.
+
+§4.9 checklist, `tests/integration/test_cli_seeds.py` once (plan row .5: manual smoke plus this file once; `test_smoke_pipeline.py` is not run because the manual smoke run above is the same evidence):
+
+1. Change set: none since `ed6dacb` (this log excepted); the branch diff is `lpcstudy/{__main__,config,seeds,provenance,report}.py` and tests.
+2. Radius: `tests/integration/test_cli_seeds.py` only (code changed in .4 since its .3 run; a new run on new code).
+3. Already run: only on the .3 code; `__main__.py` has changed since, so this is a run on different code.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads: 4; eight subprocess cases, timeout 120 s each.
+6. Contention: the smoke run has finished; no other preset run seen.
+7. Output: `-q --tb=short -rfE`.
+8. Command: as in .1 with `tests/integration/test_cli_seeds.py`.
+
+Result: `8 passed in 6.61s`.
+
+State at hand-over (for the reviewer): unit and integration radius runs per sub-task are recorded above; `tests/integration/test_smoke_pipeline.py` and the whole suite were not run (merge gate, main session). Open points: (a) the RSS bracket slack in `test_provenance` (flagged under .4); (b) `test_fixture_schema` module count edited 18 to 19 to 20 with the graph fixture; (c) `--report-only` resolves the seed id (and, with the confirmatory flag, would need the environment) before it reads `results.json`, a consequence of refusing uniformly; (d) DEF-0010 untouched: DEV-1 to DEV-4 are not runnable on a preset until it is fixed; (e) DEVELOPMENT_WORKFLOW §4.2 graph table rows for `seeds` and `provenance` are for the main session (Q7).
+
 ## Review
 
 ## Audit
