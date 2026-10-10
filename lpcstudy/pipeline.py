@@ -128,14 +128,13 @@ class Study:
         self.fitted: dict[str, FittedRules] = {}
 
     # ------------------------------------------------------------------ setup
-    def context(self, system: str, embed_dim: int | None = None,
-                delay_scale: float = 1.0) -> SystemContext:
+    def context(self, system: str, embed_dim: int | None = None) -> SystemContext:
         """System context (cached)."""
-        key = (system, embed_dim or self.config.embedding_dim, delay_scale)
+        key = (system, embed_dim or self.config.embedding_dim)
         if key not in self._contexts:
             start = time.time()
             self._contexts[key] = build_context(system, self.config, self.cache_dir,
-                                                embed_dim, delay_scale)
+                                                embed_dim)
             LOG.info("context %s built in %.1fs: %s", key, time.time() - start,
                      self._contexts[key].meta)
         return self._contexts[key]
@@ -207,8 +206,7 @@ class Study:
     # ------------------------------------------------------------------ cells
     def run_cell(self, system: str, noise: float, library_size: int, core: bool,
                  with_evals: bool, label: str = "base", embed_dim: int | None = None,
-                 delay_scale: float = 1.0, misspec: float = 0.0, n_analogs: int = 1
-                 ) -> Cell:
+                 misspec: float = 0.0, n_analogs: int = 1) -> Cell:
         """Compute oracle moments (and optionally evaluation draws) for one cell.
 
         Parameters
@@ -228,8 +226,6 @@ class Study:
             Variant label.
         embed_dim : int, optional
             Embedding-dimension override.
-        delay_scale : float, optional
-            Delay multiplier.
         misspec : float, optional
             Relative parameter perturbation of the PLP model.
         n_analogs : int, optional
@@ -242,7 +238,7 @@ class Study:
         """
         cfg = self.config
         start = time.time()
-        ctx = self.context(system, embed_dim, delay_scale)
+        ctx = self.context(system, embed_dim)
         setup = self.setup(ctx, noise, misspec, n_analogs)
         library = AnalogLibrary.build(ctx, noise, library_size, cfg.horizon_max)
         horizons = np.arange(1, cfg.horizon_max + 1) if core else np.array(cfg.eval_horizons)

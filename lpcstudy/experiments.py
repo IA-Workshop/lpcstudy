@@ -279,7 +279,6 @@ def run_robustness(study: Study, system: str) -> dict:
     variants: list[tuple[str, dict]] = []
     variants += [(f"D={d}", {"embed_dim": d}) for d in cfg.robustness_dims
                  if d != cfg.embedding_dim and d >= study.context(system).spec.dim]
-    variants.append(("delay/2", {"delay_scale": 0.5}))
     variants += [(f"k={k}", {"n_analogs": k}) for k in cfg.analog_counts if k != 1]
     variants += [(f"misspec={p:g}", {"misspec": p}) for p in cfg.misspec_levels]
     for label, kwargs in variants:
