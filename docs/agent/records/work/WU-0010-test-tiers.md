@@ -215,6 +215,19 @@ Changes: `tests/conftest.py` (R1: `pytest_collection_modifyitems` raises a `Usag
 - **k is now 5** (was 4 at .1); the earlier "18 passed" for `tests/unit` becomes 19.
 - Self-check: grep for `clip|nan_to_num|isfinite|where(|try:|except` in the diff finds only the existing `try/except ValueError` in `tier_of` and the word "except" in a docstring; no randomness; no tolerance changed. Resolution text in `## Review` is left to the main session.
 
+### Merge gate, 2026-10-10, claude-sonnet-5-5 (main session), checklist before the run (§4.9, §4.3)
+
+DEC-0002 confirmed by the human owner in chat (recorded in `decisions.md`); R4 is closed.
+
+1. **Change set:** `git diff --name-only main...HEAD` lists `pytest.ini`, `tests/conftest.py`, `tests/integration/test_smoke_pipeline.py`, `tests/test_core.py` (removed), `tests/unit/` (7 split files, `unit_helpers.py`, `test_conftest_markers.py`), `decisions.md` and this file. `git status --porcelain` is empty before the records commit of this entry.
+2. **Radius:** the merge gate of §4.3, tiers `unit` and `integration`, by the main session (the named role). Whole suite: `tests/unit tests/integration` (there is no `slow` or `gpu` content yet).
+3. **Already run?** Yes, and I say so: the developer ran this exact set on this exact code at ff945e9 (`20 passed in 68.34s`), and no code has changed since (only records). This run is not a retry. It is the independent merge-gate run that §4.3 assigns to the main session and the work-unit process requires, on the merge candidate, and it runs once. A failure would be handled by §4.4 (fix, `--lf`, radius once).
+4. **Device:** `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`.
+5. **Threads and time:** `LPC_THREADS=4`, `OMP/MKL/OPENBLAS_NUM_THREADS=4`, `timeout 600`.
+6. **Contention:** no preset running; GPU lock free.
+7. **Output:** `-q --tb=short -rfE`.
+8. **Command:** `LPC_GATE=merge timeout 600 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration` with the variables above set by hand.
+
 ## Review
 
 - **Reviewer:** reviewer, claude-opus-5-5, fresh context, 2026-10-10. Reviewed `git diff main...HEAD` (8045928, 0bd0b1c, 3cae35c, 6e306b3 on top of plan 4ea348c and merge 8967757) against the plan, amendment Q1–Q4, ROADMAP §2 rows and DEVELOPMENT_WORKFLOW §2.3, §4.
