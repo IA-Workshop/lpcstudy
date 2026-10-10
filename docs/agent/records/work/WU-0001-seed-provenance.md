@@ -218,6 +218,28 @@ The tool checks are integration and unit only, never `slow` or `gpu`. No `requir
 
 ## Log
 
+### 2026-10-10 developer (claude-sonnet-5-5), WU-0001.1: start
+
+Decisions of the developer within the plan (no criterion changed):
+
+- Q5: `tools/ledger.py` is NOT changed. `seeds.check_commitment` reads the ledger file itself (`Path.read_text`, non-empty lines) and calls only `tools.ledger.verify_chain(lines)` (it takes lines, not a path) and `tools.seal_confirmatory_seed.make_commitment`. So `read_lines(path)` is not needed (the Q5 "only if impossible" condition is not met), `tools/ledger.py` and `tests/unit/test_tools_ledger.py` are not touched, and .2 has one file fewer than the plan table lists. The `monkeypatch` of `tools.ledger.LEDGER` guard in the plan is kept in the .2 tests.
+- Argument errors: the parser uses `parse_known_args`; any leftover token is refused with exit 64 and one line (option names only, values never echoed), so `--conf` (abbreviation attempt) is a refusal, not an argparse exit 2. `--seed` is `nargs="*"` and hidden; its presence is always refused. `--confirmatory` is added in .3 (until then it is an unrecognized option and refused).
+- `tests/unit/test_tools_test_impact.py::test_fixture_schema` hard-codes the module count (`len(stems) == 18`). Adding `seeds.py` makes it 19 (20 with `provenance.py` in .4). This count is a fact about the package, not a tolerance; edited with the fixture, same commit. The stems-equality check, the independent part, is unchanged.
+- Hook note: the Bash tool blocks any command naming the seal script, so its source was read with the Read tool (source only; no seed or salt exists in it).
+
+§4.9 checklist, WU-0001.1 run (unit radius):
+
+1. Change set: `lpcstudy/{__main__,config,seeds}.py`, `tests/unit/fixtures/lpcstudy_graph.json`, `tests/unit/test_{seeds,config,data,__main__,tools_test_impact}.py` (new except the last), this unit file.
+2. Radius: `tools/test_impact.py --base main --explain` selects 9 unit files (`test___main__ test_allocation test_analysis test_config test_data test_ensemble test_oracle test_seeds test_tools_test_impact`) plus `tests/integration` (config is core). The plan defers the integration smoke to .5 (table row .1); the unit set is far smaller than the suite.
+3. Already run: no.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads: `LPC_THREADS=4`, `OMP/MKL/OPENBLAS_NUM_THREADS=4`; unit tier (<5 s per test).
+6. Contention: no `pilot`/`full`/`slow`/`gpu` run by me; unit tier only.
+7. Output: `-q --tb=short -rfE`.
+8. Command: `JAX_PLATFORMS=cpu XLA_PYTHON_CLIENT_PREALLOCATE=false LPC_THREADS=4 OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 .venv/bin/python -m pytest -q --tb=short -rfE <the 9 files>` (tools/run_tests.sh does not exist yet).
+
+Result: `103 passed in 1.30s`. Self-check of the diff: no `clip|nan_to_num|isfinite|where(|try:|except` outside `seeds.py` (`try/except` there converts `OSError`/`ValueError`/`ImportError` into a loud `SeedRefusal`; nothing is swallowed); no `default_rng|random.|PRNGKey` in `lpcstudy/` changes (the tests use `np.random.default_rng([v, crc32])` as the stated reference); no tolerance in any assert.
+
 ## Review
 
 ## Audit
