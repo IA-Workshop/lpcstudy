@@ -65,3 +65,22 @@ Dissent and resolution (REPRO.8):
 **Affects:** WU-0011 only. The risk in Q2 is under-selection, not over-selection.
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0004: WU-0001 plan: answers to the planner's questions  (2026-10-10, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** The WU-0001 plan amendment (`docs/agent/records/work/WU-0001-seed-provenance.md`, branch `wu/0001-seeds-provenance`) asks eight questions. Answers, none of which changes a verdict, a statistic or a fixed criterion except where stated:
+
+- *Q1 (WU-0001.5).* The bitwise comparison with the baseline smoke reference removes `provenance`, `seconds`, `handling` **and `config.seed_id`**, and nothing else. `config.seed_id` is a necessary consequence of WU-0001.1; the criterion's "the unit adds nothing else" cannot hold literally. This is a change to how a fixed criterion is checked, not to what it protects: every number must still be bitwise identical.
+- *Q2.* `--seed-id` defaults to `DEV-0` when omitted (CLAUDE.md: "until then, runs use DEV-0"), so `tests/integration/test_smoke_pipeline.py` stays valid.
+- *Q3.* Development headers carry both the `DEVELOPMENT (DEV-n): not a hypothesis test` label and `UNPROMOTED` (LPC.PC.13).
+- *Q4.* The sklearn seed-size defect is `DEF-0010`, to be fixed in WU-0002 after an owner ruling; not in WU-0001.
+- *Q5.* Prefer **not** to change `tools/ledger.py`: tests point the ledger readers at a `tmp_path` ledger by monkeypatching the module-level ledger path. Only if that is impossible may the developer add an optional path argument, with its own test and the reviewer's explicit attention.
+- *Q6.* Refusing a confirmatory run on a dirty tree or unknown commit is **not implemented** in WU-0001; recorded for the owner to decide before the freeze (WU-0004).
+- *Q7.* The test file is `tests/unit/test___main__.py` (the name `tools/test_impact.py` looks for). When `tools/ledger.py` changes, add `test_seeds` by hand (the Q2 gap of DEC-0003). DEVELOPMENT_WORKFLOW §4.2's import-graph table needs rows for the new modules; that is an owner edit (adopted governance).
+- *Q8.* The ledger path can be overridden only from Python, never by a flag or environment variable.
+
+**Alternatives weighed.** *Hold WU-0001 until the owner answers:* rejected, since nothing here is irreversible and the owner can override before the owner review that the unit requires anyway.
+
+**Affects:** WU-0001 only. Marked `needs owner review before freeze` (seed and provenance code).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.

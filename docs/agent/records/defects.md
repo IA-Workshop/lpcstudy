@@ -74,3 +74,11 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Blocking:** no (tracked).
 - **Schedule:** future work, reported as a limitation.
 - 2026-10-10: opened (Claude).
+
+**DEF-0010: Registered seeds of 2³² or more crash scikit-learn calls that take `config.seed` as `random_state`** (PRIME.4, LPC.PC.7)
+
+- **Blocking:** yes. Blocks WU-0003 (the DEV-1 rehearsal) and the confirmatory run.
+- **Affects:** runs on DEV-1 to DEV-4 (their registered values are all at least 2³²) and on any 62-bit confirmatory seed. DEV-0 (20261005) is unaffected, which is why the pilot and the baseline smoke run did not show it.
+- **Description.** scikit-learn accepts `random_state` only in [0, 2³² − 1]. `check_random_state(2844678021587022684)` raises `ValueError: Seed must be between 0 and 2**32 - 1` (verified in the project venv by the main session, 2026-10-10). The code passes `config.seed` directly at `lpcstudy/analysis.py:295`, `:678`, `:680` and `lpcstudy/allocation.py:358`. Found by the WU-0001 planner while planning WU-0001.1; no test catches it, because every test and the smoke preset use DEV-0.
+- **Resolution:** a fix in WU-0002 (a plan item to be added by amendment). It changes the random streams of every scikit-learn call, so it changes numbers for every seed unless the derivation keeps `config.seed` unchanged below 2³². The choice between "derive a 32-bit value with `make_rng(seed, label)` for all seeds" and "leave seeds below 2³² untouched" affects the WU-0002.12 regression against the pilot and is the owner's to rule on. Until then, only DEV-0 can be run.
+- 2026-10-10: opened (claude-sonnet-5-5, main session).
