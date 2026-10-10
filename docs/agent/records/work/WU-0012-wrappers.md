@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | in progress |
+| Status | done, **needs owner review before freeze** (the seed check, `run.meta.json` provenance, 60 h enforcement in `gpu_hours.py`); DEC-0005 proposed |
 | Class | CSQ3 development |
 | Agent(s) | claude-sonnet-5-5 (main session) under governance ledger entry 5 (authorizations 4, 6) |
 | Estimate | WU-0012.1 S, .2 S, .3 S (ROADMAP.md §2) |
@@ -270,6 +270,8 @@ Checklist for run 3 (§4.9):
 7. **Output:** `-q --tb=short -rfE`.
 8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
 
+Result (run 3, same entry): **`362 passed in 84.21s (0:01:24)`**. Run once; no failures. (Runs 1 and 2 failed as described above and led to code changes before each rerun.)
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-10. Reviewed diff `main...HEAD` (557e074, dbca55e, c831aa6 on plan 1639d96), against the plan, DEC-0005, DEVELOPMENT_WORKFLOW §2.3/§4.5/§4.6/§4.9, settings.json, test_gate.py, skill dev-run and `tools/test_impact.py`.
@@ -331,9 +333,19 @@ Scope: commit 8dd726c only. I read the diff, the newest `## Log` entries, `lpcst
 
 ## Audit
 
-- Is the definition of done met? Give the evidence.
-- Defects recorded:
-- Notes for successors:
+- Is the definition of done met? Yes.
+  - **WU-0012.1:** `tools/run_tests.sh` sets `JAX_PLATFORMS=cpu` for the non-GPU tiers, the thread caps from `LPC_THREADS` (default 4), `-q --tb=short -rfE`, a per-tier `timeout`, and `flock` plus `XLA_PYTHON_CLIENT_PREALLOCATE=false` for the `gpu` tier (exit 75 when the lock is busy); refuses empty and whole-suite path lists, `PYTEST_ADDOPTS` and `PYTEST_PLUGINS`; prints a TIMEOUT line for exit 124 and 137.
+  - **WU-0012.2:** `tools/run_preset.sh` refuses an id not in `seeds/development_seeds.json`, a raw integer, and any argument containing `confirmatory` (exit 64, one reason line); busy lock exits 75 at once; pilot and full run as a background subshell of the checked process after the lock, seed, out-dir, tally and probe checks; writes `run.meta.json` (`preset`, `seed_id`, `start_utc`, `end_utc`, `device`, `wall_seconds`, `exit_code`); the smoke preset through the wrapper gives the same `results.json` as a direct run once `seconds` and the run-specific `provenance` fields are excluded (tested for real, bitwise).
+  - **WU-0012.3:** `tools/gpu_hours.py` sums GPU wall-clock per ISO week (UTC), splits runs across a week boundary, counts a run without `end_utc` as min(now, start + 12 h), fails closed on an unreadable file or directory (exit 65), and `check` refuses a start that would pass 60 h; the wrapper calls it before a pilot or full start.
+  - **Review:** the first review found a high-severity hole (the internal `__record` mode ran any command without the lock, seed or tally checks; `tools/run_preset.sh *` is auto-allowed in settings): removed, with tests that reproduce the reviewer's probe. Fix round 1 (R1 to R4) approved; the gate-failure fixes F1 and F2 reviewed and approved; F3 was a diagnostic improvement.
+  - **Gate:** run 3 `362 passed in 84.21s` (runs 1 and 2 failed for integration reasons, not product defects; see the Log).
+- Defects recorded: none opened.
+- Notes for the owner (no code change in this unit):
+  - **R5:** `.claude/settings.json` and the hook still allow the old `flock ... python -m lpcstudy --preset` command form, and GPU-tier test runs are not counted in the weekly 60 GPU-hours.
+  - Residual risk: someone who controls the environment can get around the wrapper (a fake `flock` or `python3` on PATH, `BASH_ENV`, exported functions, `LPC_GPU_LOCK`, `LPC_PYTHON`).
+  - Not set: the XLA flag that caps CPU threads in jax 0.11.2 (needs the researcher; DEC-0005 Q3). `run.meta.json` has no peak memory (peak RSS is in the WU-0001 provenance block).
+  - Lesson for the gate: do not write to a worktree (including asking a reviewer to append) while its gate runs; the integration test now says so explicitly if the tree changes.
+- Successors: the tally scans `runs/` under every worktree; deleting a `runs/` directory or a worktree loses hours from the count (DEC-0005 Q2).
 
 ## Referral
 
