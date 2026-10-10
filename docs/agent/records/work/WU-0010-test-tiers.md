@@ -232,6 +232,31 @@ Changes: `tests/conftest.py` (R1: `pytest_collection_modifyitems` raises a `Usag
   - Note, not a finding (out of the developer's scope, which excludes `.claude/` and governance): text that still names `tests/test_core.py` as the live suite is now stale. It is in `.claude/rules/test-discipline.md:18`, `.claude/skills/test-impact/SKILL.md:27`, DEVELOPMENT_WORKFLOW §4.1 (line 89) and §4.2 (line 138), and ROADMAP line 11. Most of these phrases are conditional ("until WU-0010"); the main session may queue an update.
 - **Verdict: approve with fixes.** 4 findings (R1 medium, R2–R4 low). R1–R3 go to the developer. R4 is for the main session. A re-review covers R1–R3 as fixed or disputed.
 
+### Re-review, fix round 1, 2026-10-10, reviewer (claude-opus-5-5), fresh context
+
+Scope: R1–R3 only, as of commit ff945e9 (`git show ff945e9`) and the developer's fix-round log. I ran no tests. No code has changed since the developer's single run at this commit (`20 passed in 68.34s (0:01:08)`, = 14 moved tests + k = 5 marker tests + 1 smoke).
+
+- **R1: fixed.**
+  - `pytest_collection_modifyitems` reads each item's own tier markers before adding the directory marker. When they exist and differ from `[tier]`, it lists `nodeid (directory tier, markers)` and raises a `UsageError` after the misplacement check. Each mismatch is counted and named, not dropped silently.
+  - `_refuse_gpu` now takes `tier = tier_of(request.node.path, Path(__file__).parent)` and returns early only for `"gpu"`. The failure message uses that directory tier.
+  - The new test (e), `test_tier_marker_that_differs_from_directory_fails_collection`, builds the case I probed: a `@pytest.mark.gpu` test under `tests/unit/`, run with the real conftest and pytest.ini copies. It asserts `ExitCode.USAGE_ERROR` and the message with `directory tier 'unit'` and `gpu`. Under the pre-fix conftest that tree collects with exit 0, so (e) would have failed.
+- **R2: fixed.** The "Limits" paragraph is accurate. It names the guard as a backstop with `JAX_PLATFORMS=cpu` as the primary control, plus the three uncaught cases I listed: implicit default-device use, a name bound at import, and a non-string backend.
+  - Non-blocking suggestion: one sentence such as "only `jax.devices` and `jax.local_devices` are wrapped; other entry points (e.g. `jax.extend.backend.get_backend`, which exists in jax 0.11.2) and child processes are not guarded" would make the scope explicit. This is not required to close R2.
+- **R3: fixed.** Test (c) keeps `JAX_PLATFORMS` deleted and sets `CUDA_VISIBLE_DEVICES=""` and `ROCR_VISIBLE_DEVICES=""` through `monkeypatch.setenv`, which `runpytest_subprocess` inherits. Its assertions are unchanged.
+- **Invariants re-checked independently.**
+  - My own `ast` comparison against `git show main:tests/test_core.py` covers the source text including decorators and the `ast.dump`. All 15 functions (14 tests + `_moments_from_draws`) are present, none extra; text differs: [], AST differs: [].
+  - `git diff 6e306b3 ff945e9` outside `tests/` and this unit file is empty.
+  - No assertion was removed or weakened. The fix only adds lines to (c), adds (e) and adds a UsageError branch. The log diff removes no earlier line.
+- **Procedural note (not a finding).** §2.3 asks the developer to answer under each finding (`fixed in <commit>`). The developer's log leaves that to the main session, so the main session should record `fixed in ff945e9` for R1–R3. R4 (owner decision record for Q1–Q4) is still open with the main session and is required before merge under "approve with fixes".
+- **Verdict: approve.** R1–R3 are fixed, with no open developer findings. Merge after the main session closes R4.
+
+### Resolution of findings, 2026-10-10, claude-sonnet-5-5 (main session)
+
+- **R1: fixed in ff945e9** (re-review: fixed).
+- **R2: fixed in ff945e9** (re-review: fixed; the reviewer's optional sentence naming the only wrapped entry points is not adopted, because the Limits paragraph already lists them).
+- **R3: fixed in ff945e9** (re-review: fixed).
+- **R4: recorded as `DEC-0002` in `docs/agent/records/decisions.md`, proposed, for owner confirmation.** The merge to `main` waits for it.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
