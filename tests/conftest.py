@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 TIERS = ("unit", "integration", "slow", "gpu")
-TRANSITIONAL = {"test_core.py": "unit"}  # deleted with tests/test_core.py in WU-0010.2
 GPU_BACKENDS = frozenset({"gpu", "cuda", "rocm"})
 
 
@@ -24,16 +23,14 @@ def tier_of(path: str | Path, tests_root: str | Path) -> str | None:
     Returns
     -------
     str or None
-        The first path component under ``tests_root`` if it is in ``TIERS``;
-        ``"unit"`` for the transitional ``tests/test_core.py``; otherwise ``None``.
+        The first path component under ``tests_root`` if it is in ``TIERS`` and
+        the file lies inside that directory; otherwise ``None``.
     """
     try:
         parts = Path(path).resolve().relative_to(Path(tests_root).resolve()).parts
     except ValueError:
         return None
-    if len(parts) == 1:
-        return TRANSITIONAL.get(parts[0])
-    return parts[0] if parts and parts[0] in TIERS else None
+    return parts[0] if len(parts) > 1 and parts[0] in TIERS else None
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
