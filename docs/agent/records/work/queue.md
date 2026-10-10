@@ -21,3 +21,45 @@ The plans for WU-0001 to WU-0003 are in their unit files. WU-0004 is the owner's
 | WU-0008 | Uncertainty budget, numerical-error estimates and interval labels in the report | WU-0002, WU-0005 | review before the freeze | planned |
 
 Before the freeze, WU-0005 to WU-0008 close or are recorded as known limitations. WU-0005 and WU-0007 can run in parallel with WU-0001.
+
+## Added 2026-10-10: roadmap reconciliation (WU-0009.4; claude-opus-5-5, planner)
+
+WU-0001 to WU-0008 are executed as the sub-tasks `WU-nnnn.k` of `ROADMAP.md` §2. Each unit file tracks status per sub-task. Where the dependencies in the tables above differ from the sub-task dependencies below, the sub-task dependencies are the plan (ROADMAP.md §0). The tables above are kept unedited (append-only).
+
+| Unit | Title | Depends on | Owner checkpoint | Status |
+| --- | --- | --- | --- | --- |
+| WU-0009 | Foundations: baseline commit, environment, baseline smoke reference, queue reconciliation | — | environment set up (WU-0009.2) | in progress (.1, .2 done; .3 in progress; .4 this block) |
+| WU-0010 | Test tiers: markers and conftest, split of `tests/test_core.py`, smoke integration test | WU-0009.1 | none | planned |
+| WU-0011 | `tools/test_impact.py` and its hand-derived reference graph | WU-0010.2 | none | planned |
+| WU-0012 | Run wrappers: `tools/run_tests.sh`, `tools/run_preset.sh`, `tools/gpu_hours.py` | WU-0010.1 | none | planned |
+| WU-0013 | DEF-0007 audit of the 14 v1 tests and fixes | WU-0010.2 | none | planned |
+| WU-0014 | v3 export, concordance with Methods v2 and code, discrepancy resolution | — | v3 export (WU-0014.1); referrals (WU-0014.3) | in progress (.1 done 2026-10-10, see WU-0009 log) |
+| WU-0015 | Confirmatory run (CONF-1, full preset) | WU-0004.7 | per-action authorization; manifest entry; release of outputs | planned |
+| WU-0016 | Regeneration by another actor and run comparison | WU-0015.3, WU-0003.6 | per-action authorization; manifest entry | planned |
+| WU-0017 | v3 report and figures | WU-0015.4, WU-0016.4 | owner and student read the report | planned |
+| WU-0018 | Pre-promotion audit and promotion | WU-0017.2 | promotion transaction | planned |
+| WU-0019 | Close-out: retention and governance review | WU-0018.3 | retention; governance review | planned |
+
+Sub-task dependency index (from ROADMAP.md §2; "—" means none):
+
+| Unit | Sub-tasks and their dependencies |
+| --- | --- |
+| WU-0009 | WU-0009.1 ← —; WU-0009.2 ← WU-0009.1; WU-0009.3 ← WU-0009.1, WU-0009.2; WU-0009.4 ← — |
+| WU-0010 | WU-0010.1 ← WU-0009.1; WU-0010.2 ← WU-0010.1; WU-0010.3 ← WU-0010.1 |
+| WU-0011 | WU-0011.1 ← WU-0010.2; WU-0011.2 ← WU-0011.1 |
+| WU-0012 | WU-0012.1 ← WU-0010.1; WU-0012.2 ← WU-0012.1; WU-0012.3 ← WU-0012.2 |
+| WU-0013 | WU-0013.1 ← WU-0010.2; WU-0013.2 ← WU-0013.1 |
+| WU-0014 | WU-0014.1 ← —; WU-0014.2 ← WU-0014.1; WU-0014.3 ← WU-0014.2 |
+| WU-0001 | WU-0001.1 ← WU-0010.2; WU-0001.2 ← WU-0001.1; WU-0001.3 ← WU-0001.2; WU-0001.4 ← WU-0001.1; WU-0001.5 ← WU-0001.4 (compares against WU-0009.3); WU-0001.6 ← WU-0001.5 |
+| WU-0002 | WU-0002.1 ← WU-0010.2; WU-0002.2 ← WU-0002.1; WU-0002.3 ← WU-0002.2; WU-0002.4 ← WU-0002.2; WU-0002.5 ← WU-0002.2; WU-0002.6 ← WU-0002.2; WU-0002.7 ← WU-0002.2; WU-0002.8 ← WU-0002.1; WU-0002.9 ← WU-0002.2; WU-0002.10 ← WU-0002.2; WU-0002.11 ← WU-0002.1; WU-0002.12 ← WU-0002.1 to WU-0002.11, WU-0012.2; WU-0002.13 ← each sub-task |
+| WU-0005 | WU-0005.1 ← WU-0010.2; WU-0005.2 ← WU-0010.2; WU-0005.3 ← WU-0010.2; WU-0005.4 ← WU-0002.11; WU-0005.5 ← WU-0002.2; WU-0005.6 ← WU-0005.1 to WU-0005.5 |
+| WU-0006 | WU-0006.1 ← WU-0002.5, WU-0002.7, WU-0002.8; WU-0006.2 ← WU-0006.1; WU-0006.3 ← WU-0006.1; WU-0006.4 ← WU-0006.2, WU-0006.3 |
+| WU-0007 | WU-0007.1 ← —; WU-0007.2 ← WU-0007.1; WU-0007.3 ← WU-0007.2 |
+| WU-0008 | WU-0008.1 ← WU-0002.9, WU-0005.4; WU-0008.2 ← WU-0008.1; WU-0008.3 ← WU-0002.2; WU-0008.4 ← WU-0002.2; WU-0008.5 ← WU-0008.1 to WU-0008.4 |
+| WU-0003 | WU-0003.1 ← WU-0009.2, WU-0012.2; WU-0003.2 ← WU-0002.13, WU-0003.1, WU-0005.4, WU-0008.3; WU-0003.3 ← WU-0003.2; WU-0003.4 ← WU-0003.1; WU-0003.5 ← WU-0003.2; WU-0003.6 ← WU-0003.3, WU-0003.4 |
+| WU-0004 | WU-0004.1 ← WU-0003.6, WU-0005.6, WU-0006.4, WU-0007.3, WU-0008.5, WU-0013.2, WU-0014.3; WU-0004.2 ← WU-0004.1; WU-0004.3 ← WU-0004.1; WU-0004.4 ← WU-0004.2; WU-0004.5 ← WU-0004.4; WU-0004.6 ← WU-0004.5; WU-0004.7 ← WU-0004.6; WU-0004.8 ← WU-0004.7 |
+| WU-0015 | WU-0015.1 ← WU-0004.7; WU-0015.2 ← WU-0015.1; WU-0015.3 ← WU-0015.2; WU-0015.4 ← WU-0015.3 |
+| WU-0016 | WU-0016.1 ← WU-0015.3; WU-0016.2 ← WU-0016.1; WU-0016.3 ← WU-0003.6; WU-0016.4 ← WU-0016.3 |
+| WU-0017 | WU-0017.1 ← WU-0015.4, WU-0016.4; WU-0017.2 ← WU-0017.1; WU-0017.3 ← WU-0017.1 |
+| WU-0018 | WU-0018.1 ← WU-0017.2; WU-0018.2 ← WU-0018.1; WU-0018.3 ← WU-0018.2 |
+| WU-0019 | WU-0019.1 ← WU-0018.3; WU-0019.2 ← WU-0018.3 |
