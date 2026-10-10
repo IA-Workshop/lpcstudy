@@ -26,6 +26,14 @@
 
 <dated entries: what was done, commands, results, commits>
 
+- **2026-10-10, WU-0013.1 audit** (`reviewer`, claude-opus-5-5, fresh context, worktree `wu/0013-def0007-audit` at `0da91a7`).
+  - **What was audited.** All 14 v1 tests in `tests/unit/test_{allocation,analysis,dynamics,embedding,ensemble,oracle,statistics}.py`, plus `tests/unit/unit_helpers.py`, together with every `lpcstudy` function they call. The audit is in `docs/agent/records/audits/2026-10-10-def-0007-tests.md`.
+  - **Result.** 13 `reference`, 0 `regression guard`, 1 `defective`.
+    - **Defective:** `test_dynamics.py::test_observability_matches_independent_jacobians` copies the ν formula of dynamics.py:220–222 at test L32. It also shares the delay-index expression through `delay_map_forward`.
+    - **Weak or uncited `reference` tests, listed for WU-0013.2:** `test_delay_and_acf` (the AMI band is uncited and wider than its own docstring) and `test_logrank_detects_difference_and_not_null` (no check of the p-value's value).
+  - **Docstrings.** None of the 14 docstrings states both a reference and a tolerance justification. All 14 are listed for WU-0013.2, with fixes that loosen no tolerance.
+  - **What was not run or changed.** No test was run (WU-0013.1 needs none). No test or `lpcstudy/` file was touched. The Monte Carlo error figures in the audit are scratch NumPy arithmetic, run without importing `lpcstudy`.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
