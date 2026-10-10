@@ -205,6 +205,30 @@ Results of the fix round: unit `152 passed in 20.45s` (exit 0; 139 earlier + 13 
   - **Owner checkpoint (LPC.PC.11):** mark the unit **needs owner review before freeze**. It covers the seed check (registry and DEV-n refusals in `run_preset.sh`), the `run.meta.json` provenance, and the LPC.AUTH.3 enforcement in `gpu_hours.py`. There is no verdict or statistics code and no dependency change.
   - **Verdict: changes required** (R1 must be fixed, R2 should be fixed; R3 and R4 are small; R5 is routed to the owner). Findings: 5.
 
+### Re-review 2026-10-10 (fix round 1), `reviewer`, claude-opus-5-5, fresh context
+
+Scope: R1 to R4 only, on commit 6330c78 (`git show 6330c78`). Tests were not rerun, on the main session's instruction. The developer's log records `152 passed in 20.45s` (unit) and `2 passed in 119.11s` (integration), one run each on the changed code.
+
+- **R1: fixed.**
+  - What changed: `__record` and the `nohup bash "$self"` re-entry are gone. The script has a single grammar, read in full in `tools/run_preset.sh:126-279`: `<smoke|pilot|full> <DEV-n> <out-dir>` plus `--device`, `--systems [A-Za-z0-9_]+`, `--skip-transfer` and `--skip-robustness`. Everything else gives 64.
+  - Order of the checks: pilot and full now start as `( trap '' HUP; run_recorded … ) & disown`, after the confirmatory scan, the seed check (regex plus exact registry match), the out-dir check, the lock, the tally and the probe. The background job inherits fd 9 and the validated `command` array.
+  - Quoting: the user-supplied seed and out-dir are quoted everywhere and reach the meta only as argv to `python3 -I -c`. The out-dir is absolute, so it cannot be read as a flag. IFS is not imported by bash.
+  - Probes, run in a scratch root with a scratch lock and `LPC_PYTHON=/bin/false`:
+    - `__record`, `record` and `--record` with fd 9 open on the lock, a plain file and `sh -c touch …`: 64 each, nothing ran;
+    - a seed `DEV-1` followed by a newline, or by `\x01`: 64;
+    - a trailing `--`: 64.
+  - The new test `test_no_hidden_mode_runs_a_command` copies my original probe: fd 9 on `$LPC_GPU_LOCK`, a plain file, then `sh -c touch`. On the old code it would have failed, because the marker gets created and the exit is 0. So it would have caught the hole. The text check is a regression guard. The front-end test checks the meta pid equals the printed pid (the `$BASHPID` change).
+  - Residual risk, not a finding: anyone who controls the environment can still go around the wrapper. The ways are `PATH` fakes for `flock` or `python3`, `BASH_ENV`, exported bash functions, `LPC_GPU_LOCK` pointing at another file, and `LPC_PYTHON` pointing at any program. These need a deliberate environment prefix or a planted file. The plan and §4.5 sanction them (the tests depend on them). Noted for the owner's review before the freeze.
+- **R2: fixed.** `os.walk(..., onerror=)` records each directory that cannot be listed, with its path, in `unreadable`. `sum` names it and `check` exits 65. The new test restores the mode in `finally` and is skipped as root, with the reason given. Its hand sum is 36000 s seen and unreadable 1.
+- **R3: fixed.** A non-empty `PYTEST_ADDOPTS` or `PYTEST_PLUGINS` gives 64 with one line, before anything starts. Three cases are added to (e). `FakeRoot.environment` now strips `PYTEST_*`, so the tests do not depend on the caller's environment. No assertion is weakened.
+- **R4: fixed.** A one-line TIMEOUT message is printed for both 124 and 137. The 137 wording is accurate: it gives the elapsed time, the limit plus the 30 s grace, and says an external SIGKILL gives the same code. It still says "investigate, do not raise".
+- **Scope and evidence.**
+  - Only the files these fixes need changed: the three tools, three unit test files, the helper and the unit file. `tests/integration/test_preset_wrapper.py` is unchanged, so criterion (k), the real smoke comparison against a direct run, is still tested. Its rerun is logged (`2 passed`), as it should be after the `run_preset.sh` change.
+  - The one removed test (`test_record_refuses_without_the_lock_on_fd_9`) tested the deleted mode. The new tests replace it and are stricter. No other assertion changed.
+  - The earlier review text is untouched. The commit names the unit and carries `Agent: claude-sonnet-5-5`. Modes are still 100755.
+- **Owner checkpoint unchanged:** needs owner review before freeze (seed check, `run.meta.json`, the LPC.AUTH.3 enforcement). R5 stays routed to the owner.
+- **Verdict: approve.** R1 to R4 fixed; no new findings.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
