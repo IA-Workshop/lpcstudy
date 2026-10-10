@@ -14,37 +14,22 @@ import numpy as np  # noqa: E402
 
 from .allocation import RULE_LABELS  # noqa: E402
 from .config import StudyConfig  # noqa: E402
+from .identifiers import HYPOTHESIS_TABLE, Hypothesis  # noqa: E402
 
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7",
           "#e34948"]
 INK, INK_2, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 PLOTTED_RULES = ["A0", "A1", "A2", "A3", "A4", "A5", "A*"]
 
-HYPOTHESES: dict[str, str] = {
-    "H1a": "Estimation seed scales linearly with noise: median per-state slope of "
-           "log delta on log rho in [0.9, 1.1]",
-    "H1b": "Analog seed follows eps^2 = c^2 N^(-2/d) + f^2: fitted 1/d within 25% of the "
-           "local dimension, floor increasing with rho",
-    "H1c": "Error = amplifier x seed: slope of log rms error on log(g_H seed) in [0.8, 1.2] "
-           "for CP and PLP at H_ref",
-    "H1d": "Horizon law: median of Lambda_bar x dT/dln(theta) in [0.8, 1.25] (PLP)",
-    "H1e": "Deployable proxies of all four LPCs track their oracles: Spearman >= 0.7 each",
-    "H1f": "Fourth LPC (noise sensitivity) is reducible to the other three: Delta R^2 "
-           "(4 vs 3 coordinates, out of sample) upper bound < 0.01 for logit w* and log T",
-    "H2a": "[primary] Separation: for H >= 1 LT median range of w*(H) < 0.1 and "
-           "|partial corr(logit w*, Lambda | seeds)| < 0.1",
-    "H2b": "[primary] Knob response: w* rises with N (per-state rank correlation > 0; "
-           "median at N_max < 0.95) and with rho",
-    "H2c": "State dependence: A4 MSE < A2 and < best single forecaster at H_ref",
-    "H2d": "Empirical comparison: A4 within 10% of A3 in-distribution",
-    "H2e": "Hybrid horizon gain <= ln2 / (2 Lambda_bar) for >= 90% of eligible states",
-    "H3a": "[primary] Some K <= 5: regret <= 5% of best-single variance, regime horizon "
-           "IQR <= 0.5 LT, consecutive log-rank Holm p < 0.01",
-    "H3b": "Regret falls as K^(-2/p_eff) with p_eff < 1.5",
-    "H3c": "Structure: weight tree ignores instability (importance < 0.2); horizon tree "
-           "uses instability more than any other coordinate",
-    "H3d": "Regime lookup costs <= 5% MSE relative to the closed form",
-}
+def _hypothesis_text(row: Hypothesis) -> str:
+    """Report text of a table row: role mark, v3 criterion, and the pending note if any."""
+    text = ("[primary] " if row.role == "primary" else "") + row.criterion
+    if row.pending:
+        text += f" [computed with the v1 statistic until {', '.join(row.pending)}]"
+    return text
+
+
+HYPOTHESES: dict[str, str] = {row.key: _hypothesis_text(row) for row in HYPOTHESIS_TABLE}
 
 
 VALIDATION_CRITERIA = {
@@ -74,16 +59,20 @@ def verdicts(results: dict, config: StudyConfig) -> dict:
     Returns
     -------
     dict
-        Hypothesis id to per-system flags and verdict.
+        Result key of each table row that has a result to per-system flags and verdict. A row
+        with no result in any system is absent; a row with a result in some systems only raises
+        ``KeyError``.
     """
     out = {}
-    for hyp in HYPOTHESES:
-        flags = {s: bool(results["systems"][s][hyp]["pass"])
-                 for s in config.core_systems if s in results["systems"]}
+    systems = [s for s in config.core_systems if s in results["systems"]]
+    for row in HYPOTHESIS_TABLE:
+        if not any(row.key in results["systems"][s] for s in systems):
+            continue  # no result yet (v3 H2e until WU-0002.7); write_markdown lists the row
+        flags = {s: bool(results["systems"][s][row.key]["pass"]) for s in systems}
         n_pass = sum(flags.values())
         verdict = ("supported" if flags and n_pass == len(flags) else
                    "partially supported" if n_pass else "not supported")
-        out[hyp] = {"by_system": flags, "verdict": verdict}
+        out[row.key] = {"by_system": flags, "verdict": verdict}
     return out
 
 
@@ -92,26 +81,24 @@ def _fmt(value: float, digits: int = 3) -> str:
         else f"{value:.{digits}g}"
 
 
-def _key_number(hyp: str, res: dict) -> str:
-    """One-line numeric summary of a hypothesis result for one system."""
-    r = res[hyp]
-    match hyp:
+def _key_number(key: str, res: dict) -> str:
+    """One-line numeric summary of a result (by its table key) for one system."""
+    r = res[key]
+    match key:
         case "H1a":
-            return f"slope {_fmt(r['median_slope'])} [{_fmt(r['ci'][0])}, {_fmt(r['ci'][1])}]"
-        case "H1b":
             parts = [f"rho={k}: 1/d={_fmt(v['fitted_inverse_dim'])}"
                      for k, v in r["by_noise"].items()]
             return "; ".join(parts) + f" (1/d_LB={_fmt(1 / r['local_dimension_median'])})"
-        case "H1c":
+        case "H1b":
             return f"CP {_fmt(r['CP']['slope'])}, PLP {_fmt(r['PLP']['slope'])}"
-        case "H1d":
+        case "H1c":
             return f"PLP {_fmt(r['PLP'].get('median_ratio', float('nan')))}, " \
                    f"CP {_fmt(r['CP'].get('median_ratio', float('nan')))}"
-        case "H1e":
+        case "H1d":
             s = r["spearman"]
             return f"eps {_fmt(s['analog_seed'], 2)}, delta {_fmt(s['estimation_seed'], 2)}, " \
                    f"Lambda {_fmt(s['growth'], 2)}, N {_fmt(s['noise_sensitivity'], 2)}"
-        case "H1f":
+        case "Q-N":
             d = r["deployable"]
             return f"{d['verdict']}: dR2 w {_fmt(d['logit_w']['delta_r2'], 2)} " \
                    f"[{_fmt(d['logit_w']['ci'][0], 2)}, {_fmt(d['logit_w']['ci'][1], 2)}], " \
@@ -131,18 +118,16 @@ def _key_number(hyp: str, res: dict) -> str:
                    f"{_fmt(100 * r['A4_minus_' + r['best_single']]['relative'], 3)}%"
         case "H2d":
             return f"A4/A3-1 = {_fmt(100 * r['in_distribution_excess'], 3)}%"
-        case "H2e":
+        case "gain_bound":
             return f"within bound {_fmt(r['fraction_within_bound'], 3)} " \
                    f"(n={r['n_states']}, max gain {_fmt(r['max_gain_lyapunov'], 2)} LT)"
         case "H3a":
             return f"K={r['chosen_K']}: regret {_fmt(100 * r['regret_ratio'], 3)}%, " \
                    f"IQR {_fmt(r['mean_iqr_lyapunov'], 2)} LT"
         case "H3b":
-            return f"p_eff {_fmt(r['p_eff'], 3)}"
-        case "H3c":
             return f"Lambda imp: weight {_fmt(r['weight_tree_importance']['lambda_tilde'], 2)}, " \
                    f"horizon {_fmt(r['horizon_tree_importance']['lambda_tilde'], 2)}"
-        case "H3d":
+        case "H3c":
             return f"A5/A4 {_fmt(r['A5_over_A4_mse'], 4)}"
     return ""
 
@@ -210,12 +195,18 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
             f"{s} {'PASS' if g else 'FAIL (results provisional)' if g is not None else 'n/a'}"
             for s, g in gate.items())]
     ver = results["verdicts"]
-    for hyp, text in HYPOTHESES.items():
+    for row in HYPOTHESIS_TABLE:
+        if row.key not in ver:  # a table row without a result is listed, not dropped
+            cells = ["n/a: no result" for _ in systems]
+            lines.append(f"| {row.v3_id} | {HYPOTHESES[row.key]} | " + " | ".join(cells)
+                         + " | no result |")
+            continue
         cells = []
         for s in systems:
-            flag = "PASS" if ver[hyp]["by_system"][s] else "FAIL"
-            cells.append(f"{flag}: {_key_number(hyp, results['systems'][s])}")
-        lines.append(f"| {hyp} | {text} | " + " | ".join(cells) + f" | {ver[hyp]['verdict']} |")
+            flag = "PASS" if ver[row.key]["by_system"][s] else "FAIL"
+            cells.append(f"{flag}: {_key_number(row.key, results['systems'][s])}")
+        lines.append(f"| {row.v3_id} | {HYPOTHESES[row.key]} | " + " | ".join(cells)
+                     + f" | {ver[row.key]['verdict']} |")
 
     lines += ["", "## Allocation rules at the core cell (test split)", ""]
     for s in systems:
@@ -251,7 +242,7 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
         lines += ["", "## Robustness (core cell)", ""]
         for s, variants in results["robustness"].items():
             lines += [f"### {s}", "", "| Variant | H2a range | H2a partial r | A4 vs A2 | "
-                      "A4/A3 | A5 regret | H1c CP | H1c PLP |", "|---|---|---|---|---|---|---|---|"]
+                      "A4/A3 | A5 regret | H1b CP | H1b PLP |", "|---|---|---|---|---|---|---|---|"]
             for label, v in variants.items():
                 if "error" in v:
                     lines.append(f"| {label} | error: {v['error']} | | | | | | |")
@@ -264,7 +255,7 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
                         f"{_fmt(v['H2a_partial_corr'], 2)} | "
                         f"{_fmt(100 * v['A4_vs_A2_relative'], 3)}% | {_fmt(v['A4_over_A3'], 3)} | "
                         f"{_fmt(100 * v['A5_regret_ratio'], 3)}% | "
-                        f"{_fmt(v['H1c']['CP']['slope'], 3)} | {_fmt(v['H1c']['PLP']['slope'], 3)} |")
+                        f"{_fmt(v['H1b']['CP']['slope'], 3)} | {_fmt(v['H1b']['PLP']['slope'], 3)} |")
     path.write_text("\n".join(lines) + "\n")
 
 
@@ -337,7 +328,7 @@ def make_figures(results: dict, config: StudyConfig, out_dir: Path) -> list[Path
 
     fig, axes = plt.subplots(1, len(systems), figsize=(4.2 * len(systems), 3.4), squeeze=False)
     for ax, s in zip(axes[0], systems):
-        curve = results["systems"][s]["H3b"]["regret_ratio_by_K"]
+        curve = results["systems"][s]["regime_curve"]["regret_ratio_by_K"]
         ks = np.array(sorted(map(int, curve)))
         ax.semilogx(ks, [100 * curve[str(k)] for k in ks], color=SERIES[0], linewidth=2,
                     marker="o", markersize=5)

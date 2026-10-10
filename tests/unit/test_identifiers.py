@@ -8,6 +8,7 @@ references are the study documents, parsed here by code that shares nothing with
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from lpcstudy.identifiers import HYPOTHESIS_TABLE, V1_KEY_MAP
 ROOT = Path(__file__).resolve().parents[2]
 DECISION_LOG = ROOT / "docs" / "study" / "decision_log_lpc.md"
 PROPOSAL = ROOT / "docs" / "study" / "proposal_and_methods_v3.md"
+PACKAGE = ROOT / "lpcstudy"
 
 
 def unescape(text: str) -> str:
@@ -116,3 +118,36 @@ def test_pending_names_the_roadmap_rows() -> None:
                 "Q-N": ("WU-0002.6",), "H2b": ("WU-0002.7",), "H2e": ("WU-0002.7",),
                 "H2d": ("WU-0002.8",), "H3a": ("WU-0002.8",), "H3c": ("WU-0002.8",)}
     assert {h.v3_id: h.pending for h in HYPOTHESIS_TABLE if h.pending} == expected
+
+
+def test_no_stale_identifier_in_the_package() -> None:
+    """No module but ``identifiers`` holds a v1 or v2 id as a name or a string constant.
+
+    Reference: the ROADMAP grep of WU-0002.2 (``H1e|H1f|H2f|H3d|T1``, ``h1e_|h1f_``), done on the
+    syntax tree (names, attributes, function and argument names, string constants including
+    docstrings). Every string constant that is exactly an identifier (``H1a`` ... ``Q-N``, ``T1``)
+    must be a ``key`` of the table.
+    """
+    keys = {h.key for h in HYPOTHESIS_TABLE}
+    stale = re.compile(r"H1e|H1f|H2f|H3d|T1|h1e_|h1f_")
+    exact = re.compile(r"^(H\d[a-f]|Q-N|T1)$")
+    found = []
+    for path in sorted(PACKAGE.glob("*.py")):
+        if path.name == "identifiers.py":
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            names = []
+            if isinstance(node, ast.Name):
+                names.append(node.id)
+            elif isinstance(node, ast.Attribute):
+                names.append(node.attr)
+            elif isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                names.append(node.name)
+            elif isinstance(node, ast.arg):
+                names.append(node.arg)
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                names.append(node.value)
+                if exact.match(node.value) and node.value not in keys:
+                    found.append((path.name, "not a table key", node.value))
+            found += [(path.name, "stale", n[:60]) for n in names if stale.search(n)]
+    assert found == []

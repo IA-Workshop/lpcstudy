@@ -1,8 +1,11 @@
-"""Statistics behind each pre-registered hypothesis (H1a-H3d) and secondary analyses.
+"""Statistics behind each pre-registered hypothesis and secondary analyses.
+
+The identifiers are the v3 ones of :mod:`lpcstudy.identifiers`: H1a-H1d, Q-N, H2a-H2d, H3a-H3c,
+the reported gain bound, and the validation check V7 (H2e, noise matching, is added by WU-0002.7).
 
 Every function returns a plain ``dict`` (JSON-serializable) with the point
 estimate, its block-bootstrap interval, the pre-registered threshold and a
-``pass`` flag. Primary endpoints (H2a, H2b, H3a) use Bonferroni-adjusted
+``pass`` flag. Primary endpoints (H2a, H2b, H3c) use Bonferroni-adjusted
 intervals at level ``1 - 0.05/3``; all others use 95% intervals.
 """
 
@@ -15,6 +18,7 @@ from sklearn.tree import DecisionTreeRegressor
 
 from .allocation import deployable_profile
 from .config import StudyConfig
+from .identifiers import check_keys
 from .oracle import characteristic_horizon, curvature, hybrid_mse, oracle_weight
 from .pipeline import Cell, FittedRules, RuleScores
 from .statistics import block_bootstrap, holm_adjust, kaplan_meier, logrank_test, \
@@ -32,8 +36,8 @@ def _boot(config: StudyConfig, stat, n_items: int, level: float = 0.95, salt: in
 
 
 # ------------------------------------------------------------------------ RQ1
-def h1a_noise_scaling(noise_cells: dict[float, Cell], config: StudyConfig) -> dict:
-    """H1a: ``delta`` scales linearly with ``rho`` (per-state log-log slope in [0.9, 1.1]).
+def v7_noise_scaling(noise_cells: dict[float, Cell], config: StudyConfig) -> dict:
+    """V7: ``delta`` scales linearly with ``rho`` (per-state log-log slope in [0.9, 1.1]).
 
     Parameters
     ----------
@@ -80,9 +84,9 @@ def _fit_seed_law(sizes: np.ndarray, mean_sq: np.ndarray) -> tuple[float, float]
     return float(params[1]), float(np.exp(params[2]))
 
 
-def h1b_library_scaling(library_cells: dict[tuple[float, int], Cell],
+def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
                         config: StudyConfig) -> dict:
-    """H1b: ``eps_s^2 ~ c^2 N^{-2/d} + f^2`` with ``1/d`` within 25% of Levina-Bickel.
+    """H1a: ``eps_s^2 ~ c^2 N^{-2/d} + f^2`` with ``1/d`` within 25% of Levina-Bickel.
 
     Parameters
     ----------
@@ -123,8 +127,8 @@ def h1b_library_scaling(library_cells: dict[tuple[float, int], Cell],
     return out
 
 
-def h1c_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
-    """H1c: ``log rms(e_H)`` against ``log(g_H seed / sqrt(m))`` has unit slope at ``H_ref``.
+def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
+    """H1b: ``log rms(e_H)`` against ``log(g_H seed / sqrt(m))`` has unit slope at ``H_ref``.
 
     Parameters
     ----------
@@ -156,8 +160,8 @@ def h1c_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     return res
 
 
-def h1d_horizon_law(cell: Cell, config: StudyConfig) -> dict:
-    """H1d: state-wise slope of ``T`` against ``ln theta`` equals ``1 / Lambda_bar``.
+def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
+    """H1c: state-wise slope of ``T`` against ``ln theta`` equals ``1 / Lambda_bar``.
 
     Parameters
     ----------
@@ -198,8 +202,8 @@ def h1d_horizon_law(cell: Cell, config: StudyConfig) -> dict:
     return res
 
 
-def h1e_proxies(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
-    """H1e: Spearman correlation of each deployable proxy with its oracle >= 0.7.
+def h1d_proxies(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
+    """H1d: Spearman correlation of each deployable proxy with its oracle >= 0.7.
 
     Parameters
     ----------
@@ -238,8 +242,8 @@ def _oracle_profile(cell: Cell, split: str, config: StudyConfig) -> np.ndarray:
                             np.log(m.noise_sens + NOISE_SENS_FLOOR)])
 
 
-def h1f_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
-    """H1f: is the fourth LPC (noise sensitivity) reducible to the other three?
+def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
+    """Q-N: is the fourth LPC (noise sensitivity) reducible to the other three?
 
     Nested out-of-sample comparison. Gradient-boosted regressors are trained on
     the construction and calibration states with the first three profile
@@ -513,8 +517,8 @@ def h2d_empirical_comparison(scores: dict[str, RuleScores], config: StudyConfig)
             bool(in_dist_ok), "pass": bool(in_dist_ok)}
 
 
-def h2e_horizon_bound(cell: Cell, config: StudyConfig) -> dict:
-    """H2e: hybrid horizon gain over the better forecaster <= ``ln 2 / (2 Lambda_bar)``.
+def gain_horizon_bound(cell: Cell, config: StudyConfig) -> dict:
+    """Gain bound: hybrid horizon gain over the better forecaster <= ``ln 2 / (2 Lambda_bar)``.
 
     Evaluated on states with positive growth, uncensored single-forecaster
     horizons and nonnegative error covariance at the better forecaster's crossing.
@@ -558,7 +562,7 @@ def h2e_horizon_bound(cell: Cell, config: StudyConfig) -> dict:
 # ------------------------------------------------------------------------ RQ3
 def h3_regimes(cell: Cell, rules: FittedRules, scores: dict[str, RuleScores],
                config: StudyConfig) -> dict:
-    """H3a-H3d: regime sufficiency, regret scaling, structure and cost.
+    """H3a-H3c and the regime curve: sufficiency, structure and cost of the regimes.
 
     Parameters
     ----------
@@ -567,14 +571,15 @@ def h3_regimes(cell: Cell, rules: FittedRules, scores: dict[str, RuleScores],
     rules : FittedRules
         Fitted rules (regime maps).
     scores : dict[str, RuleScores]
-        Test scores (for H3d).
+        Test scores (for H3c).
     config : StudyConfig
         Study configuration.
 
     Returns
     -------
     dict
-        Results for H3a, H3b, H3c and H3d.
+        Results for H3a, H3b and H3c, and the reported ``regime_curve`` (regret ratio and
+        realized regime count by requested ``K``).
     """
     from .allocation import regime_regret, state_horizon_target
 
@@ -619,14 +624,8 @@ def h3_regimes(cell: Cell, rules: FittedRules, scores: dict[str, RuleScores],
            "iqr_pass": bool(iqr_ok), "logrank_pass": bool(logrank_ok),
            "pass": bool(regret_ok and iqr_ok and logrank_ok)}
 
-    requested = sorted(k for k in curve if k <= 8)
-    ks = np.array([realized[k] for k in requested], dtype=float)
-    vals = np.array([curve[k] for k in requested])
-    slope = ols_slope(np.log(ks), np.log(np.maximum(vals, 1e-12)))
-    p_eff = -2.0 / slope if slope < 0 else float("inf")
-    h3b = {"regret_ratio_by_K": {str(k): v for k, v in curve.items()},
-           "realized_K": {str(k): v for k, v in realized.items()}, "loglog_slope": slope,
-           "p_eff": p_eff, "threshold": "p_eff < 1.5", "pass": bool(p_eff < 1.5)}
+    regime_curve = {"regret_ratio_by_K": {str(k): v for k, v in curve.items()},
+                    "realized_K": {str(k): v for k, v in realized.items()}}
 
     con = cell.splits["construction"]
     con_profile = deployable_profile(con.evals, rules.proxies, cell.noise, lt)
@@ -641,15 +640,17 @@ def h3_regimes(cell: Cell, rules: FittedRules, scores: dict[str, RuleScores],
     tree_t.fit(flat, np.repeat(t_t, n_draws))
     imp_w, imp_t = tree_w.feature_importances_, tree_t.feature_importances_
     names = list(PROFILE_NAMES)
-    h3c = {"weight_tree_importance": dict(zip(names, imp_w.tolist())),
+    h3b = {"weight_tree_importance": dict(zip(names, imp_w.tolist())),
            "horizon_tree_importance": dict(zip(names, imp_t.tolist())),
            "threshold": "weight tree: lambda < 0.2; horizon tree: lambda > each other "
                         "coordinate",
            "pass": bool(imp_w[2] < 0.2 and imp_t[2] > max(np.delete(imp_t, 2)))}
 
     ratio = float(scores["A5"].state_mse_ref.mean() / scores["A4"].state_mse_ref.mean())
-    h3d = {"A5_over_A4_mse": ratio, "threshold": 1.05, "pass": bool(ratio <= 1.05)}
-    return {"H3a": h3a, "H3b": h3b, "H3c": h3c, "H3d": h3d}
+    h3c = {"A5_over_A4_mse": ratio, "threshold": 1.05, "pass": bool(ratio <= 1.05)}
+    out = {"H3a": h3a, "H3b": h3b, "H3c": h3c, "regime_curve": regime_curve}
+    check_keys(out)
+    return out
 
 
 # ------------------------------------------------------------------ secondary

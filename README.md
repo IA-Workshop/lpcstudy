@@ -1,6 +1,6 @@
 # lpcstudy — v1 research code
 
-> **Development bundle (2026-10-10).** This is the v1 code as run for the pilot, plus governance (`docs/agent/governance/`), work records (`docs/agent/records/`), seeds (`seeds/`) and study documents (`docs/study/`). Start with `.claude/CLAUDE.md` (Claude Code reads it automatically). The study design is now v3. The hypothesis identifiers below are the v1 ones, which WU-0002 updates.
+> **Development bundle (2026-10-10).** This is the v1 code as run for the pilot, plus governance (`docs/agent/governance/`), work records (`docs/agent/records/`), seeds (`seeds/`) and study documents (`docs/study/`). Start with `.claude/CLAUDE.md` (Claude Code reads it automatically). The study design is now v3. The hypothesis identifiers are the v3 ones (WU-0002.2).
 
 
 This is the working prototype for the pilot study **"State-dependent allocation between an analog (CP) and a physics-based (PLP) forecaster via local predictability conditions"**.
@@ -13,7 +13,7 @@ It runs proposal stages (i)–(v) end to end:
 - (iv) state abstraction and benchmarking;
 - (v) robustness.
 
-It then evaluates every pre-registered hypothesis (H1a–H3d) and writes a results report.
+It then evaluates every pre-registered hypothesis (v3 ids H1a–H3c, Q-N) and writes a results report.
 
 The Methods document (`methods_experimental_procedures_v1.md`) is the specification. Every constant lives in `lpcstudy/config.py`.
 

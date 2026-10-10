@@ -101,6 +101,32 @@ HYPOTHESIS_TABLE: tuple[Hypothesis, ...] = (
         ("WU-0002.8",)),
 )
 
+def check_keys(result: dict) -> None:
+    """Raise if a key of ``result`` looks like a hypothesis id but is not a key of the table.
+
+    A key looks like a hypothesis id when it is ``Q-N``, ``T1`` or ``H`` followed by a digit and
+    a letter ``a`` to ``f``. This makes a leftover v1 or v2 id (``H1f``, ``H3d``, ``T1``) a loud
+    error where results are assembled, not a silent extra key.
+
+    Parameters
+    ----------
+    result : dict
+        A dict of results keyed by identifiers.
+
+    Raises
+    ------
+    ValueError
+        Naming the offending keys.
+    """
+    keys = {row.key for row in HYPOTHESIS_TABLE}
+    bad = sorted(k for k in result if k not in keys and isinstance(k, str) and (
+        k in ("Q-N", "T1") or (len(k) == 3 and k[0] == "H" and k[1].isdigit()
+                               and k[2] in "abcdef")))
+    if bad:
+        raise ValueError(f"keys {bad} are not identifiers of the table; "
+                         f"valid keys: {sorted(keys)}")
+
+
 # The correction table of the decision log (v1 key in the code of the pilot -> v3 key), for
 # reading ``docs/study/pilot_results_v1.json`` (WU-0002.12). ``None`` marks a dropped result.
 V1_KEY_MAP: dict[str, str | None] = {

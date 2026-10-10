@@ -20,6 +20,7 @@ from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
 from .dynamics import make_finite_growth
 from .ensemble import AnalogLibrary, forecast_draws
+from .identifiers import check_keys
 from .oracle import oracle_weight
 from .pipeline import Cell, FittedRules, Study, fit_rules, rule_weights, score_rules
 from .statistics import block_bootstrap, partial_correlation
@@ -185,19 +186,20 @@ def run_system(study: Study, system: str) -> dict:
                                                         with_evals=False)
 
     # Hypotheses.
-    res["H1a"] = an.h1a_noise_scaling(noise_cells, cfg)
-    res["H1b"] = an.h1b_library_scaling(library_cells, cfg)
-    res["H1c"] = an.h1c_seed_amplifier(core, cfg)
-    res["H1d"] = an.h1d_horizon_law(core, cfg)
-    res["H1e"] = an.h1e_proxies(core, rules, cfg)
-    res["H1f"] = an.h1f_noise_redundancy(core, rules, cfg)
+    res["V7"] = an.v7_noise_scaling(noise_cells, cfg)
+    res["H1a"] = an.h1a_library_scaling(library_cells, cfg)
+    res["H1b"] = an.h1b_seed_amplifier(core, cfg)
+    res["H1c"] = an.h1c_horizon_law(core, cfg)
+    res["H1d"] = an.h1d_proxies(core, rules, cfg)
+    res["Q-N"] = an.qn_noise_redundancy(core, rules, cfg)
     res["H2a"] = an.h2a_separation(core, cfg)
     res["H2b"] = an.h2b_knob_response(noise_cells, library_cells, cfg)
     res["H2c"] = an.h2c_state_dependence(scores, cfg)
     res["H2d"] = an.h2d_empirical_comparison(scores, cfg)
-    res["H2e"] = an.h2e_horizon_bound(core, cfg)
+    res["gain_bound"] = an.gain_horizon_bound(core, cfg)
     res.update(an.h3_regimes(core, rules, scores, cfg))
     res["oracle_recovery"] = an.oracle_recovery(scores, cfg)
+    check_keys(res)
     res["seconds"] = time.time() - t0
     study.core_cells[system] = core
     study.fitted[system] = rules
@@ -215,12 +217,14 @@ def _variant_summary(cell: Cell, rules: FittedRules, config: StudyConfig) -> dic
     regret = regime_regret(rules.regimes[rules.chosen_regimes], profile,
                            cell.splits["test"].moments, config.reference_horizon - 1)[1]
     ref = config.reference_horizon - 1
-    return {"H1c": an.h1c_seed_amplifier(cell, config),
-            "H2a_median_range": h2a["median_range"], "H2a_partial_corr": h2a["partial_corr"],
-            "A4_vs_A2_relative": h2c["A4_minus_A2"]["relative"],
-            "A4_over_A3": float(scores["A4"].mse[ref] / scores["A3"].mse[ref]),
-            "A5_regret_ratio": regret, "chosen_K": rules.chosen_regimes,
-            "mse_href": {k: float(v.mse[ref]) for k, v in scores.items()}}
+    out = {"H1b": an.h1b_seed_amplifier(cell, config),
+           "H2a_median_range": h2a["median_range"], "H2a_partial_corr": h2a["partial_corr"],
+           "A4_vs_A2_relative": h2c["A4_minus_A2"]["relative"],
+           "A4_over_A3": float(scores["A4"].mse[ref] / scores["A3"].mse[ref]),
+           "A5_regret_ratio": regret, "chosen_K": rules.chosen_regimes,
+           "mse_href": {k: float(v.mse[ref]) for k, v in scores.items()}}
+    check_keys(out)
+    return out
 
 
 def _perturbation_scale_variant(study: Study, cell: Cell, rules: FittedRules,
