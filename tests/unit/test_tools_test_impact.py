@@ -398,12 +398,31 @@ def test_commands_refuse_empty_and_whole_suite_paths(paths: list[str]) -> None:
         tool.pytest_commands(selection, ROOT)
 
 
-def test_commands_for_a_tier_directory_are_allowed() -> None:
-    """A tier directory is a legitimate argument (not the whole suite). Exact argv equality."""
+def test_commands_for_a_tier_directory_are_allowed(tmp_path: Path) -> None:
+    """A tier directory is a legitimate argument (not the whole suite). Exact argv equality.
+
+    Hermetic (WU-0012 gate fix F1): the root is an empty ``tmp_path`` with no ``tools/run_tests.sh``,
+    so the direct ``python -m pytest`` form is built whether or not the real repository has the
+    wrapper. The wrapper form is the next test.
+    """
     selection = tool.Selection(
         tiers={"unit": ["tests/unit"], "integration": [], "slow": [], "gpu": []})
-    assert tool.pytest_commands(selection, ROOT) == [
+    assert not (tmp_path / "tools" / "run_tests.sh").exists()
+    assert tool.pytest_commands(selection, tmp_path) == [
         [sys.executable, "-m", "pytest", "-q", "--tb=short", "-rfE", "tests/unit"]]
+
+
+def test_commands_for_a_tier_directory_use_the_wrapper_when_it_exists(tmp_path: Path) -> None:
+    """With ``tools/run_tests.sh`` present the tier directory goes through it. Exact argv equality.
+
+    Reference: the plan of WU-0011 (Q6) and DEVELOPMENT_WORKFLOW.md 4.5: ``run_tests.sh <tier> <paths>``.
+    The wrapper is only named, never executed.
+    """
+    write(tmp_path, "tools/run_tests.sh", "echo wrapper\n")
+    selection = tool.Selection(
+        tiers={"unit": ["tests/unit"], "integration": [], "slow": [], "gpu": []})
+    assert tool.pytest_commands(selection, tmp_path) == [
+        [str(tmp_path / "tools" / "run_tests.sh"), "unit", "tests/unit"]]
 
 
 # ------------------------------------------------------------------ the other mapping rules
