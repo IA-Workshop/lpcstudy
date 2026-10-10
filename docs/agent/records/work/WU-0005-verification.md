@@ -9,10 +9,104 @@
 
 ## Plan (written before execution)
 
-- **Scope:** what is in and what is out.
-- **Definition of done:**
-- **Acceptance criteria:** checks and tolerances, with their justification, fixed now (VV.3).
-- **Affected checks:** what to run for this change (RSRC.11).
+Planner: claude-opus-5-5, 2026-10-10, on wu/0005-verification at 1574fb4. This plan covers **WU-0005.1 to .3 only**. WU-0005.4 waits for WU-0002.11 and WU-0005.5 waits for WU-0002.2. Both are planned later, in a dated amendment to this section. WU-0005.6 follows .1 to .5.
+
+- **Scope.**
+  - **In:** three test-only additions closing the NVVUQ.5 gaps "RK4", "Analog search" and "Levina–Bickel" (`NVVUQ-instantiation-LPC.md`). The design basis is v3 §4 (RK4 step bound; "Levina–Bickel ... on library states") and Methods v2 M4 ("Exact Euclidean k-d tree search"; LB with k = 20 on 2×10⁴ states).
+  - **Out:**
+    - any change under `lpcstudy/`;
+    - `AnalogLibrary.build` and `analog_vectors` (covered by `test_embedding` and `test_data`);
+    - the margin Δ and P2(c) (WU-0005.5);
+    - V6 step halving (already met);
+    - the `workers=-1` thread use in `cKDTree.query` (an observation, listed below).
+  - **If a test fails, it is a finding.** Do not change the test. Record it as a DEF and `/refer` it. A fix to `systems`, `ensemble` or `oracle` changes study numbers and is a separate, planned change (PRIME.2).
+- **Definition of done:** the three tests below exist with docstrings that give the reference and the tolerance derivation (skill `numerical-test`). Each passes once in the blast radius, with the §4.9 checklist and the summary line in `## Log`. There is one commit per sub-task. The applied-mathematician's confirmations are recorded in `## Log` before execution.
+
+**Acceptance criteria (ROADMAP.md §2, verbatim; fixed. The applied-mathematician may tighten them before execution, never loosen them):**
+
+| Sub-task | Criterion (verbatim) |
+| --- | --- |
+| WU-0005.1 | Reference: `scipy.linalg.expm(A t) x0` for a fixed 3×3 A with complex eigenvalues (independent of the integrator). Steps h, h/2, h/4 chosen so that the finest error is above 10⁻¹¹ (well above round-off) and the coarsest below 10⁻³; observed order in [3.8, 4.2]. Uses `make_flow_step` on a `SystemSpec` built in the test with the linear field and `max_dt` set to each step. Under 5 s. |
+| WU-0005.2 | 10⁴ library vectors in ℝ⁷ and 200 queries from `np.random.default_rng(<fixed>)`: nearest index identical to an exhaustive `np.argmin` of squared distances for every query (exact), nearest distance within 10⁻¹² relative (round-off of a 7-term sum). Second-nearest also checked where the margin is reported. |
+| WU-0005.3 | Sets: uniform on a line segment, a unit square and a unit cube embedded in ℝ⁷ by a fixed orthonormal map, 2×10⁴ points, k = 20 (the study's setting). Estimate within ±10% of 1, 2 and 3 respectively; the applied-mathematician confirms this from the estimator's bias and variance at k = 20 and n = 2×10⁴ before execution, and may tighten it. Fixed seed. |
+
+**Test data.** Each test uses `np.random.default_rng(<literal>)` with seeds 50051, 50052 and 50053. This is synthetic data, not a study stream. It keeps the tests independent of `make_rng`, which `test_data` tests, and no study or DEV seed is touched (§4.7, LPC.PC.7).
+
+**WU-0005.1. `tests/unit/test_systems.py::test_rk4_observed_order_is_four` (new file).**
+- **Under test:** `make_flow_step` (`lpcstudy/systems.py`).
+- **Construction:**
+  - A = S B S⁻¹, with B = [[−0.1, −2, 0], [2, −0.1, 0], [0, 0, −0.5]] and S = [[1, 0.5, 0], [0, 1, 0.3], [0.2, 0, 1]]. The eigenvalues are −0.1 ± 2i and −0.5; the test asserts this premise with `np.linalg.eigvals`. A is non-normal and |λ|max ≈ 2.0.
+  - `SystemSpec(name="linear", field_fn=lambda s, p: A_jax @ s, params={}, dim=3, observed_index=0, initial_state=x0, max_dt=h)`, with x0 = (1, 0.5, −0.3) and interval T = 1.
+  - h ∈ {1/8, 1/16, 1/32}. These are dyadic, so `ceil(T/max_dt)` is exactly 8, 16 and 32 substeps.
+- **Reference:** `scipy.linalg.expm(A T) @ x0`.
+- **Derivation:**
+  - The error of the RK4 stability polynomial is e^z − R(z) = z⁵/120 + z⁶/720 + …, so the global error ≈ (T h⁴/120)‖A⁵ e^{AT} x0‖ ≲ 0.56 h⁴. That gives ≈ 1.4e-4, 8.6e-6 and 5.3e-7.
+  - The coarsest is below 1e-3 and the finest above 1e-11, a factor of 5e4. The test asserts both bounds as premises.
+  - The round-off floor is about 32 steps × 4 stages × eps × ‖x‖ ≈ 1e-14. The error of `expm` is about 1e-15.
+  - The z⁶ term biases the observed order by log₂((1 + z/6)/(1 + z/12)) ≈ +0.03 at z = h|λ| = 0.25.
+  - Both pairs, (h, h/2) and (h/2, h/4), must give log₂(e_h / e_{h/2}) ∈ [3.8, 4.2], with ‖·‖₂ error at T. The predicted value is ≈ 4.03. The output dtype must be float64.
+- **Proposed addition**, within v3 §4 "RK4 step ≤ …": `test_flow_step_respects_max_dt`. With `max_dt = 0.3` the result equals the result at `max_dt = 0.25` (4 substeps of dt = 1/4), with `atol=1e-15`, since both run the same arithmetic. This checks that the step used never exceeds `max_dt`.
+- **Runtime:** three small `fori_loop` compilations, under 2 s.
+
+**WU-0005.2. `tests/unit/test_ensemble.py::test_kdtree_query_matches_brute_force`.**
+- **Under test:** `AnalogLibrary.query`, which wraps `cKDTree.query`, reshapes to (n, k) and maps positions to time indices.
+- **Construction:**
+  - 10⁴ standard-normal vectors in ℝ⁷.
+  - `indices = np.arange(10_000) + 41`. The offset tests the position-to-time mapping.
+  - `AnalogLibrary(indices, noisy_series=np.zeros(10_041), tree=cKDTree(vectors))`.
+  - 200 queries: 190 standard-normal, plus 10 exact copies of library vectors (the zero-distance edge case).
+- **Reference:** exhaustive squared distances `((q - vectors)**2).sum(1)`, in chunks of 20 queries (no ‖q‖² − 2q·x expansion, which cancels), then `np.argsort`.
+- **Checks:**
+  - For k ∈ {1, 2, 5}, where 5 is `config.analog_counts`: the shapes are (200, k).
+  - All k indices equal the reference indices + 41 exactly.
+  - Distances satisfy `rtol=1e-12, atol=0`, and the 10 copies give exactly 0.0.
+  - k = 2 is the second-nearest check. The margin itself is not yet reported in the code (WU-0005.5).
+- **Premise asserted:** every reference gap d²₍ⱼ₊₁₎ − d²₍ⱼ₎ > 1e-9·d²₍ⱼ₊₁₎ for j ≤ 5, so the index order is well defined (no ties).
+- **Derivation:** a 7-term sum plus a sqrt carries ≤ ~8 eps ≈ 1.8e-15 relative error, so 1e-12 leaves a factor of 500.
+- **Bad input:** a query of width 6 raises `ValueError`.
+- **Runtime:** under 1 s.
+
+**WU-0005.3. `tests/unit/test_oracle.py::test_local_dimension_known_sets`.**
+- **Under test:** `local_dimension` at its default k, asserting that the default is 20 (the value `state_oracles` uses).
+- **Construction**, for m ∈ {1, 2, 3}:
+  - U = first factor of `qr(rng.standard_normal((7, m)))`, which has orthonormal columns. The offset is c = `rng.standard_normal(7)`.
+  - Reference: c + U u for 2×10⁴ points u ~ U[0, 1]^m.
+  - Queries: 2000 fresh points drawn uniformly in the interior box [0.2, 0.8]^m. They are not in the reference, as in the study.
+- **Estimate:** the median over queries, the statistic H1b uses (`analysis.py`).
+- **Derivation (for the applied-mathematician to confirm):**
+  - Given T_k, the k − 1 inner neighbors are iid uniform in the ball. Every ball lies inside the set: P(T₂₀ > 0.2) = P(Poisson(≥ 670) < 20) ≈ 0. Hence log(T_k/T_j) are iid Exp(m) and S ~ Gamma(19, rate m), *exactly* for any n.
+  - (k − 2)/S therefore has mean m (unbiased), sd m/√17 = 0.243m and median 18m/med Γ(19, 1) ≈ 0.964m, a bias of −3.6%.
+  - The Monte Carlo sd of the median at 2000 queries is about 1.25 × 0.243m/√2000 ≈ 0.7% if the queries were independent; shared neighbors inflate it.
+  - Even with an inflation of 2, the extreme is −3.6% − 3 × 1.4% = −7.8%, inside ±10%.
+  - Boundary queries are excluded on purpose. Truncated balls bias the estimate down for about 37% of cube points (T₂₀ ≈ 0.062), which is a property of the estimator, not a code check.
+- **Runtime:** under 1 s.
+
+**Applied-mathematician: confirm before execution.**
+- **Q1 (.1):** A, T, h and the error estimates above; the predicted order of 4.03. Tighten [3.8, 4.2]? Proposed: [3.9, 4.1]. Also add a leading-constant check: e at h/4 within 10% of ‖(T h⁴/120) A⁵ e^{AT} x0‖?
+- **Q2 (.3):** the exact law of (k − 2)/S for interior queries; the interior-box design and n_q = 2000; a bound on the inter-query dependence; whether to tighten. Proposed: mean within ±3% of m, and median within ±3% of 0.964m.
+  - Note that ±10% cannot detect the normalization. Using k − 1 instead of k − 2 gives a mean of +5.9% and a median of +1.8%.
+- **Q3 (.2):** optional. Confirm 1e-12 against the round-off bound of about 1.8e-15.
+
+**Affected checks.** The change set is three files under `tests/unit/` plus `docs/`. The rule "single test file: that file only" applies, and `docs/**` needs no tests. The radius is `tests/unit/test_systems.py`, `test_ensemble.py` and `test_oracle.py`, unit tier, CPU. There is no integration tier, since the pipeline is not touched. Use `python3 tools/test_impact.py --explain`, then `--run`, through `tools/run_tests.sh`; run each file once after it is written.
+
+Known gap in §4.2: if a finding later leads to a change in `lpcstudy/systems.py`, the core-module rule misses `tests/unit/test_dynamics.py` and `test_embedding.py`. Both import `systems` directly but are not graph dependents, so add them by hand.
+
+**Order and commits.**
+1. WU-0005.2 first. It needs no confirmation; the developer owns it.
+2. WU-0005.1, then WU-0005.3, after Q1 and Q2 are answered.
+
+Each is one commit: "WU-0005.k: …", ending `Agent: <model id>`.
+
+**Risks.**
+- XLA may differ from the `max_dt` equality check by an ulp. Mitigation: `atol=1e-15`, set now, not after the run.
+- Dependence inflation in .3 is larger than estimated (Q2).
+- `cKDTree.query(workers=-1)` uses all cores, outside the `LPC_THREADS` cap. This is an observation for the main session, not in this scope; the impact is negligible at these sizes.
+
+**Owner checkpoints (LPC.PC.11):** none expected. The change is test-only and touches no verdict, statistics, seed, provenance or dependency code. `scipy` is already pinned.
+
+**Questions for the owner:** none.
+
+**Open question for the researcher:** which normalization does Levina & Bickel (2005) use: 1/(k − 1) or k − 2 (MacKay–Ghahramani)? And is the global estimate a mean of m̂ or the inverse of a mean of inverses? v3 cites LB 2005 [U], and the code uses k − 2 and the median. This does not block .3 at ±10%, but it bears on Q2.
 
 ## Log
 
