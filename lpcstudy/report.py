@@ -85,11 +85,6 @@ def verdicts(results: dict, config: StudyConfig) -> dict:
         verdict = ("supported" if flags and n_pass == len(flags) else
                    "partially supported" if n_pass else "not supported")
         out[hyp] = {"by_system": flags, "verdict": verdict}
-    if "transfer" in results:
-        out["T1"] = {"by_system": {t: results["transfer"][t]["pass"]
-                                   for t in config.transfer_targets},
-                     "verdict": "supported" if results["transfer"]["pass"] else
-                     "not supported"}
     return out
 
 
@@ -223,12 +218,6 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
             flag = "PASS" if ver[hyp]["by_system"][s] else "FAIL"
             cells.append(f"{flag}: {_key_number(hyp, results['systems'][s])}")
         lines.append(f"| {hyp} | {text} | " + " | ".join(cells) + f" | {ver[hyp]['verdict']} |")
-    if "T1" in ver:
-        tr = results["transfer"]
-        detail = "; ".join(
-            f"{t}: gap A3 {_fmt(tr[t]['gap']['A3'], 3)}, A4 {_fmt(tr[t]['gap']['A4'], 3)}, "
-            f"A5 {_fmt(tr[t]['gap']['A5'], 3)}" for t in config.transfer_targets)
-        lines += ["", f"**T1 (transfer, secondary):** {ver['T1']['verdict']} — {detail}"]
 
     lines += ["", "## Allocation rules at the core cell (test split)", ""]
     for s in systems:

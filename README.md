@@ -11,9 +11,9 @@ It runs proposal stages (i)–(v) end to end:
 - (ii) mechanism validation;
 - (iii) allocation and horizon testing;
 - (iv) state abstraction and benchmarking;
-- (v) robustness and cross-system transfer.
+- (v) robustness.
 
-It then evaluates every pre-registered hypothesis (H1a–H3d, T1) and writes a results report.
+It then evaluates every pre-registered hypothesis (H1a–H3d) and writes a results report.
 
 The Methods document (`methods_experimental_procedures_v1.md`) is the specification. Every constant lives in `lpcstudy/config.py`.
 
@@ -31,7 +31,7 @@ python -m lpcstudy --preset pilot --out results --report-only   # rebuild report
 Useful options:
 
 - `--systems lorenz63 rossler` restricts the core systems.
-- `--skip-transfer` and `--skip-robustness` skip stage (v).
+- `--skip-robustness` skips stage (v).
 
 On a CUDA machine, `pip install "jax[cuda12]"`; the code runs unchanged. All computations use float64.
 
@@ -40,7 +40,7 @@ On a CUDA machine, `pip install "jax[cuda12]"`; the code runs unchanged. All com
 | Module | Contents |
 |---|---|
 | `config.py` | `StudyConfig`; presets `full`, `pilot`, `smoke` |
-| `systems.py` | Lorenz-63, Rössler, Chua, Lorenz-96; RK4 flow maps; Benettin λ_max |
+| `systems.py` | Lorenz-63, Rössler, Chua; RK4 flow maps; Benettin λ_max |
 | `embedding.py` | delay vectors; AMI delay selection; autocorrelation time |
 | `data.py` | trajectories, normalization, whitening, library/construction/calibration/test splits |
 | `networks.py` | MLP training (learned initial guess of ψ; error-predictor allocator) |
@@ -51,7 +51,7 @@ On a CUDA machine, `pip install "jax[cuda12]"`; the code runs unchanged. All com
 | `allocation.py` | rules A0–A5, A4o, A*; seed proxies; regime trees |
 | `pipeline.py` | `Study` (caches, cells), rule fitting, scoring |
 | `analysis.py` | statistics behind every hypothesis |
-| `experiments.py` | stage orchestration; transfer; robustness |
+| `experiments.py` | stage orchestration; robustness |
 | `validation.py` | validation gate V1–V6 |
 | `statistics.py` | Kaplan–Meier, log-rank, Holm, block bootstrap, partial correlation |
 | `report.py` | verdicts, `RESULTS.md`, figures |

@@ -286,7 +286,7 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
     Parameters
     ----------
     cells : list[Cell]
-        Core cells (one for in-system fitting, several for pooled transfer).
+        Core cells (one for in-system fitting).
     config : StudyConfig
         Study configuration.
 

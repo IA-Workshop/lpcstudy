@@ -4,7 +4,7 @@ Stage (i)   dynamical-system generation        -> ``Study.context``
 Stage (ii)  mechanism validation               -> :func:`run_system` (V1-V6, E1, E2)
 Stage (iii) allocation and horizon testing     -> :func:`run_system` (E3, E4)
 Stage (iv)  state abstraction and benchmarking -> :func:`run_system` (E5)
-Stage (v)   robustness and transfer            -> :func:`run_robustness`, :func:`run_transfer`
+Stage (v)   robustness                         -> :func:`run_robustness`
 """
 
 from __future__ import annotations
@@ -123,7 +123,7 @@ def run_system(study: Study, system: str) -> dict:
     -------
     dict
         JSON-serializable results; also stores the core cell and fitted rules in
-        ``study`` for transfer.
+        ``study`` for robustness.
     """
     cfg = study.config
     t0 = time.time()
@@ -213,49 +213,6 @@ def run_system(study: Study, system: str) -> dict:
     study.fitted[system] = rules
     LOG.info("%s finished in %.0fs", system, res["seconds"])
     return res
-
-
-def run_transfer_target(study: Study, system: str) -> None:
-    """Core cell and in-system fit for a transfer-only target (e.g. Lorenz-96)."""
-    cfg = study.config
-    core = study.run_cell(system, cfg.core_noise, cfg.core_library, core=True,
-                          with_evals=True)
-    study.core_cells[system] = core
-    study.fitted[system] = fit_rules([core], cfg)
-
-
-def run_transfer(study: Study) -> dict:
-    """Stage (v): regimes and rules fitted on the sources, applied to targets unchanged.
-
-    Parameters
-    ----------
-    study : Study
-        Study holding core cells of sources and targets.
-
-    Returns
-    -------
-    dict
-        Excess-MSE ratios (refit vs transferred) and the pre-registered comparison.
-    """
-    cfg = study.config
-    sources = [study.core_cells[s] for s in cfg.transfer_sources]
-    pooled = fit_rules(sources, cfg)
-    ref = cfg.reference_horizon - 1
-    out: dict = {"sources": list(cfg.transfer_sources),
-                 "pooled_chosen_K": pooled.chosen_regimes}
-    for target in cfg.transfer_targets:
-        cell = study.core_cells[target]
-        _, refit = _evaluate(cell, study.fitted[target], cfg)
-        _, moved = _evaluate(cell, pooled, cfg)
-        ratio = lambda s: {k: float(s[k].mse[ref] / s["A*"].mse[ref])
-                           for k in ("A2", "A3", "A4", "A5")}
-        r_refit, r_moved = ratio(refit), ratio(moved)
-        gap = {k: r_moved[k] - r_refit[k] for k in r_refit}
-        out[target] = {"ratio_refit": r_refit, "ratio_transferred": r_moved, "gap": gap,
-                       "pass": bool(gap["A4"] < gap["A3"] and gap["A5"] < gap["A3"])}
-    out["pass"] = bool(all(out[t]["pass"] for t in cfg.transfer_targets)) \
-        if cfg.transfer_targets else False
-    return out
 
 
 def _variant_summary(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:

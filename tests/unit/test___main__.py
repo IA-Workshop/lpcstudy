@@ -106,6 +106,22 @@ def test_unrecognized_token_is_never_echoed(token: str, tmp_path: Path,
             assert part not in lines[0], (part, lines[0])
 
 
+def test_removed_skip_transfer_option_is_refused(tmp_path: Path,
+                                                 capsys: pytest.CaptureFixture[str]) -> None:
+    """``--skip-transfer`` no longer exists: exit 64 and one stderr line, nothing created.
+
+    Reference: the refusal contract of ``choose_seed`` (an unrecognized option is refused,
+    WU-0002.1). Exact integer and string checks, no tolerance.
+    """
+    out = tmp_path / "out"
+    assert main(["--skip-transfer", "--out", str(out)]) == 64
+    captured = capsys.readouterr()
+    lines = captured.err.splitlines()
+    assert captured.out == "" and len(lines) == 1 and lines[0].startswith(PREFIX)
+    assert "unrecognized option" in lines[0] and "skip-transfer" not in lines[0]  # never echoed
+    assert not out.exists()
+
+
 def test_refusal_does_not_set_up_logging(tmp_path: Path) -> None:
     """A refusal adds no logging handler (refusals precede logging setup).
 
@@ -206,8 +222,7 @@ def run_with_fakes(argv: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPa
                         or path.write_text(json.dumps(obj)))
     monkeypatch.setattr(cli, "write_markdown", lambda *a: None)
     monkeypatch.setattr(cli, "make_figures", lambda *a: None)
-    assert main([*argv, "--out", str(tmp_path / "out"), "--skip-transfer", "--skip-robustness"],
-                **kwargs) == 0
+    assert main([*argv, "--out", str(tmp_path / "out"), "--skip-robustness"], **kwargs) == 0
     return saves
 
 
