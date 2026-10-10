@@ -210,6 +210,22 @@ Merges to `main` authorized by the owner (this session). `main` (with WU-0001, W
 7. **Output:** `-q --tb=short -rfE`.
 8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
 
+**2026-10-10, developer claude-sonnet-5-5: merge-gate fixes F1 and F2 written, not yet run.** The merge gate (main merged into this branch) had `2 failed, 359 passed`; both failures are interactions with units on main.
+- F1: `tests/unit/test_tools_test_impact.py::test_commands_for_a_tier_directory_are_allowed` is a WU-0011 test on main and this edits it. Cause: it built the expected direct `python -m pytest` argv with the real repo root, but `tools/test_impact.py` uses `tools/run_tests.sh` as soon as that file exists (WU-0011 plan Q6), and this branch creates it. The test was environment-dependent, not wrong in purpose. Fix: the root is an empty `tmp_path` (asserted to have no wrapper), the exact argv equality is unchanged; no assertion is weakened. The wrapper form for a tier directory was not covered (the existing fake-wrapper test uses file paths), so `test_commands_for_a_tier_directory_use_the_wrapper_when_it_exists` is added, exact equality `[<root>/tools/run_tests.sh, "unit", "tests/unit"]`.
+- F2: `tests/integration/test_preset_wrapper.py`. WU-0001.4 added the top-level `provenance` block to `results.json` (argv, start/end, wall seconds, peak memory), which differs between a direct and a wrapped run by construction (DEC-0005 Q1 anticipated it). Same reading as WU-0001.5 (which removes `provenance`, `seconds`): the canonical JSON of `results.json` without `seconds` and without `provenance` must be bitwise equal; and, separately, the two provenance blocks must have the same keys, equal values for every field of `lpcstudy/provenance.py` except `RUN_SPECIFIC = {argv, start_utc, end_utc, wall_seconds, peak_rss_bytes, device_peak_bytes}`, and equal argv once the `--out` value is masked (and different argv, since the out-dirs differ). Nothing dropped or loosened beyond that.
+
+§4.9 checklist before the gate-fix run:
+1. Change set: `M tests/unit/test_tools_test_impact.py`, `M tests/integration/test_preset_wrapper.py` (and this log).
+2. Radius, as set by the main session: F1 by node ids (`test_commands_for_a_tier_directory_are_allowed`, `test_commands_for_a_tier_directory_use_the_wrapper_when_it_exists`); F2 `tests/integration/test_preset_wrapper.py`. Nothing else is run; the main session reruns the gate.
+3. Already run: not on this code (the gate run was on the unfixed tests).
+4. Device: `JAX_PLATFORMS=cpu`; no GPU, no real lock.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s, integration 900 s (two smoke runs, 70 to 120 s on shared cores).
+6. Contention: no pilot/full/slow/gpu running.
+7. Output: `-q --tb=short -rfE`.
+8. Commands: `tools/run_tests.sh unit tests/unit/test_tools_test_impact.py::test_commands_for_a_tier_directory_are_allowed tests/unit/test_tools_test_impact.py::test_commands_for_a_tier_directory_use_the_wrapper_when_it_exists`, then `tools/run_tests.sh integration tests/integration/test_preset_wrapper.py`.
+
+Results of the gate-fix run: F1 `2 passed in 0.21s` (exit 0); F2 `2 passed in 68.12s` (exit 0; the real smoke preset through the wrapper equals the direct run bitwise after removing `seconds` and `provenance`, and the provenance blocks agree on every field except `argv`, `start_utc`, `end_utc`, `wall_seconds`, `peak_rss_bytes`, `device_peak_bytes`; `runs/` empty afterwards). No other test was run (the main session reruns the gate). No tolerance was loosened and no assertion removed. Commit: "WU-0012 fix gate F1-F2" (see git log).
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-10. Reviewed diff `main...HEAD` (557e074, dbca55e, c831aa6 on plan 1639d96), against the plan, DEC-0005, DEVELOPMENT_WORKFLOW §2.3/§4.5/§4.6/§4.9, settings.json, test_gate.py, skill dev-run and `tools/test_impact.py`.
