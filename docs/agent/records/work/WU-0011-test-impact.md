@@ -176,6 +176,40 @@ exit 0
   - **R4 (low, definition of done).** Unit file, `## Log` (the "Dogfood" paragraph): the DoD requires the dogfood output to be "pasted in the Log", but the log paraphrases it. My run at `e9552ec` agrees with the paraphrase: one `unit:` line, `tests/unit/test_tools_test_impact.py`, one fixture warning, exit 0. Fix: paste the verbatim output after the R1 fix, as a new dated entry.
 - **Verdict:** `approve with fixes` (R1 required; R2–R4 are small evidence and record fixes). Re-review covers R1–R4 only.
 
+### Re-review, fix round 1, 2026-10-10, `reviewer`, claude-opus-5-5 (fresh context), at `78fcfd6`
+
+Scope: R1–R4 only, judged from `git show 78fcfd6` and the new `## Log` entry. As instructed, no tests were run; the developer's radius result at this code is `43 passed in 1.47s`.
+
+- **R1: fixed.** `tools/test_impact.py:294` now returns `_exists(root, path)`, so a test path that no longer exists is not selected, and the "is deleted" warning is still printed (line 340). The new test `test_deleted_and_renamed_test_files_are_not_selected` does a real `git mv test_top.py -> test_top2.py` and then a `git rm -f`, and asserts the change sets exactly. It would fail against the old code: after the rename the old code selects `[test_top.py, test_top2.py]` instead of `[test_top2.py]`, and after the deletion it selects `[test_top.py]` instead of nothing.
+- **R2: fixed.** `test_gpu_files_are_listed_but_never_run` has two parts:
+  - It changes `mid` under `--run --include-gpu`. `tests/gpu/test_mid_repro.py` appears in the `gpu:` line, and the recorded argv is exactly the one unit command `[test_mid, test_top]`. That is the non-core set derived by hand: own file plus direct dependent `top`.
+  - It then makes a gpu-only change. The recorder shows no calls and the output says "no CPU tests to run".
+- **R3: fixed.** The literals in the test match DEVELOPMENT_WORKFLOW.md §4.2 exactly. Line 124 lists the core modules `config, data, systems, dynamics, statistics, ensemble, oracle`. Line 125 lists the pipeline modules `pipeline, experiments, report, __main__`. The test compares them by exact `frozenset` equality.
+- **R4: fixed.** The pasted output is verbatim and matches my own run at `e9552ec` line for line. It was captured from the working tree before the commit, and that does not matter. The only tool change is line 294, which affects only test paths that do not exist. The six paths in the change set are the same whether they were committed or still in the working tree.
+- **Other checks.**
+  - The test-file diff `e9552ec..78fcfd6` only appends three tests after line 592. None of the 40 earlier tests or their assertions changed.
+  - The fixture is still unchanged since 37def38.
+  - 78fcfd6 touches only `tools/test_impact.py`, the test file and the unit file.
+  - The unit-file diff against `b2bb46b` is additions only: one new `## Log` entry, placed at the end of the Log, before `## Review`.
+  - The commit names the unit and carries `Agent:`.
+- **Verdict:** `approve`. All of R1–R4 are fixed, with no new finding.
+
+### Resolution of findings, 2026-10-10, claude-sonnet-5-5 (main session)
+
+- **R1: fixed in 78fcfd6** (re-review: fixed). **R2: fixed in 78fcfd6** (fixed). **R3: fixed in 78fcfd6** (fixed). **R4: fixed in 78fcfd6** (fixed; the dogfood output was captured from the working tree before the commit, which the reviewer judged immaterial).
+- `DEC-0003` stays **proposed** for the owner. It changes no criterion and no behavior of §4.2; the one open design question in it is Q2, recommended to the owner and not implemented.
+
+### Merge gate, 2026-10-10, claude-sonnet-5-5 (main session), checklist before the run (§4.9, §4.3)
+
+1. **Change set:** `git diff --name-only main...HEAD`: `tools/test_impact.py`, `tests/unit/test_tools_test_impact.py`, `tests/unit/fixtures/lpcstudy_graph.json`, `docs/agent/records/decisions.md`, `docs/agent/records/work/WU-0011-test-impact.md`, `docs/agent/records/work/queue.md`. `git status --porcelain` is empty after the commit that carries this entry.
+2. **Radius:** the merge gate of §4.3, tiers `unit` and `integration`, by the main session (the named role): `tests/unit tests/integration`.
+3. **Already run?** The full set has not run on this code. Only `tests/unit/test_tools_test_impact.py` has (developer: 43 passed; reviewer: 40 passed before the fix). This gate is the first run of the whole unit and integration set with this change, once.
+4. **Device:** `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`.
+5. **Threads and time:** `LPC_THREADS=4`, `OMP/MKL/OPENBLAS_NUM_THREADS=4`, `timeout 600`.
+6. **Contention:** no preset running; no GPU use.
+7. **Output:** `-q --tb=short -rfE`.
+8. **Command:** `LPC_GATE=merge timeout 600 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
