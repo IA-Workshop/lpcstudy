@@ -172,6 +172,28 @@ Files: new `tests/unit/test_{oracle,allocation,statistics,embedding,dynamics,ana
 - **`git diff --color-moved=plain HEAD~1 HEAD -- tests/test_core.py tests/unit/`**: the lines not detected as moved, other than blanks, are exactly 12: the old module docstring (removed), the seven new one-line module docstrings and the helper's docstring, and the new lines `from lpcstudy.oracle import oracle_weight` (test_allocation) and `from unit_helpers import _moments_from_draws` (test_allocation and test_oracle). `import` lines that repeat an old line count as moved, so the unmoved set is header and import lines only, as the plan requires. (conftest.py is outside this diff; its change is the removal of the transitional entry.)
 - Self-check: no test body or tolerance changed (ast evidence); `ruff check --select F tests` passes (no unused imports); no clip, replacement or fallback added; `tier_of` lost its special case.
 
+### 2026-10-10, claude-sonnet-5-5 (developer): WU-0010.3 smoke integration test, before the run
+
+File: `tests/integration/test_smoke_pipeline.py` (new). It runs `python -m lpcstudy --preset smoke --out <tmp_path>` with `cwd` at the repo root, `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`, `timeout=300`, and no seed argument (default 20261005 = DEV-0). Asserts: exit code 0 (message carries the last 20 stderr lines); `results.json`, `RESULTS.md`, `run.log` are files; `figures/` is a directory with at least one `.png`; `systems` is non-empty and every `validation.gate.gate_pass` is a `bool` (not asserted True).
+
+§4.9 checklist before the .3 invocations:
+
+1. Change set: `tests/integration/test_smoke_pipeline.py` (new, uncommitted); nothing under `lpcstudy/`.
+2. Radius: rule "a single new test file means that file only" (§4.2); no separate manual smoke run (same evidence, "run one of them, not both"). Tier: integration. Smaller than the whole suite.
+3. Already run: no, the file is new. The marker-exclusion collection `--collect-only -m unit tests/integration` is collection only and has not run.
+4. Device: `JAX_PLATFORMS=cpu` (settings, and forced again in the test's subprocess env).
+5. Threads and time: `LPC_THREADS=4` inherited by the subprocess; the test's own timeout is 300 s; the integration tier budget is 900 s.
+6. Contention: `pgrep -fa "lpcstudy --preset"` showed no run (only the pgrep's own shell); no GPU lock needed on CPU.
+7. Output: `-q --tb=short -rfE`; summary and failures only. Wall-clock taken with `time`.
+8. Commands: (i) `python -m pytest --collect-only -q -m unit tests/integration` (expect 0 collected, 1 deselected); (ii) `time python -m pytest -q --tb=short -rfE tests/integration/test_smoke_pipeline.py`.
+
+### 2026-10-10, claude-sonnet-5-5 (developer): WU-0010.3 results
+
+- (i) `python -m pytest --collect-only -q -m unit tests/integration`: `no tests collected (1 deselected) in 0.00s`. The integration test carries only `integration` (from `tests/integration/`), so the `unit` tier excludes it.
+- (ii) `python -m pytest -q --tb=short -rfE tests/integration/test_smoke_pipeline.py`: `1 passed in 66.97s (0:01:06)`; `time`: real 1m7.209s, user 1m50.325s, sys 2.663s, on the workstation, CPU, `LPC_THREADS=4`. This is under the 5 min acceptance bound and under the 300 s test timeout (baseline: 49 s). No failure, no rerun.
+- Outputs asserted present: `results.json`, `RESULTS.md`, `run.log`, `figures/` with at least one `.png`; `validation.gate.gate_pass` is a `bool` for `lorenz63`. The seed is the default DEV-0 (20261005); no seed argument is passed.
+- Self-check: no clip, replacement or fallback; no tolerance (only the 300 s timeout from §4.1); no randomness in the test; the subprocess env sets `JAX_PLATFORMS=cpu` and `XLA_PYTHON_CLIENT_PREALLOCATE=false` explicitly.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
