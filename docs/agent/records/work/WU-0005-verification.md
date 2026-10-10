@@ -146,6 +146,18 @@ Each is one commit: "WU-0005.k: …", ending `Agent: <model id>`.
   - **Premise.** Keep the gap > 1e-9 premise as a hard assert, not a skip: at the fixed seed the minimum gap is 2.2e-5. Use `np.argsort(..., kind="stable")` so that the reference order is deterministic.
   - **Tightening.** Not needed. A wrong neighbor is caught by the exact index check, and any bug in a distance is O(1).
 
+**2026-10-10, developer (claude-sonnet-5-5): WU-0005.2, run 1 (§4.9 checklist).**
+1. Change set: `tests/unit/test_ensemble.py` (appended `test_kdtree_query_matches_brute_force`, parametrized k in {1, 2, 5}); plus docs notes and this unit file.
+2. Radius: `python3 tools/test_impact.py --explain` gives "test file: that file only" -> `tests/unit/test_ensemble.py`, unit tier; smaller than the whole suite.
+3. Already run: no (new code).
+4. Device: wrapper sets `JAX_PLATFORMS=cpu`.
+5. Threads: `LPC_THREADS` default 4 (wrapper); unit timeout 300 s.
+6. Contention: no preset or slow/gpu run started by me.
+7. Output: `-q --tb=short -rfE` (wrapper).
+8. Command: `tools/run_tests.sh unit tests/unit/test_ensemble.py`.
+
+**2026-10-10, developer (claude-sonnet-5-5): WU-0005.2 result.** `tools/run_tests.sh unit tests/unit/test_ensemble.py --durations=5`: `4 passed in 0.84s` (slowest new case 0.24 s). Measured by a scratch script after the run (not a test run): smallest relative gap 1.8e-4 (premise 1e-9); max relative distance difference k-d tree vs brute force 0.0 (tolerance 1e-12); indices identical; copies at exactly 0.0. After the run, only the docstring sentence quoting the minimum gap was corrected (1.8e-4 measured here, not the mathematician's 2.2e-5 from another draw order); no code or tolerance changed. No code defect.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
