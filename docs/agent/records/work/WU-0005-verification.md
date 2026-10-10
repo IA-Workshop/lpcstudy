@@ -171,6 +171,19 @@ Note: the nonlinear check is feasible without touching `lpcstudy/`: `make_flow_s
 
 **2026-10-10, developer (claude-sonnet-5-5): WU-0005.1 result.** `tools/run_tests.sh unit tests/unit/test_systems.py --durations=5`: `3 passed in 0.69s` (slowest 0.21 s). Values measured by a scratch script after the run (not a test run), matching the mathematician's: linear errors 6.94e-5, 4.21e-6, 2.59e-7; orders 4.042 and 4.024 (band [3.9, 4.1]); leading-constant residual 0.0425 (bound 0.10); nonlinear errors 2.90e-6, 1.84e-7, 1.16e-8, orders 3.975 and 3.993 (band [3.9, 4.1]); `max_dt` 0.3 vs 0.25 max abs difference 0.0 exactly (atol 1e-15); `max_dt` 0.5 differs from 0.25 by 1.7e-2. No code defect.
 
+**2026-10-10, developer (claude-sonnet-5-5): WU-0005.3, run 1 (§4.9 checklist).**
+1. Change set: `tests/unit/test_oracle.py` (helpers `_uniform_known_dimension`, `_assert_interior`; `test_local_dimension_known_sets[m]`, `test_local_dimension_median_poisson_value[m]`, m in {1, 2, 3}); nothing under `lpcstudy/`. Committed so far on the branch: `test_ensemble.py` (.2), `test_systems.py` (.1), both already run.
+2. Radius: `python3 tools/test_impact.py --explain` -> "test file: that file only"; it lists test_ensemble, test_oracle, test_systems because of the branch diff; the first and last already ran on unchanged code, so only `tests/unit/test_oracle.py` runs.
+3. Already run: no (new tests); `tests/unit/test_oracle.py` has not run on this branch.
+4. Device: wrapper sets `JAX_PLATFORMS=cpu`.
+5. Threads: `LPC_THREADS` default 4 (`local_dimension` uses `workers=-1` in `cKDTree.query`, an observation already listed in the plan risks); unit timeout 300 s.
+6. Contention: none started by me.
+7. Output: `-q --tb=short -rfE`.
+8. Command: `tools/run_tests.sh unit tests/unit/test_oracle.py --durations=8`.
+Tolerances fixed before the run: mean `abs(mean/m - 1) <= 0.03`; median `abs(median/(0.9642 m) - 1) <= 0.03`, the constant computed as 18/median(Gamma(19)).
+
+**2026-10-10, developer (claude-sonnet-5-5): WU-0005.3 result.** `tools/run_tests.sh unit tests/unit/test_oracle.py --durations=8`: `12 passed in 1.03s` (slowest new case 0.34 s, includes the first import of scipy.stats). Values measured afterwards by a scratch script (not a test run), seed 50053: mean/m - 1 = -0.0043, -0.0026, +0.0067 for m = 1, 2, 3 (bound 0.03); median/(0.9642 m) - 1 = -0.0063, +0.0044, +0.0114 (bound 0.03); median/m = 0.9581, 0.9685, 0.9752; the k - 1 normalization would give mean/m - 1 = +0.051, +0.053, +0.063, all beyond the 0.03 bound (the test would catch it). No code defect. Self-check of the three diffs: no `clip`, `nan_to_num`, `isfinite`, `where(`, `try`, `except`; randomness only from fixed `np.random.default_rng(<literal>)` (50052 in .2, 50053 in .3; .1 has no random data, 50051 unused); no tolerance loosened (3.9/4.1, 10%, 1e-12, 1e-15, 0.03 are the confirmed values).
+
 ## Review
 
 - **Reviewer:** <actor, not the author>

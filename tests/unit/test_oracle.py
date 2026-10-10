@@ -152,3 +152,109 @@ def test_characteristic_horizon_noise_in_quadrature() -> None:
     assert horizon.tolist() == [2, 4] and event.tolist() == [True, False]
     with pytest.raises(ValueError, match="horizons 1..H_max"):
         characteristic_horizon(mse, np.arange(2, 6), 0.0, 0.2)
+
+
+def _uniform_known_dimension(m: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Reference set, interior queries and orthonormal map for the unit cube ``[0, 1]^m``.
+
+    The set is ``c + U u`` with ``u`` uniform on ``[0, 1]^m``, ``U`` (7 x m) with orthonormal
+    columns (first factor of ``qr`` of a standard-normal matrix) and a fixed offset ``c`` in
+    R^7. The map is an isometry, so Euclidean neighbor distances in R^7 equal those in
+    ``u``-space. Queries are 2000 fresh points uniform in the interior box ``[0.2, 0.8]^m``.
+    Fixed seed 50053 (test data only, not a study stream).
+    """
+    rng = np.random.default_rng(50053)
+    basis = np.linalg.qr(rng.standard_normal((7, m)))[0]
+    offset = rng.standard_normal(7)
+    reference = offset + rng.uniform(size=(20_000, m)) @ basis.T
+    queries = offset + rng.uniform(0.2, 0.8, size=(2_000, m)) @ basis.T
+    assert np.allclose(basis.T @ basis, np.eye(m), atol=1e-14)
+    return reference, queries, basis
+
+
+def _assert_interior(reference: np.ndarray, queries: np.ndarray) -> None:
+    """Premise: the 20-neighbor ball of every query lies inside the unit cube (radius < 0.2)."""
+    from scipy.spatial import cKDTree
+
+    radius = cKDTree(reference).query(queries, k=20)[0][:, -1]
+    assert radius.max() < 0.2
+
+
+@pytest.mark.parametrize("m", [1, 2, 3])
+def test_local_dimension_known_sets(m: int) -> None:
+    """Levina-Bickel estimate is unbiased on uniform sets of known dimension 1, 2, 3 in R^7.
+
+    Reference: the exact law of the estimator, independent of the code. Sets: a segment,
+    a unit square and a unit cube, each embedded in R^7 by a fixed orthonormal map, with
+    n = 2e4 points, k = 20 (the study's setting; ``local_dimension.__defaults__ == (20,)`` is
+    asserted) and 2000 queries uniform in the interior box [0.2, 0.8]^m, not in the reference.
+    Given T_k (the distance to the k-th neighbor) the k - 1 inner neighbors are iid uniform in
+    the ball, and every ball lies inside the set (asserted: T_20 < 0.2; its maximum is about
+    0.078 for the cube), so S = sum_j log(T_k / T_j) ~ Gamma(k - 1, rate m) exactly for any n.
+    The code's per-query estimate (k - 2) / S is the "divide by k - 2" variant of Levina and
+    Bickel (2005), NIPS 17, Sec. 3.1: mean m, sd m / sqrt(k - 3) = 0.2425 m.
+
+    The statistic is the arithmetic mean of the per-query estimates. That is the published
+    aggregator (Levina and Bickel 2005, NIPS 17, eq. 9). The code's callers aggregate with the
+    median over states, which is not the published aggregator; its departure is pinned in
+    ``test_local_dimension_median_poisson_value``.
+
+    Boundary queries are excluded on purpose. Their balls are truncated by the edge of the
+    set, which biases the estimator down (for the cube, 32% of points have T_20 reaching the
+    edge; bias -2.2% on the mean, -5.6% on the median at m = 3). That is a property of the
+    estimator, not a check of the code, and its reference value would have to come from
+    simulation, not from an independent law.
+
+    Tolerance: ``abs(mean / m - 1) <= 0.03``, tightened from the roadmap's 10%
+    (applied-mathematician, WU-0005 log). The mean of 2000 estimates with sd 0.2425 m has
+    sd 0.0054 m if independent; 200 simulated seeds gave sd of mean / m of 0.0054, 0.0057,
+    0.0057 for m = 1, 2, 3 (inflation by shared neighbors at most 1.06), and the mean of
+    mean / m was 0.9997, 0.9999, 1.0007 (bias nil). 3% is 5.3 standard deviations, so a false
+    alarm over the three m has probability about 1e-6. A tolerance of 10% would not detect
+    the normalization: dividing by k - 1 instead of k - 2 multiplies every estimate by
+    19/18, +5.56%, which is 2.56% beyond the 3% bound (4.5 sd), so a miss has probability
+    below 1e-5.
+    """
+    from lpcstudy.oracle import local_dimension
+
+    assert local_dimension.__defaults__ == (20,)
+    reference, queries, _ = _uniform_known_dimension(m)
+    _assert_interior(reference, queries)
+    estimates = local_dimension(reference, queries)
+    assert estimates.shape == (2_000,)
+    assert abs(estimates.mean() / m - 1) <= 0.03
+
+
+@pytest.mark.parametrize("m", [1, 2, 3])
+def test_local_dimension_median_poisson_value(m: int) -> None:
+    """The median of the per-query estimates sits at 0.964 m, 3.6% below the mean.
+
+    This is a characterization of the aggregator the code's callers use (the median over
+    states, as H1b does), not a check of the published one: Levina and Bickel (2005), NIPS 17,
+    eq. 9, average the per-point estimates arithmetically, and no median appears there. The
+    per-query estimate (k - 2) / S has S ~ Gamma(19, rate m), so its median is
+    18 m / median(Gamma(19, 1)) = 0.9642 m, below the mean m because the distribution is
+    skewed. The test documents that departure; it does not endorse it.
+
+    Reference: the exact Gamma law, with the constant computed as
+    ``18 / scipy.stats.gamma(19).median()`` (independent of the code); same data, queries
+    and premises as ``test_local_dimension_known_sets``.
+
+    Tolerance: ``abs(median / (c m) - 1) <= 0.03`` with c = 0.9642. Over 200 simulated seeds
+    the median / m averaged 0.9641, 0.9643, 0.9653 for m = 1, 2, 3, with sd 0.006 to 0.0066
+    (applied-mathematician, WU-0005 log), i.e. a relative sd of at most 0.0068 about c m;
+    3% is 4.4 sd (false alarm about 1e-5 per m). This test alone does not separate the median
+    from the mean: an estimate centered at m would be +3.7% from c m, only 1 sd beyond the
+    bound. It pins the value of the median (and so a gross change of the per-query law),
+    while the mean test, with its 3% bound about m, fixes the normalization.
+    """
+    from scipy.stats import gamma
+
+    from lpcstudy.oracle import local_dimension
+
+    reference, queries, _ = _uniform_known_dimension(m)
+    _assert_interior(reference, queries)
+    constant = 18.0 / gamma(19).median()
+    assert constant == pytest.approx(0.9642, abs=5e-5)
+    median = float(np.median(local_dimension(reference, queries)))
+    assert abs(median / (constant * m) - 1) <= 0.03
