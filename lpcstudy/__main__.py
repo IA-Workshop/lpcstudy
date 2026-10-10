@@ -49,16 +49,18 @@ def choose_seed(args: argparse.Namespace, extras: list[str], registry_path: Path
     """Return ``(seed_id, seed)`` for the parsed arguments or raise ``SeedRefusal``.
 
     Refused: a raw ``--seed``, an unrecognized option (including an abbreviation of a real
-    one), the confirmatory flag together with ``--seed-id``, a seed id that is not in the
+    one; the token is never echoed), the confirmatory flag together with ``--seed-id``, a seed id that is not in the
     registry, and a confirmatory request without the environment variables or with a seed
     and salt that do not match the ledger commitment. Values are never echoed.
     """
     if args.seed is not None:
         raise SeedRefusal("a raw integer seed (--seed) is never accepted; use --seed-id DEV-n")
     if extras:
-        options = sorted({e.split("=", 1)[0] for e in extras if e.startswith("-")})
-        what = (f"unrecognized option(s) {', '.join(options)} (abbreviations are disabled)"
-                if options else "unexpected positional argument(s)")
+        known = {name for action in build_parser()._actions for name in action.option_strings}
+        names = sorted({e.split("=", 1)[0] if e.split("=", 1)[0] in known else "<value>"
+                        for e in extras if e.startswith("-")})
+        what = (f"unrecognized option(s) {', '.join(names)} (abbreviations are disabled)"
+                if names else "unexpected positional argument(s)")
         raise SeedRefusal(what)
     if args.confirmatory:
         if args.seed_id is not None:

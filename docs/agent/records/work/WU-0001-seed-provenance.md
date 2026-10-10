@@ -327,7 +327,170 @@ Result: `8 passed in 6.61s`.
 
 State at hand-over (for the reviewer): unit and integration radius runs per sub-task are recorded above; `tests/integration/test_smoke_pipeline.py` and the whole suite were not run (merge gate, main session). Open points: (a) the RSS bracket slack in `test_provenance` (flagged under .4); (b) `test_fixture_schema` module count edited 18 to 19 to 20 with the graph fixture; (c) `--report-only` resolves the seed id (and, with the confirmatory flag, would need the environment) before it reads `results.json`, a consequence of refusing uniformly; (d) DEF-0010 untouched: DEV-1 to DEV-4 are not runnable on a preset until it is fixed; (e) DEVELOPMENT_WORKFLOW §4.2 graph table rows for `seeds` and `provenance` are for the main session (Q7).
 
+### 2026-10-10 Mathematics review of the peak-RSS tolerance (R1), applied-mathematician, claude-opus-5-5
+
+No test was run. I used scratch probes only (`rss_probe.py` and `vfork_probe.py` in the session scratchpad; no suite, CPU, a few seconds each). Machine facts: kernel 7.2.9, 32 online CPUs, 4096 B pages. The headers came from `/lib/modules/7.2.9-2-cachyos/build/include/linux/mm.h`. The `.c` sources (`kernel/sys.c`, `fs/proc/task_mmu.c`, `lib/percpu_counter.c`, `fs/exec.c`) are not installed, so the statements about them below are from memory and confirmed by the probes. They are flagged for `researcher` if a citation is wanted.
+
+**What the two numbers are** (in pages; n = online CPUs).
+- Since Linux 6.2 the per-thread `SPLIT_RSS_COUNTING` caches (sync after 64 events per thread) are gone. The caller's thread-based model applies only to kernels before 6.2. The mm RSS is now `percpu_counter rss_stat[]` (header: `get_mm_counter = percpu_counter_read_positive`, `get_mm_rss` = FILE + ANON + SHMEM).
+- Each counter has an exact value `E_i`. The kernel stores it as a central `count` plus per-CPU deltas. `percpu_counter_add_batch` keeps every delta at most `b - 1` in absolute value, with `b = percpu_counter_batch = max(32, 2n)`.
+- The approximate read `A = Σ max(0, count_i)` therefore satisfies `|A - E| <= T := 3 n (b - 1)` pages. The clamp at 0 only moves `A` toward `E >= 0`.
+- `mm->hiwater_rss = H` is raised only by `update_hiwater_rss` (an approximate read), called on the unmap and zap paths just before RSS falls. It never falls unless someone writes `clear_refs`.
+- `ru_maxrss` (RUSAGE_SELF) = `max(S, H, A_now) * PAGE_SIZE/1024` KiB. Here `S = signal->maxrss` is the hiwater of the image that this process exec'd from. It is always a whole number of pages.
+- `VmHWM` = `max(H, E_now)` in kB. `task_mem` uses `get_mm_counter_sum`, the exact sum, on recent kernels (about 6.16 and later as I recall). On 6.2 to 6.15 it is the approximate read.
+
+**Probes.**
+1. Batch: on one pinned CPU, the deficit `1024·VmHWM − 1024·ru_maxrss` has a sawtooth of period exactly 64 pages. This gives b = 64 = max(32, 2·32).
+2. Adversarial case: pin to each of the 32 CPUs in turn, flush, then touch b − 1 pages, for the anon counter and then the shmem counter. The deficit is 2036 pages after anon and 4052 pages (16.6 MB) after anon plus shmem. That is n(b − 1) = 2016 pages per counter, so the per-counter bound is attained. The file counter takes the same code path and adds up to 2016 more. The bound is T = 6048 pages = 24.77 MB.
+3. Typical case: three runs of `import lpcstudy.provenance`, then `before`, `peak`, `after`. `1024·before` is about 182 MB and `peak − 1024·before` is −0.60, −0.78 and −0.86 MB. The developer's pytest run showed −2.6 MB at 650 MB. Every `peak` is a multiple of 4096.
+4. The `S` term: a child exec'd from a Python that had touched 200 MB, by vfork (`subprocess`), by fork (`preexec_fn`) or by `sh -c` exec-in-place, reports `ru_maxrss` of 213 to 218 MB against `VmHWM` of 11 MB. A fresh fork from a small `bash` resets it (11.8 MB against 11.8 MB). In this harness pytest's parent is a forked `bash` with 4 MB, so `S` is small here.
+
+**Derivation.** Assumptions:
+- (A1) Kernel 6.2 or later (percpu RSS counters).
+- (A2) No CPU hotplug during the test process.
+- (A3) No `clear_refs` write.
+- (A4) No reclaim or swap-out of this process's pages between the two `/proc` reads, i.e. every RSS decrease in the window goes through an `update_hiwater_rss` path.
+- (A5) `S <= 1024·VmHWM_after + 2T`: the process was not exec'd, directly or through exec-in-place, from a process with a larger peak.
+
+Under these, `VmHWM_before − 2T <= ru_maxrss <= VmHWM_after + 2T` (pages):
+- Lower side: `ru >= H_before` and `ru >= E − T`. Any fall in the window first raises `H` to at least `E_before − T`. That gives a slack of T when `/proc` is exact (this kernel), and 2T when `/proc` is also approximate (6.2 to 6.15).
+- Upper side: `A <= E + T`. `E` at the read is at most `VmHWM_after`, or at most `VmHWM_after + T` if RSS fell in the window, which gives 2T.
+
+I use 2T on both sides so that the one formula holds on the GPU workstation's kernel too. The bound does not depend on the number of threads.
+
+**Error-detection matrix.** This machine has E ≥ 182 MB and 2T = 49.5 MB.
+
+| Mistake | Wrong value | Bracket ±2T | Ratio [0.5, 2] (R1 proposal) | `peak % page == 0` |
+| --- | --- | --- | --- | --- |
+| ×1024 forgotten (KiB/bytes) | E/1024 | caught when E > 2T | caught | caught, unless pages ≡ 0 mod 1024 (1/1024) |
+| ×4096 (KiB treated as pages) | 4E | caught when E > 2T/3 | caught | not caught |
+| factor 2 | 2E | caught when E > 2T | **not caught** | not caught |
+| ×1000 (kB/KiB) | 0.977E | not caught (4 MB < 2T) | not caught | caught, unless pages ≡ 0 mod 128 |
+| `(ru + 1)·1024` | E + 1 KiB | not caught | not caught | caught (exact) |
+| +1 page | E + 4096 B | not caught | not caught | not caught |
+
+A one-page additive error cannot be resolved by any reference here, because kernel noise is about 10³ pages; it is 0.002% of the peak. The bracket is valid for any E; only its power depends on E. The ratio bracket is not independent of kernel internals either: it is valid only when E ≥ 2T. On a 64-CPU host T = 100 MB, so the ratio bracket would also need about 200 MB.
+
+**Recommendation.** Keep `> 0` (the criterion). Add the exact page-multiple check. Replace the slack with the derived bound:
+```python
+    page = resource.getpagesize()
+    before = hwm()
+    peak = provenance.peak_rss_bytes()
+    after = hwm()
+    online = os.sysconf("SC_NPROCESSORS_ONLN")
+    counter_error = 3 * online * (max(32, 2 * online) - 1) * page
+    assert peak % page == 0, f"peak {peak} B is not a whole number of {page} B pages"
+    assert 1024 * before - 2 * counter_error <= peak <= 1024 * after + 2 * counter_error, (
+        f"peak {peak} B outside [{1024 * before}, {1024 * after}] B +- {2 * counter_error} B")
+```
+Use `os.sysconf`, not `os.cpu_count()`: in Python 3.13, `PYTHON_CPU_COUNT` and `-X cpu_count` override `os.cpu_count()`, and the kernel batch follows the online CPUs. The docstring paragraph to paste:
+
+> Tolerance. Since Linux 6.2 the RSS is three `percpu_counter`s (file, anon, shmem). `getrusage` reads them approximately; each per-CPU delta is below the batch `b = max(32, 2n)` (n = online CPUs), so the read is within `T = 3 n (b - 1)` pages of the exact sum (24.8 MB at n = 32; attained per counter in a probe, WU-0001 Log 2026-10-10). `VmHWM` is the exact sum (approximate before about 6.16) and `mm->hiwater_rss` is refreshed by an approximate read before RSS falls, so `1024 VmHWM_before - 2T <= peak <= 1024 VmHWM_after + 2T`. Assumptions: no CPU hotplug, `clear_refs` or reclaim between the two reads; the process was not exec'd (vfork, fork or exec-in-place) from a process whose peak exceeds the upper bound, because `ru_maxrss` includes the pre-exec image (`signal->maxrss`), which `VmHWM` does not; a failure on the upper side with a large launcher is that, not a code defect. Power: with `1024 VmHWM >= 182 MB` (after importing jax) and `2T = 49.5 MB`, the bracket rejects a missing `x1024` (E/1024), `x4096` (4E) and any factor-2 error. `ru_maxrss` is pages x PAGE_SIZE/1024 KiB, so `peak % pagesize == 0` holds exactly and also catches `x1000` and sub-page offsets. Neither check resolves a one-page additive error (kernel noise is about 10^3 pages).
+
+**Verdict on the existing slack.** It is not acceptable as written:
+- (i) It bounds one counter, not three. The probe exceeded it with two counters: 4052 pages against 2048 pages.
+- (ii) It uses `os.cpu_count()`, which can be overridden.
+- (iii) It leaves the `S` (pre-exec) assumption of the upper side unstated.
+- It would rarely flake in practice, since typical deficits are 0.6 to 2.6 MB, but it is not a derived bound.
+
+The reviewer's ratio bracket is valid here, but it misses factor-2 errors and its validity also rests on E ≥ 2T.
+
+**Note for the main session.**
+- The replacement 2T (49.5 MB) is wider than the developer's 8 MiB. Against the fixed criterion (`> 0`) it is a tightening. Against the planner's zero-slack proposal, which was never a kernel property, it is a correction, not a loosening to pass. Record it in `decisions.md`, as R1 asks.
+- Out of scope for the test, but relevant to the meaning of LPC.PC.22: `peak_rss_bytes` can report the launcher's peak, not the study's (probe 4). Consider also recording `VmHWM` on Linux, or documenting this. This is for the planner or developer; I made no code change.
+
+### 2026-10-10 developer (claude-sonnet-5-5), fix round 1: R1 to R4
+
+- R1: in `test_provenance.py` the 8 MiB slack is replaced by exactly the applied-mathematician's assertion: `peak % pagesize == 0` and `1024*VmHWM_before - 2*counter_error <= peak <= 1024*VmHWM_after + 2*counter_error`, `counter_error = 3*online*(max(32, 2*online) - 1)*pagesize`, `online = os.sysconf("SC_NPROCESSORS_ONLN")`; `peak > 0` kept; the docstring carries the mathematician's tolerance paragraph and the launcher-peak limitation. The same limitation is in the `peak_rss_bytes` docstring in `lpcstudy/provenance.py`. No schema change (no new field). DEC-0006 (proposed, on main) is not edited here.
+- R2: `choose_seed` echoes an unrecognized dash token only if it is one of the parser's known option strings, else `<value>`; a new test `test_unrecognized_token_is_never_echoed` covers `-424242424242`, `--424242424242`, `--conf`, `--conf=424242`, `--seed-i` and checks that no part of the token is on the one stderr line.
+- R3: the 1% check is now on `provenance.finish(block, clock)["wall_seconds"]` (block collected on the same clock, reference span `t1 - t0` around collect, the 1 s sleep and finish). Tolerance still 1%; the span exceeds 1 s so 1% (about 10 ms) is well above timer noise.
+- R4: `source_commit` of `lpcstudy_graph.json` is now `ed6dacb0ed5714a122c7c85fcb3ca5a53453043d` (the commit at which the graph matched the imports and the comparison test passed), and one dated sentence is appended to `description`. Edited by hand; the graph itself is unchanged.
+
+§4.9 checklist, fix round 1 run:
+
+1. Change set: `lpcstudy/{__main__,provenance}.py`, `tests/unit/{test___main__,test_provenance}.py`, `tests/unit/fixtures/lpcstudy_graph.json`, this unit file (with the uncommitted `## Review`, committed as is).
+2. Radius: `test___main__` (changed `__main__`, direct dependent of `provenance`), `test_provenance`, `test_tools_test_impact` (fixture) and `tests/integration/test_cli_seeds.py` (`__main__` changed). `test_report` and `test_seeds` import no changed code. Smaller than the suite; the smoke integration test is not selected (no computation path changed).
+3. Already run: not on this code.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads: 4; unit tier plus 8 short subprocess cases.
+6. Contention: no preset run by me.
+7. Output: `-q --tb=short -rfE`.
+8. Command: as in .1 with `tests/unit/test___main__.py tests/unit/test_provenance.py tests/unit/test_tools_test_impact.py tests/integration/test_cli_seeds.py`.
+
+Result: `97 passed in 11.43s`. Self-check: no new `clip|nan_to_num|isfinite|where(`; the new `try/except` count is zero; no randomness added; the only tolerances are the 1% (unchanged) and the mathematician's derived 2T bracket (no other test tolerance changed).
+
 ## Review
+
+### Round 1, 2026-10-10, reviewer (claude-opus-5-5), fresh context, branch `wu/0001-seeds-provenance` at `dae50c5` against `main`
+
+**Radius run (once, hand-derived).** These are the unit files the diff adds or touches, plus the test files that import a changed module, plus the integration file: `test_seeds`, `test_config`, `test_data`, `test___main__`, `test_provenance`, `test_report`, `test_tools_test_impact`, `tests/integration/test_cli_seeds.py`. The run used CPU, 4 threads, `LPC_CONF_*` unset and no `LPC_GATE`. Summary: `167 passed in 11.88s`. `test_smoke_pipeline.py` and the whole suite were not run; they belong to the merge gate.
+
+**Criteria, checked one at a time.**
+
+- **.1 met.** DEV-0 equals the literal; DEV-1 equals the value from `json.load`. `--seed 5` and `--seed-id 5` exit 64 with a message naming LPC.PC.7. A different schema is refused.
+- **.2 met.** The digest is computed independently with hashlib. The matching pair is accepted. A wrong seed, a wrong salt and a missing CONF-1 entry are each refused. The fixture path is asserted to lie under `tmp_path`.
+- **.3 met.** All 8 subprocess cases exit 64 with one stderr line. No out directory and no `results.json` are created.
+- **.4 met, apart from R1 and R3.**
+- **.5 met under DEC-0004 Q1.** I re-ran the comparison independently from the stored output:
+  - the baseline sha256 matches `0da48771…4b79`;
+  - removed from the baseline: `seconds` ×5;
+  - removed from the new file: `seconds` ×5, `provenance` ×1, `config.seed_id` ×1, `handling` ×0 in both;
+  - the canonical texts are equal (61786 characters each);
+  - the only new top-level key is `provenance`;
+  - `dirty` is false at `ed6dacb`, and `ed6dacb..HEAD` touches only this file.
+
+  The Q1 reading is sound. `config.seed_id` is required by the .1 DoD and by LPC.PC.18, and `config.seed` and every number are still compared exactly. However, DEC-0004 is still `proposed`, so .5 passes only once the owner confirms it.
+
+**Safety (LPC.PC.7).**
+
+- **Seed literals.** The only numeric literals in the diff are synthetic seeds (`123456789012345`, `222222222222222`, `987654321987654321`, `424242424242`) and DEV-1 quoted in the plan text.
+- **Environment.** `LPC_CONF_*` is read only in `seeds.confirmatory_seed`, through `choose_seed`. Every test file clears these variables. The subprocess tests strip them from the child environment. All ledgers are under `tmp_path`, and `tools.ledger.LEDGER` is monkeypatched.
+- **No run without a commitment.** A confirmatory run cannot start without a matching latest CONF-1 commitment on an intact chain. There is no flag or environment override of the ledger path.
+- **Abbreviations.** `allow_abbrev=False` is set, and `--conf` and `--seed-i` are refused with exit 64 before `mkdir` and before logging.
+- **No seed in outputs.** The seed is nulled in both config records. No log call or report line emits `config.seed`. The smoke `run.log` and `RESULTS.md` hold only the seed id. The tests grep `results.json` and `RESULTS.md` for the fixture value.
+- **DEF-0010 and presets.** DEF-0010 is untouched, and no DEV-1..4 preset was run.
+
+**Provenance.** Every LPC.PC.18 and LPC.PC.22 field is present and typed. `commit` and `dirty` are read once, before any output, and are tested against the test's own git calls. The labels match LPC.PC.13 exactly, with DEV carrying the extra `UNPROMOTED` per Q3. Git failures and missing packages are recorded in the block and logged. Nothing is silent.
+
+**Q5.** `tools/ledger.py` is unchanged. `check_commitment` reads the file with the same non-empty-line filter as `read_lines` and calls `verify_chain`, the same check the CLI `verify` runs. A missing file is a refusal, which is stricter than `read_lines`. The ledger's integrity check is not weakened.
+
+**Fixture (`lpcstudy_graph.json`).** I derived the edges by hand from the import statements:
+
+- `__main__` gains `provenance` (`from . import provenance`) and `seeds`;
+- `seeds` imports `config` only; the `tools.*` imports are lazy and not lpcstudy modules;
+- `provenance` imports `config` only, plus `jax`, which is external;
+- the `report` and `config` imports are unchanged.
+
+The fixture matches. `lpcstudy/*.py` has 20 stems, so the count edit 18→20 records a fact and does not loosen the test. The stems-equality assertion is unchanged, and no other existing assertion changed.
+
+**Findings.**
+
+- **R1 (medium; PRIME.2, tests.md "fix the code, not the test").** `tests/unit/test_provenance.py:124-153`. The RSS bracket gained slack `ncpu·max(32,2·ncpu)·pagesize` after it failed. I judge this the correction of a wrong expectation, not a loosening that hides a defect:
+  - the criterion is only `peak_rss_bytes > 0`, which is still asserted exactly;
+  - the code is the obvious `ru_maxrss·1024`;
+  - `getrusage` uses the approximate per-CPU `mm` RSS counters, while `/proc/self/status` `VmHWM` uses an exact sum on recent kernels (7.2.9 here), so byte equality is not a kernel property.
+
+  The stated bound is not rigorous, though. As I read the kernel, `get_mm_rss` sums three per-CPU counters (file, anon and shmem pages), so the worst-case error is about 3× the slack (about 24 MiB at 32 online CPUs). The test can therefore flake on a larger or busier process. A tolerance was also added after a failure without the applied-mathematician's confirmation or a decision record.
+
+  *Fix.* The applied-mathematician must confirm. Preferred: replace the slack with a bracket that is independent of kernel internals and still catches the KiB/bytes unit error, for example `0.5·1024·VmHWM_before ≤ peak ≤ 2·1024·VmHWM_after`. Otherwise use 3× the slack and cite the kernel source through `researcher`. The main session records the choice in `decisions.md`.
+- **R2 (low; LPC.PC.7 refusal contract "values never echoed").** `lpcstudy/__main__.py:59-60`. The refusal echoes any unrecognized token that begins with `-`. Probe: `main(["-424242424242"])` prints `unrecognized option(s) -424242424242`, and `--424242424242` does the same. A seed-like value can reach stderr this way.
+
+  *Fix.* Echo only names that match `^--?[A-Za-z][A-Za-z0-9-]*$` and show `<value>` otherwise. Add the two probe cases to `test_refusal_is_one_line_exit_64_and_creates_nothing`.
+- **R3 (low; .4 criterion wording).** `tests/unit/test_provenance.py:156-170`. The 1% check is made on `RunClock.elapsed()`, but the criterion names the recorded `wall_seconds`. `finish()` is checked only against the loose bound `[0, t1−t0]`.
+
+  *Fix.* After the sleep, assert the 1% bound on `provenance.finish(block, clock)["wall_seconds"]`, with `block` collected on the same clock and the reference span measured around the `finish` call.
+- **R4 (low; LPC.PC.21a reference provenance).** `tests/unit/fixtures/lpcstudy_graph.json:3`. `source_commit` still names `d6abaa7`, but the graph now includes `seeds` and `provenance`, which do not exist at that commit.
+
+  *Fix.* Update `source_commit` and the description to name this unit's hand edit, for example "updated by hand in WU-0001.1/.4".
+
+**Not findings (noted).**
+
+- `--report-only` resolves the seed before reading the stored output. It needs no confirmatory environment, because the label comes from the stored block.
+- The `--out results` default lies outside `.gitignore`, so a second run in the repository records `dirty: true`. The flag is recorded honestly, and Q6 is deferred to WU-0004.
+
+**Owner checkpoint.** This unit touches seed and provenance code: **needs owner review before freeze** (LPC.PC.11, `.claude/rules/seeds.md`). The owner also needs to confirm DEC-0004, on which .5 depends. No verdict or statistics code and no dependency is touched.
+
+**Verdict: approve with fixes** (R1 to R4; R1 needs the applied-mathematician's confirmation).
 
 ## Audit
 

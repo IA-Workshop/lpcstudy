@@ -86,6 +86,26 @@ def test_refusal_is_one_line_exit_64_and_creates_nothing(
         assert value not in lines[0]
 
 
+@pytest.mark.parametrize("token", ["-424242424242", "--424242424242", "--conf", "--conf=424242",
+                                   "--seed-i"])
+def test_unrecognized_token_is_never_echoed(token: str, tmp_path: Path,
+                                            capsys: pytest.CaptureFixture[str]) -> None:
+    """An unrecognized dash token (a seed-like number or an abbreviation) is not echoed.
+
+    Reference: the refusal contract (values never echoed; review R2 probe
+    ``-424242424242``). The stderr line must contain no part of the token: neither the token,
+    nor its text after the dashes, nor its value after ``=``. Exact substring checks.
+    """
+    assert main([token, "--out", str(tmp_path / "out")]) == 64
+    err = capsys.readouterr().err
+    lines = err.splitlines()
+    assert len(lines) == 1 and lines[0].startswith(PREFIX)
+    name, _, value = token.partition("=")
+    for part in (token, name.lstrip("-"), value):
+        if part:
+            assert part not in lines[0], (part, lines[0])
+
+
 def test_refusal_does_not_set_up_logging(tmp_path: Path) -> None:
     """A refusal adds no logging handler (refusals precede logging setup).
 

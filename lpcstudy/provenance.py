@@ -76,6 +76,11 @@ def peak_rss_bytes() -> int:
     """Return the peak resident set size of this process in bytes (``ru_maxrss``).
 
     ``ru_maxrss`` is in KiB on Linux and in bytes on Darwin.
+
+    Limitation (LPC.PC.22): a child process inherits its parent's peak in ``ru_maxrss``
+    (the pre-exec image counts), so the recorded peak can reflect the launcher's peak, not
+    only this run's. The kernel also reads the resident-set counters approximately, to within
+    about 25 MB at 32 CPUs (see ``tests/unit/test_provenance.py``).
     """
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     return int(peak if sys.platform == "darwin" else peak * 1024)

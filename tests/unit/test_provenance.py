@@ -122,19 +122,33 @@ def test_git_failure_is_recorded_not_silent(tmp_path: Path,
 
 
 def test_peak_rss_is_positive_and_bracketed_by_the_kernel_counter() -> None:
-    """``peak_rss_bytes`` is positive and, on Linux, lies between two ``VmHWM`` readings.
+    """``peak_rss_bytes`` is positive, a whole number of pages and, on Linux, bracketed by ``VmHWM``.
 
     Reference: ``VmHWM`` (kB, the kernel's high-water mark) from ``/proc/self/status`` read
     before and after the call; ``ru_maxrss`` is the same counter in KiB, so
-    ``1024 VmHWM_before - slack <= peak <= 1024 VmHWM_after + slack``.
+    ``1024 VmHWM_before - 2T <= peak <= 1024 VmHWM_after + 2T``. The roadmap criterion is
+    ``peak > 0``, asserted exactly.
 
-    The roadmap criterion is only ``peak > 0``, asserted exactly. The bracket is the planner's
-    proposed tightening. Its first form, with no slack, failed on this machine (peak 2.6 MB
-    below ``1024 VmHWM_before``, 0.4% of 650 MB): ``getrusage`` reads the per-CPU resident-set
-    counters approximately, ``/proc`` sums them exactly. Tolerance: the approximation error of
-    a per-CPU counter is at most ``ncpu * batch`` pages with ``batch = max(32, 2 ncpu)``
-    (kernel ``percpu_counter``), which is 8 MiB at 32 CPUs, about 1.3% of the observed peak
-    and far below the peak itself, so the bracket still detects a wrong unit (a factor 1024).
+    Tolerance (applied-mathematician, WU-0001 Log 2026-10-10; DEC-0006 proposed). Since Linux
+    6.2 the RSS is three ``percpu_counter``s (file, anon, shmem). ``getrusage`` reads them
+    approximately; each per-CPU delta is below the batch ``b = max(32, 2n)`` (n = online
+    CPUs), so the read is within ``T = 3 n (b - 1)`` pages of the exact sum (24.8 MB at
+    n = 32; attained per counter in a probe, WU-0001 Log 2026-10-10). ``VmHWM`` is the exact
+    sum (approximate before about 6.16) and ``mm->hiwater_rss`` is refreshed by an
+    approximate read before RSS falls, so the bracket above holds. Assumptions: no CPU
+    hotplug, ``clear_refs`` or reclaim between the two reads; the process was not exec'd
+    (vfork, fork or exec-in-place) from a process whose peak exceeds the upper bound, because
+    ``ru_maxrss`` includes the pre-exec image (``signal->maxrss``), which ``VmHWM`` does not;
+    a failure on the upper side with a large launcher is that, not a code defect. Power: with
+    ``1024 VmHWM >= 182 MB`` (after importing jax) and ``2T = 49.5 MB``, the bracket rejects
+    a missing x1024 (E/1024), x4096 (4E) and any factor-2 error. ``ru_maxrss`` is
+    pages x PAGE_SIZE/1024 KiB, so ``peak % pagesize == 0`` holds exactly and also catches
+    x1000 and sub-page offsets. Neither check resolves a one-page additive error (kernel
+    noise is about 10^3 pages). ``os.sysconf("SC_NPROCESSORS_ONLN")`` is used, not
+    ``os.cpu_count()``, which ``PYTHON_CPU_COUNT`` can override.
+
+    Limitation of the quantity (not of the test): a child process inherits its parent's peak
+    in ``ru_maxrss``, so the recorded ``peak_rss_bytes`` can reflect the launcher's peak.
     """
     def hwm() -> int:
         for line in Path("/proc/self/status").read_text().splitlines():
@@ -145,29 +159,35 @@ def test_peak_rss_is_positive_and_bracketed_by_the_kernel_counter() -> None:
     assert provenance.peak_rss_bytes() > 0
     if not sys.platform.startswith("linux"):
         pytest.skip("VmHWM exists on Linux only; the positivity check above ran")
+    page = resource.getpagesize()
     before = hwm()
     peak = provenance.peak_rss_bytes()
     after = hwm()
-    cpus = os.cpu_count() or 1
-    slack = cpus * max(32, 2 * cpus) * resource.getpagesize()
-    assert 1024 * before - slack <= peak <= 1024 * after + slack
+    online = os.sysconf("SC_NPROCESSORS_ONLN")
+    counter_error = 3 * online * (max(32, 2 * online) - 1) * page
+    assert peak % page == 0, f"peak {peak} B is not a whole number of {page} B pages"
+    assert 1024 * before - 2 * counter_error <= peak <= 1024 * after + 2 * counter_error, (
+        f"peak {peak} B outside [{1024 * before}, {1024 * after}] B +- {2 * counter_error} B")
 
 
-def test_wall_seconds_is_within_one_percent_of_the_tests_own_clock() -> None:
-    """``RunClock.elapsed`` over a 1 s sleep agrees with a second ``perf_counter`` span.
+def test_recorded_wall_seconds_is_within_one_percent_of_the_tests_own_clock() -> None:
+    """``finish(block, clock)["wall_seconds"]`` over a 1 s sleep agrees with a second clock.
 
-    Reference: ``t0 = perf_counter(); clock = RunClock(); sleep(1.0); w = clock.elapsed();
-    t1 = perf_counter()``. Both clocks span the same sleep. Tolerance 1% of the span (10 ms):
-    the two spans differ only by two call gaps (microseconds) and one possible preemption,
-    which is far below 10 ms on a shared CPU. The sleep cancels, so the check does not
-    depend on the sleep length.
+    Reference: ``t0 = perf_counter(); clock = RunClock(); block = collect(...); sleep(1.0);
+    done = finish(block, clock); t1 = perf_counter()``; the reference span is ``t1 - t0``.
+    Both clocks span the same collect and sleep. Tolerance 1% of the span (about 10 ms),
+    the criterion's own: the two spans differ only by the constructor, the end-time stamp
+    and the memory queries (microseconds) plus one possible preemption, far below 10 ms.
+    The span (1 s of sleep plus the git calls of ``collect``) is long enough that 1% is well
+    above timer noise.
     """
     t0 = time.perf_counter()
     clock = provenance.RunClock()
+    block = provenance.collect(with_seed(SMOKE, "DEV-0", SMOKE.seed), "DEV-0", [], clock)
     time.sleep(1.0)
-    wall = clock.elapsed()
+    done = provenance.finish(block, clock)
     t1 = time.perf_counter()
-    assert abs(wall - (t1 - t0)) <= 0.01 * (t1 - t0)
+    assert abs(done["wall_seconds"] - (t1 - t0)) <= 0.01 * (t1 - t0)
 
 
 def test_python_version_equals_sys_version_info() -> None:
