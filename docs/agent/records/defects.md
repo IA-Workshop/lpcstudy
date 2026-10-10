@@ -82,3 +82,11 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Description.** scikit-learn accepts `random_state` only in [0, 2³² − 1]. `check_random_state(2844678021587022684)` raises `ValueError: Seed must be between 0 and 2**32 - 1` (verified in the project venv by the main session, 2026-10-10). The code passes `config.seed` directly at `lpcstudy/analysis.py:295`, `:678`, `:680` and `lpcstudy/allocation.py:358`. Found by the WU-0001 planner while planning WU-0001.1; no test catches it, because every test and the smoke preset use DEV-0.
 - **Resolution:** a fix in WU-0002 (a plan item to be added by amendment). It changes the random streams of every scikit-learn call, so it changes numbers for every seed unless the derivation keeps `config.seed` unchanged below 2³². The choice between "derive a 32-bit value with `make_rng(seed, label)` for all seeds" and "leave seeds below 2³² untouched" affects the WU-0002.12 regression against the pilot and is the owner's to rule on. Until then, only DEV-0 can be run.
 - 2026-10-10: opened (claude-sonnet-5-5, main session).
+
+**DEF-0011: Reference pool for the 1/d estimate is drawn with a fixed literal seed, outside `make_rng`** (LPC.PC.21, CLAUDE.md "Randomness only via `lpcstudy.data.make_rng`")
+
+- **Blocking:** no (tracked). To be ruled on by the owner before the freeze, because fixing it changes numbers.
+- **Affects:** every run: the pool of up to 2×10⁴ library states used for the 1/d reference is the same for every seed id.
+- **Description.** `lpcstudy/oracle.py:101` has `rng = np.random.default_rng(0)` and draws the pool with `rng.choice`. Found by the WU-0014 reviewer (who cited line 99; checked by the main session at line 101). A grep also shows other `np.random.default_rng(...)` calls that take a seed directly instead of `make_rng(seed, *labels)`: `dynamics.py:147`, `validation.py:107` and `:147`, `statistics.py:151`, `networks.py:145`, `experiments.py:88`. Whether those derive correctly from the study seed has not been audited here.
+- **Resolution:** to be planned in WU-0002 (the owner decides whether the pool should depend on the seed id; the pilot used the fixed pool, so a change affects the WU-0002.12 regression).
+- 2026-10-10: opened (claude-sonnet-5-5, main session, on the WU-0014 reviewer's finding).

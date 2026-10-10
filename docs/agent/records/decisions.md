@@ -84,3 +84,20 @@ Dissent and resolution (REPRO.8):
 **Affects:** WU-0001 only. Marked `needs owner review before freeze` (seed and provenance code).
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0005: WU-0012 plan: answers to the planner's questions  (2026-10-10, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** The WU-0012 plan (`docs/agent/records/work/WU-0012-wrappers.md`, branch `wu/0012-wrappers`) asks six questions. Answers:
+
+- *Q1.* The smoke "same `results.json` as a direct invocation" check excludes the wall-clock `seconds` fields (and, once WU-0001.4 lands, its timing fields): the same reading as WU-0009.3, where the criterion itself removes them.
+- *Q2.* "Calendar week" is the ISO week in UTC. A shared append-only tally in addition to the per-run `run.meta.json` files is **not** added in WU-0012; the risk (deleting `runs/` or a worktree loses hours from the count) is recorded for the owner.
+- *Q3.* The XLA flag that caps CPU threads in jax 0.11.2 is **not set** in WU-0012 (an unknown `XLA_FLAGS` entry aborts XLA). Finding it needs a `researcher` retrieval; deferred, under the open question of the web-retrieval cap.
+- *Q4.* Split the wrapper tests into three files named for the tools, so that `tools/test_impact.py` finds them under the §4.2 pattern: `tests/unit/test_tools_run_tests.py`, `test_tools_run_preset.py`, `test_tools_gpu_hours.py`. (This overrides the plan's single `test_tools_wrappers.py` file name; the criterion's radius names that file, so the log records the substitution.)
+- *Q5.* `run.meta.json` does not record peak memory: its field list is fixed by the criterion, and peak RSS goes into the provenance block (WU-0001.4).
+- *Q6.* CPU `pilot` and `full` runs (WU-0002.12) take the same lock as GPU runs, so that only one long run is active at a time. The GPU-hour tally counts only runs whose device is a GPU.
+
+**Alternatives weighed.** *Keep one test file and add a mapping line to §4.2 and `test_impact.py`:* rejected, since §4.2 is adopted governance (an owner edit).
+
+**Affects:** WU-0012 only. The seed check and `run.meta.json` need owner review before the freeze (planner's note).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
