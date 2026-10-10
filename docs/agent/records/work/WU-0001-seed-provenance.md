@@ -276,6 +276,27 @@ Code: `__main__.py` gains the confirmatory flag (mutually exclusive with `--seed
 
 Result: `31 passed in 7.91s`. Self-check: `os.environ` read only in `choose_seed`; no `clip|nan_to_num|isfinite|where(|try:|except` added in `lpcstudy/__main__.py`; no randomness added; no tolerance.
 
+Commit `90c63c3` (WU-0001.3).
+
+### 2026-10-10 developer (claude-sonnet-5-5), WU-0001.4: provenance block and report header
+
+Code: new `lpcstudy/provenance.py` (`RunClock`, `git_state`, `peak_rss_bytes`, `device_peak_bytes`, `header_label`, `config_record`, `collect`, `finish`); `report.header_lines` called by `write_markdown`; `__main__` collects the block after seed validation and before any output (`out_dir.mkdir`), writes it from the first `save_json`, finishes it before the final save, and logs the commit, dirty flag, any `git_error` (warning) and the count of uninstalled packages (warning). `--report-only` collects nothing and uses the stored block as-is. `try/except` sites: `provenance.git_state` (OSError, RuntimeError, SubprocessError become the recorded `git_error` text) and `provenance._package_versions` (`PackageNotFoundError` becomes a recorded `null`); both are counted/logged by `__main__`. Fixture graph updated by hand: `__main__` + `provenance`, new `provenance: [config]`; `test_fixture_schema` count 19 to 20. In `test___main__.py` two fake-study tests check the incremental `complete: false` first save and `true` last save, and that a faked confirmatory run saves no seed value.
+
+§4.9 checklist, WU-0001.4 run:
+
+1. Change set: `lpcstudy/{__main__,report,provenance}.py`, `tests/unit/fixtures/lpcstudy_graph.json`, `tests/unit/test_{provenance,report,__main__,tools_test_impact}.py`, this unit file.
+2. Radius: plan row .4: `test_provenance`, `test_report`, `test___main__`, `test_tools_test_impact` (tool output for `provenance.py`/`report.py`/`__main__.py`/fixture, plus the unit files; `config.py` is unchanged in .4, so the core set is not re-run). `tests/integration` is deferred to .5 as the plan's table says. Smaller than the suite.
+3. Already run: no (these files are new or changed since the last run).
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads: 4; unit tier; the wall-clock test sleeps 1 s.
+6. Contention: none from me.
+7. Output: `-q --tb=short -rfE`.
+8. Command: as in .1 with `tests/unit/test_provenance.py tests/unit/test_report.py tests/unit/test___main__.py tests/unit/test_tools_test_impact.py`.
+
+Result of run 1: `1 failed, 89 passed in 3.59s`. Failure: `test_peak_rss_is_positive_and_bracketed_by_the_kernel_counter`: `1024*640828 <= 653611008` false, i.e. `ru_maxrss` was 2.6 MB (0.4%) below `1024*VmHWM` read just before. Diagnosis: the bracket is the planner's *proposed tightening* ("for the applied mathematician"), not the roadmap criterion (which is `peak_rss_bytes > 0`, still asserted exactly). `getrusage` reads the per-CPU RSS counters approximately while `/proc/self/status` sums them, so equality at the byte level is not a property of the kernel. The code is correct (`ru_maxrss * 1024`); the reference had no slack. Fix, in the test only: slack `ncpu * max(32, 2*ncpu) * pagesize` (8 MiB at 32 CPUs, a bound on the per-CPU counter approximation error), stated in the docstring; a wrong unit (factor 1024) is still caught. This adds a tolerance to a proposed check that never held; no criterion changed. FLAGGED FOR THE REVIEWER and the applied mathematician: confirm or reject the slack formula; if rejected the check reduces to the criterion `> 0`.
+
+`--lf` on the failing test: `1 passed, 15 deselected in 0.21s`. Radius once more after the test change: `90 passed in 2.34s`. Self-check: each `try/except` in the diff is listed above and reports (git_error, null package) or refuses (seeds); no `clip|nan_to_num|isfinite|where(`; no `default_rng|random.|PRNGKey` in `lpcstudy/`; the only tolerances are the existing-by-plan 1% wall-clock check and the RSS slack flagged above.
+
 ## Review
 
 ## Audit

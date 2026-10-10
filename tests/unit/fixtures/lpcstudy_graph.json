@@ -3,7 +3,7 @@
   "source_commit": "d6abaa7511e6e7db8ec377dd59d9b91c6d54b83a",
   "graph": {
     "__init__": [],
-    "__main__": ["config", "experiments", "pipeline", "report", "seeds"],
+    "__main__": ["config", "experiments", "pipeline", "provenance", "report", "seeds"],
     "allocation": ["ensemble", "networks", "oracle", "statistics"],
     "analysis": ["allocation", "config", "oracle", "pipeline", "statistics"],
     "config": [],
@@ -16,6 +16,7 @@
     "networks": [],
     "oracle": ["data", "dynamics", "ensemble", "systems"],
     "pipeline": ["allocation", "config", "data", "ensemble", "estimation", "networks", "oracle", "statistics", "systems"],
+    "provenance": ["config"],
     "report": ["allocation", "config"],
     "seeds": ["config"],
     "statistics": [],

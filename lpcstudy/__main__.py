@@ -11,6 +11,7 @@ import sys
 import time
 from pathlib import Path
 
+from . import provenance
 from .config import PRESETS
 from .experiments import run_robustness, run_system, run_transfer, run_transfer_target
 from .pipeline import Study
@@ -97,6 +98,10 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     if args.systems:
         config = dataclasses.replace(config, core_systems=tuple(args.systems))
     out_dir = args.out / config.name
+    if not args.report_only:  # read once, before any output exists (LPC.PC.18)
+        clock = provenance.RunClock()
+        block = provenance.collect(config, seed_id, sys.argv[1:] if argv is None else argv,
+                                   clock)
     out_dir.mkdir(parents=True, exist_ok=True)
     if args.report_only:
         results = json.loads((out_dir / "results.json").read_text())
@@ -108,14 +113,21 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.FileHandler(out_dir / "run.log"),
                                   logging.StreamHandler()])
-    if args.seed_id is None:
-        logging.getLogger("lpcstudy").info("seed id defaulted to %s", DEFAULT_SEED_ID)
+    log = logging.getLogger("lpcstudy")
+    if args.seed_id is None and not args.confirmatory:
+        log.info("seed id defaulted to %s", DEFAULT_SEED_ID)
+    log.info("provenance: seed id %s, commit %s, dirty %s", block["seed_id"], block["commit"],
+             block["dirty"])
+    if block["git_error"]:
+        log.warning("git state unavailable, recorded as null: %s", block["git_error"])
+    missing = [name for name, version in block["packages"].items() if version is None]
+    if missing:
+        log.warning("%d package(s) not installed, recorded as null: %s", len(missing),
+                    ", ".join(missing))
     start = time.time()
     study = Study(config, out_dir)
-    record = dataclasses.asdict(config)
-    if config.seed_id.startswith("CONF-"):
-        record["seed"] = None  # the confirmatory value is never written to an output
-    results: dict = {"config": record, "systems": {}}
+    results: dict = {"config": provenance.config_record(config), "systems": {},
+                     "provenance": block}
     for system in config.core_systems:
         results["systems"][system] = run_system(study, system)
         save_json(results, out_dir / "results.json")
@@ -132,10 +144,11 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     results["verdicts"] = verdicts(results, config)
     results["estimators"] = study.estimator_log
     results["seconds"] = time.time() - start
+    results["provenance"] = provenance.finish(block, clock)
     save_json(results, out_dir / "results.json")
     write_markdown(results, config, out_dir / "RESULTS.md")
     make_figures(results, config, out_dir / "figures")
-    logging.getLogger("lpcstudy").info("study finished in %.0fs", results["seconds"])
+    log.info("study finished in %.0fs", results["seconds"])
     return 0
 
 

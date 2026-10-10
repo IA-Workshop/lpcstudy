@@ -163,6 +163,70 @@ def test_confirmatory_refusals_in_process(argv: list[str], set_env: bool, tmp_pa
     assert str(SEED) not in err and SALT not in err
 
 
+class _FakeStudy:
+    """Stands in for ``Study``: no computation."""
+
+    core_cells: dict = {}
+    estimator_log: list = []
+
+    def __init__(self, config: object, out_dir: Path) -> None:
+        self.config = config
+
+
+def run_with_fakes(argv: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                   **kwargs: Path) -> list[dict]:
+    """Run ``main`` with the study replaced by fakes; return a deep copy of every save."""
+    import copy
+    import lpcstudy.__main__ as cli
+    saves: list[dict] = []
+    monkeypatch.setattr(cli, "Study", _FakeStudy)
+    monkeypatch.setattr(cli, "run_system", lambda study, system: {"seed_seen": study.config.seed})
+    monkeypatch.setattr(cli, "verdicts", lambda results, config: {})
+    monkeypatch.setattr(cli, "save_json", lambda obj, path: saves.append(copy.deepcopy(obj))
+                        or path.write_text(json.dumps(obj)))
+    monkeypatch.setattr(cli, "write_markdown", lambda *a: None)
+    monkeypatch.setattr(cli, "make_figures", lambda *a: None)
+    assert main([*argv, "--out", str(tmp_path / "out"), "--skip-transfer", "--skip-robustness"],
+                **kwargs) == 0
+    return saves
+
+
+def test_provenance_is_saved_incomplete_first_and_complete_last(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The first incremental save holds the block with ``complete`` false, the last true.
+
+    Reference: the plan (written from the first incremental ``save_json``, finished before the
+    final save). The study is faked; the seed the study saw is the DEV-0 literal 20261005.
+    """
+    saves = run_with_fakes(["--preset", "smoke"], tmp_path, monkeypatch)
+    first, last = saves[0]["provenance"], saves[-1]["provenance"]
+    assert first["complete"] is False and first["end_utc"] is None
+    assert last["complete"] is True and last["wall_seconds"] > 0 and last["peak_rss_bytes"] > 0
+    assert last["seed_id"] == "DEV-0" and saves[-1]["config"]["seed_id"] == "DEV-0"
+    assert saves[-1]["systems"]["lorenz63"]["seed_seen"] == 20261005 == saves[-1]["config"]["seed"]
+    assert last["argv"][:2] == ["--preset", "smoke"]
+
+
+def test_confirmatory_run_writes_no_seed_value(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A faked confirmatory run uses the synthetic seed but saves it nowhere.
+
+    Reference: the synthetic literal; the fake study records the seed it received (so the
+    run did use it), while ``results.json`` text and every save omit it. Exact.
+    """
+    monkeypatch.setenv("LPC_CONF_SEED", str(SEED))
+    monkeypatch.setenv("LPC_CONF_SALT", SALT)
+    saves = run_with_fakes(["--preset", "smoke", FLAG], tmp_path, monkeypatch,
+                           ledger_path=ledger_with(tmp_path / "l.jsonl", SEED))
+    assert saves[-1]["config"]["seed"] is None and saves[-1]["config"]["seed_id"] == "CONF-1"
+    assert saves[-1]["provenance"]["label"] == "CONFIRMATORY: UNPROMOTED"
+    assert saves[-1]["systems"]["lorenz63"]["seed_seen"] == SEED   # the fake received it
+    text = (tmp_path / "out" / "smoke" / "results.json").read_text()
+    assert text.count(str(SEED)) == 1       # only the fake's own 'seed_seen' echo
+    del saves[-1]["systems"]
+    assert str(SEED) not in json.dumps(saves[-1]) and SALT not in text
+
+
 def test_mismatched_commitment_in_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
                                           capsys: pytest.CaptureFixture[str]) -> None:
     """A seed that differs from the committed one is refused (64) with one line."""
