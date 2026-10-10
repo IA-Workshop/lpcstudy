@@ -1,0 +1,8 @@
+.venv/
+runs/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.claude/settings.local.json
+.claude/agent-memory-local/

@@ -1,0 +1,126 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m lpcstudy --preset pilot *)",
+      "Bash(python3 -m lpcstudy --preset pilot *)",
+      "Bash(python -m lpcstudy --preset full *)",
+      "Bash(python3 -m lpcstudy --preset full *)",
+      "Bash(python -m pytest *)",
+      "Bash(python3 -m pytest *)",
+      "Bash(pytest *)",
+      "Bash(python -m lpcstudy --preset smoke *)",
+      "Bash(python3 -m lpcstudy --preset smoke *)",
+      "Bash(python tools/ledger.py verify)",
+      "Bash(python3 tools/ledger.py verify)",
+      "Bash(python tools/ledger.py status)",
+      "Bash(python3 tools/ledger.py status)",
+      "Bash(ruff *)",
+      "Bash(python -m pyflakes *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git add *)",
+      "Bash(git commit -m *)",
+      "Bash(git switch *)",
+      "Bash(git checkout -b *)",
+      "Bash(git branch *)",
+      "Bash(nvidia-smi *)",
+      "Edit(/lpcstudy/**)",
+      "Edit(/tests/**)",
+      "Edit(/tools/**)",
+      "Edit(/docs/agent/records/**)",
+      "Edit(/docs/agent/notes/**)",
+      "WebSearch",
+      "WebFetch(domain:*)",
+      "Bash(tools/run_tests.sh *)",
+      "Bash(bash tools/run_tests.sh *)",
+      "Bash(tools/run_preset.sh *)",
+      "Bash(bash tools/run_preset.sh *)",
+      "Bash(python3 tools/test_impact.py *)",
+      "Bash(python tools/test_impact.py *)",
+      "Bash(python3 tools/gpu_hours.py *)",
+      "Bash(flock -n /tmp/lpcstudy-gpu.lock env JAX_PLATFORMS=cuda XLA_PYTHON_CLIENT_PREALLOCATE=false python -m lpcstudy --preset *)",
+      "Bash(git worktree *)",
+      "Bash(pgrep *)",
+      "Bash(tail *)",
+      "Bash(nohup flock -n /tmp/lpcstudy-gpu.lock env JAX_PLATFORMS=cuda XLA_PYTHON_CLIENT_PREALLOCATE=false timeout 12h python -m lpcstudy --preset *)"
+    ],
+    "ask": [
+      "Bash(pip install *)",
+      "Bash(python -m pip install *)",
+      "Bash(python3 -m pip install *)",
+      "Bash(uv pip install *)",
+      "Bash(python tools/ledger.py append *)",
+      "Bash(python3 tools/ledger.py append *)",
+      "Bash(rm -rf *)",
+      "Bash(git clean *)",
+      "Bash(git merge *)",
+      "Edit(/docs/agent/governance/**)",
+      "Edit(/docs/study/**)",
+      "Edit(/seeds/**)",
+      "Edit(/requirements.txt)",
+      "Edit(/.claude/**)"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(git commit --amend *)",
+      "Bash(git commit -m * --amend*)",
+      "Bash(git rebase *)",
+      "Bash(git reset --hard *)",
+      "Bash(git filter-branch *)",
+      "Bash(git filter-repo *)",
+      "Bash(sudo *)",
+      "Bash(su *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(python tools/seal_confirmatory_seed.py *)",
+      "Bash(python3 tools/seal_confirmatory_seed.py *)",
+      "Bash(python tools/seal_confirmatory_seed.py)",
+      "Bash(python3 tools/seal_confirmatory_seed.py)",
+      "Bash(python -m lpcstudy * --confirmatory *)",
+      "Bash(python3 -m lpcstudy * --confirmatory *)",
+      "Edit(/docs/agent/governance/ledger.jsonl)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1",
+    "JAX_PLATFORMS": "cpu",
+    "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
+    "LPC_THREADS": "4",
+    "OMP_NUM_THREADS": "4",
+    "MKL_NUM_THREADS": "4",
+    "OPENBLAS_NUM_THREADS": "4",
+    "LPC_GPU_LOCK": "/tmp/lpcstudy-gpu.lock"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/web_gate.py"
+            ],
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/test_gate.py"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

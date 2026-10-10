@@ -1,0 +1,439 @@
+"""Allocation rules A0-A5 (and oracle references), the regime map, and their fitting.
+
+Every rule returns a weight on CP for each (state, evaluation draw, horizon),
+shape ``(n, E, nH)``. Only deployable information enters A0-A5 at evaluation
+time; oracle quantities are used exclusively as training targets on the
+construction/calibration splits (leakage rule L2) and by the reference rules
+A4o and A*.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+from scipy.optimize import least_squares, nnls
+from sklearn.tree import DecisionTreeRegressor
+
+from .ensemble import EnsembleMoments, EvaluationDraws
+from .networks import TrainedNetwork, train_mlp
+from .oracle import characteristic_horizon, curvature, hybrid_mse, oracle_weight, \
+    realized_horizon
+from .statistics import kaplan_meier
+
+RULE_LABELS: dict[str, str] = {
+    "A0": "CP alone",
+    "A1": "PLP alone",
+    "A2": "Global fixed weight",
+    "A3": "Error-predictor allocator (Heuer-inspired)",
+    "A4": "LPC closed form (deployable)",
+    "A4f": "LPC full form with amplifier (deployable)",
+    "A5": "LPC regimes (deployable)",
+    "A4o": "LPC closed form (oracle seeds)",
+    "A*": "Oracle state-optimal weight",
+}
+
+
+@dataclass
+class SeedProxy:
+    """Deployable seed estimate ``seed_hat^2 = a f^2 + b g^2``.
+
+    ``f`` is an observable feature and ``g`` the scale of the noise floor:
+
+    * analog seed: ``f = R nu_hat`` (FW Lemma 1: the delay-space distance maps
+      to state space through the local conditioning of the delay map) and
+      ``g = rho nu_hat`` (FW eq. 3.1: the floor is proportional to ``rho nu``);
+    * estimation seed: ``f = rho nu_hat`` (Cramer-Rao floor at the estimate) and
+      ``g = rho`` (residual estimator error).
+
+    Both terms scale with ``rho``, so a proxy fitted at one noise level applies
+    at another. ``(a, b)`` are fitted by least squares on the log scale (the
+    weight depends on seed *ratios*, so multiplicative accuracy is what
+    matters), initialized by non-negative least squares.
+    """
+
+    slope: float
+    floor: float
+
+    @classmethod
+    def fit(cls, feature_sq: np.ndarray, floor_sq: np.ndarray, seed_sq: np.ndarray
+            ) -> "SeedProxy":
+        """Fit on construction states.
+
+        Parameters
+        ----------
+        feature_sq : np.ndarray
+            Per-state (median over draws) squared feature ``(n,)``.
+        floor_sq : np.ndarray
+            Per-state squared floor scale ``(n,)``.
+        seed_sq : np.ndarray
+            Oracle squared seed per state ``(n,)``.
+
+        Returns
+        -------
+        SeedProxy
+            Fitted proxy.
+        """
+        scale = np.median(seed_sq)
+        design = np.column_stack([feature_sq, floor_sq]) / scale
+        coef, _ = nnls(design, seed_sq / scale)
+        start = np.log(np.maximum(coef, 1e-6))
+        log_seed = np.log(seed_sq / scale)
+
+        def residual(log_coef: np.ndarray) -> np.ndarray:
+            return np.log(design @ np.exp(log_coef) + 1e-300) - log_seed
+
+        sol = least_squares(residual, start, loss="soft_l1")
+        slope, floor = np.exp(sol.x)
+        return cls(slope=float(slope), floor=float(floor))
+
+    def predict(self, feature: np.ndarray, floor_scale: np.ndarray | float) -> np.ndarray:
+        """Return the seed estimate."""
+        return np.sqrt(self.slope * feature**2 + self.floor * np.square(floor_scale))
+
+
+@dataclass
+class ProfileProxies:
+    """The two seed proxies that define the deployable profile.
+
+    Attributes
+    ----------
+    analog, estimation : SeedProxy
+        Proxies of ``epsilon_s`` and ``delta``.
+    nu_cap : float
+        Winsorization cap of ``nu_hat`` (99th percentile on construction), which
+        guards against rare non-converged estimates.
+    """
+
+    analog: SeedProxy
+    estimation: SeedProxy
+    nu_cap: float
+
+    @staticmethod
+    def features(distance: np.ndarray, nu_hat: np.ndarray, noise: float, nu_cap: float
+                 ) -> dict[str, np.ndarray]:
+        """Features and floor scales of both proxies."""
+        nu = np.minimum(nu_hat, nu_cap)
+        return {"analog_f": distance * nu, "analog_g": noise * nu,
+                "est_f": noise * nu, "est_g": np.full_like(nu, noise)}
+
+    @classmethod
+    def fit(cls, distance: np.ndarray, nu_hat: np.ndarray, analog_seed: np.ndarray,
+            est_seed: np.ndarray, noise: float) -> "ProfileProxies":
+        """Fit both proxies on construction states.
+
+        Parameters
+        ----------
+        distance, nu_hat : np.ndarray
+            Recurrence distance and ``nu(s_hat)`` per (state, draw) ``(n, E)``.
+        analog_seed, est_seed : np.ndarray
+            Oracle seeds per state ``(n,)``.
+        noise : float
+            Noise level.
+
+        Returns
+        -------
+        ProfileProxies
+            Fitted proxies.
+        """
+        cap = float(np.quantile(nu_hat, 0.99))
+        f = cls.features(distance, nu_hat, noise, cap)
+        med = {k: np.median(v**2, axis=1) for k, v in f.items()}
+        return cls(analog=SeedProxy.fit(med["analog_f"], med["analog_g"], analog_seed**2),
+                   estimation=SeedProxy.fit(med["est_f"], med["est_g"], est_seed**2),
+                   nu_cap=cap)
+
+    def seeds(self, ev: EvaluationDraws, noise: float) -> tuple[np.ndarray, np.ndarray]:
+        """Deployable ``(eps_hat, delta_hat)``, each ``(n, E)``."""
+        f = self.features(ev.distance, ev.est_nu, noise, self.nu_cap)
+        return (self.analog.predict(f["analog_f"], f["analog_g"]),
+                self.estimation.predict(f["est_f"], f["est_g"]))
+
+
+NOISE_SENS_FLOOR: float = 1e-2
+
+
+def deployable_profile(ev: EvaluationDraws, proxies: ProfileProxies, noise: float,
+                       steps_per_lyapunov: int) -> np.ndarray:
+    """Deployable four-coordinate LPC profile.
+
+    ``F_hat = (ln eps_hat/rho, ln delta_hat/rho, Lambda_hat/lambda_max, ln(N_hat + c))``:
+    recurrence (analog seed), observability (estimation seed), dynamical
+    instability, and observation-noise sensitivity of analog retrieval
+    (``c = NOISE_SENS_FLOOR`` keeps the logarithm finite when retrieval never changes).
+
+    Parameters
+    ----------
+    ev : EvaluationDraws
+        Evaluation draws with deployable features.
+    proxies : ProfileProxies
+        Seed proxies.
+    noise : float
+        Noise level ``rho``.
+    steps_per_lyapunov : int
+        Steps per Lyapunov time (``lambda_max = 1 / steps_per_lyapunov`` per step).
+
+    Returns
+    -------
+    np.ndarray
+        Profile ``(n, E, 4)``.
+    """
+    eps_hat, delta_hat = proxies.seeds(ev, noise)
+    return np.stack([np.log(eps_hat / noise), np.log(delta_hat / noise),
+                     ev.growth_proxy * steps_per_lyapunov,
+                     np.log(ev.noise_sens + NOISE_SENS_FLOOR)], axis=-1)
+
+
+def closed_form_weight(eps_sq: np.ndarray, delta_sq: np.ndarray) -> np.ndarray:
+    """FW Corollary 1: ``w = delta^2 / (eps^2 + delta^2)``."""
+    return delta_sq / np.maximum(eps_sq + delta_sq, 1e-300)
+
+
+def full_form_weight(eps_sq: np.ndarray, delta_sq: np.ndarray, gains: np.ndarray,
+                     noise: float, n_analogs: int, state_dim: int) -> np.ndarray:
+    """FW Proposition 3 with isotropic, uncorrelated seeds and the copied-noise term.
+
+    ``w = g^2 delta^2/m / (g^2 eps^2/m + rho^2/k + g^2 delta^2/m)``.
+
+    Parameters
+    ----------
+    eps_sq, delta_sq : np.ndarray
+        Squared seeds ``(n, E)``.
+    gains : np.ndarray
+        Amplification ``g_H`` ``(n, E, nH)``.
+    noise : float
+        ``rho``.
+    n_analogs : int
+        ``k``.
+    state_dim : int
+        ``m``.
+
+    Returns
+    -------
+    np.ndarray
+        Weights ``(n, E, nH)``.
+    """
+    amp = np.minimum(gains, 1e150) ** 2 / state_dim
+    v_a = amp * eps_sq[..., None]
+    v_s = amp * delta_sq[..., None]
+    return v_s / (v_a + noise**2 / n_analogs + v_s)
+
+
+@dataclass
+class ErrorPredictor:
+    """Heuer-inspired allocator: learned per-forecaster error magnitudes.
+
+    Heuer et al. (2026) attach to the ML component a second output that
+    predicts its own loss and blend ML and physics by a ramp on that predicted
+    error. With two forecasters, the adaptation predicts ``log e^2`` for both
+    CP and PLP from the raw delay vector and combines them by inverse expected
+    squared error, ``w = e_P^2 / (e_C^2 + e_P^2)`` (Bates-Granger weighting
+    with learned, state-dependent error variances).
+    """
+
+    network: TrainedNetwork
+    grid: np.ndarray
+
+    @classmethod
+    def fit(cls, inputs: np.ndarray, cp_err: np.ndarray, plp_err: np.ndarray,
+            grid: np.ndarray, noise: float, width: int, epochs: int, seed: int
+            ) -> "ErrorPredictor":
+        """Train on construction states x retained oracle draws.
+
+        Parameters
+        ----------
+        inputs : np.ndarray
+            Noisy delay vectors ``(n, K, D)``.
+        cp_err, plp_err : np.ndarray
+            Realized errors at ``grid`` ``(n, K, nG)``.
+        grid : np.ndarray
+            Horizons of the outputs.
+        noise : float
+            Noise level (sets the log floor ``(0.1 rho)^2``).
+        width : int
+            Hidden width.
+        epochs : int
+            Epochs.
+        seed : int
+            Seed.
+
+        Returns
+        -------
+        ErrorPredictor
+            Trained allocator.
+        """
+        floor = (0.1 * noise) ** 2
+        targets = np.concatenate([np.log(cp_err**2 + floor), np.log(plp_err**2 + floor)],
+                                 axis=-1)
+        net = train_mlp(inputs.reshape(-1, inputs.shape[-1]),
+                        targets.reshape(-1, targets.shape[-1]), width, epochs, seed)
+        return cls(network=net, grid=np.asarray(grid))
+
+    def weights(self, inputs: np.ndarray, horizons: np.ndarray) -> np.ndarray:
+        """Weights on CP at ``horizons`` for inputs ``(n, E, D)``."""
+        pred = np.asarray(self.network.predict(inputs.reshape(-1, inputs.shape[-1])))
+        n_grid = len(self.grid)
+        log_cp, log_plp = pred[:, :n_grid], pred[:, n_grid:]
+        interp = lambda logs: np.stack([np.interp(horizons, self.grid, row)
+                                        for row in logs])
+        diff = interp(log_cp) - interp(log_plp)  # log(e_C^2 / e_P^2)
+        weight = 1.0 / (1.0 + np.exp(np.clip(diff, -50, 50)))
+        return weight.reshape(*inputs.shape[:2], len(horizons))
+
+
+def global_weight(moments: EnsembleMoments) -> np.ndarray:
+    """A2: pooled minimizer of mean squared error per horizon, ``(nH,)``."""
+    numer = np.sum(moments.sq_plp - moments.cross, axis=0)
+    denom = np.sum(curvature(moments), axis=0)
+    return np.clip(numer / np.maximum(denom, 1e-300), 0.0, 1.0)
+
+
+def state_horizon_target(moments: EnsembleMoments, noise: float, theta: float
+                         ) -> np.ndarray:
+    """Characteristic horizon (steps) of the oracle hybrid, per state (censored at ``H_max``)."""
+    mse = hybrid_mse(moments, oracle_weight(moments))
+    horizon, _ = characteristic_horizon(mse, moments.horizons, noise, theta)
+    return horizon
+
+
+@dataclass
+class RegimeMap:
+    """Regression-tree abstraction ``F_hat -> k -> (w_k(H), T_k)``.
+
+    Attributes
+    ----------
+    tree : DecisionTreeRegressor
+        Tree fitted on the construction split.
+    leaf_ids : np.ndarray
+        Leaf node ids; regime ``k`` is ``leaf_ids[k]``.
+    weights : np.ndarray
+        Curvature-weighted regime weights ``(K, nH)`` from the calibration split.
+    horizons_km : np.ndarray
+        Kaplan-Meier median horizon per regime (steps; ``nan`` if not reached).
+    """
+
+    tree: DecisionTreeRegressor
+    leaf_ids: np.ndarray
+    weights: np.ndarray
+    horizons_km: np.ndarray
+
+    @property
+    def n_regimes(self) -> int:
+        """Number of regimes ``K``."""
+        return len(self.leaf_ids)
+
+    def assign(self, profile: np.ndarray) -> np.ndarray:
+        """Regime index for profiles ``(..., 3)``."""
+        leaves = self.tree.apply(profile.reshape(-1, profile.shape[-1]))
+        return np.searchsorted(self.leaf_ids, leaves).reshape(profile.shape[:-1])
+
+
+def fit_regime_tree(profile: np.ndarray, w_target: np.ndarray, log_t_target: np.ndarray,
+                    n_regimes: int, seed: int) -> DecisionTreeRegressor:
+    """Two-output CART on the deployable profile (construction split).
+
+    Parameters
+    ----------
+    profile : np.ndarray
+        Profiles ``(n, E, p)``.
+    w_target : np.ndarray
+        State-optimal weight at ``H_ref`` per state ``(n,)``.
+    log_t_target : np.ndarray
+        Log characteristic horizon per state ``(n,)``.
+    n_regimes : int
+        Number of leaves ``K``.
+    seed : int
+        Seed.
+
+    Returns
+    -------
+    DecisionTreeRegressor
+        Fitted tree (targets standardized so both outputs count equally).
+    """
+    n_states, n_draws, _ = profile.shape
+    targets = np.column_stack([w_target, log_t_target])
+    targets = (targets - targets.mean(axis=0)) / (targets.std(axis=0) + 1e-12)
+    tree = DecisionTreeRegressor(max_leaf_nodes=n_regimes,
+                                 min_samples_leaf=max(10, n_states * n_draws // 50),
+                                 random_state=seed)
+    tree.fit(profile.reshape(-1, profile.shape[-1]), np.repeat(targets, n_draws, axis=0))
+    return tree
+
+
+def calibrate_regimes(tree: DecisionTreeRegressor, profile: np.ndarray,
+                      moments: EnsembleMoments, ev: EvaluationDraws, theta: float,
+                      fallback: np.ndarray) -> RegimeMap:
+    """Regime weights (curvature-weighted, FW Prop. 5) and KM horizons on calibration.
+
+    Parameters
+    ----------
+    tree : DecisionTreeRegressor
+        Fitted tree.
+    profile : np.ndarray
+        Calibration profiles ``(n, E, 3)``.
+    moments : EnsembleMoments
+        Calibration oracle moments (horizons must match ``ev.horizons``).
+    ev : EvaluationDraws
+        Calibration evaluation draws (for realized horizons).
+    theta : float
+        Tolerance for regime horizons.
+    fallback : np.ndarray
+        Weights ``(nH,)`` for a regime with no calibration states.
+
+    Returns
+    -------
+    RegimeMap
+        Calibrated regime map.
+    """
+    leaf_ids = np.nonzero(tree.tree_.children_left == -1)[0]
+    leaves = tree.apply(profile.reshape(-1, profile.shape[-1])).reshape(profile.shape[:2])
+    regime = np.searchsorted(leaf_ids, leaves)
+    w_star = oracle_weight(moments)
+    curv = curvature(moments)
+    n_regimes = len(leaf_ids)
+    weights = np.tile(fallback, (n_regimes, 1)).astype(float)
+    horizons_km = np.full(n_regimes, np.nan)
+    for k in range(n_regimes):
+        state_idx, draw_idx = np.nonzero(regime == k)
+        if state_idx.size == 0:
+            continue
+        c_k, w_k = curv[state_idx], w_star[state_idx]
+        weights[k] = np.sum(c_k * w_k, axis=0) / np.maximum(np.sum(c_k, axis=0), 1e-300)
+        if np.array_equal(ev.horizons, np.arange(1, len(ev.horizons) + 1)):
+            err = weights[k] * ev.cp_err[state_idx, draw_idx] + \
+                (1 - weights[k]) * ev.plp_err[state_idx, draw_idx] - \
+                ev.verify_noise[state_idx, draw_idx]
+            dur, event = realized_horizon(err, ev.horizons, theta)
+            horizons_km[k] = kaplan_meier(dur, event, len(ev.horizons)).median()
+    return RegimeMap(tree=tree, leaf_ids=leaf_ids, weights=weights,
+                     horizons_km=horizons_km)
+
+
+def regime_regret(regime_map: RegimeMap, profile: np.ndarray, moments: EnsembleMoments,
+                  column: int) -> tuple[float, float]:
+    """Mean abstraction regret and its ratio to the best-single error variance.
+
+    Parameters
+    ----------
+    regime_map : RegimeMap
+        Regime map.
+    profile : np.ndarray
+        Profiles ``(n, E, 3)``.
+    moments : EnsembleMoments
+        Oracle moments of the same states.
+    column : int
+        Horizon column.
+
+    Returns
+    -------
+    tuple[float, float]
+        Mean regret ``c (w_k - w*)^2`` and its ratio to the mean
+        ``min(E e_C^2, E e_P^2)``.
+    """
+    regime = regime_map.assign(profile)
+    w_k = regime_map.weights[regime, column]  # (n, E)
+    w_star = oracle_weight(moments)[:, column][:, None]
+    curv = curvature(moments)[:, column][:, None]
+    regret = float(np.mean(curv * (w_k - w_star) ** 2))
+    best = float(np.mean(np.minimum(moments.sq_cp[:, column], moments.sq_plp[:, column])))
+    return regret, regret / best

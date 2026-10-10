@@ -1,0 +1,364 @@
+"""Hypothesis verdicts, markdown report and figures."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import matplotlib
+import matplotlib.ticker
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+
+from .allocation import RULE_LABELS  # noqa: E402
+from .config import StudyConfig  # noqa: E402
+
+SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7",
+          "#e34948"]
+INK, INK_2, GRID = "#0b0b0b", "#52514e", "#e4e3df"
+PLOTTED_RULES = ["A0", "A1", "A2", "A3", "A4", "A5", "A*"]
+
+HYPOTHESES: dict[str, str] = {
+    "H1a": "Estimation seed scales linearly with noise: median per-state slope of "
+           "log delta on log rho in [0.9, 1.1]",
+    "H1b": "Analog seed follows eps^2 = c^2 N^(-2/d) + f^2: fitted 1/d within 25% of the "
+           "local dimension, floor increasing with rho",
+    "H1c": "Error = amplifier x seed: slope of log rms error on log(g_H seed) in [0.8, 1.2] "
+           "for CP and PLP at H_ref",
+    "H1d": "Horizon law: median of Lambda_bar x dT/dln(theta) in [0.8, 1.25] (PLP)",
+    "H1e": "Deployable proxies of all four LPCs track their oracles: Spearman >= 0.7 each",
+    "H1f": "Fourth LPC (noise sensitivity) is reducible to the other three: Delta R^2 "
+           "(4 vs 3 coordinates, out of sample) upper bound < 0.01 for logit w* and log T",
+    "H2a": "[primary] Separation: for H >= 1 LT median range of w*(H) < 0.1 and "
+           "|partial corr(logit w*, Lambda | seeds)| < 0.1",
+    "H2b": "[primary] Knob response: w* rises with N (per-state rank correlation > 0; "
+           "median at N_max < 0.95) and with rho",
+    "H2c": "State dependence: A4 MSE < A2 and < best single forecaster at H_ref",
+    "H2d": "Empirical comparison: A4 within 10% of A3 in-distribution; A4 degrades less "
+           "than A3 in >= 4 of 5 shifted cells",
+    "H2e": "Hybrid horizon gain <= ln2 / (2 Lambda_bar) for >= 90% of eligible states",
+    "H3a": "[primary] Some K <= 5: regret <= 5% of best-single variance, regime horizon "
+           "IQR <= 0.5 LT, consecutive log-rank Holm p < 0.01",
+    "H3b": "Regret falls as K^(-2/p_eff) with p_eff < 1.5",
+    "H3c": "Structure: weight tree ignores instability (importance < 0.2); horizon tree "
+           "uses instability more than any other coordinate",
+    "H3d": "Regime lookup costs <= 5% MSE relative to the closed form",
+}
+
+
+VALIDATION_CRITERIA = {
+    "delay_jacobian_rel_err": ("V1 delay-map Jacobian vs finite differences", "< 1e-4",
+                               lambda v: v < 1e-4),
+    "gain_rel_err": ("V1 amplifier g_H vs finite differences", "< 1e-4", lambda v: v < 1e-4),
+    "crlb_ratio_median": ("V2 least squares / Cramer-Rao", "[0.8, 1.2]",
+                          lambda v: 0.8 <= v <= 1.2),
+    "cp_median_vpt_lyapunov": ("V3 CP valid-prediction time (LT, theta=0.4)", "reported", None),
+    "convergence": ("V4 w* bootstrap half-width at used M", "<= 0.05", lambda v: v <= 0.05),
+    "km_max_abs_dev": ("V5 Kaplan-Meier vs exact", "< 0.01", lambda v: v < 0.01),
+    "integrator_max_dev_sigma": ("V6 RK4 step halving (sigma_x)", "< 1e-3",
+                                 lambda v: v < 1e-3),
+}
+
+
+def verdicts(results: dict, config: StudyConfig) -> dict:
+    """Aggregate per-system pass flags into supported / partial / not supported.
+
+    Parameters
+    ----------
+    results : dict
+        Study results.
+    config : StudyConfig
+        Configuration (core systems).
+
+    Returns
+    -------
+    dict
+        Hypothesis id to per-system flags and verdict.
+    """
+    out = {}
+    for hyp in HYPOTHESES:
+        flags = {s: bool(results["systems"][s][hyp]["pass"])
+                 for s in config.core_systems if s in results["systems"]}
+        n_pass = sum(flags.values())
+        verdict = ("supported" if flags and n_pass == len(flags) else
+                   "partially supported" if n_pass else "not supported")
+        out[hyp] = {"by_system": flags, "verdict": verdict}
+    if "transfer" in results:
+        out["T1"] = {"by_system": {t: results["transfer"][t]["pass"]
+                                   for t in config.transfer_targets},
+                     "verdict": "supported" if results["transfer"]["pass"] else
+                     "not supported"}
+    return out
+
+
+def _fmt(value: float, digits: int = 3) -> str:
+    return "n/a" if value is None or (isinstance(value, float) and np.isnan(value)) \
+        else f"{value:.{digits}g}"
+
+
+def _key_number(hyp: str, res: dict) -> str:
+    """One-line numeric summary of a hypothesis result for one system."""
+    r = res[hyp]
+    match hyp:
+        case "H1a":
+            return f"slope {_fmt(r['median_slope'])} [{_fmt(r['ci'][0])}, {_fmt(r['ci'][1])}]"
+        case "H1b":
+            parts = [f"rho={k}: 1/d={_fmt(v['fitted_inverse_dim'])}"
+                     for k, v in r["by_noise"].items()]
+            return "; ".join(parts) + f" (1/d_LB={_fmt(1 / r['local_dimension_median'])})"
+        case "H1c":
+            return f"CP {_fmt(r['CP']['slope'])}, PLP {_fmt(r['PLP']['slope'])}"
+        case "H1d":
+            return f"PLP {_fmt(r['PLP'].get('median_ratio', float('nan')))}, " \
+                   f"CP {_fmt(r['CP'].get('median_ratio', float('nan')))}"
+        case "H1e":
+            s = r["spearman"]
+            return f"eps {_fmt(s['analog_seed'], 2)}, delta {_fmt(s['estimation_seed'], 2)}, " \
+                   f"Lambda {_fmt(s['growth'], 2)}, N {_fmt(s['noise_sensitivity'], 2)}"
+        case "H1f":
+            d = r["deployable"]
+            return f"{d['verdict']}: dR2 w {_fmt(d['logit_w']['delta_r2'], 2)} " \
+                   f"[{_fmt(d['logit_w']['ci'][0], 2)}, {_fmt(d['logit_w']['ci'][1], 2)}], " \
+                   f"T {_fmt(d['log_horizon']['delta_r2'], 2)} " \
+                   f"[{_fmt(d['log_horizon']['ci'][0], 2)}, {_fmt(d['log_horizon']['ci'][1], 2)}]; " \
+                   f"oracle: {r['oracle']['verdict']}"
+        case "H2a":
+            return f"range {_fmt(r['median_range'])} (CI hi {_fmt(r['range_ci'][1])}); " \
+                   f"partial r {_fmt(r['partial_corr'], 2)}"
+        case "H2b":
+            lib = "; ".join(f"N@{k}: w*(Nmax)={_fmt(v['median_at_largest_N'], 2)}"
+                            for k, v in r["library"].items())
+            return f"rho rank corr {_fmt(r['noise']['mean_state_spearman'], 2)}; {lib}"
+        case "H2c":
+            return f"A4-A2 {_fmt(100 * r['A4_minus_A2']['relative'], 3)}%; " \
+                   f"A4-{r['best_single']} " \
+                   f"{_fmt(100 * r['A4_minus_' + r['best_single']]['relative'], 3)}%"
+        case "H2d":
+            return f"A4/A3-1 = {_fmt(100 * r['in_distribution_excess'], 3)}%; shift wins " \
+                   f"{r['shift_wins_A4_over_A3']}/{r['shift_cells']}"
+        case "H2e":
+            return f"within bound {_fmt(r['fraction_within_bound'], 3)} " \
+                   f"(n={r['n_states']}, max gain {_fmt(r['max_gain_lyapunov'], 2)} LT)"
+        case "H3a":
+            return f"K={r['chosen_K']}: regret {_fmt(100 * r['regret_ratio'], 3)}%, " \
+                   f"IQR {_fmt(r['mean_iqr_lyapunov'], 2)} LT"
+        case "H3b":
+            return f"p_eff {_fmt(r['p_eff'], 3)}"
+        case "H3c":
+            return f"Lambda imp: weight {_fmt(r['weight_tree_importance']['lambda_tilde'], 2)}, " \
+                   f"horizon {_fmt(r['horizon_tree_importance']['lambda_tilde'], 2)}"
+        case "H3d":
+            return f"A5/A4 {_fmt(r['A5_over_A4_mse'], 4)}"
+    return ""
+
+
+def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
+    """Write the human-readable results report.
+
+    Parameters
+    ----------
+    results : dict
+        Study results.
+    config : StudyConfig
+        Configuration.
+    path : Path
+        Output file.
+    """
+    systems = [s for s in config.core_systems if s in results["systems"]]
+    lines = [f"# Results — preset `{config.name}`", "",
+             "Generated by `python -m lpcstudy`. Pass/fail criteria are the pre-registered "
+             "thresholds of the Methods document (§M9). A hypothesis is *supported* if it "
+             "passes on every core system, *partially supported* if on at least one.", "",
+             "## Hypothesis verdicts", "",
+             "| ID | Hypothesis | " + " | ".join(systems) + " | Verdict |",
+             "|---|---|" + "---|" * len(systems) + "---|"]
+    gate = {s: results["systems"][s]["validation"].get("gate", {}).get("gate_pass")
+            for s in systems}
+    lines[lines.index("## Hypothesis verdicts") + 1:lines.index("## Hypothesis verdicts") + 1] = [
+        "", "Validation gate: " + ", ".join(
+            f"{s} {'PASS' if g else 'FAIL (results provisional)' if g is not None else 'n/a'}"
+            for s, g in gate.items())]
+    ver = results["verdicts"]
+    for hyp, text in HYPOTHESES.items():
+        cells = []
+        for s in systems:
+            flag = "PASS" if ver[hyp]["by_system"][s] else "FAIL"
+            cells.append(f"{flag}: {_key_number(hyp, results['systems'][s])}")
+        lines.append(f"| {hyp} | {text} | " + " | ".join(cells) + f" | {ver[hyp]['verdict']} |")
+    if "T1" in ver:
+        tr = results["transfer"]
+        detail = "; ".join(
+            f"{t}: gap A3 {_fmt(tr[t]['gap']['A3'], 3)}, A4 {_fmt(tr[t]['gap']['A4'], 3)}, "
+            f"A5 {_fmt(tr[t]['gap']['A5'], 3)}" for t in config.transfer_targets)
+        lines += ["", f"**T1 (transfer, secondary):** {ver['T1']['verdict']} — {detail}"]
+
+    lines += ["", "## Allocation rules at the core cell (test split)", ""]
+    for s in systems:
+        sc = results["systems"][s]["scores"]
+        horizons = list(next(iter(sc.values()))["mse"])
+        lines += [f"### {s}", "", "| Rule | " + " | ".join(f"MSE {h}" for h in horizons) +
+                  " | regret H_ref | agreement | KM median (LT) | RMST (LT) |",
+                  "|---|" + "---|" * (len(horizons) + 4)]
+        for rule, v in sc.items():
+            lines.append(f"| {rule} {RULE_LABELS[rule]} | " +
+                         " | ".join(_fmt(x, 3) for x in v["mse"].values()) +
+                         f" | {_fmt(v['regret'][horizons[2]], 3)} | "
+                         f"{_fmt(v['agreement_href'], 3)} | {_fmt(v['km_median_lyapunov'], 3)} | "
+                         f"{_fmt(v['rmst_lyapunov'], 3)} |")
+        rec = results["systems"][s]["oracle_recovery"]
+        lines += ["", f"Oracle recovery: A4 recovers {_fmt(100 * rec['A4_vs_A4o'], 3)}% of the "
+                  f"oracle-seed closed form's gain over A2; A5 recovers "
+                  f"{_fmt(100 * rec['A5_vs_Astar'], 3)}% of A*'s.", ""]
+
+    lines += ["## Validation gate", "", "| Check | Criterion | " + " | ".join(systems) + " |",
+              "|---|---|" + "---|" * len(systems)]
+    for key, (label, criterion, ok) in VALIDATION_CRITERIA.items():
+        cells = []
+        for s in systems:
+            val = results["systems"][s]["validation"]
+            value = val["convergence"][str(config.n_oracle_draws)]["median_half_width"] \
+                if key == "convergence" else val[key]
+            flag = "" if ok is None else (" PASS" if ok(value) else " FAIL")
+            cells.append(_fmt(value, 3) + flag)
+        lines.append(f"| {label} | {criterion} | " + " | ".join(cells) + " |")
+
+    if "robustness" in results:
+        lines += ["", "## Robustness (core cell)", ""]
+        for s, variants in results["robustness"].items():
+            lines += [f"### {s}", "", "| Variant | H2a range | H2a partial r | A4 vs A2 | "
+                      "A4/A3 | A5 regret | H1c CP | H1c PLP |", "|---|---|---|---|---|---|---|---|"]
+            for label, v in variants.items():
+                if "error" in v:
+                    lines.append(f"| {label} | error: {v['error']} | | | | | | |")
+                elif "H2a_partial_corr_fin" in v:
+                    lines.append(f"| {label} | | {_fmt(v['H2a_partial_corr_fin'], 2)} | | | | | "
+                                 f"corr(fin, lin) {_fmt(v['corr_fin_vs_linear'], 2)} |")
+                else:
+                    lines.append(
+                        f"| {label} | {_fmt(v['H2a_median_range'], 3)} | "
+                        f"{_fmt(v['H2a_partial_corr'], 2)} | "
+                        f"{_fmt(100 * v['A4_vs_A2_relative'], 3)}% | {_fmt(v['A4_over_A3'], 3)} | "
+                        f"{_fmt(100 * v['A5_regret_ratio'], 3)}% | "
+                        f"{_fmt(v['H1c']['CP']['slope'], 3)} | {_fmt(v['H1c']['PLP']['slope'], 3)} |")
+    path.write_text("\n".join(lines) + "\n")
+
+
+def _style(ax: plt.Axes) -> None:
+    ax.grid(True, color=GRID, linewidth=0.8)
+    ax.set_axisbelow(True)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(INK_2)
+    ax.tick_params(colors=INK_2, labelsize=8)
+    ax.xaxis.label.set_color(INK)
+    ax.yaxis.label.set_color(INK)
+    ax.title.set_color(INK)
+
+
+def make_figures(results: dict, config: StudyConfig, out_dir: Path) -> list[Path]:
+    """Write the standard figures (PNG) for each core system.
+
+    Parameters
+    ----------
+    results : dict
+        Study results.
+    config : StudyConfig
+        Configuration.
+    out_dir : Path
+        Figure directory.
+
+    Returns
+    -------
+    list[Path]
+        Written files.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    lt = config.steps_per_lyapunov
+    systems = [s for s in config.core_systems if s in results["systems"]]
+    fig, axes = plt.subplots(1, len(systems), figsize=(4.2 * len(systems), 3.4), squeeze=False)
+    for ax, s in zip(axes[0], systems):
+        prof = results["systems"][s]["weight_profile"]
+        h = np.array(prof["horizons"]) / lt
+        ax.fill_between(h, prof["q25"], prof["q75"], color=SERIES[0], alpha=0.18, linewidth=0)
+        ax.plot(h, prof["median"], color=SERIES[0], linewidth=2)
+        ax.axvline(1.0, color=INK_2, linewidth=1, linestyle=":")
+        ax.set(xlabel="Horizon (Lyapunov times)", ylabel="Oracle weight on CP, w*",
+               title=f"{s}: median and IQR of w*(s, H)", ylim=(0, 1))
+        _style(ax)
+    fig.tight_layout()
+    path = out_dir / "separation_weight_vs_horizon.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    written.append(path)
+
+    fig, axes = plt.subplots(1, len(systems), figsize=(4.2 * len(systems), 3.4), squeeze=False)
+    for ax, s in zip(axes[0], systems):
+        curves = results["systems"][s]["km_curves"]
+        for color, rule in zip(SERIES, PLOTTED_RULES):
+            if rule in curves:
+                ax.step(np.arange(1, len(curves[rule]) + 1) / lt, curves[rule], where="post",
+                        color=color, linewidth=1.6, label=rule)
+        ax.set(xlabel="Horizon (Lyapunov times)", ylabel="Pr(T > H)",
+               title=f"{s}: realized horizons, theta={config.primary_threshold:g}")
+        ax.legend(frameon=False, fontsize=7, ncol=2, labelcolor=INK_2)
+        _style(ax)
+    fig.tight_layout()
+    path = out_dir / "kaplan_meier_by_rule.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    written.append(path)
+
+    fig, axes = plt.subplots(1, len(systems), figsize=(4.2 * len(systems), 3.4), squeeze=False)
+    for ax, s in zip(axes[0], systems):
+        curve = results["systems"][s]["H3b"]["regret_ratio_by_K"]
+        ks = np.array(sorted(map(int, curve)))
+        ax.semilogx(ks, [100 * curve[str(k)] for k in ks], color=SERIES[0], linewidth=2,
+                    marker="o", markersize=5)
+        ax.axhline(5.0, color=INK_2, linewidth=1, linestyle=":")
+        ax.set_xticks(ks)
+        ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%d"))
+        ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+        ax.set_ylim(bottom=0)
+        ax.set(xlabel="Number of regimes K", ylabel="Regret (% of best-single MSE)",
+               title=f"{s}: abstraction regret (dotted: 5% criterion)")
+        _style(ax)
+    fig.tight_layout()
+    path = out_dir / "regret_vs_regimes.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    written.append(path)
+
+    fig, axes = plt.subplots(1, len(systems), figsize=(4.2 * len(systems), 3.4), squeeze=False)
+    for ax, s in zip(axes[0], systems):
+        lib = results["systems"][s]["H2b"]["library"]
+        for color, (rho, v) in zip(SERIES, lib.items()):
+            sizes = np.array(list(map(int, v["median_w_by_N"])))
+            ax.semilogx(sizes, list(v["median_w_by_N"].values()), color=color, linewidth=2,
+                        marker="o", markersize=5, label=f"rho = {float(rho) * 100:g}% sigma_x")
+        ax.set(xlabel="Library size N", ylabel="Median w*(H_ref)", ylim=(0, 1),
+               title=f"{s}: weight vs library size")
+        ax.legend(frameon=False, fontsize=7, labelcolor=INK_2)
+        _style(ax)
+    fig.tight_layout()
+    path = out_dir / "knob_response_library.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    written.append(path)
+    return written
+
+
+def save_json(obj: dict, path: Path) -> None:
+    """Write JSON, converting numpy scalars and non-finite values."""
+    def default(value):
+        if isinstance(value, (np.floating, np.integer)):
+            return value.item()
+        if isinstance(value, np.bool_):
+            return bool(value)
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+        return str(value)
+    path.write_text(json.dumps(obj, indent=2, default=default, allow_nan=True))

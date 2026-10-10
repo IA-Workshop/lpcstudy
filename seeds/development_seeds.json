@@ -1,0 +1,38 @@
+{
+  "schema": "lpcstudy.seed-registry/1",
+  "description": "Master seeds for DEVELOPMENT runs only. Each master seed drives every random stream in a run through lpcstudy.data.make_rng(seed, *labels). Results produced with these seeds are never confirmatory and are never reported as tests of the pre-registered hypotheses (LPC.PC.7).",
+  "created": "2026-10-10",
+  "created_by": "Claude (claude-opus-5-5), Cowork session, drawn with Python secrets.randbits(62); DEV-0 is the pilot seed already in config.py",
+  "seeds": [
+    {
+      "id": "DEV-0",
+      "value": 20261005,
+      "status": "used",
+      "use": "Pilot of 2026-10-05/06 and the library-sweep recheck of 2026-10-10. Results exist (docs/study/pilot_results_v1.json, docs/study/pilot_library_recheck.json). Use for regression comparison against the pilot."
+    },
+    {
+      "id": "DEV-1",
+      "value": 2844678021587022684,
+      "status": "unused",
+      "use": "Dress rehearsal of the v2 code at the pilot preset (WU-0003)."
+    },
+    {
+      "id": "DEV-2",
+      "value": 1747709410296405302,
+      "status": "unused",
+      "use": "Precision check at the full preset, if the owner authorizes the compute (WU-0003)."
+    },
+    {
+      "id": "DEV-3",
+      "value": 4138800076919414624,
+      "status": "unused",
+      "use": "Spare for debugging and for seed-sensitivity checks."
+    },
+    {
+      "id": "DEV-4",
+      "value": 20219064491771980,
+      "status": "unused",
+      "use": "Spare for debugging and for seed-sensitivity checks."
+    }
+  ]
+}
