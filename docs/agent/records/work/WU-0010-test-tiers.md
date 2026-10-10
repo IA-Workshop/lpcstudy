@@ -125,6 +125,29 @@ Answers to Q1 to Q4, taking the planner's proposals. None loosens an acceptance 
 
 <dated entries: what was done, commands, results, commits>
 
+### 2026-10-10, claude-sonnet-5-5 (developer): WU-0010.1 markers and conftest, before the run
+
+Files: `pytest.ini` (new), `tests/conftest.py` (new), `tests/unit/test_conftest_markers.py` (new, 4 tests, so **k = 4**). No file under `lpcstudy/` is touched.
+
+§4.9 checklist before the .1 invocations:
+
+1. Change set: `pytest.ini`, `tests/conftest.py`, `tests/unit/test_conftest_markers.py` (all new, uncommitted); the unit file's `## Log`.
+2. Radius: rule "`tests/conftest.py`, `pytest.ini` -> the whole `unit` tier" (§4.2). This is a gate-sized run by rule, but the tier is small: `tests/test_core.py` (14 tests, transitional unit) plus `tests/unit` (4). It is not the whole suite, since no `slow`/`gpu`/`integration` test exists yet.
+3. Already run: no. These files are new.
+4. Device: `JAX_PLATFORMS=cpu` from the settings env, not overridden. Test (c) deletes it only inside the pytester subprocess, where the guard acts before jax is called.
+5. Threads and time: `LPC_THREADS=4` from the settings; unit timeout 300 s, expected well under.
+6. Contention: no preset, `slow` or `gpu` run is started.
+7. Output: `-q --tb=short -rfE`; only the summary and failures are recorded.
+8. Command (hand-set variables, WU-0012 not landed): (i) per Q1, `python -m pytest --strict-markers --collect-only -q tests/unit tests/test_core.py`; (ii) `python -m pytest -q --tb=short -rfE tests/test_core.py tests/unit`.
+
+### 2026-10-10, claude-sonnet-5-5 (developer): WU-0010.1 results
+
+- (i) `python -m pytest --strict-markers --collect-only -q tests/unit tests/test_core.py`: `18 tests collected in 0.56s` (14 in test_core, 4 in test_conftest_markers). Strict markers accepted all four tier markers. Per Q1 the bare `tests` path was not used.
+- (ii) `python -m pytest -q --tb=short -rfE tests/test_core.py tests/unit`: `18 passed in 5.64s`. No failure, no rerun.
+- **k = 4** (tests in `tests/unit/test_conftest_markers.py`). Expected summary for `tests/unit` in .2 is therefore 14 + 4 = 18 passed.
+- Counts: no clip, replacement or fallback in the new code. The guard raises `pytest.fail` on a GPU request. The transitional `test_core.py -> unit` entry in `tier_of` is the one special case and is removed in .2.
+- Self-check: the grep for `clip|nan_to_num|isfinite|where(|try:|except` on the new files finds only `try/except ValueError` in `tier_of`, which maps a path outside `tests/` to `None` (the UsageError then reports it if collected). The grep for `default_rng|random.|PRNGKey` finds none. No tolerance exists in the new tests.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
