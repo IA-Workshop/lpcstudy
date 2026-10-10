@@ -65,3 +65,54 @@ Dissent and resolution (REPRO.8):
 **Affects:** WU-0011 only. The risk in Q2 is under-selection, not over-selection.
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0004: WU-0001 plan: answers to the planner's questions  (2026-10-10, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** The WU-0001 plan amendment (`docs/agent/records/work/WU-0001-seed-provenance.md`, branch `wu/0001-seeds-provenance`) asks eight questions. Answers, none of which changes a verdict, a statistic or a fixed criterion except where stated:
+
+- *Q1 (WU-0001.5).* The bitwise comparison with the baseline smoke reference removes `provenance`, `seconds`, `handling` **and `config.seed_id`**, and nothing else. `config.seed_id` is a necessary consequence of WU-0001.1; the criterion's "the unit adds nothing else" cannot hold literally. This is a change to how a fixed criterion is checked, not to what it protects: every number must still be bitwise identical.
+- *Q2.* `--seed-id` defaults to `DEV-0` when omitted (CLAUDE.md: "until then, runs use DEV-0"), so `tests/integration/test_smoke_pipeline.py` stays valid.
+- *Q3.* Development headers carry both the `DEVELOPMENT (DEV-n): not a hypothesis test` label and `UNPROMOTED` (LPC.PC.13).
+- *Q4.* The sklearn seed-size defect is `DEF-0010`, to be fixed in WU-0002 after an owner ruling; not in WU-0001.
+- *Q5.* Prefer **not** to change `tools/ledger.py`: tests point the ledger readers at a `tmp_path` ledger by monkeypatching the module-level ledger path. Only if that is impossible may the developer add an optional path argument, with its own test and the reviewer's explicit attention.
+- *Q6.* Refusing a confirmatory run on a dirty tree or unknown commit is **not implemented** in WU-0001; recorded for the owner to decide before the freeze (WU-0004).
+- *Q7.* The test file is `tests/unit/test___main__.py` (the name `tools/test_impact.py` looks for). When `tools/ledger.py` changes, add `test_seeds` by hand (the Q2 gap of DEC-0003). DEVELOPMENT_WORKFLOW §4.2's import-graph table needs rows for the new modules; that is an owner edit (adopted governance).
+- *Q8.* The ledger path can be overridden only from Python, never by a flag or environment variable.
+
+**Alternatives weighed.** *Hold WU-0001 until the owner answers:* rejected, since nothing here is irreversible and the owner can override before the owner review that the unit requires anyway.
+
+**Affects:** WU-0001 only. Marked `needs owner review before freeze` (seed and provenance code).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0005: WU-0012 plan: answers to the planner's questions  (2026-10-10, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** The WU-0012 plan (`docs/agent/records/work/WU-0012-wrappers.md`, branch `wu/0012-wrappers`) asks six questions. Answers:
+
+- *Q1.* The smoke "same `results.json` as a direct invocation" check excludes the wall-clock `seconds` fields (and, once WU-0001.4 lands, its timing fields): the same reading as WU-0009.3, where the criterion itself removes them.
+- *Q2.* "Calendar week" is the ISO week in UTC. A shared append-only tally in addition to the per-run `run.meta.json` files is **not** added in WU-0012; the risk (deleting `runs/` or a worktree loses hours from the count) is recorded for the owner.
+- *Q3.* The XLA flag that caps CPU threads in jax 0.11.2 is **not set** in WU-0012 (an unknown `XLA_FLAGS` entry aborts XLA). Finding it needs a `researcher` retrieval; deferred, under the open question of the web-retrieval cap.
+- *Q4.* Split the wrapper tests into three files named for the tools, so that `tools/test_impact.py` finds them under the §4.2 pattern: `tests/unit/test_tools_run_tests.py`, `test_tools_run_preset.py`, `test_tools_gpu_hours.py`. (This overrides the plan's single `test_tools_wrappers.py` file name; the criterion's radius names that file, so the log records the substitution.)
+- *Q5.* `run.meta.json` does not record peak memory: its field list is fixed by the criterion, and peak RSS goes into the provenance block (WU-0001.4).
+- *Q6.* CPU `pilot` and `full` runs (WU-0002.12) take the same lock as GPU runs, so that only one long run is active at a time. The GPU-hour tally counts only runs whose device is a GPU.
+
+**Alternatives weighed.** *Keep one test file and add a mapping line to §4.2 and `test_impact.py`:* rejected, since §4.2 is adopted governance (an owner edit).
+
+**Affects:** WU-0012 only. The seed check and `run.meta.json` need owner review before the freeze (planner's note).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0006: Peak-RSS test tolerance in WU-0001 is derived, not tuned  (2026-10-10, proposed by claude-sonnet-5-5 (main session) on the applied-mathematician's analysis; for owner confirmation)
+
+**Decision.** The fixed criterion for `peak_rss_bytes` is `> 0` (ROADMAP WU-0001.4). The extra bracket against the kernel's `VmHWM` in `tests/unit/test_provenance.py` uses the bound derived by the applied-mathematician (claude-opus-5-5; derivation, probes and assumptions in the `## Log` of `docs/agent/records/work/WU-0001-seed-provenance.md`):
+
+- `peak % pagesize == 0`, exact (the kernel reports whole pages);
+- `1024*before - 2*T <= peak <= 1024*after + 2*T`, where `T = 3 * online * (max(32, 2*online) - 1) * pagesize` is the worst-case error of the kernel's three per-CPU RSS counters (about 24.8 MB on this 32-CPU machine), with `online = os.sysconf("SC_NPROCESSORS_ONLN")`.
+
+This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB), which the applied-mathematician found not valid: it covers one counter, not three, and uses `os.cpu_count()`, which an environment variable can override. The new bracket is wider than the developer's, but narrower than nothing: the planner's zero-slack bracket was never true of the kernel. It still catches a KiB-for-bytes error (1024x), a 4096x error and any factor-2 error; it cannot catch a one-page additive error (the kernel's own noise is about a thousand pages).
+
+**Alternatives weighed.** *The reviewer's ratio bracket 0.5x to 2x:* valid on this machine, but misses factor-2 errors and also depends on the counters. *Only `peak > 0`:* what the criterion requires, but it would not catch a unit error.
+
+**Affects:** WU-0001.4's test only. Separate finding, not a decision: a child process inherits its parent's peak in `ru_maxrss` (a child of a 200 MB Python reported 218 MB against its own `VmHWM` of 11 MB), so a recorded `peak_rss_bytes` can reflect the launcher's peak. WU-0001 documents this limitation; whether to also record `VmHWM` is for the owner (it changes the provenance schema).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
