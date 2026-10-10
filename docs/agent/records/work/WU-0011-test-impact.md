@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | in progress |
+| Status | done |
 | Class | CSQ3 development |
 | Agent(s) | claude-sonnet-5-5 (main session) under governance ledger entry 5 (authorizations 4, 6) |
 | Estimate | WU-0011.1 M, WU-0011.2 S (ROADMAP.md §2) |
@@ -156,6 +156,8 @@ exit 0
 ```
 
 
+Result (same entry): **`63 passed in 75.04s (0:01:15)`** = 14 moved tests + 5 marker tests + 43 tool tests + 1 smoke integration test. Run once; no failures; no retry.
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-10, at `e9552ec` (branch `wu/0011-test-impact`; working tree clean before this edit).
@@ -212,9 +214,18 @@ Scope: R1–R4 only, judged from `git show 78fcfd6` and the new `## Log` entry. 
 
 ## Audit
 
-- Is the definition of done met? Give the evidence.
-- Defects recorded:
+- Is the definition of done met? Yes, with the evidence below.
+  - **WU-0011.1:** `tools/test_impact.py` selects tests for every change class (a) to (h) of the plan on synthetic packages in `tmp_path` (tests in `tests/unit/test_tools_test_impact.py`); `--explain`, `--run` and `--base` work; `--run` is the only path that starts pytest and refuses an empty or whole-suite path list; slow and gpu tiers are never selected without `--include-slow` or `--include-gpu`; a deleted or renamed test file is not selected (R1); selection runtime on the real package 0.030 to 0.033 s (limit 1 s). Standard library only, no new dependency.
+  - **WU-0011.2:** `tests/unit/fixtures/lpcstudy_graph.json` (18 modules, 53 edges) was derived by hand by the planner and committed (37def38) before any tool code; unchanged since. The comparison test asserts the tool's graph equals it exactly and a sensitivity test shows a function-level import changes the graph. The reviewer re-derived it independently with an `ast` script and spot-checked 10+ edges; it matches.
+  - **Gate:** `63 passed in 75.04s` at the merge gate; independent review approved after one fix round (R1 to R4 fixed in 78fcfd6).
+  - **Dogfood:** `tools/test_impact.py --base main --explain` on this branch selects only `tests/unit/test_tools_test_impact.py` (output pasted in the Log).
+- Defects recorded: none opened. The Q2 gap is a gap in the §4.2 rule, not a defect of the tool: it is recorded as a fact in the Log and in `DEC-0003`.
 - Notes for successors:
+  - **Q2 gap (open, for the owner):** under §4.2 as written, a change to `lpcstudy/systems.py` or `config.py` does not select `tests/unit/test_dynamics.py` or `test_embedding.py`, which import `lpcstudy.systems`. Until §4.2 is amended, add those files by hand for such changes.
+  - The skill's `2>/dev/null || echo` fallback hides the tool's exit-2 errors; an owner edit to `.claude/skills/test-impact/SKILL.md` and `independent-review/SKILL.md`.
+  - `--run` uses `tools/run_tests.sh` once WU-0012.1 creates it; a test covers the switch with a fake wrapper.
+  - Any edit to the import graph of `lpcstudy/` fails the comparison test until the fixture is updated by hand in the same change, never from the tool's output.
+  - The tool warns (and does not change the selection) for a change to `lpcstudy/__init__.py`.
 
 ## Referral
 

@@ -66,3 +66,5 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
 
 - 2026-10-10, claude-sonnet-5-5 (main session): WU-0010 (.1 to .3) **done** on branch `wu/0010-test-tiers`: independent review approved, merge gate `20 passed in 75.57s`, DEC-0002 confirmed by the owner; merge to `main` follows. Dependent sub-tasks (WU-0011, WU-0012, WU-0013, WU-0001, WU-0002, WU-0005) are unblocked once the merge lands.
 - 2026-10-10, claude-opus-5-5 (planner): WU-0011 **plan written** on branch `wu/0011-test-impact` (`.1` tool, `.2` fixture and comparison test). The reference graph is derived by hand in the plan (53 edges, at `d6abaa7`), to be committed verbatim before any tool code. Owner questions Q1–Q6 are in the unit file; none blocks `.1` or `.2`.
+
+- 2026-10-10, claude-sonnet-5-5 (main session): WU-0011 (.1 and .2) **done** on branch `wu/0011-test-impact`: independent review approved, merge gate `63 passed in 75.04s`; DEC-0003 (proposed) and the Q2 selection gap are with the owner; merge to `main` follows. WU-0012.1 (wrappers) and the other tool units can now use `tools/test_impact.py`.
