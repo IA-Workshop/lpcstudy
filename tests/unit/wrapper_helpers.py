@@ -8,6 +8,8 @@ touched. Fakes stand in for the programs the wrappers start:
   ``$FAKE_DIR/python.jsonl``; answers ``--help`` with or without ``--seed-id`` (``FAKE_HELP_SEED``);
   for ``-m lpcstudy`` it writes ``<out>/<preset>/results.json``, waits for the sentinel file
   ``$FAKE_DIR/go`` (only if ``FAKE_WAIT=1``, capped at 10 s) and exits ``$FAKE_EXIT`` (default 0).
+* ``tools/gpu_hours.py`` in the root is a fake that records its argv in ``$FAKE_DIR/tally.jsonl``
+  and exits ``$FAKE_TALLY_EXIT`` (default 0), unless ``real_tally=True`` copies the real tool.
 * ``bin/timeout`` records its argv in ``$FAKE_DIR/timeout.log`` and runs the command that follows
   the duration.
 """
@@ -56,6 +58,13 @@ shift
 exec "$@"
 """
 
+FAKE_TALLY = """import json, os, sys
+
+with open(os.path.join(os.environ["FAKE_DIR"], "tally.jsonl"), "a") as handle:
+    handle.write(json.dumps(sys.argv[1:]) + "\\n")
+sys.exit(int(os.environ.get("FAKE_TALLY_EXIT", "0")))
+"""
+
 FAKE_FLOCK = """#!/usr/bin/env bash
 echo "$*" >>"$FAKE_DIR/flock.log"
 exit 0
@@ -77,9 +86,11 @@ class FakeRoot:
     ----------
     base : Path
         Empty directory (``tmp_path``) that holds ``root/``, ``fake/``, ``bin/`` and ``lock``.
+    real_tally : bool
+        Keep the real ``tools/gpu_hours.py`` (default: replace it with the recording fake).
     """
 
-    def __init__(self, base: Path) -> None:
+    def __init__(self, base: Path, real_tally: bool = False) -> None:
         self.base = base
         self.root = (base / "root").resolve()
         self.fake_dir = base / "fake"
@@ -91,6 +102,8 @@ class FakeRoot:
         for name in TOOLS:
             if (REPO / "tools" / name).is_file():
                 shutil.copy2(REPO / "tools" / name, self.root / "tools" / name)
+        if not real_tally:
+            write_script(self.root / "tools" / "gpu_hours.py", FAKE_TALLY)
         shutil.copy2(REPO / "seeds" / "development_seeds.json", self.root / "seeds")
         for tier in TIERS:
             test_dir = self.root / "tests" / tier
@@ -122,6 +135,11 @@ class FakeRoot:
         if not path.exists():
             return []
         return [json.loads(line) for line in path.read_text().splitlines()]
+
+    def tally_calls(self) -> list[list[str]]:
+        """Return the argv of each call of the fake ``gpu_hours.py`` (empty if never called)."""
+        path = self.fake_dir / "tally.jsonl"
+        return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
     def timeout_calls(self) -> list[list[str]]:
         """Return the argv of each fake ``timeout`` call (empty if never called)."""

@@ -133,6 +133,20 @@ Result of run 1: `40 passed in 1.67s` (exit 0). After the run, a manual probe sh
 
 Result of run 2: `41 passed in 1.66s` (exit 0). Self-check: no `clip|nan_to_num|isfinite|where(|try:|except` and no randomness in the diff; no tolerance exists (discrete outcomes). Criterion (a) to (e) each have a test. Not set (DEC-0005 Q3): the XLA thread flag. Commit: WU-0012.1 (see git log).
 
+**2026-10-10, developer claude-sonnet-5-5: WU-0012.2 written** (`tools/run_preset.sh`, mode 755; `tests/unit/test_tools_run_preset.py`; `tests/integration/test_preset_wrapper.py`; `tests/unit/wrapper_helpers.py` extended with a recording fake `gpu_hours.py`, `real_tally=True` keeps the real one). Design choices within the plan: lock first (so a busy lock exits 75 at once, before the 2 s+ import-heavy `--help` probe), then the tally, then the probe; out-dir and test paths are taken from the caller's directory; the seed must also match `^DEV-[0-9]+$` before the registry lookup; a failure of the CLI probe is a refusal (64). The `note` for DEV-0 without `--seed-id` goes to stdout.
+
+§4.9 checklist before the .2 unit run:
+1. Change set: `M tests/unit/wrapper_helpers.py`, `?? tools/run_preset.sh`, `?? tests/unit/test_tools_run_preset.py`, `?? tests/integration/test_preset_wrapper.py`; vs `main`: also the .1 commit (`tools/run_tests.sh`, its test and the helper).
+2. Radius (`python3 tools/test_impact.py`): unit `tests/unit/test_tools_run_preset.py tests/unit/test_tools_run_tests.py` (the helper changed and both name it); integration `tests/integration/test_preset_wrapper.py`. Smaller than the whole suite; no gate. `lpcstudy/` untouched.
+3. Already run: the run_tests file ran on the .1 code (41 passed) but the helper has changed since; the preset file and the integration file have never run.
+4. Device: `JAX_PLATFORMS=cpu`; the unit tests use a fake lock under `tmp_path`, never `/tmp/lpcstudy-gpu.lock`; no GPU.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s, integration timeout 900 s (two smoke runs, about 2 x 50 s expected, shared cores).
+6. Contention: no pilot/full/slow/gpu run by this unit; the integration run is the one smoke-preset CPU run permitted by the criterion (k) (wrapper-vs-direct comparison), done once, in this sub-task only.
+7. Output: `-q --tb=short -rfE` (added by the wrapper); only the summary lines and failures recorded.
+8. Commands: `tools/run_tests.sh unit tests/unit/test_tools_run_preset.py tests/unit/test_tools_run_tests.py`, then (background not needed) `tools/run_tests.sh integration tests/integration/test_preset_wrapper.py`.
+
+Results of the .2 runs: unit `93 passed in 10.63s` (exit 0; the 41 tests of the run_tests file and 52 of the preset file); integration `2 passed in 69.26s` (exit 0; the real smoke preset on CPU through the wrapper and directly, identical `results.json` after removing the `seconds` keys, per DEC-0005 Q1; `runs/` left empty, the test removes its directories). No pilot or full preset and no GPU lock were used; no leftover process (`pgrep` clean). Self-check: the diff has no `clip|nan_to_num|isfinite|where(|except` and no randomness; the one `try:` is the test cleanup `finally` and the `try/except` in the embedded registry helper reports the failure as the refusal reason (never skips). No tolerance exists. Not yet covered here, by design: criterion (n) (in .3) and the real tally (.3). Commit: WU-0012.2 (see git log).
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
