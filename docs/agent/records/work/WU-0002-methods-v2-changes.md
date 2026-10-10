@@ -312,6 +312,54 @@ Smoke regression (a). Clean committed tree at `696b3b367acc1bc7e682df03bcb233cfe
 
 Open for the reviewer: the owner checkpoint of the plan applies (`__main__` option set, `tools/run_preset.sh`, the T1 branch, H2d `pass`). The sweep cells now run `with_evals=False`: the bitwise equality shows the moments are unaffected by that.
 
+### 2026-10-10 developer (claude-sonnet-5-5), WU-0002.2: identifier table, v3 ids, `n_lib` (three commits, before the radius run)
+
+| Commit | Content |
+| --- | --- |
+| `47f420a` | New `lpcstudy/identifiers.py` (no intra-package imports): `Hypothesis` (frozen dataclass), `HYPOTHESIS_TABLE` (14 rows), `V1_KEY_MAP` (16 v1 keys); `tests/unit/test_identifiers.py` tests (i)-(iv). Deviation from the commit table, for consistency: the fixture node `identifiers: []` and the `test_fixture_schema` count 20 -> 21 are in this commit, because adding the module file is itself a graph change (otherwise `sorted(graph) == stems` fails at this commit). |
+| `9cf698c` | All renames at once (below), imports of `identifiers` in `analysis`, `experiments`, `report`, fixture edges by hand, `source_commit` set to `47f420a`; test (v) (AST scan), `check_keys` plumbing, report tests (vii) and (ix). |
+| `33bc928` | `n_lib` (below); report tests (vi) and (viii), `check_keys` test. |
+
+Decisions within the plan (no criterion changed):
+
+- Tests (v)-(ix) were added in the commit where the code they test lands (the plan puts them all in .2 without a per-commit split). Test (vi) and (viii) are in `33bc928` because their strings contain `n_lib`.
+- `identifiers.py` imports `dataclass` from the standard library. "No imports" is read as "no intra-package imports" (the graph node is `identifiers: []`).
+- Row field `v3_id` of the gain bound is `(reported)` exactly as in the decision-log table (test (i) compares with the parsed table); its `key` is `gain_bound`. For the other 13 rows `key == v3_id`. `_key_number` and `verdicts` are keyed by `key` (equal to the v3 id except for the gain bound).
+- `criterion` format: `"<statistic>; pass if <rule>"` from v3 section 2 (Q-N: `pass if read by the table in §7`); the gain bound is the sentence after the RQ3 table. Test (iii) parses section 2 independently and compares.
+- `pending` was copied from the ROADMAP rows of WU-0002.4 to .8 as the plan says: H1a, H1b (.4), H1d (.5), Q-N (.6), H2b, H2e (.7), H2d, H3a, H3c (.8). Rows no ROADMAP row names (H1c, H2a, H2c, v3 H3b, gain bound) are not marked, although D-14, D-20, D-25 say their v1 statistics or verdicts may change (the concordance referral). The report therefore does not mark them; flagged for the reviewer.
+- The report text `[computed with the v1 statistic until WU-0002.x]` is appended to the criterion of a pending row in the Markdown table. A row of the table without a result (v3 H2e) is listed with `n/a: no result` cells and the verdict `no result`; `verdicts` has no entry for it.
+- `identifiers.check_keys` (not in the plan): called where results are assembled (`run_system`, `_variant_summary`, `h3_regimes`). It raises `ValueError` for a key shaped like a hypothesis id that is not in the table, so a leftover v1/v2 id fails loudly; it replaces nothing and counts as the runtime use of the module by `analysis` and `experiments` (the plan's import edges). It adds no clip, fallback or silent path.
+- Rules left untouched: `verdicts` still produces `"partially supported"` and still reads `["pass"]` (WU-0002.9); `PRIMARY_LEVEL` stays on H2a and H2b (`analysis.py`); the H3 figure's 5% line, the gain bound's 0.9 bar and every `pass` expression are unchanged. The report intro sentence "*partially supported* if on at least one" is unchanged.
+- Result key `V7` (v1 H1a) is top-level in `systems.*`, written without a flag; it has no row in the verdict table (so RESULTS.md no longer shows a v1 H1a row, and `verdicts` has no entry for it, as the plan says).
+- Regime figure: `report.make_figures` reads `systems.*.regime_curve.regret_ratio_by_K` (moved from v1 `H3b`), so the figure exists before and after.
+- ROADMAP check noted for the reviewer and owner: WU-0002.8's check "no `H3b` key exists anywhere in results" conflicts with the v3 `H3b` (structure, v1 `H3c`) that this unit creates; this is the pending ruling A2 of DEC-0007. Nothing was done about it here.
+
+Map of old to new function names (analysis.py), for the concordance D-rows that cite v1 names:
+
+| v1 name | v3 name |
+| --- | --- |
+| `h1a_noise_scaling` | `v7_noise_scaling` |
+| `h1b_library_scaling` | `h1a_library_scaling` |
+| `h1c_seed_amplifier` | `h1b_seed_amplifier` |
+| `h1d_horizon_law` | `h1c_horizon_law` |
+| `h1e_proxies` | `h1d_proxies` |
+| `h1f_noise_redundancy` | `qn_noise_redundancy` |
+| `h2e_horizon_bound` | `gain_horizon_bound` |
+| `h2a_separation`, `h2b_knob_response`, `h2c_state_dependence`, `h2d_empirical_comparison`, `h3_regimes` | unchanged names (`h3_regimes` now returns `H3a`, `H3b`, `H3c` and `regime_curve`) |
+
+`n_lib` sites changed: result keys `mean_seed_by_N`, `median_w_by_N`, `median_at_largest_N` (with the report readers); the H2b `threshold` string; docstrings in `config.py` (library sizes), `data.py`, `ensemble.py`, `pipeline.py` (module vocabulary) and `analysis.py` (`_fit_seed_law`, H1a, `h1a_library_scaling` argument, H2b); the `N=%d` label in the cell log of `pipeline.py` (`n_lib=%d`); the report key-number strings (H1a and H2b) and the library-figure axis. Not changed, per the plan: the `N` that is noise sensitivity (`analysis.py` Q-N docstring, `report.py` H1d string, `ensemble.py`), `oracle.py:50` (sample count), `StudyConfig` field names (`library_sizes`, `core_library`), the criterion text (v3's own `N_lib`, DEC-0007 answer 3).
+
+#### §4.9 checklist, WU-0002.2 radius run (unit tier, then integration)
+
+1. Change set: `git diff --name-only develop...HEAD` plus status: as for .1, plus `lpcstudy/identifiers.py` (new), `tests/unit/test_{identifiers (new),report,tools_test_impact}.py`, `tests/unit/fixtures/lpcstudy_graph.json`, `lpcstudy/{analysis,experiments,report,pipeline,ensemble,data,config}.py` (changed again), `README.md`, this unit file.
+2. Radius: `python3 tools/test_impact.py --base develop --explain` (it also lists .1's files) selects the 14 unit files `test___main__ test_allocation test_analysis test_config test_data test_ensemble test_identifiers test_oracle test_provenance test_report test_seeds test_systems test_tools_run_preset test_tools_test_impact` and `tests/integration`. Plan for .2: the .1 set without `test_systems.py` and `test_tools_run_preset.py` (not touched in .2), plus `test_identifiers.py` and `test_tools_test_impact.py`, with `test_dynamics.py` and `test_embedding.py` kept because the plan says "the same set". Integration narrowed to `test_cli_seeds.py` and `test_preset_wrapper.py`, with the hand smoke of (d)/(e) replacing `test_smoke_pipeline.py`. Smaller than the suite; no gate.
+3. Already run: no (the .1 run was on the code before the .2 commits; `test_identifiers.py` and the new report tests have not run).
+4. Device: `JAX_PLATFORMS=cpu` (set by `tools/run_tests.sh`).
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s, integration 900 s.
+6. Contention: `pgrep -fa "lpcstudy --preset"` shows no run; no GPU use.
+7. Output: wrapper default `-q --tb=short -rfE`.
+8. Commands: `tools/run_tests.sh unit <the 14 unit files above for .2>` and `tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`.
+
 ## Review
 
 ## Audit

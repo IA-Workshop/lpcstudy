@@ -159,10 +159,10 @@ def test_check_keys_accepts_table_keys_and_refuses_stale_ids() -> None:
     """``check_keys`` passes the 14 table keys, V7 and ordinary keys; it raises on v1/v2 ids.
 
     Reference: the decision-log map. The ids that left the code are the v1/v2 ids that are not
-    v3 keys: H1e, H1f, H2f, H3d, T1 (and a made-up H9z). Exact: ``ValueError`` naming the keys.
+    v3 keys: H1e, H1f, H2f, H3d, T1 (and a made-up H9f of the same shape). Exact: ``ValueError`` naming the keys.
     """
     fine = {h.key: 1 for h in HYPOTHESIS_TABLE} | {"V7": 1, "scores": 2, "H2a_median_range": 3}
     check_keys(fine)
-    for stale in ("H1e", "H1f", "H2f", "H3d", "T1", "H9z"):
+    for stale in ("H1e", "H1f", "H2f", "H3d", "T1", "H9f"):
         with pytest.raises(ValueError, match=stale):
             check_keys({"H1a": 1, stale: 2})
