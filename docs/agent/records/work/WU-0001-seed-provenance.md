@@ -419,6 +419,23 @@ The reviewer's ratio bracket is valid here, but it misses factor-2 errors and it
 
 Result: `97 passed in 11.43s`. Self-check: no new `clip|nan_to_num|isfinite|where(`; the new `try/except` count is zero; no randomness added; the only tolerances are the 1% (unchanged) and the mathematician's derived 2T bracket (no other test tolerance changed).
 
+### Resolution of findings and merge-gate checklist, 2026-10-10, claude-sonnet-5-5 (main session)
+
+- **R1 to R4: fixed in 80dbb57** (re-review: all fixed, approve). The RSS bound is the applied-mathematician's derived bracket, recorded as `DEC-0006` (proposed) on `main`.
+- **Owner review needed before the freeze** (seed and provenance code, LPC.PC.11); to be marked in the queue. `DEC-0004` (Q1: the WU-0001.5 comparison also removes `config.seed_id`) and `DEC-0006` are still **proposed**; the numbers are bitwise equal to the baseline either way. Flagged for the owner, not a blocker for the merge, which needs the owner's approval at the prompt.
+- **Not in this unit:** DEF-0010 (seeds of 2**32 or more crash scikit-learn), so only DEV-0 can run a preset.
+
+Merge-gate checklist (§4.9, §4.3):
+
+1. **Change set:** `git diff --name-only main...HEAD`: new `lpcstudy/` modules for seeds and provenance, `__main__.py`, `config.py`/`report.py` as planned, new tests under `tests/unit/` and `tests/integration/test_cli_seeds.py`, the hand-edited graph fixture, `tests/unit/test_tools_test_impact.py` (module count), this unit file. `main` was merged into the branch (3066684) so the gate runs on what will be merged. `git status --porcelain` is empty after the commit that carries this entry.
+2. **Radius:** the merge gate of §4.3, tiers `unit` and `integration`, by the main session: `tests/unit tests/integration`.
+3. **Already run?** The changed files ran as radius sets (developer 97 passed; reviewer 167 passed) but never the whole unit and integration set together on this code, and `test_smoke_pipeline.py` has not run on this code. This gate is that run, once.
+4. **Device:** `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`.
+5. **Threads and time:** `LPC_THREADS=4`, `OMP/MKL/OPENBLAS_NUM_THREADS=4`, `timeout 900`.
+6. **Contention:** other agents share the 4 cores (WU-0012's fix round); no GPU use; no preset of mine running.
+7. **Output:** `-q --tb=short -rfE`.
+8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
+
 ## Review
 
 ### Round 1, 2026-10-10, reviewer (claude-opus-5-5), fresh context, branch `wu/0001-seeds-provenance` at `dae50c5` against `main`
