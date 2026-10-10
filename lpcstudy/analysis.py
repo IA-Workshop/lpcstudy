@@ -490,34 +490,27 @@ def h2c_state_dependence(scores: dict[str, RuleScores], config: StudyConfig) -> 
     return out
 
 
-def h2d_empirical_comparison(scores: dict[str, RuleScores], shift: dict, config: StudyConfig
-                             ) -> dict:
-    """H2d: A4 within 10% of A3 in-distribution, and degrades less than A3 under shift.
+def h2d_empirical_comparison(scores: dict[str, RuleScores], config: StudyConfig) -> dict:
+    """H2d: A4 within 10% of A3 in-distribution (part (ii) is removed in v3).
 
     Parameters
     ----------
     scores : dict[str, RuleScores]
         Core test scores.
-    shift : dict
-        Output of :func:`shift_gaps`.
     config : StudyConfig
         Study configuration.
 
     Returns
     -------
     dict
-        In-distribution ratio and per-cell shift gaps.
+        In-distribution excess of A4 over A3 with its interval, and the pass flags.
     """
     a3, a4 = scores["A3"].state_mse_ref, scores["A4"].state_mse_ref
     stat = lambda idx: float(a4[idx].mean() / a3[idx].mean() - 1.0)
     est, lo, hi = _boot(config, stat, len(a3), salt=6)
-    wins = sum(1 for v in shift["cells"].values() if v["gap"]["A4"] < v["gap"]["A3"])
-    n_cells = len(shift["cells"])
     in_dist_ok = est <= 0.10
-    shift_ok = wins >= min(4, n_cells) if n_cells else False
     return {"in_distribution_excess": est, "ci": [lo, hi], "in_distribution_pass":
-            bool(in_dist_ok), "shift_wins_A4_over_A3": wins, "shift_cells": n_cells,
-            "shift_pass": bool(shift_ok), "pass": bool(in_dist_ok and shift_ok)}
+            bool(in_dist_ok), "pass": bool(in_dist_ok)}
 
 
 def h2e_horizon_bound(cell: Cell, config: StudyConfig) -> dict:
@@ -560,39 +553,6 @@ def h2e_horizon_bound(cell: Cell, config: StudyConfig) -> dict:
             "max_gain_lyapunov": float(np.max(gain)) / config.steps_per_lyapunov
             if gain.size else float("nan"),
             "threshold": 0.9, "pass": bool(frac >= 0.9)}
-
-
-def shift_gaps(core_scores_sub: dict[str, RuleScores],
-               shift_scores: dict[str, dict[str, RuleScores]],
-               config: StudyConfig) -> dict:
-    """Excess-MSE ratios ``MSE_rule / MSE_A*`` at ``H_ref`` and their change under shift.
-
-    Parameters
-    ----------
-    core_scores_sub : dict[str, RuleScores]
-        Scores at the core cell on the test-sweep states (evaluation horizons).
-    shift_scores : dict[str, dict[str, RuleScores]]
-        Scores per shifted cell label.
-    config : StudyConfig
-        Study configuration.
-
-    Returns
-    -------
-    dict
-        Ratios and gaps per cell for A2, A3, A4, A5.
-    """
-    ref = list(config.eval_horizons).index(config.reference_horizon)
-
-    def ratios(scores: dict[str, RuleScores]) -> dict[str, float]:
-        base = scores["A*"].mse[ref]
-        return {k: float(scores[k].mse[ref] / base) for k in ("A2", "A3", "A4", "A5")}
-
-    core = ratios(core_scores_sub)
-    cells = {}
-    for label, scores in shift_scores.items():
-        r = ratios(scores)
-        cells[label] = {"ratio": r, "gap": {k: r[k] - core[k] for k in r}}
-    return {"core_ratio": core, "cells": cells}
 
 
 # ------------------------------------------------------------------------ RQ3

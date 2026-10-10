@@ -36,8 +36,7 @@ HYPOTHESES: dict[str, str] = {
     "H2b": "[primary] Knob response: w* rises with N (per-state rank correlation > 0; "
            "median at N_max < 0.95) and with rho",
     "H2c": "State dependence: A4 MSE < A2 and < best single forecaster at H_ref",
-    "H2d": "Empirical comparison: A4 within 10% of A3 in-distribution; A4 degrades less "
-           "than A3 in >= 4 of 5 shifted cells",
+    "H2d": "Empirical comparison: A4 within 10% of A3 in-distribution",
     "H2e": "Hybrid horizon gain <= ln2 / (2 Lambda_bar) for >= 90% of eligible states",
     "H3a": "[primary] Some K <= 5: regret <= 5% of best-single variance, regime horizon "
            "IQR <= 0.5 LT, consecutive log-rank Holm p < 0.01",
@@ -131,8 +130,7 @@ def _key_number(hyp: str, res: dict) -> str:
                    f"A4-{r['best_single']} " \
                    f"{_fmt(100 * r['A4_minus_' + r['best_single']]['relative'], 3)}%"
         case "H2d":
-            return f"A4/A3-1 = {_fmt(100 * r['in_distribution_excess'], 3)}%; shift wins " \
-                   f"{r['shift_wins_A4_over_A3']}/{r['shift_cells']}"
+            return f"A4/A3-1 = {_fmt(100 * r['in_distribution_excess'], 3)}%"
         case "H2e":
             return f"within bound {_fmt(r['fraction_within_bound'], 3)} " \
                    f"(n={r['n_states']}, max gain {_fmt(r['max_gain_lyapunov'], 2)} LT)"

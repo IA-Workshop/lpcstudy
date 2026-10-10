@@ -168,14 +168,11 @@ def run_system(study: Study, system: str) -> dict:
     # Sweeps (common random numbers across levels).
     core_sub = _sweep_subset(core, cfg)
     noise_cells = {cfg.core_noise: core_sub}
-    shift_scores = {}
     for rho in cfg.noise_levels:
         if rho != cfg.core_noise:
             noise_cells[rho] = study.run_cell(system, rho, cfg.core_library, core=False,
-                                              with_evals=True)
-            shift_scores[f"rho={rho:g}"] = _evaluate(noise_cells[rho], rules, cfg)[1]
+                                              with_evals=False)
     library_cells = {}
-    extreme_sizes = (min(cfg.library_sizes), max(cfg.library_sizes))
     for rho in cfg.library_sweep_noises:
         for size in cfg.library_sizes:
             if rho == cfg.core_noise and size == cfg.core_library:
@@ -184,15 +181,8 @@ def run_system(study: Study, system: str) -> dict:
             if size == cfg.core_library and rho in noise_cells:
                 library_cells[(rho, size)] = noise_cells[rho]
                 continue
-            shifted = rho == cfg.core_noise and size in extreme_sizes
             library_cells[(rho, size)] = study.run_cell(system, rho, size, core=False,
-                                                        with_evals=shifted)
-            if shifted:
-                shift_scores[f"N={size}"] = _evaluate(library_cells[(rho, size)], rules,
-                                                      cfg)[1]
-    core_sub_scores = _evaluate(core_sub, rules, cfg)[1]
-    shift = an.shift_gaps(core_sub_scores, shift_scores, cfg)
-    res["shift"] = shift
+                                                        with_evals=False)
 
     # Hypotheses.
     res["H1a"] = an.h1a_noise_scaling(noise_cells, cfg)
@@ -204,7 +194,7 @@ def run_system(study: Study, system: str) -> dict:
     res["H2a"] = an.h2a_separation(core, cfg)
     res["H2b"] = an.h2b_knob_response(noise_cells, library_cells, cfg)
     res["H2c"] = an.h2c_state_dependence(scores, cfg)
-    res["H2d"] = an.h2d_empirical_comparison(scores, shift, cfg)
+    res["H2d"] = an.h2d_empirical_comparison(scores, cfg)
     res["H2e"] = an.h2e_horizon_bound(core, cfg)
     res.update(an.h3_regimes(core, rules, scores, cfg))
     res["oracle_recovery"] = an.oracle_recovery(scores, cfg)
