@@ -257,6 +257,8 @@ Scope: R1–R3 only, as of commit ff945e9 (`git show ff945e9`) and the developer
 - **R3: fixed in ff945e9** (re-review: fixed).
 - **R4: recorded as `DEC-0002` in `docs/agent/records/decisions.md`, proposed, for owner confirmation.** The merge to `main` waits for it.
 
+- **Correction to the R2 line above (main session, 2026-10-10).** The stated reason for not adopting the reviewer's optional sentence was wrong: the Limits paragraph (`tests/conftest.py:75-79`) does not say that only `jax.devices` and `jax.local_devices` are wrapped, nor that child processes are unguarded. The sentence is not adopted because it is optional and non-blocking, and a comment-only change after review would need another radius run; it is left as a note for the next change to `tests/conftest.py`.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
