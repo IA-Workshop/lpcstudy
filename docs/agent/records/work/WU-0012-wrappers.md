@@ -226,6 +226,21 @@ Merges to `main` authorized by the owner (this session). `main` (with WU-0001, W
 
 Results of the gate-fix run: F1 `2 passed in 0.21s` (exit 0); F2 `2 passed in 68.12s` (exit 0; the real smoke preset through the wrapper equals the direct run bitwise after removing `seconds` and `provenance`, and the provenance blocks agree on every field except `argv`, `start_utc`, `end_utc`, `wall_seconds`, `peak_rss_bytes`, `device_peak_bytes`; `runs/` empty afterwards). No other test was run (the main session reruns the gate). No tolerance was loosened and no assertion removed. Commit: "WU-0012 fix gate F1-F2" (see git log).
 
+### Merge gate, run 2 (after the gate failures), 2026-10-10, claude-sonnet-5-5 (main session)
+
+Run 1 of the gate on the merged tree: **`2 failed, 359 passed in 138.80s`**. Failures, both integration effects between units already on `main` and this one: (F1) `tests/unit/test_tools_test_impact.py::test_commands_for_a_tier_directory_are_allowed` (a WU-0011 test) read the real repo root, where `tools/run_tests.sh` now exists, so `tools/test_impact.py` correctly delegated to it; (F2) `tests/integration/test_preset_wrapper.py::test_smoke_through_the_wrapper_matches_a_direct_run` compared whole `results.json` files, which now differ in the WU-0001 `provenance` block (argv, output path, times, memory) by construction. Neither failure is a product defect. Fixed in 8dd726c (hermetic root for F1; F2 compares `results.json` without `seconds` and `provenance`, bitwise, and checks the provenance blocks separately, as WU-0001.5 does; DEC-0005 Q1 anticipated this). The developer ran only the two failing sets (`2 passed in 0.21s`; `2 passed in 68.12s`).
+
+Checklist for run 2 (§4.9):
+
+1. **Change set:** as before plus 8dd726c: `tests/unit/test_tools_test_impact.py` (one test made hermetic, one added), `tests/integration/test_preset_wrapper.py`, this unit file. `git status --porcelain` is empty after the commit that carries this entry.
+2. **Radius:** the merge gate of §4.3, `unit` and `integration`, by the main session.
+3. **Already run?** Yes: run 1 (above) failed. The code changed since (8dd726c), so one rerun of the set is allowed (§4.4). This is that rerun, once.
+4. **Device:** `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`.
+5. **Threads and time:** `LPC_THREADS=4`, `OMP/MKL/OPENBLAS_NUM_THREADS=4`, `timeout 900`.
+6. **Contention:** the applied-mathematician is running small scratch computations in another worktree; no preset; no GPU.
+7. **Output:** `-q --tb=short -rfE`.
+8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
+
 ## Review
 
 - **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-10. Reviewed diff `main...HEAD` (557e074, dbca55e, c831aa6 on plan 1639d96), against the plan, DEC-0005, DEVELOPMENT_WORKFLOW §2.3/§4.5/§4.6/§4.9, settings.json, test_gate.py, skill dev-run and `tools/test_impact.py`.
