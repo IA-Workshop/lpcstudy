@@ -195,8 +195,8 @@ def test_local_dimension_known_sets(m: int) -> None:
     Bickel (2005), NIPS 17, Sec. 3.1: mean m, sd m / sqrt(k - 3) = 0.2425 m.
 
     The statistic is the arithmetic mean of the per-query estimates. That is the published
-    aggregator (Levina and Bickel 2005, NIPS 17, eq. 9). The code's callers aggregate with the
-    median over states, which is not the published aggregator; its departure is pinned in
+    aggregator (Levina and Bickel 2005, NIPS 17, eq. 9). The median of the per-query estimates
+    is not the published aggregator; its value is pinned against the Gamma law in
     ``test_local_dimension_median_poisson_value``.
 
     Boundary queries are excluded on purpose. Their balls are truncated by the edge of the
@@ -229,12 +229,12 @@ def test_local_dimension_known_sets(m: int) -> None:
 def test_local_dimension_median_poisson_value(m: int) -> None:
     """The median of the per-query estimates sits at 0.964 m, 3.6% below the mean.
 
-    This is a characterization of the aggregator the code's callers use (the median over
-    states, as H1b does), not a check of the published one: Levina and Bickel (2005), NIPS 17,
-    eq. 9, average the per-point estimates arithmetically, and no median appears there. The
-    per-query estimate (k - 2) / S has S ~ Gamma(19, rate m), so its median is
-    18 m / median(Gamma(19, 1)) = 0.9642 m, below the mean m because the distribution is
-    skewed. The test documents that departure; it does not endorse it.
+    The test computes ``np.median`` itself and pins the median of the distribution of the
+    per-query estimates against the exact Gamma law; it does not exercise any caller's
+    aggregation. The published aggregator is the arithmetic mean (Levina and Bickel 2005,
+    NIPS 17, eq. 9; no median appears there). The per-query estimate (k - 2) / S has
+    S ~ Gamma(19, rate m), so its median is 18 m / median(Gamma(19, 1)) = 0.9642 m, below the
+    mean m because the distribution is skewed.
 
     Reference: the exact Gamma law, with the constant computed as
     ``18 / scipy.stats.gamma(19).median()`` (independent of the code); same data, queries

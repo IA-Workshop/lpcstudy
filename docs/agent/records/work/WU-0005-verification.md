@@ -189,6 +189,14 @@ Tolerances fixed before the run: mean `abs(mean/m - 1) <= 0.03`; median `abs(med
 
 **2026-10-10, developer (claude-sonnet-5-5): WU-0005.3 result.** `tools/run_tests.sh unit tests/unit/test_oracle.py --durations=8`: `12 passed in 1.03s` (slowest new case 0.34 s, includes the first import of scipy.stats). Values measured afterwards by a scratch script (not a test run), seed 50053: mean/m - 1 = -0.0043, -0.0026, +0.0067 for m = 1, 2, 3 (bound 0.03); median/(0.9642 m) - 1 = -0.0063, +0.0044, +0.0114 (bound 0.03); median/m = 0.9581, 0.9685, 0.9752; the k - 1 normalization would give mean/m - 1 = +0.051, +0.053, +0.063, all beyond the 0.03 bound (the test would catch it). No code defect. Self-check of the three diffs: no `clip`, `nan_to_num`, `isfinite`, `where(`, `try`, `except`; randomness only from fixed `np.random.default_rng(<literal>)` (50052 in .2, 50053 in .3; .1 has no random data, 50051 unused); no tolerance loosened (3.9/4.1, 10%, 1e-12, 1e-15, 0.03 are the confirmed values).
 
+**2026-10-10, developer (claude-sonnet-5-5): fix round 1 (R1 to R3), docstrings only, before the run (§4.9 checklist).**
+1. Change set: docstrings in `tests/unit/test_systems.py` (R1: the nonlinear test checks order-1 to 3 conditions through the nonlinearity plus one weighted sum of the non-tall order-4 conditions, not sum b c^3 = 1/4, since f''' = 0; the linear test's Limitation sentence no longer claims the scalar test covers the nonlinear conditions), `tests/unit/test_oracle.py` (R2: the median test computes `np.median` itself and pins the per-query distribution against the Gamma law, with no claim about callers; the mean test's cross-reference reworded likewise), `tests/unit/test_ensemble.py` (R3: gap "measured by a scratch script after the first run", the 1e-9 threshold fixed in the plan). No assertion, tolerance, seed or code changed.
+2. Radius: `tools/test_impact.py --explain` gives the three files, unit tier, smaller than the whole suite.
+3. Already run: the three files ran on the previous code; the test files have changed (docstrings), so one run of the set follows.
+4. Device: wrapper sets `JAX_PLATFORMS=cpu`. 5. `LPC_THREADS` default 4, unit timeout 300 s. 6. No contention. 7. `-q --tb=short -rfE`.
+8. Command: `tools/run_tests.sh unit tests/unit/test_ensemble.py tests/unit/test_systems.py tests/unit/test_oracle.py`.
+Result: `19 passed in 3.04s`. Commit: "WU-0005 fix R1-R3: ..." (hash in the report).
+
 ## Review
 
 - **Reviewer:** reviewer (claude-opus-5-5), fresh context, 2026-10-10. Scope: WU-0005.1 to .3 (commits 40cf427, d6db030, 52e8a2a, 718580a) against `develop`. The unit stays open for .4 and .5.

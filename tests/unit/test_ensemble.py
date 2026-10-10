@@ -46,7 +46,8 @@ def test_kdtree_query_matches_brute_force(n_analogs: int) -> None:
     distances, for the first 6 neighbours, exceeds 1e-9 of the larger one, so the
     index order is well defined and no tie can make the reference ambiguous. At this
     seed the smallest relative gap (gap over the larger squared distance) is 1.8e-4,
-    measured before the test was fixed (the applied-mathematician measured a smallest
+    measured by a scratch script after the first run (the premise threshold 1e-9 was fixed in
+    the plan, before any run; the applied-mathematician measured a smallest
     relative gap of 1.2e-6 over 37 200 gaps across 31 seeds, so P(a gap < 1e-9 in one
     test) is about 3e-5 at a random seed).
 

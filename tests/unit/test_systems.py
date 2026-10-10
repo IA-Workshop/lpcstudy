@@ -57,8 +57,9 @@ def test_rk4_observed_order_is_four() -> None:
     errors 6.94e-5, 4.21e-6, 2.59e-7 (about 0.27 h^4).
 
     Limitation: a linear field exercises only the stability polynomial, which is shared by
-    all 4-stage order-4 methods; the nonlinear order conditions are covered by
-    ``test_rk4_observed_order_nonlinear_scalar``.
+    all 4-stage order-4 methods; it cannot see the nonlinear order conditions.
+    ``test_rk4_observed_order_nonlinear_scalar`` adds a partial check of them (see its
+    docstring for what it does not cover).
     """
     assert np.allclose(np.sort_complex(np.linalg.eigvals(_A)),
                        np.sort_complex(np.array([-0.5, -0.1 - 2j, -0.1 + 2j])))
@@ -79,8 +80,14 @@ def test_rk4_observed_order_nonlinear_scalar() -> None:
     """RK4 on y' = y^2, y(0) = 0.5 has observed order 4 (exact y(1) = 1).
 
     Reference: the closed form y(t) = y0 / (1 - y0 t), so y(1) = 0.5 / 0.5 = 1 exactly.
-    The scalar autonomous ODE has the same order conditions as a system up to order 4,
-    so the nonlinear conditions are all exercised (the linear test cannot see them).
+    What it checks: through the nonlinearity (f' and f'' are not zero), the order-1 to
+    order-3 conditions (including sum b c^2 = 1/3), plus one weighted sum of the three
+    non-tall order-4 conditions (for f = y^2 their elementary differentials are all
+    proportional to y^5, so a single scalar ODE sees only one combination of their
+    defects). What it does not check: sum b c^3 = 1/4, because f''' = 0 for y' = y^2, so
+    that term never enters the error; and it cannot tell the individual order-4 conditions
+    apart. It is a partial check of the nonlinear order conditions, not a proof of all of
+    them. The linear test cannot see them at all.
     ``make_flow_step`` takes the field through ``SystemSpec.field_fn``, so the spec is built
     here with dim = 1, T = 1 and h in {1/8, 1/16, 1/32}.
 
