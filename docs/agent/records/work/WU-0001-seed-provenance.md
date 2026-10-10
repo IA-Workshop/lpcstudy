@@ -2,9 +2,9 @@
 
 | Field | Value |
 | --- | --- |
-| Status | planned |
+| Status | done, **needs owner review before freeze** (seed and provenance code, LPC.PC.11); DEC-0004 and DEC-0006 proposed |
 | Class | CSQ3 development; the code becomes part of the CSQ2 pipeline at the freeze |
-| Agent(s) | — |
+| Agent(s) | claude-sonnet-5-5 (main session, developer); claude-opus-5-5 (planner, reviewer, applied-mathematician), under governance ledger entry 5 (authorizations 4, 6) |
 
 ## Plan
 
@@ -436,6 +436,8 @@ Merge-gate checklist (§4.9, §4.3):
 7. **Output:** `-q --tb=short -rfE`.
 8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
 
+Result (same entry): **`207 passed in 85.88s (0:01:25)`** on the merged tip (main merged into the branch at 3066684), one concurrent smoke run from another worktree sharing the cores. Run once; no failures; no retry.
+
 ## Review
 
 ### Round 1, 2026-10-10, reviewer (claude-opus-5-5), fresh context, branch `wu/0001-seeds-provenance` at `dae50c5` against `main`
@@ -533,6 +535,19 @@ This round covers R1 to R4 only. I read the diff `dae50c5..80dbb57` and the logs
 **Verdict: approve.**
 
 ## Audit
+
+- Is the definition of done met? Yes, with the evidence below (criteria verbatim in the planner's amendment).
+  - **WU-0001.1:** `--seed-id DEV-n` reads `seeds/development_seeds.json`; `DEV-0` resolves to 20261005; `--seed` and a raw-integer seed id exit non-zero naming LPC.PC.7; the registry loader rejects a wrong `schema`.
+  - **WU-0001.2 and .3:** the confirmatory seed and salt come only from `LPC_CONF_SEED` and `LPC_CONF_SALT`, checked against the latest `CONF-1` commitment in the ledger via `verify_chain` and `make_commitment`; the check accepts a matching pair and rejects a wrong seed, a wrong salt and a ledger with no entry (tests use `tmp_path` ledgers and synthetic seeds only); every refusal exits 64 with one stderr line that never echoes the seed, salt or an unrecognized token, before any output directory exists; `allow_abbrev=False`.
+  - **WU-0001.4:** the provenance block carries every LPC.PC.18 and LPC.PC.22 field; header labels per LPC.PC.13; the confirmatory value never appears in any output. `peak_rss_bytes` uses the derived bracket of DEC-0006; the launcher-peak limitation is documented.
+  - **WU-0001.5:** on CPU the smoke `results.json` at DEV-0 equals the baseline `runs/baseline/smoke/results.json` (sha256 0da48771...4b79) after removing `provenance`, `seconds` and `config.seed_id` (DEC-0004 Q1); bitwise equal canonical JSON (61786 characters); re-verified independently by the reviewer.
+  - **Gate:** `207 passed in 85.88s`; independent review approved after one fix round (R1 to R4 fixed in 80dbb57).
+- Defects recorded: DEF-0010 (seeds of 2**32 or more crash scikit-learn; found by the planner, verified by the main session; not fixed here). No defect against this unit's code.
+- Notes for successors:
+  - DEV-1 to DEV-4 cannot run a preset until DEF-0010 is fixed in WU-0002 (needs an owner ruling).
+  - DEVELOPMENT_WORKFLOW §4.2's import-graph table needs rows for the new `seeds` and `provenance` modules (an owner edit; the hand-written fixture `tests/unit/fixtures/lpcstudy_graph.json` is already updated).
+  - Not implemented, for the owner before the freeze: refusing a confirmatory run on a dirty tree or unknown commit (DEC-0004 Q6); whether `peak_rss_bytes` should also record `VmHWM` (DEC-0006).
+  - The main-session amendment answering the planner's questions (below) was appended after the template's last heading and so sits under this heading; it is part of the Plan.
 
 ### Plan amendment 2026-10-10 (answers to the plan's questions), claude-sonnet-5-5 (main session), before execution (VV.3)
 
