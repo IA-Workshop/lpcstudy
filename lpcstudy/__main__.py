@@ -106,7 +106,11 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     out_dir.mkdir(parents=True, exist_ok=True)
     if args.report_only:
         results = json.loads((out_dir / "results.json").read_text())
-        results["verdicts"] = verdicts(results, config)
+        try:
+            results["verdicts"] = verdicts(results, config)  # refuses a pre-v3 file, writes nothing
+        except ValueError as stale:
+            print(f"lpcstudy: refused (stale results schema): {stale}", file=sys.stderr)
+            return REFUSAL_EXIT
         save_json(results, out_dir / "results.json")
         write_markdown(results, config, out_dir / "RESULTS.md")
         make_figures(results, config, out_dir / "figures")

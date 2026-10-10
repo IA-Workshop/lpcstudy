@@ -198,7 +198,7 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
     marked = {row.split(" | ")[0][2:]: "[computed with the v1 statistic until " in row
               for row in rows}
     assert {i for i, m in marked.items() if m} == {"H1a", "H1b", "H1d", "Q-N", "H2b", "H2d",
-                                                   "H3a", "H3c"}
+                                                   "H3a", "H3c", "(reported)"}
     h2e = rows[ids.index("H2e")]
     assert h2e.endswith("[not computed until WU-0002.7] | n/a: no result | no result |")
     gain = rows[ids.index("(reported)")]
@@ -275,3 +275,19 @@ def test_library_figure_axis_reads_n_lib(tmp_path: Path, monkeypatch: pytest.Mon
         "separation_weight_vs_horizon.png", "kaplan_meier_by_rule.png",
         "regret_vs_regimes.png", "knob_response_library.png"]
     assert labels[2] == "Number of regimes K" and labels[3] == "Library size n_lib"
+
+
+def test_verdicts_refuse_a_results_file_older_than_the_v3_identifiers() -> None:
+    """A system with v1 keys (H1e, H1f, H3d) makes ``verdicts`` raise before any flag is read.
+
+    Reference: the decision-log correction table (v1 keys H1e, H1f and H3d no longer exist; the
+    same keys H1a to H1d, H3b and H3c now mean other statistics, so relabelling would be a
+    silent mislabel). The synthetic stale system is a current one plus the v1 keys. A current
+    system passes. Exact: the exception type and the key names in the message.
+    """
+    config = SMOKE
+    stale = fake_system(config)
+    stale.update({"H1e": {"pass": True}, "H1f": {"pass": True}, "H3d": {"pass": True}})
+    with pytest.raises(ValueError, match="H1e.*H1f.*H3d|schema older than WU-0002.2"):
+        verdicts({"systems": {"lorenz63": stale}}, config)
+    assert len(verdicts({"systems": {"lorenz63": fake_system(config)}}, config)) == 14

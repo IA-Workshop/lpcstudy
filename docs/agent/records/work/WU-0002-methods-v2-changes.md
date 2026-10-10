@@ -398,6 +398,26 @@ Open points for the reviewer and the owner (unit status not set):
 3. WU-0002.8's "no `H3b` key exists anywhere in results" now collides with v3 `H3b` (ruling A2 pending, DEC-0007).
 4. Owner checkpoint: `__main__` option set and `tools/run_preset.sh` (.1); T1 branch, H2d `pass`, verdict code (.1, .2).
 
+### 2026-10-10 developer (claude-sonnet-5-5), WU-0002 fix round 1 (R1 to R3): before the radius run
+
+Changes (code, uncommitted at this entry):
+
+- R1: `identifiers.py` gain-bound row `pending=("WU-0002.9",)` (concordance D-21 (a) proposes removing its 0.9 bar in WU-0002.9, role "reported"; the ROADMAP .9 row is the verdict-logic row; no ROADMAP row names the gain bound). The verdict and the 0.9 bar are untouched. The report now marks that row "[computed with the v1 statistic until WU-0002.9]". The expectations of `test_identifiers::test_pending_names_the_roadmap_rows` and of `test_report` (vii) gain this one row (docstrings say why; both are my own new tests).
+- R2: `report.verdicts` calls `check_keys` on every system before any flag is read and raises `ValueError` ("... schema older than WU-0002.2 (v1 keys); regenerate ..." plus the key names). `__main__` `--report-only` catches it around `verdicts`, prints one line `lpcstudy: refused (stale results schema): ...` to stderr and returns 64 (`REFUSAL_EXIT`); `verdicts` runs before `save_json`, `write_markdown`, `make_figures`, so nothing is written. New tests: `test_report.py::test_verdicts_refuse_a_results_file_older_than_the_v3_identifiers`; `test___main__.py::test_report_only_refuses_a_pre_v3_results_file_and_writes_nothing` (synthetic; bytes and directory listing compared), `test_report_only_refuses_the_v1_baseline_smoke_copy` (tmp_path copy of the read-only baseline; skipped if absent), `test_report_only_accepts_a_current_results_file`.
+- R3: `analysis.py` module docstring: H2a and H2b have the 1 - 0.05/3 interval; H3c gets its interval in WU-0002.8 and has none until then.
+
+Smoke regression: not re-run. R1 and R3 change a docstring and `pending` metadata. R2 adds a `check_keys` call at the start of `verdicts`, which the smoke path runs on a current-schema dict (it passes and adds or changes no value), and a `try/except ValueError` in the `--report-only` branch only, which the smoke path does not execute. Nothing the smoke run computes or writes to `results.json` changed; the `RESULTS.md` change (the gain-bound row's pending note) is covered by test (vii).
+
+§4.9 checklist:
+
+1. Change set: `lpcstudy/{identifiers,analysis,report,__main__}.py`, `tests/unit/test_{identifiers,report,__main__}.py`, this file.
+2. Radius (§4.2): `identifiers` -> own + dependents (`test_analysis`, `test_report`); `report` -> own + `test___main__` + integration; `__main__` -> own + integration; `analysis` -> own + dependents (docstring only). Unit: `test_identifiers test_report test___main__ test_analysis`; integration: `test_cli_seeds.py` once (`tools/`, `config` and `systems` untouched, so no wrapper test, no `test_dynamics`/`test_embedding`). Smaller than the suite.
+3. Already run: no (new code and tests).
+4. Device: `JAX_PLATFORMS=cpu`. 5. Threads 4; unit 300 s, integration 900 s. 6. Contention: no preset run. 7. Output: `-q --tb=short -rfE`.
+8. Commands: `tools/run_tests.sh unit tests/unit/test_identifiers.py tests/unit/test_report.py tests/unit/test___main__.py tests/unit/test_analysis.py`; `tools/run_tests.sh integration tests/integration/test_cli_seeds.py`.
+
+Results (each once, no failure): unit `55 passed in 1.49s`; integration `8 passed in 10.02s`. Self-check: the added `try/except ValueError` in `__main__` prints a refusal and returns 64 (not swallowed); no `clip|nan_to_num|isfinite|where(`, no randomness added; no tolerance touched. R1 to R3 are fixed in the commit "WU-0002 fix R1-R3" (the `## Review` section is left as committed by the reviewer).
+
 ## Review
 
 ### Review of WU-0002.1 and .2 (2026-10-10, `reviewer`, claude-opus-5-5, fresh context)

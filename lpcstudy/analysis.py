@@ -5,8 +5,9 @@ the reported gain bound, and the validation check V7 (H2e, noise matching, is ad
 
 Every function returns a plain ``dict`` (JSON-serializable) with the point
 estimate, its block-bootstrap interval, the pre-registered threshold and a
-``pass`` flag. Primary endpoints (H2a, H2b, H3c) use Bonferroni-adjusted
-intervals at level ``1 - 0.05/3``; all others use 95% intervals.
+``pass`` flag. Primary endpoints H2a and H2b use Bonferroni-adjusted
+intervals at level ``1 - 0.05/3`` (H3c, also primary, gets its interval in WU-0002.8, and
+until then has none); all others use 95% intervals.
 """
 
 from __future__ import annotations

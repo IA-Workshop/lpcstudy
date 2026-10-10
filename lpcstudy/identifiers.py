@@ -86,7 +86,7 @@ HYPOTHESIS_TABLE: tuple[Hypothesis, ...] = (
     Hypothesis(
         "(reported)", "H2e", "gain_bound", "reported",
         "The hybrid's horizon gain over the better forecaster is reported against the P1 bound, "
-        "without a pass/fail bar."),
+        "without a pass/fail bar.", ("WU-0002.9",)),
     Hypothesis(
         "H3a", "H3a", "H3a", "secondary",
         "Holm-adjusted log-rank tests between consecutive regimes; pass if all p < 0.01",

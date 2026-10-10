@@ -14,7 +14,7 @@ import numpy as np  # noqa: E402
 
 from .allocation import RULE_LABELS  # noqa: E402
 from .config import StudyConfig  # noqa: E402
-from .identifiers import HYPOTHESIS_TABLE, Hypothesis  # noqa: E402
+from .identifiers import HYPOTHESIS_TABLE, Hypothesis, check_keys  # noqa: E402
 
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7",
           "#e34948"]
@@ -68,9 +68,22 @@ def verdicts(results: dict, config: StudyConfig) -> dict:
         Result key of each table row that has a result to per-system flags and verdict. A row
         with no result in any system is absent; a row with a result in some systems only raises
         ``KeyError``.
+
+    Raises
+    ------
+    ValueError
+        If a system's results carry a hypothesis-shaped key that is not in the identifier table
+        (results written before WU-0002.2): nothing is relabelled.
     """
     out = {}
     systems = [s for s in config.core_systems if s in results["systems"]]
+    for s in systems:  # before any flag is read: a pre-v3 results file must not be relabelled
+        try:
+            check_keys(results["systems"][s])
+        except ValueError as stale:
+            raise ValueError(f"results of system {s} use identifiers of a schema older than "
+                             f"WU-0002.2 (v1 keys); regenerate them with a new run: {stale}"
+                             ) from None
     for row in HYPOTHESIS_TABLE:
         if not any(row.key in results["systems"][s] for s in systems):
             continue  # no result yet (v3 H2e until WU-0002.7); write_markdown lists the row

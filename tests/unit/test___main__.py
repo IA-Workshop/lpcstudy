@@ -272,3 +272,77 @@ def test_mismatched_commitment_in_process(tmp_path: Path, monkeypatch: pytest.Mo
     err = capsys.readouterr().err
     assert code == 64 and len(err.splitlines()) == 1 and err.startswith(PREFIX)
     assert not out.exists() and str(SEED + 1) not in err and SALT not in err
+
+
+BASELINE_SMOKE = Path("/home/brianm/projects/physics/chaos/lpcstudy/runs/baseline/smoke/results.json")
+
+
+def _stale_results(tmp_path: Path) -> Path:
+    """A synthetic pre-WU-0002.2 results file (v1 keys) at ``tmp_path/out/smoke``."""
+    path = tmp_path / "out" / "smoke" / "results.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"config": {}, "systems": {"lorenz63": {
+        "H1a": {"pass": True}, "H1e": {"pass": True}, "H1f": {"pass": False},
+        "H3b": {"pass": True}, "H3d": {"pass": True}}}}))
+    return path
+
+
+def _assert_stale_refused(path: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--report-only`` on ``path`` returns 64 with one line and leaves every file untouched."""
+    before = path.read_bytes()
+    assert main(["--preset", "smoke", "--out", str(tmp_path / "out"), "--report-only"]) == 64
+    captured = capsys.readouterr()
+    lines = captured.err.splitlines()
+    assert captured.out == "" and len(lines) == 1
+    assert lines[0].startswith("lpcstudy: refused (stale results schema): ")
+    assert "older than WU-0002.2" in lines[0]
+    assert path.read_bytes() == before
+    assert sorted(p.name for p in path.parent.iterdir()) == ["results.json"]
+
+
+def test_report_only_refuses_a_pre_v3_results_file_and_writes_nothing(
+        tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A results file with v1 keys is refused (exit 64, one line); the bytes stay identical.
+
+    Reference: the decision-log correction table (the v1 keys H1e, H1f, H3d no longer exist, and
+    the keys H1a to H1d, H3b, H3c changed meaning), and the CLI's refusal contract (exit 64, one
+    stderr line, nothing created). The file is a synthetic stale dict; the comparison is of
+    bytes before and after and of the directory listing. Exact, no tolerance.
+    """
+    _assert_stale_refused(_stale_results(tmp_path), tmp_path, capsys)
+
+
+@pytest.mark.skipif(not BASELINE_SMOKE.exists(), reason="the v1 baseline smoke file is absent")
+def test_report_only_refuses_the_v1_baseline_smoke_copy(
+        tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A tmp_path copy of the v1 baseline smoke ``results.json`` is refused and left identical.
+
+    Reference: as above; the baseline (read-only, copied, never written) is a real v1 file with
+    the keys H1e, H1f and H3d. Exact bytes.
+    """
+    path = tmp_path / "out" / "smoke" / "results.json"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(BASELINE_SMOKE.read_bytes())
+    _assert_stale_refused(path, tmp_path, capsys)
+
+
+def test_report_only_accepts_a_current_results_file(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A results file with v3 keys gets its verdicts rewritten and the report built (exit 0).
+
+    Reference: the identifier table (H1a, H2a are v3 keys). The report writers are replaced by
+    recorders, so only the check and the verdict step are exercised. Exact.
+    """
+    import lpcstudy.__main__ as cli
+    path = tmp_path / "out" / "smoke" / "results.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"config": {}, "systems": {"lorenz63": {
+        "H1a": {"pass": True}, "H2a": {"pass": False}}}}))
+    built: list[str] = []
+    monkeypatch.setattr(cli, "write_markdown", lambda *a: built.append("md"))
+    monkeypatch.setattr(cli, "make_figures", lambda *a: built.append("fig"))
+    assert main(["--preset", "smoke", "--out", str(tmp_path / "out"), "--report-only"]) == 0
+    saved = json.loads(path.read_text())
+    assert saved["verdicts"]["H1a"]["verdict"] == "supported"
+    assert saved["verdicts"]["H2a"]["by_system"] == {"lorenz63": False}
+    assert built == ["md", "fig"]
