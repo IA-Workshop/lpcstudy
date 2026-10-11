@@ -1,4 +1,4 @@
-"""Validation gate (stage ii prerequisites): V1-V6 checks run before any experiment."""
+"""Validation gate (stage ii prerequisites): V1-V6 run before the experiments; V7 after E1."""
 
 from __future__ import annotations
 
@@ -225,18 +225,23 @@ def check_cp_horizon(setup: ForecastSetup, library: AnalogLibrary, unit_noise: n
             kaplan_meier(dur, ev, horizon_max).median() / steps_per_lyapunov}
 
 
-def gate_status(validation: dict) -> dict[str, bool]:
-    """Pass flags of the validation gate (V1, V2, V4, V5, V6; V3 is reported only).
+def gate_status(validation: dict, v7: dict) -> dict[str, bool]:
+    """Pass flags of the validation gate (V1, V2, V4, V5, V6, V7; V3 is reported only).
+
+    V7 (estimator efficiency, :func:`lpcstudy.analysis.v7_efficiency`) needs the noise sweep of
+    E1, so the gate is final only after E1 (WU-0002.10).
 
     Parameters
     ----------
     validation : dict
-        Validation results of one system.
+        Validation results of one system (V1-V6).
+    v7 : dict
+        The V7 result of the same system; its ``"pass"`` flag is the V7 flag.
 
     Returns
     -------
     dict[str, bool]
-        Flag per check and the overall ``"gate_pass"``.
+        Flag per check and the overall ``"gate_pass"`` (all of V1, V2, V4, V5, V6, V7).
     """
     flags = {
         "V1": validation["delay_jacobian_rel_err"] < 1e-4 and validation["gain_rel_err"] < 1e-4,
@@ -244,6 +249,7 @@ def gate_status(validation: dict) -> dict[str, bool]:
         "V4": bool(validation["convergence"]["pass"]),
         "V5": validation["km_max_abs_dev"] < 0.01,
         "V6": validation["integrator_max_dev_sigma"] < 1e-3,
+        "V7": bool(v7["pass"]),
     }
     flags["gate_pass"] = all(flags.values())
     return {k: bool(v) for k, v in flags.items()}

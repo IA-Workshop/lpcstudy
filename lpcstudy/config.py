@@ -130,7 +130,7 @@ class StudyConfig:
     n_construction: int = 2000
     n_calibration: int = 1000
     n_test: int = 1000
-    n_test_sweep: int = 500
+    n_test_sweep: int = 1000
     n_oracle_draws: int = 200
     n_eval_draws: int = 4
     noise_sensitivity_draws: int = 16

@@ -41,3 +41,18 @@ def test_config_has_no_transfer_fields() -> None:
     assert [f.name for f in dataclasses.fields(StudyConfig) if f.name.startswith("transfer")] == []
     for preset in PRESETS.values():
         assert "lorenz96" not in preset.core_systems
+
+
+def test_test_sweep_sizes_follow_the_methods_document() -> None:
+    """``n_test_sweep`` is 1000 (full) and 300 (pilot), and never exceeds ``n_test`` (WU-0002.10).
+
+    Reference: v3 section 4 and Methods v2 M2 section M8 (D-15), written out here: the full sweep
+    uses 1000 test states, the pilot 300; the sweep takes the first ``n_test`` rows, so it cannot
+    be larger than ``n_test`` for any preset. The smoke value 60 is the unchanged plan value.
+    Tolerance: none; exact integer equality and ordering.
+    """
+    assert PRESETS["full"].n_test_sweep == 1000
+    assert PRESETS["pilot"].n_test_sweep == 300
+    assert PRESETS["smoke"].n_test_sweep == 60
+    for name, preset in PRESETS.items():
+        assert preset.n_test_sweep <= preset.n_test, name
