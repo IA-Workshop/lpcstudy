@@ -12,10 +12,10 @@ import numpy as np
 import pytest
 from scipy import stats as sps
 
-from lpcstudy.statistics import MIN_STATES, BootstrapInterval, block_bootstrap, \
+from lpcstudy.statistics import MIN_STATES, V3_SYSTEMS, BootstrapInterval, block_bootstrap, \
     block_bootstrap_counted, block_resample_indices, bootstrap_values, \
     combine_verdicts, criterion_verdict, holm_adjust, interval_verdict, kaplan_meier, \
-    logrank_parts, logrank_test, partial_correlation, percentile_interval
+    logrank_parts, logrank_test, overall_verdict, partial_correlation, percentile_interval
 
 
 def test_kaplan_meier_matches_geometric_survival() -> None:
@@ -690,6 +690,57 @@ def test_combine_verdicts_all_two_and_three_part_cases() -> None:
         combine_verdicts([])
     with pytest.raises(ValueError):
         combine_verdicts(["pass", "Pass"])
+
+
+def test_overall_verdict_all_27_cases_over_the_three_systems() -> None:
+    """``overall_verdict``: supported only for (pass, pass, pass); fail on any system fails it.
+
+    Reference: v3 section 7 ("supported: pass on all three systems; not supported: fail on at
+    least one system; inconclusive: otherwise"; DEC-0016 O1), enumerated as a hand table over
+    3^3 = 27 combinations and classified by counting the labels (not by calling the function).
+    Nothing is missing, so the missing list is empty. Exact.
+    """
+    labels = ("pass", "fail", "inconclusive")
+    combos = list(itertools.product(labels, repeat=3))
+    assert len(combos) == 27 and V3_SYSTEMS == ("lorenz63", "rossler", "chua")
+    n_supported = 0
+    for combo in combos:
+        want = ("not supported" if combo.count("fail") else
+                "supported" if combo.count("pass") == 3 else "inconclusive")
+        n_supported += want == "supported"
+        assert overall_verdict(dict(zip(V3_SYSTEMS, combo))) == (want, []), combo
+    assert n_supported == 1
+
+
+def test_overall_verdict_with_absent_systems_the_63_cases() -> None:
+    """A system that is absent can never be a pass; a fail on a present one still fails it.
+
+    Reference: the same rule by counting, over {pass, fail, inconclusive, absent}^3 minus the
+    all-absent case (4^3 - 1 = 63): any fail gives "not supported" whatever is absent; else all
+    present and all pass gives "supported"; else "inconclusive". ``missing`` is the absent
+    names in the order of ``required``. The all-absent input, a system outside ``required``
+    (also when it fails: it must not decide "not supported"), and an unknown verdict string
+    raise (PRIME.4). A custom ``required`` is honoured. Exact.
+    """
+    labels = ("pass", "fail", "inconclusive", "absent")
+    combos = [c for c in itertools.product(labels, repeat=3) if c != ("absent",) * 3]
+    assert len(combos) == 63
+    for combo in combos:
+        present = {name: v for name, v in zip(V3_SYSTEMS, combo) if v != "absent"}
+        absent = [name for name, v in zip(V3_SYSTEMS, combo) if v == "absent"]
+        want = ("not supported" if combo.count("fail") else
+                "supported" if combo.count("pass") == 3 else "inconclusive")
+        assert overall_verdict(present) == (want, absent), combo
+    with pytest.raises(ValueError, match="at least one"):
+        overall_verdict({})
+    with pytest.raises(ValueError, match="lorenz96"):
+        overall_verdict({"lorenz63": "pass", "lorenz96": "fail"})
+    with pytest.raises(ValueError, match="verdict"):
+        overall_verdict({"lorenz63": "Pass"})
+    with pytest.raises(ValueError, match="verdict"):
+        overall_verdict({"lorenz63": True})
+    assert overall_verdict({"a": "pass", "b": "pass"}, required=("a", "b")) == ("supported", [])
+    assert overall_verdict({"a": "pass"}, required=("a", "b")) == ("inconclusive", ["b"])
 
 
 def test_criterion_verdict_guard_order_and_reasons() -> None:
