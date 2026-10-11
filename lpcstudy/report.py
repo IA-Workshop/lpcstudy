@@ -105,9 +105,11 @@ def _key_number(key: str, res: dict) -> str:
     r = res[key]
     match key:
         case "H1a":
-            parts = [f"rho={k}: 1/d (n_lib fit)={_fmt(v['fitted_inverse_dim'])}"
+            parts = [f"rho={k}: 1/d (n_lib fit)={_fmt(v['fitted_inverse_dim'])}, "
+                     f"ratio {_fmt(v['ratio'])} [{_fmt(v['ratio_ci'][0])}, "
+                     f"{_fmt(v['ratio_ci'][1])}] {v['verdict']}"
                      for k, v in r["by_noise"].items()]
-            return "; ".join(parts) + f" (1/d_LB={_fmt(1 / r['local_dimension_median'])})"
+            return "; ".join(parts) + f" (1/d_LB={_fmt(r['inverse_dim_reference'])})"
         case "H1b":
             return f"CP {_fmt(r['CP']['slope'])}, PLP {_fmt(r['PLP']['slope'])}"
         case "H1c":

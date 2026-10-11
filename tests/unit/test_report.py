@@ -132,7 +132,9 @@ def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
     """
     hours = ["0.25", "0.5", "1", "2", "4"]
     results = {
-        "H1a": {"by_noise": {"0.01": {"fitted_inverse_dim": 0.5}}, "local_dimension_median": 2.0},
+        "H1a": {"by_noise": {"0.01": {"fitted_inverse_dim": 0.5, "ratio": 1.02,
+                                      "ratio_ci": [0.9, 1.1], "verdict": "pass"}},
+                "inverse_dim_reference": 0.5},
         "H1b": {"CP": {"slope": 1.0}, "PLP": {"slope": 0.9}},
         "H1c": {"PLP": {"median_ratio": 1.0}, "CP": {"median_ratio": 0.5}},
         "H1d": {"spearman": {"analog_seed": 0.8, "estimation_seed": 0.9, "growth": 0.7,
@@ -197,7 +199,7 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
     assert ids == [h.v3_id for h in HYPOTHESIS_TABLE]
     marked = {row.split(" | ")[0][2:]: "[computed with the v1 statistic until " in row
               for row in rows}
-    assert {i for i, m in marked.items() if m} == {"H1a", "H1b", "H1d", "Q-N", "H2b", "H2d",
+    assert {i for i, m in marked.items() if m} == {"H1b", "H1d", "Q-N", "H2b", "H2d",
                                                    "H3a", "H3c", "(reported)"}
     h2e = rows[ids.index("H2e")]
     assert h2e.endswith("[not computed until WU-0002.7] | n/a: no result | no result |")
@@ -236,7 +238,7 @@ def test_key_numbers_are_exact_for_every_v3_key() -> None:
     """
     system = fake_system(SMOKE)
     expected = {
-        "H1a": "rho=0.01: 1/d (n_lib fit)=0.5 (1/d_LB=0.5)",
+        "H1a": "rho=0.01: 1/d (n_lib fit)=0.5, ratio 1.02 [0.9, 1.1] pass (1/d_LB=0.5)",
         "H1b": "CP 1, PLP 0.9",
         "H1c": "PLP 1, CP 0.5",
         "H1d": "eps 0.8, delta 0.9, Lambda 0.7, N 0.6",

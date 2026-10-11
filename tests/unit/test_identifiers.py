@@ -117,8 +117,10 @@ def test_pending_names_the_roadmap_rows() -> None:
     rows have no pending sub-task, with one exception added in the fix round (review R1): the
     gain bound keeps its v1 0.9 pass bar although v3 says "without a pass/fail bar", and the
     concordance (D-21 (a)) proposes removing it in WU-0002.9, so that row is pending on .9.
+    WU-0002.4-5 phase 2 removes each id from ``pending`` in the commit that implements its
+    statistic (H1a, H1b, H1d); the rows still pending are those of the remaining sub-tasks.
     """
-    expected = {"H1a": ("WU-0002.4",), "H1b": ("WU-0002.4",), "H1d": ("WU-0002.5",),
+    expected = {"H1b": ("WU-0002.4",), "H1d": ("WU-0002.5",),
                 "Q-N": ("WU-0002.6",), "H2b": ("WU-0002.7",), "H2e": ("WU-0002.7",),
                 "H2d": ("WU-0002.8",), "H3a": ("WU-0002.8",), "H3c": ("WU-0002.8",),
                 "(reported)": ("WU-0002.9",)}

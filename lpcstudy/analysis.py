@@ -19,15 +19,22 @@ from sklearn.tree import DecisionTreeRegressor
 
 from .allocation import deployable_profile
 from .config import StudyConfig
+from .data import make_rng
 from .identifiers import check_keys
-from .oracle import characteristic_horizon, curvature, hybrid_mse, oracle_weight
+from .oracle import characteristic_horizon, curvature, hybrid_mse, inverse_dimension, \
+    oracle_weight
 from .pipeline import Cell, FittedRules, RuleScores
-from .statistics import block_bootstrap, holm_adjust, kaplan_meier, logrank_test, \
-    ols_slope, partial_correlation, spearman
+from .statistics import block_bootstrap, block_bootstrap_counted, bootstrap_values, \
+    combine_verdicts, criterion_verdict, holm_adjust, kaplan_meier, logrank_test, ols_slope, \
+    partial_correlation, percentile_interval, spearman
 
 PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
 PROFILE_NAMES = ("log_eps_tilde", "log_nu_tilde", "lambda_tilde", "log_noise_sens")
 REDUNDANCY_MARGIN = 0.01
+H1A_BAND = (0.75, 1.25)  # DEC-0008 A1/A4(h): the ratio (1/d_fit)/(1/d_LB), closed band
+H1B_BAND = (0.8, 1.2)  # v3 H1b: closed
+H1D_BAND = (0.7, float("inf"))  # v3 H1d: [0.7, inf), closed
+H1_LEVEL = 0.95
 
 
 def _boot(config: StudyConfig, stat, n_items: int, level: float = 0.95, salt: int = 0
@@ -153,46 +160,158 @@ def _fit_seed_law(sizes: np.ndarray, mean_sq: np.ndarray) -> tuple[float, float]
     return float(params[1]), float(np.exp(params[2]))
 
 
+def _median_fit_stats(seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.ndarray,
+                      rows: np.ndarray) -> np.ndarray:
+    """``[ratio, fitted 1/d, floor f^2]`` of the median fit and the mean reference on ``rows``.
+
+    The fit is :func:`_fit_seed_law` of the column medians of ``seed_sq[rows]``; the reference
+    is the mean of ``inverse_dim[rows]``. A median that is not positive and finite, a fit that
+    raises ``ValueError`` (``curve_fit`` does for non-finite residuals, and ``_fit_seed_law``
+    catches only ``RuntimeError``) or a fit that returns NaN gives NaN for all three, and so a
+    failed (counted) bootstrap resample. A reference that is not positive gives a NaN ratio.
+    """
+    medians = np.median(seed_sq[rows], axis=0)
+    two_over_d, floor_sq = float("nan"), float("nan")
+    if np.all(np.isfinite(medians) & (medians > 0)):
+        try:
+            two_over_d, floor_sq = _fit_seed_law(sizes, medians)
+        except ValueError:
+            pass
+    fitted = two_over_d / 2.0
+    reference = float(inverse_dim[rows].mean())
+    ratio = fitted / reference if np.isfinite(fitted) and reference > 0 else float("nan")
+    return np.array([ratio, fitted, floor_sq])
+
+
+def h1a_ratio(seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.ndarray,
+              rows: np.ndarray) -> float:
+    """H1a ratio ``(1/d_fit) / (1/d_LB)`` on the states ``rows`` (DEC-0008 A4(h)).
+
+    ``1/d_fit`` is half the exponent of the floor-power-law fit to the column medians of
+    ``seed_sq[rows]``; ``1/d_LB`` is the mean of ``inverse_dim[rows]``. Numerator and denominator
+    use the same ``rows``, so one resampled index set feeds both in the joint bootstrap.
+
+    Parameters
+    ----------
+    seed_sq : np.ndarray
+        Squared analog seed error per state and library size, ``(n_states, n_sizes)``.
+    inverse_dim : np.ndarray
+        Per-state reference ``S / (k - 1)`` (:func:`lpcstudy.oracle.inverse_dimension`),
+        ``(n_states,)``.
+    sizes : np.ndarray
+        Library sizes, ``(n_sizes,)``.
+    rows : np.ndarray
+        State indices (repeats allowed).
+
+    Returns
+    -------
+    float
+        The ratio, or NaN if it cannot be computed (see ``_median_fit_stats``).
+    """
+    return float(_median_fit_stats(seed_sq, inverse_dim, sizes, rows)[0])
+
+
 def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
                         config: StudyConfig) -> dict:
-    """H1a: ``eps_s^2 ~ c^2 n_lib^{-2/d} + f^2`` with ``1/d`` within 25% of Levina-Bickel.
+    """H1a: median fit of ``eps_s^2 ~ b^2 n_lib^{-2/d} + f^2``; ratio of ``1/d`` to Levina-Bickel.
+
+    Implements DEC-0008 A4(h), A5, A1 and A3. At each noise level the fit is to the *median*
+    over states of the squared analog seed error at each library size (heavy-tail robust). The
+    reference ``1/d_LB`` is the mean over states of ``S / (k - 1)``
+    (:func:`lpcstudy.oracle.inverse_dimension`; the median would be biased by 3.7%). The
+    statistic is the ratio ``(1/d_fit)/(1/d_LB)``; its 95% moving-block-bootstrap interval is
+    joint: one resampled state set per resample feeds the numerator and the denominator. Pass at
+    a noise level iff the interval lies in the closed band [0.75, 1.25]; fail iff it misses the
+    band; otherwise inconclusive. The whole passes iff every noise level passes (v3 section 7).
+    The floor ``f`` is reported only (the v1 condition "floor increasing in rho" is removed).
+
+    A state with a non-finite seed error (any library size, any noise level) or a non-finite
+    reference is excluded from both parts and counted (``n_excluded_nonfinite``); fewer than
+    ``statistics.MIN_STATES`` (50) states left gives inconclusive ("n_states < 50"); a non-finite point
+    estimate gives inconclusive ("not computable"); failed resamples are counted per noise level
+    (``n_failed_resamples``) and placed at the unfavourable tail by the shared helper.
 
     Parameters
     ----------
     library_cells : dict[tuple[float, int], Cell]
-        Cells keyed by ``(rho, n_lib)``.
+        Cells keyed by ``(rho, n_lib)``, all on the same test-sweep states.
     config : StudyConfig
         Study configuration.
 
     Returns
     -------
     dict
-        Fitted exponent per noise level, local-dimension reference, floors.
+        ``inverse_dim_reference``, ``reference_estimator``, ``n_states``, ``n_excluded_nonfinite``,
+        ``band``, ``level``, ``verdict``, ``reason``, ``pass`` and ``by_noise[rho]`` with
+        ``fitted_inverse_dim``, ``ci_inverse_dim`` (marginal, reported only), ``ratio``,
+        ``ratio_ci``, ``n_failed_resamples``, ``verdict``, ``reason``, ``floor_rms`` and
+        ``median_seed_by_n_lib`` (square root of the median).
+
+    Raises
+    ------
+    ValueError
+        If the cells do not share the same ``local_dim`` (the same states), or a seed error has
+        a different number of states.
     """
     noises = sorted({k[0] for k in library_cells})
     sizes = np.array(sorted({k[1] for k in library_cells}), dtype=float)
     first = library_cells[(noises[0], int(sizes[0]))]
-    d_ref = float(np.median(first.oracles["test"].local_dim))
-    out: dict = {"local_dimension_median": d_ref, "by_noise": {}}
-    floors = {}
+    local_dim = first.oracles["test"].local_dim
+    for key, cell in library_cells.items():
+        if not np.array_equal(cell.oracles["test"].local_dim, local_dim, equal_nan=True):
+            raise ValueError(f"cell {key} has a different local_dim: the library cells must "
+                             f"share the test-sweep states")
+    inverse_all = inverse_dimension(local_dim)
+    seed_sq = {rho: np.column_stack([library_cells[(rho, int(n))].splits["test"]
+                                     .moments.analog_seed ** 2 for n in sizes])
+               for rho in noises}
+    finite = np.isfinite(inverse_all)
+    for rho, sq in seed_sq.items():
+        if sq.shape[0] != len(local_dim):
+            raise ValueError(f"rho={rho:g}: {sq.shape[0]} seed errors for {len(local_dim)} "
+                             f"local dimensions")
+        finite &= np.all(np.isfinite(sq), axis=1)
+    keep = np.flatnonzero(finite)  # time order kept; one state set for every rho
+    n_states = len(keep)
+    inverse = inverse_all[keep]
+    nan_pair = [float("nan"), float("nan")]
+    out: dict = {
+        "inverse_dim_reference": float(inverse.mean()) if n_states else float("nan"),
+        "reference_estimator": "mean over states of S/(k-1), S = sum_j ln(T_k/T_j), k = 20 "
+                               "(Levina-Bickel with the k-1 normalisation; exactly unbiased for "
+                               "1/d under the Poisson law)",
+        "n_states": int(n_states), "n_excluded_nonfinite": int(len(local_dim) - n_states),
+        "band": list(H1A_BAND), "level": H1_LEVEL, "by_noise": {}}
+    system = first.system
     for rho in noises:
-        sq = np.column_stack([library_cells[(rho, int(n))].splits["test"].moments.analog_seed**2
-                              for n in sizes])
-        stat = lambda idx: _fit_seed_law(sizes, sq[idx].mean(axis=0))[0]
-        est, lo, hi = _boot(config, stat, len(sq), salt=int(1e4 * rho))
-        two_over_d, floor_sq = _fit_seed_law(sizes, sq.mean(axis=0))
-        floors[rho] = floor_sq
-        rel = abs(two_over_d / 2.0 - 1.0 / d_ref) / (1.0 / d_ref)
+        sq = seed_sq[rho][keep]
+        if n_states:
+            point, values = bootstrap_values(
+                lambda idx: _median_fit_stats(sq, inverse, sizes, idx), n_states,
+                config.bootstrap_resamples, config.bootstrap_block,
+                make_rng(config.seed, system, "bootstrap", "H1a", f"{rho:g}"))
+            ratio_lo, ratio_hi, n_failed = percentile_interval(values[:, 0], H1_LEVEL)
+            inv_lo, inv_hi, _ = percentile_interval(values[:, 1], H1_LEVEL)
+            medians = np.median(sq, axis=0)
+        else:
+            point = np.full(3, np.nan)
+            ratio_lo = ratio_hi = inv_lo = inv_hi = float("nan")
+            n_failed, medians = 0, np.full(len(sizes), np.nan)
+        verdict, reason = criterion_verdict(float(point[0]), ratio_lo, ratio_hi, H1A_BAND,
+                                            n_states=n_states)
         out["by_noise"][f"{rho:g}"] = {
-            "fitted_inverse_dim": two_over_d / 2.0, "ci_inverse_dim": [lo / 2, hi / 2],
-            "relative_error_vs_local_dim": rel, "floor_rms": float(np.sqrt(floor_sq)),
-            "mean_seed_by_n_lib": {str(int(n)): float(np.sqrt(v))
-                               for n, v in zip(sizes, sq.mean(axis=0))}}
-    rel_ok = all(v["relative_error_vs_local_dim"] <= 0.25 for v in out["by_noise"].values())
-    floor_ok = all(floors[b] > floors[a] for a, b in zip(noises[:-1], noises[1:])) \
-        if len(noises) > 1 else True
-    out.update({"threshold": "relative error <= 0.25; floor increasing in rho",
-                "floor_increases": floor_ok, "pass": bool(rel_ok and floor_ok)})
+            "fitted_inverse_dim": float(point[1]), "ci_inverse_dim": [inv_lo, inv_hi],
+            "ratio": float(point[0]), "ratio_ci": [ratio_lo, ratio_hi],
+            "n_failed_resamples": int(n_failed), "verdict": verdict, "reason": reason,
+            "floor_rms": float(np.sqrt(point[2])),
+            "median_seed_by_n_lib": {str(int(n)): float(np.sqrt(v))
+                                     for n, v in zip(sizes, medians)}}
+    parts = out["by_noise"]
+    out["verdict"] = combine_verdicts(v["verdict"] for v in parts.values())
+    out["reason"] = "; ".join(f"rho={k}: {v['reason']}" for k, v in parts.items()
+                              if v["verdict"] == "inconclusive") \
+        if out["verdict"] == "inconclusive" else None
+    out["pass"] = bool(out["verdict"] == "pass")
     return out
 
 
