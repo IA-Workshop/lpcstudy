@@ -15,6 +15,7 @@ import numpy as np
 from scipy.optimize import least_squares, nnls
 from sklearn.tree import DecisionTreeRegressor
 
+from .data import sklearn_seed
 from .ensemble import EnsembleMoments, EvaluationDraws
 from .networks import TrainedNetwork, train_mlp
 from .oracle import characteristic_horizon, curvature, hybrid_mse, oracle_weight, \
@@ -324,7 +325,7 @@ def fit_regime_tree(profile: np.ndarray, w_target: np.ndarray, log_t_target: np.
     targets = (targets - targets.mean(axis=0)) / (targets.std(axis=0) + 1e-12)
     tree = DecisionTreeRegressor(max_leaf_nodes=n_regimes,
                                  min_samples_leaf=max(10, n_states * n_draws // 50),
-                                 random_state=seed)
+                                 random_state=sklearn_seed(seed, "regime-tree"))
     tree.fit(profile.reshape(-1, profile.shape[-1]), np.repeat(targets, n_draws, axis=0))
     return tree
 

@@ -51,6 +51,48 @@ def make_rng(seed: int, *keys: object) -> np.random.Generator:
     return np.random.default_rng([seed, zlib.crc32(label)])
 
 
+SKLEARN_SEED_LIMIT: int = 2**32
+"""scikit-learn accepts ``random_state`` only in ``[0, 2**32 - 1]``."""
+
+
+def sklearn_seed(seed: int, label: str) -> int:
+    """Seed for a scikit-learn ``random_state=``, valid in ``[0, 2**32 - 1]`` (DEC-0008 B).
+
+    scikit-learn's ``check_random_state`` raises ``ValueError`` for a seed of ``2**32`` or
+    more, and every registered seed DEV-1 to DEV-4 and any 62-bit confirmatory seed is above
+    that bound (DEF-0010). The raw seed is returned when it is in range, so streams of
+    seeds below ``2**32`` (DEV-0) are unchanged; otherwise a 32-bit value is derived from
+    ``make_rng(seed, "sklearn", label)``.
+
+    Parameters
+    ----------
+    seed : int
+        Master seed (``config.seed``).
+    label : str
+        Purpose of the estimator; use one distinct label per ``random_state=`` site.
+
+    Returns
+    -------
+    int
+        ``seed`` if ``0 <= seed < 2**32``, else an integer in ``[0, 2**32)`` that is a
+        deterministic function of ``(seed, label)``.
+
+    Raises
+    ------
+    TypeError
+        If ``seed`` is not an integer.
+    ValueError
+        If ``seed`` is negative.
+    """
+    if isinstance(seed, bool) or not isinstance(seed, (int, np.integer)):
+        raise TypeError(f"seed must be an integer, got {type(seed).__name__}")
+    if seed < 0:
+        raise ValueError(f"seed must be non-negative, got {seed}")
+    if seed < SKLEARN_SEED_LIMIT:
+        return int(seed)
+    return int(make_rng(int(seed), "sklearn", label).integers(0, SKLEARN_SEED_LIMIT))
+
+
 @dataclass
 class SystemContext:
     """Everything about one system that does not depend on noise or library size.

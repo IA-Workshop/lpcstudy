@@ -19,6 +19,7 @@ from sklearn.tree import DecisionTreeRegressor
 
 from .allocation import deployable_profile
 from .config import StudyConfig
+from .data import sklearn_seed
 from .identifiers import check_keys
 from .oracle import characteristic_horizon, curvature, hybrid_mse, oracle_weight
 from .pipeline import Cell, FittedRules, RuleScores
@@ -297,7 +298,8 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> 
         return HistGradientBoostingRegressor(max_iter=300, learning_rate=0.05,
                                              max_leaf_nodes=15, min_samples_leaf=20,
                                              l2_regularization=1.0,
-                                             random_state=config.seed)
+                                             random_state=sklearn_seed(config.seed,
+                                                                       "qn-regressor"))
 
     def r2(y: np.ndarray, pred: np.ndarray, idx: np.ndarray) -> float:
         resid = np.sum((y[idx] - pred[idx]) ** 2)
@@ -635,9 +637,11 @@ def h3_regimes(cell: Cell, rules: FittedRules, scores: dict[str, RuleScores],
     w_t = oracle_weight(con.moments)[:, col]
     c_t = curvature(con.moments)[:, col]
     t_t = np.log(state_horizon_target(con.moments, cell.noise, config.primary_threshold))
-    tree_w = DecisionTreeRegressor(max_leaf_nodes=max(chosen, 4), random_state=config.seed)
+    tree_w = DecisionTreeRegressor(max_leaf_nodes=max(chosen, 4),
+                                   random_state=sklearn_seed(config.seed, "h3b-weight-tree"))
     tree_w.fit(flat, np.repeat(w_t, n_draws), sample_weight=np.repeat(c_t, n_draws))
-    tree_t = DecisionTreeRegressor(max_leaf_nodes=max(chosen, 4), random_state=config.seed)
+    tree_t = DecisionTreeRegressor(max_leaf_nodes=max(chosen, 4),
+                                   random_state=sklearn_seed(config.seed, "h3b-horizon-tree"))
     tree_t.fit(flat, np.repeat(t_t, n_draws))
     imp_w, imp_t = tree_w.feature_importances_, tree_t.feature_importances_
     names = list(PROFILE_NAMES)
