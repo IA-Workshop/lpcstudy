@@ -481,6 +481,13 @@ The full form is the addendum A1 to A8 of `docs/agent/notes/2026-10-11-math-wu00
 
 **Test run 6 result.** `1 passed in 0.79s` (`runs/tests/slow-20261011T175548Z.log`, exit 0). The A9 ranges are applied inclusively, row by row, at both phi in the fake-data test. Open: the 12 real consistency nodes and the N1, N2, N3 study nodes await a delta-R2 study rerun (main session's call; identical design and seeds).
 
+**Test run 7 (the delta-R2 study file, once, on the changed harness and references), §4.9 checklist.**
+1. Change set: as run 6; `git status --porcelain` clean after the commit that precedes the run.
+2. Radius: `tests/slow/test_analysis_null_delta_r2.py` (slow tier; the file whose references and assertions changed). It is an evaluation of the changed code with the same design and seeds as run 2, not a rerun for a different answer: nothing in the study design changed.
+3. Already run? The earlier version of this file ran in run 2; this code (new references, N-rows under the switch, 12 range nodes) has not.
+4. Device: `JAX_PLATFORMS=cpu`. 5. Threads and time: `LPC_THREADS=8` as the main session commands; the harness's `pool_size()` is `min(LPC_THREADS, 4)` (plan O1), so the pool is still 4 single-thread workers (I did not change the cap); about 12 minutes; timeout 3600 s. 6. Contention: a DEV-0 pilot runs in another worktree (permitted by the owner's authorization); no other slow run here; no GPU. 7. `-q --tb=short -rfE` by the wrapper, plus `--durations=10`.
+8. Command: `LPC_THREADS=8 tools/run_tests.sh slow --background --durations=10 tests/slow/test_analysis_null_delta_r2.py`.
+
 ## Review
 
 ## Audit
