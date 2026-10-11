@@ -1,0 +1,10 @@
+phi=0 orig: R=20000 pass=25 fail=213 (lo>=0.1: 213, hi<=-0.1: 0) inconclusive=19762 mean width=0.2098
+phi=0 ext: R=40000 pass=37 fail=416 (lo>=0.1: 416, hi<=-0.1: 0) inconclusive=39547 mean width=0.2100
+phi=0 pooled R_ref=60000 pass: k=62 rate=0.00103 se=0.00013 (count SE 0.13) range=(0, 6) beta-range=(0, 6) false-alarm below=0.00000 above=0.00013 P(ROADMAP A3 fails)=0.000
+phi=0 pooled R_ref=60000 fail: k=629 rate=0.01048 se=0.00042 (count SE 0.42) range=(1, 23) beta-range=(1, 24) false-alarm below=0.00003 above=0.00025 P(ROADMAP A3 fails)=0.040
+phi=0 pooled R_ref=60000 inconclusive: k=59309 rate=0.98848 se=0.00044 (count SE 0.44) range=(975, 998) beta-range=(975, 998) false-alarm below=0.00017 above=0.00013 P(ROADMAP A3 fails)=nan
+phi=0.3 orig: R=20000 pass=7 fail=223 (lo>=0.1: 223, hi<=-0.1: 0) inconclusive=19770 mean width=0.2242
+phi=0.3 ext: R=40000 pass=8 fail=480 (lo>=0.1: 480, hi<=-0.1: 0) inconclusive=39512 mean width=0.2240
+phi=0.3 pooled R_ref=60000 pass: k=15 rate=0.00025 se=0.00006 (count SE 0.06) range=(0, 3) beta-range=(0, 3) false-alarm below=0.00000 above=0.00018 P(ROADMAP A3 fails)=0.000
+phi=0.3 pooled R_ref=60000 fail: k=703 rate=0.01172 se=0.00044 (count SE 0.44) range=(2, 25) beta-range=(2, 25) false-alarm below=0.00011 above=0.00022 P(ROADMAP A3 fails)=0.087
+phi=0.3 pooled R_ref=60000 inconclusive: k=59282 rate=0.98803 se=0.00044 (count SE 0.44) range=(974, 998) beta-range=(974, 998) false-alarm below=0.00013 above=0.00008 P(ROADMAP A3 fails)=nan

@@ -16,4 +16,12 @@ Run from this directory with the project interpreter (`LPC_PYTHON`, or `.venv/bi
 | `m4_dr2.py <phi> 400`, `m4_dr2_full.py 0 200` | Null ΔR² through production `qn_profile_block` and conditional truth → `m4_dr2.log`, `other_outputs.log` | about 7 and 3 min |
 | `o4_proxy.py` | O4 dynamics proxy, independent numpy RK4 (1 thread) | about 1 min |
 
+**WU-0006.4 additions (2026-10-11, C7 correction, DEF-0022).** Run from a directory that holds `cov_C7_0.npy` and `cov_C7_0.3.npy` from `m2_coverage.py`.
+
+| Script | What | Time (4 workers) |
+| --- | --- | --- |
+| `c7_extend.py <phi> 40000` | Independent extension of the C7 reference (scratch seed 20261012) → `cov_C7_<phi>_ext.npy`, `c7_extend.log` | about 2 min each |
+| `c7_verdict_ranges.py` | C7 pass / fail / inconclusive counts by the production verdict rule, ranges by the `m2_ranges` rule (R_ref 60 000) → `c7_verdict_ranges.log` | seconds |
+| `h2a_power.py` | H2a(ii-b) interval width against n (250 to 2000) and P(pass \| rho), phi 0 and 0.3 (scratch seed 20261013) → `h2a_power.log` | about 2 min |
+
 `simcore.py` holds the shared generators and fast statistics. The scripts that import `lpcstudy` put the repository root on `sys.path` (`parents[4]` of the script).

@@ -351,6 +351,67 @@ Characterization rows (coverage 95% / 98.3% out of 1000; z against the reference
 
 **Deviations from the plan and the amendment.** (1) Added `test_wu0006_harness.py` (30 self-checks) and `wu0006_reference.py`. (2) `evaluate_*` keep a `strict` switch used only by the smoke. (3) The ROADMAP-bound tests of a (case, phi) are one test each (all of A1, A2, A3 together), with every violated row listed in the message. (4) The C7 pass range failure (F3) stays a recorded failure; nothing was relaxed. (5) The unit tier radius is empty (no `lpcstudy/`, `tools/` or `tests/unit` change), so no unit test was run. (6) Not done: the independent review, WU-0006.4 (the applied-mathematician's section) and the status, which are the main session's.
 
+**2026-10-11, applied-mathematician (claude-opus-5-5): WU-0006.4 mathematician review (C7 correction), part 1, on 1ef7b9c.**
+
+The full form is the addendum A1 to A8 of `docs/agent/notes/2026-10-11-math-wu0006.md`. Scripts and logs: `c7_extend.py`, `c7_verdict_ranges.py` and `h2a_power.py` in the scripts folder. All data are synthetic, from the scratch seeds 20261011, 20261012 and 20261013; no DEV or CONF seed, preset, test run or GPU was used. CPU only, 4 single-thread workers, about 7 min.
+
+- **VV.3 (stated plainly).**
+  - This correction is made **after run 2 showed the failure** (F3, DEF-0022). I had read the run-2 C7 counts before deriving anything.
+  - The derivation uses **only the design and reference replications**, never the run-2 counts.
+  - The range rule was fixed before any corrected count existed. It is the rule of the other 70 ranges: the central 1 − 0.0005 interval of Bin(1000, p) mixed over p ~ N(p_ref, se_ref²).
+  - R_ref was extended from 20 000 to 60 000 per φ (seed 20261012) because the original reference pass counts were only 25 and 7. The test counts played no part in that decision.
+- **The error was mine (M6).**
+  - The reference counted "pass" as the one-sided miss P(0.1 > hi).
+  - H2a(ii-b) passes only if lo > −0.1 and hi < 0.1.
+  - The 98.3% interval is 0.210 (φ = 0) and 0.224 (φ = 0.3) wide on average, wider than the band of 0.2. So a pass needs width < 0.2 (P = 0.25 and 0.07) and an estimate about 2.2 SD below the truth.
+  - "The far edge is never touched" was reversed. It is struck through in the note.
+- **Corrected ranges (counts out of 1000, R_ref = 60 000).**
+
+  | φ | pass, old → new | fail | inconclusive (new, not asserted) |
+  | --- | --- | --- | --- |
+  | 0 | (1, 23) → **(0, 6)**, rate 0.00103 | (1, 24) kept | (975, 998) |
+  | 0.3 | (2, 27) → **(0, 3)**, rate 0.00025 | (2, 25) kept | (974, 998) |
+
+  - **Fail ranges are kept.** Their definition was already exact: hi ≤ −0.1 occurred in 0 of 60 000 replications per φ.
+  - **Reference error.** The reference SE is 0.13 and 0.06 counts against range widths of 6 and 3, which is negligible. The Jeffreys sensitivity check gives the same ranges.
+  - **False alarm.** The per-range false alarm is ≤ 0.00018. The family-wise bound stays ≤ 3.5%.
+  - **ROADMAP rows.** P(A3-pass bound fails) for C7 is now 0 (was 0.03 and 0.14). The expected ROADMAP failures for correct code become 1.66 and 11.23.
+  - **Cross-checks.** An independent-seed shift estimate gives 0.001 at both φ. Normal theory gives 0.0017 and 0.00045, the same order.
+- **Comparison with run 2 (made only after the ranges were written).**
+  - φ = 0: pass 1 in (0, 6), fail 15 in (1, 24), inconclusive 984 in (975, 998).
+  - φ = 0.3: pass 0 in (0, 3), fail 9 in (2, 25), inconclusive 991 in (974, 998).
+  - **All are inside.** P(K = 0) is 0.78 at φ = 0.3, a typical value.
+  - F3 is therefore a reference defect, not a code defect. The production verdict, the harness rule and A4 were right.
+- **Power of H2a(ii-b)** (n = states in the part's domain; 98.3%; B = 2000).
+  - **Width.** W ≈ 4.76/√n (independent states) and 5.10/√n (lag-1 0.3). The observed exponent is 0.48–0.50.
+    - n = 500: 0.212 and 0.226. n = 1000 (FULL n_test): 0.151 and 0.161. n = 2000: 0.106 and 0.114.
+    - A pass needs W < 0.2, which means n > 566 and n > 650.
+  - **P(pass) ≥ 0.8 is reached for no true partial correlation**, at either the pilot size (n_test = 500; max P = 0.018 and 0.003 at ρ = 0) or the full size (n_test = 1000; max 0.56 and 0.43 at ρ = 0). These are for one part with all test states interior; the interior part has fewer.
+    - At n = 2000 it is reached for |ρ| ≤ 0.027 and 0.023.
+    - n needed at ρ = 0: 1360 and 1600; at ρ = 0.02: 1660 and 1950; at ρ = 0.05: 4180 and 4890.
+    - Jointly, (ii) needs every part to pass and "supported" needs three systems: at best about 0.03 at FULL.
+  - **Refutation is reachable** with 0.8 for |ρ| ≳ 0.25 (n = 500) and 0.20 (n = 1000).
+  - **This is the limitation v3 §7 already pre-registers** ("H2a's second part … essentially cannot pass"). DEF-0022's power point confirms and quantifies it; it is not a new defect. Any change is a v3 matter for the owner.
+- **Monte Carlo statements in `tests/slow/*.py` docstrings, against M1.**
+  - **Correct:** the A1–A3, L, N1 and N2 bounds and SEs, the integer rules, the 3.5% family-wise bound, the H1 Bartlett SE and the log-rank ranges.
+  - **Wrong or missing** (developer to fix; none moves a bound):
+    1. N2's "P(fail) < 0.01" and N3's "about 0.03" hold at 900/1000. At 3000/1000 the indicator reference (R_ref 200) gives **0.25 and 0.42**. I recommend a 3000/1000 reference with R_ref ≥ 1000 (about 12 min) before the next gate.
+    2. N1's "0.5 and 1.0" should read 0.42 and 0.88.
+    3. `test_analysis_coverage.py`:
+       - "R_ref 20 000 to 40 000" should read 10 000 to 40 000 (C6);
+       - "one-sided-miss rule" is wrong for C7, whose rule is two-sided;
+       - the A3 reference rates are missing.
+    4. Harness smoke:
+       - the C7 truth check's "SE about 3e-3" is the chunk SD; the SE is 3.1e-4;
+       - the log-normal "SE near 1e-3" is really 3.3e-4 to 5.2e-4;
+       - the bivariate lag-1 bias is 0.46 SE (false alarm 0.0058, not 0.0027);
+       - the corr(x₄, x₁) tolerance 3e-3 is 4.7 SE (SE 6.4e-4), and may be tightened to 1.9e-3.
+- **Integrity.**
+  - `tests/slow/wu0006_reference.py` changes only the two C7 pass tuples, with the old values kept in dated comments. It adds a dated docstring paragraph and the unasserted `C7_INCONCLUSIVE_REFERENCE`.
+  - **The other 68 ranges are untouched.** (70 in total; the two C7 pass ranges at φ = 0 and 0.3 shared the error.) A regeneration from the saved reference arrays reproduces 62 of 64 coverage and A3 ranges exactly, and the 6 log-rank ranges equal M5.
+  - No other code or test changed. No test was run; the slow tier was not run.
+  - Rerun owed by the §4.2 rule: the reference module changed, so the C7 consistency nodes (`test_analysis_coverage.py::test_counts_are_consistent_with_the_reference[C7-0.0]` and `[C7-0.3]`) and the smoke `test_reference_tables_hold_the_70_ranges` are the radius, for the developer or the main session.
+
 ## Review
 
 ## Audit

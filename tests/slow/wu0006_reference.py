@@ -9,6 +9,17 @@ the count out of 1000)``; the range is the central 1 - 0.0005 interval of
 is ``{"pass": (rate, P(fail), range), "fail": (...)}`` at the criterion's own level
 ``A3_LEVEL[case]``. The ranges hold only for the generators of ``wu0006_harness``, which follow
 the note's M3 (a) specification.
+
+**Correction of 2026-10-11 (WU-0006.4, applied-mathematician; DEF-0022; made AFTER test run 2
+showed the failure, VV.3).** The C7 ``"pass"`` entries were wrong: the reference took P(pass) at
+the edge to be the one-sided miss P(0.1 > hi), but H2a(ii-b) passes only if the interval lies
+inside the open band (-0.1, 0.1), i.e. also lo > -0.1. They are recomputed with the production
+verdict rule on the same design and procedure (reference replications only, no test-run count):
+R_ref = 60 000 per phi (20 000 of seed 20261011 plus 40 000 of seed 20261012, scripts
+``c7_extend.py`` and ``c7_verdict_ranges.py`` next to the note), same range rule as every other
+range. The C7 ``"fail"`` entries are unchanged: their definition (lo >= 0.1 or hi <= -0.1)
+matches the reference exactly (hi <= -0.1 occurred in 0 of 60 000 replications per phi). No other
+entry is touched. ``C7_INCONCLUSIVE_REFERENCE`` is new and is not asserted by the harness.
 """
 
 from __future__ import annotations
@@ -77,16 +88,26 @@ A3_REFERENCE: dict[tuple[str, str], dict[str, tuple[float, float, tuple[int, int
     ('C4', '0'): {'pass': (0.0116, 0.08, (2, 25)), 'fail': (0.0111, 0.06, (2, 25))},
     ('C5', '0'): {'pass': (0.032, 0.09, (14, 53)), 'fail': (0.0297, 0.04, (13, 50))},
     ('C6', '0'): {'pass': (0.0268, 0.01, (10, 47)), 'fail': (0.0262, 0.01, (10, 47))},
-    ('C7', '0'): {'pass': (0.01, 0.03, (1, 23)), 'fail': (0.0106, 0.05, (1, 24))},
+    # 2026-10-11 correction (DEF-0022, after run 2): was 'pass': (0.01, 0.03, (1, 23)).
+    ('C7', '0'): {'pass': (0.00103, 0.0, (0, 6)), 'fail': (0.0106, 0.05, (1, 24))},
     ('C8', '0'): {'pass': (0.01, 0.03, (1, 23)), 'fail': (0.0095, 0.02, (1, 22))},
     ('C9', '0'): {'pass': (0.0299, 0.05, (13, 51)), 'fail': (0.0274, 0.02, (11, 48))},
     ('C2', '0.3'): {'pass': (0.036, 0.27, (17, 58)), 'fail': (0.0358, 0.26, (17, 58))},
     ('C4', '0.3'): {'pass': (0.0145, 0.29, (3, 30)), 'fail': (0.014, 0.24, (3, 29))},
     ('C5', '0.3'): {'pass': (0.0362, 0.28, (17, 59)), 'fail': (0.0363, 0.29, (17, 59))},
     ('C6', '0.3'): {'pass': (0.0274, 0.02, (11, 48)), 'fail': (0.0287, 0.03, (12, 50))},
-    ('C7', '0.3'): {'pass': (0.0126, 0.14, (2, 27)), 'fail': (0.0112, 0.07, (2, 25))},
+    # 2026-10-11 correction (DEF-0022, after run 2): was 'pass': (0.0126, 0.14, (2, 27)).
+    ('C7', '0.3'): {'pass': (0.00025, 0.0, (0, 3)), 'fail': (0.0112, 0.07, (2, 25))},
     ('C8', '0.3'): {'pass': (0.0158, 0.41, (4, 31)), 'fail': (0.016, 0.44, (4, 32))},
     ('C9', '0.3'): {'pass': (0.0335, 0.15, (15, 56)), 'fail': (0.0355, 0.24, (17, 58))},
+}
+
+# 2026-10-11 (WU-0006.4, DEF-0022): C7 "inconclusive" at the edge, (rate, range of the count out of
+# 1000), same rule and R_ref = 60 000 as the corrected C7 "pass". Reported for the owner; the harness
+# asserts only the "pass" and "fail" ranges.
+C7_INCONCLUSIVE_REFERENCE: dict[tuple[str, str], tuple[float, tuple[int, int]]] = {
+    ('C7', '0'): (0.98848, (975, 998)),
+    ('C7', '0.3'): (0.98803, (974, 998)),
 }
 
 # --- Log-rank (note M5; production h3a_logrank; 600 states, 3 terciles of 200; R_ref = 40 000) ---
