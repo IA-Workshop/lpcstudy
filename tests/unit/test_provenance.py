@@ -259,7 +259,7 @@ def test_device_is_the_cpu_backend_under_jax_platforms_cpu() -> None:
 
 def test_env_block_has_the_listed_names_and_never_the_confirmatory_variables(
         monkeypatch: pytest.MonkeyPatch) -> None:
-    """``env`` records the seven listed variables and never ``LPC_CONF_*``.
+    """``env`` records the nine listed variables and never ``LPC_CONF_*``.
 
     Reference: the plan's list; the variables below are set to a synthetic value that must
     not appear anywhere in the block. Exact.
@@ -270,10 +270,29 @@ def test_env_block_has_the_listed_names_and_never_the_confirmatory_variables(
     block = block_for("CONF-1", ["--confirmatory"])
     assert set(block["env"]) == {"JAX_PLATFORMS", "XLA_FLAGS", "XLA_PYTHON_CLIENT_PREALLOCATE",
                                  "LPC_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
-                                 "OPENBLAS_NUM_THREADS"}
+                                 "OPENBLAS_NUM_THREADS", "PJRT_NPROC", "NPROC"}
     assert block["env"]["OMP_NUM_THREADS"] == "3"
     text = json.dumps(block)
     assert "424242424242" not in text and "ab" * 16 not in text and "LPC_CONF" not in text
+
+
+def test_env_block_records_the_xla_thread_cap_variables(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """``env`` records ``PJRT_NPROC`` and ``NPROC`` as set, and ``None`` when unset (LPC.PC.18).
+
+    Reference: the values the test itself puts in the environment (a synthetic "7" and "5",
+    distinct from each other and from the budget of 4, so a swapped or defaulted value
+    fails); the names are appended after the earlier seven. Exact.
+    """
+    assert provenance.ENV_NAMES[-2:] == ("PJRT_NPROC", "NPROC")
+    monkeypatch.setenv("PJRT_NPROC", "7")
+    monkeypatch.setenv("NPROC", "5")
+    assert block_for("DEV-0", [])["env"]["PJRT_NPROC"] == "7"
+    assert block_for("DEV-0", [])["env"]["NPROC"] == "5"
+    monkeypatch.delenv("PJRT_NPROC")
+    monkeypatch.delenv("NPROC")
+    env = block_for("DEV-0", [])["env"]
+    assert env["PJRT_NPROC"] is None and env["NPROC"] is None
 
 
 def test_confirmatory_block_nulls_the_seed_and_labels_it() -> None:
