@@ -219,17 +219,22 @@ QOI_DECLARATIONS: dict[str, dict[str, str]] = {
         "status": "pre-registered estimate, read by the table of v3 section 7, no pass/fail; "
                   "exploratory on development seeds"},
     "H2a": {
-        "definition": "(i) median over eligible states of the range of w* over 1, 2 and 4 LT in "
-                      "the small-error regime; (ii) partial correlation of logit w* with Λ̃ given "
-                      "the analog and estimation seeds, on the interior (0 < w* < 1) and the "
-                      "w* = 0 parts",
+        "definition": "(i) median over eligible states of the range of w* over the initial "
+                      "segment of the horizons 1, 2 and 4 LT at which both r.m.s. errors are at "
+                      "most 0.5 σ_x (eligible: at least two such leading horizons); (ii) at H_ref, "
+                      "the partial correlation with Λ̃ of the indicator 1{w* = 0} over all states, "
+                      "of logit w* over the states with 0 < w* < 1, and, if w* = 1 in more than "
+                      "5% of the states, of the indicator 1{w* = 1} over all states, each given "
+                      "the seeds through quadratic controls (ln ε_s/ρ, ln δ/ρ, their squares and "
+                      "their product; DEC-0008 A4)",
         "units": "w* in [0, 1], the optimal weight on CP; Λ̃ = 30 Λ̄ (per 30 steps); the "
-                 "small-error regime is r.m.s. error below 0.5 σ_x for both forecasters; "
-                 "horizons in LT (30 steps)",
-        "decision_error": "(i) a half-width near 0.1 (projected 0.04 at full size, Methods v2 "
-                          "M12); (ii) a half-width near 0.1 (projected 0.10): part (ii) can be "
-                          "refuted but essentially cannot pass, which needs |r| within about 0.01 "
-                          "of zero",
+                 "small-error regime is r.m.s. error at most 0.5 σ_x for both forecasters; "
+                 "horizons in LT (30 steps); H_ref = 30 steps",
+        "decision_error": "(i) the edge is the bound 0.1: a half-width comparable to the distance "
+                          "of the median range from 0.1 changes the verdict (Methods v2 M12: pilot "
+                          "medians 0.12 to 0.28, projected half-width 0.04); (ii) a half-width "
+                          "near the band half-width 0.1 means it can be refuted but essentially "
+                          "cannot pass: passing needs |r| within about 0.01 of zero",
         "decision": "whether the optimal weight separates from horizon and instability once the "
                     "seeds are fixed, which licenses allocating on the seeds alone (RQ2)",
         "status": _PRIMARY},
@@ -287,26 +292,31 @@ QOI_DECLARATIONS: dict[str, dict[str, str]] = {
                       "lookup A5, on the realized horizons",
         "units": "p-values dimensionless; horizons in steps (30 steps = 1 LT) censored at "
                  "H_max = 8 LT",
-        "decision_error": "an adjusted p-value near 0.01; the log-rank test treats states as "
-                          "independent, so serial dependence of neighbouring states could "
-                          "overstate significance",
-        "decision": "whether regimes separate forecast horizons (RQ3, compression)",
+        "decision_error": "H3a cannot fail (no equivalence margin is set, DEC-0008 A3): an "
+                          "adjusted p-value near 0.01, a pair not computed or fewer than 50 states "
+                          "moves the verdict only between pass and inconclusive, and no outcome "
+                          "refutes it; the log-rank test treats states as independent, so serial "
+                          "dependence of neighbouring states could overstate significance",
+        "decision": "whether regimes separate forecast horizons (RQ3, compression); it can "
+                    "confirm the separation, never refute it",
         "status": _SECONDARY},
     "H3b": {
         "definition": "importances of the profile coordinates in a weight tree and a horizon "
-                      "tree (8 leaves), with a bootstrap over construction states and a "
-                      "stability index",
+                      "tree (8 leaves), with a bootstrap over construction states; D is the "
+                      "importance of Λ̃ in the horizon tree minus the largest other importance; "
+                      "the stability index (share of resamples with D > 0) is reported only",
         "units": "importances dimensionless, summing to 1 over the four coordinates; Λ̃ per 30 "
                  "steps",
-        "decision_error": "a weight-tree Λ̃ interval reaching 0.2, or a horizon-tree ranking "
-                          "that changes across resamples (the stability index)",
+        "decision_error": "a weight-tree Λ̃ upper bound within one half-width of 0.2, or a lower "
+                          "bound of D within one half-width of 0; the stability index is "
+                          "reported, not decided (DEC-0008 A3)",
         "decision": "whether instability sets the horizon rather than the weight (RQ3)",
         "status": _SECONDARY},
     "H3c": {
         "definition": "MSE of the regime lookup A5 over the MSE of the closed form A4 at H_ref",
         "units": "ratio dimensionless; MSE in σ_x² against the noise-free truth; H_ref = 30 steps",
-        "decision_error": "an upper bound within the interval half-width of 1.05; excess error "
-                          "flat in K is read as the P3 floor, not as a failure (v3 section 7)",
+        "decision_error": "an upper bound within the interval half-width of 1.05; v3 section 7 "
+                          "reads \"H3c holds while excess error is flat in K\" as \"the P3 floor\"",
         "decision": "whether a few regimes cost almost nothing against the closed form (RQ3, "
                     "compression)",
         "status": _PRIMARY},

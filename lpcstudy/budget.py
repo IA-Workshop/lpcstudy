@@ -32,11 +32,13 @@ V4_RESAMPLES = 200
 """Bootstrap resamples of the V4 check, a literal of ``experiments.py`` (``(200, m_draws)``); a
 test reads that source to pin the equality."""
 
-STORED_LEVEL_PATHS: dict[str, tuple[str, ...]] = {
-    "H1a": ("level",), "H1d": ("level",), "H2b": ("library_change", "level"),
-    "H3b": ("weight_lambda", "level"), "H3c": ("level",)}
-"""Where a result stores the level of its decision interval, by table key. The other results store
-none; their label then uses the level of the row's role."""
+STORED_LEVEL_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "H1a": (("level",),), "H1d": (("level",),), "H2b": (("library_change", "level"),),
+    "H2e": (("by_noise", "*", "level"),),
+    "H3b": (("weight_lambda", "level"), ("D", "level")), "H3c": (("level",),)}
+"""Where a result stores the level of each of its decision intervals, by table key: a tuple of
+paths, in which ``*`` stands for every key of the dict at that point (H2e: each noise level). The
+other results store none; their label then uses the level of the row's role."""
 
 NO_INTERVAL_KEYS = ("gain_bound", "H3a")
 """Rows that show no interval: the gain bound (a fraction) and H3a (adjusted p-values)."""
@@ -54,15 +56,17 @@ def level_text(level: float) -> str:
     return f"{100 * level:g}%"
 
 
-def stored_level(row: Hypothesis, result: dict) -> float | None:
-    """The level stored in ``result`` for the decision interval of ``row``, or ``None`` if the
-    result stores none (see ``STORED_LEVEL_PATHS``)."""
-    node = result
-    for part in STORED_LEVEL_PATHS.get(row.key, ()):
-        if not isinstance(node, dict) or part not in node:
-            return None
-        node = node[part]
-    return None if node is result else float(node)
+def stored_levels(row: Hypothesis, result: dict) -> list[float]:
+    """The levels stored in ``result`` for the decision intervals of ``row`` (see
+    ``STORED_LEVEL_PATHS``); empty if the result stores none."""
+    found = []
+    for path in STORED_LEVEL_PATHS.get(row.key, ()):
+        nodes = [result]
+        for part in path:
+            nodes = [child for node in nodes if isinstance(node, dict)
+                     for name, child in node.items() if part in ("*", name)]
+        found += [float(node) for node in nodes if node is not None]
+    return found
 
 
 def row_level(row: Hypothesis, results: dict, systems: list[str]) -> float:
@@ -76,17 +80,23 @@ def row_level(row: Hypothesis, results: dict, systems: list[str]) -> float:
     """
     nominal = role_level(row)
     for system in systems:
-        found = stored_level(row, results["systems"][system][row.key])
-        if found is not None and abs(found - nominal) >= LEVEL_TOLERANCE:
-            raise ValueError(
-                f"result {row.key} of system {system} stores level {found!r} but its role "
-                f"({row.role}) has level {nominal!r}: a defect, not relabelled")
+        for found in stored_levels(row, results["systems"][system][row.key]):
+            if abs(found - nominal) >= LEVEL_TOLERANCE:
+                raise ValueError(
+                    f"result {row.key} of system {system} stores level {found!r} but its role "
+                    f"({row.role}) has level {nominal!r}: a defect, not relabelled")
     return nominal
 
 
 def _dependence(config: StudyConfig, what: str = "test states") -> str:
     return (f"resampled in blocks of {config.bootstrap_block} consecutive {what} in time order "
             f"(Künsch 1989), so dependence is kept within a block and none is assumed beyond it")
+
+
+H3B_COVERAGE = ("coverage not measured: the interval conditions on the fitted proxies and is not "
+                "guaranteed to cover, because the split variable can switch between resamples "
+                "(the bootstrap of a non-smooth functional; the WU-0006 coverage study has no "
+                "H3b case)")
 
 
 def interval_label(row: Hypothesis, level: float, config: StudyConfig) -> str:
@@ -126,10 +136,14 @@ def interval_label(row: Hypothesis, level: float, config: StudyConfig) -> str:
                      f"blocks of {block} consecutive states in time order, B = {resamples}")
         dependence = _dependence(config, "construction states")
     else:
-        what = "eligible (small-error) test states" if row.key == "H2a" else "test states"
         procedure = (f"moving-block bootstrap percentile interval, blocks of {block} "
-                     f"consecutive {what} in time order, B = {resamples}")
-        dependence = _dependence(config, what)
+                     f"consecutive test states in time order, B = {resamples}")
+        if row.key == "H2a":  # DEC-0008 A4(b): all states resampled, domains re-evaluated
+            procedure = procedure.replace(
+                "test states", "test states (all of them, not only the eligible ones)") + (
+                ", with the eligibility of part (i) and the domain of part (ii) re-evaluated "
+                "inside each resample (DEC-0008 A4)")
+        dependence = _dependence(config)
     if row.key in PRIMARY_KEYS:
         multiplicity = ("Bonferroni over the three primaries (H2a, H2b, H3c), intersection–union "
                         "across systems, every part of the criterion must pass")
@@ -138,8 +152,9 @@ def interval_label(row: Hypothesis, level: float, config: StudyConfig) -> str:
     else:
         multiplicity = ("none (secondary, unadjusted), intersection–union across systems, "
                         "every part of the criterion must pass")
-    return (f"procedure: {procedure}; level: {level_text(level)}; dependence: {dependence}; "
-            f"multiplicity: {multiplicity}")
+    label = (f"procedure: {procedure}; level: {level_text(level)}; dependence: {dependence}; "
+             f"multiplicity: {multiplicity}")
+    return f"{label}; {H3B_COVERAGE}" if row.key == "H3b" else label
 
 
 def interval_label_lines(results: dict, systems: list[str], config: StudyConfig) -> list[str]:

@@ -85,6 +85,16 @@ def test_every_label_has_the_four_elements_and_reads_its_config() -> None:
             assert "level: 95%" in label and "Bonferroni" not in label, row.key
     rows = {r.key: r for r in HYPOTHESIS_TABLE}
     assert "over construction states" in budget.interval_label(rows["H3b"], 0.95, config)
+    h2a = budget.interval_label(rows["H2a"], 0.9833333333333333, config)
+    # DEC-0008 A4(b): the bootstrap resamples all test states and re-evaluates the eligibility
+    # of part (i) and the domain of part (ii) inside each resample; no eligible-only resampling
+    assert "all of them, not only the eligible ones" in h2a and "re-evaluated inside each" in h2a
+    assert "consecutive eligible" not in h2a and "small-error) test states" not in h2a
+    h3b = budget.interval_label(rows["H3b"], 0.95, config)
+    # DEC-0008 A4 and the analysis docstring of h3b: coverage of these intervals is not measured
+    assert "coverage not measured" in h3b and "not guaranteed to cover" in h3b
+    assert all("coverage not measured" not in budget.interval_label(r, 0.95, config)
+               for r in HYPOTHESIS_TABLE if r.key != "H3b")
     h3a = budget.interval_label(rows["H3a"], 0.95, config)
     assert "Holm" in h3a and "p-values with no interval" in h3a
 
@@ -146,6 +156,9 @@ def test_label_level_equals_the_stored_level_and_a_mismatch_raises(tmp_path: Pat
     stores the primary level, is a defect and ``ValueError`` names the key (nothing relabelled).
     """
     def store(system: dict) -> None:
+        system["H3b"]["D"]["level"] = 0.95
+        system["H2e"]["by_noise"]["0.01"]["level"] = 0.95
+        system["H2e"]["by_noise"]["0.02"]["level"] = 0.95
         system["H3c"]["level"] = 1.0 - 0.05 / 3.0
         system["H2b"]["library_change"]["level"] = 1.0 - 0.05 / 3.0
         system["H1a"]["level"] = 0.95
@@ -154,9 +167,14 @@ def test_label_level_equals_the_stored_level_and_a_mismatch_raises(tmp_path: Pat
     assert "level: 1 − 0.05/3 (98.33%);" in by_id["H3c"]
     assert "level: 1 − 0.05/3 (98.33%);" in by_id["H2b"]
     assert "level: 95%;" in by_id["H1a"]
+    assert "level: 95%;" in by_id["H3b"] and "level: 95%;" in by_id["H2e"]
     for key, wrong, path in (("H3c", 0.95, ("level",)),
                              ("H1a", 1.0 - 0.05 / 3.0, ("level",)),
-                             ("H2b", 0.95, ("library_change", "level"))):
+                             ("H2b", 0.95, ("library_change", "level")),
+                             ("H3b", 1.0 - 0.05 / 3.0, ("D", "level")),
+                             ("H3b", 0.9, ("weight_lambda", "level")),
+                             ("H2e", 1.0 - 0.05 / 3.0, ("by_noise", "0.01", "level")),
+                             ("H2e", 0.9, ("by_noise", "0.02", "level"))):
         results, config = fake_results("DEV-0")
         system = fake_system(config)
         node = system[key]
@@ -175,7 +193,7 @@ def test_results_without_stored_levels_use_the_role_level() -> None:
     system = fake_system(config)
     results["systems"] = {"lorenz63": system}
     row = next(r for r in HYPOTHESIS_TABLE if r.key == "H3c")
-    assert budget.stored_level(row, system["H3c"]) is None
+    assert budget.stored_levels(row, system["H3c"]) == []
     assert budget.row_level(row, results, ["lorenz63"]) == 1.0 - 0.05 / 3.0
     assert budget.row_level(HYPOTHESIS_TABLE[0], results, ["lorenz63"]) == 0.95
 
@@ -320,3 +338,28 @@ def test_markdown_has_the_declaration_section_between_labels_and_allocation(
     i = heads.index("## Quantities of interest (NVVUQ.3)")
     assert heads[i - 1] == "## Hypothesis verdicts"
     assert heads[i + 1] == "## Allocation rules at the core cell (test split)"
+
+
+def test_declaration_texts_state_the_statistics_of_the_decision_log() -> None:
+    """The H2a, H3a, H3b and H3c declarations say what DEC-0008 A3, A4 and v3 section 7 say.
+
+    Reference: hand-written phrases from DEC-0008 A4(a), A4(a2), A4(b) (H2a), A3 (H3a cannot fail;
+    H3b decided by the lower bound of D, the stability index reported) and the sentence of v3
+    section 7 "H3c holds while excess error is flat in K. This is the P3 floor." (read from the
+    proposal file). Exact substring checks.
+    """
+    declared = budget.QOI_DECLARATIONS
+    h2a = declared["H2a"]
+    assert "indicator 1{w* = 0}" in h2a["definition"] and "1{w* = 1}" in h2a["definition"]
+    assert "quadratic controls" in h2a["definition"] and "initial segment" in h2a["definition"]
+    assert "at most 0.5" in h2a["definition"] and "below 0.5" not in h2a["definition"]
+    assert "the edge is the bound 0.1" in h2a["decision_error"]
+    assert "cannot fail" in declared["H3a"]["decision_error"]
+    h3b = declared["H3b"]
+    assert "lower bound of D" in h3b["decision_error"]
+    assert "reported, not decided" in h3b["decision_error"] and "reported only" in h3b["definition"]
+    text = PROPOSAL.read_text(encoding="utf-8")
+    assert "H3c holds while excess error is flat in K" in text and "This is the P3 floor" in text
+    assert 'reads "H3c holds while excess error is flat in K" as "the P3 floor"' in \
+        declared["H3c"]["decision_error"]
+    assert "not as a failure" not in declared["H3c"]["decision_error"]

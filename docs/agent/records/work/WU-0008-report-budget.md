@@ -473,6 +473,22 @@ Each cell names the case, n, the synthetic design ("seed 6006, not a registered 
 - Cross-host primaries in WU-0003.4.
 
 
+### 2026-10-11, developer claude-sonnet-5-5: fix round 1 (R1 to R6)
+
+Merged develop first (own command, clean; it has the `statistics.py` docstring fix e3b70cc). Changes, text and tests only, no number: R1 the H2a label (all test states resampled, eligibility of (i) and the domain of (ii) re-evaluated inside each resample, DEC-0008 A4); R2 the H2a declaration (indicator 1{w* = 0}, the conditional 1{w* = 1}, quadratic controls, initial segments of 1, 2, 4 LT, "at most 0.5 sigma_x", the edge of (i) is the bound 0.1); R3 the H3b declaration (D lower bound decides, the stability index is reported); R4 H3a cannot fail, H3c quotes v3 section 7; R5 `STORED_LEVEL_PATHS` takes several paths per key and a `*` step: H2e `by_noise[*].level`, H3b `weight_lambda.level` and `D.level`, `stored_level` is now `stored_levels`; R6 the H3b label says "coverage not measured". R7 is the main session's. The A1 smoke rule of the main session applies: .3 and .4 are report-side only; the check is the report-only leaf compare of the Log above (0 of 4393 leaves differ) plus a grep that no producer (`analysis`, `experiments`, `pipeline`, `statistics`, `__main__`) uses `QOI_DECLARATIONS`, `QOI_FIELDS` or `budget` (below); the full A1 smoke runs once at the .2a head.
+
+**Test run 5 (fix round 1).** Checklist:
+1. Change set: `lpcstudy/budget.py`, `lpcstudy/identifiers.py`, `tests/unit/test_budget.py`, this file (the merge brought `statistics.py` docstring, decisions, defects, notes).
+2. Radius: `tools/test_impact.py --base develop --explain`: unit `test___main__`, `test_analysis`, `test_budget`, `test_experiments`, `test_identifiers`, `test_report`, `test_tools_test_impact`; by hand `test_data.py`, `test_validation.py` (`test_identifiers.py` and `test_tools_test_impact.py` are in the tool's set). Not the whole suite; the integration pair is not needed until the .2a head.
+3. Already run? No: `budget.py`, `identifiers.py` and `test_budget.py` changed after runs 1 to 4.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s.
+6. Contention: none needed (unit tier, no preset).
+7. Output: wrapper's `-q --tb=short -rfE`.
+8. Command: `LPC_THREADS=4 tools/run_tests.sh unit tests/unit/test___main__.py tests/unit/test_analysis.py tests/unit/test_budget.py tests/unit/test_experiments.py tests/unit/test_identifiers.py tests/unit/test_report.py tests/unit/test_tools_test_impact.py tests/unit/test_data.py tests/unit/test_validation.py`.
+
+Result of run 5: `245 passed in 266.43s (0:04:26)` (slow only because the `v1-baseline` pilot shares the CPU). Grep of `analysis`, `experiments`, `pipeline`, `statistics`, `__main__` for `QOI_DECLARATIONS|QOI_FIELDS|budget`: no match. Report-only on the base smoke results at this head: 4393 leaves, 0 different, none on one side only (`results.json` is written before any report code runs).
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
