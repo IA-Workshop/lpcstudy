@@ -8,12 +8,20 @@ WU-0008.3 (this part): the four-element label of every interval (procedure, leve
 multiplicity; NVVUQ.16), the figure captions, and the same caption written into each PNG.
 WU-0008.4: the declaration table of the quantities of interest (NVVUQ.3, NVVUQ.22), built from
 ``identifiers.HYPOTHESIS_TABLE`` and ``identifiers.QOI_DECLARATIONS``.
+WU-0008.1 and .2b: the uncertainty budget, one table per primary QoI with nine rows (the eight of
+the ``uq-budget`` skill and the interval procedure), after the design M1 to M9 of the
+applied-mathematician (DEC-0024): finite-M bias stated and not sized (F1, F2 formulas only), the
+bootstrap endpoint error from ``ci_mc_se``, discretization 0 by LPC.NV.1, the iterative error not
+estimated, round-off 1e-4 of the interval, the WU-0006 coverage rates as the interval-procedure
+size, and the strict 10% flag.
 """
 
 from __future__ import annotations
 
+import math
 import textwrap
 from dataclasses import dataclass
+from statistics import NormalDist
 
 from .config import StudyConfig
 from .identifiers import HYPOTHESIS_TABLE, QOI_DECLARATIONS, Hypothesis
@@ -348,3 +356,544 @@ def qoi_declaration_lines(config: StudyConfig) -> list[str]:
     lines += ["", general_label(config)]
     return lines
 
+
+
+# ------------------------------------------------------------ uncertainty budget (WU-0008.1, .2b)
+# One table per primary QoI, nine rows each (the eight rows of the ``uq-budget`` skill and the
+# interval procedure, DEC-0021 O2). Every size cell is a number, ``0 (...)``, or
+# ``not estimated: <reason>``; a missing key never raises and never prints a blank (PRIME.4).
+# Row decisions: the applied-mathematician's design M1 to M9, accepted in DEC-0024.
+
+ROUNDOFF_RELATIVE = 1e-4
+"""Round-off size as a fraction of max(|lo|, |hi|): the empirical cross-platform perturbation of
+the QoI-type statistics, at most 6.0e-5 relative (DEV-0 against the v1 pilot, M5), rounded up."""
+FLAG_FRACTION = 0.1
+"""A numerical row is small against the sampling half-width iff its size is strictly below this
+fraction of it (M9; the skill's "at least 10 times smaller" differs only at equality)."""
+LM_SUMMARY_PATH: tuple[str, ...] | None = None
+"""Key path, below a system's results, of the WU-0005.4 iteration summary (``median_residual``,
+``fraction_no_decrease``). Set when WU-0005.4 names it; until then the row reads "not estimated:
+WU-0005.4 summary absent from results"."""
+LM_ABSENT = "not estimated: WU-0005.4 summary absent from results"
+SYNTHETIC_SEED_TEXT = "synthetic, seed 6006, not a registered seed"
+CONDITIONAL_SENTENCE = ("Conditional on one realization per system of the trajectory, the library "
+                        "noise and the trained networks. Between-realization variability is not "
+                        "estimated (v3 section 8, future work).")
+H3C_SENTENCE = ("Conditional on the fitted A4 and A5. Fit-stage variability is outside the "
+                "interval and not estimated.")
+ITERATIVE_SENTENCE = ("The iterative (Levenberg–Marquardt) error is not estimated, so the "
+                      "numerical error of this QoI is partly unverified (PRIME.3, NVVUQ.9; "
+                      "DEC-0024).")
+WIDENING_SENTENCE = ("A numerical row at or above 10% of the sampling half-width is flagged, not "
+                     "widened; widening an interval is the owner's decision (DEF-0020, DEC-0018).")
+
+
+@dataclass(frozen=True)
+class CoverageCase:
+    """One WU-0006 coverage case at the primary level 1 - 0.05/3.
+
+    Attributes
+    ----------
+    rate : float
+        Reference coverage of the block-5 percentile interval (independent implementation,
+        R_ref 10^4 to 4*10^4, SE below 0.0013).
+    rate_se : float
+        Monte Carlo SE of ``rate``.
+    count : int
+        Run-2 coverage count out of 1000 (the production check, beside the reference).
+    n_states : int
+        States of the synthetic series.
+    design : str
+        What was simulated.
+    """
+
+    rate: float
+    rate_se: float
+    count: int
+    n_states: int
+    design: str
+
+
+COVERAGE_PROVENANCE = ("WU-0006 run 2, log `runs/tests/slow-20261011…165447Z.log` (the letter "
+                       "between date and time elided: it would match the stale-identifier grep "
+                       "of test_identifiers), Log table at "
+                       "b73bbed; reference rates from docs/agent/notes/2026-10-11-math-wu0006.md "
+                       "and, for C4h, docs/agent/notes/2026-10-11-math-wu0008-scripts/m7b.log")
+COVERAGE_WU0006: dict[tuple[str, float], CoverageCase] = {
+    ("C1", 0.0): CoverageCase(0.9800, 0.0007, 983, 500, "mean, Gaussian AR(1)"),
+    ("C1", 0.3): CoverageCase(0.9695, 0.0009, 969, 500, "mean, Gaussian AR(1)"),
+    ("C3", 0.0): CoverageCase(0.9807, 0.0010, 984, 500, "median, Gaussian AR(1)"),
+    ("C3", 0.3): CoverageCase(0.9732, 0.0011, 973, 500, "median, Gaussian AR(1)"),
+    ("C4", 0.0): CoverageCase(0.9772, 0.0007, 971, 500, "ratio of means, log-normal pair, sigma 1"),
+    ("C4", 0.3): CoverageCase(0.9715, 0.0008, 961, 500, "ratio of means, log-normal pair, sigma 1"),
+    ("C7", 0.0): CoverageCase(0.9794, 0.0010, 972, 500, "partial correlation, interior part"),
+    ("C7", 0.3): CoverageCase(0.9762, 0.0011, 977, 500, "partial correlation, interior part"),
+    ("C8", 0.0): CoverageCase(0.9806, 0.0007, 987, 300, "paired mean, Gaussian AR(1)"),
+    ("C8", 0.3): CoverageCase(0.9682, 0.0009, 972, 300, "paired mean, Gaussian AR(1)"),
+    ("C4h1.5", 0.0): CoverageCase(0.9744, 0.0011, 965, 500, "ratio of means, log-normal, sigma 1.5"),
+    ("C4h2", 0.0): CoverageCase(0.9669, 0.0013, 984, 500, "ratio of means, log-normal, sigma 2"),
+}
+"""WU-0006 coverage at level 1 - 0.05/3, by (case, phi): the reference rate with its SE as the
+size, the run-2 count beside it (O3 of DEC-0021: constants with provenance; tests parse the
+WU-0006 Log table and the math note as the independent reference)."""
+
+QOI_IDS = ("H2a(i)", "H2a(ii)", "H2b(i)", "H2b(ii)", "H3c")
+QOI_TITLES = {
+    "H2a(i)": "H2a(i): median range of w* over the initial segments of the horizons 1, 2, 4 LT",
+    "H2a(ii)": "H2a(ii): partial correlation of w* (indicator or logit) with Λ̃ given the seeds",
+    "H2b(i)": "H2b(i): mean per-state rank correlation of w* with ρ",
+    "H2b(ii)": "H2b(ii): mean paired change in w* from N_lib = 10³ to 10⁴ at ρ = 1%",
+    "H3c": "H3c: MSE ratio, regimes (A5) over closed form (A4), at H_ref"}
+QOI_KEYS = {"H2a(i)": "H2a", "H2a(ii)": "H2a", "H2b(i)": "H2b", "H2b(ii)": "H2b", "H3c": "H3c"}
+QOI_COVERAGE: dict[str, dict[str, tuple[tuple[str, float], ...]]] = {
+    "H2a(i)": {"": (("C3", 0.0), ("C3", 0.3))},
+    "H2a(ii)": {"interior": (("C7", 0.0), ("C7", 0.3))},
+    "H2b(i)": {"": (("C8", 0.0), ("C8", 0.3))},
+    "H2b(ii)": {"": (("C8", 0.0), ("C8", 0.3))},
+    "H3c": {"": (("C4", 0.0), ("C4", 0.3), ("C4h1.5", 0.0), ("C4h2", 0.0))}}
+"""WU-0006 cases mapped to each QoI and part (M7): H2a(i) is a proxy (C3); the zero and the
+w* = 1 parts of H2a(ii) have no case; H2b(i) is C8 (one per-state series at the sweep size, C1
+cited beside it)."""
+
+ROW_NAMES = (
+    ("Oracle Monte Carlo (M draws per state)", "aleatory"),
+    ("Sampling of test states", "aleatory"),
+    ("Bootstrap Monte Carlo error", "numerical"),
+    ("Discretization (RK4)", "numerical"),
+    ("Iterative (Levenberg–Marquardt)", "numerical"),
+    ("Round-off", "numerical"),
+    ("Proxy error (deployable against oracle)", "estimator"),
+    ("Model form: exact model, three systems, scalar observable", "epistemic"),
+    ("Interval procedure (coverage of the block-5 percentile interval)", "statistical method"))
+INCLUDED = ("variance: yes (propagated); finite-M bias: no", "yes", "no", "no", "no", "no",
+            "reported separately", "no", "no")
+BUDGET_HEADING = "## Uncertainty budget (NVVUQ.15)"
+
+NOT_ESTIMATED = "not estimated: "
+INTERVAL_UNBOUNDED = "not estimated: interval unbounded"
+
+
+@dataclass(frozen=True)
+class _Part:
+    """The interval of one part of a QoI in one system, as stored."""
+
+    label: str
+    ci: list | None
+    se: list | None
+    n_failed: int | None
+    n_states: int | None = None
+
+
+def below_tenth(size: float | None, half_width: float | None) -> str:
+    """The flag of a numerical row: ``yes`` iff ``size < 0.1 * half_width`` (strict, M9).
+
+    ``not estimated`` if the size is missing, ``not estimated: interval unbounded`` if the
+    half-width is not finite (or missing).
+    """
+    if size is None:
+        return "not estimated"
+    if half_width is None or not math.isfinite(half_width):
+        return INTERVAL_UNBOUNDED
+    return "yes" if size < FLAG_FRACTION * half_width else "no"
+
+
+def _num(value: float) -> str:
+    return f"{value:.3g}"
+
+
+def _half_width(ci: list | None) -> float | None:
+    if not isinstance(ci, (list, tuple)) or len(ci) != 2 or None in ci:
+        return None
+    return (float(ci[1]) - float(ci[0])) / 2.0
+
+
+def oracle_range_bound(v4_half_width: float, horizons: int = 3) -> float:
+    """F1 of M3: indicative worst-case upward bias of the H2a(i) median range from finite M.
+
+    E[range of k iid N(0, s^2)] is ``2 s / sqrt(pi)`` for k = 2 and ``3 s / sqrt(pi)`` for k = 3
+    (the expected range of three standard normals is ``3 / sqrt(pi)``), with ``s`` the SD of the
+    per-state weight at H_ref, ``s = v4_half_width / z_0.975`` (V4's median half-width is a 95%
+    half-width). Independent draw noise across the horizons is the worst case.
+    """
+    if horizons not in (2, 3):
+        raise ValueError(f"the expected range is tabulated for 2 or 3 horizons; got {horizons}")
+    return horizons / math.sqrt(math.pi) * v4_half_width / NormalDist().inv_cdf(0.975)
+
+
+def oracle_change_share(mean_abs_dev: float, used_draws: int, max_draws: int, n_states: int,
+                        level: float) -> float:
+    """F2 of M3: the share of the H2b(ii) half-width that is oracle-draw variance (an upper bound).
+
+    ``s_mean = a / (sqrt(2/pi) sqrt(1 - M/M_max))`` from V4's mean absolute deviation ``a`` of the
+    weight at ``M`` draws from the largest-``M`` reference (nested draws,
+    ``Var(w_M - w_Mmax) = (1 - M/M_max) s^2``, Gaussian ``E|X| = sqrt(2/pi) sigma``); then
+    ``F2 = z_L sqrt(2) s_mean / sqrt(n)`` with ``z_L`` the normal quantile of the level, assuming
+    zero correlation of the draw noise across the two library sizes and V4's 10^4 SD at 10^3.
+
+    Raises
+    ------
+    ValueError
+        If ``used_draws >= max_draws`` (V4 has no larger reference to compare with) or
+        ``n_states < 1``.
+    """
+    if used_draws >= max_draws or n_states < 1:
+        raise ValueError("F2 needs V4 at a larger M than the one used, and at least one state")
+    s_mean = mean_abs_dev / (math.sqrt(2.0 / math.pi) * math.sqrt(1.0 - used_draws / max_draws))
+    z_level = NormalDist().inv_cdf((1.0 + level) / 2.0)
+    return z_level * math.sqrt(2.0) * s_mean / math.sqrt(n_states)
+
+
+def coverage_shortfall(rate: float, rate_se: float, level: float) -> tuple[float, float]:
+    """Half-width shortfall ``f = z_nom / z_obs - 1`` of an interval that covers at ``rate``.
+
+    If the interval behaves like ``est +- k z_nom SE`` then ``rate = 2 Phi(k z_nom) - 1`` and
+    ``k = z_obs / z_nom`` with ``z_obs = Phi^-1((1 + rate)/2)``; the half-width needed for the
+    nominal coverage is the reported one divided by ``k``, so ``f`` is the shortfall as a fraction
+    of the reported half-width (negative when the coverage is above nominal). The Monte Carlo SE
+    of ``f`` is ``z_nom / z_obs^2 * rate_se / (2 phi(z_obs))`` (delta method).
+
+    Returns
+    -------
+    tuple[float, float]
+        ``f`` and its standard error.
+    """
+    normal = NormalDist()
+    z_nom = normal.inv_cdf((1.0 + level) / 2.0)
+    z_obs = normal.inv_cdf((1.0 + rate) / 2.0)
+    shortfall = z_nom / z_obs - 1.0
+    return shortfall, z_nom / z_obs**2 * rate_se / (2.0 * normal.pdf(z_obs))
+
+
+def mc_error_reason(ci: list | None, n_failed: int | None, n_resamples: int, level: float) -> str:
+    """Why ``statistics.endpoint_mc_error`` returned None, from the interval and the counts (M2).
+
+    The rules are the helper's, in its order: (1) a bound is infinite (the A3 rule), (3) the
+    binomial window leaves (0, 1) at this B, (2) failed resamples reach the window.
+    """
+    if ci is not None and any(not math.isfinite(float(bound)) for bound in ci):
+        return "bound infinite (A3)"
+    alpha = (1.0 - level) / 2.0
+    spread = math.sqrt(alpha * (1.0 - alpha) / n_resamples)
+    if alpha - spread <= 0.0 or (1.0 - alpha) + spread >= 1.0:
+        return f"B = {n_resamples} too small for the binomial window"
+    if n_failed:
+        return f"failed resamples (F = {n_failed}) within one binomial SE of the endpoint"
+    return "the endpoint error is undefined for these inputs"
+
+
+def _parts_of(qoi: str, system: dict) -> list[_Part] | None:
+    """The stored interval parts of a QoI in one system's results, or ``None`` if absent."""
+    result = system.get(QOI_KEYS[qoi])
+    if not isinstance(result, dict):
+        return None
+    if qoi == "H2a(i)":
+        return [_Part("", result.get("range_ci"), result.get("ci_mc_se"),
+                      result.get("range_n_failed_resamples"), result.get("n_eligible_states"))]
+    if qoi == "H2a(ii)":
+        parts = result.get("part_ii")
+        if not isinstance(parts, dict):
+            return None
+        return [_Part(name, p.get("ci"), p.get("ci_mc_se"), p.get("n_failed_resamples"),
+                      p.get("n_states")) for name, p in parts.items()]
+    block = {"H2b(i)": result.get("noise"), "H2b(ii)": result.get("library_change"),
+             "H3c": result}[qoi]
+    if not isinstance(block, dict):
+        return None
+    return [_Part("", block.get("ci"), block.get("ci_mc_se"), block.get("n_failed_resamples"),
+                  block.get("n_states"))]
+
+
+def _v4(system: dict) -> tuple[float, float, int, int] | None:
+    """V4's median half-width, mean absolute deviation, used M and largest M, or ``None``."""
+    conv = system.get("validation", {}).get("convergence")
+    if not isinstance(conv, dict) or "used_M" not in conv:
+        return None
+    used = int(conv["used_M"])
+    entry = conv.get(str(used))
+    if not isinstance(entry, dict) or "median_half_width" not in entry:
+        return None
+    largest = max(int(k) for k in conv if str(k).isdigit())
+    return (float(entry["median_half_width"]), float(entry.get("mean_abs_dev_from_max", math.nan)),
+            used, largest)
+
+
+def _oracle_cell(qoi: str, part: _Part, system: dict, level: float) -> tuple[str, str]:
+    """Row 1: the finite-M bias statement of M3, with F1 or F2 where a formula exists."""
+    flag = "not estimated"
+    if qoi == "H2a(i)":
+        v4 = _v4(system)
+        bound = ("; V4 absent from these results" if v4 is None else
+                 f"; indicative worst case ≤ F1 = {_num(oracle_range_bound(v4[0]))} (independent "
+                 "draw noise across 3 horizons; V4 at H_ref only)")
+        return (NOT_ESTIMATED + "finite-M bias upward (toward fail)" + bound, flag)
+    if qoi == "H2a(ii)":
+        return (NOT_ESTIMATED + "per-state draw variance on the logit scale not stored; the "
+                "classical part attenuates toward 0 (favours a pass; a fail is robust)", flag)
+    if qoi == "H2b(i)":
+        return (NOT_ESTIMATED + "draw noise flips ranks across the four ρ cells and attenuates "
+                "the mean toward 0 (against a pass; a fail is not certified against it); V4 "
+                "exists only at ρ = 1%", flag)
+    if qoi == "H2b(ii)":
+        v4 = _v4(system)
+        share = "variance inside the interval, share not computable (V4 absent)"
+        if v4 is not None and part.n_states and v4[2] < v4[3] and math.isfinite(v4[1]):
+            share = ("variance inside the interval, share ≈ F2 = "
+                     f"{_num(oracle_change_share(v4[1], v4[2], v4[3], part.n_states, level))}")
+        elif v4 is not None:
+            share = ("variance inside the interval, share not computable (V4 has no larger M "
+                     "than the one used)")
+        return (NOT_ESTIMATED + "finite-M clip-boundary bias (≤ 0.40 s per state near a clip "
+                "bound, partly cancelling in the pair); " + share, flag)
+    return (NOT_ESTIMATED + "M-draw noise enters only through the fitted A4 and A5 inputs "
+            "(the interval is conditional on them)", flag)
+
+
+def _bootstrap_cell(part: _Part, half_width: float | None, config: StudyConfig, level: float
+                    ) -> tuple[str, str]:
+    """Row 3: the larger endpoint SE against the half-width; the reason when it is None."""
+    if part.se is None:
+        return (NOT_ESTIMATED + "no ci_mc_se in these results (written before WU-0008.2a)",
+                "not estimated")
+    if len(part.se) != 2 or None in part.se:
+        return (NOT_ESTIMATED + mc_error_reason(part.ci, part.n_failed, config.bootstrap_resamples,
+                                                level), "not estimated")
+    size = max(float(part.se[0]), float(part.se[1]))
+    text = f"{_num(size)} (lower {_num(part.se[0])}, upper {_num(part.se[1])})"
+    if size == 0.0:
+        text = "0 (tie at the endpoint)"
+    return text, below_tenth(size, half_width)
+
+
+def _lm_cell(system: dict, config: StudyConfig) -> tuple[str, str]:
+    """Row 5: not estimated, with the WU-0005.4 diagnostic when its keys are present (M4)."""
+    block: object = system
+    for key in LM_SUMMARY_PATH or ():
+        block = block.get(key) if isinstance(block, dict) else None
+    if LM_SUMMARY_PATH is None or not isinstance(block, dict):
+        return LM_ABSENT, "not estimated"
+    floor = 3.36 * config.core_noise**2
+    ratio = block.get("median_residual")
+    ratio_text = "n/a" if ratio is None else _num(float(ratio) / floor)
+    decrease = block.get("fraction_no_decrease")
+    return (NOT_ESTIMATED + "residual and iteration summary do not convert to the QoI scale "
+            "(excess residual bounds the error in the observation metric only; cond(JᵀJ) ≈ 1e7); "
+            "needs a 15 → 30 iteration refinement of the QoI; diagnostic (core cell): median "
+            f"residual/(3.36ρ²) = {ratio_text}, fraction no decrease = "
+            f"{'n/a' if decrease is None else _num(float(decrease))}", "not estimated")
+
+
+def _proxy_cell(qoi: str, system: dict) -> tuple[str, str]:
+    """Row 7: 0 by construction for the oracle-defined QoIs; H3c reports the fidelity (M8)."""
+    if qoi != "H3c":
+        return ("0: by construction (oracle w*, oracle seeds, oracle Λ̃; no deployable proxy "
+                "enters)", "—")
+    recovery = system.get("oracle_recovery")
+    rows = system.get("H1d", {}).get("rows") if isinstance(system.get("H1d"), dict) else None
+
+    def share(key: str, reference: str) -> str:
+        value = recovery.get(key) if isinstance(recovery, dict) else None
+        if value is None or not math.isfinite(float(value)):
+            return "not computable (A2 ≤ A4o)" if key == "A4_vs_A4o" else "not computable"
+        return f"{_num(100 * float(value))}% of {reference}"
+
+    def rho(name: str) -> str:
+        value = rows.get(name, {}).get("spearman") if isinstance(rows, dict) else None
+        return "n/a" if value is None else _num(float(value))
+
+    return (NOT_ESTIMATED + "the QoI compares two deployable rules, so proxy error is not an "
+            f"error of this QoI; reported separately: A4 recovers {share('A4_vs_A4o', 'A4o')} "
+            f"gain over A2, A5 recovers {share('A5_vs_Astar', 'A*')} gain; H1d Spearman, proxy "
+            f"against oracle: analog seed {rho('analog_seed')}, estimation seed "
+            f"{rho('estimation_seed')}, growth {rho('growth')} (N̂ {rho('nhat')}, reported only)",
+            "—")
+
+
+def _coverage_f(qoi: str, label: str, level: float) -> float | None:
+    """The largest shortfall over the WU-0006 cases mapped to a QoI part (M7), or ``None``."""
+    cases = QOI_COVERAGE[qoi].get(label)
+    if cases is None:
+        return None
+    return max(coverage_shortfall(COVERAGE_WU0006[c].rate, COVERAGE_WU0006[c].rate_se, level)[0]
+               for c in cases)
+
+
+def coverage_how(qoi: str, level: float) -> str:
+    """The "how estimated" text of the interval-procedure row: cases, rates, shortfalls (M7)."""
+    pieces = []
+    for label, cases in QOI_COVERAGE[qoi].items():
+        for case in cases:
+            c = COVERAGE_WU0006[case]
+            f, f_se = coverage_shortfall(c.rate, c.rate_se, level)
+            name = case[0] + (f" φ = {case[1]:g}")
+            pieces.append(f"{(label + ': ') if label else ''}{name} (n = {c.n_states}, {c.design}"
+                          f"): reference coverage {c.rate:.4f} (SE {c.rate_se:.4f}), shortfall "
+                          f"{f:+.3f} ± {f_se:.3f} of the half-width, run 2: {c.count}/1000")
+    tail = ("; zero and w* = 1 parts: no WU-0006 case has a binary target"
+            if qoi == "H2a(ii)" else "")
+    return ("shortfall f = z_nom/z_obs − 1 of the reference coverage (WU-0006, the block-5 "
+            "percentile interval at level 1 − 0.05/3); " + "; ".join(pieces) + tail + "; "
+            f"{SYNTHETIC_SEED_TEXT}; the study's residual lag-1 is unmeasured (DEC-0018 O4); "
+            "DEF-0020: widening or another procedure (Option C or K) is the owner's decision, "
+            f"pending; source: {COVERAGE_PROVENANCE}")
+
+
+def _coverage_cell(qoi: str, part: _Part, half_width: float | None, level: float
+                   ) -> tuple[str, str]:
+    """Row 9: the half-width shortfall of the procedure in QoI units, with its flag."""
+    f_max = _coverage_f(qoi, part.label, level)
+    if f_max is None:
+        return (NOT_ESTIMATED + "no WU-0006 case has a binary target (C7's zero column is "
+                "constant)", "not estimated")
+    if half_width is None or not math.isfinite(half_width):
+        return INTERVAL_UNBOUNDED, "not estimated"
+    if f_max <= 0.0:
+        return "0 (coverage ≥ nominal)", "yes"
+    size = f_max * half_width
+    return _num(size), below_tenth(size, half_width)
+
+
+def _cells(qoi: str, row: int, part: _Part, system: dict, config: StudyConfig, level: float
+           ) -> tuple[str, str]:
+    """The size text and flag of one row for one part of one system."""
+    half_width = _half_width(part.ci)
+    finite = half_width is not None and math.isfinite(half_width)
+    if row == 0:
+        return _oracle_cell(qoi, part, system, level)
+    if row == 1:
+        if half_width is None:
+            return NOT_ESTIMATED + "no interval in these results", "—"
+        if not finite:
+            return NOT_ESTIMATED + "interval unbounded (failed resamples at the A3 threshold)", "—"
+        return _num(half_width), "—"
+    if row == 2:
+        return _bootstrap_cell(part, half_width, config, level)
+    if row == 3:
+        v6 = system.get("validation", {}).get("integrator_max_dev_sigma")
+        shown = "V6 not in these results" if v6 is None else f"V6 = {_num(float(v6))} σ_x"
+        return (f"0 (LPC.NV.1: truth and model share the discrete map); {shown} (map against "
+                "half step over 1 LT; not added)", "yes")
+    if row == 4:
+        return _lm_cell(system, config)
+    if row == 5:
+        if half_width is None:
+            return NOT_ESTIMATED + "no interval in these results", "not estimated"
+        if not finite:
+            return INTERVAL_UNBOUNDED, "not estimated"
+        size = ROUNDOFF_RELATIVE * max(abs(float(part.ci[0])), abs(float(part.ci[1])))
+        return _num(size), below_tenth(size, half_width)
+    if row == 6:
+        return _proxy_cell(qoi, system)
+    if row == 7:
+        return NOT_ESTIMATED + "v3 section 8 (exact model, three systems, scalar observable)", "—"
+    return _coverage_cell(qoi, part, half_width, level)
+
+
+def _how(qoi: str, row: int, config: StudyConfig, level: float) -> str:
+    resamples = config.bootstrap_resamples
+    return (
+        "V4 convergence check (core cell, ρ = 1%, N_lib = 10⁴, H_ref only); the variance "
+        "propagates through the state resampling, the finite-M bias is stated, not sized; F1 and "
+        "F2 are indicative formulas (WU-0008 M3)",
+        "moving-block bootstrap percentile interval (label below); size = half-width (hi − lo)/2",
+        f"binomial error of the percentile index, converted to the statistic's scale: SE = "
+        f"(Q(q + d) − Q(q − d))/2, d = √(q(1 − q)/B), B = {resamples} "
+        "(statistics.endpoint_mc_error); the larger endpoint is compared",
+        "step halving (V6); the QoI is defined on the discrete map (LPC.NV.1)",
+        "WU-0005.4 residual and iteration summary: does not convert to the QoI scale (M4)",
+        f"empirical cross-platform perturbation, {ROUNDOFF_RELATIVE:g} × max(|lo|, |hi|) "
+        "(DEVELOPMENT (DEV-0) against the v1 pilot, M5); excludes a discrete flip (one state's "
+        "share in a median or a K choice)",
+        ("not applicable to the oracle-defined QoI: no deployable proxy enters" if qoi != "H3c"
+         else "A4 against A4o and A5 against A*, and the H1d proxy-oracle correlations (M8)"),
+        "not estimated; stated as a limitation (v3 section 8)",
+        coverage_how(qoi, level))[row]
+
+
+def seed_text(results: dict) -> str:
+    """``DEVELOPMENT (DEV-n)`` (or ``CONFIRMATORY (CONF-n)``) from the provenance block."""
+    block = results.get("provenance")
+    seed_id = block.get("seed_id") if isinstance(block, dict) else None
+    if not isinstance(seed_id, str):
+        return "seed not recorded (no provenance block)"
+    kind = "DEVELOPMENT" if seed_id.startswith("DEV-") else "CONFIRMATORY"
+    return f"{kind} ({seed_id})"
+
+
+def _join_parts(items: list[tuple[str, str]]) -> str:
+    """One cell from the per-part texts: part-labelled when there is more than one part."""
+    if len(items) == 1 and not items[0][0]:
+        return items[0][1]
+    return "; ".join(f"{label or 'all'}: {text}" for label, text in items)
+
+
+def _table(qoi: str, results: dict, systems: list[str], config: StudyConfig, level: float,
+           label: str) -> list[str]:
+    lines = [f"### {QOI_TITLES[qoi]}", "",
+             "| Source | Type | How estimated | " + " | ".join(f"Size: {s}" for s in systems)
+             + " | Included in the reported interval? | Below 10% of the sampling half-width? |",
+             "|" + "---|" * (3 + len(systems) + 2)]
+    for row, (name, kind) in enumerate(ROW_NAMES):
+        sizes, flags = [], []
+        for system_name in systems:
+            system = results["systems"][system_name]
+            parts = _parts_of(qoi, system)
+            if parts is None:
+                text = NOT_ESTIMATED + f"no {QOI_KEYS[qoi]} result in these results"
+                sizes.append(text)
+                flags.append("not estimated")
+                continue
+            pairs = [(part.label, *_cells(qoi, row, part, system, config, level))
+                     for part in parts]
+            sizes.append(_join_parts([(label, text) for label, text, _ in pairs]))
+            flags.append(_join_parts([(label, flag) for label, _, flag in pairs]))
+        flag_cell = flags[0] if len(set(flags)) == 1 else "; ".join(
+            f"{s}: {flag}" for s, flag in zip(systems, flags))
+        cells = [name, kind, _how(qoi, row, config, level).replace("|", "\\|")]
+        cells += [text.replace("|", "\\|") for text in sizes]
+        cells += [INCLUDED[row], flag_cell]
+        lines.append("| " + " | ".join(cells) + " |")
+    lines += ["", f"Interval label — {label}", "",
+              f"Seed: {seed_text(results)}; the interval-procedure row: {SYNTHETIC_SEED_TEXT}.",
+              "", WIDENING_SENTENCE, "", CONDITIONAL_SENTENCE, ""]
+    if qoi == "H3c":
+        lines += [H3C_SENTENCE, ""]
+    lines += [ITERATIVE_SENTENCE]
+    return lines
+
+
+def budget_lines(results: dict, systems: list[str], config: StudyConfig) -> list[str]:
+    """The ``## Uncertainty budget`` section: one table per primary QoI, nine rows each (WU-0008).
+
+    Rows, in order: the eight rows of the ``uq-budget`` skill and the interval procedure. Every
+    size cell is a number, ``0 (...)`` or ``not estimated: <reason>``; results written before
+    ``ci_mc_se``, before the LM summary, or without a system's QoI never raise. Under each table:
+    the interval label of ``interval_label``, the seed line, the 10% rule sentence, and the
+    sentences of M1 (conditional on one realization; for H3c also conditional on the fitted A4 and
+    A5) and the iterative-error statement.
+
+    Parameters
+    ----------
+    results : dict
+        Study results (``systems``, ``provenance``).
+    systems : list[str]
+        Systems in report order.
+    config : StudyConfig
+        Source of the bootstrap resamples, block and ``core_noise``.
+
+    Returns
+    -------
+    list[str]
+        Markdown lines.
+    """
+    lines = [BUDGET_HEADING, "",
+             "One table per primary quantity of interest (H2a, H2b and H3c; the secondaries have "
+             "no table yet). Each size is in the units of the QoI. Sampling is the half-width of "
+             "the reported interval; the numerical rows are flagged against it."]
+    for key in ("H2a", "H2b", "H3c"):
+        row = next(r for r in HYPOTHESIS_TABLE if r.key == key)
+        present = [s for s in systems if key in results["systems"][s]]
+        level = row_level(row, results, present) if present else role_level(row)
+        label = interval_label(row, level, config)
+        for qoi in (q for q in QOI_IDS if QOI_KEYS[q] == key):
+            lines += ["", *_table(qoi, results, systems, config, level, label)]
+    return lines

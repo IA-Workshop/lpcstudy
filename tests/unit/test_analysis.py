@@ -3171,3 +3171,47 @@ def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
     for (array, level), item in zip(seen, part["part_ii"].values()):
         assert item["ci_mc_se"] == list(real(array, level))
         assert list(percentile_interval(array, level)[:2]) == item["ci"]
+
+
+def test_stored_levels_are_found_on_real_producer_output() -> None:
+    """R8: ``budget.stored_levels`` is non-empty on the output of each producer (not a fake).
+
+    Reference: the producers are called on small synthetic inputs of this file (H1a, H1d, H2b, H2e,
+    H3b, H3c) and the expected counts of levels are written out from the plan: one for H1a, H1d,
+    H2b (``library_change``) and H3c, two for H3b (``weight_lambda`` and ``D``) and one per noise
+    level for H2e (two). A producer that renamed a key on a path of ``STORED_LEVEL_PATHS`` would
+    make ``stored_levels`` return nothing and silently disable the label's level cross-check
+    (PRIME.4); every key of ``STORED_LEVEL_PATHS`` must be covered here. Each level equals the
+    level of the row's role. Exact.
+    """
+    from lpcstudy import analysis as an
+    from lpcstudy import budget
+    from lpcstudy.identifiers import HYPOTHESIS_TABLE
+
+    rng = np.random.default_rng(11005)
+    config = _config()
+    same = {0.01: _seed_sq(rng, 300, 1), 0.02: _seed_sq(rng, 300, 1)}
+    x, profile, curvature = _h3b_data(31)
+    n = 50
+    idx = np.arange(n)
+    low = idx / 100.0
+    a4 = np.random.default_rng(21).uniform(1.0, 2.0, 60)
+    noise_cells = {0.01: _stub_cell(TABLE[:, 2]),
+                   0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0))}
+    produced = {
+        "H1a": an.h1a_library_scaling(_fake_cells(same, _gamma_local_dim(rng, 300, D_TRUE)),
+                                      config),
+        "H1d": an.h1d_correlations(_pairs(np.random.default_rng(21011), 500, (0.7861,) * 4),
+                                   "lorenz63", _config(50)),
+        "H2b": an.h2b_knob_response(noise_cells, _library_cells(TABLE), CONFIG),
+        "H2e": an.h2e_noise_matching(_h2e_cells(low, low + 0.3), CONFIG),
+        "H3b": an.h3b_importances(profile, 0.5 * (x[:, 0] > 0.5), curvature,
+                                  3.0 * x[:, 2] + 0.5 * x[:, 0], CONFIG),
+        "H3c": an.h3c_ratio(a4 * 1.01, a4, CONFIG)}
+    expected = {"H1a": 1, "H1d": 1, "H2b": 1, "H2e": 2, "H3b": 2, "H3c": 1}
+    assert set(budget.STORED_LEVEL_PATHS) == set(expected) == set(produced)
+    for row in HYPOTHESIS_TABLE:
+        if row.key in expected:
+            levels = budget.stored_levels(row, produced[row.key])
+            assert len(levels) == expected[row.key], row.key
+            assert all(abs(v - budget.role_level(row)) < 1e-12 for v in levels), row.key

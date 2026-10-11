@@ -511,6 +511,26 @@ Result of run 6: `4 failed, 354 passed in 32.66s`. The four failures were in `te
 
 Result of run 7: `358 passed in 32.11s`. Pending (a preset is running): the A1 smoke comparison at the .2a head, the integration pair, and the slow exact-check nodes `tests/slow/test_analysis_coverage.py::test_exact_checks` for C4, C7, C8 at both phi (DEC-0021 O6).
 
+### 2026-10-11, developer claude-sonnet-5-5: WU-0008.1 and .2b (budget tables), R8
+
+Commit a8bdf0b is the .2a head. Implemented in `lpcstudy/budget.py` (`budget_lines` and helpers, `COVERAGE_WU0006` with provenance, `ROUNDOFF_RELATIVE = 1e-4`, `LM_SUMMARY_PATH = None` until WU-0005.4 names it) and the report hunk R5 (`# --- WU-0008.1 begin/end ---`, after the P2(c) subsection, before Robustness; no existing line edited). Rows and wording follow M1 to M9 as accepted in DEC-0024: finite-M bias stated with F1 (H2a(i)) and F2 (H2b(ii)) only; endpoint error from `ci_mc_se` with the reasons of M2 and "0 (tie at the endpoint)"; discretization 0 with V6; LM "not estimated: WU-0005.4 summary absent from results" (and the M4 text when a path is set); round-off 1e-4 x max(|lo|, |hi|); proxy 0 (H2a, H2b) or the H3c fidelity; model form not estimated; interval procedure from the WU-0006 reference rates (H2a(i) C3, H2a(ii) interior C7 and the zero part not estimated, H2b C8, H3c C4 and C4h) as f = z_nom/z_obs - 1 of the half-width; the 10% flag is strict. Flags per M9. Under each table: the label, the seed line, the 10% sentence, the two M1 sentences (H3c: the extra one) and the iterative-error statement. R8: `test_stored_levels_are_found_on_real_producer_output` in `test_analysis.py` (H1a, H1d, H2b, H2e, H3b, H3c producer output). No `analysis`/`statistics`/`experiments`/`pipeline` file changed in this step, so every results.json leaf is unchanged by it. Self-check grep of the diff: `isfinite` sites in `budget.py` are display branches (an unbounded or missing interval prints "not estimated: ..." and is flagged, never dropped or replaced); no `clip`, `try`, `except`, `where(`; no randomness.
+
+**Test run 8 (.1/.2b and R8).** Checklist:
+1. Change set: `lpcstudy/budget.py`, `lpcstudy/report.py` (hunk R5), `tests/unit/test_budget.py`, `tests/unit/test_analysis.py` (R8 test), this file.
+2. Radius: `tools/test_impact.py --base develop --explain`: unit `test___main__`, `test_allocation`, `test_analysis`, `test_budget`, `test_experiments`, `test_identifiers`, `test_pipeline`, `test_report`, `test_statistics`, `test_tools_test_impact`, `test_validation` (the `budget` and `report` rules; the earlier statistics rule still applies to the branch), plus by hand `test_data.py`. Integration and slow nodes pending (a preset is running).
+3. Already run? No: `budget.py`, `report.py` and two test files changed after run 7.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s.
+6. Contention: unit tier, no preset started.
+7. Output: wrapper's `-q --tb=short -rfE`.
+8. Command: `LPC_THREADS=4 tools/run_tests.sh unit tests/unit/test___main__.py tests/unit/test_allocation.py tests/unit/test_analysis.py tests/unit/test_budget.py tests/unit/test_experiments.py tests/unit/test_identifiers.py tests/unit/test_pipeline.py tests/unit/test_report.py tests/unit/test_statistics.py tests/unit/test_tools_test_impact.py tests/unit/test_validation.py tests/unit/test_data.py`.
+
+Result of run 8: `3 failed, 369 passed in 34.03s`. (a) Two tests in `test_budget.py` lacked `import math` (my omission; fixed). (b) `test_no_stale_identifier_in_the_package` flagged `COVERAGE_PROVENANCE`: the plan's log file name `slow-20261011T165447Z.log` contains the substring "T1" that the test's stale-identifier regex looks for. The test is not changed. The constant now reads `slow-20261011…165447Z.log` with a sentence saying the letter between date and time is elided because of that grep (a deviation from the plan's literal string; the file name is recoverable from the stamp). `--lf`: `3 passed` (B5 at 1e-15 passes).
+
+**Test run 9 (radius once after these fixes).** Checklist: 1. Change set as run 8 plus the two fixes (`budget.py` provenance string, `test_budget.py` import). 2. Radius: as run 8. 3. Already run? No, code changed. 4. `JAX_PLATFORMS=cpu`. 5. `LPC_THREADS=4`, unit timeout 300 s. 6. Unit tier, no preset started. 7. `-q --tb=short -rfE`. 8. Command: as run 8.
+
+Result of run 9: `372 passed in 33.33s`. Report-only at this head: the base smoke results give 4393 leaves, 0 different (the budget section and the other additions are report text); the stored DEV-0 pilot results (old schema: no `ci_mc_se`, no LM summary, no `used_M`) render all five tables with "not estimated: no ci_mc_se in these results (written before WU-0008.2a)" and no exception. **Pending, because `pgrep -fa 'lpcstudy --preset'` still shows the `v1-baseline` pilot:** the full A1 smoke comparison at this head (base smoke is `runs/base/smoke`; `leafcmp.py` as above), the integration pair, and the slow exact-check nodes for C4, C7, C8 (DEC-0021 O6).
+
 ## Review
 
 - **Reviewer:** <actor, not the author>

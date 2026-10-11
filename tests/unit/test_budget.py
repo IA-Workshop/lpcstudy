@@ -9,6 +9,7 @@ matplotlib's own text extents; none is produced by the code under test. All chec
 from __future__ import annotations
 
 import dataclasses
+import math
 import re
 from pathlib import Path
 
@@ -363,3 +364,372 @@ def test_declaration_texts_state_the_statistics_of_the_decision_log() -> None:
     assert 'reads "H3c holds while excess error is flat in K" as "the P3 floor"' in \
         declared["H3c"]["decision_error"]
     assert "not as a failure" not in declared["H3c"]["decision_error"]
+
+
+# ------------------------------------------------------------ WU-0008.1 and .2b: the budget tables
+
+NOTE_WU0006 = ROOT / "docs" / "agent" / "notes" / "2026-10-11-math-wu0006.md"
+NOTE_WU0008_M7B = (ROOT / "docs" / "agent" / "notes" / "2026-10-11-math-wu0008-scripts"
+                   / "m7b.log")
+WU0006_UNIT = ROOT / "docs" / "agent" / "records" / "work" / "WU-0006-simstudies.md"
+SOURCES = [name for name, _ in budget.ROW_NAMES]
+PART_LABEL = re.compile(r"(?:^|; )(zero|interior|one|all): ")
+
+
+def full_system(config=SMOKE) -> dict:  # noqa: ANN001
+    """``fake_system`` plus the keys of WU-0008.2a (``ci_mc_se``) and V4's used M and larger M."""
+    system = fake_system(config)
+    system["H2a"]["ci_mc_se"] = [0.001, 0.002]
+    system["H2a"]["range_n_failed_resamples"] = 0
+    for part in system["H2a"]["part_ii"].values():
+        part["ci_mc_se"] = [0.003, 0.004]
+        part["n_failed_resamples"] = 0
+    system["H2b"]["noise"].update(ci=[0.1, 0.3], ci_mc_se=[0.002, 0.002], n_failed_resamples=0,
+                                  n_states=300)
+    system["H2b"]["library_change"].update(ci_mc_se=[0.001, 0.002], n_states=300,
+                                           n_failed_resamples=0)
+    system["H3c"]["ci_mc_se"] = [0.0005, 0.0006]
+    system["H3c"]["n_failed_resamples"] = 0
+    system["H1d"]["rows"]["analog_seed"]["spearman"] = 0.8
+    convergence = system["validation"]["convergence"]
+    convergence["used_M"] = config.n_oracle_draws
+    convergence[str(config.n_oracle_draws)]["mean_abs_dev_from_max"] = 0.02
+    convergence[str(4 * config.n_oracle_draws)] = {"median_half_width": 0.005,
+                                                   "mean_abs_dev_from_max": 0.0}
+    return system
+
+
+def budget_results(*systems: dict, names=("lorenz63", "rossler", "chua")) -> tuple[dict, list]:
+    """Results with the given systems (in ``names`` order) and the matching system list."""
+    results, _ = fake_results("DEV-0")
+    results["systems"] = dict(zip(names, systems))
+    return results, list(results["systems"])
+
+
+def tables_of(lines: list[str]) -> dict[str, list[list[str]]]:
+    """Heading to the cells of each table row (header and separator dropped), from the lines."""
+    out: dict[str, list[list[str]]] = {}
+    heading = ""
+    for ln in lines:
+        if ln.startswith("### "):
+            heading = ln[4:]
+            out[heading] = []
+        elif ln.startswith("| ") and not ln.startswith("| Source") and heading:
+            out[heading].append(ln[2:-2].split(" | "))
+    return out
+
+
+def part_values(cell: str) -> list[str]:
+    """The values of a size or flag cell: one per part when the cell is part-labelled."""
+    marks = list(PART_LABEL.finditer(cell))
+    if not marks:
+        return [cell]
+    return [cell[m.end():(marks[i + 1].start() if i + 1 < len(marks) else len(cell))]
+            for i, m in enumerate(marks)]
+
+
+def test_every_table_has_nine_rows_in_order_and_no_cell_is_empty_or_unparsable() -> None:
+    """B1: five tables, nine rows in the skill's order, every size a number or "not estimated: why".
+
+    Reference: the skill ``uq-budget`` (the eight rows) and DEC-0021 O2 (the ninth), written out in
+    ``ROW_NAMES`` order here by hand; ``fake_system`` results with the full keys. A size cell, or
+    each part of a part-labelled cell, starts with a digit (a number, ``0 (...)``, ``0: ...``) or
+    with "not estimated: " followed by a non-empty reason. No cell is blank. Exact.
+    """
+    results, systems = budget_results(full_system(), full_system())
+    lines = budget.budget_lines(results, systems, SMOKE)
+    tables = tables_of(lines)
+    assert list(tables) == list(budget.QOI_TITLES.values())
+    skill_rows = ["Oracle Monte Carlo (M draws per state)", "Sampling of test states",
+                  "Bootstrap Monte Carlo error", "Discretization (RK4)",
+                  "Iterative (Levenberg–Marquardt)", "Round-off",
+                  "Proxy error (deployable against oracle)",
+                  "Model form: exact model, three systems, scalar observable",
+                  "Interval procedure (coverage of the block-5 percentile interval)"]
+    for title, rows in tables.items():
+        assert [r[0] for r in rows] == skill_rows, title
+        for cells in rows:
+            assert len(cells) == 3 + 2 + 2, (title, cells[0])  # 2 systems
+            assert all(c.strip() for c in cells), (title, cells[0])
+            for cell in cells[3:5]:
+                for value in part_values(cell):
+                    assert re.match(r"\d", value) or (
+                        value.startswith("not estimated: ") and value[15:].strip()), \
+                        (title, cells[0], value)
+    assert [ln for ln in lines if ln.startswith("### ")] == [
+        f"### {t}" for t in budget.QOI_TITLES.values()]
+
+
+def test_old_schema_and_a_missing_result_give_the_same_rows_and_not_estimated_cells() -> None:
+    """B2: results without ``ci_mc_se``, the LM keys or V4's used M, and a system without H3c.
+
+    Reference: the plan: the same nine rows, no exception, the affected cells "not estimated: why".
+    The old system is ``fake_system`` as it stood before WU-0008 (no ``ci_mc_se``, no ``used_M``);
+    the second system lacks the H3c result and V4. Exact string checks.
+    """
+    old = fake_system(SMOKE)
+    short = full_system()
+    del short["H3c"], short["validation"]
+    results, systems = budget_results(old, short, names=("lorenz63", "rossler"))
+    tables = tables_of(budget.budget_lines(results, systems, SMOKE))
+    assert all(len(rows) == 9 for rows in tables.values())
+    h3c = tables[budget.QOI_TITLES["H3c"]]
+    assert all(r[4].startswith("not estimated: no H3c result") for r in h3c)
+    bootstrap = tables[budget.QOI_TITLES["H2b(ii)"]][2]
+    assert bootstrap[3].startswith("not estimated: no ci_mc_se in these results")
+    assert bootstrap[4] == "0.002 (lower 0.001, upper 0.002)"  # the second system has the keys
+    assert tables[budget.QOI_TITLES["H2a(i)"]][4][3] == budget.LM_ABSENT
+    assert "V4 absent" in tables[budget.QOI_TITLES["H2a(i)"]][0][3]
+    discretization = tables[budget.QOI_TITLES["H2a(i)"]][3][4]
+    assert discretization.startswith("0 (LPC.NV.1") and "V6 not in these results" in discretization
+
+
+def test_the_ten_percent_flag_is_strict() -> None:
+    """B3: sizes 0.09, 0.10 and 0.11 of a half-width of 1 read yes, no, no (M9).
+
+    Reference: the plan (strict "<"): 0.1 * 1.0 == 0.1 exactly in float64, so a size of 0.1 is not
+    below it. An unbounded half-width and a missing size are "not estimated". Exact.
+    """
+    assert [budget.below_tenth(s, 1.0) for s in (0.09, 0.10, 0.11)] == ["yes", "no", "no"]
+    assert budget.below_tenth(0.0, 1.0) == "yes"
+    assert budget.below_tenth(0.5, float("inf")) == "not estimated: interval unbounded"
+    assert budget.below_tenth(0.5, None) == "not estimated: interval unbounded"
+    assert budget.below_tenth(None, 1.0) == "not estimated"
+
+
+def test_coverage_constants_equal_the_wu0006_documents() -> None:
+    """B4: every run-2 count, reference rate and SE equals the documents they come from.
+
+    Reference (parsed from the files, shared nothing with the module): the Log table of
+    ``WU-0006-simstudies.md`` ("| C1, 0 | 945 (918-969) | 983 (963-994) | ..."), whose third column
+    is the count out of 1000 at level 1 - 0.05/3; the reference table of the math note of WU-0006
+    ("| C8 | 300 | 0.3 | 0 | 0.9444 (0.0011) | ... | 0.9806 (0.0007) | ...") for the rate and SE at
+    98.3%; and ``m7b.log`` for the C4h rows. Exact (the documents hold the same four-digit
+    decimals); the n_states of each case equals the note's n.
+    """
+    counts = {}
+    for ln in WU0006_UNIT.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"\| (C\d), (0|0\.3) \| \**(\d+)\**.*? \| \**(\d+)\**", ln)
+        if m:
+            counts[(m.group(1), float(m.group(2)))] = int(m.group(4))
+    reference = {}
+    for ln in NOTE_WU0006.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"\| (C\d) \| (\d+) \| [<=\d.]+ \| (0|0\.3) \| [\d.]+ \([\d.]+\) \| [\d.]+ "
+                     r"\| \[[\d, ]+\] \| ([\d.]+) \(([\d.]+)\) \|", ln)
+        if m:
+            reference[(m.group(1), float(m.group(3)))] = (
+                float(m.group(4)), float(m.group(5)), int(m.group(2)))
+    log = {}
+    for ln in NOTE_WU0008_M7B.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"C4h s(1\.5|2) phi0\s+p_ref ([\d.]+) \(([\d.]+)\)", ln)
+        if m:
+            log[("C4h" + m.group(1), 0.0)] = (float(m.group(2)), float(m.group(3)))
+    assert len(counts) >= 16 and len(reference) == 18 and len(log) == 2
+    for key, case in budget.COVERAGE_WU0006.items():
+        if key[0].startswith("C4h"):
+            assert (case.rate, case.rate_se) == log[key], key
+            assert case.count == {"C4h1.5": 965, "C4h2": 984}[key[0]]  # WU-0006 Log, F5 row
+            continue
+        assert case.count == counts[key], key
+        assert (case.rate, case.rate_se, case.n_states) == reference[key], key
+
+
+def test_oracle_row_formulas_equal_the_hand_expressions() -> None:
+    """B5: F1 and F2 of M3 against one float expression each (1e-15 relative).
+
+    Reference: F1 = (3/sqrt(pi)) h / z_0.975 with z_0.975 from ``scipy.stats.norm.ppf`` (a
+    different quantile implementation from the module's ``statistics.NormalDist``), F2 =
+    z_L sqrt(2) s / sqrt(n) with s = a / (sqrt(2/pi) sqrt(1 - M/M_max)), z_L = ppf((1 + level)/2),
+    on hand values h = 0.02, a = 0.03, M = 200, M_max = 800, n = 300, level 1 - 0.05/3. Tolerance:
+    one expression of about ten operations plus two quantile evaluations that agree to a few ulp:
+    1e-15 relative was fixed by the plan.
+    """
+    from scipy.stats import norm
+
+    level = 1.0 - 0.05 / 3.0
+    f1 = 3.0 / math.sqrt(math.pi) * 0.02 / norm.ppf(0.975)
+    assert budget.oracle_range_bound(0.02) == pytest.approx(f1, rel=1e-15)
+    s_mean = 0.03 / (math.sqrt(2.0 / math.pi) * math.sqrt(1.0 - 200 / 800))
+    f2 = norm.ppf((1.0 + level) / 2.0) * math.sqrt(2.0) * s_mean / math.sqrt(300)
+    assert budget.oracle_change_share(0.03, 200, 800, 300, level) == pytest.approx(f2, rel=1e-15)
+    assert budget.oracle_range_bound(0.02, horizons=2) == pytest.approx(
+        2.0 / math.sqrt(math.pi) * 0.02 / norm.ppf(0.975), rel=1e-15)
+    with pytest.raises(ValueError):
+        budget.oracle_change_share(0.03, 800, 800, 300, level)
+    with pytest.raises(ValueError):
+        budget.oracle_range_bound(0.02, horizons=4)
+
+
+def test_oracle_cell_shows_f1_and_f2_with_three_digits() -> None:
+    """The oracle row prints F1 (H2a(i)) and F2 (H2b(ii)) from the stored V4, 3 significant digits.
+
+    Reference: the functions of B5 (hand-checked) formatted with ``f"{x:.3g}"``; V4 of the full
+    fake system: half-width 0.01, mean deviation 0.02 at M = 30, larger M = 120; H2b(ii) n = 300.
+    """
+    results, systems = budget_results(full_system(), names=("lorenz63",))
+    tables = tables_of(budget.budget_lines(results, systems, SMOKE))
+    level = 1.0 - 0.05 / 3.0
+    f1 = budget.oracle_range_bound(0.01)
+    f2 = budget.oracle_change_share(0.02, 30, 120, 300, level)
+    assert f"F1 = {f1:.3g}" in tables[budget.QOI_TITLES["H2a(i)"]][0][3]
+    assert f"F2 = {f2:.3g}" in tables[budget.QOI_TITLES["H2b(ii)"]][0][3]
+    assert tables[budget.QOI_TITLES["H2b(ii)"]][0][5] == "not estimated"
+
+
+def test_coverage_shortfall_matches_the_applied_mathematician_table() -> None:
+    """f = z_nom/z_obs - 1 and its SE reproduce the M7 table; f = 10% at p = 0.9705.
+
+    Reference: the M7 table of the unit file (WU-0008 design): C8 at phi 0.3, reference 0.9682
+    (SE 0.0009), f +0.115 +- 0.006 (four-digit rates and three-digit results: the table rounds the
+    inputs, so abs 2e-3 on f and 1e-3 on its SE); C3 at phi 0 gives +0.023 +- 0.009; and the
+    statement "f = 10% <=> p = 0.9705" (abs 2e-3: the rate is given to four digits, df/dp is about
+    7). The flag of the whole table (M7 'Flag'): H2a(i) yes, H2a(ii) interior yes, H2b no, H3c no.
+    """
+    level = 1.0 - 0.05 / 3.0
+    f, se = budget.coverage_shortfall(0.9682, 0.0009, level)
+    assert f == pytest.approx(0.115, abs=2e-3) and se == pytest.approx(0.006, abs=1e-3)
+    f, se = budget.coverage_shortfall(0.9807, 0.0010, level)
+    assert f == pytest.approx(0.023, abs=2e-3) and se == pytest.approx(0.009, abs=1e-3)
+    assert budget.coverage_shortfall(0.9705, 0.001, level)[0] == pytest.approx(0.10, abs=2e-3)
+    assert budget.coverage_shortfall(0.99, 0.001, level)[0] < 0.0  # above nominal: no shortfall
+    flags = {q: budget._coverage_f(q, label, level) for q, label in
+             (("H2a(i)", ""), ("H2a(ii)", "interior"), ("H2b(i)", ""), ("H2b(ii)", ""),
+              ("H3c", ""))}
+    assert [f < 0.1 for f in flags.values()] == [True, True, False, False, False]
+    assert budget._coverage_f("H2a(ii)", "zero", level) is None
+
+
+def test_table_cells_for_each_numerical_row() -> None:
+    """Bootstrap error, round-off, discretization, coverage and the flags, by hand values.
+
+    Reference: the full fake system: H3c interval [0.99, 1.04] (half-width 0.025), ``ci_mc_se``
+    [0.0005, 0.0006]; round-off 1e-4 * max(|0.99|, |1.04|) = 1.04e-4; the bootstrap size is the
+    larger endpoint, 0.0006, against 10% of 0.025 = 0.0025: yes; round-off 1.04e-4 < 0.0025: yes;
+    the coverage size is f_max * 0.025 with f_max = 0.1235 (C4h sigma 2, M7, computed in the test
+    from scipy's quantiles): 0.0031 > 0.0025: no.
+    V6 of the fake system 1e-5 is printed with the zero discretization size. Exact strings, 3
+    significant digits.
+    """
+    results, systems = budget_results(full_system(), names=("lorenz63",))
+    rows = tables_of(budget.budget_lines(results, systems, SMOKE))[budget.QOI_TITLES["H3c"]]
+    assert rows[1][3] == "0.025" and rows[1][5] == "—"
+    assert rows[2][3] == "0.0006 (lower 0.0005, upper 0.0006)" and rows[2][5] == "yes"
+    assert rows[3][3].startswith("0 (LPC.NV.1: truth and model share the discrete map); "
+                                 "V6 = 1e-05 σ_x") and rows[3][5] == "yes"
+    assert rows[5][3] == "0.000104" and rows[5][5] == "yes"
+    from scipy.stats import norm
+
+    level = 1.0 - 0.05 / 3.0  # f of C4h sigma 2 (reference rate 0.9669) by scipy's quantiles
+    f_c4h2 = norm.ppf((1.0 + level) / 2.0) / norm.ppf((1.0 + 0.9669) / 2.0) - 1.0
+    assert rows[8][3] == f"{f_c4h2 * 0.025:.3g}" and rows[8][5] == "no"
+    assert rows[7][3].startswith("not estimated: v3 section 8") and rows[7][5] == "—"
+    assert rows[6][3].startswith("not estimated: the QoI compares two deployable rules")
+    assert "H1d Spearman" in rows[6][3] and "analog seed 0.8" in rows[6][3]
+
+
+def test_failed_resamples_tie_and_unbounded_interval_cells() -> None:
+    """None endpoint errors get the reason of M2; a tie reads 0; an unbounded interval says so.
+
+    Reference: hand cases at B = 50 (smoke) and level 1 - 0.05/3: the window leaves (0, 1) ->
+    "B = 50 too small for the binomial window"; an infinite bound -> "bound infinite (A3)"; a
+    finite interval with failures -> "failed resamples (F = 3) within one binomial SE of the
+    endpoint". At B = 2000 with 13 failed resamples and a finite interval the same last text.
+    A tie (``ci_mc_se`` [0, 0]) reads "0 (tie at the endpoint)" and flag yes; an interval
+    [-inf, inf] gives a half-width cell "not estimated: interval unbounded ...", flag "not
+    estimated" and round-off/coverage cells "not estimated: interval unbounded".
+    """
+    level = 1.0 - 0.05 / 3.0
+    assert budget.mc_error_reason([0.0, 1.0], 0, 50, level) == \
+        "B = 50 too small for the binomial window"
+    assert budget.mc_error_reason([-math.inf, 1.0], 20, 2000, level) == "bound infinite (A3)"
+    assert budget.mc_error_reason([0.0, 1.0], 13, 2000, level) == \
+        "failed resamples (F = 13) within one binomial SE of the endpoint"
+    system = full_system()
+    system["H3c"]["ci_mc_se"] = [None, None]
+    system["H3c"]["ci"] = [0.9, 1.1]
+    system["H3c"]["n_failed_resamples"] = 3
+    system["H2b"]["library_change"]["ci_mc_se"] = [0.0, 0.0]
+    system["H2a"]["range_ci"] = [-math.inf, math.inf]
+    system["H2a"]["ci_mc_se"] = [None, None]
+    results, systems = budget_results(system, names=("lorenz63",))
+    tables = tables_of(budget.budget_lines(results, systems, SMOKE))
+    h3c = tables[budget.QOI_TITLES["H3c"]][2]
+    assert h3c[3] == "not estimated: B = 50 too small for the binomial window"
+    assert h3c[5] == "not estimated"
+    tie = tables[budget.QOI_TITLES["H2b(ii)"]][2]
+    assert tie[3] == "0 (tie at the endpoint)" and tie[5] == "yes"
+    unbounded = tables[budget.QOI_TITLES["H2a(i)"]]
+    assert unbounded[1][3].startswith("not estimated: interval unbounded")
+    assert unbounded[2][3] == "not estimated: bound infinite (A3)"
+    assert unbounded[5][3] == "not estimated: interval unbounded" and unbounded[8][3] == \
+        "not estimated: interval unbounded"
+    assert unbounded[8][5] == "not estimated"
+
+
+def test_h2a_ii_cells_are_labelled_by_part_and_the_zero_part_has_no_coverage_case() -> None:
+    """H2a(ii) shows each part in each cell; the zero part's coverage cell is "not estimated".
+
+    Reference: M1/M7: the parts are zero and interior (and "one" when stored); C7 maps to the
+    interior part only, so the zero part reads "not estimated: no WU-0006 case has a binary
+    target" and the interior part has a size and the flag "yes" (f_max 0.059 < 0.1). Exact.
+    """
+    system = full_system()
+    system["H2a"]["part_ii"]["one"] = dict(system["H2a"]["part_ii"]["zero"])
+    results, systems = budget_results(system, names=("lorenz63",))
+    rows = tables_of(budget.budget_lines(results, systems, SMOKE))[budget.QOI_TITLES["H2a(ii)"]]
+    assert [m.group(1) for m in PART_LABEL.finditer(rows[1][3])] == ["zero", "interior", "one"]
+    values = part_values(rows[8][3])
+    assert values[0].startswith("not estimated: no WU-0006 case has a binary target")
+    assert re.match(r"[\d.e-]+$", values[1])
+    assert part_values(rows[8][5]) == ["not estimated", "yes", "not estimated"]
+
+
+def test_lm_row_reads_the_summary_when_a_path_is_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With ``LM_SUMMARY_PATH`` set and the keys present the row is "not estimated" plus the diagnostic.
+
+    Reference: M4's text: median residual/(3.36 rho^2) with rho = 0.01 (smoke core noise):
+    a median residual of 6.72e-4 gives 2 (6.72e-4 / (3.36 * 1e-4) = 2, by hand), the fraction
+    of no decrease 0.25. The flag stays "not estimated" (the residual does not convert to the QoI
+    scale). Absent keys give ``LM_ABSENT``. Exact.
+    """
+    monkeypatch.setattr(budget, "LM_SUMMARY_PATH", ("estimators", "summary"))
+    system = full_system()
+    system["estimators"] = {"summary": {"median_residual": 6.72e-4, "fraction_no_decrease": 0.25}}
+    results, systems = budget_results(system, full_system(), names=("lorenz63", "rossler"))
+    row = tables_of(budget.budget_lines(results, systems, SMOKE))[
+        budget.QOI_TITLES["H3c"]][4]
+    assert row[3].startswith("not estimated: residual and iteration summary do not convert")
+    assert "median residual/(3.36ρ²) = 2, fraction no decrease = 0.25" in row[3]
+    assert row[4] == budget.LM_ABSENT and row[6] == "not estimated"
+
+
+def test_text_under_every_table() -> None:
+    """Under each table: the interval label, the seed line, the 10% rule, and the M1 sentences.
+
+    Reference: the plan and M1: the label contains the four elements; "DEVELOPMENT (DEV-0)" from
+    the provenance block; the H3c table has the extra "Conditional on the fitted A4 and A5"
+    sentence and no other table has it; the iterative-error statement is under all five; a
+    results dict without provenance says the seed is not recorded.
+    """
+    results, systems = budget_results(full_system(), names=("lorenz63",))
+    text = "\n".join(budget.budget_lines(results, systems, SMOKE))
+    assert text.count("Interval label — procedure:") == 5
+    assert text.count("Seed: DEVELOPMENT (DEV-0); the interval-procedure row: synthetic, seed "
+                      "6006, not a registered seed.") == 5
+    assert text.count(budget.WIDENING_SENTENCE) == 5 == text.count(budget.CONDITIONAL_SENTENCE)
+    assert text.count(budget.H3C_SENTENCE) == 1 == text.count("Conditional on the fitted A4")
+    assert text.count(budget.ITERATIVE_SENTENCE) == 5
+    del results["provenance"]
+    assert "seed not recorded" in "\n".join(budget.budget_lines(results, systems, SMOKE))
+    assert all(tag in ln for ln in text.splitlines() if ln.startswith("Interval label — ")
+               for tag in TAGS)
+
+
+def test_markdown_has_the_budget_section_between_validation_and_robustness(
+        tmp_path: Path) -> None:
+    """RESULTS.md holds the budget section once, after the validation gate and before Handling."""
+    lines = markdown(tmp_path)
+    heads = [ln for ln in lines if ln.startswith("## ")]
+    assert heads.count(budget.BUDGET_HEADING) == 1
+    i = heads.index(budget.BUDGET_HEADING)
+    assert heads[i - 1] == "## Validation gate" and heads[i + 1] == "## Figures"

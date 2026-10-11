@@ -23,6 +23,9 @@ from .budget import (caption_figure, figure_caption_lines, interval_label_lines,
 # --- WU-0008.4 begin ---
 from .budget import qoi_declaration_lines  # noqa: E402
 # --- WU-0008.4 end ---
+# --- WU-0008.1 begin ---
+from .budget import budget_lines  # noqa: E402
+# --- WU-0008.1 end ---
 
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7",
           "#e34948"]
@@ -624,6 +627,9 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
               *_lyapunov_lines(results, systems)]
     lines += ["", "### Theorem P2(c) bound (verification check, not a hypothesis)", "",
               *_p2c_lines(results, systems)]
+    # --- WU-0008.1 begin ---
+    lines += ["", *budget_lines(results, systems, config)]
+    # --- WU-0008.1 end ---
 
     if "robustness" in results:
         lines += ["", "## Robustness (core cell)", ""]
