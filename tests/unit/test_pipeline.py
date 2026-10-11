@@ -295,3 +295,85 @@ def test_moment_counters_a5_floors_and_bad_input() -> None:
         moment_counters(bare, 2)
     with pytest.raises(ValueError, match="reference horizon"):
         moment_counters(moments, 31)
+
+
+def test_fit_counters_sum_by_k_and_chosen() -> None:
+    """``fit_counters`` sums the empty regimes over K, keeps the chosen K and the pooled floors.
+
+    Reference: hand-built maps. K = 2 has 1 empty regime, K = 3 has 0, K = 4 has 2 (``empty`` masks
+    written out), with pooled floors 0, 1, 0; chosen K = 4; A2 floor 1; 1 constant target.
+    Expected: ``empty_regime_fallback == 3``, by-K ``{"2": 1, "3": 0, "4": 2}``, chosen 2,
+    ``pooled_curvature_floor == 2``, ``regime_target_constant == 1``. The by-K keys are strings,
+    so that the block round-trips through JSON. Exact.
+    """
+    import json
+
+    from lpcstudy.pipeline import fit_counters
+
+    def regime_map(empty: list[bool], pooled: int) -> RegimeMap:
+        return RegimeMap(tree=None, leaf_ids=np.arange(len(empty)), weights=np.zeros((len(empty), 1)),
+                         horizons_km=np.full(len(empty), np.nan), empty=np.array(empty),
+                         pooled_curvature_floor=pooled)
+
+    maps = {2: regime_map([True, False], 0), 3: regime_map([False] * 3, 1),
+            4: regime_map([True, False, True, False], 0)}
+    got = fit_counters(maps, 4, a2_floor=1, target_constant=1)
+    assert got == {"empty_regime_fallback": 3, "empty_regime_fallback_by_K": {"2": 1, "3": 0, "4": 2},
+                   "empty_regime_fallback_chosen": 2, "pooled_curvature_floor": 2,
+                   "regime_target_constant": 1}
+    assert json.loads(json.dumps(got)) == got
+
+
+def test_fit_rules_records_fit_counters(monkeypatch) -> None:
+    """``fit_rules`` returns ``handled`` with the empty-regime, floor and constant-target counts.
+
+    Reference: a hand construction with the heavy parts stubbed (proxy fit, error-predictor fit
+    and the profile: the profile of a split is its ``growth_proxy`` column, a 1-D feature). Config:
+    2 steps per Lyapunov time, H_max = 4, H_ref = 2, K in (2, 3). 40 construction states, half at
+    x = -1 (E_C = 2, E_P = 1, C = 0, so w* = 1/3) and half at x = +1 (E_C = 1, E_P = 2, C = 0, so
+    w* = 2/3); the error moments make the hybrid exceed theta at horizon 1 for every state, so the
+    log-horizon target is the constant 0 and the weight target is not: ``regime_target_constant``
+    is exactly 1 (once, not once per K: D7). Calibration profiles are all x = +1, so with only two
+    distinct feature values every K has two leaves and the x = -1 leaf is empty: by K
+    ``{"2": 1, "3": 1}``, total 2, and the chosen K is 2 (the rule picks the smallest K inside the
+    margin; both maps are identical), so ``empty_regime_fallback_chosen == 1``. All curvatures
+    are 3, so ``pooled_curvature_floor == 0``. Exact integers.
+    """
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    from lpcstudy import pipeline
+    from lpcstudy.ensemble import EvaluationDraws
+
+    config = replace(StudyConfig(), steps_per_lyapunov=2, horizon_max_lyapunov=2.0,
+                     reference_horizon_lyapunov=1.0, eval_horizons_lyapunov=(0.5, 1.0, 2.0),
+                     regime_counts=(2, 3), regime_max_primary=3, primary_threshold=0.2)
+    assert config.horizon_max == 4 and config.reference_horizon == 2
+    n_draws, n_hor = 2, 4
+
+    def split(n: int, x: np.ndarray, planned: bool) -> SplitData:
+        e_c = np.where(x < 0, 2.0, 1.0)[:, None] * np.ones((1, n_hor))
+        e_p = np.where(x < 0, 1.0, 2.0)[:, None] * np.ones((1, n_hor))
+        moments = moments_from_triples(e_c, e_p, np.zeros((n, n_hor)))
+        moments.kept = {"inputs": np.zeros((n, 1, 1)), "cp_err": np.zeros((n, 1, 1)),
+                        "plp_err": np.zeros((n, 1, 1))}
+        ones = np.ones((n, n_draws, n_hor))
+        evals = EvaluationDraws(
+            horizons=np.arange(1, n_hor + 1), cp_err=ones, plp_err=ones,
+            verify_noise=np.zeros_like(ones), distance=np.ones((n, n_draws)),
+            est_nu=np.ones((n, n_draws)), growth_proxy=np.repeat(x[:, None], n_draws, axis=1),
+            gain_proxy=ones, inputs=np.zeros((n, n_draws, 1)), noise_sens=np.zeros((n, n_draws)))
+        return SplitData(moments=moments, evals=evals)
+
+    x_con = np.concatenate([-np.ones(20), np.ones(20)])
+    cell = SimpleNamespace(noise=0.01, splits={"construction": split(40, x_con, True),
+                                               "calibration": split(40, np.ones(40), True)})
+    monkeypatch.setattr(pipeline, "ProfileProxies", SimpleNamespace(fit=lambda *a, **k: "proxies"))
+    monkeypatch.setattr(pipeline, "ErrorPredictor", SimpleNamespace(fit=lambda *a, **k: "predictor"))
+    monkeypatch.setattr(pipeline, "deployable_profile", lambda ev, *a, **k: ev.growth_proxy[..., None])
+    rules = pipeline.fit_rules([cell], config)
+    assert rules.chosen_regimes == 2
+    assert rules.handled == {"empty_regime_fallback": 2,
+                             "empty_regime_fallback_by_K": {"2": 1, "3": 1},
+                             "empty_regime_fallback_chosen": 1, "pooled_curvature_floor": 0,
+                             "regime_target_constant": 1}

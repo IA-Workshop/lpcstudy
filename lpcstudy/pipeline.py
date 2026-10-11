@@ -21,8 +21,8 @@ from pathlib import Path
 import numpy as np
 
 from .allocation import ErrorPredictor, ProfileProxies, RegimeMap, calibrate_regimes, \
-    closed_form_weight, deployable_profile, fit_regime_tree, global_weight, regime_regret, \
-    state_horizon_target
+    closed_form_weight, constant_target_count, deployable_profile, fit_regime_tree, \
+    global_weight, pooled_floor_count, regime_regret, state_horizon_target
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, build_context, make_rng
 from .ensemble import CORRELATION_FIELDS, AnalogLibrary, EnsembleMoments, EvaluationDraws, \
@@ -94,6 +94,7 @@ class FittedRules:
     predictor: ErrorPredictor
     regimes: dict[int, RegimeMap]
     chosen_regimes: int
+    handled: dict[str, object] = field(default_factory=dict)
 
 
 def allocator_grid(config: StudyConfig) -> np.ndarray:
@@ -371,7 +372,51 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
                                            config.primary_threshold, a2)
     chosen = _choose_regimes(regimes, cal_profile, cal_moments, config)
     return FittedRules(proxies=proxies, global_weights=a2, predictor=predictor,
-                       regimes=regimes, chosen_regimes=chosen)
+                       regimes=regimes, chosen_regimes=chosen,
+                       handled=fit_counters(regimes, chosen, pooled_floor_count(con_moments),
+                                            constant_target_count(w_target, t_target)))
+
+
+FIT_COUNTERS: tuple[str, ...] = (
+    "empty_regime_fallback", "empty_regime_fallback_chosen", "pooled_curvature_floor",
+    "regime_target_constant")
+"""Scalar counters of one ``fit_rules`` call; ``empty_regime_fallback_by_K`` (a dict keyed by the
+string of ``K``) comes with them in ``FittedRules.handled``."""
+
+
+def fit_counters(regimes: dict[int, RegimeMap], chosen: int, a2_floor: int,
+                 target_constant: int) -> dict[str, object]:
+    """Counters of one rule fit (DEF-0001; Q4 of DEC-0017 renames the ROADMAP key).
+
+    * ``empty_regime_fallback``: (K, regime) pairs with no calibration (state, draw), summed over
+      all fitted ``K``, with ``empty_regime_fallback_by_K`` and the count at the chosen ``K``
+      (``empty_regime_fallback_chosen``: only the chosen ``K`` reaches A5 and H3).
+    * ``pooled_curvature_floor``: the A2 pool plus every regime pool of every ``K`` whose summed
+      curvature was below ``1e-300`` at some horizon (summed over horizons).
+    * ``regime_target_constant``: constant tree targets, once per fit (D7).
+
+    Parameters
+    ----------
+    regimes : dict[int, RegimeMap]
+        Calibrated maps by ``K`` (built by ``calibrate_regimes``).
+    chosen : int
+        The chosen ``K``.
+    a2_floor : int
+        :func:`pooled_floor_count` of the A2 pool.
+    target_constant : int
+        :func:`constant_target_count` of the tree targets.
+
+    Returns
+    -------
+    dict[str, object]
+        The counters of ``FIT_COUNTERS`` and ``empty_regime_fallback_by_K``.
+    """
+    by_k = {str(k): int(regimes[k].empty.sum()) for k in sorted(regimes)}
+    return {"empty_regime_fallback": sum(by_k.values()), "empty_regime_fallback_by_K": by_k,
+            "empty_regime_fallback_chosen": by_k[str(chosen)],
+            "pooled_curvature_floor": int(a2_floor + sum(r.pooled_curvature_floor
+                                                         for r in regimes.values())),
+            "regime_target_constant": int(target_constant)}
 
 
 def choose_regime_count(excess_by_count: Mapping[int, float], margin: float = 0.05) -> int:

@@ -209,6 +209,51 @@ def closed_form_floor_count(eps_sq: np.ndarray, delta_sq: np.ndarray) -> int:
     return int(np.sum(eps_sq + delta_sq < 1e-300))
 
 
+def nu_cap_clip_count(est_nu: np.ndarray, nu_cap: float) -> int:
+    """Estimates that the winsorization cap of :class:`ProfileProxies` changes (``nu_cap_clips``).
+
+    ``features`` takes ``np.minimum(nu_hat, nu_cap)``, which changes exactly the entries with
+    ``nu_hat > nu_cap`` (strict: an entry equal to the cap is not clipped). On construction the
+    cap is the 99th percentile, so about 1% (exactly ``ceil(0.01 (N - 1))`` without ties) are
+    clipped by construction; on other splits the rate is a diagnostic.
+
+    Parameters
+    ----------
+    est_nu : np.ndarray
+        ``nu_hat`` per (state, draw), any shape.
+    nu_cap : float
+        The cap of the fitted proxies.
+
+    Returns
+    -------
+    int
+        Number of entries above the cap.
+    """
+    return int(np.sum(est_nu > nu_cap))
+
+
+def constant_target_count(w_target: np.ndarray, log_t_target: np.ndarray) -> int:
+    """Targets of :func:`fit_regime_tree` whose standard deviation is below its ``1e-12`` guard.
+
+    The tree standardizes each target by ``std + 1e-12``. A constant target (std 0, or round-off
+    of order 1e-16) is then divided by the guard instead of its spread; this counts the columns
+    (0 to 2) for which the guard is larger than the spread. The targets do not depend on ``K``,
+    so the caller counts once per fit (D7).
+
+    Parameters
+    ----------
+    w_target, log_t_target : np.ndarray
+        The two per-state targets, ``(n,)``.
+
+    Returns
+    -------
+    int
+        0, 1 or 2.
+    """
+    targets = np.column_stack([w_target, log_t_target])
+    return int(np.sum(targets.std(axis=0) < 1e-12))
+
+
 def pooled_floor_count(moments: EnsembleMoments, members: np.ndarray | None = None) -> int:
     """Horizons at which a pooled curvature is below the ``1e-300`` floor (A2, regime weights).
 
@@ -325,12 +370,21 @@ class RegimeMap:
         Optimal regime weights ``(K, nH)`` from the calibration split (Theorem P3(a)).
     horizons_km : np.ndarray
         Kaplan-Meier median horizon per regime (steps; ``nan`` if not reached).
+    empty : np.ndarray or None
+        Boolean ``(K,)``: regime ``k`` had no calibration (state, draw), so its weights are the
+        ``fallback`` row (A2) and its Kaplan-Meier horizon is NaN (``empty_regime_fallback``).
+        ``None`` for hand-built maps.
+    pooled_curvature_floor : int
+        Number of (regime, horizon) pools whose summed curvature was below the ``1e-300``
+        floor of :func:`regime_weight` (a sentinel; 0 for hand-built maps).
     """
 
     tree: DecisionTreeRegressor
     leaf_ids: np.ndarray
     weights: np.ndarray
     horizons_km: np.ndarray
+    empty: np.ndarray | None = None
+    pooled_curvature_floor: int = 0
 
     @property
     def n_regimes(self) -> int:
@@ -437,7 +491,9 @@ def calibrate_regimes(tree: DecisionTreeRegressor, profile: np.ndarray,
     Returns
     -------
     RegimeMap
-        Calibrated regime map.
+        Calibrated regime map; ``empty`` marks the regimes that fell back to ``fallback``
+        (with NaN Kaplan-Meier horizon), and ``pooled_curvature_floor`` counts the floored
+        pools. Neither changes a weight.
     """
     leaf_ids = np.nonzero(tree.tree_.children_left == -1)[0]
     leaves = tree.apply(profile.reshape(-1, profile.shape[-1])).reshape(profile.shape[:2])
@@ -445,10 +501,14 @@ def calibrate_regimes(tree: DecisionTreeRegressor, profile: np.ndarray,
     n_regimes = len(leaf_ids)
     weights = np.tile(fallback, (n_regimes, 1)).astype(float)
     horizons_km = np.full(n_regimes, np.nan)
+    empty = np.zeros(n_regimes, dtype=bool)
+    pooled_floor = 0
     for k in range(n_regimes):
         state_idx, draw_idx = np.nonzero(regime == k)
         if state_idx.size == 0:
+            empty[k] = True
             continue
+        pooled_floor += pooled_floor_count(moments, state_idx)
         weights[k] = regime_weight(moments, state_idx)
         if np.array_equal(ev.horizons, np.arange(1, len(ev.horizons) + 1)):
             err = weights[k] * ev.cp_err[state_idx, draw_idx] + \
@@ -457,7 +517,7 @@ def calibrate_regimes(tree: DecisionTreeRegressor, profile: np.ndarray,
             dur, event = realized_horizon(err, ev.horizons, theta)
             horizons_km[k] = kaplan_meier(dur, event, len(ev.horizons)).median()
     return RegimeMap(tree=tree, leaf_ids=leaf_ids, weights=weights,
-                     horizons_km=horizons_km)
+                     horizons_km=horizons_km, empty=empty, pooled_curvature_floor=pooled_floor)
 
 
 def regime_regret(regime_map: RegimeMap, profile: np.ndarray, moments: EnsembleMoments,
