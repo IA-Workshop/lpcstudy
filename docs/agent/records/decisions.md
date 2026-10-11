@@ -332,3 +332,15 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0002.12 step 3, WU-0004.3. Marked "needs owner review before freeze".
 
 **Dissent and resolution (REPRO.8):** none. Status: proposed.
+
+## DEC-0021: WU-0008: defaults for the planner's questions O1 to O6 (declaration table, ninth budget row, constants, figures, secondaries, slow nodes)  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision (defaults, so the work can proceed; none is irreversible).**
+- **O1.** The QoI declaration table has **14 rows** (the gain bound included, as NVVUQ.22 asks), not the ROADMAP's 13; the ROADMAP row is amended by the owner.
+- **O2.** The budget has the **ninth row 'Interval procedure (coverage)'** (DEF-0020); adding it to the `uq-budget` skill is the owner's edit.
+- **O3.** The WU-0006 coverage numbers are **constants with provenance** in `budget.COVERAGE_WU0006` (the run-2 analysis tables were overwritten, WU-0006 R2), with a unit test that parses the WU-0006 Log table as the independent reference.
+- **O4.** **Captions only** for figures (no interval drawn; LPC.PC.1).
+- **O5.** Budget tables for the secondaries and Q-N: **later** (a follow-up), the ROADMAP limits .1 to the five primaries.
+- **O6.** For the endpoint-error change (.2a): the unit tiers of `statistics` and its dependants, the integration tier, and the slow `test_exact_checks` nodes for C4, C7 and C8 at both phi, once.
+
+**Affects:** WU-0008. Marked "needs owner review before freeze". **Status:** proposed.
