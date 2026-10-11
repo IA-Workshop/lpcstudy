@@ -283,8 +283,8 @@ def excess_mse(moments: EnsembleMoments, weight: np.ndarray) -> np.ndarray:
 
     Hypothesis: ``c > 0`` (P1(a): ``c >= rho^2 / k``). A non-positive or non-finite
     curvature is not filtered here (it makes ``u`` infinite or NaN through the
-    ``1e-300`` floor of ``oracle_weight``); counting it belongs to the floor audit of
-    DEF-0001.
+    ``1e-300`` floor of ``oracle_weight``); the entries with ``c < 1e-300`` are counted as
+    ``curvature_floor`` in the cell blocks of ``handling`` (``pipeline.moment_counters``).
 
     Parameters
     ----------

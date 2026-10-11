@@ -451,7 +451,8 @@ def regime_weight(moments: EnsembleMoments, members: np.ndarray) -> np.ndarray:
     ``c_i = E[(e_C - e_P)^2]`` of state ``i``. The mean of the clipped ``w*_i``
     weighted by ``c_i`` is not this minimizer (DEF-0003). The denominator keeps the
     ``1e-300`` floor of ``oracle_weight`` (it cannot bind under P1(a), where
-    ``c >= rho^2 / k``; counting it belongs to DEF-0001).
+    ``c >= rho^2 / k``; ``pooled_floor_count`` counts the pools where it would bind, as
+    ``pooled_curvature_floor`` in the ``fitting`` block of ``handling``).
 
     Parameters
     ----------
