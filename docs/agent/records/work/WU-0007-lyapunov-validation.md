@@ -322,6 +322,26 @@ Tightened: Lorenz 3% → 1%. Unchanged: Rössler 3% (both references) and memo 1
 
 **Result (four rows).** `13 passed in 5.18s`. Durations: lorenz63 1.37 s, chua 1.13 s, chua_memo 1.02 s, rossler 0.79 s. Memo case measured (scratch script, same code): lambda_max 0.323544 per tau against 0.3286: -1.53% (0.39 of the 3.9% sigma; tolerance 10%); max over the orbit of (x, y, z) = (2.242, 0.399, 3.185), so |x| 2.242 <= 3. The research note gets a dated line for it below. Observed |x| maxima of all four cases: Lorenz 19.27 (40), Rössler 11.43 (25; below 16.7, no referral), Chua 2.263 (3), memo 2.242 (3).
 
+**WU-0007.3 implementation (developer, claude-sonnet-5-5).** `lpcstudy/report.py`: constants `LYAPUNOV_REFERENCES` (Lorenz 0.90563 at 1%; Rössler 0.0714 and 0.07062 each at 3%; Chua none; sources named) and `LYAPUNOV_MEMO` (0.23/0.7 at 10%), the function `_lyapunov_lines`, and the subsection `### Largest Lyapunov exponent against published values` after the V7 rows. Values come from `systems.<s>.context.lambda_max` (no schema change). A system without it shows "n/a". The memo row is not computed in a run (the study does not run that set); it names the unit test that asserts it and says it validates the routine and the field form, not the study's Chua parameters (main-session instruction 2026-10-11, DEC-0010 update). The sentences: LPC.NV.1 convention, NVVUQ.13 referent, the Chua known limitation, and "report-only: does not enter the validation gate or any verdict". `verdicts()`, `VALIDATION_CRITERIA` and the gate are untouched. No import edge or module changed, so the graph fixture is not edited. `fake_system` was NOT changed (the new test adds `context` to its own systems), so no other `test_report` test is affected. Test: `test_markdown_lyapunov_section_has_comparisons_convention_and_referent` in `tests/unit/test_report.py`.
+
+**§4.9 checklist before the WU-0007.3 unit invocation.**
+1. Change set: ` M lpcstudy/report.py`, ` M tests/unit/test_report.py` (committed on the branch against develop: test_data.py, the note, this unit file).
+2. Radius: `report.py` is a pipeline-tier module: own test `test_report.py` plus direct dependent `test___main__.py` (hand-derived from §4.2 and the import graph, as the coordinator specified), plus `test_identifiers.py` (report imports identifiers); the tool's `--explain` list is longer (it lists 14 unit files and all integration), so the coordinator's smaller set is used. Smaller than the suite.
+3. Already run? No.
+4. Device: wrapper sets CPU. 5. Threads 4, unit timeout 300 s. 6. CPU only, no lock.
+7. Output: wrapper's `-q --tb=short -rfE`.
+8. Command: `tools/run_tests.sh unit tests/unit/test_report.py tests/unit/test___main__.py tests/unit/test_identifiers.py`.
+
+**Result (unit radius).** `54 passed in 2.00s`.
+
+**§4.9 checklist before the integration invocation.** 1. Change set as above (no new change since the unit run). 2. Radius: report.py is a pipeline-tier module, so the integration tier; the coordinator's set `test_cli_seeds.py` and `test_preset_wrapper.py` (the smoke itself is run by hand below, not through `test_smoke_pipeline.py`, §4.2). 3. Not run before. 4. Device: wrapper sets CPU. 5. Threads 4, integration timeout 900 s. 6. No `pilot` or `full` of mine; `pgrep -fa "lpcstudy --preset"` checked before. 7. Wrapper output flags. 8. `tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`.
+
+**Result (integration radius).** `10 passed in 113.53s (0:01:53)`. (Another agent's smoke preset was running on CPU; no pilot or full.)
+
+**DEV-0 smoke comparison.** Base: `runs/dev/base-0007/smoke` (taken at commit 3bb2e4e, before the report change). New: `runs/dev/new-0007/smoke`, `tools/run_preset.sh smoke DEV-0 runs/dev/new-0007`, exit 0, 19 s. Every `results.json` leaf was compared (floats by their IEEE bytes). Leaves that differ: 12, all provenance or timing, none numerical: `seconds` (study, system, three estimator entries), `provenance.{peak_rss_bytes, dirty, end_utc, start_utc, commit, wall_seconds}` and `provenance.argv[3]` (the out dir). All statistics, scores, verdicts, validation and `context.lambda_max` are bitwise equal. `RESULTS.md` differs in the provenance rows (commit, dirty, argv, times) and by the new subsection only: a lorenz63 row (0.905494 against 0.9056, -0.02%, PASS within 1%), the memo row ("not computed in this run", names the unit test), and the four sentences. (-0.02% is -0.015% rounded by `:+.2f`.)
+
+**Self-check.** Grep of the library diff for `clip|nan_to_num|isfinite|where(|try:|except|default_rng|random.|PRNGKey`: no hits. No tolerance in any assert or approx grew (Lorenz tightened to 1% from the roadmap's 3% by amendment A2; the others are as the amendment states). float64 throughout (the orbit dtype is float64, checked). Rössler observed max|x| 11.43 is below 16.7: no referral.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>

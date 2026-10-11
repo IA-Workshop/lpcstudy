@@ -322,3 +322,67 @@ def test_markdown_validation_table_has_the_two_v7_rows(tmp_path: Path) -> None:
     assert "| V7 median slope of ln δ on ln ρ | [0.9, 1.1] | 1.05 PASS | 1.2 FAIL | n/a |" in table
     names = [row.split(" | ")[0][2:6] for row in table if row.startswith("| V")]
     assert names == ["V1 d", "V1 a", "V2 l", "V3 C", "V4 w", "V5 K", "V6 R", "V7 m", "V7 m"]
+
+
+def test_markdown_lyapunov_section_has_comparisons_convention_and_referent(tmp_path: Path) -> None:
+    """The validation section compares lambda_max with published values and states two sentences.
+
+    Reference: hand strings (WU-0007.3 plan and amendment A6). Fake lambda_max: lorenz63 0.9
+    gives 0.9 / 0.90563 - 1 = -0.00622, "-0.62%", inside 1% (PASS). rossler 0.08 gives
+    0.08 / 0.0714 - 1 = +0.12045, "+12.04%", and 0.08 / 0.07062 - 1 = +0.13282, "+13.28%", both
+    outside 3% (FAIL, with the LPC.NV.1 phrase). chua 0.43 has no reference: the limitation text,
+    no difference. The memo row names the unit test and says the set is a different one. The
+    LPC.NV.1 convention and the NVVUQ.13 referent sentences are checked verbatim, as is the
+    report-only sentence. A lorenz63 result without ``context`` gives "n/a" cells, not a skipped
+    row (PRIME.4). Tolerance: none (exact strings; the percentages are rounded to 2 decimals by
+    ``:+.2f``; the hand values 12.0448 and 13.2822 are far from float round-off, 1e-12).
+    """
+    config = dataclasses.replace(SMOKE, core_systems=("lorenz63", "rossler", "chua"))
+    results, _ = fake_results("DEV-0")
+    values = {"lorenz63": 0.9, "rossler": 0.08, "chua": 0.43}
+    systems = {name: fake_system(config) for name in config.core_systems}
+    for name, value in values.items():
+        systems[name]["context"] = {"lambda_max": value}
+    results["systems"] = systems
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    start = lines.index("### Largest Lyapunov exponent against published values")
+    assert start > lines.index("## Validation gate")
+    section = lines[start:]
+    assert "| lorenz63 | 0.9 | 0.9056 | Sprott, sprott.physics.wisc.edu/chaos/lespec.htm " \
+        "(confirmed) | -0.62% | PASS: within 1% |" in section
+    assert "| rossler | 0.08 | 0.0714 | Sprott as cited by Bogdanov and Bogdanova, " \
+        "arXiv:1412.2242 (secondary) | +12.04% | FAIL: outside 3%; step size suspected " \
+        "(LPC.NV.1), reported, not tuned |" in section
+    assert "| rossler | 0.08 | 0.07062 | Bogdanov and Bogdanova, arXiv:1412.2242, own estimate " \
+        "0.07062 ± 0.00066 (primary) | +13.28% | FAIL: outside 3%; step size suspected " \
+        "(LPC.NV.1), reported, not tuned |" in section
+    assert "| chua | 0.43 | none | no confirmed published value | n/a | not validated: no " \
+        "published reference at these parameters (known limitation, NVVUQ.13, DEC-0010) |" \
+        in section
+    memo = next(row for row in section if row.startswith("| chua, memo parameter set"))
+    assert "| 0.3286 |" in memo and "within 10% is asserted by `tests/unit/test_data.py::" \
+        "test_lyapunov_cached_matches_published_reference[chua_memo]`" in memo
+    assert "a different parameter set from the study's: validates the routine and the field " \
+        "form, not the study's Chua parameters |" in memo
+    assert ("Every quantity is defined for the fixed-step RK4 flow map at the configured "
+            "observation interval, not for the continuous ODE (LPC.NV.1). λ_max is estimated "
+            "on that map by Benettin's method and compared in natural time units with "
+            "published values for the continuous systems.") in section
+    assert ("Validation against a real-world referent does not apply: the three systems are "
+            "mathematical models (NVVUQ.13).") in section
+    assert ("Chua at the study's own parameters (α=15.6, β=28, m0=−1.143, m1=−0.714) has no "
+            "confirmed published value (known limitation, NVVUQ.13, DEC-0010): its λ_max is "
+            "reported but not validated.") in section
+    assert ("This comparison is report-only: it does not enter the validation gate or any "
+            "verdict.") in section
+
+    bare_config = dataclasses.replace(SMOKE, core_systems=("lorenz63",))
+    bare, _ = fake_results("DEV-0")
+    bare["systems"] = {"lorenz63": fake_system(bare_config)}
+    bare["verdicts"] = verdicts(bare, bare_config)
+    write_markdown(bare, bare_config, tmp_path / "BARE.md")
+    rows = (tmp_path / "BARE.md").read_text().splitlines()
+    assert "| lorenz63 | n/a | 0.9056 | Sprott, sprott.physics.wisc.edu/chaos/lespec.htm " \
+        "(confirmed) | n/a | n/a: no λ_max in the results |" in rows

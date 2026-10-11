@@ -209,6 +209,73 @@ def _v7_rows(results: dict, systems: list[str]) -> list[str]:
             "| V7 median slope of ln δ on ln ρ | [0.9, 1.1] | " + " | ".join(slope_cells) + " |"]
 
 
+# Published largest Lyapunov exponents, per natural time unit, with the relative tolerance of the
+# comparison (WU-0007; tolerances derived in tests/unit/test_data.py, not tuned). The study's own
+# Chua parameters have no confirmed published value (known limitation, NVVUQ.13, DEC-0010).
+LYAPUNOV_REFERENCES: dict[str, list[tuple[float, float, str]]] = {
+    "lorenz63": [(0.90563, 0.01, "Sprott, sprott.physics.wisc.edu/chaos/lespec.htm (confirmed)")],
+    "rossler": [
+        (0.0714, 0.03, "Sprott as cited by Bogdanov and Bogdanova, arXiv:1412.2242 (secondary)"),
+        (0.07062, 0.03, "Bogdanov and Bogdanova, arXiv:1412.2242, own estimate "
+                        "0.07062 ± 0.00066 (primary)")],
+    "chua": [],
+}
+# A different Chua parameter set (alpha 9, beta 100/7, m0 -8/7, m1 -5/7): 0.23 per circuit time of
+# the memo, divided by 0.7 (tau = 0.7 t, derived), tolerance 10%.
+LYAPUNOV_MEMO = (0.23 / 0.7, 0.10, "Matsumoto, Chua and Komuro, UCB/ERL M84/73 (1984), "
+                 "μ1 = 0.23 per circuit time ÷ 0.7 (derived); Martins (2016) states 0.33")
+LYAPUNOV_MEMO_TEST = ("tests/unit/test_data.py::"
+                      "test_lyapunov_cached_matches_published_reference[chua_memo]")
+
+
+def _lyapunov_lines(results: dict, systems: list[str]) -> list[str]:
+    """Markdown of the subsection comparing lambda_max with published values (WU-0007.3).
+
+    The code's value is read from ``systems.<s>.context.lambda_max``; the references and
+    tolerances are the constants above. A system without that value shows "n/a", not a skip. The
+    comparison is report-only: it does not enter the validation gate or any verdict.
+    """
+    lines = ["| System | Code λ_max | Published | Source | Relative difference | Result |",
+             "|---|---|---|---|---|---|"]
+    for s in systems:
+        found = results["systems"][s].get("context", {}).get("lambda_max")
+        code = "n/a" if found is None else _fmt(found, 6)
+        references = LYAPUNOV_REFERENCES.get(s, [])
+        if not references:
+            lines.append(f"| {s} | {code} | none | no confirmed published value | n/a | "
+                         "not validated: no published reference at these parameters "
+                         "(known limitation, NVVUQ.13, DEC-0010) |")
+        for value, tolerance, source in references:
+            if found is None:
+                gap, verdict = "n/a", "n/a: no λ_max in the results"
+            else:
+                relative = found / value - 1.0
+                gap = f"{100 * relative:+.2f}%"
+                verdict = (f"PASS: within {100 * tolerance:g}%" if abs(relative) <= tolerance
+                           else f"FAIL: outside {100 * tolerance:g}%; step size suspected "
+                                "(LPC.NV.1), reported, not tuned")
+            lines.append(f"| {s} | {code} | {_fmt(value, 4)} | {source} | {gap} | {verdict} |")
+    value, tolerance, source = LYAPUNOV_MEMO
+    lines.append(f"| chua, memo parameter set (α=9, β=100/7, m0=−8/7, m1=−5/7) | not computed "
+                 f"in this run | {_fmt(value, 4)} | {source} | n/a | "
+                 f"within {100 * tolerance:g}% is asserted by `{LYAPUNOV_MEMO_TEST}`; "
+                 "a different parameter set from the study's: validates the routine and the "
+                 "field form, not the study's Chua parameters |")
+    lines += ["",
+              "Every quantity is defined for the fixed-step RK4 flow map at the configured "
+              "observation interval, not for the continuous ODE (LPC.NV.1). λ_max is estimated "
+              "on that map by Benettin's method and compared in natural time units with "
+              "published values for the continuous systems.", "",
+              "Chua at the study's own parameters (α=15.6, β=28, m0=−1.143, m1=−0.714) has no "
+              "confirmed published value (known limitation, NVVUQ.13, DEC-0010): its λ_max is "
+              "reported but not validated.", "",
+              "Validation against a real-world referent does not apply: the three systems are "
+              "mathematical models (NVVUQ.13).", "",
+              "This comparison is report-only: it does not enter the validation gate or any "
+              "verdict."]
+    return lines
+
+
 def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
     """Write the human-readable results report.
 
@@ -280,6 +347,8 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
             cells.append(_fmt(value, 3) + flag)
         lines.append(f"| {label} | {criterion} | " + " | ".join(cells) + " |")
     lines += _v7_rows(results, systems)
+    lines += ["", "### Largest Lyapunov exponent against published values", "",
+              *_lyapunov_lines(results, systems)]
 
     if "robustness" in results:
         lines += ["", "## Robustness (core cell)", ""]
