@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import inspect
 import json
 import zlib
@@ -154,43 +155,116 @@ def test_sklearn_seed_rejects_negative_seed_and_bad_types() -> None:
         sklearn_seed(1.5, "regime-tree")  # type: ignore[arg-type]
 
 
-def test_every_random_state_keyword_is_a_sklearn_seed_call() -> None:
-    """In ``lpcstudy/`` every ``random_state=`` keyword value is a ``sklearn_seed(...)`` call.
+def _is_master_seed(node: ast.expr) -> bool:
+    """True for the name ``seed`` or the attribute ``config.seed`` / ``cfg.seed``."""
+    if isinstance(node, ast.Name):
+        return node.id == "seed"
+    return (isinstance(node, ast.Attribute) and node.attr == "seed"
+            and isinstance(node.value, ast.Name) and node.value.id in ("config", "cfg"))
 
-    Reference: the ``ast`` parse of every module (no import of the code under test); sites with
-    a different value (a raw ``config.seed``, a name, a literal) fail the scan. At least four
-    sites must exist (analysis x3, allocation x1), so the scan cannot pass vacuously.
-    Tolerance: none. Scope: DEC-0008 B; the labels at the sites are also checked to be distinct
-    string literals.
+
+def _scan_random_state(sources: dict[str, str]) -> tuple[int, list[str]]:
+    """Scan module sources for ``random_state=`` uses that bypass ``sklearn_seed``.
+
+    Returns the number of ``random_state=`` sites and a list of problems. A site is accepted
+    only if its value is ``sklearn_seed(<master seed>, "<literal label>")`` with the master seed
+    the name ``seed`` or ``config.seed`` / ``cfg.seed`` (not a constant, an offset or another
+    name) and the label a distinct string literal (distinct across all ``sources``). A call that
+    carries a ``random_state=`` keyword and also ``**`` unpacking, or unpacks a dict literal with
+    the key ``"random_state"``, is flagged too.
     """
-    import ast
-    from pathlib import Path
-
-    package = Path(__file__).resolve().parents[2] / "lpcstudy"
-    sites: list[str] = []
-    bad: list[str] = []
-    labels: list[str] = []
-    for path in sorted(package.glob("*.py")):
-        tree = ast.parse(path.read_text(), filename=str(path))
-        for node in ast.walk(tree):
+    sites = 0
+    problems: list[str] = []
+    labels: dict[str, str] = {}
+    for name, source in sources.items():
+        for node in ast.walk(ast.parse(source, filename=name)):
             if not isinstance(node, ast.Call):
                 continue
+            has_state = any(k.arg == "random_state" for k in node.keywords)
+            for keyword in node.keywords:
+                if keyword.arg is not None:
+                    continue
+                literal = keyword.value
+                if has_state or (isinstance(literal, ast.Dict) and any(
+                        isinstance(key, ast.Constant) and key.value == "random_state"
+                        for key in literal.keys)):
+                    problems.append(f"{name}:{node.lineno} ** unpacking with random_state")
             for keyword in node.keywords:
                 if keyword.arg != "random_state":
                     continue
-                where = f"{path.name}:{keyword.value.lineno}"
-                sites.append(where)
+                sites += 1
                 value = keyword.value
+                where = f"{name}:{value.lineno}"
                 func = value.func if isinstance(value, ast.Call) else None
-                name = getattr(func, "id", getattr(func, "attr", None))
-                if name != "sklearn_seed":
-                    bad.append(where)
+                callee = getattr(func, "id", getattr(func, "attr", None))
+                if callee != "sklearn_seed" or value.keywords or len(value.args) != 2:
+                    problems.append(f"{where} not a sklearn_seed(seed, label) call")
                     continue
-                label = value.args[1] if len(value.args) == 2 else None
-                if isinstance(label, ast.Constant) and isinstance(label.value, str):
-                    labels.append(label.value)
+                first, label = value.args
+                if not _is_master_seed(first):
+                    problems.append(f"{where} first argument is not the master seed")
+                if not (isinstance(label, ast.Constant) and isinstance(label.value, str)):
+                    problems.append(f"{where} label is not a string literal")
+                elif label.value in labels:
+                    problems.append(
+                        f"{where} label {label.value!r} duplicates {labels[label.value]}")
                 else:
-                    bad.append(f"{where} (label is not a string literal)")
-    assert len(sites) >= 4, sites
-    assert not bad, f"random_state= not routed through sklearn_seed: {bad}"
-    assert len(set(labels)) == len(labels), f"labels not distinct: {sorted(labels)}"
+                    labels[label.value] = where
+    return sites, problems
+
+
+def test_random_state_scan_flags_bypasses_and_passes_good_forms() -> None:
+    """The scanner flags every bypass of ``sklearn_seed`` and passes the two accepted forms.
+
+    Reference: hand-written source strings (not repository files) whose verdict is known by
+    construction. Tolerance: none. Flagged: ``random_state=0``; ``random_state=config.seed``
+    (raw seed); ``sklearn_seed(0, "y")`` (constant first argument); ``sklearn_seed(seed + 1,
+    "z")`` (offset); ``sklearn_seed(other, "z")``; a duplicate label; a non-literal label; a
+    ``**`` unpacking with ``random_state`` either as a keyword of the same call or as a key of
+    a dict literal. Passed: ``sklearn_seed(seed, "x")`` and ``sklearn_seed(config.seed, "x")``
+    (also ``cfg.seed``).
+    """
+    bad_sources = {
+        "const": "M(random_state=0)",
+        "raw": "M(random_state=config.seed)",
+        "const_seed": 'M(random_state=sklearn_seed(0, "y"))',
+        "offset": 'M(random_state=sklearn_seed(seed + 1, "z"))',
+        "other_name": 'M(random_state=sklearn_seed(other, "z"))',
+        "nonliteral_label": "M(random_state=sklearn_seed(seed, name))",
+        "kw_label": 'M(random_state=sklearn_seed(seed, label="x"))',
+        "unpack_dict": 'M(**{"random_state": config.seed})',
+        "unpack_with_state": 'M(random_state=sklearn_seed(seed, "x"), **kw)',
+    }
+    for name, source in bad_sources.items():
+        _, problems = _scan_random_state({name: source})
+        assert problems, f"{name} was not flagged"
+    duplicate = 'A(random_state=sklearn_seed(seed, "x"))\nB(random_state=sklearn_seed(seed, "x"))'
+    sites, problems = _scan_random_state({"dup": duplicate})
+    assert sites == 2 and len(problems) == 1 and "duplicates" in problems[0]
+    sites, problems = _scan_random_state({"a": 'A(random_state=sklearn_seed(seed, "x"))',
+                                          "b": 'B(random_state=sklearn_seed(config.seed, "w"))',
+                                          "c": 'C(random_state=sklearn_seed(cfg.seed, "v"))',
+                                          "d": "f(**kw)"})
+    assert sites == 3 and problems == []
+
+
+def test_every_random_state_keyword_is_a_sklearn_seed_call() -> None:
+    """In ``lpcstudy/`` every ``random_state=`` value is ``sklearn_seed(<master seed>, "<label>")``.
+
+    Reference: the ``ast`` parse of every module (no import of the code under test), by the
+    scanner whose verdicts are tested on source strings above. The first argument must be the
+    master seed (``seed``, ``config.seed`` or ``cfg.seed``), the label a distinct string
+    literal, and no call may carry ``random_state`` together with ``**`` unpacking. At least
+    four sites must exist (analysis x3, allocation x1), so the scan cannot pass vacuously.
+    Tolerance: none. Scope: DEC-0008 B. Limit: a MISSING ``random_state`` keyword is not caught
+    (scikit-learn then draws from the global NumPy state): telling whether an estimator needs a
+    seed requires its class semantics, which an AST scan does not know, so that stays with the
+    review and with the ``make_rng`` rule in numerical-code.md.
+    """
+    from pathlib import Path
+
+    package = Path(__file__).resolve().parents[2] / "lpcstudy"
+    sources = {path.name: path.read_text() for path in sorted(package.glob("*.py"))}
+    sites, problems = _scan_random_state(sources)
+    assert sites >= 4, sites
+    assert not problems, f"random_state= not routed through sklearn_seed: {problems}"
