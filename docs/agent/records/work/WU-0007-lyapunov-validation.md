@@ -302,6 +302,26 @@ Tightened: Lorenz 3% → 1%. Unchanged: Rössler 3% (both references) and memo 1
 7. Output: the wrapper's `-q --tb=short -rfE`; `--durations=10` added for the §4.6 evidence.
 8. Command: `tools/run_tests.sh unit --durations=10 tests/unit/test_data.py`.
 
+**Result (Lorenz, Rössler, Chua rows).** `12 passed in 4.09s` (the file's 9 older tests plus the 3 rows). Durations: lorenz63 1.60 s, rossler 0.96 s, chua 0.95 s per row (call, including JIT). Committed a3526db. Measured values (scratch script, same code): Lorenz 0.9054940535 (-0.015% against 0.90563, 0.11 code SE); Rössler 0.0719397851 (+0.76% against 0.0714, +1.87% against 0.07062); Chua 0.4311326016 (not validated, no assertion). The research-note addendum is appended in the same commit.
+
+**Main-session instruction 2026-10-11, DEC-0010 update (memo case added).** The coordinator reports the researcher's re-read of the memo UCB/ERL M84/73: the condition of plan amendment A3 is met for lambda_max only. Handling: a fourth row `chua_memo` of the same parametrized test, after the three rows above were run and committed.
+- Spec built in the test: `SystemSpec(name="chua_memo", field_fn=chua_field, params={alpha: 9, beta: 100/7, m0: -8/7 (inner), m1: -5/7 (outer)}, dim=3, observed_index=0, initial_state=(0.7,0,0), max_dt=0.005)`.
+- Verified against `lpcstudy/systems.py:74-101`: `chua_field` has x' = alpha(y - x - f), y' = x - y + z, z' = -beta y with f = m1 x + (m0 - m1)(|x+1| - |x-1|)/2, so the slope is m0 for |x| < 1 (inner) and m1 outside; this is the memo's (1.1)/(1.2) after tau = 0.7 t (researcher's section "Chua memo re-read": (1.1) quoted verbatim, (1.3) parameters) and Martins (2016) eq. (2) with a = m0, b = m1.
+- Reference 0.23 / 0.7 = 0.3286 per dimensionless time (derived from the memo, confirmed to two digits; weak second source Martins 2016, 0.33). Tolerance 10% (mathematician's combined sigma about 3.9%). Orbit guard max|x| <= 3 (first coordinate) as for the registry Chua.
+- Not asserted, and stated so in the docstring: the memo's mu_3 (-0.28), the exponent sum (-0.05), the Kaplan-Yorke dimension (2.82): internally contradictory in the memo.
+- The code's value at this set (0.3235, mathematician's development run) was seen before the tolerance was fixed; the 10% rests on the error budget alone (docstring says so).
+- The test parameter changed from a system name to the `SystemSpec` itself (so that the memo spec need not enter the registry); the other three rows are unchanged in content.
+
+**§4.9 checklist before the second WU-0007.2 invocation (the code changed since a3526db).**
+1. Change set: `git status --porcelain`: ` M tests/unit/test_data.py` (and this unit file).
+2. Radius: test file only, "that file only" rule: `tests/unit/test_data.py`, unit tier; no `lpcstudy/` change.
+3. Already run? The earlier run was on the previous version of the file (no memo row); this is a changed file, so one run of the new version.
+4. Device: wrapper sets `JAX_PLATFORMS=cpu`. 5. Threads: 4, unit timeout 300 s. 6. Contention: CPU only.
+7. Output: wrapper's `-q --tb=short -rfE`, `--durations=10`.
+8. Command: `tools/run_tests.sh unit --durations=10 tests/unit/test_data.py`.
+
+**Result (four rows).** `13 passed in 5.18s`. Durations: lorenz63 1.37 s, chua 1.13 s, chua_memo 1.02 s, rossler 0.79 s. Memo case measured (scratch script, same code): lambda_max 0.323544 per tau against 0.3286: -1.53% (0.39 of the 3.9% sigma; tolerance 10%); max over the orbit of (x, y, z) = (2.242, 0.399, 3.185), so |x| 2.242 <= 3. The research note gets a dated line for it below. Observed |x| maxima of all four cases: Lorenz 19.27 (40), Rössler 11.43 (25; below 16.7, no referral), Chua 2.263 (3), memo 2.242 (3).
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
