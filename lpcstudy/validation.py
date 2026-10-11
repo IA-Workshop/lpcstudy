@@ -361,7 +361,7 @@ def p2_bound_population(r1: np.ndarray, delta: np.ndarray, noise: float, dim: in
 
 def p2_bound_terms(library: AnalogLibrary, clean: np.ndarray, unit_noise: np.ndarray,
                    noise: float) -> dict[str, np.ndarray]:
-    """The terms of Theorem P2(c) for a set of states, on the production retrieval path.
+    """The terms of Theorem P2(c) (v3 §3; Methods v2 §M5) for a set of states, on the production path.
 
     For each clean query ``x`` (row of ``clean``) the function takes the draws
     ``q_r = x + rho z_r`` exactly as ``forecast_draws`` forms them, retrieves ``Y_r`` through

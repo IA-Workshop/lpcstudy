@@ -529,7 +529,9 @@ def test_p2_chain_holds_on_switching_states_against_closed_forms() -> None:
     (rho^2 D) = L^2 p^2 / (rho^2 D)`` (Huygens: ``N^2 = A - centre``). Design: rho = 0.1,
     r1 = 5 rho, ``default_rng(50056)`` (WU-0005.5a, M7). Tolerances (M4/M7): ``|N - N_ref| <=
     tau_N + kappa N_ref``, ``|A - A_ref| <= kappa A_ref``, ``|N^2 - (A - centre)| <= tau_N^2 + 2
-    kappa A`` (observed errors are at most 0.004 of these). Premises asserted: at least 100
+    kappa A``; the centre term is also compared with ``L^2 p^2 / (rho^2 D)`` at relative 1e-9 (absolute
+    1e-24 for p = 0, where it is the square of a centring round-off of at most 1e-16)
+    (observed errors are at most 0.004 of these). Premises asserted: at least 100
     switching states, 40 states with B > 0 and A == 0, 40 with B == 0, and no distractor retrieved
     (``n_switch == K`` exactly). Violations: 0.
     """
