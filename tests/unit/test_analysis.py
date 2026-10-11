@@ -2189,8 +2189,8 @@ def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -
                                "horizon_tree_importance", "degenerate_fits", "nan_resamples",
                                "n_states", "n_resamples", "max_leaf_nodes", "threshold", "verdict",
                                "pass", "reason"}
-    assert set(out["H3c"]) == {"A5_over_A4_mse", "ci", "level", "n_states", "n_failed_resamples",
-                               "threshold", "verdict", "pass", "reason"}
+    assert set(out["H3c"]) == {"A5_over_A4_mse", "ci", "ci_mc_se", "level", "n_states",
+                               "n_failed_resamples", "threshold", "verdict", "pass", "reason"}
     assert out["H3c"] == analysis.h3c_ratio(a5.state_mse_ref, a4.state_mse_ref, CONFIG)
     col = CONFIG.reference_horizon - 1
     assert out["H3b"] == analysis.h3b_importances(
@@ -2974,11 +2974,13 @@ def _old_boot(config: StudyConfig, stat, n_items: int, level: float = 0.95, salt
 
 
 def _inject_first_call(monkeypatch: pytest.MonkeyPatch, failing: set[int], value: float) -> None:
-    """Make the statistic of the FIRST ``analysis.block_bootstrap_counted`` call return ``value``
+    """Make the statistic of the FIRST ``analysis.bootstrap_values`` call return ``value``
     on the calls numbered ``failing`` (0-based; calls 0..B-1 are the resamples, call B is the
-    point estimate, in the order of ``bootstrap_values``). Later calls (part ii) are untouched."""
+    point estimate). Later calls (part ii) are untouched. WU-0008.2a: H2b(i) calls
+    ``bootstrap_values`` (the body of ``block_bootstrap_counted``) to keep the resample values,
+    so the injection point moved from the wrapper to its body; the semantics are unchanged."""
     from lpcstudy import analysis
-    real = analysis.block_bootstrap_counted
+    real = analysis.bootstrap_values
     seen = {"calls": 0}
 
     def wrapper(statistic, *args, **kwargs):
@@ -2993,7 +2995,7 @@ def _inject_first_call(monkeypatch: pytest.MonkeyPatch, failing: set[int], value
             return value if k in failing else statistic(idx)
         return real(faulty, *args, **kwargs)
 
-    monkeypatch.setattr(analysis, "block_bootstrap_counted", wrapper)
+    monkeypatch.setattr(analysis, "bootstrap_values", wrapper)
 
 
 def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails() -> None:
@@ -3097,3 +3099,75 @@ def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_incon
             assert noise["reason"] == "failed resamples >= threshold" and not noise["pass"]
             assert result["verdict"] == "inconclusive" and result["pass"] is False
             assert result["reason"].startswith("noise: ")
+
+
+# ------------------------------------------------------ WU-0008.2a: ci_mc_se at the five primary sites
+
+
+def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """A2: ``ci_mc_se`` equals ``endpoint_mc_error`` of the same resample values, exactly.
+
+    Reference: the values are recomputed in the test with ``statistics.bootstrap_values`` at the
+    documented seeds (H3c ``make_rng(seed, "h3c-ratio")``; H2b(i) the integer ``seed + 3``; H2b(ii)
+    ``make_rng(seed, "h2b-library-change", "0.01")``), and ``endpoint_mc_error`` is the helper
+    tested in ``test_statistics`` (E1 to E3). H2a(i) and H2a(ii) are checked by spying on the
+    helper: the array it receives for each part is the one the reported interval is the percentile
+    interval of (``percentile_interval`` of that array equals ``ci``), and the key equals the
+    helper's output on it. The sites that are not primary (H2e, the reported H2b change, H2c) carry
+    no such key. Exact equality; no tolerance.
+    """
+    from lpcstudy import analysis as an
+    from lpcstudy.statistics import bootstrap_values, endpoint_mc_error, percentile_interval
+
+    # H3c
+    rng = np.random.default_rng(21)
+    a4 = rng.uniform(1.0, 2.0, 60)
+    a5 = a4 * (1.0 + 0.1 * rng.uniform(size=60))
+    out = an.h3c_ratio(a5, a4, CONFIG)
+    _, values = bootstrap_values(lambda idx: float(a5[idx].mean() / a4[idx].mean()), 60, 200, 5,
+                                 make_rng(CONFIG.seed, "h3c-ratio"))
+    assert out["ci_mc_se"] == list(endpoint_mc_error(values, LEVEL))
+    assert all(isinstance(v, float) for v in out["ci_mc_se"])
+
+    # H2b(i) and (ii)
+    noise_cells = {0.01: _stub_cell(TABLE[:, 2]),
+                   0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0))}
+    res = an.h2b_knob_response(noise_cells, _library_cells(TABLE, (0.01, 0.02)), CONFIG)
+    diff = TABLE[:, 2] - TABLE[:, 0]
+    _, values = bootstrap_values(lambda idx: float(np.mean(diff[idx])), 6, 200, 5,
+                                 make_rng(CONFIG.seed, "h2b-library-change", "0.01"))
+    assert res["library_change"]["ci_mc_se"] == list(endpoint_mc_error(values, LEVEL))
+    rho_levels = np.array([0.01, 0.02])
+    w_rho = np.column_stack([an._split_weights(noise_cells[r], CONFIG) for r in rho_levels])
+    corr, _ = an._per_state_spearman_counted(rho_levels, w_rho)
+    _, values = bootstrap_values(lambda idx: float(np.mean(corr[idx])), len(corr), 200, 5,
+                                 CONFIG.seed + 3)
+    assert res["noise"]["ci_mc_se"] == list(endpoint_mc_error(values, LEVEL))
+    assert "ci_mc_se" not in res["library_change_reported"]["0.02"]
+
+    # H2a(i) and (ii): spy on the helper
+    seen: list[tuple[np.ndarray, float]] = []
+    real = an.endpoint_mc_error
+
+    def spy(array: np.ndarray, level: float):  # noqa: ANN202
+        seen.append((np.array(array), level))
+        return real(array, level)
+
+    monkeypatch.setattr(an, "endpoint_mc_error", spy)
+    gen = np.random.default_rng(12)
+    weights = np.sort(gen.uniform(0.0, 1.0, (200, 3)), axis=1)
+    small = gen.uniform(size=(200, 3)) < 0.8
+    first = an.h2a_initial_segments(weights, small, ["1", "2", "4"], n_resamples=200, block=5,
+                                    seed=3, level=LEVEL)
+    assert len(seen) == 1  # the main statistic only (the complete-case interval is a sensitivity)
+    assert first["ci_mc_se"] == list(real(*seen[0])) and None not in first["ci_mc_se"]
+    assert list(percentile_interval(*seen[0])[:2]) == first["range_ci"]
+    seen.clear()
+    data = _synthetic("S0", 300, np.random.default_rng(3))
+    part = an.h2a_part_ii(data["w"], data["lam"], data["x"], n_resamples=200, block=5, seed=2,
+                          level=LEVEL)
+    assert len(seen) == len(part["part_ii"]) >= 2
+    for (array, level), item in zip(seen, part["part_ii"].values()):
+        assert item["ci_mc_se"] == list(real(array, level))
+        assert list(percentile_interval(array, level)[:2]) == item["ci"]

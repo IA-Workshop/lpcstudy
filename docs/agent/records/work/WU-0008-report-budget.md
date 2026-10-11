@@ -489,6 +489,28 @@ Merged develop first (own command, clean; it has the `statistics.py` docstring f
 
 Result of run 5: `245 passed in 266.43s (0:04:26)` (slow only because the `v1-baseline` pilot shares the CPU). Grep of `analysis`, `experiments`, `pipeline`, `statistics`, `__main__` for `QOI_DECLARATIONS|QOI_FIELDS|budget`: no match. Report-only on the base smoke results at this head: 4393 leaves, 0 different, none on one side only (`results.json` is written before any report code runs).
 
+### 2026-10-11, developer claude-sonnet-5-5: WU-0008.2a (endpoint_mc_error and ci_mc_se), DEC-0024
+
+Sequence from the main session: .2a, then .1/.2b (with R8). `pgrep -fa 'lpcstudy --preset'` shows the `v1-baseline` pilot, so the A1 smoke comparison at the .2a head, the integration pair and the slow exact-check nodes (DEC-0021 O6) are **pending** and not started.
+
+Changes: `statistics.endpoint_mc_error(values, level)` (docstring marks **needs owner review before freeze**); `analysis.py` at the five primary sites: `ci_mc_se` = `[se_lo, se_hi]` in H2a(i) (`h2a_initial_segments`), per part of H2a(ii) (`h2a_part_ii`), H2b(i) (`noise`), H2b(ii) (`library_change`, via `_paired_change(..., mc_error=True)`, so H2e and the reported changes get no key) and H3c (`h3c_ratio`). The three sites that called `block_bootstrap_counted` (`_paired_change`, H2b(i), `h3c_ratio`) call its body (`bootstrap_values` then `percentile_interval`, same seeds) to keep the resample values; estimates, intervals and counts are the same code path, so every existing leaf is bitwise unchanged and only `ci_mc_se` leaves are new (A1; the full smoke comparison is pending, see above). Self-check grep: the `np.where` in `endpoint_mc_error` is the A3 replacement of `percentile_interval` (failed resamples counted in the interval's `n_failed`; the helper returns None when failures reach the binomial window, rule 2); `isfinite` finds the failures; no `clip`, `try`, `except`; no randomness in library code; test seeds are fixed integers or `make_rng`. No tolerance changed; E1 uses 2%, E2 the median at factor 1.4, E3 the failure-window case, as fixed by DEC-0024.
+
+**Test run 6 (.2a).** Checklist:
+1. Change set: `lpcstudy/statistics.py`, `lpcstudy/analysis.py`, `tests/unit/test_statistics.py` (E1 to E3), `tests/unit/test_analysis.py` (A2).
+2. Radius: `tools/test_impact.py --base develop --explain`: unit `test___main__`, `test_allocation`, `test_analysis`, `test_budget`, `test_experiments`, `test_identifiers`, `test_pipeline`, `test_report`, `test_statistics`, `test_tools_test_impact`, `test_validation`; by hand `test_data.py`. Integration and the slow exact checks are pending (a run is active).
+3. Already run? No: statistics and analysis are new code.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s (the pilot shares the CPU; run 5 took 266 s for a smaller set).
+6. Contention: unit tier, no preset started.
+7. Output: wrapper's `-q --tb=short -rfE`.
+8. Command: `LPC_THREADS=4 tools/run_tests.sh unit tests/unit/test___main__.py tests/unit/test_allocation.py tests/unit/test_analysis.py tests/unit/test_budget.py tests/unit/test_experiments.py tests/unit/test_identifiers.py tests/unit/test_pipeline.py tests/unit/test_report.py tests/unit/test_statistics.py tests/unit/test_tools_test_impact.py tests/unit/test_validation.py tests/unit/test_data.py`.
+
+Result of run 6: `4 failed, 354 passed in 32.66s`. The four failures were in `test_analysis.py`: (a) `test_h3_regimes_wiring_keys_and_arguments` asserts the exact key set of the H3c result, which now has the additive key `ci_mc_se` (the expected set was updated; a specification of the new key, not a loosening); (b) three cases of `test_h2b_noise_failed_resample_goes_to_the_a3_tail...` inject failed resamples by patching `analysis.block_bootstrap_counted`, which H2b(i) no longer calls (it calls the body, `bootstrap_values`, to keep the values): the injection helper `_inject_first_call` now patches `analysis.bootstrap_values` at the same first call with the same semantics, and its expected numbers, thresholds and assertions are untouched. `--lf`: `4 passed`.
+
+**Test run 7 (.2a, radius once after the fix).** Checklist: 1. change set as run 6 plus the edits to `tests/unit/test_analysis.py` above. 2. Radius: the same as run 6. 3. Already run? Not on this code (the test file changed). 4. Device `JAX_PLATFORMS=cpu`. 5. `LPC_THREADS=4`; unit timeout 300 s. 6. Unit tier, no preset started. 7. Wrapper's `-q --tb=short -rfE`. 8. Command: as run 6.
+
+Result of run 7: `358 passed in 32.11s`. Pending (a preset is running): the A1 smoke comparison at the .2a head, the integration pair, and the slow exact-check nodes `tests/slow/test_analysis_coverage.py::test_exact_checks` for C4, C7, C8 at both phi (DEC-0021 O6).
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
