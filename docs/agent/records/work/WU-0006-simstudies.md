@@ -475,6 +475,10 @@ The full form is the addendum A1 to A8 of `docs/agent/notes/2026-10-11-math-wu00
 3. Already run? Not on this code. 4. Device `JAX_PLATFORMS=cpu`. 5. `LPC_THREADS=4`; about 20 s. 6. Contention: other worktrees may run CPU work (authorized); no GPU. 7. `-q --tb=short -rfE`.
 8. Command: `tools/run_tests.sh slow` on the seven node ids above.
 
+**Test run 5 result.** `1 failed, 6 passed in 15.52s` (`runs/tests/slow-20261011T175523Z.log`). The failure was an arithmetic error in my own fake-data test `test_evaluate_delta_applies_the_a9_ranges_exactly`: `fake_delta(478, 24, 461)` asks for 478 + 24 = 502 of 500 replications (IndexError in the fake). Fixed to `fake_delta(470, 24, 461)` (N1 470 lies inside both N1 ranges, N2 24 is outside the logit range (0, 23) and inside the indicator range (0, 25)); no reference, range or bound changed. The other six passed: the 70-ranges table test, the switch test, the exact-bounds test, the delta switch test, the 12-ranges table test and the end-to-end tiny-R run.
+
+**Test run 6 (the one fixed test), §4.9 checklist.** 1. Change set: as run 5 plus this fix, committed first. 2. Radius: `test_wu0006_harness.py::test_evaluate_delta_applies_the_a9_ranges_exactly` only (a changed test, rerun with `--lf` semantics by node id). 3. Already run? Yes, on the previous code, where it failed; it changed. 4 to 7 as run 5, about 5 s. 8. `tools/run_tests.sh slow --background tests/slow/test_wu0006_harness.py::test_evaluate_delta_applies_the_a9_ranges_exactly`.
+
 ## Review
 
 ## Audit

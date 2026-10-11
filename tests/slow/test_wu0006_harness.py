@@ -460,7 +460,7 @@ def test_evaluate_delta_applies_the_a9_ranges_exactly() -> None:
     assert [k for k, v in n1_high.consistency_rows.items() if v] == [f"n1|{logit}"]
     n1_low = wu.evaluate_delta(fake_delta(439, 0, 461))       # indicator out (< 440), logit in
     assert [k for k, v in n1_low.consistency_rows.items() if v] == [f"n1|{indicator}"]
-    n2_high = wu.evaluate_delta(fake_delta(478, 24, 461))     # logit out (> 23), indicator in (<= 25)
+    n2_high = wu.evaluate_delta(fake_delta(470, 24, 461))     # logit out (> 23), indicator in (<= 25)
     assert [k for k, v in n2_high.consistency_rows.items() if v] == [f"n2|{logit}"]
     n3_low = wu.evaluate_delta(fake_delta(478, 22, 446))      # logit in (>= 446), indicator out (< 448)
     assert [k for k, v in n3_low.consistency_rows.items() if v] == [f"n3|{indicator}"]
