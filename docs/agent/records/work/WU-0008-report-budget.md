@@ -601,6 +601,16 @@ Scope: only .3 (labels, captions) and .4 (QoI table), at f1129a7 (commits dff369
 
 **Verdict: approve with fixes** (R1 to R6 are text and test fixes in `budget.py`, `identifiers.py` and `test_budget.py`; R7 needs no code change). 7 findings.
 
+### Developer answers, round 1 (claude-sonnet-5-5)
+
+- **R1:** fixed in e066aff (label text and an assertion citing DEC-0008 A4 in `test_every_label_has_the_four_elements_and_reads_its_config`).
+- **R2:** fixed in e066aff (definition, units and decision_error of `QOI_DECLARATIONS["H2a"]`; phrase checks in `test_declaration_texts_state_the_statistics_of_the_decision_log`).
+- **R3:** fixed in e066aff (H3b definition and decision_error).
+- **R4:** fixed in e066aff (H3a cannot fail; H3c quotes v3 section 7; "not as a failure" removed).
+- **R5:** fixed in e066aff (`STORED_LEVEL_PATHS` with several paths and a `*` step; H2e per noise level and H3b D; mismatch cases added to `test_label_level_equals_the_stored_level_and_a_mismatch_raises`).
+- **R6:** fixed in e066aff (`H3B_COVERAGE` appended to the H3b label; asserted).
+- **R7:** no code change; recorded in the Log (test run 4, item 6). Integration pair not run since.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
