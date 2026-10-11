@@ -5,8 +5,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lpcstudy.oracle import characteristic_horizon, curvature, hybrid_mse, oracle_weight
-from unit_helpers import _moments_from_draws
+from lpcstudy.oracle import characteristic_horizon, curvature, excess_mse, hybrid_mse, \
+    oracle_weight
+from unit_helpers import _moments_from_draws, moments_from_triples, realizable_triples
+
+
+def _direct_v(weight: np.ndarray, e_c: np.ndarray, e_p: np.ndarray, cross: np.ndarray
+              ) -> np.ndarray:
+    """V(w) = w^2 E_C + (1 - w)^2 E_P + 2 w (1 - w) C evaluated directly (independent of code)."""
+    return weight**2 * e_c + (1 - weight) ** 2 * e_p + 2 * weight * (1 - weight) * cross
 
 
 def test_oracle_weight_minimizes_ensemble_mse() -> None:
@@ -120,6 +127,135 @@ def test_regret_identity_matches_draws() -> None:
                                rtol=0.0, atol=1e-12)
     np.testing.assert_allclose(from_draws(w) - from_draws(w_star),
                                curvature(moments) * (w - w_star) ** 2, rtol=0.0, atol=1e-12)
+
+
+def test_excess_mse_matches_grid_minimum() -> None:
+    """``excess_mse`` equals V(w) minus the brute-force minimum of V over [0, 1] (P1(a)).
+
+    Reference: brute force. V(w) = w^2 E_C + (1-w)^2 E_P + 2w(1-w) C is evaluated directly
+    from the moment triple on ``np.linspace(0, 1, 10_000)`` (h = 1/9999; both end points
+    exact), and the reference excess is V(w) - min over the grid. Inputs: 200 manufactured
+    realizable triples (70 with u in (-5, 0), 60 in [0, 1], 70 in (1, 6); c log-uniform on
+    [1e-3, 10]); the reference sees only (E_C, E_P, C). w is uniform on [0, 1] with
+    |w - w*| >= 0.1 (rejection, fixed seed), plus w = 0 and w = 1 whenever |w - w*| >= 0.1
+    (the endpoint is kept only under that guard) or w equals w* (then excess and reference
+    are both exactly 0).
+    Tolerance ``rtol=1e-6``, ``atol=0``: the grid minimum exceeds V(w*) by at most
+    c (h/2)^2 = 2.5005e-9 c, and the excess is at least c (w - w*)^2 >= 0.01 c (also when u
+    is clipped: (w - w*)(w + w* - 2u) >= (w - w*)^2), so the relative bias is at most
+    2.5e-7, four times below 1e-6. Round-off is about 1e-12 relative (V <= 46 c on these
+    ranges, over an excess of at least 0.01 c).
+    """
+    rng = np.random.default_rng(20261011)
+    t = realizable_triples(rng, 70, 60, 70)
+    e_c, e_p, cross = t["E_C"][:, None], t["E_P"][:, None], t["C"][:, None]
+    moments = moments_from_triples(e_c, e_p, cross)
+    w_star = oracle_weight(moments)[:, 0]
+    assert np.allclose(w_star, np.clip(t["u"], 0.0, 1.0), rtol=1e-9, atol=1e-9)
+    grid = np.linspace(0.0, 1.0, 10_000)
+    v_grid = _direct_v(grid[None, :], e_c, e_p, cross)  # (200, 10000)
+    v_min = v_grid.min(axis=1)
+
+    weights = rng.uniform(0.0, 1.0, 200)
+    for _ in range(100):
+        bad = np.abs(weights - w_star) < 0.1
+        if not bad.any():
+            break
+        weights[bad] = rng.uniform(0.0, 1.0, bad.sum())
+    assert not (np.abs(weights - w_star) < 0.1).any()
+    got = excess_mse(moments, weights[:, None])[:, 0]
+    ref = _direct_v(weights, e_c[:, 0], e_p[:, 0], cross[:, 0]) - v_min
+    np.testing.assert_allclose(got, ref, rtol=1e-6, atol=0.0)
+
+    used = excluded = 0
+    for end in (0.0, 1.0):
+        d = np.abs(end - w_star)
+        keep = d >= 0.1
+        same = end == w_star
+        used += int(keep.sum()) + int(same.sum())
+        excluded += int((~keep & ~same).sum())
+        w_end = np.full((200, 1), end)
+        got_end = excess_mse(moments, w_end)[:, 0]
+        ref_end = _direct_v(w_end[:, 0], e_c[:, 0], e_p[:, 0], cross[:, 0]) - v_min
+        np.testing.assert_allclose(got_end[keep], ref_end[keep], rtol=1e-6, atol=0.0)
+        assert same.sum() > 0
+        assert np.all(got_end[same] == 0.0) and np.all(ref_end[same] == 0.0)
+    assert used > 150 and excluded > 0  # guard exercised; counts: excluded end points
+
+
+def test_excess_mse_is_nonnegative_and_zero_at_optimum() -> None:
+    """The excess is >= 0 everywhere, exactly 0.0 at w*, and >= 0 one to five ulps from w*.
+
+    Reference: exact algebra (P1(a)): V(w) - V(w*) = c [(w - u)^2 - (w* - u)^2] >= 0 with
+    equality at w = w*. In IEEE arithmetic the form used is >= 0 exactly (rounding is
+    monotone and |w - u| >= |w* - u|), and exactly 0.0 at w* computed from the same u; the
+    factored form fails the sign within 5 ulps of w* (measured by the mathematician).
+    Inputs: the 200 triples of ``test_excess_mse_matches_grid_minimum`` (same seed), w on
+    a 21-point grid of [0, 1], at w*, and at ``np.nextafter`` of w* in both directions up
+    to 5 steps (clipped to [0, 1]). Tolerance: none (exact comparisons).
+    """
+    rng = np.random.default_rng(20261011)
+    t = realizable_triples(rng, 70, 60, 70)
+    moments = moments_from_triples(t["E_C"][:, None], t["E_P"][:, None], t["C"][:, None])
+    w_star = oracle_weight(moments)
+    assert np.all(excess_mse(moments, w_star) == 0.0)
+    for w in np.linspace(0.0, 1.0, 21):
+        assert np.all(excess_mse(moments, np.full_like(w_star, w)) >= 0.0)
+    near_up, near_down = w_star, w_star
+    for _ in range(5):
+        near_up = np.nextafter(near_up, np.inf)
+        near_down = np.nextafter(near_down, -np.inf)
+        for near in (near_up, near_down):
+            assert np.all(excess_mse(moments, np.clip(near, 0.0, 1.0)) >= 0.0)
+
+
+def test_excess_mse_clipped_case() -> None:
+    """When u > 1, c (w - w*)^2 underestimates V(w) - V(w*); ``excess_mse`` is exact (DEF-0002).
+
+    Reference: direct evaluation of the quadratic. E_C = 1, E_P = 4, C = 1.5 (realizable:
+    E_C E_P - C^2 = 1.75 >= 0) give c = 2, b = E_P - C = 2.5, u = 1.25, w* = 1. With
+    w = 0.5: V(0.5) = 0.25 + 1 + 0.75 = 2.0 and V(1) = 1.0, so the excess is 1.0, against
+    c (w - w*)^2 = 0.5. Tolerance: exact ``==``; every operand and intermediate is dyadic
+    (0.5625, 0.0625, 2.0), so no rounding occurs.
+    """
+    moments = moments_from_triples(np.array([[1.0]]), np.array([[4.0]]), np.array([[1.5]]))
+    w = np.array([[0.5]])
+    assert oracle_weight(moments, clip=False)[0, 0] == 1.25
+    assert oracle_weight(moments)[0, 0] == 1.0
+    got = excess_mse(moments, w)[0, 0]
+    direct = _direct_v(0.5, 1.0, 4.0, 1.5) - _direct_v(1.0, 1.0, 4.0, 1.5)
+    assert direct == 1.0
+    assert got == 1.0
+    assert curvature(moments)[0, 0] * (0.5 - 1.0) ** 2 == 0.5 < got
+
+
+def test_excess_mse_unclipped_equals_curvature_form_and_broadcasts() -> None:
+    """For u in [0, 1] the excess is c (w - u)^2, and 3-D weights broadcast the moments.
+
+    Reference: the FW Prop. 5 identity (the unclipped case of ``test_regret_identity``)
+    with the curvature and u written out from the triple by hand: c = E_C + E_P - 2C,
+    u = (E_P - C) / c. Also: ``excess_mse`` of a ``(n, E, nH)`` weight equals the 2-D
+    result per draw, exactly (same elementwise operations), and a wrong shape raises.
+    Tolerance ``rtol=1e-12``: a few operations at ~1e-16 each over an excess >= 1e-3 c
+    (w is at least 0.05 from u by construction).
+    """
+    rng = np.random.default_rng(5)
+    t = realizable_triples(rng, 0, 30, 0, inside=(0.2, 0.8))
+    e_c, e_p, cross = t["E_C"][:, None], t["E_P"][:, None], t["C"][:, None]
+    moments = moments_from_triples(e_c, e_p, cross)
+    c = e_c + e_p - 2 * cross
+    u = (e_p - cross) / c
+    w = np.where(u > 0.5, u - 0.1, u + 0.1)
+    np.testing.assert_allclose(excess_mse(moments, w), c * (w - u) ** 2, rtol=1e-12, atol=0.0)
+    three = np.stack([w, np.clip(w + 0.05, 0.0, 1.0)], axis=1)  # (n, 2, 1)
+    got = excess_mse(moments, three)
+    assert got.shape == three.shape
+    assert np.array_equal(got[:, 0, :], excess_mse(moments, three[:, 0, :]))
+    assert np.array_equal(got[:, 1, :], excess_mse(moments, three[:, 1, :]))
+    with pytest.raises(ValueError, match="weight shape"):
+        excess_mse(moments, np.zeros((30, 2)))
+    with pytest.raises(ValueError, match="weight shape"):
+        excess_mse(moments, np.zeros(30))
 
 
 def test_characteristic_horizon_and_censoring() -> None:

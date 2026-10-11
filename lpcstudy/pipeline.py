@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -28,7 +29,7 @@ from .ensemble import AnalogLibrary, EnsembleMoments, EvaluationDraws, ForecastS
     ensemble_moments, evaluation_draws
 from .estimation import StateEstimator
 from .networks import train_estimator
-from .oracle import StateOracles, curvature, oracle_weight, realized_horizon, \
+from .oracle import StateOracles, excess_mse, oracle_weight, realized_horizon, \
     state_oracles
 from .statistics import kaplan_meier
 from .systems import make_flow_step
@@ -323,19 +324,63 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
         tree = fit_regime_tree(con_profile, w_target, t_target, n_reg, config.seed)
         regimes[n_reg] = calibrate_regimes(tree, cal_profile, cal_moments, cal_evals,
                                            config.primary_threshold, a2)
-    chosen = _choose_regimes(regimes, cal_profile, cal_moments, href_col, config)
+    chosen = _choose_regimes(regimes, cal_profile, cal_moments, config)
     return FittedRules(proxies=proxies, global_weights=a2, predictor=predictor,
                        regimes=regimes, chosen_regimes=chosen)
 
 
+def choose_regime_count(excess_by_count: Mapping[int, float], margin: float = 0.05) -> int:
+    """Smallest ``K`` whose calibration excess MSE is within ``margin`` of the minimum (M2 §M7).
+
+    The rule is ``excess_K <= (1.0 + margin) * min_K excess_K`` on the unrounded float64
+    values, ``K`` taken in increasing order; a tie at the edge counts as inside. A "tie" is
+    defined on this expression with ``min = 1.0`` (``1.0 + 0.05 == 1.05`` in float64),
+    not on ``excess - min <= margin * min``, which judges 1.05 against 1.0 as outside
+    (DEC-0008 A1, A5). The quantity is the absolute calibration excess
+    ``V(w_K) - V(w*)`` (Theorem P1(a)), not the ratio to the best single forecaster.
+
+    Parameters
+    ----------
+    excess_by_count : Mapping[int, float]
+        Mean calibration excess MSE for each candidate ``K``.
+    margin : float, optional
+        Relative margin (0.05).
+
+    Returns
+    -------
+    int
+        The chosen ``K``.
+
+    Raises
+    ------
+    ValueError
+        If the mapping is empty, ``margin`` is negative, or a value is not finite or is
+        negative (the exact excess is non-negative, so a negative value is a bug and
+        would invert the margin).
+    """
+    if margin < 0.0:
+        raise ValueError(f"margin must be >= 0, got {margin}")
+    if not excess_by_count:
+        raise ValueError("choose_regime_count needs at least one candidate K")
+    values = {k: float(excess_by_count[k]) for k in sorted(excess_by_count)}
+    for count, value in values.items():
+        if not np.isfinite(value) or value < 0.0:
+            raise ValueError(f"excess MSE for K={count} must be finite and >= 0, got {value}")
+    minimum = min(values.values())
+    return next(count for count, value in values.items() if value <= (1.0 + margin) * minimum)
+
+
 def _choose_regimes(regimes: dict[int, RegimeMap], profile: np.ndarray,
-                    moments: EnsembleMoments, column: int, config: StudyConfig) -> int:
-    """Smallest admissible ``K`` meeting the 5% regret criterion on calibration (L3)."""
-    admissible = [k for k in sorted(regimes) if k <= config.regime_max_primary]
-    for n_reg in admissible:
-        if regime_regret(regimes[n_reg], profile, moments, column)[1] <= 0.05:
-            return n_reg
-    return max(admissible)
+                    moments: EnsembleMoments, config: StudyConfig) -> int:
+    """``K`` by the §M7 rule on the calibration excess MSE at ``H_ref`` (DEC-0008 A5).
+
+    The candidates are the ``K`` of ``regimes`` up to ``config.regime_max_primary``; the
+    horizon column is located by value (``horizons == reference_horizon``).
+    """
+    column = int(np.nonzero(moments.horizons == config.reference_horizon)[0][0])
+    excess = {k: regime_regret(regimes[k], profile, moments, column)[0]
+              for k in sorted(regimes) if k <= config.regime_max_primary}
+    return choose_regime_count(excess)
 
 
 def _concat_moments(parts: list[EnsembleMoments]) -> EnsembleMoments:
@@ -416,7 +461,7 @@ class RuleScores:
     state_mse_ref : np.ndarray
         Per-state realized squared error at ``H_ref`` averaged over draws ``(n,)``.
     regret : np.ndarray
-        Mean ``c (w - w*)^2`` per horizon ``(nH,)``.
+        Mean exact excess error ``V(w) - V(w*)`` per horizon ``(nH,)`` (Theorem P1(a)).
     agreement : float
         Fraction of decisive states at ``H_ref`` where the rule weights the
         better forecaster more.
@@ -461,8 +506,6 @@ def score_rules(weights: dict[str, np.ndarray], split: SplitData, horizons: np.n
     """
     ev, moments = split.evals, split.moments
     ref = int(np.nonzero(horizons == config.reference_horizon)[0][0])
-    w_star = oracle_weight(moments)
-    curv = curvature(moments)
     decisive_ratio = np.sqrt(moments.sq_cp[:, ref] / np.maximum(moments.sq_plp[:, ref],
                                                                  1e-300))
     decisive = np.abs(np.log(decisive_ratio)) >= np.log(1.1)
@@ -473,7 +516,7 @@ def score_rules(weights: dict[str, np.ndarray], split: SplitData, horizons: np.n
     for name, w in weights.items():
         err = w * ev.cp_err + (1 - w) * ev.plp_err
         sq = err**2
-        regret = np.mean(curv[:, None, :] * (w - w_star[:, None, :]) ** 2, axis=(0, 1))
+        regret = np.mean(excess_mse(moments, w), axis=(0, 1))
         favours_cp = w[:, :, ref].mean(axis=1) > 0.5
         agreement = float(np.mean(favours_cp[decisive] == cp_better[decisive])) \
             if decisive.any() else float("nan")

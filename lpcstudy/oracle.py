@@ -157,6 +157,61 @@ def hybrid_mse(moments: EnsembleMoments, weight: np.ndarray) -> np.ndarray:
         2 * w * (1 - w) * moments.cross
 
 
+def excess_mse(moments: EnsembleMoments, weight: np.ndarray) -> np.ndarray:
+    """Exact excess error ``V(w) - V(w*)`` of a weight over the constrained optimum.
+
+    Implements Theorem P1(a). With ``c = E[(e_C - e_P)^2]`` (``curvature``) and the
+    unconstrained minimizer ``u = E[e_P (e_P - e_C)] / c``, the expected squared
+    error is ``V(w) = c (w - u)^2 + V(u)``. The admissible optimum is
+    ``w* = clip(u, 0, 1)``, hence
+
+    ``V(w) - V(w*) = c [(w - u)^2 - (w* - u)^2]``,
+
+    which equals ``c (w - w*)^2`` only when ``u`` lies in ``[0, 1]``. When ``u`` is
+    clipped, ``c (w - w*)^2`` underestimates the excess (DEF-0002). This form is
+    evaluated in IEEE arithmetic from the same ``u`` that gives ``w*``, so the
+    result is ``>= 0`` and is exactly ``0.0`` at ``w = w*`` (rounding is monotone and
+    ``|w - u| >= |w* - u|``); the factored form ``(w - w*)(c (w + w*) - 2 b)``
+    can be negative near ``w*``.
+
+    Hypothesis: ``c > 0`` (P1(a): ``c >= rho^2 / k``). A non-positive or non-finite
+    curvature is not filtered here (it makes ``u`` infinite or NaN through the
+    ``1e-300`` floor of ``oracle_weight``); counting it belongs to the floor audit of
+    DEF-0001.
+
+    Parameters
+    ----------
+    moments : EnsembleMoments
+        Ensemble moments, arrays ``(n, nH)``.
+    weight : np.ndarray
+        Weights ``(n, nH)`` or ``(n, E, nH)``. For three dimensions the moments
+        are broadcast along axis 1 (draws).
+
+    Returns
+    -------
+    np.ndarray
+        Excess expected squared error against the noise-free truth, same shape
+        as ``weight``.
+
+    Raises
+    ------
+    ValueError
+        If ``weight`` is not ``(n, nH)`` or ``(n, E, nH)`` for the moments' shape.
+    """
+    unclipped = oracle_weight(moments, clip=False)
+    curv = curvature(moments)
+    if weight.ndim == 2 and weight.shape == curv.shape:
+        pass
+    elif weight.ndim == 3 and weight.shape[0] == curv.shape[0] \
+            and weight.shape[2] == curv.shape[1]:
+        unclipped, curv = unclipped[:, None, :], curv[:, None, :]
+    else:
+        raise ValueError(f"weight shape {weight.shape} does not match moments "
+                         f"{curv.shape}: expected (n, nH) or (n, E, nH)")
+    optimum = np.clip(unclipped, 0.0, 1.0)
+    return curv * ((weight - unclipped) ** 2 - (optimum - unclipped) ** 2)
+
+
 def characteristic_horizon(mse: np.ndarray, horizons: np.ndarray, noise: float,
                            theta: float) -> tuple[np.ndarray, np.ndarray]:
     """First horizon at which the r.m.s. error against the *noisy* truth exceeds ``theta``.

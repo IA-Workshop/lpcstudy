@@ -83,7 +83,7 @@ class StudyConfig:
     regime_counts : tuple[int, ...]
         Regime counts ``K`` for the abstraction curve.
     regime_max_primary : int
-        Largest ``K`` admissible for H3a.
+        Largest ``K`` for the §M7 K rule.
     bootstrap_resamples : int
         Block-bootstrap resamples.
     bootstrap_block : int
@@ -143,7 +143,7 @@ class StudyConfig:
     allocator_epochs: int = 40
     allocator_draws: int = 50
     regime_counts: tuple[int, ...] = (2, 3, 4, 5, 6, 8, 12, 16)
-    regime_max_primary: int = 5
+    regime_max_primary: int = 8
     bootstrap_resamples: int = 2000
     bootstrap_block: int = 5
     misspec_levels: tuple[float, ...] = (0.05, 0.10)

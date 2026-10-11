@@ -5,10 +5,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from sklearn.tree import DecisionTreeRegressor
+
 from lpcstudy import allocation
-from lpcstudy.allocation import RULE_LABELS, SeedProxy, closed_form_weight
-from lpcstudy.oracle import oracle_weight
-from unit_helpers import _moments_from_draws
+from lpcstudy.allocation import RULE_LABELS, RegimeMap, SeedProxy, closed_form_weight, \
+    regime_regret, regime_weight
+from lpcstudy.oracle import curvature, oracle_weight
+from unit_helpers import _moments_from_draws, moments_from_triples, realizable_triples
 
 
 def test_closed_form_matches_uncorrelated_isotropic_case() -> None:
@@ -80,3 +83,140 @@ def test_rule_set_is_the_v3_rule_set() -> None:
     """
     assert set(RULE_LABELS) == {"A0", "A1", "A2", "A3", "A4", "A5", "A4o", "A*"}
     assert not hasattr(allocation, "full_form_weight")
+
+
+def test_regime_regret_is_mean_exact_excess() -> None:
+    """``regime_regret`` is the mean over (state, draw) of V(w_k) - V(w*), not c (w_k - w*)^2.
+
+    Reference: brute force. For each state the excess is V(w_k) - min over
+    ``np.linspace(0, 1, 10_000)`` of V, with V evaluated directly from the moment triple
+    (the grid argument of ``test_excess_mse_matches_grid_minimum``); the reference is the
+    mean of these over the states (each state appears E = 2 times with the same regime).
+    Setup: a 2-leaf tree on a 1-D synthetic profile (140 states, 2 horizon columns; the
+    regret is requested at column 1). Leaf 0 holds 70 states with u in (1, 6) or [0.6, 1]
+    and w_k = 0.35; leaf 1 holds 70 states with u in (-5, 0) or [0, 0.2] and w_k = 0.7, so
+    |w_k - w*| >= 0.25 >= 0.1 for every state, asserted as a precondition on the weights
+    the code returns. Half of the states have u outside [0, 1]. The second output is
+    checked against the mean of min(E_C, E_P) written out here.
+    Tolerance ``rtol=1e-6``: the grid minimum exceeds V(w*) by at most c (h/2)^2 =
+    2.5e-9 c with h = 1/9999 and the excess is at least c (w_k - w*)^2 >= 0.0625 c, so the
+    relative bias is at most 4e-8 (the argument of the 10-fold looser bound at 0.1);
+    round-off is about 1e-12. It also asserts that the old c (w - w*)^2 mean is below the
+    exact value by more than 1e-3 relative (the test would detect DEF-0002).
+    """
+    rng = np.random.default_rng(31)
+    parts = []
+    for _ in range(2):  # two horizon columns, each with its own triples
+        left = realizable_triples(rng, 0, 20, 50, inside=(0.6, 1.0))
+        right = realizable_triples(rng, 50, 20, 0, inside=(0.0, 0.2))
+        parts.append({k: np.concatenate([left[k], right[k]]) for k in left})
+    n_states = 140
+    e_c = np.stack([p["E_C"] for p in parts], axis=1)
+    e_p = np.stack([p["E_P"] for p in parts], axis=1)
+    cross = np.stack([p["C"] for p in parts], axis=1)
+    moments = moments_from_triples(e_c, e_p, cross)
+    x = np.concatenate([-rng.uniform(0.5, 1.5, (70, 2)), rng.uniform(0.5, 1.5, (70, 2))])
+    profile = x[:, :, None]  # (140, 2, 1)
+    label = (x[:, 0] > 0).astype(float)
+    tree = DecisionTreeRegressor(max_leaf_nodes=2, random_state=0)
+    tree.fit(profile.reshape(-1, 1), np.repeat(label, 2))
+    leaf_ids = np.nonzero(tree.tree_.children_left == -1)[0]
+    regime_map = RegimeMap(tree=tree, leaf_ids=leaf_ids,
+                           weights=np.array([[0.4, 0.35], [0.6, 0.7]]),
+                           horizons_km=np.full(2, np.nan))
+    column = 1
+    regime = regime_map.assign(profile)
+    assert np.array_equal(regime[:, 0], np.r_[np.zeros(70, int), np.ones(70, int)])
+    w_k = regime_map.weights[regime, column]
+    w_star = oracle_weight(moments)[:, column]
+    assert np.all(np.abs(w_k - w_star[:, None]) >= 0.1)  # precondition of the grid reference
+    unclipped = oracle_weight(moments, clip=False)[:, column]
+    assert np.mean((unclipped < 0) | (unclipped > 1)) >= 0.4
+
+    grid = np.linspace(0.0, 1.0, 10_000)
+
+    def direct_v(weight: np.ndarray) -> np.ndarray:
+        return weight**2 * e_c[:, [column]] + (1 - weight) ** 2 * e_p[:, [column]] + \
+            2 * weight * (1 - weight) * cross[:, [column]]
+
+    v_min = direct_v(grid[None, :]).min(axis=1)
+    reference = float(np.mean(direct_v(w_k) - v_min[:, None]))
+    regret, ratio = regime_regret(regime_map, profile, moments, column)
+    assert regret == pytest.approx(reference, rel=1e-6, abs=0.0)
+    best = float(np.mean(np.minimum(e_c[:, column], e_p[:, column])))
+    assert ratio == pytest.approx(regret / best, rel=1e-12, abs=0.0)
+    old = float(np.mean(curvature(moments)[:, [column]] * (w_k - w_star[:, None]) ** 2))
+    assert old < reference * (1.0 - 1e-3)
+
+
+def test_regime_weight_matches_brute_force() -> None:
+    """``regime_weight`` is clip(sum b / sum c), the brute-force minimizer of sum_i V_i(w) (P3(a)).
+
+    Reference: brute force on the direct quadratic V_i(w) = w^2 E_C + (1-w)^2 E_P +
+    2w(1-w) C summed over the members (with multiplicity). Stage 1 is the argmin g over
+    ``np.linspace(0, 1, 10_000)``; stage 2 is the argmin g2 over 10_000 points of
+    [g - h, g + h] cap [0, 1] (h = 1/9999, spacing about 2e-8), because a single grid
+    quantizes the argmin to h/2 = 5e-5, which is above the tolerance (a strengthening of
+    the reference, not a change of the tolerance). 50 regimes of 5 to 40 members from the
+    manufactured generator: 10 with all u > 1, 10 with all u < 0, 10 mixed u < 0 and
+    u > 1 (none in [0, 1]), 20 with u drawn over all three strata; in 10 regimes some member
+    indices repeat 2 to 4 times (one state counted once per draw in the regime), and the
+    brute-force sum is weighted the same way.
+    Tolerance ``abs=1e-6``: |g2 - w_S| <= h2/2 + sqrt(delta / S_c) with h2 = 2e-8 and the
+    round-off of the sum delta <= 9 eps * 138 S_c (V <= 46 c per member), about 1e-8 +
+    3.7e-7 = 3.8e-7, a margin of 2.6. The measurement of the mathematician on 200 such
+    regimes gave 3.9e-8. Sensitivity: in at least one mixed regime the old curvature-weighted
+    mean of the clipped w* misses the reference by more than 1e-2 (DEF-0003).
+    """
+    rng = np.random.default_rng(4242)
+    grid = np.linspace(0.0, 1.0, 10_000)
+    spacing = 1.0 / 9999.0
+    n_repeated = n_old_misses = 0
+    for index in range(50):
+        size = int(rng.integers(5, 41))
+        if index < 10:
+            counts = (0, 0, size)
+        elif index < 20:
+            counts = (size, 0, 0)
+        elif index < 30:
+            below = int(rng.integers(1, size))
+            counts = (below, 0, size - below)
+        else:
+            counts = tuple(int(x) for x in rng.multinomial(size, [1 / 3, 1 / 3, 1 / 3]))
+        t = realizable_triples(rng, *counts)
+        moments = moments_from_triples(t["E_C"][:, None], t["E_P"][:, None], t["C"][:, None])
+        members = np.arange(size)
+        if index % 5 == 0:
+            extra = rng.choice(size, size=int(rng.integers(1, size + 1)), replace=False)
+            members = np.concatenate([members] + [extra] * int(rng.integers(1, 4)))
+            n_repeated += 1
+        got = regime_weight(moments, members)
+        assert got.shape == (1,)
+
+        def total(weights: np.ndarray) -> np.ndarray:
+            v = weights[None, :] ** 2 * t["E_C"][:, None] + \
+                (1 - weights[None, :]) ** 2 * t["E_P"][:, None] + \
+                2 * weights[None, :] * (1 - weights[None, :]) * t["C"][:, None]
+            return v[members].sum(axis=0)
+
+        g = grid[np.argmin(total(grid))]
+        fine = np.linspace(max(g - spacing, 0.0), min(g + spacing, 1.0), 10_000)
+        g2 = fine[np.argmin(total(fine))]
+        assert abs(got[0] - g2) <= 1e-6, (index, got[0], g2)
+        if 20 <= index < 30:
+            old_w = oracle_weight(moments)[members, 0]
+            old_c = curvature(moments)[members, 0]
+            old = float(np.sum(old_c * old_w) / np.sum(old_c))
+            n_old_misses += abs(old - g2) > 1e-2
+    assert n_repeated >= 5
+    assert n_old_misses >= 1
+
+
+def test_regime_weight_rejects_empty_members() -> None:
+    """An empty regime raises ``ValueError`` (no silent fallback; PRIME.4).
+
+    Reference: the documented contract. Tolerance: none (exception type).
+    """
+    moments = moments_from_triples(np.ones((3, 1)), np.ones((3, 1)), np.zeros((3, 1)))
+    with pytest.raises(ValueError, match="at least one member"):
+        regime_weight(moments, np.array([], dtype=int))
