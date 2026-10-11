@@ -9,7 +9,7 @@ from sklearn.tree import DecisionTreeRegressor
 
 from lpcstudy import allocation
 from lpcstudy.allocation import RULE_LABELS, RegimeMap, SeedProxy, closed_form_weight, \
-    regime_regret
+    regime_regret, regime_weight
 from lpcstudy.oracle import curvature, oracle_weight
 from unit_helpers import _moments_from_draws, moments_from_triples, realizable_triples
 
@@ -147,3 +147,76 @@ def test_regime_regret_is_mean_exact_excess() -> None:
     assert ratio == pytest.approx(regret / best, rel=1e-12, abs=0.0)
     old = float(np.mean(curvature(moments)[:, [column]] * (w_k - w_star[:, None]) ** 2))
     assert old < reference * (1.0 - 1e-3)
+
+
+def test_regime_weight_matches_brute_force() -> None:
+    """``regime_weight`` is clip(sum b / sum c), the brute-force minimizer of sum_i V_i(w) (P3(a)).
+
+    Reference: brute force on the direct quadratic V_i(w) = w^2 E_C + (1-w)^2 E_P +
+    2w(1-w) C summed over the members (with multiplicity). Stage 1 is the argmin g over
+    ``np.linspace(0, 1, 10_000)``; stage 2 is the argmin g2 over 10_000 points of
+    [g - h, g + h] cap [0, 1] (h = 1/9999, spacing about 2e-8), because a single grid
+    quantizes the argmin to h/2 = 5e-5, which is above the tolerance (a strengthening of
+    the reference, not a change of the tolerance). 50 regimes of 5 to 40 members from the
+    manufactured generator: 10 with all u > 1, 10 with all u < 0, 10 mixed u < 0 and
+    u > 1 (none in [0, 1]), 20 with u drawn over all three strata; in 10 regimes some member
+    indices repeat 2 to 4 times (one state counted once per draw in the regime), and the
+    brute-force sum is weighted the same way.
+    Tolerance ``abs=1e-6``: |g2 - w_S| <= h2/2 + sqrt(delta / S_c) with h2 = 2e-8 and the
+    round-off of the sum delta <= 9 eps * 138 S_c (V <= 46 c per member), about 1e-8 +
+    3.7e-7 = 3.8e-7, a margin of 2.6. The measurement of the mathematician on 200 such
+    regimes gave 3.9e-8. Sensitivity: in at least one mixed regime the old curvature-weighted
+    mean of the clipped w* misses the reference by more than 1e-2 (DEF-0003).
+    """
+    rng = np.random.default_rng(4242)
+    grid = np.linspace(0.0, 1.0, 10_000)
+    spacing = 1.0 / 9999.0
+    n_repeated = n_old_misses = 0
+    for index in range(50):
+        size = int(rng.integers(5, 41))
+        if index < 10:
+            counts = (0, 0, size)
+        elif index < 20:
+            counts = (size, 0, 0)
+        elif index < 30:
+            below = int(rng.integers(1, size))
+            counts = (below, 0, size - below)
+        else:
+            counts = tuple(int(x) for x in rng.multinomial(size, [1 / 3, 1 / 3, 1 / 3]))
+        t = realizable_triples(rng, *counts)
+        moments = moments_from_triples(t["E_C"][:, None], t["E_P"][:, None], t["C"][:, None])
+        members = np.arange(size)
+        if index % 5 == 0:
+            extra = rng.choice(size, size=int(rng.integers(1, size + 1)), replace=False)
+            members = np.concatenate([members] + [extra] * int(rng.integers(1, 4)))
+            n_repeated += 1
+        got = regime_weight(moments, members)
+        assert got.shape == (1,)
+
+        def total(weights: np.ndarray) -> np.ndarray:
+            v = weights[None, :] ** 2 * t["E_C"][:, None] + \
+                (1 - weights[None, :]) ** 2 * t["E_P"][:, None] + \
+                2 * weights[None, :] * (1 - weights[None, :]) * t["C"][:, None]
+            return v[members].sum(axis=0)
+
+        g = grid[np.argmin(total(grid))]
+        fine = np.linspace(max(g - spacing, 0.0), min(g + spacing, 1.0), 10_000)
+        g2 = fine[np.argmin(total(fine))]
+        assert abs(got[0] - g2) <= 1e-6, (index, got[0], g2)
+        if 20 <= index < 30:
+            old_w = oracle_weight(moments)[members, 0]
+            old_c = curvature(moments)[members, 0]
+            old = float(np.sum(old_c * old_w) / np.sum(old_c))
+            n_old_misses += abs(old - g2) > 1e-2
+    assert n_repeated >= 5
+    assert n_old_misses >= 1
+
+
+def test_regime_weight_rejects_empty_members() -> None:
+    """An empty regime raises ``ValueError`` (no silent fallback; PRIME.4).
+
+    Reference: the documented contract. Tolerance: none (exception type).
+    """
+    moments = moments_from_triples(np.ones((3, 1)), np.ones((3, 1)), np.zeros((3, 1)))
+    with pytest.raises(ValueError, match="at least one member"):
+        regime_weight(moments, np.array([], dtype=int))

@@ -276,7 +276,7 @@ class RegimeMap:
     leaf_ids : np.ndarray
         Leaf node ids; regime ``k`` is ``leaf_ids[k]``.
     weights : np.ndarray
-        Curvature-weighted regime weights ``(K, nH)`` from the calibration split.
+        Optimal regime weights ``(K, nH)`` from the calibration split (Theorem P3(a)).
     horizons_km : np.ndarray
         Kaplan-Meier median horizon per regime (steps; ``nan`` if not reached).
     """
@@ -329,10 +329,49 @@ def fit_regime_tree(profile: np.ndarray, w_target: np.ndarray, log_t_target: np.
     return tree
 
 
+def regime_weight(moments: EnsembleMoments, members: np.ndarray) -> np.ndarray:
+    """Optimal common weight of a set of (state, draw) pairs (Theorem P3(a)), per horizon.
+
+    The mean excess error over the members is ``sum_i c_i (w - u_i)^2 / n + const``, a
+    strictly convex quadratic in ``w`` with vertex ``sum_i c_i u_i / sum_i c_i`` over the
+    *unclipped* per-state optima ``u_i = b_i / c_i``. Its minimizer on ``[0, 1]`` is the
+    projection of the vertex: sum first, then clip,
+    ``w_S = clip(sum_i b_i / sum_i c_i, 0, 1)`` with ``b_i = E[e_P (e_P - e_C)]`` and
+    ``c_i = E[(e_C - e_P)^2]`` of state ``i``. The mean of the clipped ``w*_i``
+    weighted by ``c_i`` is not this minimizer (DEF-0003). The denominator keeps the
+    ``1e-300`` floor of ``oracle_weight`` (it cannot bind under P1(a), where
+    ``c >= rho^2 / k``; counting it belongs to DEF-0001).
+
+    Parameters
+    ----------
+    moments : EnsembleMoments
+        Oracle moments of the states, arrays ``(n, nH)``.
+    members : np.ndarray
+        State indices of the (state, draw) pairs of the regime, ``(m,)``. A state
+        appears once per draw that falls in the regime.
+
+    Returns
+    -------
+    np.ndarray
+        Weights ``(nH,)``.
+
+    Raises
+    ------
+    ValueError
+        If ``members`` is empty.
+    """
+    members = np.asarray(members)
+    if members.size == 0:
+        raise ValueError("regime_weight needs at least one member")
+    numerator = np.sum((moments.sq_plp - moments.cross)[members], axis=0)
+    denominator = np.sum(curvature(moments)[members], axis=0)
+    return np.clip(numerator / np.maximum(denominator, 1e-300), 0.0, 1.0)
+
+
 def calibrate_regimes(tree: DecisionTreeRegressor, profile: np.ndarray,
                       moments: EnsembleMoments, ev: EvaluationDraws, theta: float,
                       fallback: np.ndarray) -> RegimeMap:
-    """Regime weights (curvature-weighted, FW Prop. 5) and KM horizons on calibration.
+    """Regime weights (optimal per regime, Theorem P3(a)) and KM horizons on calibration.
 
     Parameters
     ----------
@@ -357,8 +396,6 @@ def calibrate_regimes(tree: DecisionTreeRegressor, profile: np.ndarray,
     leaf_ids = np.nonzero(tree.tree_.children_left == -1)[0]
     leaves = tree.apply(profile.reshape(-1, profile.shape[-1])).reshape(profile.shape[:2])
     regime = np.searchsorted(leaf_ids, leaves)
-    w_star = oracle_weight(moments)
-    curv = curvature(moments)
     n_regimes = len(leaf_ids)
     weights = np.tile(fallback, (n_regimes, 1)).astype(float)
     horizons_km = np.full(n_regimes, np.nan)
@@ -366,8 +403,7 @@ def calibrate_regimes(tree: DecisionTreeRegressor, profile: np.ndarray,
         state_idx, draw_idx = np.nonzero(regime == k)
         if state_idx.size == 0:
             continue
-        c_k, w_k = curv[state_idx], w_star[state_idx]
-        weights[k] = np.sum(c_k * w_k, axis=0) / np.maximum(np.sum(c_k, axis=0), 1e-300)
+        weights[k] = regime_weight(moments, state_idx)
         if np.array_equal(ev.horizons, np.arange(1, len(ev.horizons) + 1)):
             err = weights[k] * ev.cp_err[state_idx, draw_idx] + \
                 (1 - weights[k]) * ev.plp_err[state_idx, draw_idx] - \
