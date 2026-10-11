@@ -23,5 +23,7 @@ Run from this directory with the project interpreter (`LPC_PYTHON`, or `.venv/bi
 | `c7_extend.py <phi> 40000` | Independent extension of the C7 reference (scratch seed 20261012) → `cov_C7_<phi>_ext.npy`, `c7_extend.log` | about 2 min each |
 | `c7_verdict_ranges.py` | C7 pass / fail / inconclusive counts by the production verdict rule, ranges by the `m2_ranges` rule (R_ref 60 000) → `c7_verdict_ranges.log` | seconds |
 | `h2a_power.py` | H2a(ii-b) interval width against n (250 to 2000) and P(pass \| rho), phi 0 and 0.3 (scratch seed 20261013) → `h2a_power.log` | about 2 min |
+| `dr2_full_ref.py <phi> 1000 8` | A9: null ΔR² reference at 3000/1000 (the study's sizes), `m4_dr2_full.work` with scratch seed 20261014 → `dr2ref_<phi>.npy`, `dr2ref.log` | about 12 min each (8 workers) |
+| `dr2_full_ranges.py` | A9: N1–N3 rates, P(fail) of the R = 500 bounds and consistency ranges (same rule) → `dr2_full_ranges.log` | seconds |
 
 `simcore.py` holds the shared generators and fast statistics. The scripts that import `lpcstudy` put the repository root on `sys.path` (`parents[4]` of the script).

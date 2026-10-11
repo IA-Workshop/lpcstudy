@@ -425,6 +425,8 @@ The full form is the addendum A1 to A8 of `docs/agent/notes/2026-10-11-math-wu00
 4. Device: `JAX_PLATFORMS=cpu`. 5. Threads and time: `LPC_THREADS=4`; expected about 1 minute (the C7 run costs 38 s per phi). 6. Contention: the mathematician's reference simulations may overlap; the owner's authorization allows parallel runs; no GPU use. 7. Output: `-q --tb=short -rfE` by the wrapper.
 8. Command: `tools/run_tests.sh slow --background "tests/slow/test_analysis_coverage.py::test_counts_are_consistent_with_the_reference[C7-0.0]" "tests/slow/test_analysis_coverage.py::test_counts_are_consistent_with_the_reference[C7-0.3]" "tests/slow/test_wu0006_harness.py::test_reference_tables_hold_the_70_ranges" "tests/slow/test_wu0006_harness.py::test_delta_r2_design_marginals"`.
 
+**Test run 4 result.** `4 passed in 101.86s (0:01:41)` (`runs/tests/slow-20261011T173439Z.log`, exit 0): `test_counts_are_consistent_with_the_reference[C7-0.0]` and `[C7-0.3]` (run-2 counts: pass 1 and 0, fail 15 and 9, inside the corrected and kept ranges), `test_reference_tables_hold_the_70_ranges` (still 70 ranges, each containing its rate) and `test_delta_r2_design_marginals` with the tightened 1.9e-3 tolerance on corr(x4, x1). The run-2 coverage and delta-R2 results stand; the C7 consistency failure of run 2 (F3) is now resolved by the corrected reference.
+
 ## Review
 
 ## Audit
