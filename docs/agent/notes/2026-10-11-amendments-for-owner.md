@@ -98,3 +98,9 @@ The retrieval cap stays in force until that first entry exists: until then the r
 - v3 section 7: state the overall rule (supported only if all three systems pass; not supported if any fails; otherwise inconclusive; a missing system is inconclusive) and that the intersection-union remark controls only the error of "supported" (up to about 7.3% over three systems for "not supported", about 14% for H2c's two parts).
 - v3 section 2, H1c: "(PLP)" stays; CP reported without a verdict.
 - New ROADMAP row (gain bound): screen on the raw C >= 0 at every horizon, report the subset and the per-screen counts, no bar (concordance D-21(b), (c)).
+
+## 12. Additions from the WU-0001.6 plan (DEC-0023) and the baseline change (DEC-0022), 2026-10-11
+
+- ROADMAP section 2: WU-0001.6 is already the WU-0001 review sub-task; name the platform-record unit WU-0001.6b (or renumber) and list its dependency on WU-0002.12 (the regression found DEF-0024).
+- ROADMAP WU-0002.12 acceptance: the baseline of the regression is the local re-run of tag `v1-baseline` on the reference platform (DEC-0022); the original pilot file is the historical record.
+- DEC-0019 F1: once both runs carry W and U digests, state how a digest difference is treated in branch selection.
