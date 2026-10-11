@@ -1019,6 +1019,78 @@ Scope: a8bdf0b (.2a) and df40a3b (.1/.2b, R8), against the plan, the design M1 t
 - The merge waits for the evidence above.
 - 5 new findings (R17 to R21).
 
+### 2026-10-11, reviewer claude-opus-5-5 (fresh context): R17 to R21 re-review (fix round 2), develop merge 9377a83, LM row 6b727b8
+
+**Scope.** R17 to R21 at 81b33d3; the merge of develop b0c939c (9377a83); the LM-row reconciliation (6b727b8). Head 1ed30ee (Log only after 6b727b8). Checked against DEC-0024, its addendum A1, DEC-0025 and DEC-0021 in `decisions.md` (identical in this worktree and in the develop worktree; 9fcfa76 is an ancestor of HEAD).
+- **No test was run.** Run 16 (`781 passed`) is at the code of 6b727b8, and 1ed30ee changes only this file, so a rerun would break the once-rule. I did read-only comparisons only: git diffs, an AST import scan, and leaf and regex checks on the existing smoke outputs.
+
+**Status of R17 to R21.**
+- **R17: resolved.**
+  - `addendum_a1()` reads `ROOT/docs/agent/records/decisions.md`, with `ROOT = Path(__file__).resolve().parents[2]`, so it does not depend on the cwd. It slices from `## DEC-0024 addendum A1` to the next `\n## ` heading, or to EOF, which is where A1 is now. A `###` heading cannot end the slice early.
+  - It fails loudly if A1 is renamed or missing: `str.index` raises ValueError, and `re.search(...).group` on None raises AttributeError.
+  - The five Included cells are parsed from A1's backticked bullets. The test asserts `parsed == expected` (the literals) and `cell == parsed text` for each QoI. A change in `ORACLE_INCLUDED` or in A1 fails the test.
+  - Row 9 is parsed from A1 and compared for equality with `DEF0020_TEXT`, which must also appear in the rendered cell.
+  - The widening sentence is checked against A1's constraint (uq-budget rule only, no DEF-0020 or DEC-0018). A1 gives no exact text for it.
+  - R_ref is parsed from the primary log (R21) and also checked against the values A1 states, typed as literals.
+  - The Log (line 560) and the `budget.py` comment and docstring cite A1 and say it amends M1 (a) and M7.
+- **R18: resolved.** The row-1 How text names the "'Included in the reported interval?' column". The test asserts this and asserts that the old wording is gone. The rendered header in the head smoke is that exact text, and it follows the Size column.
+- **R19: resolved.**
+  - `iterative_label(config)` reads `config.estimator_refine_steps`, and `interval_label` calls it for `PRIMARY_KEYS`.
+  - The LM text's "n → 2n" is formatted from the same field (`LM_PRESENT.format`).
+  - The test sets 30 and asserts "fixed 30-iteration" and "30 → 60". It also asserts 15 for SMOKE.
+  - No literal 15 remains in `budget.py`. The remaining "30 steps" literals are the Lyapunov-time convention.
+- **R20: resolved, append-only.** The unit-file diffs of 81b33d3, c2aec658, 6b727b8 and 1ed30ee are 23/0, 12/0, 18/0 and 4/0 lines (insertions/deletions). The merge did not touch this file. Line 536 is unchanged, and the void note is at line 563.
+- **R21: resolved.**
+  - The regex matches `C\d` or `C\d_sigma…c0.8` at the start of a line. The `c0.95` lines cannot match, so there is no key collision.
+  - It captures R, the L0.9833 cov and its SE. C4_sigma1.5c0.8 and C4_sigma2.0c0.8 map to C4h1.5 and C4h2.
+  - All 12 `COVERAGE_WU0006` keys are looked up with `parsed[key]`, so a missing case raises KeyError. The (r_ref, rate, rate_se) tuples are compared exactly, so a mismatch fails.
+  - I read the log: all 12 tuples agree, C4h included (0.9744/0.0011/20000 and 0.9669/0.0013/20000).
+
+**Merge 9377a83.**
+- **Only the conflict was hand-resolved.** `git merge-tree --write-tree c2aec658 b0c939c` differs from the merge commit's tree only in `lpcstudy/report.py`, the conflict; every other file is git's automatic merge.
+- **No hunk is lost or doubled.** I compared the `-U0` hunk lines of `report.py`, `±` lines only:
+  - the branch side (merge base 6dfd8db → c2aec658) is identical to b0c939c → 9377a83 (37 lines);
+  - the develop side (6dfd8db → b0c939c) is identical to c2aec658 → 9377a83 (83 lines).
+  - So every hunk of each side is present exactly once. `report.py` is unchanged after the merge.
+- **Section order.** In `write_markdown` the order is P2(c) `###`, then LM `###`, then `budget_lines` (`## Uncertainty budget`), then `## Robustness`. The head smoke `RESULTS.md` has: Validation gate (210), P2(c) (241), LM (249), Uncertainty budget (262), Robustness (390), Figures (393), Handling (402).
+- **Import graph.** The AST scan of all 22 modules equals the fixture rows exactly (`__init__` has none).
+- **Removed constants.** `LM_SUMMARY_PATH`, `LM_NOT_READ` and `ITERATIVE_LABEL` appear only in the historical record text, in no `.py` file.
+
+**LM row, statement truth.**
+- `lm_summary_present` uses the same criterion as `report._lm_lines`: a cell's `lm.by_kind` part with truthy `n_estimates`.
+- The LM subsection heading is printed unconditionally, so the present wording's pointer to "'Levenberg–Marquardt diagnostics' subsection" always resolves.
+- **Present wording.** It agrees with DEC-0024 M4 (observation metric only, cond ≈ 1e7) and DEC-0025 D2 (row stays "not estimated" until the doubling study), and it prints no summary number.
+- **Absent wording.** It is true by construction.
+- **Head smoke.** All 5 LM rows read the present text. Develop's new `assert_lm_rows` regex finds 6 rows against 6 expected, and none of them falls inside the budget section, so the budget tables do not disturb develop's integration check.
+
+**Neutrality.**
+- `git diff a8bdf0b HEAD -- lpcstudy/statistics.py lpcstudy/analysis.py` is empty. Neither the merge nor any later commit touched them.
+- Against develop b0c939c, the only differences in these two files are this branch's .2a change. Develop's tip has no code change after b0c939c.
+- **A1 smoke, re-checked on the existing outputs.** Develop is `run/dev-b0c939c/runs/dev/smoke` (provenance b0c939c, clean); the head is `runs/head/smoke` (6b727b8). Result: 0 different, 0 removed, 14 new leaves, exactly the `ci_mc_se[0,1]` of the five primary sites, all null.
+- My leaf counts are 4538/4552 against the Log's 4537/4551. The offset is the same on both sides, so it is a leaf-counting convention. Not material.
+
+**Coverage of the earlier runs at the final head.**
+- **Slow exact checks (run 15, 81b33d3): no rerun needed.**
+  - `analysis.py`, `statistics.py` and `tests/slow/` are byte-identical to run 15.
+  - The harness imports only `analysis`, `config`, `data` and `statistics`.
+  - Develop's changes in the transitive closure (`pipeline`, `estimation`, `ensemble`) reach `analysis` only through type imports (`Cell`, `FittedRules`, `RuleScores`, `SplitData`), and the merge changed none of their definitions.
+- **Integration pair (run 14, 81b33d3): no separate rerun before the gate.**
+  - The CLI path changed with the merge. The A1 smokes at 6b727b8 then ran end to end through `tools/run_preset.sh` (exit 0).
+  - Develop's integration tier passed on its own tree (WU-0005.4: 11 passed).
+  - The merged tree has not yet executed develop's changed `test_smoke_pipeline.py` (`handling/2`, `assert_lm_rows`). I checked its LM-row assertion read-only on the head smoke output (above). The merge gate's whole-suite run (`LPC_GATE=merge`, main session) is where it runs; no developer rerun is needed beforehand.
+
+**Commits.** 81b33d3, 9377a83, 6b727b8 and 1ed30ee each name the unit (the merge through its branch name) and end with `Agent: claude-sonnet-5-5`.
+
+**Owner checkpoint.** Unchanged. The budget statements and the .2a statistics path need **owner review before freeze**. DEC-0024, A1 and DEC-0025 are still "proposed". The fix round and the merge touch no seed, provenance or dependency code from this branch.
+
+**New findings: none.**
+
+**Verdict: approve.**
+- R17 to R21 are resolved.
+- The merge resolution is a correct union.
+- The LM row is true in both cases.
+- Merge to develop is recommended through the main session's merge gate.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
