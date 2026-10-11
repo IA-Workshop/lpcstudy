@@ -427,6 +427,41 @@ The full form is the addendum A1 to A8 of `docs/agent/notes/2026-10-11-math-wu00
 
 **Test run 4 result.** `4 passed in 101.86s (0:01:41)` (`runs/tests/slow-20261011T173439Z.log`, exit 0): `test_counts_are_consistent_with_the_reference[C7-0.0]` and `[C7-0.3]` (run-2 counts: pass 1 and 0, fail 15 and 9, inside the corrected and kept ranges), `test_reference_tables_hold_the_70_ranges` (still 70 ranges, each containing its rate) and `test_delta_r2_design_marginals` with the tightened 1.9e-3 tolerance on corr(x4, x1). The run-2 coverage and delta-R2 results stand; the C7 consistency failure of run 2 (F3) is now resolved by the corrected reference.
 
+**2026-10-11, applied-mathematician (claude-opus-5-5): WU-0006.4 mathematician review, part 2: the null ΔR² reference at 3000/1000 (note addendum A9).**
+
+- **What was run.**
+  - `dr2_full_ref.py`: the same replication as the harness's `_delta_replicate`, through production `qn_profile_block` with B = 2000 and blocks of 5. The truth is computed on 10⁵ fresh i.i.d. states.
+  - R_ref = 1000 per φ ∈ {0, 0.3}, both targets, scratch seed 20261014.
+  - 8 spawned single-thread workers, 16.5 min wall, CPU only.
+  - It ran in parallel with an 8-thread CPU pilot preset run (DEV-0, another worktree), under the owner's parallel-run authorization for the WU-0006 slow job as relayed by the main session. The host has 32 cores and the load was about 3, so there was no oversubscription.
+  - Integrity: the refit was bitwise in 4000 of 4000 target replications, with 0 failed resamples. The truth's MC SE is 0.051 of the half-width on average (maximum 0.074).
+  - My `dr2_full_ref.py`, `dr2_full_ranges.py` and README entry were committed by the main session in f406046 and d6643f3 while the job ran. This commit adds the two logs.
+- **VV.3.** The run-2 N counts were known before this reference. They were not used, and they were compared only after the ranges were fixed.
+- **Reference and pre-registered values** (R_test = 500; P(fail) of the slow test's bound, mixed over the reference error; range = the WU-0006 rule, central 1 − 0.0005 of Bin(500, p) mixed over N(p, SE²)):
+
+  | φ, target | N1 (P(fail); range) | N2 (P(fail); range) | N3 (P(fail); range) |
+  | --- | --- | --- | --- |
+  | 0, logit | 0.919 (0.54; [431, 483]) | 0.016 (0.000; [0, 23]) | 0.941 (0.066; [446, 490]) |
+  | 0, indicator | 0.933 (0.19; [440, 487]) | 0.019 (0.001; [0, 25]) | 0.945 (0.033; [448, 491]) |
+  | 0.3, logit | 0.924 (0.41; [434, 484]) | 0.009 (0.000; [0, 16]) | 0.946 (0.028; [449, 491]) |
+  | 0.3, indicator | 0.926 (0.35; [436, 485]) | 0.014 (0.000; [0, 21]) | 0.945 (0.033; [448, 491]) |
+
+  - Mean Δ_cond is −0.0024 to −0.0034 and the half-width is 0.0155 (logit) and 0.0251 (indicator).
+  - **Retraction.** The R_ref = 200 values (indicator N2 0.035, N3 0.925) were tail draws, consistent with these at z ≥ −1.8. **My earlier P(fail) figures of 0.25 (N2) and 0.42 (N3), and the N1 figures 0.42 and 0.88, are retracted.**
+  - The current docstring of `test_analysis_null_delta_r2.py`, which I prompted, says "0.42 and 0.88" for N1. It should read 0.19–0.54 per row. Its "TO BE REPLACED" lines should take the N2 and N3 values above.
+  - `DELTA_R2_REFERENCE` should take the R_ref = 1000 values.
+- **Run 2 against these ranges** (compared only after they were fixed): all 12 counts are inside.
+- **Meaning for the study's tests.**
+  - The always-asserted N2 and N3 rows are not flaky at 0.25 or 0.42. N2 is safe (P ≤ 0.001), and each N3 row fails with P 0.03–0.07.
+  - But the 8 always-asserted rows together have **P(at least one spurious failure) ≈ 0.15 per run**. That is too high for a defect test; the consistency ranges give at most 3.5% family-wise.
+  - **The cause is the bounds' basis, not the sizes.** N3's bound is nominal − 3 SE (0.921), while the procedure covers Δ_cond at 0.941–0.946 (block-5 undercoverage, as in A1/A2). The margin is only 2.0–2.4 SE, and a larger R does not help (0.012 at R 500 against 0.019 at R 1000 at a true 0.945).
+  - **Going back to 900/1000 is not a remedy.** Its reference has N3 0.930 for the logit at φ = 0 (P(fail) about 0.29) and N1 0.86–0.91. It would verify a configuration the study does not use. And choosing sizes by which one passes is the PRIME.2 pattern.
+- **Recommendation (owner decides; no test changed by me).**
+  - Keep 3000/1000.
+  - Put the N2 and N3 nominal bounds under the same switch as A1–A3 (`ASSERT_ROADMAP_BOUNDS`, DEC-0018 K or C).
+  - Make the 12 N consistency ranges above the always-asserted defect test (family-wise ≤ 0.6%). They are fixed after run 2, so their first assertion at the next run is a genuine pre-registration.
+  - If N2 and N3 stay always asserted, record now that an N3 failure inside its range is a predicted "method" finding (about 15% per run), not a defect.
+
 ## Review
 
 ## Audit
