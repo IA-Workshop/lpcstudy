@@ -144,6 +144,22 @@ Scope of this session: .3 and .4 only. Not done here: the budget tables (.1), `e
 Result of run 1: `148 passed in 14.06s`. Self-check of the diff for `clip|nan_to_num|isfinite|where(|try:|except` and for `default_rng|random.|PRNGKey`: none in `budget.py` or the report hunks (two `try:` in `test_budget.py` close figures in a `finally`; no handling of a value). No tolerance in an assert or approx was touched (the changes to `test_tools_test_impact.py` are a docstring and the module count 21 to 22).
 
 
+Commit dff3692 (.3).
+
+**Test run 2 (.4 code: `QOI_DECLARATIONS` and `QOI_FIELDS` appended to `identifiers.py`, the QoI section of `budget.py`, report hunk R3 and its import, tests in `test_budget.py` and `test_identifiers.py`).** Checklist:
+1. Change set: `lpcstudy/identifiers.py`, `lpcstudy/budget.py`, `lpcstudy/report.py`, `tests/unit/test_budget.py`, `tests/unit/test_identifiers.py`, this unit file. The import graph does not change in this step (budget already imported `config` and `identifiers`).
+2. Radius: `tools/test_impact.py --base develop --explain`: unit `test___main__`, `test_analysis`, `test_budget`, `test_experiments`, `test_identifiers`, `test_report`, `test_tools_test_impact` (rule: `identifiers` = own + direct dependents analysis, experiments, report, budget; `report` and `budget` as in run 1), plus by hand `test_data.py` and `test_validation.py`. Not the whole suite; no gate.
+3. Already run? No: the identifiers and budget code and the added tests differ from run 1; test_analysis and test_experiments have not run on this branch.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s.
+6. Contention: no `lpcstudy --preset` run active.
+7. Output: wrapper's `-q --tb=short -rfE`.
+8. Command: `LPC_THREADS=4 tools/run_tests.sh unit tests/unit/test___main__.py tests/unit/test_analysis.py tests/unit/test_budget.py tests/unit/test_experiments.py tests/unit/test_identifiers.py tests/unit/test_report.py tests/unit/test_tools_test_impact.py tests/unit/test_data.py tests/unit/test_validation.py`.
+
+Result of run 2: `1 failed, 243 passed in 20.60s`. The one failure, `tests/unit/test_identifiers.py::test_no_stale_identifier_in_the_package`, is not caused by this change and is **not fixed here** (out of scope: `statistics.py` is the mathematician's lane, and the test is not to be loosened): it reports `('statistics.py', 'stale', 'Kaplan-Meier estimator for discrete first-passage times...')`, i.e. the docstring of `kaplan_meier` (introduced in a486b7d, WU-0002.11b, present on `develop`) contains "inventory row T1", and the test's regex `T1` (a stale v1 id) matches it. Nothing in `budget.py` or `QOI_DECLARATIONS` is flagged. For the main session: reword that docstring on develop (e.g. "inventory row 1 of T-series") or the test must learn that "inventory row T1" is not an id; the owner or the planner decides. Not rerun (no code change).
+Self-check of the .4 diff: no `clip|nan_to_num|isfinite|where(|try:|except` and no `default_rng|random.|PRNGKey` in non-test code; no tolerance in an assert or approx touched; the QoI texts are drawn from v3 sections 2, 5, 7, 8 and Methods v2 M12.
+
+
 ## Review
 
 - **Reviewer:** <actor, not the author>

@@ -14,7 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from lpcstudy.identifiers import HYPOTHESIS_TABLE, V1_KEY_MAP, check_keys
+from lpcstudy.identifiers import (HYPOTHESIS_TABLE, QOI_DECLARATIONS, QOI_FIELDS, V1_KEY_MAP,
+                                  check_keys)
 
 ROOT = Path(__file__).resolve().parents[2]
 DECISION_LOG = ROOT / "docs" / "study" / "decision_log_lpc.md"
@@ -170,3 +171,18 @@ def test_check_keys_accepts_table_keys_and_refuses_stale_ids() -> None:
     for stale in ("H1e", "H1f", "H2f", "H3d", "T1", "H9f"):
         with pytest.raises(ValueError, match=stale):
             check_keys({"H1a": 1, stale: 2})
+
+
+def test_declarations_cover_the_table_keys_with_nonempty_fields() -> None:
+    """``QOI_DECLARATIONS`` has exactly the table keys, each with the five fields, none empty (Q1).
+
+    Reference: ``HYPOTHESIS_TABLE`` (the keys) and NVVUQ.3 (definition, units and conventions,
+    error that would change a decision, decision informed; the criterion is the table's own
+    text) with the status of NVVUQ.22. Exact set and string checks.
+    """
+    assert set(QOI_DECLARATIONS) == {row.key for row in HYPOTHESIS_TABLE}
+    assert len(QOI_DECLARATIONS) == 14
+    assert QOI_FIELDS == ("definition", "units", "decision_error", "decision", "status")
+    for key, declared in QOI_DECLARATIONS.items():
+        assert set(declared) == set(QOI_FIELDS), key
+        assert all(text.strip() for text in declared.values()), key

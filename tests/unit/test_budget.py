@@ -25,6 +25,7 @@ from lpcstudy.report import make_figures, verdicts, write_markdown
 TAGS = ("procedure:", "level:", "dependence:", "multiplicity:")
 NUMERIC_INTERVAL = re.compile(r"\[-?\d[\d.e+-]*, -?\d[\d.e+-]*\]")
 ROOT = Path(__file__).resolve().parents[2]
+PROPOSAL = ROOT / "docs" / "study" / "proposal_and_methods_v3.md"
 
 
 def markdown(tmp_path: Path, mutate=None) -> list[str]:  # noqa: ANN001
@@ -115,7 +116,9 @@ def test_markdown_labels_every_interval_table_before_the_next_heading(tmp_path: 
         found = [ln for ln in lines[end:nxt] if all(tag in ln for tag in TAGS)]
         assert found, lines[start]
         labelled += 1
-    assert labelled == 2  # the verdict table and the validation table
+    # the verdict table, the declaration table (its criteria name bands such as [0.8, 1.2]) and
+    # the validation table
+    assert labelled == 3
     verdict_lines = [ln for ln in lines if ln.startswith("- ") and "— procedure:" in ln]
     assert [ln.split(" ")[1] for ln in verdict_lines] == [r.v3_id for r in HYPOTHESIS_TABLE]
     v4 = [ln for ln in lines if ln.startswith("V4 half-width — procedure:")]
@@ -256,3 +259,63 @@ def test_an_interval_caption_states_level_and_procedure() -> None:
                     "consecutive test states in time order, B = 50, level 1 − 0.05/3 (98.33%).")
     with pytest.raises(KeyError):
         budget.figure_caption("missing.png", SMOKE, captions)
+
+
+def proposal_ids() -> list[str]:
+    """Hypothesis ids of the three tables of v3 section 2, in order, then the gain bound.
+
+    Reference: the proposal file, parsed by a regular expression on the table rows (``| H1a |``,
+    ``| **H2a** |``, ``| Q-N (estimate) |``); the gain bound is the sentence after the RQ3 table
+    ("The hybrid's horizon gain over the better forecaster is reported against the P1 bound"),
+    which the decision log maps to the id ``(reported)``.
+    """
+    text = PROPOSAL.read_text(encoding="utf-8")
+    section = text[text.index("## 2. Research questions"):text.index("## 3. Mathematical")]
+    ids = re.findall(r"^\| (?:\*\*)?(H\d[a-e]|Q-N)(?:\*\*)?(?: \(estimate\))? \|", section, re.M)
+    assert "reported against the P1 bound" in section
+    return ids[:10] + ["(reported)"] + ids[10:]
+
+
+def test_declaration_table_has_a_complete_row_per_table_row() -> None:
+    """The declaration section has 14 rows, none with an empty cell, criterion verbatim (Q1).
+
+    Reference: the ids parsed from v3 section 2 (13 hypotheses and the estimate, plus the
+    reported gain bound: 14) and ``HYPOTHESIS_TABLE`` for the verbatim criterion. The heading and
+    the seven columns are the plan's. The closing label has the four elements.
+    """
+    lines = budget.qoi_declaration_lines(SMOKE)
+    assert lines[0] == "## Quantities of interest (NVVUQ.3)"
+    header = next(i for i, ln in enumerate(lines) if ln.startswith("| ID |"))
+    rows = [ln for ln in lines[header + 2:] if ln.startswith("|")]
+    assert lines[header + 1] == "|" + "---|" * 7
+    assert [c.strip() for c in lines[header].strip("|").split(" | ")] == [
+        "ID", "Definition", "Units and conventions", "Criterion", "Decision-relevant error",
+        "Decision informed", "Confirmatory or exploratory"]
+    assert len(rows) == len(HYPOTHESIS_TABLE) == 14
+    cells = [ln[2:-2].split(" | ") for ln in rows]
+    assert all(len(row) == 7 and all(c.strip() for c in row) for row in cells)
+    assert [row[0] for row in cells] == proposal_ids()
+    assert [row[3] for row in cells] == [h.criterion.replace("|", "\\|") for h in HYPOTHESIS_TABLE]
+    assert all(tag in lines[-1] for tag in TAGS) and "B = 50" in lines[-1]
+    assert "blocks of 5" in lines[-1] and "98.33%" in lines[-1]
+
+
+def test_a_table_row_without_a_declaration_raises() -> None:
+    """A QoI is never reported undeclared: a missing declaration is a ``KeyError``."""
+    declared = dict(budget.QOI_DECLARATIONS)
+    del declared["H3c"]
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(budget, "QOI_DECLARATIONS", declared)
+        with pytest.raises(KeyError, match="H3c"):
+            budget.qoi_declaration_lines(SMOKE)
+
+
+def test_markdown_has_the_declaration_section_between_labels_and_allocation(
+        tmp_path: Path) -> None:
+    """RESULTS.md has the section once, after the verdict labels and before the allocation rules."""
+    lines = markdown(tmp_path)
+    heads = [ln for ln in lines if ln.startswith("## ")]
+    assert heads.count("## Quantities of interest (NVVUQ.3)") == 1
+    i = heads.index("## Quantities of interest (NVVUQ.3)")
+    assert heads[i - 1] == "## Hypothesis verdicts"
+    assert heads[i + 1] == "## Allocation rules at the core cell (test split)"

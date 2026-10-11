@@ -6,6 +6,8 @@ of ``results.json`` changes. This module holds what is longer than a call site, 
 
 WU-0008.3 (this part): the four-element label of every interval (procedure, level, dependence,
 multiplicity; NVVUQ.16), the figure captions, and the same caption written into each PNG.
+WU-0008.4: the declaration table of the quantities of interest (NVVUQ.3, NVVUQ.22), built from
+``identifiers.HYPOTHESIS_TABLE`` and ``identifiers.QOI_DECLARATIONS``.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ import textwrap
 from dataclasses import dataclass
 
 from .config import StudyConfig
-from .identifiers import HYPOTHESIS_TABLE, Hypothesis
+from .identifiers import HYPOTHESIS_TABLE, QOI_DECLARATIONS, Hypothesis
 
 PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
 """Level of the primary intervals H2a, H2b, H3c (v3 section 7: Bonferroni over the three). A
@@ -272,4 +274,61 @@ def caption_figure(fig, name: str, config: StudyConfig,
     fig.set_size_inches(width, height + extra)
     fig.tight_layout(rect=(0, extra / (height + extra), 1, 1))
     fig.text(0.01, 0.01, wrapped, ha="left", va="bottom", fontsize=size, color="#52514e")
+
+
+# ------------------------------------------------------------------ quantity-of-interest table
+
+QOI_COLUMNS = ("ID", "Definition", "Units and conventions", "Criterion",
+               "Decision-relevant error", "Decision informed", "Confirmatory or exploratory")
+"""Columns of the declaration table: the five items of NVVUQ.3 and the status of NVVUQ.22."""
+
+
+def general_label(config: StudyConfig) -> str:
+    """One label for the intervals quoted in the criteria of the declaration table (v3 section 7)."""
+    block, resamples = config.bootstrap_block, config.bootstrap_resamples
+    return (f"Intervals named in the criteria column — procedure: moving-block bootstrap "
+            f"percentile interval, blocks of {block} consecutive states in time order, "
+            f"B = {resamples}; level: {level_text(PRIMARY_LEVEL)} for H2a, H2b and H3c, "
+            f"{level_text(SECONDARY_LEVEL)} for every other row; dependence: kept within a block "
+            f"of {block}, none assumed beyond it; multiplicity: Bonferroni over the three "
+            f"primaries, intersection–union across systems, Holm within H3a, none for the "
+            f"secondaries. The labels of each row are under the verdict table.")
+
+
+def _escape(text: str) -> str:
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def qoi_declaration_lines(config: StudyConfig) -> list[str]:
+    """The ``## Quantities of interest (NVVUQ.3)`` section: one row per table row (WU-0008.4).
+
+    The criterion column is ``row.criterion`` verbatim; the other cells are
+    ``identifiers.QOI_DECLARATIONS[row.key]``. A table row without a declaration raises
+    ``KeyError`` (a QoI is never reported undeclared).
+
+    Parameters
+    ----------
+    config : StudyConfig
+        Source of the block length and the number of resamples named in the closing label.
+
+    Returns
+    -------
+    list[str]
+        The Markdown lines: heading, one introductory sentence, the table, and the label of the
+        intervals its criteria name.
+    """
+    lines = ["## Quantities of interest (NVVUQ.3)", "",
+             "Every row of the identifier table is declared with its definition, units, "
+             "criterion, the error that would change the decision, and the decision it informs "
+             "(NVVUQ.3), and with its status (NVVUQ.22). Time is in observation steps "
+             "(1 Lyapunov time = 30 steps), noise ρ is a fraction of σ_x, latent states are "
+             "whitened, and errors are measured against the noise-free truth.", "",
+             "| " + " | ".join(QOI_COLUMNS) + " |", "|" + "---|" * len(QOI_COLUMNS)]
+    for row in HYPOTHESIS_TABLE:
+        declared = QOI_DECLARATIONS[row.key]
+        cells = [row.v3_id, declared["definition"], declared["units"], row.criterion,
+                 declared["decision_error"], declared["decision"], declared["status"]]
+        lines.append("| " + " | ".join(_escape(cell) for cell in cells) + " |")
+    lines += ["", general_label(config)]
+    return lines
 
