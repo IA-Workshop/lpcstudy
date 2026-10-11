@@ -495,4 +495,100 @@ The full form is the addendum A1 to A8 of `docs/agent/notes/2026-10-11-math-wu00
 
 ## Review
 
+**2026-10-11, reviewer (claude-opus-5-5), fresh context: independent review of WU-0006.1 to .3 at 06147f9** (plan d954db9, amendment 493b5de, mathematician 9d1152e, db82ac5, bd21e76; DEC-0018 and DEF-0020 to DEF-0022 read on `develop`).
+
+**Tests run: none.** As instructed, I did not rerun the slow tier or any test. Read-only checks: `git diff`/`git log`; `python3 tools/test_impact.py --base develop --explain --include-slow` (selection only, no `--run`); `_convention(root, "slow", m)`; reading `runs/tests/wu0006_*.json` and `slow-*.log`.
+
+**Verified (no finding).**
+1. **Production code under test.**
+   - No change under `lpcstudy/`, `tools/`, `requirements.txt`, `tests/unit`, `tests/integration` or `tests/conftest.py` (`git diff b4f5b81..HEAD`). The only imports are numpy, scipy and the standard library, so there is no new dependency.
+   - `assert_design` pins FULL to B = 2000, block 5, levels 0.95 and 1 − 0.05/3, and sizes 3000/1000.
+   - The identity check is real. `_production` calls `h2c_state_dependence`, `h3c_ratio`, `h2d_empirical_comparison`, `h1d_correlations`, `h2a_part_ii` (interior column), `_paired_change` and `block_bootstrap_counted`, and compares estimate, bounds, failed count and verdict with exact `==`. This holds in 10 replications per case (3 for C6). Run 2 shows `identity_checked` 10 of 10.
+   - The C7, C8 and C9 levels and seed paths match the pipeline call sites: analysis.py:1204 and experiments.py:517 (PRIMARY_LEVEL), :1361 (H2b(ii) PRIMARY_LEVEL), and :1469 (H2e 0.95).
+   - `EDGE_RULES`/`expected_verdict` agree with `interval_verdict` for every open or closed edge, including the two-sided C7 band.
+2. **Generators and seeds.**
+   - `ar1` (x₀ = e₀, then √(1−φ²) innovations through `lfilter`) is stationary with unit variance and lag-1 φ. Its bivariate form gives lag-0 cross-correlation c at every t.
+   - The geometric copula gives P(T > k) = (1−h)^k, with censoring (1−h)²⁴⁰.
+   - The C4, C5 and C6 truths are exact, and so is the C7 partial correlation 0.1.
+   - The delta-R² design matches M3 (g).
+   - All randomness comes from `make_rng(6006, "wu0006", …)`, through per-replication `"boot"` integers. There is no `default_rng`, `SeedSequence`, DEV or CONF site in the WU-0006 files.
+3. **Bounds.**
+   - A1 930, A2 972, A3 39/16, L 33, N1 = N3 461 and N2 22 equal the stricter-of rule. I recomputed each: 929.324 → 930, 971.188 → 972, 39.81 → 39, 16.96 → 16, 33.35 → 33, 460.38 → 461, 22.97 → 22. They are unchanged from 1e870da to the tip.
+   - The post-result changes are these four, each documented in the Log with a derivation:
+     - **C7 pass ranges (db82ac5).** Derived from R_ref = 60 000 reference replications.
+     - **The A9 delta-R² table (bd21e76/166e23d).** `dr2_full_ranges.py` reads only `dr2ref_*.npy`, and its log reproduces the 12 ranges in `wu0006_reference.py`.
+     - **The corr(x₄, x₁) self-check.** It was tightened from 3e-3 to 1.9e-3.
+     - **The C7 zero-column expectation (F4, 665e1a9).** This one is not in the brief's list, but it is legitimate: it now follows `combine_verdicts` ("fail" if any part fails), not a count.
+   - The H1 Bartlett SE change (slightly wider) was made in the amendment before any code or result.
+4. **Switch.**
+   - `ASSERT_ROADMAP_BOUNDS = True`, and `enforce` reads it at call time.
+   - Both positions are tested: `test_roadmap_switch_has_both_modes` (monkeypatch) and `test_delta_roadmap_rows_follow_the_switch_in_both_modes`.
+   - In the default position, A1–A3, L1, L2 and N1–N3 all raise. Run 7 shows that N1 raised.
+   - The 70 + 12 consistency ranges, the exact checks, L3 and the refit are asserted in both positions.
+5. **Results.**
+   - The run-2 summary is `12 failed, 66 passed` (78 = 14 + 46 + 12 + 6 nodes). The run-7 summary is `2 failed, 16 passed` (18 nodes).
+   - Every run-2 failure message in `slow-20261011T165447Z.log` matches the Log table, and the remaining JSONs match too: C1, C3, C1s, C7, L1, L2 and DR2.
+   - The run-7 DR2 counts equal run 2's: 467/460/457/467, 8/10/8/8 and 475/475/478/476, with refit 500/500 and 0 failed resamples. All of them lie inside the A9 ranges.
+   - The 16 + 2 ROADMAP failures are DEF-0020 and DEF-0021, and each count lies inside its range.
+6. **Monte Carlo statements.** All are correct except those in R7: the bound SEs, the 3.5 % and 0.6 % family-wise rates, P(≥1 of 8 N2/N3) = 0.153 (it matches the `dr2_full_ranges.log` line), the C7 P ≈ 1e-13, and the corrected A7 items.
+7. **Pool.**
+   - The workers are spawned. The seven thread variables are set to 1 in `os.environ` before `ProcessPoolExecutor` is created and are restored afterwards; the smoke test checks this.
+   - The pool size is `min(LPC_THREADS, 4)` (run 7 at `LPC_THREADS=8` used 4).
+   - Results are deterministic: H2 holds in the smoke, and runs 2 and 7 are identical.
+8. **Selection.**
+   - `test_impact` selects each study file by its target module (`statistics` → `test_statistics_coverage.py`; `analysis` → the three `test_analysis_*` files).
+   - The graph fixture is unchanged.
+   - Commit messages name the unit and carry `Agent:`.
+
+**Findings.**
+
+- **R1 (low–medium; provenance, REPRO).** Every results table records the wrong worker count: tests/slow/wu0006_harness.py:979.
+  - `ResultTable.add` writes `"workers": pool_size()`, but it is called inside `worker_pool`, which has set `LPC_THREADS=1` in the parent (:150–151, :172).
+  - So every `runs/tests/wu0006_*.json` records `"workers": 1` although the runs used 4.
+  - The counts are not affected (H2), but the provenance is false.
+  - *Fix:* capture the size when the pool is created (for example, `worker_pool` yields it or `RunCache` stores it) and write that value. Add one smoke assertion that `_meta.workers` equals the pool's `_max_workers`.
+- **R2 (medium; evidence retention, plan deviation).** The run-2 machine record for 12 of the 18 asserted coverage rows is lost: tests/slow/wu0006_harness.py:972.
+  - The plan (Scope, "Result rows") specified `runs/tests/wu0006/<test>-<UTC>.json`. The harness writes one fixed file per study, `wu0006_<name>.json`, and rewrites it with only the current session's rows.
+  - The C7-only reruns (runs 3 and 4) therefore overwrote the run-2 `wu0006_coverage_analysis.json`. It now holds only C7, written at 17:36Z.
+  - The run-2 numbers for C2, C4, C5, C6, C8 and C9 now survive only in the hand-typed Log table. For the rows that failed they also survive in the pytest messages. The passing values cannot be checked: for example C6 959/985, C2 φ=0 29/39, and C8 and C9 at φ=0.
+  - *Fix:* timestamped (or run-id) file names as planned, never overwritten. Record the loss in the Log. That harness change puts the study files in radius, and their next owed run regenerates the tables (deterministic seeds); do not rerun only to recover them.
+- **R3 (medium; evidence labelling, VV.3 / LPC.PC.21).** One claim of pre-registration does not hold: tests/slow/test_analysis_null_delta_r2.py:126–128, and the Log for runs 4 and 7 (lines 428 and 492).
+  - The docstring says the 12 A9 ranges' "first use as an assertion is the next run, a genuine pre-registration". The ranges were fixed after the run-2 counts were known. Run 7 used the same seeds and design and is bitwise deterministic, so it could only reproduce those known counts; the developer predicted this at line 470.
+  - The run-7 passes of the 12 range nodes, and the run-4 passes of the corrected C7 ranges, are therefore a determinism and regression confirmation. They are not independent evidence that the ranges detect a defect.
+  - *Fix:* reword the docstring and add a Log note. The first pre-registered use is the first run whose counts were not known when the ranges were fixed, for example after a seed-derivation change (plan risk R4). Label run 7's range passes as a regression guard.
+- **R4 (medium; governance, QA.6 / LPC.AI.12; for the main session).** DEC-0018 does not record the change: `develop:docs/agent/records/decisions.md:298`.
+  - The Log (line 465) cites a "DEC-0018 update by the main session". The text of DEC-0018 O5 still says "N2 and N3 are asserted" (always), and no branch holds an update.
+  - The tip has changed three things since:
+    - N2 and N3 now sit under `ASSERT_ROADMAP_BOUNDS`, so under Option C they are no longer asserted;
+    - the 12 A9 ranges are the always-asserted delta-R² defect test;
+    - the delta-R² reference was replaced after the result.
+  - None of this weakens the default position, but it changes what Option C would assert, after run 2. That change is the owner's to see.
+  - DEF-0022's resolution line (`defects.md:191`) still reads "pending the mathematician's corrected range", although db82ac5 corrected it.
+  - *Fix:* append a dated update to DEC-0018 (or a new DEC) with these three changes, marked "needs owner review before freeze", and update DEF-0022's resolution.
+- **R5 (low; blast radius, R5 of the plan).** A change to `wu0006_reference.py` alone does not select `test_analysis_logrank_size.py` or `test_analysis_null_delta_r2.py`.
+  - The `test_impact` helper rule is "tests naming it". These two files reach `LOGRANK_REFERENCE` and `DELTA_R2_REFERENCE` only through `wu0006_harness`.
+  - A future edit of either table would leave its study unselected.
+  - *Fix (no tooling change):* have both files import `wu0006_reference` and use it, for example by asserting `ref.DELTA_R2_REFERENCE_R == 1000`. Alternatively, record the transitive gap in the Log for WU-0011.
+- **R6 (low; silent-assertion risk, PRIME.4).** The default-position guarantee for the N rows rests on an untested string match: tests/slow/test_analysis_null_delta_r2.py:186 and :198.
+  - The N2/N3 and N1 study tests pick their failures out of `evaluation.roadmap` by the substrings `" N2 "`, `" N3 "` and `" N1 "`. Today these match the messages at wu0006_harness.py:927–936.
+  - No smoke test checks the filter. Rewording a message would make the N rows stop asserting under Option K, with nothing to show for it.
+  - *Fix:* key the roadmap failures by row (for example, a dict `n1|n2|n3 → messages`, like `consistency_rows`), or add a smoke test that applies the two filters to `fake_delta` failures and expects a raise.
+  - Related: under Option C, a failed ROADMAP row gives a passing node with nothing in the pytest output. Consider a `warnings.warn` so that `-rw` shows it.
+- **R7 (low; Monte Carlo statements and labels).**
+  - **tests/slow/test_wu0006_harness.py:21–22.** It says "about 3% over the dozen". The H1/H3 self-checks are 31 z-tests: AR(1) 6, bivariate 12, truths 5, log-rank 4 and delta-R² 4. About 25 have a false-alarm probability of 0.27 % and about 6 (the φ = 0.3 bivariate lag-1 checks) 0.58 %, so the family-wise probability for correct generators is about 10 %. Correct the sentence.
+  - **tests/slow/test_analysis_coverage.py:236.** The A3 98.3 % SE reads 0.00288; it is √(0.008333·0.991667/1000) = 0.002875 → 0.00287, as in the plan.
+  - **tests/slow/test_statistics_coverage.py:65–66.** For C1 and C3 the "identity with `block_bootstrap_counted`" compares the production function with its own body. It is a self-comparison: label it a regression guard. Coverage against the analytic truth and the independent reference remains the evidence.
+
+**Owner checkpoint.** This unit verifies statistics and verdict code, so it **needs owner review before freeze** (LPC.PC.11). The owner has two items:
+- the Option C or K choice (DEC-0018), including the N2/N3 change of R4;
+- the method findings DEF-0020, DEF-0021 and DEF-0022: block-5 undercoverage, the N1 estimand, and the H2a(ii-b) power.
+
+No seed, provenance code or dependency changed.
+
+**Verdict: approve with fixes.**
+- I found no defect in the code under test, the harness's counts or the bounds. Nothing was loosened or tuned after results; the post-result changes are the four documented corrections above.
+- Fixes before merge: R1, R2, R3 and R6 for the developer; R4 for the main session.
+- R5 and R7 are low and can go in the same round.
+- **7 findings** (0 high, 3 medium, 1 low–medium, 3 low).
+
 ## Audit
