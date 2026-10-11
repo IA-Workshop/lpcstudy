@@ -646,6 +646,10 @@ def test_p2_chain_items_fire_on_planted_defects(monkeypatch: pytest.MonkeyPatch)
         expected = int(np.sum(rho * np.linalg.norm(noise[0], axis=-1) < delta / 2))
         assert t["n_p2a"][0] == t["n_triangle"][0] == expected
         assert t["n_consistency"][0] == 0
+        # the reported flag is the OR of the checks: dropping a term from it is caught here
+        assert bool(t["violation"][0]) == (expected > 0 or bool(t["fail_a_le_b"][0])
+                                           or bool(t["fail_n_le_a"][0])
+                                           or bool(t["fail_headline"][0]))
         if grid == 16:
             assert t["fail_a_le_b"][0] and t["violation"][0]
             n_a_le_b += 1
@@ -671,6 +675,8 @@ def test_p2_chain_items_fire_on_planted_defects(monkeypatch: pytest.MonkeyPatch)
             fires_a = k > 0 and factor**2 * (m - k) > m  # f^2 N^2 > A  <=>  f^2 (1 - p) > 1
             assert bool(t["fail_n_le_a"][0]) == fires_a
             assert bool(t["fail_headline"][0]) == (n_sq > b_ref)
+            # only N is mutated, so the violation flag is true exactly when a check fires
+            assert bool(t["violation"][0]) == (fires_a or bool(n_sq > b_ref))
             want_a += fires_a
             want_head += n_sq > b_ref
             got_a += bool(t["fail_n_le_a"][0])
