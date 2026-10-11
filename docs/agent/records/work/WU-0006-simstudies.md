@@ -272,6 +272,18 @@ Where the ROADMAP gives a formula and a rounded value, the stricter of the two i
 7. Output: `-q --tb=short -rfE` by the wrapper, plus `--durations=10`.
 8. Command: `tools/run_tests.sh slow --background --durations=10 tests/slow/test_wu0006_harness.py`.
 
+**Test run 1 result.** `29 passed in 20.20s` (`runs/tests/slow-20261011T165352Z.log`, exit 0). The slowest was the end-to-end tiny-R run of all designs on the pool (13 s); the 10^7-draw truth checks took 0.8 to 1.5 s each. Self-check greps of the new files: the only `np.where`/`isfinite`/`try` sites are the design (hazard of regime 2; the w* = 0 rule below the 15% quantile), the exclusion of an uncomputed log-rank p from the variance-inflation diagnostic (those pairs are counted and asserted zero by L3), JSON serialization, the environment restore in `worker_pool`, and the exception cache in `RunCache` (re-raised, never swallowed). Randomness comes from `make_rng` only (no `default_rng`, `random.` or `PRNGKey` site).
+
+**Test run 2 (the four study files, once), §4.9 checklist.**
+1. Change set: as for run 1, plus the run-1 log entry; `git status --porcelain` is clean after the commit that precedes the run.
+2. Radius: `tests/slow/test_statistics_coverage.py`, `test_analysis_coverage.py`, `test_analysis_logrank_size.py` and `test_analysis_null_delta_r2.py` (slow tier; "a test file: that file only", the four files named by `test_impact` for `statistics` and `analysis`); smaller than the suite; no gate. The smoke file is not rerun (no code change since run 1).
+3. Already run? No. These four files have never run.
+4. Device: `JAX_PLATFORMS=cpu` (wrapper; workers via `worker_pool`).
+5. Threads and time: `LPC_THREADS=4`, pool of 4 single-thread workers; slow timeout 3600 s; expected 15 to 20 minutes (one delta-R2 replication costs 2.9 s: 1000 replications / 4 workers about 12 minutes; coverage a few minutes; log-rank under a minute). If it nears the limit: stop and report, do not reduce R.
+6. Contention: `pgrep -fa 'lpcstudy --preset|run_tests.sh slow'` shows nothing; no GPU use.
+7. Output: `-q --tb=short -rfE` by the wrapper, plus `--durations=10`.
+8. Command: `tools/run_tests.sh slow --background --durations=10 tests/slow/test_statistics_coverage.py tests/slow/test_analysis_coverage.py tests/slow/test_analysis_logrank_size.py tests/slow/test_analysis_null_delta_r2.py`.
+
 ## Review
 
 ## Audit
