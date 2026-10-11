@@ -76,3 +76,8 @@ The retrieval cap stays in force until that first entry exists: until then the r
 - `.claude/settings.json` `env` block: a direct `python -m lpcstudy` outside the wrappers still spawns 32 XLA threads. Add `"PJRT_NPROC": "4"` and `"NPROC": "4"` next to `LPC_THREADS` so interactive runs honor the budget too.
 - Note for everyone: this machine has **32 logical CPUs**; "4 cores" is the thread budget (`LPC_THREADS`), and `nproc` shows 4 only because it reads `OMP_NUM_THREADS`.
 - `PJRT_NPROC` is an undocumented knob (documented only in an XLA source comment): re-check it on every jax pin change.
+
+## 8. Additions after the WU-0002.6 review, 2026-10-11
+
+- v3 Q-N (lines 83, 345): add "a part with fewer than 50 states is inconclusive" (DEC-0014).
+- WU-0011 follow-up (a main-session item, not an owner edit): a change to any `lpcstudy/*.py` should select `tests/unit/test_tools_test_impact.py` (the hand-written graph fixture is checked there), and `test_validation.py` was missing from the radius of the WU-0002.6 (b) and (c) runs because the tool's graph misses it (related to DEC-0003 Q2).
