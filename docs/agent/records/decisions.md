@@ -239,3 +239,48 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 - 2026-10-11 (claude-sonnet-5-5, main session; DEC-0010 still **proposed**): correction on the memo case's 10% tolerance, from the WU-0007.2 review R2. The 10% was proposed by the planner before any code value was computed (commit 431a482, 07:58). The applied-mathematician measured the code's lambda_max = 0.3235 afterwards (8e1dc9e, 08:06) and then confirmed the 10% from the error budget (combined sigma about 3.9%). So the 10% was confirmed after the value was seen; it was not changed after seeing it. The measured gap is -1.53% (0.323544 against 0.3286), well inside the bound. Also note: the memo row is in the test and in every RESULTS.md while DEC-0010 is unconfirmed (review R3); if the owner rejects it, the row is removed from both.
 
 - 2026-10-11 (claude-sonnet-5-5, main session; DEC-0012 still **proposed**): ruling on result-key names, from the WU-0002.7/.8 review R1. DEC-0012 governs: every criterion result emits `verdict` ("pass", "fail" or "inconclusive"), `reason` (when inconclusive) and `n_failed_resamples`, plus `pass` as the boolean for the pass case, as the H1 lane (91c31f7) does. DEC-0011 O3's names (`inconclusive_reason`) are superseded for key names only; its content stands. H3a's `verdict` is only pass or inconclusive. The report reads these keys. Also (R7): ROADMAP line 115's expected `handling.zero_variance_corr` count sits in the result under `zero_variance_corr[rho][n_lib]` (a dict of counts); WU-0002.11 picks it up, and the amendments note section 1 records the wording change.
+
+## DEC-0015: DEF-0014: V7 is a plumbing check; the smoke preset does not have to pass it  (2026-10-11, owner ruling relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner ruled in the session on 2026-10-11, in these words: "V7 is plumbing only and may be retired once superseded." The main session reads this as option 1 of the DEF-0014 referral (WU-0002.10 `## Referral`): V7 is a plumbing check, not a scientific criterion; `gate_pass` is false at smoke by design; V7 is judged at pilot size and above (WU-0002.12 on DEV-0, WU-0003 on DEV-1); and V7 may be retired (removed from the gate) once something supersedes it. Nothing is retired now: no superseding check exists, so V7 stays in the code and the gate.
+
+**Consequences.**
+- No threshold, band, sample size or preset changes (PRIME.2 stands).
+- The smoke `gate_pass` of false is expected; regression comparisons at smoke exclude it or expect false; the report labels V7's smoke values as plumbing-size numbers (planned inside WU-0002.9, which edits the report's gate and verdict rows).
+- WU-0002.12 must show that V7 passes at pilot size on DEV-0 with this code (the v1 pilot already did). If it fails there, that is a real finding to open and refer.
+- 'Fully green' (the owner's condition for merging to `main`, 2026-10-11) is read as: V7 evaluated and passing at pilot size, not at smoke.
+- Open for the owner: what 'superseded' means (which check retires V7) and whether a ledger `ruling` entry should state it. The ROADMAP's smoke wording ('smoke passes the gate') should become 'smoke lists V1 to V7' (amendments note section 1).
+
+**Dissent and resolution (REPRO.8):** none. Status: ruled by the owner in conversation; recorded here pending the owner's ledger entry.
+
+## DEC-0016: WU-0002.9: the overall verdict, H1c on PLP only, the gain-bound row, and gate_pass  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the planner's questions O1 to O4 and the applied-mathematician's answers; for owner confirmation)
+
+**Decision.**
+- **O1.** The overall verdict is "supported" only if all three v3 systems pass; it is "not supported" if any system fails; otherwise "inconclusive", with the missing systems listed. `required` is a fixed constant list of the three v3 systems (not `config.core_systems`), so a one-system smoke or development run can never read "supported". A system name outside `required` raises. Consequence: every smoke and development run reads inconclusive at best.
+- **O2.** The gain bound (D-21(b) covariance screen, D-21(c) subset satisfying P1) is a gap with no ROADMAP row. The unit keeps a `pending` marker that names it. A ROADMAP row is to be opened by the owner (amendments note): "screen on the raw C >= 0 at every horizon, report the subset and the per-screen counts, no bar".
+- **O3.** H1c is decided on PLP only (v3 section 2 says "(PLP)"); CP is reported without a verdict, as for H1b.
+- **O4.** Verdicts are not conditioned on `gate_pass`; a gate failure marks that system's results provisional (v3 section 6 E0), which the report shows as "FAIL (results provisional)".
+- **Error rate (for the owner, not a code change).** The intersection-union argument of v3 section 7 controls only the error of "supported". "Not supported" can be wrong with probability up to about 7.3% over three systems at 95% (and up to about 14% for H2c's two parts); this should be stated in v3 section 7.
+
+**Alternatives weighed.** Treating missing systems as not counted: rejected (a one-system run would read "supported"). Deciding H1c on both forecasters: rejected (v3 says PLP).
+
+**Affects:** WU-0002.9, the report's verdict rows, WU-0002.12's `compare_pilot` and WU-0008 (they read the verdict values, which become strings). Marked "needs owner review before freeze" (verdict code).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0017: WU-0002.11: counting only, the split into lanes, and the answers to the planner's questions Q1 to Q7  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the planner's questions and the applied-mathematician's answers; for owner confirmation)
+
+**Decision.**
+- **Q1 (blocks .11c only).** A diverging Lyapunov orbit **refuses the run** (a flagged run would have a wrong time unit), with the WU-0007 bounds on |x| plus a finiteness check: Lorenz-63 40, Rössler 25, Chua 3, applied to the Benettin orbit and the three `build_context` trajectories; the cache is recomputed once and asserted bitwise equal. Lane .11c waits for the owner's ruling on DEF-0017 (seed-dependent start states change the same code).
+- **Q2.** DEF-0012 (`workers=LPC_THREADS`) is a separate small unit. **Q3.** The Levenberg–Marquardt internal sites go to WU-0005.4.
+- **Q4.** `regime_count_fallback` is renamed `empty_regime_fallback` (it now counts empty calibration regimes), and a count of the chosen K is added; the ROADMAP key wording is amended by the owner.
+- **Q5.** This unit only counts: it excludes nothing and changes no number. Exclusions, moving dropped resamples to the A3 tail and failing on bound hits are WU-0002.9 or a later ruling.
+- **Q6.** Rate counters are report-only. A nonzero counter that should be zero under the theorems, or a collapsed ν cap (more than about 1% of construction ν̂ replaced), marks results provisional; that rule is for the owner. A clip-sensitivity flag (3s against one tenth of the interval half-width) is reported next to each MSE- or weight-based verdict in .11b.
+- **Q7.** The fixed seeds of the V2 (`validation.py:107`) and V5 (`:147`) checks stay as verification fixtures; the rest of the DEF-0011 conversions follow WU-0002.12 and need the owner's ruling (they change numbers). The shared stream `default_rng(config.seed)` across four consumers and the shared bootstrap indices across systems are not an inference problem (intersection–union and Holm are valid under any dependence); hygiene only.
+- **Plan fixes D1 to D8** from the mathematician's review are part of the plan (the developer applies each before the commit that implements it).
+
+**Alternatives weighed.** Flag-and-count a diverging orbit: rejected (wrong time unit). Convert all `default_rng` sites now: rejected (changes the pilot comparison anchor, DEC-0008 B).
+
+**Affects:** WU-0002.11 (.11a to .11d), WU-0002.9 hand-off, WU-0005.4, DEF-0012. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.

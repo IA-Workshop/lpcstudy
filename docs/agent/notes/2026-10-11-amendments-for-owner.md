@@ -87,3 +87,14 @@ The retrieval cap stays in force until that first entry exists: until then the r
 - ROADMAP.md WU-0002.8 acceptance (line 115): replace "`handling.zero_variance_corr`" with "the zero-variance count is `zero_variance_corr[rho][n_lib]` in the H2b result, a dict of counts (CP constant, PLP constant, both, non-finite, n_states)" (review R7/R8).
 - Result keys: every criterion result carries `verdict` ("pass", "fail", "inconclusive"), `reason` (when inconclusive), `n_failed_resamples` and `pass` (DEC-0012 governs; DEC-0011 O3's `inconclusive_reason` is superseded for names). H3a's verdict is only pass or inconclusive.
 - H3a needs at least 50 test states on the full sample (the per-regime minimum is waived, DEC-0011 O1); H2d keeps a pending marker until WU-0002.9 because its pass uses the point estimate (DEC-0011 O4).
+
+## 10. Ruling on V7 (DEC-0015), 2026-10-11
+
+- ROADMAP: the smoke acceptance wording ('smoke passes the gate') becomes 'smoke lists V1 to V7'; WU-0002.12 acceptance adds 'V7 passes at pilot size on DEV-0'.
+- Ledger: the owner's `ruling` entry for DEF-0014 (option 1); say what 'superseded' means for the retirement of V7.
+
+## 11. Additions from the WU-0002.9 plan check, 2026-10-11 (DEC-0016)
+
+- v3 section 7: state the overall rule (supported only if all three systems pass; not supported if any fails; otherwise inconclusive; a missing system is inconclusive) and that the intersection-union remark controls only the error of "supported" (up to about 7.3% over three systems for "not supported", about 14% for H2c's two parts).
+- v3 section 2, H1c: "(PLP)" stays; CP reported without a verdict.
+- New ROADMAP row (gain bound): screen on the raw C >= 0 at every horizon, report the subset and the per-screen counts, no bar (concordance D-21(b), (c)).
