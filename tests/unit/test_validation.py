@@ -294,3 +294,47 @@ def test_gate_status_requires_and_reports_v7() -> None:
 
     with pytest.raises(TypeError):
         gate_status(_passing_validation())  # type: ignore[call-arg]
+
+
+def test_check_cp_horizon_returns_counts_under_one_key_and_keeps_the_value(monkeypatch) -> None:
+    """``check_cp_horizon`` keeps its value and returns its counts under the one key ``handling``.
+
+    Reference: the old function body, copied (``realized_horizon`` then ``kaplan_meier`` on the CP
+    error minus the verification noise), evaluated on hand-planned CP errors; and the planned
+    counts. ``forecast_draws`` is monkeypatched to return 4 states x 1 draw x 6 horizons with CP
+    errors 0.5 (beyond theta = 0.4 from horizon 1, so every duration is 1 and the KM median is 1
+    step = 1/30 Lyapunov time), a planned ``handled`` table and entry totals. Expected: value
+    equal bitwise to the old expression; ``handling`` carries the column sums of the table by
+    name, the totals, and the sizes (4, 1, 6). The only extra key is ``handling`` (the caller pops
+    it, so no validation leaf is added). Exact.
+    """
+    from lpcstudy import ensemble
+    from lpcstudy.oracle import realized_horizon
+    from lpcstudy.statistics import kaplan_meier
+    from lpcstudy.validation import check_cp_horizon
+
+    n_states, horizon_max = 4, 6
+    handled = np.arange(24, dtype=np.int64).reshape(4, 6)
+    entries = {"error_clips_cp": 2, "error_clips_plp": 3, "error_clips_nonfinite": 5}
+
+    def fake(setup, library, split, rows, unit_noise, horizons, reference_horizon=None):
+        assert reference_horizon == 3
+        return ensemble.DrawBatch(
+            cp_err=np.full((len(rows), 1, len(horizons)), 0.5), plp_err=np.zeros((len(rows), 1, 6)),
+            analog_seed_sq=None, est_seed_sq=None, distance=None, inputs=None, est_states=None,
+            est_nu=None, analog_vecs=None, handled=handled, clip_entries=dict(entries))
+
+    monkeypatch.setattr(ensemble, "forecast_draws", fake)
+    setup = SimpleNamespace(noise=0.01)
+    verify = np.zeros((n_states, 1, horizon_max))
+    out = check_cp_horizon(setup, None, np.zeros((n_states, 1, 2)), verify, horizon_max, 0.4, 30, 3)
+    horizons = np.arange(1, horizon_max + 1)
+    dur, ev = realized_horizon(np.full((n_states, horizon_max), 0.5) - 0.01 * verify[:, 0],
+                               horizons, 0.4)
+    old = kaplan_meier(dur, ev, horizon_max).median() / 30
+    assert set(out) == {"cp_median_vpt_lyapunov", "handling"}
+    assert np.float64(out["cp_median_vpt_lyapunov"]).tobytes() == np.float64(old).tobytes()
+    info = out["handling"]
+    assert info["handled"] == dict(zip(ensemble.DRAW_COUNTERS, handled.sum(axis=0).tolist()))
+    assert info["clip_entries"] == entries
+    assert (info["n_states"], info["n_draws"], info["n_horizons"]) == (4, 1, 6)

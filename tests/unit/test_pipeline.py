@@ -175,3 +175,315 @@ def test_concat_moments_stacks_the_correlation_fields_and_refuses_a_mixture() ->
     np.testing.assert_array_equal(stacked.plp_constant, grid < 4)
     with pytest.raises(ValueError, match="err_corr"):
         _concat_moments([with_fields[0], plain[1]])
+
+
+def test_concat_carries_handled_and_sums_entry_totals() -> None:
+    """``_concat_moments`` and ``_concat_evals`` stack ``handled`` row-wise and add ``clip_entries``.
+
+    Reference: hand-built arrays whose entries are their own flat index (expected values read
+    off by eye) and hand-added totals. Two parts of 3 and 2 states with 6 counter columns: the
+    stacked ``handled`` is the 5 rows in order; the totals are the sums (3 + 4, 0 + 1, 5 + 6).
+    A part without ``handled`` among parts with it raises ``ValueError`` (PRIME.4); parts
+    without any give ``None``; a part whose totals are ``None`` (a view) gives ``None`` totals.
+    Exact.
+    """
+    import dataclasses
+
+    from lpcstudy.pipeline import _concat_evals, _concat_moments
+    from unit_helpers import _moments_from_draws
+
+    rng = np.random.default_rng(6)
+    plain = [_moments_from_draws(rng.standard_normal((n, 4, 3)), rng.standard_normal((n, 4, 3)))
+             for n in (3, 2)]
+    assert _concat_moments(plain).handled is None and _concat_moments(plain).clip_entries is None
+    grid = np.arange(30, dtype=np.int64).reshape(5, 6)
+    entries = [{"error_clips_cp": 3, "error_clips_plp": 0, "error_clips_nonfinite": 5},
+               {"error_clips_cp": 4, "error_clips_plp": 1, "error_clips_nonfinite": 6}]
+    parts = [dataclasses.replace(p, handled=g, clip_entries=e)
+             for p, g, e in zip(plain, (grid[:3], grid[3:]), entries)]
+    stacked = _concat_moments(parts)
+    np.testing.assert_array_equal(stacked.handled, grid)
+    assert stacked.clip_entries == {"error_clips_cp": 7, "error_clips_plp": 1,
+                                    "error_clips_nonfinite": 11}
+    with pytest.raises(ValueError, match="handled"):
+        _concat_moments([parts[0], plain[1]])
+    assert _concat_moments([parts[0], dataclasses.replace(parts[1], clip_entries=None)]
+                           ).clip_entries is None
+
+    def evals(n: int, handled, entry) -> EvaluationDraws:
+        zeros = np.zeros((n, 2, 3))
+        return EvaluationDraws(
+            horizons=np.arange(1, 4), cp_err=zeros, plp_err=zeros, verify_noise=zeros,
+            distance=np.zeros((n, 2)), est_nu=np.zeros((n, 2)), growth_proxy=np.zeros((n, 2)),
+            gain_proxy=zeros, inputs=np.zeros((n, 2, 1)), noise_sens=np.zeros((n, 2)),
+            handled=handled, clip_entries=entry)
+
+    both = _concat_evals([evals(3, grid[:3], entries[0]), evals(2, grid[3:], entries[1])])
+    np.testing.assert_array_equal(both.handled, grid)
+    assert both.clip_entries["error_clips_cp"] == 7 and both.cp_err.shape == (5, 2, 3)
+    none = _concat_evals([evals(3, None, None), evals(2, None, None)])
+    assert none.handled is None and none.clip_entries is None
+
+
+def _flag_moments(n_states: int, cp_cells: list, plp_cells: list, horizons=(10, 30, 60)):
+    """Moments with the given constant (state, horizon) cells; curvature 2 everywhere."""
+    n_hor = len(horizons)
+    moments = moments_from_triples(np.full((n_states, n_hor), 2.0), np.full((n_states, n_hor), 2.0),
+                                   np.full((n_states, n_hor), 1.0))
+    moments.horizons = np.array(horizons)
+    cp = np.zeros((n_states, n_hor), dtype=bool)
+    plp = np.zeros((n_states, n_hor), dtype=bool)
+    for state, hor in cp_cells:
+        cp[state, hor] = True
+    for state, hor in plp_cells:
+        plp[state, hor] = True
+    moments.err_corr = np.zeros((n_states, n_hor))
+    moments.cp_constant, moments.plp_constant = cp, plp
+    return moments
+
+
+def test_moment_counters_a4_union_and_h2e_slice() -> None:
+    """A4: ``zero_variance_corr`` is the union over all horizons; its H_ref slice equals H2e's fields.
+
+    Reference: a hand construction. 4 states, horizons (10, 30, 60), H_ref = 30 (column 1). CP
+    constant at (0,0), (1,1), (2,1), (3,2); PLP constant at (2,1), (0,2), (3,1); so CP 4, PLP 3,
+    both 1 at (2,1), union 4 + 3 - 1 = 6 (D4: an entry that is both CP- and PLP-constant). The
+    H_ref slice, counted by hand: CP at states {1, 2} = 2, PLP at {2, 3} = 2, both {2} = 1. The
+    slice is compared field by field with ``h2e_noise_matching``'s ``cp_constant``,
+    ``plp_constant`` and ``both_constant`` on a cell holding the same moments. Exact integers.
+    """
+    from lpcstudy.analysis import h2e_noise_matching
+    from lpcstudy.pipeline import Cell, moment_counters
+
+    moments = _flag_moments(4, [(0, 0), (1, 1), (2, 1), (3, 2)], [(2, 1), (0, 2), (3, 1)])
+    got = moment_counters(moments, 30)
+    assert got["zero_variance_corr"] == 6 and got["zero_variance_corr_cp"] == 4
+    assert got["zero_variance_corr_plp"] == 3
+    assert got["zero_variance_corr"] == got["zero_variance_corr_cp"] \
+        + got["zero_variance_corr_plp"] - 1
+    cell = Cell(system="lorenz63", noise=0.01, library_size=1000, label="stub", setup=None,
+                splits={"test": SplitData(moments, None)}, oracles={}, horizons=moments.horizons)
+    h2e = h2e_noise_matching({(0.01, 1000): cell}, StudyConfig())["zero_variance_corr"]["0.01"]["1000"]
+    assert (h2e["cp_constant"], h2e["plp_constant"], h2e["both_constant"]) == (2, 2, 1)
+    cp, plp = moments.cp_constant[:, 1], moments.plp_constant[:, 1]
+    assert (int(cp.sum()), int(plp.sum()), int((cp & plp).sum())) == (2, 2, 1)
+
+
+def test_moment_counters_a5_floors_and_bad_input() -> None:
+    """A5: ``curvature_floor`` and ``decisive_floor`` count one entry each; bad moments raise.
+
+    Reference: hand moments, 4 states x 3 horizons (10, 30, 60), H_ref 30. ``E_C = E_P = 2``,
+    ``C = 1`` give ``c = 2``; the entry (0, 0) has ``E_C = E_P = C = 1`` so ``c = 0`` exactly (one
+    curvature floor); state 2 has ``E_P = 0`` at H_ref (column 1) with ``C = 0`` (one decisive
+    floor; ``c = 2``, no curvature floor). A cancellation case: (1, 2) has ``C`` just above
+    ``(E_C + E_P) / 2`` so ``c < 0`` (counted: the expression is ``curvature(moments) < 1e-300``).
+    Expected ``curvature_floor == 2``, ``decisive_floor == 1``. Moments without the masks and an
+    unknown ``H_ref`` raise ``ValueError`` (PRIME.4).
+    """
+    from lpcstudy.pipeline import moment_counters
+
+    moments = _flag_moments(4, [], [])
+    moments.sq_cp[0, 0], moments.sq_plp[0, 0], moments.cross[0, 0] = 1.0, 1.0, 1.0
+    moments.sq_plp[2, 1], moments.cross[2, 1] = 0.0, 0.0
+    moments.cross[1, 2] = 2.0 + 1e-3  # c = 2 + 2 - 2 * 2.001 = -0.002 < 0
+    assert float(curvature(moments)[1, 2]) < 0.0
+    got = moment_counters(moments, 30)
+    assert got["curvature_floor"] == 2 and got["decisive_floor"] == 1
+    assert got["zero_variance_corr"] == 0
+    bare = moments_from_triples(np.ones((2, 3)), np.ones((2, 3)), np.ones((2, 3)))
+    with pytest.raises(ValueError, match="masks"):
+        moment_counters(bare, 2)
+    with pytest.raises(ValueError, match="reference horizon"):
+        moment_counters(moments, 31)
+
+
+def test_fit_counters_sum_by_k_and_chosen() -> None:
+    """``fit_counters`` sums the empty regimes over K, keeps the chosen K and the pooled floors.
+
+    Reference: hand-built maps. K = 2 has 1 empty regime, K = 3 has 0, K = 4 has 2 (``empty`` masks
+    written out), with pooled floors 0, 1, 0; chosen K = 4; A2 floor 1; 1 constant target.
+    Expected: ``empty_regime_fallback == 3``, by-K ``{"2": 1, "3": 0, "4": 2}``, chosen 2,
+    ``pooled_curvature_floor == 2``, ``regime_target_constant == 1``. The by-K keys are strings,
+    so that the block round-trips through JSON. Exact.
+    """
+    import json
+
+    from lpcstudy.pipeline import fit_counters
+
+    def regime_map(empty: list[bool], pooled: int) -> RegimeMap:
+        return RegimeMap(tree=None, leaf_ids=np.arange(len(empty)), weights=np.zeros((len(empty), 1)),
+                         horizons_km=np.full(len(empty), np.nan), empty=np.array(empty),
+                         pooled_curvature_floor=pooled)
+
+    maps = {2: regime_map([True, False], 0), 3: regime_map([False] * 3, 1),
+            4: regime_map([True, False, True, False], 0)}
+    got = fit_counters(maps, 4, a2_floor=1, target_constant=1)
+    assert got == {"empty_regime_fallback": 3, "empty_regime_fallback_by_K": {"2": 1, "3": 0, "4": 2},
+                   "empty_regime_fallback_chosen": 2, "pooled_curvature_floor": 2,
+                   "regime_target_constant": 1}
+    assert json.loads(json.dumps(got)) == got
+
+
+def test_fit_rules_records_fit_counters(monkeypatch) -> None:
+    """``fit_rules`` returns ``handled`` with the empty-regime, floor and constant-target counts.
+
+    Reference: a hand construction with the heavy parts stubbed (proxy fit, error-predictor fit
+    and the profile: the profile of a split is its ``growth_proxy`` column, a 1-D feature). Config:
+    2 steps per Lyapunov time, H_max = 4, H_ref = 2, K in (2, 3). 40 construction states, half at
+    x = -1 (E_C = 2, E_P = 1, C = 0, so w* = 1/3) and half at x = +1 (E_C = 1, E_P = 2, C = 0, so
+    w* = 2/3); the error moments make the hybrid exceed theta at horizon 1 for every state, so the
+    log-horizon target is the constant 0 and the weight target is not: ``regime_target_constant``
+    is exactly 1 (once, not once per K: D7). Calibration profiles are all x = +1, so with only two
+    distinct feature values every K has two leaves and the x = -1 leaf is empty: by K
+    ``{"2": 1, "3": 1}``, total 2, and the chosen K is 2 (the rule picks the smallest K inside the
+    margin; both maps are identical), so ``empty_regime_fallback_chosen == 1``. All curvatures
+    are 3, so ``pooled_curvature_floor == 0``. Exact integers.
+    """
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    from lpcstudy import pipeline
+    from lpcstudy.ensemble import EvaluationDraws
+
+    config = replace(StudyConfig(), steps_per_lyapunov=2, horizon_max_lyapunov=2.0,
+                     reference_horizon_lyapunov=1.0, eval_horizons_lyapunov=(0.5, 1.0, 2.0),
+                     regime_counts=(2, 3), regime_max_primary=3, primary_threshold=0.2)
+    assert config.horizon_max == 4 and config.reference_horizon == 2
+    n_draws, n_hor = 2, 4
+
+    def split(n: int, x: np.ndarray, planned: bool) -> SplitData:
+        e_c = np.where(x < 0, 2.0, 1.0)[:, None] * np.ones((1, n_hor))
+        e_p = np.where(x < 0, 1.0, 2.0)[:, None] * np.ones((1, n_hor))
+        moments = moments_from_triples(e_c, e_p, np.zeros((n, n_hor)))
+        moments.kept = {"inputs": np.zeros((n, 1, 1)), "cp_err": np.zeros((n, 1, 1)),
+                        "plp_err": np.zeros((n, 1, 1))}
+        ones = np.ones((n, n_draws, n_hor))
+        evals = EvaluationDraws(
+            horizons=np.arange(1, n_hor + 1), cp_err=ones, plp_err=ones,
+            verify_noise=np.zeros_like(ones), distance=np.ones((n, n_draws)),
+            est_nu=np.ones((n, n_draws)), growth_proxy=np.repeat(x[:, None], n_draws, axis=1),
+            gain_proxy=ones, inputs=np.zeros((n, n_draws, 1)), noise_sens=np.zeros((n, n_draws)))
+        return SplitData(moments=moments, evals=evals)
+
+    x_con = np.concatenate([-np.ones(20), np.ones(20)])
+    cell = SimpleNamespace(noise=0.01, splits={"construction": split(40, x_con, True),
+                                               "calibration": split(40, np.ones(40), True)})
+    monkeypatch.setattr(pipeline, "ProfileProxies", SimpleNamespace(fit=lambda *a, **k: "proxies"))
+    monkeypatch.setattr(pipeline, "ErrorPredictor", SimpleNamespace(fit=lambda *a, **k: "predictor"))
+    monkeypatch.setattr(pipeline, "deployable_profile", lambda ev, *a, **k: ev.growth_proxy[..., None])
+    rules = pipeline.fit_rules([cell], config)
+    assert rules.chosen_regimes == 2
+    assert rules.handled == {"empty_regime_fallback": 2,
+                             "empty_regime_fallback_by_K": {"2": 1, "3": 1},
+                             "empty_regime_fallback_chosen": 1, "pooled_curvature_floor": 0,
+                             "regime_target_constant": 1}
+
+
+def _counted_split(n: int, handled: np.ndarray, clip: dict, cp_cells: list) -> SplitData:
+    """A split whose moments and draws carry planned counts (what ``run_cell`` would store)."""
+    moments = _flag_moments(n, cp_cells, [], horizons=(10, 30, 60))
+    moments.handled, moments.clip_entries = handled, dict(clip)
+    zeros = np.zeros((n, 2, 3))
+    evals = EvaluationDraws(
+        horizons=moments.horizons, cp_err=zeros, plp_err=zeros, verify_noise=zeros,
+        distance=np.zeros((n, 2)), est_nu=np.full((n, 2), 3.0), growth_proxy=np.zeros((n, 2)),
+        gain_proxy=zeros, inputs=np.zeros((n, 2, 1)), noise_sens=np.zeros((n, 2)),
+        handled=handled + 1, clip_entries={k: v + 1 for k, v in clip.items()})
+    return SplitData(moments=moments, evals=evals)
+
+
+def test_cell_handling_and_system_assembly_a11(tmp_path) -> None:
+    """A11: every counter is present as an int; totals are the sums of the parts; JSON round-trips.
+
+    Reference: hand sums. Two cells of 4 test states, 2 oracle draws (M) and 2 evaluation draws,
+    3 horizons: cell 1 has ``handled`` all 1 in the six columns (so each oracle column sums to 4)
+    and the evaluation draws ``handled + 1`` (each sums to 8), entry totals (cp, plp, nonfinite)
+    (1, 2, 3) for the oracle kind and (2, 3, 4) for the evaluation kind, one CP-constant entry;
+    cell 2 has ``handled`` all 2 with entry totals (0, 0, 5) and (1, 1, 6), no constant entry.
+    Hand totals: ``invariant_mean_replacements``: cell 1 oracle 4 + eval 8, cell 2 oracle 8 + eval
+    12 = 32; ``error_clips`` = cell 1 (1+2+3) + (2+3+4) = 15, cell 2 5 + (1+1+6) = 13, total 28;
+    ``zero_variance_corr`` = 1 (cell 1 oracle). Oracle blocks 1, 0, 2 flags; the
+    fit block counts 1, 1, 0, 1. The system total of each counter equals the sum over cells,
+    their evaluation sub-blocks, the oracle blocks and the fit; the run total equals the sum
+    over two systems. ``json.dumps`` round-trips. The denominators follow n, M, E, nH.
+    """
+    import json
+    from types import SimpleNamespace
+
+    from lpcstudy.experiments import run_handling
+    from lpcstudy.oracle import StateOracles
+    from lpcstudy.pipeline import ALL_COUNTERS, Study, cell_handling, cell_id
+
+    n, m_draws = 4, 2
+    study = Study(StudyConfig(), tmp_path)
+    clip_1 = {"error_clips_cp": 1, "error_clips_plp": 2, "error_clips_nonfinite": 3}
+    clip_2 = {"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 5}
+    one = cell_handling({"test": _counted_split(n, np.ones((n, 6), dtype=np.int64), clip_1,
+                                                [(0, 0)])}, m_draws, 30)
+    two = cell_handling({"test": _counted_split(n, np.full((n, 6), 2, dtype=np.int64), clip_2,
+                                                [])}, m_draws, 30)
+    assert one["counts"]["invariant_mean_replacements"] == 4 + 8
+    assert one["by_kind"]["oracle"]["counts"]["invariant_mean_replacements"] == 4
+    assert one["by_kind"]["eval"]["counts"]["invariant_mean_replacements"] == 8
+    assert two["counts"]["invariant_mean_replacements"] == 8 + 12
+    assert one["counts"]["error_clips"] == (1 + 2 + 3) + (2 + 3 + 4) == 15
+    assert one["counts"]["error_clips_cp"] == 1 + 2 and one["counts"]["zero_variance_corr"] == 1
+    assert two["counts"]["error_clips"] == 5 + (1 + 1 + 6)
+    assert one["denominators"]["estimates"] == n * m_draws + n * 2 and \
+        one["denominators"]["error_entries"] == n * m_draws * 3 + n * 2 * 3
+    assert one["denominators"]["moment_entries"] == n * 3 and one["denominators"]["states"] == n
+    assert one["denominators"]["eval_draws"] == n * 2 and one["denominators"]["href_draws"] == \
+        n * m_draws + n * 2
+    for record in (one, two):
+        for kind in record["by_kind"].values():
+            assert set(kind["counts"]) == set(record["counts"])
+        assert all(type(v) is int for v in record["counts"].values())
+        assert all(record["counts"][k] == sum(kind["counts"][k] for kind in
+                                              record["by_kind"].values())
+                   for k in record["counts"])
+
+    study.record_cell("lorenz63", "base", cell_id("base", 0.01, 10_000, True), one)
+    study.record_cell("lorenz63", "base", cell_id("base", 0.02, 10_000, False), two)
+    flags = np.array([[0, 1, 0], [0, 0, 0], [1, 0, 1], [0, 0, 1]], dtype=np.int64)
+    study._oracles[("lorenz63", 7, 3, "test")] = StateOracles(
+        nu=np.ones(n), gains=np.ones((n, 2)), growth=np.ones(n), local_dim=np.ones(n),
+        handled=flags)
+    rules = SimpleNamespace(
+        proxies=SimpleNamespace(nu_cap=2.0, seeds=lambda ev, noise: (np.zeros((n, 2)),
+                                                                     np.zeros((n, 2)))),
+        handled={"empty_regime_fallback": 1, "empty_regime_fallback_by_K": {"2": 1},
+                 "empty_regime_fallback_chosen": 1, "pooled_curvature_floor": 0,
+                 "regime_target_constant": 1}, regimes={2: None}, chosen_regimes=2)
+    cell1 = SimpleNamespace(label="base", noise=0.01, library_size=10_000, horizons=np.arange(3),
+                            splits={"construction": SplitData(_counted_split(
+                                n, np.ones((n, 6), dtype=np.int64), clip_1, []).moments, None),
+                                    "test": _counted_split(n, np.ones((n, 6), dtype=np.int64),
+                                                           clip_1, [(0, 0)])})
+    # est_nu = 3 > cap 2 on every draw; the construction split has no draws, so only the test split counts.
+    study.record_rules("lorenz63", cell1, rules)
+    handling = study.system_handling("lorenz63", {"H1b/n_failed_resamples": 2})
+    assert handling["schema"] == "lpcstudy.handling/1"
+    assert set(handling["totals"]) == set(ALL_COUNTERS)
+    assert all(type(v) is int for v in handling["totals"].values())
+    evaluation = handling["cells"][cell_id("base", 0.01, 10_000, True)]["evaluation"]
+    assert evaluation["counts"] == {"nu_cap_clips": n * 2, "closed_form_floor_a4": n * 2,
+                                    "closed_form_floor_a4o": 0}
+    assert evaluation["by_split"] == {"nu_cap_clips": {"test": n * 2}}
+    t = handling["totals"]
+    assert t["invariant_mean_replacements"] == 12 + 20
+    assert t["error_clips"] == 15 + 13 and t["zero_variance_corr"] == 1
+    assert (t["local_dim_zero_distance"], t["oracle_gain_floor"], t["oracle_nonfinite"]) == (1, 1, 2)
+    assert (t["nu_cap_clips"], t["closed_form_floor_a4"], t["closed_form_floor_a4o"]) == (8, 8, 0)
+    assert (t["empty_regime_fallback"], t["empty_regime_fallback_chosen"],
+            t["pooled_curvature_floor"], t["regime_target_constant"]) == (1, 1, 0, 1)
+    assert handling["result_counts"] == {"H1b/n_failed_resamples": 2}
+    assert handling["fitting"]["empty_regime_fallback_by_K"] == {"2": 1}
+    assert handling["fitting"]["denominators"] == {"regimes": 2, "chosen_regimes": 2,
+                                                    "pools": 3 * 3, "targets": 2}
+    assert json.loads(json.dumps(handling)) == handling
+    # the run level: two systems with the same block
+    results = {"systems": {"lorenz63": {"handling": handling}, "rossler": {"handling": handling}}}
+    run = run_handling(study, results)
+    assert run["totals"] == {k: 2 * v for k, v in t.items()} and run["failed_variants"] == 0
+    assert run["by_system"]["rossler"] == t and run["robustness"] == {}
+    assert json.loads(json.dumps(run)) == run

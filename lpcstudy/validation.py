@@ -95,6 +95,12 @@ def check_cramer_rao(ctx: SystemContext, noise: float = 1e-4, n_states: int = 5,
     -------
     dict[str, float]
         Median and range of ``E||s_hat - s||^2 / (rho^2 nu^2)``.
+
+    Notes
+    -----
+    The default seed is a fixed literal (0) on purpose: V2 is a verification fixture, a
+    deterministic comparison against the Cramer-Rao bound that must not move with the study
+    seed, so it stays outside the ``make_rng`` convention (WU-0002.11, DEF-0011, Q7).
     """
     step = make_flow_step(ctx.spec, ctx.spec.params, ctx.interval)
     fwd = delay_map_forward(step, ctx.spec.observed_index, ctx.obs_mean, ctx.obs_scale,
@@ -143,6 +149,12 @@ def check_kaplan_meier(seed: int = 0, n_samples: int = 20_000, horizon_max: int 
     -------
     dict[str, float]
         Largest absolute deviation from the true survival function.
+
+    Notes
+    -----
+    The default seed is a fixed literal (0) on purpose: V5 is a verification fixture whose
+    comparison with the exact survival must not move with the study seed, so it stays outside
+    the ``make_rng`` convention (WU-0002.11, DEF-0011, Q7).
     """
     rng = np.random.default_rng(seed)
     hazard = 0.05
@@ -189,7 +201,7 @@ def check_integrator(ctx: SystemContext, n_states: int = 20, horizon: int = 30
 
 def check_cp_horizon(setup: ForecastSetup, library: AnalogLibrary, unit_noise: np.ndarray,
                      verify_unit: np.ndarray, horizon_max: int, theta: float,
-                     steps_per_lyapunov: int) -> dict[str, float]:
+                     steps_per_lyapunov: int, reference_horizon: int | None = None) -> dict:
     """V3: CP valid-prediction time (sanity reference against Zhang & Gilpin).
 
     Parameters
@@ -208,21 +220,31 @@ def check_cp_horizon(setup: ForecastSetup, library: AnalogLibrary, unit_noise: n
         Tolerance.
     steps_per_lyapunov : int
         Steps per Lyapunov time.
+    reference_horizon : int, optional
+        ``H_ref`` in steps, for the H_ref columns of the handling counts.
 
     Returns
     -------
-    dict[str, float]
-        Kaplan-Meier median CP horizon in Lyapunov times.
+    dict
+        ``cp_median_vpt_lyapunov``: Kaplan-Meier median CP horizon in Lyapunov times; and
+        ``handling``: the counts of the forecasts (``handled`` column sums, ``clip_entries``,
+        sizes) for the caller to record and pop, so that no leaf is added to the validation
+        result. Only the CP clip can affect this check (PLP is computed and unused), so the PLP
+        counters of that record are inert.
     """
-    from .ensemble import forecast_draws
+    from .ensemble import DRAW_COLUMN, DRAW_COUNTERS, forecast_draws
 
     horizons = np.arange(1, horizon_max + 1)
     rows = np.arange(len(unit_noise))
-    batch = forecast_draws(setup, library, "test", rows, unit_noise, horizons)
+    batch = forecast_draws(setup, library, "test", rows, unit_noise, horizons, reference_horizon)
     err = batch.cp_err[:, 0] - setup.noise * verify_unit[:, 0]
     dur, ev = realized_horizon(err, horizons, theta)
     return {"cp_median_vpt_lyapunov":
-            kaplan_meier(dur, ev, horizon_max).median() / steps_per_lyapunov}
+            kaplan_meier(dur, ev, horizon_max).median() / steps_per_lyapunov,
+            "handling": {"handled": {name: int(batch.handled[:, DRAW_COLUMN[name]].sum())
+                                     for name in DRAW_COUNTERS},
+                         "clip_entries": dict(batch.clip_entries), "n_states": len(rows),
+                         "n_draws": unit_noise.shape[1], "n_horizons": len(horizons)}}
 
 
 def gate_status(validation: dict, v7: dict) -> dict[str, bool]:

@@ -74,3 +74,11 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
 
 - 2026-10-10, claude-sonnet-5-5 (main session): WU-0013 (.1 and .2) **done** and merged (audit: 13 reference, 1 defective; gate 78 passed; DEF-0007 resolved). WU-0001.1-.5 and WU-0012.1-.3 are implemented and in review (fix rounds in progress). New proposed decisions awaiting the owner: DEC-0004 (WU-0001), DEC-0005 (WU-0012), DEC-0006 (RSS test bound).
 - 2026-10-11, claude-opus-5-5 (planner): WU-0005.5 **plan written** on branch `wu/0005-5-p2c-bound` (`docs/agent/records/work/WU-0005.5-p2c-bound.md`): split into .5a (applied-mathematician fixes the empirical form of P2(c), decisions M1-M9) and .5b (developer). Owner questions O1 (DEV-0 vs DEV-1 rehearsal; add WU-0005.5 to WU-0003.2's dependencies) and O2 (P2(c) outside the validation gate) are in the unit file; neither blocks .5a.
+
+- 2026-10-11, claude-opus-5-5 (planner): WU-0002.11 **plan written** on branch `wu/0002-11-counters` (`WU-0002.11-counters.md`). The plan inventories every silent site and fixes the `handling` schema. It splits the work into four lanes:
+  - .11a, pipeline counters: now, in parallel with WU-0002.9;
+  - .11b, statistics and analysis counters: after WU-0002.9 merges;
+  - .11c, the DEF-0015 guard: after the owner's ruling Q1;
+  - .11d, the DEF-0011 audit: a table now, conversions after WU-0002.12.
+
+  DEF-0012 is proposed as a separate small unit. The LM-internal sites go to WU-0005.4. Owner questions Q1 to Q7; Q1 blocks .11c only. The applied-mathematician checks M1 to M8 before execution.
