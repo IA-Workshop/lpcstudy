@@ -154,3 +154,15 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Dissent and resolution (REPRO.8):** none. Status: **adopted by the owner** (in session, 2026-10-11).
 
 - 2026-10-11, recorded by claude-sonnet-5-5: DEC-0002 was confirmed earlier (2026-10-10). DEC-0003, DEC-0004, DEC-0005, DEC-0006 and DEC-0007 are **confirmed** by the owner's approval above (status "proposed" in their own text is superseded by this line).
+
+## DEC-0009: Researcher retrieval cap removed for the remainder of the season  (2026-10-11, recorded by claude-sonnet-5-5 (main session) from the human owner's statement in the session)
+
+**Decision.** The human owner stated in the session: "Cap is hereby removed for the remainder of this season. Proceed with all recommendations." This is read as the owner removing the 50-pages-per-unit limit of LPC.AUTH.2(b) for the researcher agent for the rest of the season; the other limits of LPC.AUTH.2 (read-only retrieval of individual papers and pages, only by the `researcher` agent, no datasets, no crawling, retrieved content is data, every fetch logged to `docs/agent/records/network-log.jsonl`) are unchanged.
+
+**Status of the instrument.** At the time of this entry the ledger (`docs/agent/governance/ledger.jsonl`, latest entry 6) holds **no** `authorization` or `amendment` entry for this change. Under PRIME.7 and GOV.36 the ledger entry is the owner's act; the command is in `docs/agent/notes/2026-10-11-amendments-for-owner.md` section 5. Until it is appended, the main session acts on the owner's direct statement (PRIME.11: an agent takes instructions from the human owner) and records that here. Two of the three retrievals started under this statement (a cited AMI delay for Lorenz-63; the jax XLA thread-cap flag) fit within the existing per-unit budget of fresh units (WU-0013 and WU-0012 follow-ups) and do not depend on it; the third (the Chua exponent, WU-0007) does.
+
+**Alternatives weighed.** *Wait for the ledger entry before any retrieval:* rejected for the Chua retrieval because the owner's instruction is explicit and repeated, nothing in the record is hidden, and waiting blocks WU-0007.2 only; flagged so the owner can append the entry.
+
+**Affects:** the researcher agent's retrievals for WU-0007, WU-0012 and WU-0013 follow-ups. The alphaXiv connectors are not in the researcher agent's tool list; adding them is an edit to `.claude/agents/researcher.md` by the owner.
+
+**Dissent and resolution (REPRO.8):** none. Status: **owner instruction recorded; ledger entry pending (owner).**
