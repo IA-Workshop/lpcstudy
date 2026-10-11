@@ -439,6 +439,8 @@ Merge-gate checklist (§4.9, §4.3). This gate runs on the branch with `develop`
 
 Merging `develop` into this branch conflicted in one file, `tests/unit/test_systems.py` (both WU-0002.1 and WU-0005 created it: the registry test of 4f70254 and the three RK4 tests of WU-0005). I chained `git add -A && git commit` after the merge, so merge commit `a26881c` ("resolutions and merge-gate checklist") committed the file **with conflict markers**. This was my error. History is not rewritten (PRIME.5); the fix is the next commit, which resolves the file as the union of both sides: WU-0005's file as the base with its docstring and imports extended, and the registry test appended unchanged. Verified by an `ast` comparison: every function of each side (`_linear_error`, `_spec`, the three RK4 tests, the registry test) is identical in the resolved file; no marker remains in any tracked file outside `docs/`. No gate or test run happened at `a26881c`.
 
+Result of the merge gate (checklist above; run on the tree with the fix-forward commit 79080e2, after the incident described below it): **`396 passed in 213.88s (0:03:33)`**. Run once; no failures; no retry. (The checklist was written before the incident; its item 1 and the claim "git status empty after the commit" refer to the corrected tree.)
+
 ## Review
 
 ### Review of WU-0002.1 and .2 (2026-10-10, `reviewer`, claude-opus-5-5, fresh context)
@@ -488,3 +490,19 @@ The fix redefines no statistic, band, level, threshold or verdict rule. The owne
 **Verdict: approve** (R1-R3 fixed; 0 open findings).
 
 ## Audit
+
+### Audit of WU-0002.1 and .2 (main session, 2026-10-10)
+
+- Is the definition of done met for .1 and .2? Yes, with the evidence below.
+  - **WU-0002.1:** no Lorenz-96, transfer, A4f, tau_d/2 or shift code path remains (reviewer's grep clean; `--skip-transfer` is refused by the CLI and by `tools/run_preset.sh`; H2d part (ii) and T1 removed); `StudyConfig` has no `transfer_*` fields; no test removed (three existing tests edited only for the removed option and the module count, listed in the Log); smoke passes the gate on DEV-0.
+  - **WU-0002.2:** one identifier table (`lpcstudy/identifiers.py`) with exactly the 14 decision-log rows used by analysis, report and figures; every hypothesis key in `results.json`, `RESULTS.md` and figure labels is a v3 id; library size reads `n_lib` in config labels, report text and figure axes; criterion text is v3 verbatim (DEC-0007 Q3); a stale-schema `--report-only` is refused (exit 64) and leaves `results.json` byte-identical (R2).
+  - **Regression:** on CPU at DEV-0 the smoke `results.json` equals the baseline (sha256 0da48771...4b79) after the planned removals and renames: 286 leaves deleted, 121 renamed positions, 6 moved, **3307 leaves compared bitwise equal**; the developer's counts were reproduced by the reviewer's own script built from the plan's tables.
+  - **Gate:** `396 passed in 213.88s`; independent review approved after one fix round (R1 to R3 in 15bd84f).
+- Defects recorded: none opened by these sub-tasks. DEF-0001 gained a third uncounted silent case (`oracle.py:62`, on `develop`).
+- Notes for successors and the owner:
+  - **Owner review needed before the freeze:** the CLI option set, `tools/run_preset.sh`, the T1 branch, H2d's `pass` rule and the `verdicts` code. `DEC-0007` is proposed.
+  - The ROADMAP's WU-0002.8 check "no `H3b` key exists anywhere in results" collides with the v3 `H3b` created in .2; ruling A2 (rulings document on `develop`) is pending.
+  - Rows H1c, H2a, H2c, v3 H3b are not marked `pending` although the referral says their statistics may change; the gain bound is marked pending on WU-0002.9.
+  - The unit stays **open**: WU-0002.3 to .13 wait for the owner's rulings (WU-0014 referral, DEF-0010) and are planned after them.
+  - Process note: a merge of `develop` into this branch conflicted once and the conflict markers were committed by mistake (a26881c) and fixed forward (79080e2); from now on a merge is never chained with `git add -A`.
+
