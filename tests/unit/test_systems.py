@@ -1,4 +1,5 @@
-"""Tests for lpcstudy.systems: code verification of the fixed-step RK4 flow map."""
+"""Tests for lpcstudy.systems: the registry of systems (WU-0002.1) and code verification of the
+fixed-step RK4 flow map (WU-0005)."""
 
 from __future__ import annotations
 
@@ -7,7 +8,8 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
-from lpcstudy.systems import SystemSpec, make_flow_step
+from lpcstudy import systems
+from lpcstudy.systems import SYSTEMS, SystemSpec, make_flow_step
 
 # Linear test system x' = A x, A = S B S^-1 (A non-normal, |lambda|max ~ 2.0).
 _B = np.array([[-0.1, -2.0, 0.0], [2.0, -0.1, 0.0], [0.0, 0.0, -0.5]])
@@ -128,3 +130,13 @@ def test_flow_step_respects_max_dt() -> None:
     np.testing.assert_allclose(capped, exact_quarter, rtol=0, atol=1e-15)
     coarse = np.asarray(make_flow_step(spec(0.5), {}, 1.0)(x0))
     assert np.linalg.norm(coarse - exact_quarter) > 1e-6
+
+
+def test_registry_holds_exactly_the_three_v3_systems() -> None:
+    """The registry is Lorenz-63, Rossler and Chua; Lorenz-96 and its field are gone.
+
+    Reference: decision log D3 and proposal and methods v3 section 4 (three systems), written
+    out in the test, not read from the code. Tolerance: none; equality of a set of strings.
+    """
+    assert set(SYSTEMS) == {"lorenz63", "rossler", "chua"}
+    assert not hasattr(systems, "lorenz96_field")

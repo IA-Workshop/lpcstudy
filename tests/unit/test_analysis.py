@@ -42,3 +42,34 @@ def test_per_state_spearman_partial_ties_and_non_monotone() -> None:
     values = np.array([[0.0, 0.0, 0.1, 0.2], [1.0, 3.0, 2.0, 4.0]])
     rho = _per_state_spearman(np.array([1.0, 2.0, 3.0, 4.0]), values)
     assert np.allclose(rho, [3.0 / np.sqrt(10.0), 0.8], rtol=0.0, atol=1e-12)
+
+
+def test_h2d_is_the_in_distribution_part_only() -> None:
+    """H2d has no shift part: ``pass`` equals ``in_distribution_pass`` and no shift key remains.
+
+    Reference: hand calculation. With A4 per-state squared error exactly 1.05 (1.2) times A3's,
+    the excess ``mean(A4)/mean(A3) - 1`` is 0.05 (0.2), so the 10% criterion (v1 and v3 H2d part
+    (i), unchanged) passes (fails). The set of keys is the four written out below (WU-0002.1
+    removed part (ii) and its three ``shift_*`` keys; DL: "H2d, part (ii) dropped").
+    Tolerance ``abs=1e-12`` on the excess: two means and a quotient of float64 numbers of
+    order 1 (relative round-off a few 1e-16, times about 6 operations), 1e-12 is a margin of
+    three orders. The booleans and the key set are exact.
+    """
+    import pytest
+
+    from lpcstudy.analysis import h2d_empirical_comparison
+    from lpcstudy.config import SMOKE
+    from lpcstudy.pipeline import RuleScores
+
+    base = np.random.default_rng(7).uniform(1.0, 2.0, 60)
+
+    def scores(factor: float) -> dict[str, RuleScores]:
+        make = lambda e: RuleScores(mse=np.zeros(1), state_mse_ref=e, regret=np.zeros(1),
+                                    agreement=0.0, km_median=0.0, rmst=0.0)
+        return {"A3": make(base), "A4": make(factor * base)}
+
+    for factor, excess, ok in ((1.05, 0.05, True), (1.2, 0.2, False)):
+        out = h2d_empirical_comparison(scores(factor), SMOKE)
+        assert set(out) == {"in_distribution_excess", "ci", "in_distribution_pass", "pass"}
+        assert out["in_distribution_excess"] == pytest.approx(excess, abs=1e-12)
+        assert out["pass"] is ok and out["in_distribution_pass"] is ok

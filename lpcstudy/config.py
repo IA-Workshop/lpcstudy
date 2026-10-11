@@ -20,10 +20,6 @@ class StudyConfig:
         Preset name.
     core_systems : tuple[str, ...]
         Systems run through the primary experiments (stages ii-iv).
-    transfer_targets : tuple[str, ...]
-        Systems used only as transfer targets (stage v).
-    transfer_sources : tuple[str, ...]
-        Systems whose fitted maps are transferred.
     steps_per_lyapunov : int
         Observation steps per Lyapunov time (sets ``Delta``).
     burn_in_lyapunov : float
@@ -37,7 +33,7 @@ class StudyConfig:
     noise_levels : tuple[float, ...]
         Observation-noise standard deviations, as fractions of ``sigma_x``.
     library_sizes : tuple[int, ...]
-        Analog-library sizes ``N``.
+        Analog-library sizes ``n_lib``.
     core_noise : float
         Noise level of the core cell.
     core_library : int
@@ -114,8 +110,6 @@ class StudyConfig:
 
     name: str = "full"
     core_systems: tuple[str, ...] = ("lorenz63", "rossler", "chua")
-    transfer_targets: tuple[str, ...] = ("chua", "lorenz96")
-    transfer_sources: tuple[str, ...] = ("lorenz63", "rossler")
     steps_per_lyapunov: int = 30
     burn_in_lyapunov: float = 100.0
     embedding_dim: int = 7
@@ -211,8 +205,8 @@ PILOT = replace(
 )
 
 SMOKE = replace(
-    FULL, name="smoke", core_systems=("lorenz63",), transfer_targets=(),
-    transfer_sources=(), noise_levels=(0.01, 0.02), library_sizes=(1_000, 10_000),
+    FULL, name="smoke", core_systems=("lorenz63",),
+    noise_levels=(0.01, 0.02), library_sizes=(1_000, 10_000),
     library_sweep_noises=(0.01,), n_construction=120, n_calibration=60,
     n_test=80, n_test_sweep=60, n_oracle_draws=30, n_eval_draws=1,
     noise_sensitivity_draws=4,

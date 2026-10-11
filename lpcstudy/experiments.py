@@ -4,7 +4,7 @@ Stage (i)   dynamical-system generation        -> ``Study.context``
 Stage (ii)  mechanism validation               -> :func:`run_system` (V1-V6, E1, E2)
 Stage (iii) allocation and horizon testing     -> :func:`run_system` (E3, E4)
 Stage (iv)  state abstraction and benchmarking -> :func:`run_system` (E5)
-Stage (v)   robustness and transfer            -> :func:`run_robustness`, :func:`run_transfer`
+Stage (v)   robustness                         -> :func:`run_robustness`
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
 from .dynamics import make_finite_growth
 from .ensemble import AnalogLibrary, forecast_draws
+from .identifiers import check_keys
 from .oracle import oracle_weight
 from .pipeline import Cell, FittedRules, Study, fit_rules, rule_weights, score_rules
 from .statistics import block_bootstrap, partial_correlation
@@ -104,8 +105,7 @@ def convergence_check(study: Study, cell: Cell) -> dict:
 def _evaluate(cell: Cell, rules: FittedRules, config: StudyConfig, split: str = "test"):
     """Rule weights and scores on one split of a cell."""
     data = cell.splits[split]
-    weights = rule_weights(rules, data, cell.noise, config, cell.horizons,
-                           cell.ctx.spec.dim)
+    weights = rule_weights(rules, data, cell.noise, config, cell.horizons)
     return weights, score_rules(weights, data, cell.horizons, config,
                                 config.primary_threshold)
 
@@ -124,7 +124,7 @@ def run_system(study: Study, system: str) -> dict:
     -------
     dict
         JSON-serializable results; also stores the core cell and fitted rules in
-        ``study`` for transfer.
+        ``study`` for robustness.
     """
     cfg = study.config
     t0 = time.time()
@@ -169,14 +169,11 @@ def run_system(study: Study, system: str) -> dict:
     # Sweeps (common random numbers across levels).
     core_sub = _sweep_subset(core, cfg)
     noise_cells = {cfg.core_noise: core_sub}
-    shift_scores = {}
     for rho in cfg.noise_levels:
         if rho != cfg.core_noise:
             noise_cells[rho] = study.run_cell(system, rho, cfg.core_library, core=False,
-                                              with_evals=True)
-            shift_scores[f"rho={rho:g}"] = _evaluate(noise_cells[rho], rules, cfg)[1]
+                                              with_evals=False)
     library_cells = {}
-    extreme_sizes = (min(cfg.library_sizes), max(cfg.library_sizes))
     for rho in cfg.library_sweep_noises:
         for size in cfg.library_sizes:
             if rho == cfg.core_noise and size == cfg.core_library:
@@ -185,78 +182,29 @@ def run_system(study: Study, system: str) -> dict:
             if size == cfg.core_library and rho in noise_cells:
                 library_cells[(rho, size)] = noise_cells[rho]
                 continue
-            shifted = rho == cfg.core_noise and size in extreme_sizes
             library_cells[(rho, size)] = study.run_cell(system, rho, size, core=False,
-                                                        with_evals=shifted)
-            if shifted:
-                shift_scores[f"N={size}"] = _evaluate(library_cells[(rho, size)], rules,
-                                                      cfg)[1]
-    core_sub_scores = _evaluate(core_sub, rules, cfg)[1]
-    shift = an.shift_gaps(core_sub_scores, shift_scores, cfg)
-    res["shift"] = shift
+                                                        with_evals=False)
 
     # Hypotheses.
-    res["H1a"] = an.h1a_noise_scaling(noise_cells, cfg)
-    res["H1b"] = an.h1b_library_scaling(library_cells, cfg)
-    res["H1c"] = an.h1c_seed_amplifier(core, cfg)
-    res["H1d"] = an.h1d_horizon_law(core, cfg)
-    res["H1e"] = an.h1e_proxies(core, rules, cfg)
-    res["H1f"] = an.h1f_noise_redundancy(core, rules, cfg)
+    res["V7"] = an.v7_noise_scaling(noise_cells, cfg)
+    res["H1a"] = an.h1a_library_scaling(library_cells, cfg)
+    res["H1b"] = an.h1b_seed_amplifier(core, cfg)
+    res["H1c"] = an.h1c_horizon_law(core, cfg)
+    res["H1d"] = an.h1d_proxies(core, rules, cfg)
+    res["Q-N"] = an.qn_noise_redundancy(core, rules, cfg)
     res["H2a"] = an.h2a_separation(core, cfg)
     res["H2b"] = an.h2b_knob_response(noise_cells, library_cells, cfg)
     res["H2c"] = an.h2c_state_dependence(scores, cfg)
-    res["H2d"] = an.h2d_empirical_comparison(scores, shift, cfg)
-    res["H2e"] = an.h2e_horizon_bound(core, cfg)
+    res["H2d"] = an.h2d_empirical_comparison(scores, cfg)
+    res["gain_bound"] = an.gain_horizon_bound(core, cfg)
     res.update(an.h3_regimes(core, rules, scores, cfg))
     res["oracle_recovery"] = an.oracle_recovery(scores, cfg)
+    check_keys(res)
     res["seconds"] = time.time() - t0
     study.core_cells[system] = core
     study.fitted[system] = rules
     LOG.info("%s finished in %.0fs", system, res["seconds"])
     return res
-
-
-def run_transfer_target(study: Study, system: str) -> None:
-    """Core cell and in-system fit for a transfer-only target (e.g. Lorenz-96)."""
-    cfg = study.config
-    core = study.run_cell(system, cfg.core_noise, cfg.core_library, core=True,
-                          with_evals=True)
-    study.core_cells[system] = core
-    study.fitted[system] = fit_rules([core], cfg)
-
-
-def run_transfer(study: Study) -> dict:
-    """Stage (v): regimes and rules fitted on the sources, applied to targets unchanged.
-
-    Parameters
-    ----------
-    study : Study
-        Study holding core cells of sources and targets.
-
-    Returns
-    -------
-    dict
-        Excess-MSE ratios (refit vs transferred) and the pre-registered comparison.
-    """
-    cfg = study.config
-    sources = [study.core_cells[s] for s in cfg.transfer_sources]
-    pooled = fit_rules(sources, cfg)
-    ref = cfg.reference_horizon - 1
-    out: dict = {"sources": list(cfg.transfer_sources),
-                 "pooled_chosen_K": pooled.chosen_regimes}
-    for target in cfg.transfer_targets:
-        cell = study.core_cells[target]
-        _, refit = _evaluate(cell, study.fitted[target], cfg)
-        _, moved = _evaluate(cell, pooled, cfg)
-        ratio = lambda s: {k: float(s[k].mse[ref] / s["A*"].mse[ref])
-                           for k in ("A2", "A3", "A4", "A5")}
-        r_refit, r_moved = ratio(refit), ratio(moved)
-        gap = {k: r_moved[k] - r_refit[k] for k in r_refit}
-        out[target] = {"ratio_refit": r_refit, "ratio_transferred": r_moved, "gap": gap,
-                       "pass": bool(gap["A4"] < gap["A3"] and gap["A5"] < gap["A3"])}
-    out["pass"] = bool(all(out[t]["pass"] for t in cfg.transfer_targets)) \
-        if cfg.transfer_targets else False
-    return out
 
 
 def _variant_summary(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
@@ -269,12 +217,14 @@ def _variant_summary(cell: Cell, rules: FittedRules, config: StudyConfig) -> dic
     regret = regime_regret(rules.regimes[rules.chosen_regimes], profile,
                            cell.splits["test"].moments, config.reference_horizon - 1)[1]
     ref = config.reference_horizon - 1
-    return {"H1c": an.h1c_seed_amplifier(cell, config),
-            "H2a_median_range": h2a["median_range"], "H2a_partial_corr": h2a["partial_corr"],
-            "A4_vs_A2_relative": h2c["A4_minus_A2"]["relative"],
-            "A4_over_A3": float(scores["A4"].mse[ref] / scores["A3"].mse[ref]),
-            "A5_regret_ratio": regret, "chosen_K": rules.chosen_regimes,
-            "mse_href": {k: float(v.mse[ref]) for k, v in scores.items()}}
+    out = {"H1b": an.h1b_seed_amplifier(cell, config),
+           "H2a_median_range": h2a["median_range"], "H2a_partial_corr": h2a["partial_corr"],
+           "A4_vs_A2_relative": h2c["A4_minus_A2"]["relative"],
+           "A4_over_A3": float(scores["A4"].mse[ref] / scores["A3"].mse[ref]),
+           "A5_regret_ratio": regret, "chosen_K": rules.chosen_regimes,
+           "mse_href": {k: float(v.mse[ref]) for k, v in scores.items()}}
+    check_keys(out)
+    return out
 
 
 def _perturbation_scale_variant(study: Study, cell: Cell, rules: FittedRules,
@@ -323,7 +273,6 @@ def run_robustness(study: Study, system: str) -> dict:
     variants: list[tuple[str, dict]] = []
     variants += [(f"D={d}", {"embed_dim": d}) for d in cfg.robustness_dims
                  if d != cfg.embedding_dim and d >= study.context(system).spec.dim]
-    variants.append(("delay/2", {"delay_scale": 0.5}))
     variants += [(f"k={k}", {"n_analogs": k}) for k in cfg.analog_counts if k != 1]
     variants += [(f"misspec={p:g}", {"misspec": p}) for p in cfg.misspec_levels]
     for label, kwargs in variants:

@@ -30,3 +30,14 @@ def test_seed_id_is_the_last_field() -> None:
     """
     keys = list(dataclasses.asdict(StudyConfig()))
     assert keys[-2:] == ["seed", "seed_id"]
+
+
+def test_config_has_no_transfer_fields() -> None:
+    """``StudyConfig`` has no ``transfer*`` field and no preset names Lorenz-96 (WU-0002.1).
+
+    Reference: decision log D3 and the WU-0002.1 acceptance row (transfer and Lorenz-96 are not in
+    v3), written out in the test. Tolerance: none; exact checks of field names and strings.
+    """
+    assert [f.name for f in dataclasses.fields(StudyConfig) if f.name.startswith("transfer")] == []
+    for preset in PRESETS.values():
+        assert "lorenz96" not in preset.core_systems

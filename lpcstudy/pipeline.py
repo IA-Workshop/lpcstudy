@@ -5,9 +5,9 @@ Vocabulary
 cell
     One (system, noise level, library size, variant) combination.
 core cell
-    ``rho = 1% sigma_x``, ``N = 10^4``: all splits, all horizons ``1..H_max``.
+    ``rho = 1% sigma_x``, ``n_lib = 10^4``: all splits, all horizons ``1..H_max``.
 sweep cell
-    Any other (rho, N): test-sweep states only, evaluation horizons only.
+    Any other (rho, n_lib): test-sweep states only, evaluation horizons only.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ from pathlib import Path
 import numpy as np
 
 from .allocation import ErrorPredictor, ProfileProxies, RegimeMap, calibrate_regimes, \
-    closed_form_weight, deployable_profile, fit_regime_tree, full_form_weight, \
-    global_weight, regime_regret, state_horizon_target
+    closed_form_weight, deployable_profile, fit_regime_tree, global_weight, regime_regret, \
+    state_horizon_target
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, build_context, make_rng
 from .ensemble import AnalogLibrary, EnsembleMoments, EvaluationDraws, ForecastSetup, \
@@ -93,8 +93,6 @@ class FittedRules:
     predictor: ErrorPredictor
     regimes: dict[int, RegimeMap]
     chosen_regimes: int
-    n_analogs: int
-    state_dim: int
 
 
 def allocator_grid(config: StudyConfig) -> np.ndarray:
@@ -130,14 +128,13 @@ class Study:
         self.fitted: dict[str, FittedRules] = {}
 
     # ------------------------------------------------------------------ setup
-    def context(self, system: str, embed_dim: int | None = None,
-                delay_scale: float = 1.0) -> SystemContext:
+    def context(self, system: str, embed_dim: int | None = None) -> SystemContext:
         """System context (cached)."""
-        key = (system, embed_dim or self.config.embedding_dim, delay_scale)
+        key = (system, embed_dim or self.config.embedding_dim)
         if key not in self._contexts:
             start = time.time()
             self._contexts[key] = build_context(system, self.config, self.cache_dir,
-                                                embed_dim, delay_scale)
+                                                embed_dim)
             LOG.info("context %s built in %.1fs: %s", key, time.time() - start,
                      self._contexts[key].meta)
         return self._contexts[key]
@@ -209,8 +206,7 @@ class Study:
     # ------------------------------------------------------------------ cells
     def run_cell(self, system: str, noise: float, library_size: int, core: bool,
                  with_evals: bool, label: str = "base", embed_dim: int | None = None,
-                 delay_scale: float = 1.0, misspec: float = 0.0, n_analogs: int = 1
-                 ) -> Cell:
+                 misspec: float = 0.0, n_analogs: int = 1) -> Cell:
         """Compute oracle moments (and optionally evaluation draws) for one cell.
 
         Parameters
@@ -230,8 +226,6 @@ class Study:
             Variant label.
         embed_dim : int, optional
             Embedding-dimension override.
-        delay_scale : float, optional
-            Delay multiplier.
         misspec : float, optional
             Relative parameter perturbation of the PLP model.
         n_analogs : int, optional
@@ -244,7 +238,7 @@ class Study:
         """
         cfg = self.config
         start = time.time()
-        ctx = self.context(system, embed_dim, delay_scale)
+        ctx = self.context(system, embed_dim)
         setup = self.setup(ctx, noise, misspec, n_analogs)
         library = AnalogLibrary.build(ctx, noise, library_size, cfg.horizon_max)
         horizons = np.arange(1, cfg.horizon_max + 1) if core else np.array(cfg.eval_horizons)
@@ -275,7 +269,7 @@ class Study:
             full_oracles = self.state_oracles(ctx, split)
             oracles[split] = full_oracles if core else full_oracles.subset(
                 np.arange(cfg.n_test_sweep))
-        LOG.info("cell %s rho=%.3f N=%d core=%s label=%s done in %.1fs", system, noise,
+        LOG.info("cell %s rho=%.3f n_lib=%d core=%s label=%s done in %.1fs", system, noise,
                  library_size, core, label, time.time() - start)
         return Cell(system=system, noise=noise, library_size=library_size, label=label,
                     setup=setup, splits=splits, oracles=oracles, horizons=horizons)
@@ -288,7 +282,7 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
     Parameters
     ----------
     cells : list[Cell]
-        Core cells (one for in-system fitting, several for pooled transfer).
+        Core cells (one for in-system fitting).
     config : StudyConfig
         Study configuration.
 
@@ -331,9 +325,7 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
                                            config.primary_threshold, a2)
     chosen = _choose_regimes(regimes, cal_profile, cal_moments, href_col, config)
     return FittedRules(proxies=proxies, global_weights=a2, predictor=predictor,
-                       regimes=regimes, chosen_regimes=chosen,
-                       n_analogs=cells[0].setup.n_analogs,
-                       state_dim=cells[0].ctx.spec.dim)
+                       regimes=regimes, chosen_regimes=chosen)
 
 
 def _choose_regimes(regimes: dict[int, RegimeMap], profile: np.ndarray,
@@ -370,7 +362,7 @@ def _concat_evals(parts: list[EvaluationDraws]) -> EvaluationDraws:
 
 # ------------------------------------------------------------------- evaluation
 def rule_weights(rules: FittedRules, split: SplitData, noise: float,
-                 config: StudyConfig, horizons: np.ndarray, state_dim: int
+                 config: StudyConfig, horizons: np.ndarray
                  ) -> dict[str, np.ndarray]:
     """Weights of every rule on one split's evaluation draws.
 
@@ -386,8 +378,6 @@ def rule_weights(rules: FittedRules, split: SplitData, noise: float,
         Study configuration.
     horizons : np.ndarray
         Horizons of the split's arrays.
-    state_dim : int
-        State dimension ``m`` of the evaluated system (used by A4f).
 
     Returns
     -------
@@ -409,8 +399,6 @@ def rule_weights(rules: FittedRules, split: SplitData, noise: float,
         "A3": rules.predictor.weights(ev.inputs, horizons),
         "A4": np.broadcast_to(closed_form_weight(eps_hat**2, delta_hat**2)[..., None],
                               shape).copy(),
-        "A4f": full_form_weight(eps_hat**2, delta_hat**2, ev.gain_proxy, noise,
-                                rules.n_analogs, state_dim),
         "A5": regime_map.weights[regime][..., horizons - 1],
         "A4o": np.broadcast_to(oracle_cf[:, None, None], shape).copy(),
         "A*": np.broadcast_to(oracle_weight(moments)[:, None, :], shape).copy(),

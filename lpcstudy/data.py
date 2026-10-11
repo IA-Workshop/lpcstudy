@@ -132,7 +132,7 @@ class SystemContext:
         Parameters
         ----------
         size : int
-            Library size ``N``.
+            Library size ``n_lib``.
         horizon_max : int
             Largest forecast horizon; analogs need that many future values.
 
@@ -195,8 +195,7 @@ def lyapunov_cached(spec: SystemSpec, cache: Path) -> float:
 
 
 def build_context(system: str, config: StudyConfig, cache_dir: Path,
-                  embed_dim: int | None = None, delay_scale: float = 1.0
-                  ) -> SystemContext:
+                  embed_dim: int | None = None) -> SystemContext:
     """Generate all trajectories and splits for one system.
 
     Parameters
@@ -209,8 +208,6 @@ def build_context(system: str, config: StudyConfig, cache_dir: Path,
         Directory for cached Lyapunov exponents.
     embed_dim : int, optional
         Override of ``config.embedding_dim`` (robustness sweep).
-    delay_scale : float, optional
-        Multiplier applied to the AMI delay (robustness sweep: 0.5).
 
     Returns
     -------
@@ -236,7 +233,7 @@ def build_context(system: str, config: StudyConfig, cache_dir: Path,
     # tau_d: first AMI minimum, capped so that the delay window (D-1) tau_d spans at
     # most one Lyapunov time (keeps the window inverse problem well conditioned).
     ami_delay = select_delay(obs_norm, max_lag=3 * lt_steps)
-    delay = max(1, int(round(min(ami_delay, lt_steps // (dim - 1)) * delay_scale)))
+    delay = max(1, int(round(min(ami_delay, lt_steps // (dim - 1)))))
     acf_time = autocorrelation_time(obs_norm, max_lag=50 * lt_steps)
     # Phase-coherent systems (Rossler) have a non-decaying ACF envelope; the
     # autocorrelation time is capped at one Lyapunov time (see Methods M4).
