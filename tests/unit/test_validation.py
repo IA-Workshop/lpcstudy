@@ -319,7 +319,9 @@ def test_check_cp_horizon_returns_counts_under_one_key_and_keeps_the_value(monke
     from lpcstudy.validation import check_cp_horizon
 
     n_states, horizon_max = 4, 6
-    handled = np.arange(24, dtype=np.int64).reshape(4, 6)
+    handled = np.arange(32, dtype=np.int64).reshape(4, 8)  # one column per DRAW_COUNTERS name
+    lm_planned = (np.arange(4.0).reshape(4, 1) + 0.5, np.arange(4).reshape(4, 1),
+                  np.ones((4, 1), dtype=np.int32))
     entries = {"error_clips_cp": 2, "error_clips_plp": 3, "error_clips_nonfinite": 5}
 
     def fake(setup, library, split, rows, unit_noise, horizons, reference_horizon=None):
@@ -327,7 +329,8 @@ def test_check_cp_horizon_returns_counts_under_one_key_and_keeps_the_value(monke
         return ensemble.DrawBatch(
             cp_err=np.full((len(rows), 1, len(horizons)), 0.5), plp_err=np.zeros((len(rows), 1, 6)),
             analog_seed_sq=None, est_seed_sq=None, distance=None, inputs=None, est_states=None,
-            est_nu=None, analog_vecs=None, handled=handled, clip_entries=dict(entries))
+            est_nu=None, analog_vecs=None, handled=handled, clip_entries=dict(entries),
+            lm_residual=lm_planned[0], lm_accepted=lm_planned[1], lm_late=lm_planned[2])
 
     monkeypatch.setattr(ensemble, "forecast_draws", fake)
     setup = SimpleNamespace(noise=0.01)
@@ -343,6 +346,9 @@ def test_check_cp_horizon_returns_counts_under_one_key_and_keeps_the_value(monke
     assert info["handled"] == dict(zip(ensemble.DRAW_COUNTERS, handled.sum(axis=0).tolist()))
     assert info["clip_entries"] == entries
     assert (info["n_states"], info["n_draws"], info["n_horizons"]) == (4, 1, 6)
+    # WU-0005.4: the noise level and the batch's LM arrays travel in the same dict (popped by the caller)
+    assert info["noise"] == 0.01
+    assert all(got is planned for got, planned in zip(info["lm"], lm_planned))
 
 
 # ------------------------------------------------------------------------------------------

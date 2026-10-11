@@ -56,6 +56,11 @@ GOF_EXCEED: float = float(stats.chi2.ppf(GOF_QUANTILE, GOF_DEGREES))
 class LMDiagnostics:
     """Per-estimate diagnostics of the Levenberg-Marquardt refinement (NVVUQ.10, WU-0005.4).
 
+    The stopping criterion is a fixed ``refine_steps`` with no tolerance stop, and these arrays
+    are the achieved residual and the iteration count that NVVUQ.10 asks for (DEC-0017 Q3;
+    DEC-0025 for the corrections). They are report-only: no decision reads them. Needs owner
+    review before freeze (LPC.PC.11).
+
     Attributes
     ----------
     residual : np.ndarray

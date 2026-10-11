@@ -848,3 +848,98 @@ def test_markdown_p2c_section_is_labelled_report_only_and_shows_defects(tmp_path
             "(r₁ + ‖η_r‖)² 1{‖η_r‖ ≥ Δ/2} / (ρ²D) is the bound, both over the M draws, in the "
             "units of N².") in paragraph
     assert "P2c" not in "".join(lines[:lines.index("## Validation gate")])  # no verdict row
+
+
+# ---------------------------------------------------------------------------------------
+# WU-0005.4 (L7): the Levenberg-Marquardt diagnostics subsection of RESULTS.md.
+# ---------------------------------------------------------------------------------------
+def _lm_part(n: int, noise: float, **kwargs) -> dict:
+    """A hand ``lm`` summary (the keys of ``lm_summary``); unspecified values are None."""
+    out = {"n_estimates": n, "noise": noise, "median_residual": None, "p95_residual": None,
+           "median_iterations": None, "fraction_no_decrease": None, "nonfinite_residuals": 0,
+           "fraction_late_progress": None, "fraction_above_chi2": None}
+    out.update(kwargs)
+    return out
+
+
+def _lm_results() -> tuple[dict, StudyConfig]:
+    """Fake results whose lorenz63 core cell has an oracle and an eval LM summary, hand-written."""
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    oracle = _lm_part(8, 0.01, median_residual=3.36e-4, p95_residual=9.49e-4,
+                      median_iterations=8.0, fraction_no_decrease=0.0,
+                      fraction_late_progress=0.125, fraction_above_chi2=0.001)
+    evaluation = _lm_part(4, 0.01, median_residual=1e-3, p95_residual=None,
+                          median_iterations=7.5, fraction_no_decrease=0.25,
+                          nonfinite_residuals=2, fraction_late_progress=0.0,
+                          fraction_above_chi2=0.5)
+    empty = _lm_part(0, 0.01)
+    pooled = {**_lm_part(12, 0.01), "by_kind": {"oracle": oracle, "eval": evaluation,
+                                                  "check": empty}}
+    system["handling"] = {"schema": "lpcstudy.handling/2", "cells": {
+        "base|rho=0.01|n_lib=10000|core": {"counts": {}, "denominators": {}, "lm": pooled},
+        "V3-cp-horizon": {"counts": {}, "denominators": {}}},
+        "oracles": {}, "fitting": {}, "result_counts": {}, "totals": {}}
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    return results, config
+
+
+def test_lm_lines_exact_rows_note_and_missing_block() -> None:
+    """L7: one row per cell and kind with n > 0, printing c beside c/rho^2; a missing block: 1 line.
+
+    Reference: the hand ``lm`` summaries of ``_lm_results`` formatted by hand to three
+    significant digits: oracle c 3.36e-4 -> 0.000336, p95 9.49e-4 -> 0.000949, c/rho^2 with
+    rho = 0.01 -> 3.36 and 9.49, accepted 8, no decrease 0, late 0.125, above 0.001, 0 infinite;
+    eval median 1e-3 -> 0.001 and 10, p95 None -> n/a, accepted 7.5, 0.25, 0, 0.5, 2 infinite.
+    The check kind (n = 0) and the cell without an ``lm`` block (V3 here) have no row. The note
+    states the fixed 15 iterations with no tolerance stop, the units of c, the chi^2_4 reference,
+    that accepted steps include round-off accepts, and that the fraction above 18.47 is a
+    diagnostic with no gate or verdict role. Exact strings.
+    """
+    results, config = _lm_results()
+    lines = report._lm_lines(results, ["lorenz63"], config)
+    cell = "`base\\|rho=0.01\\|n_lib=10000\\|core`"
+    assert lines[0].startswith("| System | Cell | Kind | n | median c | p95 c | median c/ρ² | "
+                               "p95 c/ρ² | median accepted steps (of 15) |")
+    assert lines[2] == (f"| lorenz63 | {cell} | oracle | 8 | 0.000336 | 0.000949 | 3.36 | 9.49 | "
+                        "8 | 0 | 0.125 | 0.001 | 0 |")
+    assert lines[3] == (f"| lorenz63 | {cell} | eval | 4 | 0.001 | n/a | 10 | n/a | "
+                        "7.5 | 0.25 | 0 | 0.5 | 2 |")
+    assert len([x for x in lines if x.startswith("| lorenz63")]) == 2
+    note = lines[-1]
+    for phrase in ("fixed 15 Levenberg–Marquardt iterations with no tolerance stop",
+                   "sum of D squared terms in the units of σ_x", "χ²₄", "median 3.36, p95 9.49",
+                   "round-off accepts after convergence included",
+                   "printed as a diagnostic, with no gate or verdict role", "not a hypothesis test"):
+        assert phrase in note, phrase
+    old, config = fake_results("DEV-0")
+    old["systems"] = {"lorenz63": fake_system(config)}
+    assert len(report._lm_lines(old, ["lorenz63"], config)) == 1
+    assert report._lm_lines(old, ["lorenz63"], config)[0].startswith(
+        "No Levenberg-Marquardt estimates in these results")
+
+
+def test_write_markdown_places_the_lm_subsection_after_p2c_and_before_handling(
+        tmp_path: Path) -> None:
+    """L7: RESULTS.md has the LM subsection between the P2(c) subsection and the Handling section.
+
+    Reference: the heading strings and their order in the written file (list indices); the
+    section is also present, with its one-line message, for results without any ``lm`` block.
+    Exact.
+    """
+    heading = "### Levenberg–Marquardt diagnostics (verification, NVVUQ.10; not a hypothesis)"
+    results, config = _lm_results()
+    results["handling"] = {"schema": "lpcstudy.handling/2", "totals": {}, "by_system": {},
+                           "robustness": {}, "failed_variants": 0}
+    write_markdown(results, config, tmp_path / "LM.md")
+    lines = (tmp_path / "LM.md").read_text().splitlines()
+    p2c = lines.index("### Theorem P2(c) bound (verification check, not a hypothesis)")
+    assert p2c < lines.index(heading) < lines.index("## Handling (DEF-0001: nothing silent)")
+    assert any(x.startswith("| lorenz63 | `base") for x in lines)
+    plain, config = fake_results("DEV-0")
+    plain["systems"] = {"lorenz63": fake_system(config)}
+    plain["verdicts"] = verdicts(plain, config)
+    write_markdown(plain, config, tmp_path / "NO_LM.md")
+    text = (tmp_path / "NO_LM.md").read_text()
+    assert heading in text and "No Levenberg-Marquardt estimates in these results" in text

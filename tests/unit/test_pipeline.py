@@ -379,16 +379,36 @@ def test_fit_rules_records_fit_counters(monkeypatch) -> None:
                              "regime_target_constant": 1}
 
 
+def _planned_lm_arrays(n: int, kind: str):
+    """Planned LM arrays for ``n == 4`` states and 2 draws (written out in the L6 test).
+
+    Oracle: residuals 1..8, accepted [0, 0, 1, 2, 3, 4, 5, 15], late progress on the first and
+    the last estimate. Evaluation: residuals 10, 20, ..., 70 and inf, accepted [0, 0, 0, 0, 2,
+    2, 2, 2], no late progress. For other ``n`` the arrays are filled with ones (shape only).
+    """
+    if n != 4:
+        return np.ones((n, 2)), np.ones((n, 2), dtype=np.int32), np.ones((n, 2), dtype=np.int32)
+    if kind == "oracle":
+        return (np.arange(1.0, 9.0).reshape(4, 2),
+                np.array([0, 0, 1, 2, 3, 4, 5, 15], dtype=np.int32).reshape(4, 2),
+                np.array([1, 0, 0, 0, 0, 0, 0, 1], dtype=np.int32).reshape(4, 2))
+    return (np.array([10.0, 20, 30, 40, 50, 60, 70, np.inf]).reshape(4, 2),
+            np.array([0, 0, 0, 0, 2, 2, 2, 2], dtype=np.int32).reshape(4, 2),
+            np.zeros((4, 2), dtype=np.int32))
+
+
 def _counted_split(n: int, handled: np.ndarray, clip: dict, cp_cells: list) -> SplitData:
     """A split whose moments and draws carry planned counts (what ``run_cell`` would store)."""
     moments = _flag_moments(n, cp_cells, [], horizons=(10, 30, 60))
     moments.handled, moments.clip_entries = handled, dict(clip)
+    moments.lm_residual, moments.lm_accepted, moments.lm_late = _planned_lm_arrays(n, "oracle")
     zeros = np.zeros((n, 2, 3))
     evals = EvaluationDraws(
         horizons=moments.horizons, cp_err=zeros, plp_err=zeros, verify_noise=zeros,
         distance=np.zeros((n, 2)), est_nu=np.full((n, 2), 3.0), growth_proxy=np.zeros((n, 2)),
         gain_proxy=zeros, inputs=np.zeros((n, 2, 1)), noise_sens=np.zeros((n, 2)),
         handled=handled + 1, clip_entries={k: v + 1 for k, v in clip.items()})
+    evals.lm_residual, evals.lm_accepted, evals.lm_late = _planned_lm_arrays(n, "eval")
     return SplitData(moments=moments, evals=evals)
 
 
@@ -412,16 +432,17 @@ def test_cell_handling_and_system_assembly_a11(tmp_path) -> None:
 
     from lpcstudy.experiments import run_handling
     from lpcstudy.oracle import StateOracles
+    from lpcstudy.ensemble import DRAW_COUNTERS
     from lpcstudy.pipeline import ALL_COUNTERS, Study, cell_handling, cell_id
 
-    n, m_draws = 4, 2
+    n, m_draws, width = 4, 2, len(DRAW_COUNTERS)
     study = Study(StudyConfig(), tmp_path)
     clip_1 = {"error_clips_cp": 1, "error_clips_plp": 2, "error_clips_nonfinite": 3}
     clip_2 = {"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 5}
-    one = cell_handling({"test": _counted_split(n, np.ones((n, 6), dtype=np.int64), clip_1,
-                                                [(0, 0)])}, m_draws, 30)
-    two = cell_handling({"test": _counted_split(n, np.full((n, 6), 2, dtype=np.int64), clip_2,
-                                                [])}, m_draws, 30)
+    one = cell_handling({"test": _counted_split(n, np.ones((n, width), dtype=np.int64), clip_1,
+                                                [(0, 0)])}, m_draws, 30, 0.01)
+    two = cell_handling({"test": _counted_split(n, np.full((n, width), 2, dtype=np.int64), clip_2,
+                                                [])}, m_draws, 30, 0.02)
     assert one["counts"]["invariant_mean_replacements"] == 4 + 8
     assert one["by_kind"]["oracle"]["counts"]["invariant_mean_replacements"] == 4
     assert one["by_kind"]["eval"]["counts"]["invariant_mean_replacements"] == 8
@@ -456,13 +477,13 @@ def test_cell_handling_and_system_assembly_a11(tmp_path) -> None:
                  "regime_target_constant": 1}, regimes={2: None}, chosen_regimes=2)
     cell1 = SimpleNamespace(label="base", noise=0.01, library_size=10_000, horizons=np.arange(3),
                             splits={"construction": SplitData(_counted_split(
-                                n, np.ones((n, 6), dtype=np.int64), clip_1, []).moments, None),
-                                    "test": _counted_split(n, np.ones((n, 6), dtype=np.int64),
+                                n, np.ones((n, width), dtype=np.int64), clip_1, []).moments, None),
+                                    "test": _counted_split(n, np.ones((n, width), dtype=np.int64),
                                                            clip_1, [(0, 0)])})
     # est_nu = 3 > cap 2 on every draw; the construction split has no draws, so only the test split counts.
     study.record_rules("lorenz63", cell1, rules)
     handling = study.system_handling("lorenz63", {"H1b/n_failed_resamples": 2})
-    assert handling["schema"] == "lpcstudy.handling/1"
+    assert handling["schema"] == "lpcstudy.handling/2"  # WU-0005.4 (O1)
     assert set(handling["totals"]) == set(ALL_COUNTERS)
     assert all(type(v) is int for v in handling["totals"].values())
     evaluation = handling["cells"][cell_id("base", 0.01, 10_000, True)]["evaluation"]
@@ -487,3 +508,144 @@ def test_cell_handling_and_system_assembly_a11(tmp_path) -> None:
     assert run["totals"] == {k: 2 * v for k, v in t.items()} and run["failed_variants"] == 0
     assert run["by_system"]["rossler"] == t and run["robustness"] == {}
     assert json.loads(json.dumps(run)) == run
+
+
+# ------------------------------------------------------------------------------------------
+# WU-0005.4 (L6): the Levenberg-Marquardt block of the handling record. Hand values below.
+# ------------------------------------------------------------------------------------------
+def test_cell_handling_lm_block_hand_values() -> None:
+    """L6: ``cell_handling`` builds the ``lm`` block per kind and over all kinds, from hand arrays.
+
+    Reference: hand order statistics of the planned arrays of ``_planned_lm_arrays`` (4 states,
+    2 draws each for the oracle and the evaluation kind), noise 0.5 so the goodness-of-fit
+    threshold on c is 18.4668 * 0.25 = 4.617.
+    Oracle (n = 8): residuals 1..8, median 4.5, p95 = x_(ceil(7.6)) = 8; accepted
+    [0,0,1,2,3,4,5,15] has median 2.5 and 2 zeros (0.25); late 2 of 8; above 4.617: 5,6,7,8 (0.5).
+    Evaluation (n = 8): residuals 10..70 and inf, median 45, p95 = x_(8) = inf -> None, one
+    infinite residual; accepted [0,0,0,0,2,2,2,2] median 1, no decrease 0.5, late 0, above 1.0.
+    All (n = 16): sorted 1..8, 10..70, inf: median (8 + 10)/2 = 9, p95 = x_(16) = inf -> None;
+    accepted: six zeros, 1, five 2s, 3, 4, 5, 15 -> median 2, no decrease 6/16, late 2/16, above
+    12/16. The check kind has no estimate: n 0 and None values. Estimate counts equal the
+    ``estimates`` denominators. Exact (small dyadic rationals), and the record round-trips JSON.
+    """
+    import json
+
+    from lpcstudy.ensemble import DRAW_COUNTERS
+    from lpcstudy.pipeline import cell_handling
+
+    n, width = 4, len(DRAW_COUNTERS)
+    clip = {"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 0}
+    record = cell_handling({"test": _counted_split(n, np.ones((n, width), dtype=np.int64), clip,
+                                                   [])}, 2, 30, 0.5)
+    lm = record["lm"]
+    oracle, evaluation, check = (lm["by_kind"][k] for k in ("oracle", "eval", "check"))
+    assert (oracle["n_estimates"], oracle["median_residual"], oracle["p95_residual"]) == (8, 4.5, 8.0)
+    assert (oracle["median_iterations"], oracle["fraction_no_decrease"]) == (2.5, 0.25)
+    assert (oracle["fraction_late_progress"], oracle["fraction_above_chi2"]) == (0.25, 0.5)
+    assert oracle["nonfinite_residuals"] == 0 and oracle["noise"] == 0.5
+    assert (evaluation["n_estimates"], evaluation["median_residual"]) == (8, 45.0)
+    assert evaluation["p95_residual"] is None and evaluation["nonfinite_residuals"] == 1
+    assert (evaluation["median_iterations"], evaluation["fraction_no_decrease"]) == (1.0, 0.5)
+    assert (evaluation["fraction_late_progress"], evaluation["fraction_above_chi2"]) == (0.0, 1.0)
+    assert (lm["n_estimates"], lm["median_residual"], lm["p95_residual"]) == (16, 9.0, None)
+    assert (lm["median_iterations"], lm["fraction_no_decrease"]) == (2.0, 6 / 16)
+    assert (lm["fraction_late_progress"], lm["fraction_above_chi2"]) == (2 / 16, 12 / 16)
+    assert lm["nonfinite_residuals"] == 1
+    assert check["n_estimates"] == 0 and check["median_residual"] is None
+    assert set(lm["by_kind"]) == {"oracle", "eval", "check"}
+    assert record["denominators"]["estimates"] == lm["n_estimates"]
+    assert record["by_kind"]["oracle"]["denominators"]["estimates"] == oracle["n_estimates"]
+    assert json.loads(json.dumps(record)) == record
+
+
+def test_cell_handling_refuses_moments_without_lm_arrays() -> None:
+    """``cell_handling`` raises for moments without LM arrays, and for arrays of the wrong shape.
+
+    Reference: construction (PRIME.4: no silent n = 0 for a cell that has estimates). The error
+    names the split. Exact.
+    """
+    from lpcstudy.ensemble import DRAW_COUNTERS
+    from lpcstudy.pipeline import cell_handling
+
+    n, width = 4, len(DRAW_COUNTERS)
+    clip = {"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 0}
+    split = _counted_split(n, np.ones((n, width), dtype=np.int64), clip, [])
+    split.moments.lm_residual = None
+    with pytest.raises(ValueError, match="split 'test' moments.*Levenberg"):
+        cell_handling({"test": split}, 2, 30, 0.5)
+    split = _counted_split(n, np.ones((n, width), dtype=np.int64), clip, [])
+    split.evals.lm_residual = np.ones((n, 3))
+    with pytest.raises(ValueError, match="evaluation draws.*shapes"):
+        cell_handling({"test": split}, 2, 30, 0.5)
+
+
+def test_check_record_lm_block_and_size_check() -> None:
+    """L6: ``check_record`` summarizes the arrays of a validation check under the ``check`` kind.
+
+    Reference: hand values. 2 states x 2 draws: residuals [1, 2, 3, 4] (median 2.5, p95 =
+    x_(ceil(3.8)) = 4), accepted [0, 1, 2, 3] (median 1.5, one zero: 0.25), late [0, 0, 1, 0]
+    (0.25); noise 0.5, threshold 4.617: none above (0.0). The other kinds are empty, the record's
+    ``lm`` equals its ``check`` part plus ``by_kind``, and the two new counters flow through the
+    handled dict. A wrong array size raises. Exact.
+    """
+    from lpcstudy.ensemble import DRAW_COUNTERS
+    from lpcstudy.pipeline import check_record
+
+    handled = dict.fromkeys(DRAW_COUNTERS, 0)
+    handled["lm_nonfinite_cost"], handled["lm_nonfinite_jacobian"] = 3, 1
+    clip = {"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 0}
+    arrays = (np.array([1.0, 2.0, 3.0, 4.0]), np.array([0, 1, 2, 3]), np.array([0, 0, 1, 0]))
+    record = check_record(handled, clip, 2, 2, 1, 0.5, arrays)
+    part = record["lm"]["by_kind"]["check"]
+    assert (part["n_estimates"], part["median_residual"], part["p95_residual"]) == (4, 2.5, 4.0)
+    assert (part["median_iterations"], part["fraction_no_decrease"]) == (1.5, 0.25)
+    assert (part["fraction_late_progress"], part["fraction_above_chi2"]) == (0.25, 0.0)
+    assert {k: v for k, v in record["lm"].items() if k != "by_kind"} == part
+    assert record["lm"]["by_kind"]["oracle"]["n_estimates"] == 0
+    assert record["counts"]["lm_nonfinite_cost"] == 3 and record["counts"]["lm_nonfinite_jacobian"] == 1
+    assert record["denominators"]["estimates"] == part["n_estimates"]
+    with pytest.raises(ValueError, match="expected 4 estimates"):
+        check_record(handled, clip, 2, 2, 1, 0.5, (arrays[0][:3], arrays[1], arrays[2]))
+
+
+def test_concat_stacks_lm_arrays_and_refuses_partial() -> None:
+    """``_concat_moments`` and ``_concat_evals`` stack the LM arrays in order; a partial set raises.
+
+    Reference: hand arrays (rows of residual r_i = i, accepted 2 i, late i mod 2, for the rows
+    0..4 split 3 + 2): the stack equals the whole. If only some parts carry them the call raises
+    (no silent drop); if none does the field stays ``None``. Exact.
+    """
+    import dataclasses
+
+    from lpcstudy.pipeline import _concat_evals, _concat_moments
+    from unit_helpers import _moments_from_draws
+
+    rng = np.random.default_rng(6)
+    plain = [_moments_from_draws(rng.standard_normal((n, 4, 3)), rng.standard_normal((n, 4, 3)))
+             for n in (3, 2)]
+    residual = np.arange(10.0).reshape(5, 2)
+    accepted = (2 * np.arange(10)).reshape(5, 2).astype(np.int32)
+    late = (np.arange(10) % 2).reshape(5, 2).astype(np.int32)
+    parts = [dataclasses.replace(p, lm_residual=residual[a:b], lm_accepted=accepted[a:b],
+                                 lm_late=late[a:b]) for p, (a, b) in zip(plain, ((0, 3), (3, 5)))]
+    stacked = _concat_moments(parts)
+    assert stacked.lm_residual.tobytes() == residual.tobytes()
+    assert np.array_equal(stacked.lm_accepted, accepted) and np.array_equal(stacked.lm_late, late)
+    with pytest.raises(ValueError, match="only some parts"):
+        _concat_moments([parts[0], plain[1]])
+    assert _concat_moments(plain).lm_residual is None
+
+    def evals(n: int, lo: int, hi: int, with_lm: bool = True) -> EvaluationDraws:
+        zeros = np.zeros((n, 2, 3))
+        extra = dict(lm_residual=residual[lo:hi], lm_accepted=accepted[lo:hi],
+                     lm_late=late[lo:hi]) if with_lm else {}
+        return EvaluationDraws(
+            horizons=np.arange(1, 4), cp_err=zeros, plp_err=zeros, verify_noise=zeros,
+            distance=np.zeros((n, 2)), est_nu=np.zeros((n, 2)), growth_proxy=np.zeros((n, 2)),
+            gain_proxy=zeros, inputs=np.zeros((n, 2, 1)), noise_sens=np.zeros((n, 2)), **extra)
+
+    both = _concat_evals([evals(3, 0, 3), evals(2, 3, 5)])
+    assert both.lm_residual.tobytes() == residual.tobytes() and np.array_equal(both.lm_late, late)
+    assert _concat_evals([evals(3, 0, 3, False), evals(2, 3, 5, False)]).lm_residual is None
+    with pytest.raises(ValueError, match="only some parts"):
+        _concat_evals([evals(3, 0, 3), evals(2, 3, 5, False)])

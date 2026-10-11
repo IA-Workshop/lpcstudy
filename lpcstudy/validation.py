@@ -229,9 +229,10 @@ def check_cp_horizon(setup: ForecastSetup, library: AnalogLibrary, unit_noise: n
     dict
         ``cp_median_vpt_lyapunov``: Kaplan-Meier median CP horizon in Lyapunov times; and
         ``handling``: the counts of the forecasts (``handled`` column sums, ``clip_entries``,
-        sizes) for the caller to record and pop, so that no leaf is added to the validation
-        result. Only the CP clip can affect this check (PLP is computed and unused), so the PLP
-        counters of that record are inert.
+        sizes, the noise level and the Levenberg-Marquardt arrays of the estimates) for the caller
+        to record and pop, so that no leaf is added to the validation result. Only the CP clip can
+        affect this check (PLP is computed and unused), so the PLP counters of that record are
+        inert.
     """
     from .ensemble import DRAW_COLUMN, DRAW_COUNTERS, forecast_draws
 
@@ -245,7 +246,9 @@ def check_cp_horizon(setup: ForecastSetup, library: AnalogLibrary, unit_noise: n
             "handling": {"handled": {name: int(batch.handled[:, DRAW_COLUMN[name]].sum())
                                      for name in DRAW_COUNTERS},
                          "clip_entries": dict(batch.clip_entries), "n_states": len(rows),
-                         "n_draws": unit_noise.shape[1], "n_horizons": len(horizons)}}
+                         "n_draws": unit_noise.shape[1], "n_horizons": len(horizons),
+                         "noise": setup.noise,
+                         "lm": (batch.lm_residual, batch.lm_accepted, batch.lm_late)}}
 
 
 def gate_status(validation: dict, v7: dict) -> dict[str, bool]:
