@@ -255,6 +255,23 @@ Where the ROADMAP gives a formula and a rounded value, the stricter of the two i
 - **O3.** The delta-R2 study uses 3000 training and 1000 test states. Seeds are `make_rng(6006, "wu0006", case, ...)`, never a DEV or confirmatory seed.
 - **Process.** The §4.9 checklist is logged before each test invocation. The slow tier runs once for the whole set through `tools/run_tests.sh slow --background`. If it needs more than the 3600 s tier timeout, stop and report; R is never reduced.
 
+**2026-10-11, developer (claude-sonnet-5-5): implementation log (WU-0006.1 to .3).**
+
+- Merge: `git merge develop` conflicted only in `queue.md` (both sides appended log lines; kept both); no markers remain (`git grep '^<<<<<<<'` empty). Commit 7c277ce.
+- Files: `tests/slow/wu0006_harness.py` (generators, pool, evaluation, results table), `tests/slow/wu0006_reference.py` (the 70 ranges and the reference tables, transcribed by script from the note), `tests/slow/test_wu0006_harness.py` (smoke and self-checks), and the four study files of O2. No change under `lpcstudy/`, `tools/`, `tests/conftest.py` or `tests/unit`.
+- `python3 tools/test_impact.py --base develop --explain`: each of the four study files and the smoke is "test file: that file only"; the harness and reference modules are "test helper: tests naming it". `_convention` confirms the selection by module: `statistics` selects `test_statistics_coverage.py`; `analysis` selects `test_analysis_coverage.py`, `test_analysis_logrank_size.py` and `test_analysis_null_delta_r2.py`. The unit and integration radius is empty (no `lpcstudy/` or `tools/` change), so no unit test is run.
+- Ad hoc development check (not a test run; one process, a few replications, no pytest): all nine coverage designs reproduce the production call site bitwise (identity 1 in each), the C7 zero column reads "not computable", the log-rank replication costs 4 to 10 ms and one delta-R2 replication 2.9 s.
+
+**Test run 1 (the harness smoke), §4.9 checklist.**
+1. Change set: `git diff --name-only develop...HEAD` is the note and scripts, the unit file and `queue.md`, and seven files under `tests/slow/`; `git status --porcelain` is clean.
+2. Radius: `tests/slow/test_wu0006_harness.py` only (slow tier; rule "a test file: that file only"); far smaller than the suite; no gate.
+3. Already run? No, this code has never run under pytest.
+4. Device: `JAX_PLATFORMS=cpu` (set by the wrapper, and in the workers by `worker_pool`).
+5. Threads and time: `LPC_THREADS=4` (pool of 4 single-thread workers); slow timeout 3600 s; expected 2 to 4 minutes.
+6. Contention: `pgrep -fa 'lpcstudy --preset|run_tests.sh slow'` shows nothing but itself; no GPU use.
+7. Output: `-q --tb=short -rfE` by the wrapper, plus `--durations=10`.
+8. Command: `tools/run_tests.sh slow --background --durations=10 tests/slow/test_wu0006_harness.py`.
+
 ## Review
 
 ## Audit
