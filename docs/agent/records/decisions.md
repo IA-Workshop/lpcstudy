@@ -252,3 +252,18 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 - Open for the owner: what 'superseded' means (which check retires V7) and whether a ledger `ruling` entry should state it. The ROADMAP's smoke wording ('smoke passes the gate') should become 'smoke lists V1 to V7' (amendments note section 1).
 
 **Dissent and resolution (REPRO.8):** none. Status: ruled by the owner in conversation; recorded here pending the owner's ledger entry.
+
+## DEC-0016: WU-0002.9: the overall verdict, H1c on PLP only, the gain-bound row, and gate_pass  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the planner's questions O1 to O4 and the applied-mathematician's answers; for owner confirmation)
+
+**Decision.**
+- **O1.** The overall verdict is "supported" only if all three v3 systems pass; it is "not supported" if any system fails; otherwise "inconclusive", with the missing systems listed. `required` is a fixed constant list of the three v3 systems (not `config.core_systems`), so a one-system smoke or development run can never read "supported". A system name outside `required` raises. Consequence: every smoke and development run reads inconclusive at best.
+- **O2.** The gain bound (D-21(b) covariance screen, D-21(c) subset satisfying P1) is a gap with no ROADMAP row. The unit keeps a `pending` marker that names it. A ROADMAP row is to be opened by the owner (amendments note): "screen on the raw C >= 0 at every horizon, report the subset and the per-screen counts, no bar".
+- **O3.** H1c is decided on PLP only (v3 section 2 says "(PLP)"); CP is reported without a verdict, as for H1b.
+- **O4.** Verdicts are not conditioned on `gate_pass`; a gate failure marks that system's results provisional (v3 section 6 E0), which the report shows as "FAIL (results provisional)".
+- **Error rate (for the owner, not a code change).** The intersection-union argument of v3 section 7 controls only the error of "supported". "Not supported" can be wrong with probability up to about 7.3% over three systems at 95% (and up to about 14% for H2c's two parts); this should be stated in v3 section 7.
+
+**Alternatives weighed.** Treating missing systems as not counted: rejected (a one-system run would read "supported"). Deciding H1c on both forecasters: rejected (v3 says PLP).
+
+**Affects:** WU-0002.9, the report's verdict rows, WU-0002.12's `compare_pilot` and WU-0008 (they read the verdict values, which become strings). Marked "needs owner review before freeze" (verdict code).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
