@@ -487,7 +487,8 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
     dict
         ``thresholds``; ``PLP`` and ``CP`` (``h1c_ratio_block`` plus ``n_ineligible_states``;
         ``verdict``, ``reason`` and ``pass`` for the PLP only); ``threshold`` [0.8, 1.25]; and
-        the PLP ``verdict``, ``reason`` and ``pass`` at the top level.
+        the PLP ``verdict``, ``reason``, ``pass``, ``n_failed_resamples`` and ``n_states`` at
+        the top level (DEC-0012: every criterion result carries them).
     """
     m = cell.splits["test"].moments
     growth = cell.oracles["test"].growth
@@ -507,7 +508,8 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
         res[name] = h1c_ratio_block(np.asarray(ratios), config, with_verdict=name == "PLP")
         res[name]["n_ineligible_states"] = int(len(horizons) - len(ratios))
     res["threshold"] = list(H1C_BAND)
-    res.update({key: res["PLP"][key] for key in ("verdict", "reason", "pass")})
+    res.update({key: res["PLP"][key]
+                for key in ("verdict", "reason", "pass", "n_failed_resamples", "n_states")})
     return res
 
 

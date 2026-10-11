@@ -2088,7 +2088,7 @@ def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o
     for PLP (A1), so the realized calibration MSEs are 0.25 and 4.0 and the choice is A0, although
     on the test scores A1 has the smaller per-state MSE (0.1 against 0.2), which the old rule would
     have picked. A tie (equal squares) goes to A0. ``A4o_minus_A2.mean`` is the hand mean of
-    ``a4o - a2`` (``abs=1e-12``: one reduction of 6 numbers); its interval is at level 0.95, it
+    ``a4o - a2`` (``abs=1e-12``: one reduction of 60 numbers, the six hand values tiled ten times, each of order 1, so round-off is below 60 * 1.1e-16 * 1 ~ 7e-15, two orders under the tolerance); its interval is at level 0.95, it
     carries ``role == "reported"`` and no ``pass``. The value at the other horizon (100) must not
     be read: the column is located by the horizon value, not by position. The entry
     ``A4_minus_A0`` exists and ``A4_minus_A1`` does not.
@@ -2476,6 +2476,7 @@ def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_with
     assert plp["n_ineligible_states"] == 5 and plp["n_failed_resamples"] == 0
     assert plp["verdict"] == "pass" and plp["reason"] is None and plp["pass"] is True
     assert (out["verdict"], out["reason"], out["pass"]) == ("pass", None, True)
+    assert out["n_failed_resamples"] == 0 and out["n_states"] == 60  # copied from the PLP (R2)
     assert cp["median_ratio"] == pytest.approx(cp_ratio, abs=1e-12) and cp_ratio > 1.25
     assert cp["n_states"] == 60 and cp["n_excluded_nonfinite"] == 1
     assert cp["n_ineligible_states"] == 5
@@ -2484,6 +2485,7 @@ def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_with
     out = h1c_horizon_law(small, CONFIG)
     assert out["PLP"]["n_states"] == 40 and out["PLP"]["median_ratio"] is not None
     assert (out["verdict"], out["reason"], out["pass"]) == ("inconclusive", "n_states < 50", False)
+    assert out["n_states"] == 40 and out["n_failed_resamples"] == 0
 
 
 def _h2c_stub_scores(d_a2: np.ndarray, d_best: np.ndarray) -> dict[str, RuleScores]:

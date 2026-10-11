@@ -162,11 +162,13 @@ def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
                 "library_change": {"mean_change": 0.2, "ci": [0.1, 0.3]},
                 "library_curves": {"0.01": {"1000": {"median": 0.7}, "10000": {"median": 0.8}}},
                 "verdict": "pass", "reason": None},
-        "H2c": {"A4_minus_A2": {"relative": -0.1, "ci": [-0.2, -0.05], "verdict": "pass",
-                                "reason": None},
+        # mean, interval and relative are consistent: relative = mean / (mean of the reference),
+        # with reference means 1.5 (A2) and 1.0 (A1), so -0.15 / 1.5 = -10% and -0.05 / 1.0 = -5%
+        "H2c": {"A4_minus_A2": {"mean": -0.15, "relative": -0.1, "ci": [-0.2, -0.05],
+                                "verdict": "pass", "reason": None},
                 "best_single": "A1",
-                "A4_minus_A1": {"relative": -0.05, "ci": [-0.1, -0.01], "verdict": "pass",
-                                "reason": None},
+                "A4_minus_A1": {"mean": -0.05, "relative": -0.05, "ci": [-0.1, -0.01],
+                                "verdict": "pass", "reason": None},
                 "A4o_minus_A2": {"relative": -0.2}},
         "H2d": {"in_distribution_excess": 0.05, "ci": [0.04, 0.06]},
         "H2e": {"by_noise": {"0.01": {"median_change": 0.1, "ci": [0.05, 0.15]},
@@ -301,7 +303,7 @@ def test_key_numbers_are_exact_for_every_v3_key() -> None:
         "H2a": "(i) pass: range 0.05 (CI hi 0.08, n=120); (ii) pass: partial r zero 0.02 "
                "[-0.05, 0.08], interior -0.03 [-0.09, 0.04] (w*=0: 30, w*=1: 4)",
         "H2b": "rho rank corr 0.9; n_lib 10^3->10^4 change 0.2 [0.1, 0.3]: pass",
-        "H2c": "A4-A2 -10% [-0.2, -0.05] pass; A4-A1 -5% [-0.1, -0.01] pass; "
+        "H2c": "A4-A2 -0.15 [-0.2, -0.05] (-10%) pass; A4-A1 -0.05 [-0.1, -0.01] (-5%) pass; "
                "A4o-A2 -20% (reported): pass",
         "H2d": "A4/A3-1 = 5% [4, 6]%: pass",
         "H2e": "rho=0.01: median change 0.1 [0.05, 0.15]; rho=0.02: median change n/a n/a: pass",
@@ -665,8 +667,12 @@ def test_key_numbers_show_inconclusive_h1c_h2c_h2d_with_their_reasons() -> None:
                                         reason="interval meets band edge")
     system["H2c"]["A4_minus_A1"] = dict(system["H2c"]["A4_minus_A1"], verdict="fail", reason=None)
     assert _key_number("H2c", system) == (
-        "A4-A2 -10% [-0.2, -0.05] inconclusive (interval meets band edge); "
-        "A4-A1 -5% [-0.1, -0.01] fail; A4o-A2 -20% (reported): fail")
+        "A4-A2 -0.15 [-0.2, -0.05] (-10%) inconclusive (interval meets band edge); "
+        "A4-A1 -0.05 [-0.1, -0.01] (-5%) fail; A4o-A2 -20% (reported): fail")
+    # R3: a gain-bound result without the screen counts fails loudly (PRIME.4), not silently
+    bare = {key: value for key, value in system["gain_bound"].items() if key != "n_screened_out"}
+    with pytest.raises(KeyError, match="n_screened_out"):
+        _key_number("gain_bound", dict(system, gain_bound=bare))
     system["H2d"] = dict(system["H2d"], verdict="inconclusive", reason="interval meets band edge")
     assert _key_number("H2d", system) == \
         "A4/A3-1 = 5% [4, 6]%: inconclusive (interval meets band edge)"

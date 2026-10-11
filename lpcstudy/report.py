@@ -211,8 +211,8 @@ def _key_number(key: str, res: dict) -> str:
                    f"{_interval(change['ci'], 2)}: {_verdict_text(r)}"
         case "H2c":
             best = f"A4_minus_{r['best_single']}"
-            part = lambda p: f"{_fmt(100 * p['relative'], 3)}% {_interval(p['ci'])} " \
-                             f"{_verdict_text(p)}"
+            part = lambda p: f"{_fmt(p['mean'], 3)} {_interval(p['ci'])} " \
+                             f"({_fmt(100 * p['relative'], 3)}%) {_verdict_text(p)}"
             return f"A4-A2 {part(r['A4_minus_A2'])}; A4-{r['best_single']} {part(r[best])}; " \
                    f"A4o-A2 {_fmt(100 * r['A4o_minus_A2']['relative'], 3)}% (reported): " \
                    f"{_verdict_text(r)}"
@@ -221,11 +221,11 @@ def _key_number(key: str, res: dict) -> str:
                    f"[{_fmt(100 * r['ci'][0], 3)}, {_fmt(100 * r['ci'][1], 3)}]%: " \
                    f"{_verdict_text(r)}"
         case "gain_bound":
-            out = r["n_screened_out"] if "n_screened_out" in r else None
-            screens = "" if out is None else \
-                (f" of {r['n_total_states']}; screened out: growth<=0 {out['growth_nonpositive']}, "
-                 f"censored {out['censored_single_forecaster']}, "
-                 f"covariance<0 {out['negative_covariance']}")
+            out = r["n_screened_out"]  # a result without the counts fails loudly (PRIME.4)
+            screens = (f" of {r['n_total_states']}; screened out: "
+                       f"growth<=0 {out['growth_nonpositive']}, "
+                       f"censored {out['censored_single_forecaster']}, "
+                       f"covariance<0 {out['negative_covariance']}")
             return f"within bound {_fmt(r['fraction_within_bound'], 3)} " \
                    f"(n={r['n_states']}{screens}, max gain {_fmt(r['max_gain_lyapunov'], 2)} LT)"
         case "H2e":
