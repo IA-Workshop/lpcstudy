@@ -241,6 +241,69 @@ def test_smoke_foreground_command_environment_and_meta(fake: FakeRoot) -> None:
     assert (out / "smoke" / "results.json").is_file()
 
 
+@pytest.mark.parametrize(("threads", "expected"), [(None, "4"), ("2", "2"), ("17", "17")])
+def test_xla_thread_cap_is_exported_from_lpc_threads(fake: FakeRoot, threads: str | None,
+                                                     expected: str) -> None:
+    """PJRT_NPROC and NPROC equal the validated LPC_THREADS (default 4) in every child (WU-0012.4, 1).
+
+    Reference: the criterion text of WU-0012.4 and the research note
+    ``2026-10-11-research-xla-threads.md`` (XLA's ``DefaultThreadPoolSize()`` reads these two plain
+    environment variables); the expected strings are written literally (4, 2, 17). Larger values
+    inherited from the caller (``9``) must be overridden. Both the ``--help`` probe and the study
+    call are children, and both must carry the cap. Tolerance: none, exact string equality.
+    """
+    extra = {"PJRT_NPROC": "9", "NPROC": "9"}
+    if threads is not None:
+        extra["LPC_THREADS"] = threads
+    done = fake.run("run_preset.sh", "smoke", "DEV-1", "runs/dev/DEV-1", env=fake.environment(**extra))
+    assert done.returncode == 0, done.stderr
+    calls = fake.calls()
+    assert len(calls) == 2 and "--help" in calls[0]["argv"] and "--preset" in calls[1]["argv"]
+    for call in calls:
+        assert (call["env"]["PJRT_NPROC"], call["env"]["NPROC"]) == (expected, expected)
+        assert call["env"]["OMP_NUM_THREADS"] == expected
+    assert json.loads(meta_path(fake, "smoke").read_text())["lpc_threads"] == int(expected)
+
+
+def test_background_pilot_child_carries_the_xla_thread_cap(fake: FakeRoot) -> None:
+    """The background child (pilot, cpu device) inherits PJRT_NPROC and NPROC = LPC_THREADS (1)."""
+    _, pid = start_pilot(fake, "--device", "cpu", LPC_THREADS="3", NPROC="9")
+    assert wait_until(lambda: not alive(pid))
+    (call,) = cli_calls(fake)
+    assert (call["env"]["PJRT_NPROC"], call["env"]["NPROC"]) == ("3", "3")
+
+
+@pytest.mark.parametrize("threads", ["0", "100", "four", "-1", "2.5"])
+def test_invalid_lpc_threads_still_refused_and_starts_nothing(fake: FakeRoot, threads: str) -> None:
+    """An invalid LPC_THREADS gives 64 and one line, no meta file and no child (WU-0012.4, 1)."""
+    done = fake.run("run_preset.sh", "smoke", "DEV-1", "runs/dev/DEV-1",
+                    env=fake.environment(LPC_THREADS=threads))
+    assert done.returncode == 64, (done.stdout, done.stderr)
+    assert len(done.stderr.strip().splitlines()) == 1, done.stderr
+    assert not list(fake.root.rglob("run.meta.json*"))
+    assert fake.calls() == [] and fake.timeout_calls() == [] and fake.tally_calls() == []
+
+
+def test_xla_flags_is_passed_through_unchanged_and_never_added(fake: FakeRoot) -> None:
+    """The wrapper neither sets nor alters XLA_FLAGS (WU-0012.4, 1; research note, claims 1, 2).
+
+    Reference: the behaviour before WU-0012.4 (inherited value passes unchanged, absent stays
+    absent) and a literal scan of the script: no code line (comments excluded) names XLA_FLAGS.
+    Tolerance: none.
+    """
+    absent = fake.run("run_preset.sh", "smoke", "DEV-1", "runs/dev/DEV-1")
+    assert absent.returncode == 0, absent.stderr
+    assert all("XLA_FLAGS" not in call["env"] for call in fake.calls())
+    supplied = "--xla_cpu_multi_thread_eigen=false"
+    done = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/DEV-2",
+                    env=fake.environment(XLA_FLAGS=supplied))
+    assert done.returncode == 0, done.stderr
+    assert all(call["env"]["XLA_FLAGS"] == supplied for call in fake.calls()[-2:])
+    code = [line for line in (REPO / "tools" / "run_preset.sh").read_text().splitlines()
+            if not line.lstrip().startswith("#")]
+    assert not [line for line in code if "XLA_FLAGS" in line]
+
+
 def test_pass_through_arguments_follow_the_seed(fake: FakeRoot) -> None:
     """``--systems a b --skip-robustness`` reach the CLI unchanged."""
     done = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/DEV-2", "--systems", "lorenz63",
