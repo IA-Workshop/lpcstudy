@@ -169,6 +169,77 @@ Where the ROADMAP gives a formula and a rounded value, the stricter of the two i
 
 ## Log
 
+**2026-10-11, applied-mathematician (claude-opus-5-5): WU-0006 mathematician review (M1 to M6, O1 to O5), on the plan at d954db9.**
+
+- **Basis.** Full derivations and tables are in `docs/agent/notes/2026-10-11-math-wu0006.md`. The scripts and output logs are in `docs/agent/notes/2026-10-11-math-wu0006-scripts/` (REPRO.10).
+  - All data are synthetic. Every computation ran on CPU as 4 spawned single-thread workers, with the scratch seed literal 20261011. No preset, no test suite, no GPU, no DEV or CONF seed.
+  - The reference reimplements each statistic on the production index arrays. It agrees with production `spearman`, `partial_correlation` and the resampled mean to ≤ 4e-16. ΔR² and log-rank go through production `qn_profile_block` and `h3a_logrank`.
+  - Disclosure: for about 2 min one 4-thread script overlapped the 4-worker job (8 threads). I stopped it; no result is affected.
+- **M1: confirmed, with two corrections.**
+  - Confirmed: R (1000, 2000, 500), z = 3, the stricter-of rule, and every SE.
+  - Integer rules: A1 ≥ 930/1000; A2 ≥ 972; A3 ≤ 39 (95%) and ≤ 16 (98.3%); L ≤ 33/2000; N1 and N3 ≥ 461/500; N2 ≤ 22/500.
+  - **N2 bound 0.045946**, not 0.045950. Same count.
+  - **H1 lag-1 SE is Bartlett's √((1 − φ²)/N)**, not (1 − φ²)/√N. Empirical 0.00944, Bartlett 0.00954, plan 0.00910 at φ = 0.3. This is a derivation error and no result exists yet. Keeping the stricter form is admissible; its spurious-failure probability is 0.004 instead of 0.0027.
+- **M2: the procedure is not nominal, even at φ = 0.**
+  - Reference coverage, 95% / 98.3% (B = 2000):
+    - φ = 0: 0.938–0.947 / 0.977–0.981. The log-normal cases C2, C4 and C5 are lowest, at 0.938–0.940, against the plan's 0.947–0.948.
+    - φ = 0.3: means, ratios and medians 0.923–0.931 / 0.968–0.974; C6 0.944 / 0.980; C7 0.939 / 0.976.
+    - C1s: 0.940 (φ = 0.1) and 0.933 (φ = 0.2).
+  - Second-order terms: noise of the MBB variance −0.001 to −0.005; heavy tails −0.005 to −0.007; B = 2000 endpoint about −0.0004.
+  - **Per-assertion P(fail) for correct code is tabulated in the note.**
+    - φ = 0: 0.01–0.15 per assertion; about 1.1–1.7 expected failures among 32.
+    - φ = 0.3: 0.33–0.78 for C1–C5, C8 and C9; about 11.4 expected among 32.
+  - **Design (owner decides).** The ROADMAP bound is a method-validity criterion, and a failure of it is a true detection, not a code defect.
+    - Recommended now, as a tightening: add a **reference-consistency assertion**. Each observed count must lie in the pre-registered range of the note. These are 64 coverage and A3 ranges plus 6 log-rank ranges, with a family-wise false alarm ≤ 3.5%. This is the "fail = defect" test.
+    - Then either **Option C (recommended, decided before the run, QA.6).** A1 to A3 become characterization rows: the ROADMAP outcome is computed and reported to the Log and to WU-0008, the pytest outcome is the consistency assertion, and the predictions are fixed now.
+    - Or **Option K.** Keep A1 to A3 as assertions. About 13 DEFs of class "method (predicted)" are expected, and they recur at every gate.
+- **M3: designs.**
+  - **Generator specification fixed in the note**; the predictions apply only to it.
+  - **σ = 1 is probably too light.** The O4 proxy puts the log-SD of 1-LT amplification at 1.5–1.9, so per-state MSE log-SD is about 1.7–2.0. At φ = 0, σ = 1.5 gives 95% coverage 0.930–0.933 and σ = 2 gives 0.920–0.923. **This is the main finding for WU-0008:** the H2c, H2d and H3c intervals may run at an effective 0.92–0.93. Add C2h and C4h characterization rows.
+  - φ stays on the latent. The influence-series lag-1 at φ = 0.3 is 0.30 (mean), 0.19 (median), 0.16 (log-normal) and ≤ 0.09 (Spearman, partial correlation).
+  - The C7 truth is exact. But the zero part is then all-NaN, so **A5 applies to the interior column**, **A3 and A4 use `part_ii["interior"]`** (and the H1d per-row verdict), and the zero column should be asserted as "not computable" with 2000 failed.
+  - C8 needs no zero-inflated variant.
+  - Log-rank censoring is (1 − h)²⁴⁰ = 0.0489. The design is adequate.
+  - ΔR² process: specified in the note, with R²₃ = 0.35 / 0.27.
+- **M4: what the interval covers.** The Q-N interval covers **Δ_cond** = [E(Y − f̂₃)² − E(Y − f̂₄)²]/Var(Y), with the fitted models fixed, over a new stationary test state in the target's domain. It does not cover the population ΔR², which is 0 under the null.
+  - Under the null, Δ_cond has mean −0.007 (logit) and −0.010 (indicator) at 900/1000, and −0.002 / −0.0035 at 3000/1000. It is positive in 14–21% of training sets.
+  - **N1 is predicted to fail:** P(0 ∈ CI) = 0.86–0.93, so P(fail) = 0.66–1.0. This is an estimand mismatch, not a defect.
+  - **N2 is the right error criterion:** a false "distinct" occurs at 0.013–0.035, and P(fail) < 0.01.
+  - **N3 is the procedure check:** 0.946 ± 0.008 (logit) and 0.960 ± 0.007 (indicator); P(fail) about 0.03.
+  - The truth's MC SE is 0.051 (mean) and 0.070 (max) of the half-width, which meets "below a tenth". The refit was bitwise in 1000/1000 replications.
+  - The v3 reading under the null is "reduces" 92–99% of the time.
+- **M5: log-rank.** Variance inflation at φ = 0.3 is 1.079 (planner: about 1.1).
+  - L1 FWER: 0.0105 at φ = 0 and 0.0134 at φ = 0.3. The planner's 0.015–0.02 was too high. P(L1 fails) is 0.006 and 0.10.
+  - L2 P(pass): 0.0115 and 0.0122, so P(fail) is 0.02–0.04.
+  - L3: 0 uncomputed pairs in 160 000 families.
+- **M6: verdict error rates.** A3's α/2 is the right nominal: one-sided non-coverage at the edge, worst case over the null, the same for open and closed edges.
+  - A4 is exact. Assert it per replication, with C7's two-sided rule.
+  - A4 cannot test the open/closed flags, since ties never occur. Deterministic unit tie tests cover H2a(i), H2a(ii), H2b, H2c, H2d and H3c. **None found for H1d's closed edge at 0.7** (a gap for a later unit).
+- **Multiplicity.** There are 82 assertions. If the procedures were exactly nominal, P(≥ 1 spurious failure at φ = 0) would be about 13%. **For correct code about 16–17 ROADMAP-bound failures are expected** (A1 to A3: 1.1–1.7 and 11.4; L: 0.2; N1: 3.6; N3: 0.03–0.3). The plan's multiplicity paragraph must be replaced.
+- **O1.** Approve the spawned pool, with the thread variables set to 1 in the parent's `os.environ` before the pool is created (an initializer is too late). B = 500 is not equivalent: it is a different procedure and loses about 0.0016 more coverage.
+- **O2.** `test_impact` selects slow files for the changed module only. Use:
+  - `test_statistics_coverage.py` (C1, C3, C1s);
+  - `test_analysis_coverage.py` (C2, C4–C9);
+  - `test_analysis_logrank_size.py`;
+  - `test_analysis_null_delta_r2.py`.
+
+  The R5 by-hand rule remains for `statistics.py` changes.
+- **O3.** Use 3000/1000 (FULL) if the pool is approved, which fits T ≤ 20 min. Otherwise 900/1000, where my predictions apply.
+- **O4.** The existing development outputs hold no per-state series, so the autocorrelation cannot be measured from them.
+  - The CPU dynamics proxy gives lag-1 of −0.06 (Lorenz), +0.13 (Rössler, lag-3 −0.20) and +0.06 (Chua). φ = 0.3 is therefore very likely a stress case.
+  - The real measurement needs a per-state dump from a DEV pilot: influence acf, V*(b = 10, 20)/V*(b = 5), and the per-state MSE log-SD. It belongs in WU-0003, before the freeze, not now.
+- **O5.** Amend now (QA.6, original kept): N1 becomes reported characterization; N2 and N3 are the assertions. Otherwise record the predicted DEF.
+- **Plan amendments needed before execution.**
+  1. N2 bound and H1 lag-1 SE corrections.
+  2. Generator specification.
+  3. A5, A3 and A4 column and verdict choice for C7 and C6.
+  4. A4 per replication.
+  5. Consistency ranges, plus the C2h and C4h rows.
+  6. Replace the predictions and multiplicity text.
+  7. Owner decisions C or K, and O1 to O5.
+
+  Every item is a tightening or a correction; no bound is loosened.
+
 ## Review
 
 ## Audit
