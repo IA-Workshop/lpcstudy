@@ -394,3 +394,81 @@ def test_local_dimension_median_poisson_value(m: int) -> None:
     assert constant == pytest.approx(0.9642, abs=5e-5)
     median = float(np.median(local_dimension(reference, queries)))
     assert abs(median / (constant * m) - 1) <= 0.03
+
+
+@pytest.mark.parametrize("m", [1, 2, 3])
+def test_inverse_dimension_is_unbiased_on_known_sets(m: int) -> None:
+    """The per-state reference ``S / (k - 1)`` has mean ``1 / m`` on uniform sets of dimension m.
+
+    Reference: the exact Gamma law, independent of the code (applied-mathematician, WU-0002.4-5
+    log, Job 1 item 2). On the sets, queries and premises of ``test_local_dimension_known_sets``
+    (segment, square, cube in R^7; k = 20; interior queries with T_20 < 0.2, asserted), the
+    k - 1 inner neighbors of a query are iid uniform in the ball given T_k, so
+    ``S = sum_j ln(T_k / T_j)`` satisfies ``S m ~ Gamma(k - 1, 1)`` exactly and
+    ``E[S / (k - 1)] = 1 / m`` exactly. Inverting the k - 2 estimate of ``local_dimension``
+    without the correction (``1 / local_dim = S / (k - 2)``) would be too high by
+    ``(k - 1) / (k - 2) - 1 = +5.56%``.
+
+    Tolerance: ``abs(mean * m - 1) <= 0.03`` (the tolerance of the ``local_dimension`` mean
+    test). The per-query relative sd is ``1 / sqrt(k - 1) = 0.229``, so the mean of 2000
+    queries has sd 0.0054 (inflation by shared neighbors at most 1.06 in 900 simulated cases,
+    applied-mathematician), and 3% is 5.5 sd (a false alarm over the three m has probability
+    about 1e-7). The k - 2 slip sits at +5.56%, 4.7 sd beyond the bound, so it is caught.
+    """
+    from lpcstudy.oracle import inverse_dimension, local_dimension
+
+    reference, queries, _ = _uniform_known_dimension(m)
+    _assert_interior(reference, queries)
+    estimates = inverse_dimension(local_dimension(reference, queries))
+    assert estimates.shape == (2_000,)
+    assert abs(estimates.mean() * m - 1) <= 0.03
+
+
+def test_inverse_dimension_equals_brute_force_log_ratio_mean() -> None:
+    """``inverse_dimension(local_dimension(...))`` is ``(1/(k-1)) sum_{j<k} ln(T_k/T_j)``.
+
+    Reference: an independent algorithm. The neighbor distances come from ``scipy.spatial``'s
+    ``cdist`` (all pairs) and a full sort, not from the k-d tree of ``local_dimension``; the
+    mean of the k - 1 log ratios is formed directly. 500 reference points and 50 queries, both
+    standard normal in R^3 (fixed ``default_rng(30013)``), in general position (no ties, queries
+    not in the reference), k = 20. Also asserted: ``inverse_dimension.__defaults__`` equals
+    ``local_dimension.__defaults__`` (both ``(20,)``), so the two functions use the same k.
+
+    Tolerance: relative 1e-12. The code takes 19 logs, a sum, a division by the local dimension
+    ``(k - 2) / S`` and the reverse ``(k - 2) / ((k - 1) local_dim)``; each step is a few ulp
+    (2.2e-16), about 40 operations in all. The worst deviation between the k-d tree and the
+    brute-force distances is 3.3e-16 relative (applied-mathematician, 50 cases), so 1e-12 is
+    about 3000 times the round-off.
+    """
+    from scipy.spatial.distance import cdist
+
+    from lpcstudy.oracle import inverse_dimension, local_dimension
+
+    assert inverse_dimension.__defaults__ == local_dimension.__defaults__ == (20,)
+    rng = np.random.default_rng(30013)
+    reference = rng.standard_normal((500, 3))
+    queries = rng.standard_normal((50, 3))
+    k = 20
+    sorted_dist = np.sort(cdist(queries, reference), axis=1)[:, :k]
+    expected = np.mean(np.log(sorted_dist[:, k - 1:k] / sorted_dist[:, :k - 1]), axis=1)
+    got = inverse_dimension(local_dimension(reference, queries))
+    assert got.shape == expected.shape
+    assert np.allclose(got, expected, rtol=1e-12, atol=0.0)
+
+
+def test_inverse_dimension_rejects_too_few_neighbors_and_keeps_nonfinite() -> None:
+    """``k < 3`` raises; a non-finite local dimension stays non-finite (never replaced).
+
+    Reference: the formula ``(k - 2) / ((k - 1) d)``. With k = 2 the estimator ``(k - 2) / S``
+    is identically zero (no information), and ``k < 2`` has no log ratio, so both raise
+    (PRIME.4). For ``d = (nan, inf, 2)`` at k = 20 the values are ``nan``, ``0`` (the
+    limit, an infinite dimension) and ``18 / (19 * 2)``; the caller (H1a) decides what to
+    exclude. Tolerance: relative 1e-15 on the one finite nonzero value (a division and a product).
+    """
+    from lpcstudy.oracle import inverse_dimension
+
+    with pytest.raises(ValueError, match="n_neighbors"):
+        inverse_dimension(np.array([2.0]), n_neighbors=2)
+    out = inverse_dimension(np.array([np.nan, np.inf, 2.0]))
+    assert np.isnan(out[0]) and out[1] == 0.0
+    assert out[2] == pytest.approx(18.0 / (19.0 * 2.0), rel=1e-15, abs=0.0)

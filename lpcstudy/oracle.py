@@ -64,6 +64,41 @@ def local_dimension(reference: np.ndarray, queries: np.ndarray, n_neighbors: int
     return (n_neighbors - 2) / np.sum(logs, axis=1)
 
 
+def inverse_dimension(local_dim: np.ndarray, n_neighbors: int = 20) -> np.ndarray:
+    """Per-state Levina-Bickel inverse dimension ``S / (k - 1)`` (H1a reference, DEC-0008 A4(h)).
+
+    ``S = sum_{j<k} ln(T_k / T_j)`` is the sum of the ``k - 1`` log distance ratios of a state.
+    With the nearest-neighbor ball uniform on a ``d``-flat (the Poisson law of Levina and
+    Bickel 2005, NIPS 17, Sec. 3.1), ``S d ~ Gamma(k - 1, 1)``, so ``E[S / (k - 1)] = 1 / d``
+    exactly. It is *not* ``1 / local_dim``: :func:`local_dimension` is ``(k - 2) / S``, whose
+    inverse ``S / (k - 2)`` is too high by ``(k - 1) / (k - 2) - 1 = +1 / (k - 2)`` (5.6% at
+    ``k = 20``). This function inverts the k - 2 estimate and applies the ``(k - 2) / (k - 1)``
+    correction, so ``inverse_dimension(local_dimension(r, q, k), k) = S / (k - 1)``.
+
+    Parameters
+    ----------
+    local_dim : np.ndarray
+        Output of :func:`local_dimension`, ``(n,)``. NaN stays NaN, and ``+inf`` (``S = 0``,
+        all neighbors at the same distance) gives 0; the caller excludes and counts such
+        states.
+    n_neighbors : int, optional
+        The ``k`` used to compute ``local_dim`` (same default as :func:`local_dimension`).
+
+    Returns
+    -------
+    np.ndarray
+        ``(k - 2) / ((k - 1) local_dim)``, ``(n,)``.
+
+    Raises
+    ------
+    ValueError
+        If ``n_neighbors < 3`` (with ``k = 2`` the estimator ``(k - 2) / S`` is identically 0).
+    """
+    if n_neighbors < 3:
+        raise ValueError(f"n_neighbors must be at least 3; got {n_neighbors}")
+    return (n_neighbors - 2) / ((n_neighbors - 1) * np.asarray(local_dim, dtype=float))
+
+
 def state_oracles(ctx: SystemContext, split: str, window: int,
                   chunk: int = 2000) -> StateOracles:
     """Compute ``nu``, ``g_H`` and ``Lambda_bar`` along the true trajectory.
