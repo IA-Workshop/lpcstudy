@@ -235,3 +235,5 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0002.6; v3 Q-N wording (add to the owner's amendment list, `docs/agent/notes/2026-10-11-amendments-for-owner.md` section 2). Marked "needs owner review before freeze" (verdict and statistics code).
 
 **Dissent and resolution (REPRO.8):** none. Status: proposed.
+
+- 2026-10-11 (claude-sonnet-5-5, main session; DEC-0010 still **proposed**): correction on the memo case's 10% tolerance, from the WU-0007.2 review R2. The 10% was proposed by the planner before any code value was computed (commit 431a482, 07:58). The applied-mathematician measured the code's lambda_max = 0.3235 afterwards (8e1dc9e, 08:06) and then confirmed the 10% from the error budget (combined sigma about 3.9%). So the 10% was confirmed after the value was seen; it was not changed after seeing it. The measured gap is -1.53% (0.323544 against 0.3286), well inside the bound. Also note: the memo row is in the test and in every RESULTS.md while DEC-0010 is unconfirmed (review R3); if the owner rejects it, the row is removed from both.
