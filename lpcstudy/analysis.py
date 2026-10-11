@@ -37,8 +37,9 @@ from .oracle import characteristic_horizon, curvature, hybrid_mse, inverse_dimen
     oracle_weight
 from .pipeline import Cell, FittedRules, RuleScores, SplitData
 from .statistics import MIN_STATES, block_bootstrap_counted, block_bootstrap_dropped, \
-    bootstrap_values, combine_verdicts, criterion_verdict, holm_adjust, kaplan_meier, \
-    logrank_parts, logrank_test, ols_slope, partial_correlation, percentile_interval, spearman
+    bootstrap_values, combine_verdicts, criterion_verdict, endpoint_mc_error, holm_adjust, \
+    kaplan_meier, logrank_parts, logrank_test, ols_slope, partial_correlation, \
+    percentile_interval, spearman
 
 PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
 PROFILE_NAMES = ("log_eps_tilde", "log_nu_tilde", "lambda_tilde", "log_noise_sens")
@@ -1131,6 +1132,7 @@ def h2a_initial_segments(w_cols: np.ndarray, small: np.ndarray, horizon_labels: 
                                                     "n_states": int(rows.size)}
     admitted_before = ok.sum(axis=1) >= 2
     return {"median_range": float(point[0]), "range_ci": interval,
+            "ci_mc_se": list(endpoint_mc_error(values[:, 0], level)),  # WU-0008.2a
             "range_n_failed_resamples": n_failed, "n_eligible_states": n_eligible,
             "n_excluded_states": int(n_states - n_eligible),
             "n_noncontiguous_states": int((admitted_before & (ok.sum(axis=1) != length)).sum()),
@@ -1224,6 +1226,7 @@ def h2a_part_ii(w_ref: np.ndarray, growth_scaled: np.ndarray, seeds: np.ndarray,
                                             H2A_PARTIAL_BAND, (False, False),
                                             n_states=domain_size[name])
         parts[name] = {"partial_corr": float(point[col]), "ci": interval,
+                       "ci_mc_se": list(endpoint_mc_error(values[:, col], level)),  # WU-0008.2a
                        "n_states": domain_size[name], "n_failed_resamples": n_failed,
                        "verdict": verdict, "reason": reason}
         verdicts.append(verdict)
@@ -1359,18 +1362,23 @@ def _missing_cells(cells: dict, wanted: list[tuple[float, int]]) -> list[str]:
 
 
 def _paired_change(low: np.ndarray, high: np.ndarray, config: StudyConfig, level: float,
-                   labels: tuple[str, ...], name: str, statistic: str = "mean"
-                   ) -> tuple[dict, str, str | None]:
+                   labels: tuple[str, ...], name: str, statistic: str = "mean",
+                   mc_error: bool = False) -> tuple[dict, str, str | None]:
     """Bootstrap interval of the mean or median of per-state paired differences ``high - low``.
 
     One index array (the moving-block resample of states) serves both cells, and the
     generator is ``make_rng(config.seed, *labels)`` (DEC-0012). Failed (non-finite)
-    resamples are counted at the unfavourable tail (DEC-0008 A3).
+    resamples are counted at the unfavourable tail (DEC-0008 A3). With ``mc_error`` the result
+    also carries ``ci_mc_se`` (``statistics.endpoint_mc_error`` on the same resample values;
+    WU-0008.2a: set only for the primary H2b(ii)); estimate and interval are those of
+    ``block_bootstrap_counted``, whose body is called here (``bootstrap_values`` then
+    ``percentile_interval``, bitwise the same).
 
     Returns
     -------
     tuple[dict, str, str | None]
-        ``{<name>, ci, level, n_states, n_failed_resamples, n_zero_difference}``, then the
+        ``{<name>, ci, level, n_states, n_failed_resamples, n_zero_difference}`` (and
+        ``ci_mc_se`` with ``mc_error``), then the
         verdict and the reason of the criterion "lower bound > 0" (strict, DEC-0008 A1) from
         ``criterion_verdict``.
     """
@@ -1378,14 +1386,17 @@ def _paired_change(low: np.ndarray, high: np.ndarray, config: StudyConfig, level
         raise ValueError(f"paired cells must hold the same states; got {low.shape}, {high.shape}")
     diff = high - low
     centre = np.mean if statistic == "mean" else np.median
-    boot = block_bootstrap_counted(lambda idx: float(centre(diff[idx])), len(diff),
-                                   config.bootstrap_resamples, config.bootstrap_block,
-                                   make_rng(config.seed, *labels), level)
-    verdict, reason = criterion_verdict(boot.estimate, boot.lower, boot.upper, (0.0, np.inf),
+    point, values = bootstrap_values(lambda idx: float(centre(diff[idx])), len(diff),
+                                     config.bootstrap_resamples, config.bootstrap_block,
+                                     make_rng(config.seed, *labels))
+    lower, upper, n_failed = percentile_interval(values, level)
+    verdict, reason = criterion_verdict(float(point), lower, upper, (0.0, np.inf),
                                         (False, True), n_states=len(diff))
-    out = {name: boot.estimate, "ci": [boot.lower, boot.upper], "level": level,
-           "n_states": int(len(diff)), "n_failed_resamples": boot.n_failed,
+    out = {name: float(point), "ci": [lower, upper], "level": level,
+           "n_states": int(len(diff)), "n_failed_resamples": n_failed,
            "n_zero_difference": int(np.count_nonzero(diff == 0.0))}
+    if mc_error:
+        out["ci_mc_se"] = list(endpoint_mc_error(values, level))
     return out, verdict, reason
 
 
@@ -1452,16 +1463,19 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     rho_levels = np.array(sorted(noise_cells))
     w_rho = np.column_stack([_split_weights(noise_cells[r], config) for r in rho_levels])
     rho_corr, n_constant = _per_state_spearman_counted(rho_levels, w_rho)
-    boot = block_bootstrap_counted(lambda idx: float(np.mean(rho_corr[idx])), len(rho_corr),
-                                   config.bootstrap_resamples, config.bootstrap_block,
-                                   config.seed + 3, PRIMARY_LEVEL)  # integer seed as _boot (salt 3)
-    est, lo, hi = boot.estimate, boot.lower, boot.upper
+    # integer seed as _boot (salt 3); the body of block_bootstrap_counted, to keep the values
+    point, noise_values = bootstrap_values(
+        lambda idx: float(np.mean(rho_corr[idx])), len(rho_corr), config.bootstrap_resamples,
+        config.bootstrap_block, config.seed + 3)
+    lo, hi, noise_failed = percentile_interval(noise_values, PRIMARY_LEVEL)
+    est = float(point)
     medians = np.median(w_rho, axis=0)
     res["noise"] = {"median_w_by_noise": dict(zip(map(str, rho_levels), medians.tolist())),
                     "mean_state_spearman": est, "ci": [lo, hi],
+                    "ci_mc_se": list(endpoint_mc_error(noise_values, PRIMARY_LEVEL)),  # WU-0008.2a
                     "monotone_medians": bool(np.all(np.diff(medians) > 0)),
-                    "n_constant_states": n_constant, "n_failed_resamples": int(boot.n_failed),
-                    "n_dropped_resamples": int(boot.n_failed)}
+                    "n_constant_states": n_constant, "n_failed_resamples": int(noise_failed),
+                    "n_dropped_resamples": int(noise_failed)}
     noise_verdict, noise_reason = criterion_verdict(est, lo, hi, (0.0, np.inf), (False, True),
                                                     n_states=len(rho_corr))
     res["noise"].update(_decision(noise_verdict, noise_reason))
@@ -1472,7 +1486,7 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     fields, verdict, reason = _unavailable(PRIMARY_LEVEL, missing, "mean_change") if missing \
         else _paired_change(*(_split_weights(library_cells[key], config) for key in wanted),
                             config, PRIMARY_LEVEL, ("h2b-library-change", f"{rho:g}"),
-                            "mean_change")
+                            "mean_change", mc_error=True)
     res["library_change"] = {**fields, "rho": rho, "n_lib": list(H2B_LIBRARY_SIZES),
                              **_decision(verdict, reason)}
 
@@ -2034,16 +2048,19 @@ def h3c_ratio(a5_state_mse: np.ndarray, a4_state_mse: np.ndarray, config: StudyC
     """
     if a5_state_mse.shape != a4_state_mse.shape or a5_state_mse.ndim != 1:
         raise ValueError(f"need two (n,) arrays; got {a5_state_mse.shape}, {a4_state_mse.shape}")
-    boot = block_bootstrap_counted(
+    # the body of block_bootstrap_counted (same seed, bitwise the same), to keep the values
+    point, values = bootstrap_values(
         lambda idx: float(a5_state_mse[idx].mean() / a4_state_mse[idx].mean()),
         len(a5_state_mse), config.bootstrap_resamples, config.bootstrap_block,
-        make_rng(config.seed, "h3c-ratio"), PRIMARY_LEVEL)
-    verdict, reason = criterion_verdict(boot.estimate, boot.lower, boot.upper,
+        make_rng(config.seed, "h3c-ratio"))
+    lower, upper, n_failed = percentile_interval(values, PRIMARY_LEVEL)
+    verdict, reason = criterion_verdict(float(point), lower, upper,
                                         (-np.inf, H3C_BOUND), (True, True),
                                         n_states=len(a5_state_mse))
-    return {"A5_over_A4_mse": _finite_or_none(boot.estimate), "ci": [boot.lower, boot.upper],
+    return {"A5_over_A4_mse": _finite_or_none(float(point)), "ci": [lower, upper],
+            "ci_mc_se": list(endpoint_mc_error(values, PRIMARY_LEVEL)),  # WU-0008.2a
             "level": PRIMARY_LEVEL, "n_states": int(len(a5_state_mse)),
-            "n_failed_resamples": boot.n_failed, "threshold": H3C_BOUND,
+            "n_failed_resamples": n_failed, "threshold": H3C_BOUND,
             **_decision(verdict, reason)}
 
 

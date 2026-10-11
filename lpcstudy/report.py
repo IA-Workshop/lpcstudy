@@ -16,6 +16,16 @@ from .allocation import RULE_LABELS  # noqa: E402
 from .config import StudyConfig  # noqa: E402
 from .identifiers import HYPOTHESIS_TABLE, Hypothesis, check_keys  # noqa: E402
 from .statistics import overall_verdict  # noqa: E402
+# --- WU-0008.3 begin ---
+from .budget import (caption_figure, figure_caption_lines, interval_label_lines,  # noqa: E402
+                     v4_label_line)
+# --- WU-0008.3 end ---
+# --- WU-0008.4 begin ---
+from .budget import qoi_declaration_lines  # noqa: E402
+# --- WU-0008.4 end ---
+# --- WU-0008.1 begin ---
+from .budget import budget_lines  # noqa: E402
+# --- WU-0008.1 end ---
 
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7",
           "#e34948"]
@@ -693,6 +703,12 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
         overall = ver[row.key]["verdict"] + (f" (missing: {', '.join(missing)})" if missing else "")
         lines.append(f"| {row.v3_id} | {HYPOTHESES[row.key]} | " + " | ".join(cells)
                      + f" | {overall} |")
+    # --- WU-0008.3 begin ---
+    lines += interval_label_lines(results, systems, config)
+    # --- WU-0008.3 end ---
+    # --- WU-0008.4 begin ---
+    lines += ["", *qoi_declaration_lines(config)]
+    # --- WU-0008.4 end ---
 
     lines += ["", "## Allocation rules at the core cell (test split)", ""]
     for s in systems:
@@ -724,12 +740,18 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
             cells.append(_fmt(value, 3) + flag)
         lines.append(f"| {label} | {criterion} | " + " | ".join(cells) + " |")
     lines += _v7_rows(results, systems, config)
+    # --- WU-0008.3 begin ---
+    lines += ["", v4_label_line(config)]
+    # --- WU-0008.3 end ---
     lines += ["", "### Largest Lyapunov exponent against published values", "",
               *_lyapunov_lines(results, systems)]
     lines += ["", "### Theorem P2(c) bound (verification check, not a hypothesis)", "",
               *_p2c_lines(results, systems)]
     lines += ["", "### Levenberg–Marquardt diagnostics (verification, NVVUQ.10; not a hypothesis)",
               "", *_lm_lines(results, systems, config)]
+    # --- WU-0008.1 begin ---
+    lines += ["", *budget_lines(results, systems, config)]
+    # --- WU-0008.1 end ---
 
     if "robustness" in results:
         lines += ["", "## Robustness (core cell)", ""]
@@ -753,6 +775,9 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
                         f"{_fmt(100 * v['A5_regret_ratio'], 3)}% | "
                         f"{_fmt(v['H1b']['CP']['slope'], 3)} | {_fmt(v['H1b']['PLP']['slope'], 3)} |")
 
+    # --- WU-0008.3 begin ---
+    lines += ["", *figure_caption_lines(config)]
+    # --- WU-0008.3 end ---
     lines += ["", *handling_lines(results, systems)]  # WU-0002.11b: Handling section
     path.write_text("\n".join(lines) + "\n")
 
@@ -802,6 +827,9 @@ def make_figures(results: dict, config: StudyConfig, out_dir: Path) -> list[Path
                title=f"{s}: median and IQR of w*(s, H)", ylim=(0, 1))
         _style(ax)
     fig.tight_layout()
+    # --- WU-0008.3 begin ---
+    caption_figure(fig, "separation_weight_vs_horizon.png", config)
+    # --- WU-0008.3 end ---
     path = out_dir / "separation_weight_vs_horizon.png"
     fig.savefig(path, dpi=150)
     plt.close(fig)
@@ -819,6 +847,9 @@ def make_figures(results: dict, config: StudyConfig, out_dir: Path) -> list[Path
         ax.legend(frameon=False, fontsize=7, ncol=2, labelcolor=INK_2)
         _style(ax)
     fig.tight_layout()
+    # --- WU-0008.3 begin ---
+    caption_figure(fig, "kaplan_meier_by_rule.png", config)
+    # --- WU-0008.3 end ---
     path = out_dir / "kaplan_meier_by_rule.png"
     fig.savefig(path, dpi=150)
     plt.close(fig)
@@ -839,6 +870,9 @@ def make_figures(results: dict, config: StudyConfig, out_dir: Path) -> list[Path
                title=f"{s}: abstraction regret (dotted: 5% criterion)")
         _style(ax)
     fig.tight_layout()
+    # --- WU-0008.3 begin ---
+    caption_figure(fig, "regret_vs_regimes.png", config)
+    # --- WU-0008.3 end ---
     path = out_dir / "regret_vs_regimes.png"
     fig.savefig(path, dpi=150)
     plt.close(fig)
@@ -856,6 +890,9 @@ def make_figures(results: dict, config: StudyConfig, out_dir: Path) -> list[Path
         ax.legend(frameon=False, fontsize=7, labelcolor=INK_2)
         _style(ax)
     fig.tight_layout()
+    # --- WU-0008.3 begin ---
+    caption_figure(fig, "knob_response_library.png", config)
+    # --- WU-0008.3 end ---
     path = out_dir / "knob_response_library.png"
     fig.savefig(path, dpi=150)
     plt.close(fig)

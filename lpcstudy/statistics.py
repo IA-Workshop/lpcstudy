@@ -392,6 +392,80 @@ def block_bootstrap_counted(statistic: Callable[[np.ndarray], float], n_items: i
                              n_failed=n_failed, n_resamples=int(values.size), level=level)
 
 
+def endpoint_mc_error(values: np.ndarray, level: float) -> tuple[float | None, float | None]:
+    """Monte Carlo standard error of the two endpoints of a percentile interval (WU-0008.2a).
+
+    **Needs owner review before freeze** (statistics code).
+
+    The error of the endpoint at percentile ``q`` from using ``B`` resamples instead of
+    infinitely many, given the data (it is not sampling error). The rank of the ``q``-quantile of
+    the bootstrap distribution among ``B`` resamples is Binomial(B, q), so the empirical CDF has
+    standard deviation ``d = sqrt(q (1 - q) / B)`` there; ``(Q(q + d) - Q(q - d)) / 2``, with ``Q``
+    the empirical quantile (``np.quantile``, linear), is the half-length of the one-standard-error
+    order-statistic interval, which estimates ``d / f(F^-1(q))``, the asymptotic SD of the endpoint
+    (Bahadur). ``q`` is ``a = (1 - level) / 2`` and ``1 - a``; ``d`` is the same at both. The
+    quantiles are taken on the same array as ``percentile_interval`` uses: a failed resample is
+    replaced by the finite minimum for the lower endpoint and by the finite maximum for the upper
+    (the failure count is the ``n_failed`` of the interval; nothing is dropped).
+
+    Both values are ``None`` (never a number) when any of these holds:
+
+    1. the bound is infinite by the A3 rule (``percentile_interval`` returns an infinite pair);
+    2. failed resamples reach the binomial window: their count is at least
+       ``floor((B - 1) (a - d)) + 1``, so ``Q(q - d)`` (lower) or ``Q(q + d)`` (upper) would weigh a
+       failed value and the bound could become infinite under another seed (at ``B = 2000`` the
+       counts are 43 at level 0.95 and 13 at ``1 - 0.05/3``, against bound thresholds 50 and 17);
+    3. the window leaves ``(0, 1)``: ``q - d <= 0`` or ``q + d >= 1`` (``B = 50`` at
+       ``1 - 0.05/3``).
+
+    A value of exactly 0 means a tie: the endpoint sits on an atom of the bootstrap distribution.
+
+    Parameters
+    ----------
+    values : np.ndarray
+        All ``B`` resampled values of a scalar statistic, failed ones included, 1-D.
+    level : float
+        Confidence level in (0, 1).
+
+    Returns
+    -------
+    tuple[float | None, float | None]
+        Standard error of the lower and of the upper endpoint, in the units of the statistic.
+
+    Raises
+    ------
+    ValueError
+        If ``values`` is not 1-D and non-empty or ``level`` is outside (0, 1).
+    """
+    resampled = np.asarray(values, dtype=float)
+    if resampled.ndim != 1 or resampled.size == 0:
+        raise ValueError(f"values must be a non-empty 1-D array; got shape {resampled.shape}")
+    if not 0.0 < level < 1.0:
+        raise ValueError(f"level must lie in (0, 1); got {level}")
+    n_resamples = resampled.size
+    alpha = (1.0 - level) / 2.0
+    spread = float(np.sqrt(alpha * (1.0 - alpha) / n_resamples))
+    failed = ~np.isfinite(resampled)
+    n_failed = int(failed.sum())
+    if n_failed >= int(np.floor((n_resamples - 1) * alpha)) + 1:  # rule 1
+        return None, None
+    if alpha - spread <= 0.0 or (1.0 - alpha) + spread >= 1.0:  # rule 3
+        return None, None
+    if n_failed >= int(np.floor((n_resamples - 1) * (alpha - spread))) + 1:  # rule 2
+        return None, None
+    if n_failed:
+        finite = resampled[~failed]
+        lower_values = np.where(failed, finite.min(), resampled)
+        upper_values = np.where(failed, finite.max(), resampled)
+    else:
+        lower_values = upper_values = resampled
+
+    def half_range(array: np.ndarray, q: float) -> float:
+        return float((np.quantile(array, q + spread) - np.quantile(array, q - spread)) / 2.0)
+
+    return half_range(lower_values, alpha), half_range(upper_values, 1.0 - alpha)
+
+
 def interval_verdict(lower: float, upper: float, band: tuple[float, float],
                      closed: tuple[bool, bool] = (True, True)) -> Verdict:
     """Verdict of an interval against a band (DEC-0008 A1; v3 section 2).

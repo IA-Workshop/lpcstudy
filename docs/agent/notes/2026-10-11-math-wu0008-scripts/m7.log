@@ -1,0 +1,14 @@
+C3 (H2a(i))                      phi 0  : p 0.984 +- 0.0040; z_obs 2.409 (nom 2.394); shortfall -0.006 +- 0.037
+C3 (H2a(i))                      phi 0.3: p 0.973 +- 0.0051; z_obs 2.212 (nom 2.394); shortfall +0.083 +- 0.036
+C7 (H2a(ii) interior)            phi 0  : p 0.972 +- 0.0052; z_obs 2.197 (nom 2.394); shortfall +0.090 +- 0.036
+C7 (H2a(ii) interior)            phi 0.3: p 0.977 +- 0.0047; z_obs 2.273 (nom 2.394); shortfall +0.053 +- 0.036
+C1 (n=500 mean)                  phi 0  : p 0.983 +- 0.0041; z_obs 2.387 (nom 2.394); shortfall +0.003 +- 0.037
+C1 (n=500 mean)                  phi 0.3: p 0.969 +- 0.0055; z_obs 2.157 (nom 2.394); shortfall +0.110 +- 0.036
+C8 (H2b(ii); H2b(i) proposed)    phi 0  : p 0.987 +- 0.0036; z_obs 2.484 (nom 2.394); shortfall -0.036 +- 0.038
+C8 (H2b(ii); H2b(i) proposed)    phi 0.3: p 0.972 +- 0.0052; z_obs 2.197 (nom 2.394); shortfall +0.090 +- 0.036
+C4 (H3c)                         phi 0  : p 0.971 +- 0.0053; z_obs 2.183 (nom 2.394); shortfall +0.096 +- 0.036
+C4 (H3c)                         phi 0.3: p 0.961 +- 0.0061; z_obs 2.064 (nom 2.394); shortfall +0.160 +- 0.036
+C4h sigma 1.5, phi 0            : p 0.965 +- 0.0058; shortfall +0.135 +- 0.036
+C4h sigma 2, phi 0              : p 0.984 +- 0.0040; shortfall -0.006 +- 0.037
+shortfall 0.05 <=> coverage 0.9774
+shortfall 0.10 <=> coverage 0.9705

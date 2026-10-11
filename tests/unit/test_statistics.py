@@ -15,8 +15,9 @@ from scipy import stats as sps
 
 from lpcstudy.statistics import MIN_STATES, V3_SYSTEMS, BootstrapInterval, block_bootstrap, \
     block_bootstrap_counted, block_bootstrap_dropped, block_resample_indices, bootstrap_values, \
-    combine_verdicts, criterion_verdict, holm_adjust, interval_verdict, kaplan_meier, \
-    logrank_parts, logrank_test, overall_verdict, partial_correlation, percentile_interval
+    combine_verdicts, criterion_verdict, endpoint_mc_error, holm_adjust, interval_verdict, \
+    kaplan_meier, logrank_parts, logrank_test, overall_verdict, partial_correlation, \
+    percentile_interval
 
 
 def test_kaplan_meier_matches_geometric_survival() -> None:
@@ -898,3 +899,123 @@ def test_kaplan_meier_empty_input_is_all_ones_with_nan_median() -> None:
     assert np.array_equal(curve.times, np.arange(1, 7))
     assert math.isnan(curve.median())
     assert curve.restricted_mean() == 6.0
+
+
+# ------------------------------------------------------- WU-0008.2a: endpoint_mc_error (E1 to E3)
+
+PRIMARY_LEVEL = 1.0 - 0.05 / 3.0  # v3 section 7, written out again here
+
+
+def test_endpoint_mc_error_on_the_deterministic_normal_grid_within_2_percent() -> None:
+    """E1: on values Phi^-1((i - 1/2)/B), B = 2000, the SE equals sqrt(q(1-q)/B)/phi(z_q) (2%).
+
+    Reference: the asymptotic SD of a sample quantile, d / f(F^-1(q)) with d = sqrt(q (1 - q)/B)
+    and f the standard normal density (``statistics.NormalDist``, independent of the helper), at
+    the levels 0.95 and 1 - 0.05/3, both endpoints. Tolerance 2% relative: the central difference's
+    curvature term (+0.52% at 95%, +1.72% at 1 - 0.05/3) is partly cancelled by the grid's
+    discreteness, leaving -0.33% and -0.91% (applied-mathematician's calculation, WU-0008 M2),
+    so 2% is 2.2 times the larger deviation; a formula error (a missing /2, n for B, a wrong q)
+    is at least 29% off.
+    """
+    from statistics import NormalDist
+
+    normal = NormalDist()
+    n_resamples = 2000
+    grid = np.array([normal.inv_cdf((i - 0.5) / n_resamples) for i in range(1, n_resamples + 1)])
+    for level in (0.95, PRIMARY_LEVEL):
+        alpha = (1.0 - level) / 2.0
+        found = endpoint_mc_error(grid, level)
+        for q, se in zip((alpha, 1.0 - alpha), found):
+            expected = math.sqrt(q * (1.0 - q) / n_resamples) / normal.pdf(normal.inv_cdf(q))
+            assert se is not None and abs(se / expected - 1.0) < 0.02, (level, q)
+
+
+def test_endpoint_mc_error_median_over_100_bootstraps_matches_the_endpoint_sd() -> None:
+    """E2 (replaced by the applied-mathematician, DEC-0024): median helper SE within 1.4 of the SD.
+
+    Reference: one data set, a Gaussian AR(1) with phi = 0.3, n = 500, from
+    ``make_rng(8008, "wu0008", "nested")``; the mean statistic, moving blocks of 5, B = 2000,
+    R = 100 bootstraps with independent seeds on the same data; the reference is the sample SD over
+    the 100 repetitions of each of the four endpoints (95% and 1 - 0.05/3, lower and upper), found
+    with ``percentile_interval``. The helper's value is the median over the 100 repetitions of its
+    SE. Tolerance, factor 1.4: log(median ratio) has mean -0.02 and SD 0.08 over simulated data
+    sets (WU-0008 M2), so a correct helper fails with probability about 2e-4 (None of 1000
+    simulated sets failed); the seeds are fixed here and not changed. A single first-bootstrap
+    ratio is NOT asserted (a correct helper fails that with probability 0.13); it is printed in the
+    message.
+    """
+    from lpcstudy.data import make_rng
+
+    n_items, block, n_resamples, repetitions, phi = 500, 5, 2000, 100, 0.3
+    shocks = make_rng(8008, "wu0008", "nested").standard_normal(n_items)
+    x = np.empty(n_items)
+    x[0] = shocks[0]
+    for t in range(1, n_items):
+        x[t] = phi * x[t - 1] + math.sqrt(1.0 - phi**2) * shocks[t]
+    levels = (0.95, PRIMARY_LEVEL)
+    endpoints = np.empty((repetitions, 4))
+    helper = np.empty((repetitions, 4))
+    for r in range(repetitions):
+        _, values = bootstrap_values(lambda idx: float(x[idx].mean()), n_items, n_resamples,
+                                     block, make_rng(8008, "wu0008", "nested-boot", r))
+        for j, level in enumerate(levels):
+            lo, hi, failed = percentile_interval(values, level)
+            assert failed == 0
+            endpoints[r, 2 * j], endpoints[r, 2 * j + 1] = lo, hi
+            helper[r, 2 * j:2 * j + 2] = endpoint_mc_error(values, level)
+    ratio = np.median(helper, axis=0) / endpoints.std(axis=0, ddof=1)
+    first = helper[0] / endpoints.std(axis=0, ddof=1)
+    assert np.all((ratio > 1.0 / 1.4) & (ratio < 1.4)), (ratio, "first bootstrap:", first)
+
+
+def test_endpoint_mc_error_is_none_when_failures_reach_the_window_or_the_window_leaves_0_1() -> None:
+    """E3: the None rules of DEC-0024 and the finite case just below them.
+
+    Reference: hand thresholds at B = 2000, level 1 - 0.05/3 (a = 0.008333, d = 0.0020326): the
+    bound is infinite at 17 failures (``percentile_interval``, floor(1999 a) + 1), the binomial
+    window reaches a failure at 13 (floor(1999 (a - d)) + 1 = floor(12.595) + 1); with 12 failures
+    both are finite and the SE equals a hand evaluation of the formula on the array with the
+    failures replaced by the finite minimum (lower) and maximum (upper), wherever the failures sit.
+    That expected value re-evaluates the helper's own formula, so it is not an independent check
+    of the formula (E1 and E2 are); what it checks is the boundary (12 finite, 13 None) and the
+    replacement semantics (position of the failures does not matter).
+    At B = 50 and 1 - 0.05/3 the window leaves (0, 1) (q - d < 0), at 95% it does not. All failed
+    gives None. A constant array (an atom at both endpoints) gives exactly 0. Exact.
+    """
+    from statistics import NormalDist
+
+    normal = NormalDist()
+    n_resamples = 2000
+    grid = np.array([normal.inv_cdf((i - 0.5) / n_resamples) for i in range(1, n_resamples + 1)])
+
+    def with_failures(count: int, seed: int = 5) -> np.ndarray:
+        values = grid.copy()
+        values[np.random.default_rng(seed).choice(n_resamples, count, replace=False)] = np.nan
+        return values
+
+    assert percentile_interval(with_failures(17), PRIMARY_LEVEL)[:2] == (-math.inf, math.inf)
+    assert all(math.isfinite(b) for b in percentile_interval(with_failures(13), PRIMARY_LEVEL)[:2])
+    assert endpoint_mc_error(with_failures(17), PRIMARY_LEVEL) == (None, None)  # bound infinite
+    assert endpoint_mc_error(with_failures(13), PRIMARY_LEVEL) == (None, None)  # window reached
+    assert endpoint_mc_error(with_failures(43), 0.95) == (None, None)
+    assert all(se is not None for se in endpoint_mc_error(with_failures(42), 0.95))
+    for seed in (5, 6):  # position of the failures does not matter
+        values = with_failures(12, seed)
+        failed = np.isnan(values)
+        finite = values[~failed]
+        alpha = (1.0 - PRIMARY_LEVEL) / 2.0
+        d = math.sqrt(alpha * (1.0 - alpha) / n_resamples)
+        low = np.where(failed, finite.min(), values)
+        high = np.where(failed, finite.max(), values)
+        expected = ((np.quantile(low, alpha + d) - np.quantile(low, alpha - d)) / 2,
+                    (np.quantile(high, 1 - alpha + d) - np.quantile(high, 1 - alpha - d)) / 2)
+        assert endpoint_mc_error(values, PRIMARY_LEVEL) == expected
+    few = np.random.default_rng(1).standard_normal(50)
+    assert endpoint_mc_error(few, PRIMARY_LEVEL) == (None, None)  # q - d <= 0 at B = 50
+    assert all(se is not None and se > 0 for se in endpoint_mc_error(few, 0.95))  # window inside
+    assert endpoint_mc_error(np.full(10, np.nan), 0.95) == (None, None)
+    assert endpoint_mc_error(np.zeros(2000), 0.95) == (0.0, 0.0)
+    with pytest.raises(ValueError):
+        endpoint_mc_error(np.zeros((3, 3)), 0.95)
+    with pytest.raises(ValueError):
+        endpoint_mc_error(np.zeros(100), 1.0)

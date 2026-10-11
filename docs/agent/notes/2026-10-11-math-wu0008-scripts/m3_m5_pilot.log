@@ -1,0 +1,29 @@
+expected endpoint SE / half-width at level 0.9500: B=500: 0.0610; B=2000: 0.0305
+expected endpoint SE / half-width at level 0.9833: B=500: 0.0747; B=2000: 0.0374
+== lorenz63: V4 h=0.0370 a=0.0303 s_med=0.0189 s_mean=0.0438; V6=3.93e-05
+  H2a(i) est 0.1144 ci [0.0839, 0.1581] hw 0.0371; F1 0.0320 = 0.86 hw; lower - F1 = 0.0519
+  H2a(ii) zero: est -0.0621 ci [-0.1551, 0.0508] hw 0.1030 n 500
+  H2a(ii) interior: est 0.1063 ci [-0.014, 0.2226] hw 0.1183 n 334
+  H2b(i) est 0.2351 hw 0.0976
+  H2b(ii) est 0.0537 hw 0.0413; F2 0.0086 = 0.21 hw; hw at M=inf >= 0.0404
+  H3c est 0.7957 ci [0.4594, 1.3413] hw 0.4409
+  proxy (H3c): A4_vs_A4o -0.439, A5_vs_Astar 0.097; H1d analog_seed 0.769, estimation_seed 0.821, growth 0.983, nhat 0.684
+== rossler: V4 h=0.0390 a=0.0167 s_med=0.0199 s_mean=0.0241; V6=3.31e-05
+  H2a(i) est 0.2738 ci [0.2111, 0.3303] hw 0.0596; F1 0.0337 = 0.57 hw; lower - F1 = 0.1774
+  H2a(ii) zero: est -0.1177 ci [-0.2206, -0.0056] hw 0.1075 n 500
+  H2a(ii) interior: est 0.1132 ci [-0.0015, 0.2237] hw 0.1126 n 347
+  H2b(i) est 0.1645 hw 0.0911
+  H2b(ii) est 0.0786 hw 0.0378; F2 0.0047 = 0.12 hw; hw at M=inf >= 0.0375
+  H3c est 0.9086 ci [0.849, 0.973] hw 0.0620
+  proxy (H3c): A4_vs_A4o -0.680, A5_vs_Astar 0.108; H1d analog_seed 0.736, estimation_seed 0.957, growth 0.994, nhat 0.628
+== chua: V4 h=0.0308 a=0.0159 s_med=0.0157 s_mean=0.0230; V6=7.54e-05
+  H2a(i) est 0.1727 ci [0.1135, 0.2358] hw 0.0611; F1 0.0266 = 0.43 hw; lower - F1 = 0.0870
+  H2a(ii) zero: est -0.0177 ci [-0.129, 0.0768] hw 0.1029 n 500
+  H2a(ii) interior: est 0.1277 ci [-0.0204, 0.2711] hw 0.1458 n 352
+  H2b(i) est 0.2531 hw 0.0917
+  H2b(ii) est 0.0550 hw 0.0459; F2 0.0045 = 0.10 hw; hw at M=inf >= 0.0456
+  H3c est 0.9085 ci [0.5714, 1.0355] hw 0.2321
+  proxy (H3c): A4_vs_A4o -0.395, A5_vs_Astar 0.285; H1d analog_seed 0.679, estimation_seed 0.912, growth 0.968, nhat 0.685
+platform: 2355 N2 + 103 N3 leaves; max relative, continuous non-weight-profile leaves (fitted coefficients excluded): [(5.977089728269019e-05, 'systems/chua/H2d/in_distribution_excess'), (5.977089728269019e-05, 'systems/chua/H2d/in_distribution_excess'), (3.28261510192733e-05, 'systems/lorenz63/H2c/A4_minus_A1/ci/[1]')]
+  weight_profile up to 4 LT (120 steps): (9.472255788954245e-06, 'systems/lorenz63/weight_profile/median/[85]'); all weight_profile: (0.00013351089962642025, 'systems/chua/weight_profile/median/[213]')
+  discrete-event leaves (gain_bound): [(0.32692307692307676, 'systems/lorenz63/gain_bound/max_gain_lyapunov'), (0.32692307692307676, 'systems/lorenz63/gain_bound/max_gain_lyapunov'), (0.006578947368421115, 'systems/rossler/gain_bound/fraction_within_bound')]
