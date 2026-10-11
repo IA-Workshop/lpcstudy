@@ -13,29 +13,47 @@ paths (2000 + 1000); test: one path of 1000.
 v2 E3), so the interval is for the conditional gain
 Delta_cond = [E(Y - f3)^2 - E(Y - f4)^2] / Var(Y) of the fitted pair over a new stationary state in the
 target's domain, not for the population gain 0. Under the null Delta_cond has a negative mean (the
-learner pays for an irrelevant feature): reference -0.0023 (logit) and -0.0035 (indicator), positive in
-15% and 21% of training sets.
+learner pays for an irrelevant feature): reference (A9, phi 0) -0.0024 (logit) and -0.0032 (indicator), positive in
+17% and 22% of training sets.
+
+**Reference** (addendum A9, 2026-10-11: production ``qn_profile_block`` at these sizes, R_ref = 1000 per
+phi, scratch seed 20261014; it replaces the R_ref = 200 values of the review's M4 and was made after
+run 2, VV.3, without using the run-2 counts). Rates with their standard errors (0.003 to 0.009), the
+probability that the bound fails at R = 500 for correct code, and the consistency range of the count
+out of 500:
+
+| phi | target | N1: P(0 in CI) | P(N1 fails) | N1 range | N2: P(lo > 0) | P(N2 fails) | N2 range | N3: coverage | P(N3 fails) | N3 range |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | logit | 0.919 | 0.54 | 431-483 | 0.016 | 0.000 | 0-23 | 0.941 | 0.066 | 446-490 |
+| 0 | indicator | 0.933 | 0.19 | 440-487 | 0.019 | 0.001 | 0-25 | 0.945 | 0.033 | 448-491 |
+| 0.3 | logit | 0.924 | 0.41 | 434-484 | 0.009 | 0.000 | 0-16 | 0.946 | 0.028 | 449-491 |
+| 0.3 | indicator | 0.926 | 0.35 | 436-485 | 0.014 | 0.000 | 0-21 | 0.945 | 0.033 | 448-491 |
 
 **Rows.**
 
 * N1 (ROADMAP as written): the 95% interval contains 0, for ``logit_w_interior`` and
-  ``w_zero_indicator``, >= 461 of 500 (0.921, SE 0.00975). Reference P(contains 0) 0.925 (logit) and
-  0.890 (indicator): predicted P(fail) 0.42 and 0.88. This is an estimand mismatch, not a defect.
-  Asserted while ``ASSERT_ROADMAP_BOUNDS`` is True (Option K).
-* N2 (always asserted): false "distinct", P(lower bound > 0) <= 22 of 500 (0.045946, SE 0.00698).
-  Reference 0.020 and 0.035; predicted P(fail) < 0.01.
-  TO BE REPLACED by the 3000/1000 reference: this P(fail) holds only at 900/1000 states (applied-
-  mathematician's addendum A7, item 1); a 3000/1000 reference is being produced.
-* N3 (always asserted): coverage of Delta_cond, truth computed from the returned fitted pair on 10^5
-  fresh i.i.d. stationary states (Monte Carlo error 0.05 of the half-width on average), >= 461 of 500.
-  Reference 0.960 and 0.925 (R_ref 200, indicative); predicted P(fail) about 0.03.
-  TO BE REPLACED by the 3000/1000 reference: this P(fail) holds only at 900/1000 states (addendum A7,
-  item 2); R_ref 200 is too small to pre-register N2 and N3 at these sizes.
+  ``w_zero_indicator``, >= 461 of 500 (0.921, SE 0.00975). Predicted P(fail) 0.19 to 0.54 per row,
+  an estimand mismatch, not a defect.
+* N2: false "distinct", P(lower bound > 0) <= 22 of 500 (0.045946, SE 0.00698). Predicted P(fail)
+  at most 0.001 per row.
+* N3: coverage of Delta_cond, truth computed from the returned fitted pair on 10^5 fresh i.i.d.
+  stationary states (Monte Carlo error 0.05 of the half-width on average), >= 461 of 500. Predicted
+  P(fail) 0.03 to 0.07 per row (the block-5 percentile interval covers Delta_cond at 0.941 to 0.946,
+  2.0 to 2.4 SE above the bound).
+* The nominal bounds of N1, N2 and N3 are asserted while ``ASSERT_ROADMAP_BOUNDS`` is True (Option K;
+  DEC-0018, main-session decision after addendum A9; before it N2 and N3 were always asserted).
+  Over the 8 N2 and N3 rows a correct implementation fails at least one with probability about 0.15 per
+  run (almost all from N3): such a failure at a count inside its range is a predicted finding of class
+  "method", not a defect.
+* Consistency (always asserted, any switch position): each of the 12 counts lies in its range above,
+  the defect test; family-wise false alarm at most 12 x 0.0005 = 0.6%. The ranges are fixed after run 2
+  (VV.3); their first use as an assertion is the next run, a genuine pre-registration (the run-2
+  counts lie inside all 12).
 * Exact: refitting ``qn_regressor(seed)`` on the same data reproduces the returned ``delta_r2``
   bitwise in every replication.
 
 Failed resamples, the reading frequencies, Delta_cond moments and the half-width are written to
-``runs/tests/wu0006_delta_r2.json`` and compared with the reference there (R_ref 200 at phi = 0).
+``runs/tests/wu0006_delta_r2.json`` and compared with the reference there.
 """
 
 from __future__ import annotations
@@ -67,22 +85,37 @@ def test_refit_reproduces_the_returned_gain_bitwise(pool, cache: wu.RunCache, ph
 
 
 @pytest.mark.parametrize("phi", wu.PHIS)
-def test_false_distinct_rate_and_conditional_coverage(pool, cache: wu.RunCache,
-                                                      phi: float) -> None:
+@pytest.mark.parametrize("target", wu.DELTA_TARGETS)
+@pytest.mark.parametrize("row", ("n1", "n2", "n3"))
+def test_count_is_consistent_with_the_reference(pool, cache: wu.RunCache, row: str, target: str,
+                                                phi: float) -> None:
+    """The count of N1, N2 or N3 lies in its pre-registered range (addendum A9: central 0.9995 of
+    Bin(500, p_ref) mixed over the reference's error, R_ref = 1000). Always asserted; a count outside
+    is a defect candidate (DEF class "code")."""
+    evaluation = cache.delta(pool, phi)
+    assert evaluation.consistency_rows[f"{row}|{target}"] is None, \
+        evaluation.consistency_rows[f"{row}|{target}"]
+
+
+@pytest.mark.parametrize("phi", wu.PHIS)
+def test_roadmap_false_distinct_rate_and_conditional_coverage(pool, cache: wu.RunCache,
+                                                              phi: float) -> None:
     """N2 (P(lower > 0) <= 22 of 500) and N3 (coverage of Delta_cond >= 461 of 500), both targets.
 
-    Nominal -/+ 3 SE with R = 500: 0.045946 and 0.92076 (rounded up to the ROADMAP's 0.921). Always
-    asserted, in both Option K and Option C."""
+    Nominal -/+ 3 SE with R = 500: 0.045946 and 0.92076 (rounded up to the ROADMAP's 0.921). Predicted
+    P(fail) per row: N2 at most 0.001, N3 0.03 to 0.07 (module table). Under the switch since
+    addendum A9: asserted under Option K, only recorded under Option C."""
     evaluation = cache.delta(pool, phi)
-    assert not evaluation.always, "; ".join(evaluation.always)
+    failures = [m for m in evaluation.roadmap if " N2 " in m or " N3 " in m]
+    assert wu.enforce(failures) in ("pass", "fail")
 
 
 @pytest.mark.parametrize("phi", wu.PHIS)
 def test_roadmap_interval_contains_zero(pool, cache: wu.RunCache, phi: float) -> None:
     """N1 as the ROADMAP words it: the 95% interval contains 0 in >= 461 of 500 replications.
 
-    Predicted to fail (estimand mismatch: the interval is for Delta_cond, whose mean is negative under
-    the null). A failure is a finding for the owner, who may amend the ROADMAP row to N2 and N3
-    (DEC-0018), and is never tuned away. Under Option C the outcome is only recorded."""
+    Predicted P(fail) 0.19 to 0.54 per row (estimand mismatch: the interval is for Delta_cond, whose
+    mean is negative under the null). A failure is a finding for the owner, who may amend the ROADMAP
+    row (DEC-0018), and is never tuned away. Under Option C the outcome is only recorded."""
     evaluation = cache.delta(pool, phi)
-    assert wu.enforce(evaluation.roadmap) in ("pass", "fail")
+    assert wu.enforce([m for m in evaluation.roadmap if " N1 " in m]) in ("pass", "fail")

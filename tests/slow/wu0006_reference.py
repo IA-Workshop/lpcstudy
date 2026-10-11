@@ -135,14 +135,37 @@ CHARACTERIZATION_REFERENCE: dict[str, tuple[float, float]] = {
 }
 CHARACTERIZATION_R_REF = 20_000
 
-# --- Null delta R^2 (note M4; production qn_profile_block; reference R = 200 per row, indicative) ---
-# (sizes, target) -> mean conditional gain, SD, P(gain > 0), mean half-width, N1, N2, N3, P("reduces")
-DELTA_R2_REFERENCE: dict[str, dict[str, float]] = {
-    "logit_w_interior": {"mean_gain": -0.0023, "sd_gain": 0.0024, "p_gain_positive": 0.15,
-                         "half_width": 0.0155, "n1": 0.925, "n2": 0.020, "n3": 0.960,
-                         "p_reduces": 0.980},
-    "w_zero_indicator": {"mean_gain": -0.0035, "sd_gain": 0.0043, "p_gain_positive": 0.21,
-                         "half_width": 0.0253, "n1": 0.890, "n2": 0.035, "n3": 0.925,
-                         "p_reduces": 0.960},
+# --- Null delta R^2 (addendum A9; production qn_profile_block; 3000 / 1000 states) ---
+# 2026-10-11 replacement (applied-mathematician, addendum A9; a documented correction made AFTER test
+# run 2, VV.3; the derivation does not use the run-2 counts). The first version of this table was the
+# R_ref = 200 run of the review's M4 (phi = 0 only, seed 20261011, indicative), kept here:
+#   logit_w_interior: mean_gain -0.0023, sd 0.0024, P(gain > 0) 0.15, half_width 0.0155,
+#                     N1 0.925, N2 0.020, N3 0.960, P("reduces") 0.980
+#   w_zero_indicator: mean_gain -0.0035, sd 0.0043, P(gain > 0) 0.21, half_width 0.0253,
+#                     N1 0.890, N2 0.035, N3 0.925, P("reduces") 0.960
+# Its failure probabilities (N2 0.25, N3 0.42 for the indicator) came from tail draws of that small
+# run and are retracted (A9).
+# New table: R_ref = 1000 per phi (scratch seed 20261014, 8 single-thread workers). For each
+# (phi, target): the reference rates of the three rows with their standard errors, the probability
+# that the slow test's bound fails at R = 500 (N1 and N3 >= 461, N2 <= 22) for correct code, and
+# the consistency range of the count out of 500 (central 1 - 0.0005 of Bin(500, p) mixed over the
+# reference's error; the always-asserted defect test).
+DELTA_R2_REFERENCE_R = 1000
+DELTA_R2_REFERENCE: dict[tuple[str, str], dict[str, object]] = {
+    ("0", "logit_w_interior"): {
+        "mean_gain": -0.0024, "p_gain_positive": 0.169, "half_width": 0.0156,
+        "n1": (0.919, 0.009, 0.54, (431, 483)), "n2": (0.016, 0.004, 0.000, (0, 23)),
+        "n3": (0.941, 0.007, 0.066, (446, 490))},
+    ("0", "w_zero_indicator"): {
+        "mean_gain": -0.0032, "p_gain_positive": 0.218, "half_width": 0.0251,
+        "n1": (0.933, 0.008, 0.19, (440, 487)), "n2": (0.019, 0.004, 0.001, (0, 25)),
+        "n3": (0.945, 0.007, 0.033, (448, 491))},
+    ("0.3", "logit_w_interior"): {
+        "mean_gain": -0.0025, "p_gain_positive": 0.125, "half_width": 0.0155,
+        "n1": (0.924, 0.008, 0.41, (434, 484)), "n2": (0.009, 0.003, 0.000, (0, 16)),
+        "n3": (0.946, 0.007, 0.028, (449, 491))},
+    ("0.3", "w_zero_indicator"): {
+        "mean_gain": -0.0034, "p_gain_positive": 0.203, "half_width": 0.0251,
+        "n1": (0.926, 0.008, 0.35, (436, 485)), "n2": (0.014, 0.004, 0.000, (0, 21)),
+        "n3": (0.945, 0.007, 0.033, (448, 491))},
 }
-DELTA_R2_REFERENCE_R = 200

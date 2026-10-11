@@ -89,12 +89,13 @@ from wu0006_reference import (
 
 # ------------------------------------------------------------------------------------ constants
 ASSERT_ROADMAP_BOUNDS = True
-"""Option K of DEC-0018: the ROADMAP-bound rows (A1, A2, A3, L1, L2, N1) are asserted.
+"""Option K of DEC-0018: the ROADMAP-bound rows (A1, A2, A3, L1, L2 and N1, N2, N3) are asserted.
 
 Flipping it to False is Option C, which only the owner may rule: those rows are then computed,
 written to the results table and reported as characterization rows, and the pytest outcome is the
-consistency ranges (the defect test) and the exact checks. N2 and N3 of the delta-R2 study are
-asserted in both modes."""
+consistency ranges (the defect test) and the exact checks. N2 and N3 of the delta-R2 study joined
+the switch after addendum A9 (their nominal bounds, like A1 and A2, are method-validity bounds that
+correct code fails with probability about 0.15 per run); the 12 delta-R2 ranges are always asserted."""
 
 WU0006_SEED = 6006
 """Literal master seed of the simulation studies; not a registered DEV or confirmatory seed."""
@@ -539,7 +540,8 @@ class Evaluation:
     exact: list[str] = field(default_factory=list)
     consistency: list[str] = field(default_factory=list)
     roadmap: list[str] = field(default_factory=list)
-    always: list[str] = field(default_factory=list)
+    consistency_rows: dict[str, str | None] = field(default_factory=dict)
+    """Delta-R2 only: the consistency message (or None) of each row, keyed ``"n1|<target>"``."""
 
 
 def in_range(count: int, bounds: tuple[int, int]) -> bool:
@@ -884,7 +886,13 @@ def run_delta(pool: ProcessPoolExecutor, phi: float, R: int = R_DELTA, chunk: in
 
 
 def evaluate_delta(run: DeltaRun, *, strict: bool = True) -> Evaluation:
-    """N1 (ROADMAP, under the constant), N2 and N3 (always) and the exact refit check."""
+    """N1, N2, N3 against the ROADMAP bounds, the A9 ranges and the exact refit check.
+
+    The nominal bounds of all three rows (N1 and N3 >= 461 of 500, N2 <= 22 of 500) go to ``roadmap``
+    and are asserted only while ``ASSERT_ROADMAP_BOUNDS`` is True (DEC-0018, as for A1 to A3). The
+    pre-registered consistency ranges of the 3000/1000 reference (addendum A9, 12 in all) are the
+    always-asserted defect test; ``consistency_rows`` holds one entry per row.
+    """
     if strict and run.R != R_DELTA:
         raise ValueError(f"R must be {R_DELTA}; got {run.R}")
     ev = Evaluation(row={"phi": run.phi, "R": run.R, "seconds": run.seconds,
@@ -893,13 +901,15 @@ def evaluate_delta(run: DeltaRun, *, strict: bool = True) -> Evaluation:
     for name in DELTA_TARGETS:
         est, lo, hi, truth, truth_se, refit, failed, r2_three, reduces = run.target(name).T
         label = f"{name} phi={run.phi:g}"
-        n1 = int(np.sum((lo <= 0) & (0 <= hi)))
-        n2 = int(np.sum(lo > 0))
-        n3 = int(np.sum((lo <= truth) & (truth <= hi)))
+        counts = {"n1": int(np.sum((lo <= 0) & (0 <= hi))), "n2": int(np.sum(lo > 0)),
+                  "n3": int(np.sum((lo <= truth) & (truth <= hi)))}
         half = (hi - lo) / 2
-        reference = DELTA_R2_REFERENCE[name]
+        reference = DELTA_R2_REFERENCE[(f"{run.phi:g}", name)]
+        ok = {"n1": counts["n1"] >= N1_MIN, "n2": counts["n2"] <= N2_MAX,
+              "n3": counts["n3"] >= N3_MIN}
         ev.row["targets"][name] = {
-            "n1_contains_zero": n1, "n2_false_distinct": n2, "n3_covers_conditional": n3,
+            "n1_contains_zero": counts["n1"], "n2_false_distinct": counts["n2"],
+            "n3_covers_conditional": counts["n3"],
             "truth_below_lower": int(np.sum(truth < lo)), "truth_above_upper": int(np.sum(truth > hi)),
             "mean_estimate": float(est.mean()), "mean_conditional_gain": float(truth.mean()),
             "sd_conditional_gain": float(truth.std()), "p_gain_positive": float(np.mean(truth > 0)),
@@ -908,22 +918,34 @@ def evaluate_delta(run: DeltaRun, *, strict: bool = True) -> Evaluation:
             "truth_se_over_half_width_max": float(np.max(truth_se / half)),
             "p_reduces": float(reduces.mean()), "refit_bitwise": int(refit.sum()),
             "failed_resamples": int(failed.sum()), "mean_r2_three": float(r2_three.mean()),
-            "reference_phi0_R200": reference, "n1_roadmap_ok": n1 >= N1_MIN,
-            "n2_ok": n2 <= N2_MAX, "n3_ok": n3 >= N3_MIN}
+            "reference_R1000": reference, "n1_roadmap_ok": ok["n1"], "n2_roadmap_ok": ok["n2"],
+            "n3_roadmap_ok": ok["n3"]}
         if int(refit.sum()) != run.R:
             ev.exact.append(f"{label}: refitting qn_regressor reproduced delta_r2 bitwise in "
                             f"{int(refit.sum())}/{run.R} replications")
-        if n1 < N1_MIN:
-            ev.roadmap.append(f"{label}: N1 interval contains 0 in {n1}/{run.R} < {N1_MIN} "
+        if not ok["n1"]:
+            ev.roadmap.append(f"{label}: N1 interval contains 0 in {counts['n1']}/{run.R} < {N1_MIN} "
                               "(predicted to fail: the interval targets the conditional gain, "
-                              f"mean {truth.mean():.4f}, not the population gain 0)")
-        if n2 > N2_MAX:
-            ev.always.append(f"{label}: N2 false 'distinct' {n2}/{run.R} > {N2_MAX}")
-        if n3 < N3_MIN:
-            ev.always.append(f"{label}: N3 coverage of the conditional gain {n3}/{run.R} < {N3_MIN}")
+                              f"mean {truth.mean():.4f}, not the population gain 0; "
+                              f"P(fail | correct code) {reference['n1'][2]:.2f})")
+        if not ok["n2"]:
+            ev.roadmap.append(f"{label}: N2 false 'distinct' {counts['n2']}/{run.R} > {N2_MAX} "
+                              f"(P(fail | correct code) {reference['n2'][2]:.3f})")
+        if not ok["n3"]:
+            ev.roadmap.append(f"{label}: N3 coverage of the conditional gain {counts['n3']}/{run.R} "
+                              f"< {N3_MIN} (P(fail | correct code) {reference['n3'][2]:.3f})")
+        for key in ("n1", "n2", "n3"):
+            rate, _, _, bounds = reference[key]
+            message = None
+            if not in_range(counts[key], bounds):
+                message = (f"{label}: {key.upper()} {counts[key]}/{run.R} outside the pre-registered "
+                           f"range {bounds} (reference {rate:.3f})")
+                ev.consistency.append(message)
+            ev.consistency_rows[f"{key}|{name}"] = message
+            ev.row["targets"][name][f"{key}_range_ok"] = message is None
     ev.row["roadmap_outcome"] = "fail" if ev.roadmap else "pass"
+    ev.row["consistency_outcome"] = "fail" if ev.consistency else "pass"
     ev.row["roadmap_failures"] = list(ev.roadmap)
-    ev.row["always_outcome"] = "fail" if ev.always else "pass"
     return ev
 
 

@@ -401,8 +401,8 @@ def test_evaluate_logrank_applies_the_registered_bounds_exactly() -> None:
     assert "L3" in wu.evaluate_logrank(fake_logrank("L1", 0.0, 20, 5, uncomputed=1)).exact[0]
 
 
-def fake_delta(contains_zero: int, positive_lower: int, covers: int, refit_bad: int = 0
-               ) -> wu.DeltaRun:
+def fake_delta(contains_zero: int, positive_lower: int, covers: int, refit_bad: int = 0,
+               phi: float = 0.0) -> wu.DeltaRun:
     """R = 500 replications: ``contains_zero`` intervals around 0, ``positive_lower`` above 0, the
     rest below 0; the truth is inside the interval in the first ``covers`` replications."""
     total = wu.R_DELTA
@@ -415,22 +415,75 @@ def fake_delta(contains_zero: int, positive_lower: int, covers: int, refit_bad: 
     refit[:refit_bad] = 0.0
     block = np.column_stack([np.zeros(total), lo, hi, truth, np.full(total, 0.001), refit,
                              np.zeros(total), np.full(total, 0.4), np.ones(total)])
-    return wu.DeltaRun(phi=0.0, R=total, table=np.hstack([block, block]))
+    return wu.DeltaRun(phi=phi, R=total, table=np.hstack([block, block]))
 
 
 def test_evaluate_delta_applies_the_registered_bounds_exactly() -> None:
-    """N1 >= 461 (under the constant), N2 <= 22 and N3 >= 461 (always), the bitwise refit (exact).
-
-    N1 alone can fail with no false 'distinct' when the missed intervals lie below 0.
+    """N1 >= 461, N2 <= 22 and N3 >= 461 (all under the constant since addendum A9), the bitwise
+    refit (exact). N1 alone can fail with no false 'distinct' when the missed intervals lie below 0.
     """
     assert wu.evaluate_delta(fake_delta(478, 22, 461)).roadmap == []
-    assert wu.evaluate_delta(fake_delta(478, 22, 461)).always == []
     only_n1 = wu.evaluate_delta(fake_delta(460, 0, 461))
-    assert len(only_n1.roadmap) == 2 and only_n1.always == []        # both targets
+    assert len(only_n1.roadmap) == 2 and "N1" in only_n1.roadmap[0]       # both targets
     assert wu.evaluate_delta(fake_delta(461, 0, 461)).roadmap == []
-    assert len(wu.evaluate_delta(fake_delta(477, 23, 461)).always) == 2   # N2: 23 > 22
-    assert len(wu.evaluate_delta(fake_delta(478, 22, 460)).always) == 2   # N3: 460 < 461
+    n2 = wu.evaluate_delta(fake_delta(477, 23, 461))
+    assert len(n2.roadmap) == 2 and "N2" in n2.roadmap[0]                  # 23 > 22
+    n3 = wu.evaluate_delta(fake_delta(478, 22, 460))
+    assert len(n3.roadmap) == 2 and "N3" in n3.roadmap[0]                  # 460 < 461
     assert wu.evaluate_delta(fake_delta(478, 22, 461, refit_bad=1)).exact[0].count("bitwise") == 1
+
+
+def test_delta_roadmap_rows_follow_the_switch_in_both_modes() -> None:
+    """A failed N1, N2 or N3 row raises under Option K and is only reported under Option C.
+
+    Their consistency ranges are asserted in both modes: ``evaluate_delta`` fills ``consistency``
+    independently of the switch (checked by the next test).
+    """
+    for counts in ((460, 0, 461), (477, 23, 461), (478, 22, 460)):
+        failures = wu.evaluate_delta(fake_delta(*counts)).roadmap
+        assert len(failures) == 2
+        with pytest.raises(AssertionError, match="finding"):
+            wu.enforce(failures, asserting=True)
+        assert wu.enforce(failures, asserting=False) == "fail"
+    assert wu.enforce(wu.evaluate_delta(fake_delta(478, 22, 461)).roadmap, asserting=True) == "pass"
+
+
+def test_evaluate_delta_applies_the_a9_ranges_exactly() -> None:
+    """The 12 pre-registered ranges (phi 0: N1 logit (431, 483), indicator (440, 487); N2 (0, 23) and
+    (0, 25); N3 (446, 490) and (448, 491); phi 0.3: N1 (434, 484) and (436, 485), N2 (0, 16) and
+    (0, 21), N3 (449, 491) and (448, 491)): inclusive ends, row by row, independent of the switch."""
+    logit, indicator = "logit_w_interior", "w_zero_indicator"
+    ok = wu.evaluate_delta(fake_delta(478, 22, 461))
+    assert ok.consistency == [] and set(ok.consistency_rows.values()) == {None}
+    assert len(ok.consistency_rows) == 6
+    n1_high = wu.evaluate_delta(fake_delta(484, 0, 461))      # logit out (> 483), indicator in
+    assert [k for k, v in n1_high.consistency_rows.items() if v] == [f"n1|{logit}"]
+    n1_low = wu.evaluate_delta(fake_delta(439, 0, 461))       # indicator out (< 440), logit in
+    assert [k for k, v in n1_low.consistency_rows.items() if v] == [f"n1|{indicator}"]
+    n2_high = wu.evaluate_delta(fake_delta(478, 24, 461))     # logit out (> 23), indicator in (<= 25)
+    assert [k for k, v in n2_high.consistency_rows.items() if v] == [f"n2|{logit}"]
+    n3_low = wu.evaluate_delta(fake_delta(478, 22, 446))      # logit in (>= 446), indicator out (< 448)
+    assert [k for k, v in n3_low.consistency_rows.items() if v] == [f"n3|{indicator}"]
+    assert len(wu.evaluate_delta(fake_delta(478, 22, 445)).consistency) == 2
+    # phi = 0.3 has its own ranges: N2 = 17 is out for the logit (<= 16), in for the indicator
+    third = wu.evaluate_delta(fake_delta(478, 17, 461, phi=0.3))
+    assert [k for k, v in third.consistency_rows.items() if v] == [f"n2|{logit}"]
+
+
+def test_delta_reference_holds_12_ranges() -> None:
+    """Addendum A9: 4 (phi, target) cells x 3 rows = 12 ranges, each containing its rate x 500; the
+    rates are probabilities, the bound-failure chances lie in [0, 1], and N1 is the row that fails."""
+    cells = ref.DELTA_R2_REFERENCE
+    assert sorted(cells) == [("0", "logit_w_interior"), ("0", "w_zero_indicator"),
+                             ("0.3", "logit_w_interior"), ("0.3", "w_zero_indicator")]
+    n_ranges = 0
+    for entry in cells.values():
+        for key in ("n1", "n2", "n3"):
+            rate, se, p_fail, (low, high) = entry[key]
+            assert 0 < rate < 1 and se > 0 and 0 <= p_fail <= 1 and low <= rate * 500 <= high
+            n_ranges += 1
+        assert entry["n1"][2] > entry["n3"][2] >= entry["n2"][2]
+    assert n_ranges == 12 and ref.DELTA_R2_REFERENCE_R == 1000
 
 
 def test_result_table_round_trips_numpy_and_non_finite_values(tmp_path) -> None:
