@@ -285,6 +285,22 @@ def test_clip_errors_minus_inf_goes_to_minus_clip() -> None:
     assert masks.counts()["error_clips_nonfinite"] == 3 and masks.counts()["error_clips_plp"] == 0
 
 
+def _planned_lm(n_flat: int):
+    """Planned Levenberg-Marquardt diagnostics of ``n_flat`` flat rows (state-major, 3 draws).
+
+    Residual ``r + 0.5``, accepted ``2 r``, late progress ``r mod 2`` for flat row ``r``;
+    ``nonfinite_cost`` on rows 4, 10 and 11 and ``nonfinite_jacobian`` on rows 5 and 9 (when they
+    exist), so the per-state counts are written out in the tests that use them.
+    """
+    from lpcstudy.estimation import LMDiagnostics
+
+    rows = np.arange(n_flat)
+    return LMDiagnostics(residual=rows + 0.5, accepted=(2 * rows).astype(np.int32),
+                         nonfinite_cost=np.isin(rows, [4, 10, 11]),
+                         nonfinite_jacobian=np.isin(rows, [5, 9]),
+                         late_progress=(rows % 2).astype(np.int32))
+
+
 def _fake_world(plp_diff: np.ndarray, state_bad: np.ndarray, nu_bad: np.ndarray,
                 horizons: np.ndarray, n_states: int, n_draws: int):
     """A miniature, deterministic world for ``forecast_draws`` with stubbed estimator and paths.
@@ -324,7 +340,8 @@ def _fake_world(plp_diff: np.ndarray, state_bad: np.ndarray, nu_bad: np.ndarray,
 
     class Stub:
         def estimate_counted(self, flat):
-            return (np.full((len(flat), 2), 0.1), np.ones(len(flat)), state_bad, nu_bad)
+            return (np.full((len(flat), 2), 0.1), np.ones(len(flat)), state_bad, nu_bad,
+                    _planned_lm(len(flat)))
 
     setup = ForecastSetup(ctx=ctx, noise=0.01, estimator=Stub(), model_step=None)
     setup._paths[h_last] = paths
@@ -359,11 +376,20 @@ def test_forecast_draws_handled_columns_per_state() -> None:
     nu_bad[[7, 10]] = True
     setup, library, noise, rows = _fake_world(diff, state_bad, nu_bad, horizons, n_states, n_draws)
     batch = forecast_draws(setup, library, "test", rows, noise, horizons, reference_horizon=2)
-    expected = np.array([[2, 0, 0, 0, 1, 1], [0] * 6, [1, 1, 0, 0, 0, 0], [0, 1, 0, 0, 1, 0]])
+    # Columns 6 and 7 (WU-0005.4): the planned LM flags, ``_planned_lm``: nonfinite_cost on flat
+    # rows 4, 10, 11 (states 1, 3, 3) -> [0, 1, 0, 2]; nonfinite_jacobian on rows 5, 9 (states
+    # 1, 3) -> [0, 1, 0, 1].
+    expected = np.array([[2, 0, 0, 0, 1, 1, 0, 0], [0, 0, 0, 0, 0, 0, 1, 1],
+                         [1, 1, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 1, 0, 2, 1]])
     assert DRAW_COUNTERS == ("invariant_mean_replacements", "nu_replacements", "gain_replacements",
-                             "gain_floor", "error_clips_plp_href", "error_clips_nonfinite_href")
-    assert batch.handled.dtype == np.int64 and batch.handled.shape == (4, 6)
+                             "gain_floor", "error_clips_plp_href", "error_clips_nonfinite_href",
+                             "lm_nonfinite_cost", "lm_nonfinite_jacobian")
+    assert batch.handled.dtype == np.int64 and batch.handled.shape == (4, 8)
     np.testing.assert_array_equal(batch.handled, expected)
+    planned = _planned_lm(12)
+    assert batch.lm_residual.tobytes() == planned.residual.reshape(4, 3).tobytes()
+    assert np.array_equal(batch.lm_accepted, planned.accepted.reshape(4, 3))
+    assert np.array_equal(batch.lm_late, planned.late_progress.reshape(4, 3))
     assert batch.clip_entries == {"error_clips_cp": 0, "error_clips_plp": 3,
                                   "error_clips_nonfinite": 2}
     plp = batch.plp_err.reshape(12, 3)
@@ -371,8 +397,9 @@ def test_forecast_draws_handled_columns_per_state() -> None:
     assert abs(plp[9, 1] - (-10.0)) < 1e-12 and plp[10, 1] == 10.0
     # Without a reference horizon the two H_ref columns are 0 and the others are unchanged.
     plain = forecast_draws(setup, library, "test", rows, noise, horizons)
-    assert np.all(plain.handled[:, 4:] == 0)
+    assert np.all(plain.handled[:, 4:6] == 0)  # the two H_ref columns
     np.testing.assert_array_equal(plain.handled[:, :4], expected[:, :4])
+    np.testing.assert_array_equal(plain.handled[:, 6:], expected[:, 6:])
     with pytest.raises(ValueError):
         forecast_draws(setup, library, "test", rows, noise, horizons, reference_horizon=7)
 
@@ -443,15 +470,27 @@ def _stubbed_forecasts(monkeypatch, handled_table: np.ndarray, entry_table: np.n
             inputs=unit_noise, est_states=est_states[rows], est_nu=np.ones((len(rows), n_draws)),
             analog_vecs=np.zeros((len(rows), n_draws, dim)), handled=handled_table[rows].copy(),
             clip_entries={name: int(entry_table[rows, i].sum())
-                          for i, name in enumerate(ensemble.ENTRY_COUNTERS)})
+                          for i, name in enumerate(ensemble.ENTRY_COUNTERS)},
+            lm_residual=planned_lm(n_states, n_draws)[0][rows],
+            lm_accepted=planned_lm(n_states, n_draws)[1][rows],
+            lm_late=planned_lm(n_states, n_draws)[2][rows])
 
     monkeypatch.setattr(ensemble, "forecast_draws", fake)
     return cp, plp
 
 
+def planned_lm(n_states: int, n_draws: int):
+    """Planned per-estimate LM arrays ``(n_states, n_draws)``: residual 10 s + d + 0.25, accepted
+    s + d, late (s + d) mod 2, for state ``s`` and draw ``d`` (read off by hand in the tests)."""
+    s, d = np.meshgrid(np.arange(n_states), np.arange(n_draws), indexing="ij")
+    return 10.0 * s + d + 0.25, (s + d).astype(np.int32), ((s + d) % 2).astype(np.int32)
+
+
 def _planned_tables(n_states: int, n_draws: int):
+    from lpcstudy.ensemble import DRAW_COUNTERS
+
     rng = np.random.default_rng(91)
-    handled = rng.integers(0, n_draws + 1, size=(n_states, 6)).astype(np.int64)
+    handled = rng.integers(0, n_draws + 1, size=(n_states, len(DRAW_COUNTERS))).astype(np.int64)
     handled[:, 2:4] = 0  # gain columns are filled by evaluation_draws only
     entries = rng.integers(0, 50, size=(n_states, 3)).astype(np.int64)
     return handled, entries
@@ -486,6 +525,13 @@ def test_ensemble_moments_accumulates_handled_exactly_for_any_chunking(monkeypat
     part = moments.subset(np.array([5, 2]))
     np.testing.assert_array_equal(part.handled, handled[[5, 2]])
     assert part.clip_entries is None  # a view has no valid entry totals
+    # WU-0005.4: the per-estimate LM arrays equal the planned ones for any chunking (rows in
+    # order), and a row subset slices them like ``handled``.
+    residual, accepted, late = planned_lm(n_states, n_draws)
+    assert moments.lm_residual.tobytes() == residual.tobytes()
+    assert np.array_equal(moments.lm_accepted, accepted) and np.array_equal(moments.lm_late, late)
+    assert part.lm_residual.tobytes() == residual[[5, 2]].tobytes()
+    assert np.array_equal(part.lm_accepted, accepted[[5, 2]])
 
 
 @pytest.mark.parametrize("chunk_traj", [4, 10**6])
@@ -540,6 +586,11 @@ def test_evaluation_draws_accumulates_handled_and_gain_columns(monkeypatch,
     sub = out.subset(np.array([4, 0]))
     np.testing.assert_array_equal(sub.handled, expected[[4, 0]])
     assert sub.clip_entries is None
+    # WU-0005.4: the LM arrays of the evaluation draws are the planned ones, in row order.
+    residual, accepted, late = planned_lm(n_states, n_draws)
+    assert out.lm_residual.tobytes() == residual.tobytes()
+    assert np.array_equal(out.lm_accepted, accepted) and np.array_equal(out.lm_late, late)
+    assert sub.lm_residual.tobytes() == residual[[4, 0]].tobytes()
 
 
 class _SpyTree:

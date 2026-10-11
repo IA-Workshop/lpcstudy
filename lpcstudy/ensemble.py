@@ -63,13 +63,16 @@ def worker_count() -> int:
 
 DRAW_COUNTERS: tuple[str, ...] = (
     "invariant_mean_replacements", "nu_replacements", "gain_replacements", "gain_floor",
-    "error_clips_plp_href", "error_clips_nonfinite_href")
+    "error_clips_plp_href", "error_clips_nonfinite_href", "lm_nonfinite_cost",
+    "lm_nonfinite_jacobian")
 """Columns of the per-state ``handled`` array of a computation (DEF-0001, WU-0002.11a).
 
 Each column counts (state, draw) pairs and is invariant under a row subset *and* a horizon
 subset of the moments (D1 of the mathematics review, option (b)): the first four are
-horizon-free (an estimate, or the gains of an estimate), the last two are taken at ``H_ref``,
-which every horizon set contains. ``gain_*`` are filled by ``evaluation_draws`` only.
+horizon-free (an estimate, or the gains of an estimate), the next two are taken at ``H_ref``,
+which every horizon set contains. ``gain_*`` are filled by ``evaluation_draws`` only. The last two
+(WU-0005.4, S3 and S4 of DEF-0001) are horizon-free, one per estimate: the Levenberg-Marquardt loop
+met a non-finite cost, or zeroed a non-finite Jacobian entry, at least once.
 """
 
 ENTRY_COUNTERS: tuple[str, ...] = ("error_clips_cp", "error_clips_plp", "error_clips_nonfinite")
@@ -291,6 +294,10 @@ class DrawBatch:
         (``gain_*`` columns are 0 here; ``evaluation_draws`` fills them).
     clip_entries : dict[str, int] or None
         ``error_clips_cp``, ``_plp``, ``_nonfinite`` totals of this batch (``ENTRY_COUNTERS``).
+    lm_residual, lm_accepted, lm_late : np.ndarray or None
+        Levenberg-Marquardt diagnostics per estimate, ``(n, M)`` (WU-0005.4, NVVUQ.10): the final
+        cost, the accepted iterations and the ``late_progress`` flag. ``None`` for batches built
+        by hand.
     """
 
     cp_err: np.ndarray
@@ -304,6 +311,37 @@ class DrawBatch:
     analog_vecs: np.ndarray
     handled: np.ndarray | None = None
     clip_entries: dict[str, int] | None = None
+    lm_residual: np.ndarray | None = None
+    lm_accepted: np.ndarray | None = None
+    lm_late: np.ndarray | None = None
+
+
+LM_FIELDS: tuple[str, ...] = ("lm_residual", "lm_accepted", "lm_late")
+"""The per-estimate Levenberg-Marquardt arrays carried by batches, moments and evaluation draws."""
+
+
+def stack_optional(parts: list[np.ndarray | None]) -> np.ndarray | None:
+    """Concatenate arrays that are all present, or return ``None`` if none is.
+
+    Parameters
+    ----------
+    parts : list
+        Arrays (or ``None``) in row order.
+
+    Returns
+    -------
+    np.ndarray or None
+        The concatenation; ``None`` if every part is ``None``.
+
+    Raises
+    ------
+    ValueError
+        If only some parts are ``None`` (no silent partial stacking).
+    """
+    present = [p is not None for p in parts]
+    if any(present) and not all(present):
+        raise ValueError("cannot stack: only some parts carry the array")
+    return np.concatenate(parts) if parts and all(present) else None
 
 
 def forecast_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
@@ -364,7 +402,7 @@ def forecast_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
                           - s_true_w[:, None, :]) ** 2, axis=-1)
 
     # Physics-based latent-state propagation.
-    est_phys, est_nu, state_bad, nu_bad = setup.estimator.estimate_counted(flat)
+    est_phys, est_nu, state_bad, nu_bad, lm = setup.estimator.estimate_counted(flat)
     est_w = ctx.whiten_states(est_phys)
     path = np.asarray(setup.paths(int(horizons[-1]))(jnp.asarray(est_phys)))
     plp = path[:, horizons - 1].reshape(n_states, n_draws, -1)
@@ -376,6 +414,10 @@ def forecast_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
     handled[:, DRAW_COLUMN["invariant_mean_replacements"]] = \
         state_bad.reshape(n_states, n_draws).sum(axis=1)
     handled[:, DRAW_COLUMN["nu_replacements"]] = nu_bad.reshape(n_states, n_draws).sum(axis=1)
+    handled[:, DRAW_COLUMN["lm_nonfinite_cost"]] = \
+        lm.nonfinite_cost.reshape(n_states, n_draws).sum(axis=1)
+    handled[:, DRAW_COLUMN["lm_nonfinite_jacobian"]] = \
+        lm.nonfinite_jacobian.reshape(n_states, n_draws).sum(axis=1)
     if ref_col is not None:
         handled[:, DRAW_COLUMN["error_clips_plp_href"]] = masks.plp[:, :, ref_col].sum(axis=1)
         handled[:, DRAW_COLUMN["error_clips_nonfinite_href"]] = \
@@ -387,7 +429,10 @@ def forecast_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
                      est_nu=est_nu.reshape(n_states, n_draws),
                      analog_vecs=library.analog_vectors(lib_idx).reshape(n_states, n_draws, dim),
                      handled=handled,
-                     clip_entries={k: entries[k] for k in ENTRY_COUNTERS})
+                     clip_entries={k: entries[k] for k in ENTRY_COUNTERS},
+                     lm_residual=lm.residual.reshape(n_states, n_draws),
+                     lm_accepted=lm.accepted.reshape(n_states, n_draws),
+                     lm_late=lm.late_progress.reshape(n_states, n_draws))
 
 
 def retrieval_spread(analog_vecs: np.ndarray, noise: float) -> np.ndarray:
@@ -498,6 +543,10 @@ class EnsembleMoments:
     clip_entries : dict[str, int] or None
         ``ENTRY_COUNTERS`` totals over (state, draw, horizon) of the computation that made these
         moments. ``None`` after any subset (a view has no valid totals) and for hand-built moments.
+    lm_residual, lm_accepted, lm_late : np.ndarray or None
+        Levenberg-Marquardt diagnostics of every oracle estimate, ``(n, M)`` (WU-0005.4,
+        NVVUQ.10): final cost, accepted iterations, ``late_progress``. Horizon-free, so a row
+        subset slices them and a horizon subset leaves them. ``None`` for hand-built moments.
     """
 
     horizons: np.ndarray
@@ -515,6 +564,9 @@ class EnsembleMoments:
     plp_constant: np.ndarray | None = None
     handled: np.ndarray | None = None
     clip_entries: dict[str, int] | None = None
+    lm_residual: np.ndarray | None = None
+    lm_accepted: np.ndarray | None = None
+    lm_late: np.ndarray | None = None
 
     def at(self, horizon: int) -> int:
         """Column index of a horizon."""
@@ -531,7 +583,7 @@ class EnsembleMoments:
             kept={k: v[rows] for k, v in self.kept.items()},
             handled=None if self.handled is None else self.handled[rows], clip_entries=None,
             **{k: None if getattr(self, k) is None else getattr(self, k)[rows]
-               for k in CORRELATION_FIELDS})
+               for k in (*CORRELATION_FIELDS, *LM_FIELDS)})
 
 
 def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
@@ -583,11 +635,14 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
     keep_cols = None if keep_horizons is None else np.searchsorted(horizons, keep_horizons)
     handled = np.zeros((n_states, len(DRAW_COUNTERS)), dtype=np.int64)
     clip_entries = dict.fromkeys(ENTRY_COUNTERS, 0)
+    lm_parts: dict[str, list[np.ndarray | None]] = {k: [] for k in LM_FIELDS}
     for start in range(0, n_states, per_chunk):
         rows = np.arange(start, min(n_states, start + per_chunk))
         batch = forecast_draws(setup, library, split, rows, unit_noise[rows], horizons,
                                reference_horizon)
         handled[rows] = batch.handled
+        for name in LM_FIELDS:
+            lm_parts[name].append(getattr(batch, name))
         for name in ENTRY_COUNTERS:
             clip_entries[name] += batch.clip_entries[name]
         out["mean_cp"][rows] = batch.cp_err.mean(axis=1)
@@ -609,7 +664,8 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
                            est_seed=est_seed, noise_sens=noise_sens, kept=kept_arrays,
                            err_corr=err_corr, cp_constant=cp_constant,
                            plp_constant=plp_constant, handled=handled,
-                           clip_entries=clip_entries, **out)
+                           clip_entries=clip_entries,
+                           **{k: stack_optional(v) for k, v in lm_parts.items()}, **out)
 
 
 @dataclass
@@ -642,6 +698,9 @@ class EvaluationDraws:
         columns. ``None`` for hand-built draws.
     clip_entries : dict[str, int] or None
         ``ENTRY_COUNTERS`` totals of the computation; ``None`` after a subset.
+    lm_residual, lm_accepted, lm_late : np.ndarray or None
+        Levenberg-Marquardt diagnostics of every evaluation estimate, ``(n, E)`` (WU-0005.4,
+        NVVUQ.10). ``None`` for hand-built draws.
     """
 
     horizons: np.ndarray
@@ -656,6 +715,9 @@ class EvaluationDraws:
     noise_sens: np.ndarray
     handled: np.ndarray | None = None
     clip_entries: dict[str, int] | None = None
+    lm_residual: np.ndarray | None = None
+    lm_accepted: np.ndarray | None = None
+    lm_late: np.ndarray | None = None
 
     def subset(self, rows: np.ndarray) -> "EvaluationDraws":
         """Restrict to a subset of states (``clip_entries`` is dropped; ``None`` stays ``None``)."""
@@ -736,6 +798,7 @@ def evaluation_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
     parts: dict[str, list[np.ndarray]] = {k: [] for k in (
         "cp_err", "plp_err", "distance", "est_nu", "growth_proxy", "gain_proxy",
         "inputs", "noise_sens", "handled")}
+    lm_parts: dict[str, list[np.ndarray | None]] = {k: [] for k in LM_FIELDS}
     clip_entries = dict.fromkeys(ENTRY_COUNTERS, 0)
     amp_steps = max(int(horizons[-1]), growth_window)
     amp_fn = setup.amplification(amp_steps)
@@ -751,6 +814,8 @@ def evaluation_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
         chunk_handled[:, DRAW_COLUMN["gain_replacements"]] = gain_replaced.reshape(shape).sum(1)
         chunk_handled[:, DRAW_COLUMN["gain_floor"]] = gain_floored.reshape(shape).sum(1)
         parts["handled"].append(chunk_handled)
+        for name in LM_FIELDS:
+            lm_parts[name].append(getattr(batch, name))
         for name in ENTRY_COUNTERS:
             clip_entries[name] += batch.clip_entries[name]
         parts["cp_err"].append(batch.cp_err)
@@ -768,4 +833,5 @@ def evaluation_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
     merged = {k: np.concatenate(v) for k, v in parts.items()}
     verify = setup.noise * verify_unit[:, :, horizons - 1]
     return EvaluationDraws(horizons=np.asarray(horizons), verify_noise=verify,
-                           clip_entries=clip_entries, **merged)
+                           clip_entries=clip_entries,
+                           **{k: stack_optional(v) for k, v in lm_parts.items()}, **merged)

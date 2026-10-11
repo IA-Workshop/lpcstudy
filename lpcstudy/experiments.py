@@ -82,6 +82,7 @@ def convergence_check(study: Study, cell: Cell) -> dict:
     library = AnalogLibrary.build(ctx, cell.noise, cell.library_size, cfg.horizon_max)
     horizons = np.array([cfg.reference_horizon])
     cp, plp = [], []
+    lm_parts: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []
     handled = dict.fromkeys(DRAW_COUNTERS, 0)
     clipped = dict.fromkeys(ENTRY_COUNTERS, 0)
     for start in range(0, n, 5):
@@ -90,13 +91,17 @@ def convergence_check(study: Study, cell: Cell) -> dict:
                                cfg.reference_horizon)
         cp.append(batch.cp_err[:, :, 0])
         plp.append(batch.plp_err[:, :, 0])
+        lm_parts.append((batch.lm_residual, batch.lm_accepted, batch.lm_late))
         for name in DRAW_COUNTERS:
             handled[name] += int(batch.handled[:, DRAW_COLUMN[name]].sum())
         for name in ENTRY_COUNTERS:
             clipped[name] += batch.clip_entries[name]
     cp, plp = np.concatenate(cp), np.concatenate(plp)
     study.record_cell(cell.system, cell.label, "V4-convergence",
-                      check_record(handled, clipped, n, noise.shape[1], 1))
+                      check_record(handled, clipped, n, noise.shape[1], 1, cell.noise,
+                                   ctx.embed_dim - ctx.spec.dim,
+                                   tuple(np.concatenate([part[i].ravel() for part in lm_parts])
+                                         for i in range(3))))
 
     def weight(c: np.ndarray, p: np.ndarray) -> np.ndarray:
         # The clip to [0, 1] is the definition of the admissible weight (P1), and 1e-300 the floor
@@ -298,7 +303,8 @@ def collect_result_counts(result: object, path: str = "") -> dict[str, int]:
 
 _V3_INERT: frozenset[str] = frozenset({
     "invariant_mean_replacements", "nu_replacements", "error_clips_plp", "error_clips_nonfinite",
-    "error_clips_plp_href", "error_clips_nonfinite_href"})
+    "error_clips_plp_href", "error_clips_nonfinite_href", "lm_nonfinite_cost",
+    "lm_nonfinite_jacobian"})
 
 
 def _log_block(system: str, block_id: str, counts: dict, denominators: dict) -> int:
