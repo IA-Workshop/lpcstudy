@@ -223,3 +223,84 @@ def test_log_handling_writes_one_warning_per_nonzero_counter_a12(caplog) -> None
         "[inert: V3 uses CP only]"]
     assert infos == ["handling lorenz63: 3 nonzero counters in 3 blocks"]
     assert set(ALL_COUNTERS) >= {"error_clips_cp", "gain_floor"}
+
+
+# ----------------------------------------------------------- WU-0005.5: P2(c) wiring
+def _p2c_fixture():
+    """A fake study, core cell and library for ``p2c_verification`` (k = 1, D = 7, 3 splits)."""
+    from scipy.spatial import cKDTree
+
+    from lpcstudy.ensemble import AnalogLibrary, retrieval_spread
+
+    rng = np.random.default_rng(50061)
+    series = rng.standard_normal(400)
+    delay, dim, rho, draws = 3, 7, 0.4, 10
+    splits = {"construction": np.arange(20, 60), "calibration": np.arange(60, 90),
+              "test": np.arange(90, 120)}
+    vectors = rng.standard_normal((200, dim))
+    library = AnalogLibrary(indices=np.arange(200), noisy_series=np.zeros(1),
+                            tree=cKDTree(vectors))
+    ctx = SimpleNamespace(eval_clean=series, split_indices=splits, delay=delay, embed_dim=dim)
+    noises = {name: rng.standard_normal((len(t), draws, dim)) for name, t in splits.items()}
+    seen = []
+
+    def unit_noise(context, split, purpose, n_draws, width):
+        seen.append((split, purpose, n_draws, width))
+        return noises[split]
+
+    study = SimpleNamespace(config=SimpleNamespace(n_oracle_draws=draws), unit_noise=unit_noise)
+    sens = {}
+    for name, times in splits.items():
+        # Independent reference: the delay vector written out, the retrieval by exhaustive search.
+        clean = np.stack([series[times - j * delay] for j in range(dim)], axis=1)
+        queries = clean[:, None, :] + rho * noises[name]
+        nearest = np.argmin(np.linalg.norm(queries[:, :, None, :] - vectors[None, None], axis=-1),
+                            axis=-1)
+        sens[name] = retrieval_spread(vectors[nearest], rho)
+    core = SimpleNamespace(
+        system="toy", noise=rho, library_size=200, ctx=ctx, setup=SimpleNamespace(n_analogs=1),
+        splits={name: SimpleNamespace(moments=SimpleNamespace(noise_sens=sens[name]))
+                for name in splits})
+    return study, core, library, sens, seen
+
+
+def test_p2c_verification_uses_the_core_draws_and_logs_a_mismatch(caplog) -> None:
+    """``p2c_verification`` takes the clean queries and oracle noise of every split and logs defects.
+
+    Reference: the clean delay vectors written out by indexing (``series[t - j tau]``) and the
+    core ``noise_sens`` computed by exhaustive nearest-neighbor search on a toy library
+    (200 vectors in R^7, rho = 0.4, M = 10, 3 splits of 40, 30 and 30 states): the check must
+    report ``same_draws_identical`` (bitwise), no violation, 100 states, the cell description,
+    and ask ``unit_noise`` for the ``"oracle"`` draws of each split. With one ``noise_sens`` entry
+    moved by an ulp it must report ``False`` and write one WARNING naming the defect (PRIME.4).
+    The toy library is far from the exact-arithmetic limits, so any violation would be a defect.
+    k = 2 is refused. Exact comparisons.
+    """
+    import logging
+
+    from lpcstudy.experiments import p2c_verification
+
+    study, core, library, sens, seen = _p2c_fixture()
+    with caplog.at_level(logging.INFO, logger="lpcstudy"):
+        out = p2c_verification(study, core, library)
+    assert out["same_draws_identical"] is True and out["n_violations"] == 0
+    assert out["n_states"] == 100 and out["splits"] == {"construction": 40, "calibration": 30,
+                                                        "test": 30}
+    assert out["cell"] == {"noise": 0.4, "n_lib": 200, "n_analogs": 1, "draws": 10,
+                           "splits": ["construction", "calibration", "test"]}
+    assert seen == [(name, "oracle", 10, 7) for name in ("construction", "calibration", "test")]
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+    sens["test"] = sens["test"].copy()
+    sens["test"][2] = np.nextafter(sens["test"][2], np.inf)
+    core.splits["test"].moments.noise_sens = sens["test"]
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="lpcstudy"):
+        bad = p2c_verification(study, core, library)
+    assert bad["same_draws_identical"] is False
+    warnings_ = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings_) == 1 and warnings_[0].startswith("toy P2(c) verification FAILED")
+
+    core.setup.n_analogs = 2
+    with pytest.raises(ValueError, match="single nearest analog"):
+        p2c_verification(study, core, library)
