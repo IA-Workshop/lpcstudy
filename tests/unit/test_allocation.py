@@ -220,3 +220,43 @@ def test_regime_weight_rejects_empty_members() -> None:
     moments = moments_from_triples(np.ones((3, 1)), np.ones((3, 1)), np.zeros((3, 1)))
     with pytest.raises(ValueError, match="at least one member"):
         regime_weight(moments, np.array([], dtype=int))
+
+
+# ---------------------------------------------------------------- WU-0002.11a: counters (DEF-0001)
+def test_floor_counters_a5_count_and_leave_outputs_unchanged() -> None:
+    """A5: ``closed_form_floor_count`` and ``pooled_floor_count`` count the bound floors; outputs kept.
+
+    Reference: hand-built inputs, expected counts read off the construction. (a) Squared seeds
+    ``eps^2 = [0.16, 0, 0.5, nan]``, ``delta^2 = [0.81, 0, 0.0, 0.3]``: only the second pair has a
+    sum below 1e-300 (the NaN pair is not counted: ``NaN < x`` is False), count 1. (b) Moments of
+    4 states by 3 horizons with ``E_C = E_P = C = 1`` at (state 0, horizon 0) and 2 elsewhere
+    (``c = E_C + E_P - 2C``: 0 at the one entry, 2 elsewhere): the pool of all states has
+    ``sum c = 6`` at horizon 0, so no floor (count 0); the members [0] alone have ``sum c = 0``
+    at horizon 0, count 1; members [1, 2] count 0. The outputs of ``closed_form_weight``,
+    ``global_weight`` and ``regime_weight`` equal the pre-change expressions bitwise (this is a
+    regression guard: the functions are untouched).
+    """
+    from lpcstudy.allocation import closed_form_floor_count, global_weight, pooled_floor_count
+
+    eps_sq = np.array([0.16, 0.0, 0.5, np.nan])
+    delta_sq = np.array([0.81, 0.0, 0.0, 0.3])
+    assert closed_form_floor_count(eps_sq, delta_sq) == 1
+    old_cf = delta_sq / np.maximum(eps_sq + delta_sq, 1e-300)
+    assert closed_form_weight(eps_sq, delta_sq).tobytes() == old_cf.tobytes()
+
+    e_c = np.full((4, 3), 2.0)
+    e_p = np.full((4, 3), 2.0)
+    cross = np.full((4, 3), 1.0)  # c = 2 + 2 - 2 = 2
+    e_c[0, 0], e_p[0, 0], cross[0, 0] = 1.0, 1.0, 1.0  # c = 0
+    moments = moments_from_triples(e_c, e_p, cross)
+    assert float(curvature(moments)[0, 0]) == 0.0
+    assert pooled_floor_count(moments) == 0
+    assert pooled_floor_count(moments, np.array([0])) == 1
+    assert pooled_floor_count(moments, np.array([1, 2])) == 0
+    old_a2 = np.clip(np.sum(moments.sq_plp - moments.cross, axis=0)
+                     / np.maximum(np.sum(curvature(moments), axis=0), 1e-300), 0.0, 1.0)
+    assert global_weight(moments).tobytes() == old_a2.tobytes()
+    members = np.array([0, 3, 3])
+    old_rw = np.clip(np.sum((moments.sq_plp - moments.cross)[members], axis=0)
+                     / np.maximum(np.sum(curvature(moments)[members], axis=0), 1e-300), 0.0, 1.0)
+    assert regime_weight(moments, members).tobytes() == old_rw.tobytes()

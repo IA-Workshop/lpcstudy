@@ -223,3 +223,75 @@ def test_concat_carries_handled_and_sums_entry_totals() -> None:
     assert both.clip_entries["error_clips_cp"] == 7 and both.cp_err.shape == (5, 2, 3)
     none = _concat_evals([evals(3, None, None), evals(2, None, None)])
     assert none.handled is None and none.clip_entries is None
+
+
+def _flag_moments(n_states: int, cp_cells: list, plp_cells: list, horizons=(10, 30, 60)):
+    """Moments with the given constant (state, horizon) cells; curvature 2 everywhere."""
+    n_hor = len(horizons)
+    moments = moments_from_triples(np.full((n_states, n_hor), 2.0), np.full((n_states, n_hor), 2.0),
+                                   np.full((n_states, n_hor), 1.0))
+    moments.horizons = np.array(horizons)
+    cp = np.zeros((n_states, n_hor), dtype=bool)
+    plp = np.zeros((n_states, n_hor), dtype=bool)
+    for state, hor in cp_cells:
+        cp[state, hor] = True
+    for state, hor in plp_cells:
+        plp[state, hor] = True
+    moments.err_corr = np.zeros((n_states, n_hor))
+    moments.cp_constant, moments.plp_constant = cp, plp
+    return moments
+
+
+def test_moment_counters_a4_union_and_h2e_slice() -> None:
+    """A4: ``zero_variance_corr`` is the union over all horizons; its H_ref slice equals H2e's fields.
+
+    Reference: a hand construction. 4 states, horizons (10, 30, 60), H_ref = 30 (column 1). CP
+    constant at (0,0), (1,1), (2,1), (3,2); PLP constant at (2,1), (0,2), (3,1); so CP 4, PLP 3,
+    both 1 at (2,1), union 4 + 3 - 1 = 6 (D4: an entry that is both CP- and PLP-constant). The
+    H_ref slice, counted by hand: CP at states {1, 2} = 2, PLP at {2, 3} = 2, both {2} = 1. The
+    slice is compared field by field with ``h2e_noise_matching``'s ``cp_constant``,
+    ``plp_constant`` and ``both_constant`` on a cell holding the same moments. Exact integers.
+    """
+    from lpcstudy.analysis import h2e_noise_matching
+    from lpcstudy.pipeline import Cell, moment_counters
+
+    moments = _flag_moments(4, [(0, 0), (1, 1), (2, 1), (3, 2)], [(2, 1), (0, 2), (3, 1)])
+    got = moment_counters(moments, 30)
+    assert got["zero_variance_corr"] == 6 and got["zero_variance_corr_cp"] == 4
+    assert got["zero_variance_corr_plp"] == 3
+    assert got["zero_variance_corr"] == got["zero_variance_corr_cp"] \
+        + got["zero_variance_corr_plp"] - 1
+    cell = Cell(system="lorenz63", noise=0.01, library_size=1000, label="stub", setup=None,
+                splits={"test": SplitData(moments, None)}, oracles={}, horizons=moments.horizons)
+    h2e = h2e_noise_matching({(0.01, 1000): cell}, StudyConfig())["zero_variance_corr"]["0.01"]["1000"]
+    assert (h2e["cp_constant"], h2e["plp_constant"], h2e["both_constant"]) == (2, 2, 1)
+    cp, plp = moments.cp_constant[:, 1], moments.plp_constant[:, 1]
+    assert (int(cp.sum()), int(plp.sum()), int((cp & plp).sum())) == (2, 2, 1)
+
+
+def test_moment_counters_a5_floors_and_bad_input() -> None:
+    """A5: ``curvature_floor`` and ``decisive_floor`` count one entry each; bad moments raise.
+
+    Reference: hand moments, 4 states x 3 horizons (10, 30, 60), H_ref 30. ``E_C = E_P = 2``,
+    ``C = 1`` give ``c = 2``; the entry (0, 0) has ``E_C = E_P = C = 1`` so ``c = 0`` exactly (one
+    curvature floor); state 2 has ``E_P = 0`` at H_ref (column 1) with ``C = 0`` (one decisive
+    floor; ``c = 2``, no curvature floor). A cancellation case: (1, 2) has ``C`` just above
+    ``(E_C + E_P) / 2`` so ``c < 0`` (counted: the expression is ``curvature(moments) < 1e-300``).
+    Expected ``curvature_floor == 2``, ``decisive_floor == 1``. Moments without the masks and an
+    unknown ``H_ref`` raise ``ValueError`` (PRIME.4).
+    """
+    from lpcstudy.pipeline import moment_counters
+
+    moments = _flag_moments(4, [], [])
+    moments.sq_cp[0, 0], moments.sq_plp[0, 0], moments.cross[0, 0] = 1.0, 1.0, 1.0
+    moments.sq_plp[2, 1], moments.cross[2, 1] = 0.0, 0.0
+    moments.cross[1, 2] = 2.0 + 1e-3  # c = 2 + 2 - 2 * 2.001 = -0.002 < 0
+    assert float(curvature(moments)[1, 2]) < 0.0
+    got = moment_counters(moments, 30)
+    assert got["curvature_floor"] == 2 and got["decisive_floor"] == 1
+    assert got["zero_variance_corr"] == 0
+    bare = moments_from_triples(np.ones((2, 3)), np.ones((2, 3)), np.ones((2, 3)))
+    with pytest.raises(ValueError, match="masks"):
+        moment_counters(bare, 2)
+    with pytest.raises(ValueError, match="reference horizon"):
+        moment_counters(moments, 31)

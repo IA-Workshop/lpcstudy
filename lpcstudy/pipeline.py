@@ -29,7 +29,7 @@ from .ensemble import CORRELATION_FIELDS, AnalogLibrary, EnsembleMoments, Evalua
     ForecastSetup, ensemble_moments, evaluation_draws
 from .estimation import StateEstimator
 from .networks import train_estimator
-from .oracle import StateOracles, excess_mse, oracle_weight, realized_horizon, \
+from .oracle import StateOracles, curvature, excess_mse, oracle_weight, realized_horizon, \
     state_oracles
 from .statistics import kaplan_meier
 from .systems import make_flow_step
@@ -274,6 +274,51 @@ class Study:
                  library_size, core, label, time.time() - start)
         return Cell(system=system, noise=noise, library_size=library_size, label=label,
                     setup=setup, splits=splits, oracles=oracles, horizons=horizons)
+
+
+# --------------------------------------------------------------- handling counters
+def moment_counters(moments: EnsembleMoments, reference_horizon: int) -> dict[str, int]:
+    """Counters derived from the stored moment arrays (DEF-0001; no instrumentation needed).
+
+    * ``zero_variance_corr``: moment entries (state, horizon) whose CP **or** PLP error is
+      constant over the oracle draws, so the correlation was set to 0 (the union D4 of the
+      mathematics review); ``_cp`` and ``_plp`` are its parts, so
+      ``zero_variance_corr == _cp + _plp - both``. Over all horizons; the ``H_ref`` slice is the
+      one H2e reports.
+    * ``curvature_floor``: entries with ``c = E[(e_C - e_P)^2] < 1e-300`` (the expression of
+      ``oracle.curvature``, so negatives from cancellation count); under P1(a)
+      ``c >= rho^2 / k``, so this is a sentinel.
+    * ``decisive_floor``: states with ``E[e_P^2] < 1e-300`` at ``H_ref`` (the floor of the
+      decisive ratio in ``score_rules``); a sentinel.
+
+    Parameters
+    ----------
+    moments : EnsembleMoments
+        Oracle moments of a cell split, built by ``ensemble_moments`` (they carry the masks).
+    reference_horizon : int
+        ``H_ref`` in steps.
+
+    Returns
+    -------
+    dict[str, int]
+        The five counters.
+
+    Raises
+    ------
+    ValueError
+        If the moments carry no ``cp_constant`` and ``plp_constant``, or ``H_ref`` is not among
+        the horizons.
+    """
+    if moments.cp_constant is None or moments.plp_constant is None:
+        raise ValueError("moment_counters needs moments from ensemble_moments (constancy masks)")
+    where = np.nonzero(moments.horizons == reference_horizon)[0]
+    if where.size == 0:
+        raise ValueError(f"reference horizon {reference_horizon} is not among the horizons")
+    cp, plp = moments.cp_constant, moments.plp_constant
+    return {"zero_variance_corr": int((cp | plp).sum()), "zero_variance_corr_cp": int(cp.sum()),
+            "zero_variance_corr_plp": int(plp.sum()),
+            "curvature_floor": int((curvature(moments) < 1e-300).sum()),
+            "decisive_floor": int((moments.sq_plp[:, where[0]] < 1e-300).sum())}
 
 
 # ---------------------------------------------------------------------- fitting

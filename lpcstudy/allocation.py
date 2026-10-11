@@ -189,6 +189,51 @@ def closed_form_weight(eps_sq: np.ndarray, delta_sq: np.ndarray) -> np.ndarray:
     return delta_sq / np.maximum(eps_sq + delta_sq, 1e-300)
 
 
+def closed_form_floor_count(eps_sq: np.ndarray, delta_sq: np.ndarray) -> int:
+    """Entries on which the ``1e-300`` floor of :func:`closed_form_weight` binds (DEF-0001).
+
+    The floor binds where ``eps^2 + delta^2 < 1e-300``. Under the theory ``eps^2 > 0`` (FW
+    Lemma 1), so a nonzero count on oracle seeds (A4o) or on proxies (A4) is a sentinel. NaN
+    does not count (``NaN < x`` is False); it propagates to the weight.
+
+    Parameters
+    ----------
+    eps_sq, delta_sq : np.ndarray
+        Squared seeds, any common shape.
+
+    Returns
+    -------
+    int
+        Number of entries with ``eps_sq + delta_sq < 1e-300``.
+    """
+    return int(np.sum(eps_sq + delta_sq < 1e-300))
+
+
+def pooled_floor_count(moments: EnsembleMoments, members: np.ndarray | None = None) -> int:
+    """Horizons at which a pooled curvature is below the ``1e-300`` floor (A2, regime weights).
+
+    The pool is all states (A2, :func:`global_weight`) or the given members
+    (:func:`regime_weight`); the denominator is ``sum_i c_i`` per horizon, the expression of
+    those functions. Under P1(a) every ``c_i >= rho^2 / k > 0``, so a nonzero count is a
+    sentinel.
+
+    Parameters
+    ----------
+    moments : EnsembleMoments
+        Oracle moments, arrays ``(n, nH)``.
+    members : np.ndarray, optional
+        State indices of the pool (default: all states).
+
+    Returns
+    -------
+    int
+        Number of horizons with ``sum c < 1e-300``.
+    """
+    curv = curvature(moments)
+    denominator = np.sum(curv if members is None else curv[np.asarray(members)], axis=0)
+    return int(np.sum(denominator < 1e-300))
+
+
 @dataclass
 class ErrorPredictor:
     """Heuer-inspired allocator: learned per-forecaster error magnitudes.
