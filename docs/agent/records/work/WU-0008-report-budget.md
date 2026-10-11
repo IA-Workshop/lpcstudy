@@ -553,6 +553,29 @@ Result of run 10: `2 failed, 363 passed in 26.78s`, both test errors of mine in 
 
 Result of run 11: `365 passed in 28.31s`. Report-only on the stored DEV-0 pilot results at this head: no exception, F1 printed in the H2a(i) table, "not estimated: no ci_mc_se in these results (written before WU-0008.2a)" in the bootstrap row (the pilot predates .2a). **Still pending (the `v1-baseline` pilot is running):** (1) the A1 smoke at the head: `LPC_THREADS=4 tools/run_preset.sh smoke DEV-0 runs/new`, then `.venv/bin/python <scratchpad>/leafcmp.py runs/base/smoke/results.json runs/new/smoke/results.json`; the new-only leaves must be the `ci_mc_se` ones, all null at smoke (B = 50, rule 3); (2) the integration pair: `LPC_THREADS=4 tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`; (3) the slow exact checks: `tools/run_tests.sh slow --background "tests/slow/test_analysis_coverage.py::test_exact_checks[C4-0.0]" "...[C4-0.3]" "...[C7-0.0]" "...[C7-0.3]" "...[C8-0.0]" "...[C8-0.3]"` (node ids as in `--collect-only`, once).
 
+### 2026-10-11, developer claude-sonnet-5-5: fix round 2 (R17 to R21)
+
+Merged develop first (own command; conflicts in `tests/unit/fixtures/lpcstudy_graph.json` and `docs/agent/records/work/queue.md`; no marker left, grep over docs, lpcstudy, tests, tools). The fixture takes develop's version (its edge `experiments -> provenance`, checked against the imports of `experiments.py`, `provenance.py`, `data.py`, `__main__.py` and `report.py`, which agree with the 22 rows) plus this unit's `budget` row, the `report -> budget` edge and the description sentence; `queue.md` keeps both sides' entries.
+
+- **R17 (records).** The source of the five row-1 Included cells, the row-9 DEF-0020 sentence, the widening sentence (the uq-budget rule only) and R_ref per case (C1, C4, C8: 40000; C3, C7, C4h: 20000) is **DEC-0024 addendum A1** (`docs/agent/records/decisions.md`, commit 9fcfa76 on develop), which **amends M1 (a) and M7** of the design. `ORACLE_INCLUDED`, `DEF0020_TEXT`, `WIDENING_SENTENCE` and `COVERAGE_WU0006` cite it in `budget.py`; `test_included_cell_of_the_oracle_row_is_per_qoi` and `test_interval_procedure_cell_names_both_seed_sources_and_def0020_correctly` now parse the addendum from the decisions file (reachable in the worktree after the merge) and compare, with the literals kept as a second copy. No other test says "wording supplied in fix round 1".
+- **R18.** The row-1 How text names the "Included in the reported interval?" column.
+- **R19.** `ITERATIVE_LABEL` is now `iterative_label(config)`, reading `config.estimator_refine_steps` (and the LM diagnostic's "n → 2n" likewise); tested with 30.
+- **R20.** The R15 correction (3) in the entry above is **void**: it "corrects" a statement about `used_M` in the `.2a` entry, and that entry has no such statement. Corrections (1) and (2) stand.
+- **R21.** `m2_coverage.log` (in `docs/agent/notes/2026-10-11-math-wu0006-scripts/`, reachable) gives R per case: `test_coverage_r_ref_and_rates_equal_the_reference_run_log` parses R_ref, rate and SE for every case and replaces the "no parseable source" test, whose docstring was wrong.
+- At the last check `pgrep -fa lpcstudy` shows no preset (the `v1-baseline` pilot finished: "study finished in 5490s"), so the A1 smoke, the integration pair and the slow exact checks follow below, each after its checklist.
+
+**Test run 12 (R17 to R21; unit radius).** Checklist:
+1. Change set: `lpcstudy/budget.py`, `tests/unit/test_budget.py`, this file; the merge brought `__main__`, `data`, `experiments`, `provenance`, `report` changes from develop and the fixture.
+2. Radius: `tools/test_impact.py --base develop --explain`: unit `test___main__`, `test_allocation`, `test_analysis`, `test_budget`, `test_experiments`, `test_identifiers`, `test_pipeline`, `test_report`, `test_statistics`, `test_tools_test_impact`, `test_validation`; by hand `test_provenance.py` and `test_data.py` (develop changed `provenance` and `data`, and the fixture merge touches the graph test).
+3. Already run? No: new code and the merged tree.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s.
+6. Contention: unit tier; no preset running.
+7. Output: `-q --tb=short -rfE`.
+8. Command: `LPC_THREADS=4 tools/run_tests.sh unit tests/unit/test___main__.py tests/unit/test_allocation.py tests/unit/test_analysis.py tests/unit/test_budget.py tests/unit/test_experiments.py tests/unit/test_identifiers.py tests/unit/test_pipeline.py tests/unit/test_report.py tests/unit/test_statistics.py tests/unit/test_tools_test_impact.py tests/unit/test_validation.py tests/unit/test_provenance.py tests/unit/test_data.py`.
+
+Result of run 12: `422 passed in 35.79s`.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>

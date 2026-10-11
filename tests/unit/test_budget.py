@@ -26,6 +26,9 @@ from lpcstudy.report import make_figures, verdicts, write_markdown
 TAGS = ("procedure:", "level:", "dependence:", "multiplicity:")
 NUMERIC_INTERVAL = re.compile(r"\[-?\d[\d.e+-]*, -?\d[\d.e+-]*\]")
 ROOT = Path(__file__).resolve().parents[2]
+DECISIONS = ROOT / "docs" / "agent" / "records" / "decisions.md"
+M2_COVERAGE_LOG = (ROOT / "docs" / "agent" / "notes" / "2026-10-11-math-wu0006-scripts"
+                   / "m2_coverage.log")
 PROPOSAL = ROOT / "docs" / "study" / "proposal_and_methods_v3.md"
 
 
@@ -746,28 +749,52 @@ def test_markdown_has_the_budget_section_between_validation_and_robustness(
     assert heads[i - 1] == "## Validation gate" and heads[i + 1] == "## Figures"
 
 
-def test_coverage_r_ref_is_the_hand_transcription_of_the_math_note() -> None:
-    """R_ref of each case: 40000 for C1, C4, C8; 20000 for C3, C7 and C4h (hand transcription).
+def test_coverage_r_ref_and_rates_equal_the_reference_run_log() -> None:
+    """R_ref, rate and SE of each case equal the reference run's own log (R21).
 
-    Reference: the applied-mathematician's statement (fix round 1) from the math note and its
-    scripts: the C7 pooled 60000 applies to its verdict counts only. The note gives the range
-    "10^4 to 4*10^4" generically, so this is a transcription, not a parse. Exact.
+    Reference: ``m2_coverage.log`` of the WU-0006 math scripts (the scratch run, seed 20261011),
+    one line per case and phi: "C8 phi=0.3 R=40000 ... L0.9833: cov=0.9682(se 0.0009)"; the C4h
+    rows are the log's ``C4_sigma1.5c0.8`` and ``C4_sigma2.0c0.8`` lines. Parsed, so R_ref per
+    case is read, not typed. The values also equal DEC-0024 addendum A1 (R_ref 40000 for C1, C4,
+    C8; 20000 for C3, C7 and C4h; C7's pooled 60000 is for its verdict counts only), checked by
+    the constants below, written out from the addendum. Exact.
     """
-    expected = {"C1": 40000, "C4": 40000, "C8": 40000, "C3": 20000, "C7": 20000,
+    parsed = {}
+    for ln in M2_COVERAGE_LOG.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"(C\d(?:_sigma[\d.]+c0\.8)?) phi=([\d.]+) R=(\d+) .*?L0\.9833: "
+                     r"cov=([\d.]+)\(se ([\d.]+)\)", ln)
+        if m:
+            name = {"C4_sigma1.5c0.8": "C4h1.5", "C4_sigma2.0c0.8": "C4h2"}.get(m.group(1),
+                                                                               m.group(1))
+            parsed[(name, float(m.group(2)))] = (int(m.group(3)), float(m.group(4)),
+                                                 float(m.group(5)))
+    assert len(parsed) >= 14
+    for key, case in budget.COVERAGE_WU0006.items():
+        assert (case.r_ref, case.rate, case.rate_se) == parsed[key], key
+    addendum = {"C1": 40000, "C4": 40000, "C8": 40000, "C3": 20000, "C7": 20000,
                 "C4h1.5": 20000, "C4h2": 20000}
     assert {k: v.r_ref for k, v in budget.COVERAGE_WU0006.items()} == {
-        (case, phi): r for case, r in expected.items() for phi in (0.0, 0.3)
+        (case, phi): r for case, r in addendum.items() for phi in (0.0, 0.3)
         if (case, phi) in budget.COVERAGE_WU0006}
+
+
+def addendum_a1() -> str:
+    """The text of DEC-0024 addendum A1 in the decisions file (the reference for the wording)."""
+    text = DECISIONS.read_text(encoding="utf-8")
+    start = text.index("## DEC-0024 addendum A1")
+    end = text.find("\n## ", start + 5)
+    return text[start:end if end != -1 else len(text)]
 
 
 def test_interval_procedure_cell_names_both_seed_sources_and_def0020_correctly() -> None:
     """R9 and R13: reference seed 20261011 with R_ref and run-2 seed 6006; DEF-0020 stated truly.
 
-    Reference: the review's wording (the reference rates come from the scratch seed 20261011, the
-    run-2 counts from make_rng(6006, ...)); DEF-0020's Resolution (Option C or K only decides
-    whether the WU-0006 ROADMAP-bound rows stay asserted; widening or another procedure is a
-    separate design question). The widening sentence cites the uq-budget rule, not DEF-0020 or
-    DEC-0018. Exact substring checks.
+    Reference: DEC-0024 addendum A1, parsed from the decisions file (row 9 text between backticks;
+    the reference rates come from the scratch seed 20261011, the run-2 counts from
+    make_rng(6006, ...)); DEF-0020's Resolution (Option C or K only decides whether the WU-0006
+    ROADMAP-bound rows stay asserted; widening or another procedure is a separate design
+    question). The widening sentence cites the uq-budget rule, not DEF-0020 or DEC-0018. Exact
+    substring checks.
     """
     results, systems = budget_results(full_system(), names=("lorenz63",))
     tables = tables_of(budget.budget_lines(results, systems, SMOKE))
@@ -779,14 +806,19 @@ def test_interval_procedure_cell_names_both_seed_sources_and_def0020_correctly()
     assert "separate, undecided design question for the owner and the applied-mathematician" in h2b
     assert "widening or another procedure (Option C or K)" not in h2b
     assert "registered seed" in h2b and "synthetic, seed 6006" not in h2b
+    row9 = re.search(r"\*\*Row 9 \(DEF-0020\)\.\*\* `([^`]+)`", addendum_a1()).group(1)
+    assert row9.rstrip(".") == budget.DEF0020_TEXT and row9.rstrip(".") in h2b
+    assert "scratch seed 20261011" in addendum_a1() and "make_rng(6006" in addendum_a1()
     assert "DEF-0020" not in budget.WIDENING_SENTENCE and "DEC-0018" not in budget.WIDENING_SENTENCE
     assert "uq-budget skill is to widen the interval or refine" in budget.WIDENING_SENTENCE
 
 
 def test_included_cell_of_the_oracle_row_is_per_qoi() -> None:
-    """R10: the Included cell of row 1 is the applied-mathematician's wording for each QoI.
+    """R10: the Included cell of row 1 is the wording of DEC-0024 addendum A1 for each QoI.
 
-    Reference: the wording supplied in fix round 1, written out here; each at most 140 characters;
+    Reference: the five bullets of DEC-0024 addendum A1, parsed from the decisions file (the
+    hand-written literals below are the same text, kept as a second copy); each at most 140
+    characters;
     H3c says the test-state M draws do not enter and the fit-stage noise is conditioned on; no
     table says the variance is inside "every" primary interval; the H2a(ii) table carries the note
     that the w* = 1 part is decided once on the full sample. Exact.
@@ -805,7 +837,11 @@ def test_included_cell_of_the_oracle_row_is_per_qoi() -> None:
                    "N_lib); finite-M clip-boundary bias: no",
         "H3c": "no: test-state M draws do not enter the QoI; fit-stage M-draw noise (A4 proxies; "
                "A5 tree, leaf weights, K) is conditioned on"}
-    for qoi, text in expected.items():
+    parsed = dict(re.findall(r"^- (H2a\(i\)|H2a\(ii\), all parts|H2b\(i\)|H2b\(ii\)|H3c): `([^`]+)`",
+                             addendum_a1(), re.M))
+    parsed["H2a(ii)"] = parsed.pop("H2a(ii), all parts")
+    assert parsed == expected  # the literals equal the addendum
+    for qoi, text in parsed.items():
         cell = tables[budget.QOI_TITLES[qoi]][0][4]
         assert cell == text and len(cell) <= 140, qoi
     text = "\n".join(lines)
@@ -923,3 +959,29 @@ def test_lm_row_text_is_true_whatever_the_merge_order(monkeypatch: pytest.Monkey
     assert cell() == "not estimated: WU-0005.4 summary absent from results"
     monkeypatch.setattr(budget, "LM_SUMMARY_PATH", ("handling", "lm"))
     assert "median residual/(3.36ρ²) = " in cell()
+
+
+def test_iterative_label_reads_the_configured_iteration_budget(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """R19: the label's iteration count is ``config.estimator_refine_steps``, not a literal.
+
+    Reference: the config field (15 in every preset, 30 in a changed configuration, set in the
+    test); the label of a primary row reads "fixed 30-iteration" then and the LM diagnostic
+    sentence "30 → 60". R18: the row-1 how-text names the Included column. Exact substrings.
+    """
+    config = dataclasses.replace(SMOKE, estimator_refine_steps=30)
+    row = next(r for r in HYPOTHESIS_TABLE if r.key == "H3c")
+    label = budget.interval_label(row, 1.0 - 0.05 / 3.0, config)
+    assert "the fixed 30-iteration Levenberg–Marquardt error" in label and "15-iteration" not in label
+    assert "the fixed 15-iteration Levenberg–Marquardt error" in budget.interval_label(
+        row, 1.0 - 0.05 / 3.0, SMOKE)
+    results, systems = budget_results(full_system(), names=("lorenz63",))
+    rows = tables_of(budget.budget_lines(results, systems, config))[budget.QOI_TITLES["H3c"]]
+    assert "'Included in the reported interval?' column" in rows[0][2]
+    assert "is in the next column" not in rows[0][2]
+    monkeypatch.setattr(budget, "LM_SUMMARY_PATH", ("handling", "lm"))
+    system = full_system()
+    system["handling"] = {"lm": {"median_residual": 1.0, "fraction_no_decrease": 0.0}}
+    results, systems = budget_results(system, names=("lorenz63",))
+    lm = tables_of(budget.budget_lines(results, systems, config))[budget.QOI_TITLES["H3c"]][4][3]
+    assert "needs a 30 → 60 iteration refinement of the QoI" in lm

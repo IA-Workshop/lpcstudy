@@ -101,8 +101,18 @@ def _dependence(config: StudyConfig, what: str = "test states") -> str:
             f"(Künsch 1989), so dependence is kept within a block and none is assumed beyond it")
 
 
-ITERATIVE_LABEL = ("iterative error: the fixed 15-iteration Levenberg–Marquardt error of the PLP "
-                   "estimator is not estimated and is unverified (DEC-0024)")
+def iterative_label(config: StudyConfig) -> str:
+    """The statement that the iterative error of the PLP estimator is unverified (DEC-0024).
+
+    The number of iterations is ``config.estimator_refine_steps`` (the fixed Levenberg–Marquardt
+    budget of the estimator), so the label stays true under a study with another budget.
+    """
+    return (f"iterative error: the fixed {config.estimator_refine_steps}-iteration "
+            "Levenberg–Marquardt error of the PLP estimator is not estimated and is unverified "
+            "(DEC-0024)")
+
+
+
 H3B_COVERAGE = ("coverage not measured: the interval conditions on the fitted proxies and is not "
                 "guaranteed to cover, because the split variable can switch between resamples "
                 "(the bootstrap of a non-smooth functional; the WU-0006 coverage study has no "
@@ -166,7 +176,7 @@ def interval_label(row: Hypothesis, level: float, config: StudyConfig) -> str:
              f"multiplicity: {multiplicity}")
     if row.key == "H3b":
         return f"{label}; {H3B_COVERAGE}"
-    return f"{label}; {ITERATIVE_LABEL}" if row.key in PRIMARY_KEYS else label
+    return f"{label}; {iterative_label(config)}" if row.key in PRIMARY_KEYS else label
 
 
 def interval_label_lines(results: dict, systems: list[str], config: StudyConfig) -> list[str]:
@@ -397,6 +407,8 @@ WIDENING_SENTENCE = ("A numerical row at or above 10% of the sampling half-width
                      "widened: the rule of the uq-budget skill is to widen the interval or "
                      "refine, and which of the two is the owner's choice; this report does not "
                      "widen.")
+# The texts of ORACLE_INCLUDED, DEF0020_TEXT, WIDENING_SENTENCE and the R_ref of COVERAGE_WU0006
+# are those of DEC-0024 addendum A1 (docs/agent/records/decisions.md), which amends M1 (a) and M7.
 DEF0020_TEXT = ("DEF-0020: Option C or K (DEC-0018; owner, pending; K in force by default via "
                 "ASSERT_ROADMAP_BOUNDS = True) decides only whether the WU-0006 ROADMAP-bound "
                 "coverage rows stay asserted (K) or become recorded characterization rows with "
@@ -505,8 +517,8 @@ ORACLE_INCLUDED = {
                "finite-M clip-boundary bias: no",
     "H3c": "no: test-state M draws do not enter the QoI; fit-stage M-draw noise (A4 proxies; A5 "
            "tree, leaf weights, K) is conditioned on"}
-"""Row 1 of the Included column by QoI (the applied-mathematician's wording, fix round 1; it
-amends M1 and decision (a): the M-draw variance is inside the interval of H2a and H2b, and not in
+"""Row 1 of the Included column by QoI (the applied-mathematician's wording, DEC-0024 addendum A1;
+it amends M1 (a) and M7: the M-draw variance is inside the interval of H2a and H2b, and not in
 H3c's)."""
 H2A_ONE_NOTE = ("Whether the w* = 1 part is added at all is decided once on the full sample and is "
                 "not resampled.")
@@ -751,7 +763,8 @@ def _lm_cell(system: dict, config: StudyConfig) -> tuple[str, str]:
     decrease = block.get("fraction_no_decrease")
     return (NOT_ESTIMATED + "residual and iteration summary do not convert to the QoI scale "
             "(excess residual bounds the error in the observation metric only; cond(JᵀJ) ≈ 1e7); "
-            "needs a 15 → 30 iteration refinement of the QoI; diagnostic (core cell): median "
+            f"needs a {config.estimator_refine_steps} → {2 * config.estimator_refine_steps} "
+            "iteration refinement of the QoI; diagnostic (core cell): median "
             f"residual/(3.36ρ²) = {ratio_text}, fraction no decrease = "
             f"{'n/a' if decrease is None else _num(float(decrease))}", "not estimated")
 
@@ -869,7 +882,7 @@ def _how(qoi: str, row: int, config: StudyConfig, level: float) -> str:
     return (
         "V4 convergence check (core cell, ρ = 1%, N_lib = 10⁴, H_ref only); the finite-M bias is "
         "stated, not sized; F1 and F2 are indicative formulas (WU-0008 M3); whether the M-draw "
-        "variance is inside the interval is in the next column",
+        "variance is inside the interval is in the 'Included in the reported interval?' column",
         "moving-block bootstrap percentile interval (label below); size = half-width (hi − lo)/2",
         f"binomial error of the percentile index, converted to the statistic's scale: SE = "
         f"(Q(q + d) − Q(q − d))/2, d = √(q(1 − q)/B), B = {resamples} "
