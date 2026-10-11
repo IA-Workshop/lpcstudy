@@ -488,6 +488,11 @@ The full form is the addendum A1 to A8 of `docs/agent/notes/2026-10-11-math-wu00
 4. Device: `JAX_PLATFORMS=cpu`. 5. Threads and time: `LPC_THREADS=8` as the main session commands; the harness's `pool_size()` is `min(LPC_THREADS, 4)` (plan O1), so the pool is still 4 single-thread workers (I did not change the cap); about 12 minutes; timeout 3600 s. 6. Contention: a DEV-0 pilot runs in another worktree (permitted by the owner's authorization); no other slow run here; no GPU. 7. `-q --tb=short -rfE` by the wrapper, plus `--durations=10`.
 8. Command: `LPC_THREADS=8 tools/run_tests.sh slow --background --durations=10 tests/slow/test_analysis_null_delta_r2.py`.
 
+**Test run 7 result.** `2 failed, 16 passed in 751.90s (0:12:31)` (`runs/tests/slow-20261011T175622Z.log`, exit 1; 4 workers, 377 s and 374 s per phi). The counts are identical to run 2 (same design and seeds, deterministic): N1 467 and 460 (phi 0, logit and indicator), 457 and 467 (phi 0.3); N2 8, 10, 8, 8; N3 475, 475, 478, 476; refit bitwise 500 of 500 in all four rows; failed resamples 0.
+- **Passed (16):** the 2 refit nodes; **all 12 consistency nodes** (every N1, N2, N3 count lies inside its A9 range, for both targets and both phi); and both `test_roadmap_false_distinct_rate_and_conditional_coverage` nodes (N2 8 to 10 of 500 against <= 22, N3 475 to 478 against >= 461).
+- **Failed (2), a finding, not tuned:** `test_roadmap_interval_contains_zero[0.0]` (indicator N1 460 of 500 < 461; A9 P(fail) 0.19, count inside its range 440-487) and `[0.3]` (logit N1 457 of 500 < 461; P(fail) 0.41, range 434-484). Class "method" (predicted estimand mismatch: the interval targets the conditional gain, mean -0.0027 to -0.0033, not the population gain 0), not a defect. Under Option C they would be recorded, not asserted.
+- No range, bound, R, B, level or seed was changed.
+
 ## Review
 
 ## Audit
