@@ -676,3 +676,47 @@ def test_key_numbers_show_inconclusive_h1c_h2c_h2d_with_their_reasons() -> None:
     system["H2d"] = dict(system["H2d"], verdict="inconclusive", reason="interval meets band edge")
     assert _key_number("H2d", system) == \
         "A4/A3-1 = 5% [4, 6]%: inconclusive (interval meets band edge)"
+
+
+# ------------------------------------------------- WU-0005.5: Theorem P2(c) verification subsection
+def _p2c_block(violations: int, chain: tuple[int, ...], spread: dict, same: bool | None) -> dict:
+    """The fields of ``verification.P2c`` that the report reads (hand-planned values)."""
+    return {"n_states": 1400, "n_violations": violations,
+            "n_chain_violations": dict(zip(("N_le_A", "A_le_B", "p2a", "triangle", "consistency"),
+                                           chain)),
+            "n_switching_states": 1052, "n_zero_bound_states": 12,
+            "tightness": {"N_over_sqrt_B": spread}, "same_draws_identical": same}
+
+
+def test_markdown_p2c_section_is_labelled_report_only_and_shows_defects(tmp_path: Path) -> None:
+    """The validation section has the P2(c) subsection: label, one row per system, defects bold.
+
+    Reference: hand strings (WU-0005.5 plan, ``results.json`` and report paragraph). Lorenz has
+    no violation and the draws match (``yes``); rossler has 3 violating states, a chain count per
+    item, no state with B > 0 (median ``None`` gives "n/a") and a bitwise mismatch (``NO:
+    DEFECT``); chua has no block and must show "n/a", not a skipped row (PRIME.4). The label
+    sentence is verbatim from the plan. The numbers use the ``.3g`` rule of ``_fmt``. Exact
+    strings, no tolerance.
+    """
+    config = dataclasses.replace(SMOKE, core_systems=("lorenz63", "rossler", "chua"))
+    results, _ = fake_results("DEV-0")
+    systems = {name: fake_system(config) for name in config.core_systems}
+    systems["lorenz63"]["verification"] = {"P2c": _p2c_block(
+        0, (0, 0, 0, 0, 0), {"n_states": 1388, "median": 0.1724, "p90": 0.3312, "max": 0.4611}, True)}
+    systems["rossler"]["verification"] = {"P2c": _p2c_block(
+        3, (1, 2, 0, 0, 1), {"n_states": 0, "median": None, "p90": None, "max": None}, False)}
+    results["systems"] = systems
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    start = lines.index("### Theorem P2(c) bound (verification check, not a hypothesis)")
+    assert start > lines.index("### Largest Lyapunov exponent against published values")
+    section = lines[start:]
+    assert "| lorenz63 | 1400 | 0 | 0, 0, 0, 0, 0 | 1052 | 12 | 0.172, 0.331, 0.461 | yes |" \
+        in section
+    assert "| rossler | 1400 | **3: DEFECT** | 1, 2, 0, 0, 1 | 1052 | 12 | n/a | **NO: DEFECT** |" \
+        in section
+    assert "| chua | n/a: no P2(c) result | | | | | | |" in section
+    assert any(row.startswith("Verification check (NVVUQ.14, v3 Theorem P2(c)); not a hypothesis "
+                              "test; no verdict; not in the validation gate.") for row in section)
+    assert "P2c" not in "".join(lines[:lines.index("## Validation gate")])  # no verdict row

@@ -19,8 +19,9 @@ import numpy as np
 from . import analysis as an
 from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
-from .data import make_rng
+from .data import SPLITS, make_rng
 from .dynamics import make_finite_growth
+from .embedding import delay_vectors
 from .ensemble import CORRELATION_FIELDS, DRAW_COLUMN, DRAW_COUNTERS, ENTRY_COUNTERS, \
     AnalogLibrary, forecast_draws
 from .identifiers import check_keys
@@ -28,7 +29,7 @@ from .oracle import oracle_weight
 from .pipeline import ALL_COUNTERS, COUNTER_DENOMINATOR, HANDLING_SCHEMA, Cell, FittedRules, \
     Study, check_record, fit_rules, rule_weights, score_rules
 from .validation import check_cp_horizon, check_cramer_rao, check_integrator, \
-    check_jacobians, check_kaplan_meier, gate_status
+    check_jacobians, check_kaplan_meier, check_p2_bound, gate_status
 
 LOG = logging.getLogger("lpcstudy")
 
@@ -139,6 +140,57 @@ def _cp_horizon_check(study: Study, core: Cell, library: AnalogLibrary, vt: np.n
     out = check_cp_horizon(core.setup, library, vt, vv, cfg.horizon_max, 0.4,
                            cfg.steps_per_lyapunov, cfg.reference_horizon)
     study.record_cell(core.system, core.label, "V3-cp-horizon", check_record(**out.pop("handling")))
+    return out
+
+
+def p2c_verification(study: Study, core: Cell, library: AnalogLibrary) -> dict:
+    """Theorem P2(c) checked on the core cell, state by state (``verification.P2c``, WU-0005.5).
+
+    A verification check (NVVUQ.14), not a hypothesis test: it carries no verdict and is not part
+    of the validation gate. It uses the core cell's library and the same oracle noise draws on
+    all three splits, recomputes ``N`` with them and compares it bitwise with the cell's
+    ``noise_sens`` (``same_draws_identical``). The checks and their slack are those of
+    :func:`lpcstudy.validation.p2_bound_terms`. It draws no new random numbers (the oracle noise
+    is regenerated from the same ``make_rng`` labels) and changes no other result.
+
+    A violation, or a mismatch with ``noise_sens``, is a defect and is written to the run log as
+    one ``WARNING`` line (PRIME.4); it is never a tolerance to widen.
+
+    Parameters
+    ----------
+    study : Study
+        The study (configuration and the noise generators).
+    core : Cell
+        The core cell (``k = 1``).
+    library : AnalogLibrary
+        The core library (built as ``run_cell`` built it).
+
+    Returns
+    -------
+    dict
+        :func:`lpcstudy.validation.check_p2_bound` plus ``cell`` (noise, library size, analogs,
+        draws, splits).
+    """
+    cfg = study.config
+    ctx = core.ctx
+    if core.setup.n_analogs != 1:
+        raise ValueError(f"P2(c) is stated for the single nearest analog, got "
+                         f"k = {core.setup.n_analogs}")
+    cleans = {s: delay_vectors(ctx.eval_clean, ctx.split_indices[s], ctx.delay, ctx.embed_dim)
+              for s in SPLITS}
+    noises = {s: study.unit_noise(ctx, s, "oracle", cfg.n_oracle_draws, ctx.embed_dim)
+              for s in SPLITS}
+    sensitivity = {s: core.splits[s].moments.noise_sens for s in SPLITS}
+    out = check_p2_bound(library, cleans, noises, core.noise, sensitivity)
+    out["cell"] = {"noise": core.noise, "n_lib": core.library_size, "n_analogs": 1,
+                   "draws": cfg.n_oracle_draws, "splits": list(SPLITS)}
+    if out["n_violations"] or not out["same_draws_identical"]:
+        LOG.warning("%s P2(c) verification FAILED (a defect, not a tolerance): %d of %d states "
+                    "violate (chain %s, headline %d), same_draws_identical = %s",
+                    core.system, out["n_violations"], out["n_states"], out["n_chain_violations"],
+                    out["n_headline_violations"], out["same_draws_identical"])
+    LOG.info("%s P2(c) verification: %d of %d states violate, %d switching states",
+             core.system, out["n_violations"], out["n_states"], out["n_switching_states"])
     return out
 
 
@@ -352,6 +404,8 @@ def run_system(study: Study, system: str) -> dict:
         "convergence": convergence_check(study, core),
         "estimators": {k: v for k, v in study.estimator_log.items() if system in k}}
     LOG.info("%s validation (V1-V6; the gate is set after V7): %s", system, res["validation"])
+    # Verification, not validation: report-only, outside the gate (WU-0005.5, NVVUQ.14).
+    res["verification"] = {"P2c": p2c_verification(study, core, library)}
 
     rules = fit_rules([core], cfg)
     study.record_rules(system, core, rules)
