@@ -347,6 +347,58 @@ Tightened: Lorenz 3% → 1%. Unchanged: Rössler 3% (both references) and memo 1
 - **Reviewer:** <actor, not the author>
 - **Findings and resolution:**
 
+### 2026-10-11 Independent review, round 1 (reviewer, claude-opus-5-5, fresh context)
+
+Scope: commits a3526db, 80d8fa8 and 7c3161f (WU-0007.2 and .3) against the plan, amendments A1-A8, the research note (including the develop-side "Chua memo re-read") and DEC-0010. No tests were rerun. The Log already records the radius results (`13 passed in 5.18s`, `54 passed in 2.00s`, `10 passed in 113.53s`), and none of the claims needed a rerun to check. `tools/test_impact.py --base 089e278 --explain` (read-only) gives test_report, test___main__, test_data and tests/integration, which matches the runs in the Log (the smoke was run by hand instead of test_smoke_pipeline, as the plan allows).
+
+**What I checked and found sound.**
+- *Correctness of the test.* The guard builds the same map as `estimate_lyapunov` (`make_flow_step(spec, spec.params, 20*max_dt)`, `systems.py:233`) from the same start. It runs 5000 + 10^5 states, which is the count the estimator visits. `lyapunov_cached` writes to a fresh `tmp_path` for each case, so no cache is shared. float64 holds. No RNG is used.
+- *Lorenz B = 40.* I re-derived it. V̇ = −2(σx² + y² + βz² − β(σ+ρ)z). The maximum of V on the ellipsoid is c²β²/(4(β−1)) with c = 38, giving 1540.3 and radius 39.25. This needs β ≥ 2, and β = 8/3. V(1,1,1) = 1371. The bound is correct.
+- *Chua B = 3 and Rössler B = 25.* Both are justified as written. An escape in either system drives |x| (Chua: the outer unstable spiral; Rössler: x' = −y − z with z growing) or the finite check, so guarding on the first coordinate is enough.
+- *Choice of the first coordinate.* The developer's reading is the only one consistent with A4's numbers (Lorenz z reaches 47.45 and Chua z reaches 3.64). The code indexes `spec.observed_index`, which is 0 for all registry systems and for CHUA_MEMO. A future change to it would give a loud failure, not a silent pass.
+- *Memo conversion.* I re-derived α = C2/C1 = 9, β = C2/(L G²) = 100/7 and τ = 0.7t, so λ_τ = 0.23/0.7. The slope mapping is inner −8/7 to code m0 and outer −5/7 to code m1. The equation numbers (3.14) and (3.19) match the re-read.
+- *Tolerances.*
+  - Lorenz: 3·√(0.13² + 0.33²) = 1.06%, rounded down to 1% (a tightening).
+  - Rössler: 3% is the roadmap value, fixed before this unit.
+  - Memo: √(1.5² + 3.3² + 1.3² + (1.5/√3)²) ≈ 3.95%, and 10% ≈ 2.5σ.
+  - None of the three uses an observed gap.
+- *Memo 10% and the order of events (the question put to the reviewer).* The 10% first appears in the planner's plan (431a482, 07:58) as a proposal, before the mathematician measured 0.3235 (8e1dc9e, 08:06). The mathematician then confirmed it from an error budget that does not contain the gap. The observed gap is −1.53%, far inside 10%, so there was no incentive to loosen the bound and none happened. **I judge this acceptable under VV.3**, and the docstring and the Log state it honestly. DEC-0010 is less complete (R2).
+- *Report.*
+  - The subsection follows the V7 rows inside `## Validation gate`, and the blank line closes the table.
+  - It contains the LPC.NV.1 sentence (verbatim per the plan, a), the NVVUQ.13 sentence (b), the Chua-limitation sentence and the report-only sentence.
+  - A missing `context` prints "n/a".
+  - `verdicts()`, `VALIDATION_CRITERIA` and the gate are untouched. The only file changed in `lpcstudy/` is `report.py`.
+  - `fake_system` was not edited; the new test adds `context` to its own systems.
+  - I recomputed the hand strings: 0.9/0.90563 − 1 = −0.62%, 0.08/0.0714 − 1 = +12.04%, 0.08/0.07062 − 1 = +13.28%.
+- *Smoke claim.* The 12 differing leaves are 5 `seconds` entries, 6 `provenance` fields and `argv[3]`. That count is internally consistent. I did not recompute it from the run directories (read-only git and tests only).
+- *Commits.* Each commit names its unit and carries `Agent: claude-sonnet-5-5`. No history was rewritten. Owner checkpoint categories: no verdict or statistics code, no seed or provenance code, no dependencies. R3 is the exception.
+
+**Findings.**
+
+- **R1. `tests/unit/test_data.py:337`: the docstring says the tolerances were "fixed before the result was seen". That is not true for Lorenz and Rössler, and it contradicts line 349.**
+  - The code's values (0.905494 and 0.0719398) were visible in `pilot_results_v1.json` and in the plan itself (line 24, the VV.3 caveat) before the mathematician derived 1% and confirmed 3%.
+  - The research-note addendum states this correctly. The test docstring, which is the evidence record a later reader will see (LPC.PC.21), does not.
+  - Fix: reword to "Tolerances derived from the error budget alone, without using any observed gap. The code's pilot values were already visible (VV.3), and the memo value was measured before the 10% was confirmed." Docstring only; no rerun is required beyond the file's radius after the edit.
+- **R2. `docs/agent/records/decisions.md:227` (develop; main session, not the developer): the DEC-0010 update does not record the VV.3 order for the memo tolerance.**
+  - It gives "tolerance 10% (the mathematician's computation: combined sigma about 3.9%)" without saying that the code's memo value (0.3235) was measured and seen before the 10% was confirmed.
+  - The record is not dishonest, but a reader of the decision log alone could take the 10% as blind.
+  - Fix: the main session appends a dated line to DEC-0010 (append-only). It should say that the 10% was proposed blind (431a482), then confirmed from the error budget after the value was seen (8e1dc9e), and that the gap is −1.53%.
+- **R3. Owner checkpoint: the memo case was implemented while DEC-0010 is still `proposed`.**
+  - The affected code is the `chua_memo` row in `tests/unit/test_data.py` (CHUA_MEMO, LYAPUNOV_CASES) and in `lpcstudy/report.py` (LYAPUNOV_MEMO, the memo row printed in every RESULTS.md).
+  - The plan made the memo check conditional on owner approval (Scope "only if DEC-0010's proposal is approved", Q-O1). A3 added the re-read condition but left Q-O1 live once the re-read confirmed.
+  - The main session's instruction is recorded, but it is not owner consent.
+  - Fix: no code change now. Mark the unit "needs owner confirmation of DEC-0010 / Q-O1 before merge to main or freeze". If the owner rejects it, remove the memo test row, `LYAPUNOV_MEMO`/`LYAPUNOV_MEMO_TEST` and the memo report row, and keep the Chua limitation.
+- **R4. `lpcstudy/report.py:243`: `LYAPUNOV_REFERENCES.get(s, [])` is a silent fallback (PRIME.4).**
+  - Any system name missing from the table, such as a renamed or added system, would be reported as "not validated: no published reference at these parameters (known limitation, NVVUQ.13, DEC-0010)". That attributes a Chua-specific, recorded limitation to a system for which nobody made that decision.
+  - Fix: use `LYAPUNOV_REFERENCES[s]` so that a missing entry raises. Alternatively, print a distinct "no entry in LYAPUNOV_REFERENCES" text and test it. Add one assertion to the `test_report` test if the text route is taken.
+
+**Merge with develop (91c31f7).**
+- I did a trial `git merge-tree` (no write to any branch). `lpcstudy/report.py` and `tests/unit/test_report.py` **auto-merge cleanly**: develop's H1 phase-2 hunks (`_verdict_text`, `_key_number`, `fake_system` H1 keys, a new test) do not overlap this branch's additions.
+- **Conflict:** `docs/agent/notes/2026-10-10-research-lyapunov.md`. Both branches append at the end of the file: develop adds "Chua memo re-read" and its corrections, and this branch adds two addenda. Resolve by keeping both blocks unedited (append-only, PRIME.5), with develop's re-read first, because the branch's Addendum 2 and the test docstring cite it.
+- The semantic risk is low. After the merge, the new report test runs against develop's `fake_system` and H1 rendering, so the unit radius (test_report, test___main__, test_data) must be run once on the merge commit.
+
+**Verdict: approve with fixes.** R1 and R4 go to the developer. R2 goes to the main session. R3 is an owner checkpoint before merge or freeze. Findings: 4.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
