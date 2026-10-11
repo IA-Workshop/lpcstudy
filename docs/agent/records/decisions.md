@@ -180,3 +180,19 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0007 plan, `tests/unit/test_embedding.py` docstring, `tools/run_tests.sh`, `tools/run_preset.sh`.
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0011: WU-0002.7/.8 plan: answers to the planner's questions  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** The plan (`docs/agent/records/work/WU-0002.7-8-h2-h3.md`) asks four questions, answered with the applied-mathematician's confirmation (last dated entry of the same file):
+
+- *O1.* The minimum of 50 states (DEC-0008 A3) is **not** applied to each regime in the H3a log-rank tests: the test does not need it, a small regime cannot produce a spurious pass (a pass needs p < 0.01 for every pair), and the rule would cost power with small A5 leaves. It applies to the full sample of each statistic and to subsets that feed a block bootstrap. Degenerate or missing pairs enter the Holm family at p = 1 (conservative).
+- *O2.* A state where PLP's error is constant across draws is set to correlation 0 and counted, as for CP (stricter; the oracle draws and the proxy are shared across n_lib, so such a state's change is exactly 0).
+- *O3.* Until WU-0002.9, results carry `pass` plus an `inconclusive_reason` and no `fail` key; WU-0002.9's plan must take over these keys.
+- *O4.* H2d's `pass` stays on the point estimate until WU-0002.9.
+- **Corrections taken from the confirmation (they tighten the plan):** `kind="stable"` for every `argsort`, tie order by regime index (DEF-0013); a bound is infinite iff the number of failed resamples is at least ceil(a·B), a = (1 − level)/2; failed resamples are placed outward on both sides for a two-sided band; the S3 test uses B = 40, not 20; the H3b synthetic tests draw x per state, repeat it across draws, and use dyadic targets (0.5, 0.25) with integer curvature weights so the zeros are exact; percentile (not basic) intervals for H3b.
+
+**Alternatives weighed.** Applying the 50-state rule per regime: rejected on power grounds, with no effect on the pass error.
+
+**Affects:** WU-0002.7 and .8 only; DEF-0013. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.

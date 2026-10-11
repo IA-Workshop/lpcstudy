@@ -104,3 +104,11 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Resolution:** pass the `LPC_THREADS` value as `workers`. This does not change any number (a query's result does not depend on the worker count); a test can pin that. To be done in a small unit after WU-0002.1 and .2 (it touches `ensemble.py` and `oracle.py`).
 - 2026-10-10: opened (claude-sonnet-5-5, main session).
 - 2026-10-11 (claude-sonnet-5-5, recording the owner's ruling, DEC-0008 B): pass `LPC_THREADS` as `workers`; a small unit after WU-0002.1 and .2 (done); no numbers change.
+
+**DEF-0013: Regime ordering uses a default (unstable) `argsort`; tie order depends on the CPU** (LPC.PC.18, REPRO)
+
+- **Blocking:** no (tracked); fixed inside WU-0002.8.
+- **Affects:** H3a (the pairs of consecutive regimes tested) and anything downstream of the A5 regime ordering when two regimes have equal horizons or when NaN horizons are mapped to infinity and tie.
+- **Description.** `lpcstudy/analysis.py:613` orders regimes with `np.argsort(np.nan_to_num(rmap.horizons_km, nan=np.inf))`. NumPy's default sort is not stable and its tie order depends on the CPU's vector instructions: the WU-0002.7/.8 mathematician measured that the default `argsort` differs from `kind="stable"` on tied arrays in 19,534 of 30,000 trials on this machine. With integer Kaplan–Meier medians and NaN to infinity, ties are realistic, so the pairs tested could differ between machines. The pilot was produced on different hardware; a mismatch in H3a at the WU-0002.12 regression is a candidate explanation. The other sort-order-dependent sites in `lpcstudy/` were checked by the main session: `statistics.py:114` (`holm_adjust`) gives identical adjusted values to tied p-values under either order; `np.searchsorted` and `np.unique` are deterministic.
+- **Resolution:** WU-0002.8 rewrites this ordering with `kind="stable"` and tie order by regime index (confirmed by the applied-mathematician); a test pins it with tied horizons.
+- 2026-10-11: opened (claude-sonnet-5-5, main session, on the WU-0002.7/.8 mathematician's finding M6).
