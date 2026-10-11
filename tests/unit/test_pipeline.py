@@ -147,3 +147,31 @@ def test_choose_regimes_uses_absolute_excess_at_href_column() -> None:
     config = StudyConfig()
     assert config.reference_horizon == 30 and config.regime_max_primary == 8
     assert _choose_regimes(regimes, profile, moments, config) == 4
+
+
+def test_concat_moments_stacks_the_correlation_fields_and_refuses_a_mixture() -> None:
+    """``_concat_moments`` stacks ``err_corr``, ``cp_constant`` and ``plp_constant`` row-wise.
+
+    Reference: ``np.concatenate`` of hand-built arrays whose entries are their own flat index
+    (expected values read off by eye). Two parts of 3 and 2 states: the stacked field is the 5
+    rows in order. Parts without the fields give ``None``. A mixture (one part with, one
+    without) raises ``ValueError`` instead of dropping the field silently (PRIME.4). Exact.
+    """
+    import dataclasses
+
+    from lpcstudy.pipeline import _concat_moments
+    from unit_helpers import _moments_from_draws
+
+    rng = np.random.default_rng(6)
+    plain = [_moments_from_draws(rng.standard_normal((n, 4, 3)), rng.standard_normal((n, 4, 3)))
+             for n in (3, 2)]
+    assert _concat_moments(plain).err_corr is None
+    grid = np.arange(15.0).reshape(5, 3)
+    with_fields = [dataclasses.replace(p, err_corr=g, cp_constant=g > 6, plp_constant=g < 4)
+                   for p, g in zip(plain, (grid[:3], grid[3:]))]
+    stacked = _concat_moments(with_fields)
+    np.testing.assert_array_equal(stacked.err_corr, grid)
+    np.testing.assert_array_equal(stacked.cp_constant, grid > 6)
+    np.testing.assert_array_equal(stacked.plp_constant, grid < 4)
+    with pytest.raises(ValueError, match="err_corr"):
+        _concat_moments([with_fields[0], plain[1]])

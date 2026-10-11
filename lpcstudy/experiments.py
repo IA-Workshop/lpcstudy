@@ -20,7 +20,7 @@ from . import analysis as an
 from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
 from .dynamics import make_finite_growth
-from .ensemble import AnalogLibrary, forecast_draws
+from .ensemble import CORRELATION_FIELDS, AnalogLibrary, forecast_draws
 from .identifiers import check_keys
 from .oracle import oracle_weight
 from .pipeline import Cell, FittedRules, Study, fit_rules, rule_weights, score_rules
@@ -39,8 +39,9 @@ def _sweep_subset(cell: Cell, config: StudyConfig) -> Cell:
     cols = np.array(config.eval_horizons) - 1
     test = cell.splits["test"]
     m = test.moments.subset(rows)
-    for attr in ("mean_cp", "mean_plp", "sq_cp", "sq_plp", "cross"):
-        setattr(m, attr, getattr(m, attr)[:, cols])
+    for attr in ("mean_cp", "mean_plp", "sq_cp", "sq_plp", "cross", *CORRELATION_FIELDS):
+        if getattr(m, attr) is not None:  # the correlation fields are optional
+            setattr(m, attr, getattr(m, attr)[:, cols])
     m.horizons = np.array(config.eval_horizons)
     ev = test.evals.subset(rows)
     for attr in ("cp_err", "plp_err", "verify_noise", "gain_proxy"):
