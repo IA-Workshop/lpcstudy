@@ -19,6 +19,7 @@ from sklearn.tree import DecisionTreeRegressor
 
 from .allocation import deployable_profile
 from .config import StudyConfig
+from .data import sklearn_seed
 from .identifiers import check_keys
 from .oracle import characteristic_horizon, curvature, hybrid_mse, oracle_weight
 from .pipeline import Cell, FittedRules, RuleScores
@@ -37,8 +38,86 @@ def _boot(config: StudyConfig, stat, n_items: int, level: float = 0.95, salt: in
 
 
 # ------------------------------------------------------------------------ RQ1
+def v7_efficiency(levels: np.ndarray, deltas: np.ndarray, nu: np.ndarray,
+                  config: StudyConfig) -> dict:
+    """V7: the estimator attains the Cramer-Rao scaling ``delta = rho nu`` at every ``rho``.
+
+    Two checks, both on point medians over the sweep states (E0 verification check, decided like
+    V2; the intervals are reported and enter neither flag):
+
+    * the median over states of the per-state OLS slope of ``ln delta_i`` on ``ln rho`` lies in
+      [0.9, 1.1] (v3 E0; DEC-0008 A2);
+    * at **every** ``rho``, the median over states of ``delta_i / (rho nu_i)`` lies in
+      [0.9, 1.1], each state with its own oracle ``nu_i`` (Methods v2 M2 section M10).
+
+    A state with a non-finite or non-positive ``delta`` at any level, or a non-finite or
+    non-positive ``nu_i``, is counted in ``n_nonfinite``, kept (never dropped), given NaN
+    statistics so that the median is NaN, and makes ``pass`` false (PRIME.4).
+
+    Parameters
+    ----------
+    levels : np.ndarray
+        Noise levels ``rho``, shape ``(n_levels,)``, at least two distinct positive values.
+    deltas : np.ndarray
+        R.m.s. whitened estimation error ``delta_i(rho)``, shape ``(n_states, n_levels)``.
+    nu : np.ndarray
+        Per-state oracle ``nu_i`` (noise-free, the same states at every level), ``(n_states,)``.
+    config : StudyConfig
+        Study configuration (bootstrap settings).
+
+    Returns
+    -------
+    dict
+        ``median_slope`` with block-bootstrap interval ``ci`` (reported only), ``threshold``,
+        ``slope_pass``; ``efficiency_median_by_noise``, its interval
+        ``efficiency_ci_by_noise`` (reported only) and ``efficiency_pass_by_noise`` per level;
+        ``n_states``, ``n_nonfinite`` and ``pass`` (slope and every level, bands closed).
+
+    Raises
+    ------
+    ValueError
+        If the shapes disagree or the levels are not at least two distinct positive values.
+    """
+    levels = np.asarray(levels, dtype=float)
+    deltas = np.asarray(deltas, dtype=float)
+    nu = np.asarray(nu, dtype=float)
+    if levels.ndim != 1 or deltas.ndim != 2 or deltas.shape[1] != len(levels) \
+            or nu.shape != (deltas.shape[0],):
+        raise ValueError(f"V7 needs levels (L,), deltas (n, L), nu (n,); got {levels.shape}, "
+                         f"{deltas.shape}, {nu.shape}")
+    if len(np.unique(levels)) < 2 or not np.all(levels > 0):
+        raise ValueError(f"V7 needs at least two distinct positive levels; got {levels}")
+    low, high = 0.9, 1.1
+    bad = ~np.all(np.isfinite(deltas) & (deltas > 0), axis=1) | ~(np.isfinite(nu) & (nu > 0))
+    n_bad = int(bad.sum())
+    safe_deltas = np.where(bad[:, None], np.nan, deltas)  # counted in n_nonfinite, fails pass
+    safe_nu = np.where(bad, np.nan, nu)
+    log_delta = np.log(safe_deltas)
+    centered = np.log(levels) - np.log(levels).mean()
+    slopes = (log_delta - log_delta.mean(axis=1, keepdims=True)) @ centered / \
+        np.sum(centered**2)
+    efficiency = safe_deltas / (levels[None, :] * safe_nu[:, None])
+    nan_ci = (float("nan"), float("nan"))  # no bootstrap on NaN statistics (all-NaN quantile)
+    est, lo, hi = (float(np.median(slopes)), *nan_ci) if n_bad else \
+        _boot(config, lambda idx: float(np.median(slopes[idx])), len(slopes))
+    out_eff, out_ci, out_pass = {}, {}, {}
+    for i, rho in enumerate(levels):
+        key = f"{rho:g}"
+        out_eff[key] = float(np.median(efficiency[:, i]))
+        out_ci[key] = list(nan_ci) if n_bad else list(_boot(
+            config, lambda idx: float(np.median(efficiency[idx, i])), len(efficiency),
+            salt=7000 + i)[1:])
+        out_pass[key] = bool(low <= out_eff[key] <= high)
+    slope_pass = bool(low <= est <= high)
+    return {"median_slope": est, "ci": [lo, hi], "threshold": [low, high],
+            "slope_pass": slope_pass, "efficiency_median_by_noise": out_eff,
+            "efficiency_ci_by_noise": out_ci, "efficiency_pass_by_noise": out_pass,
+            "n_states": int(len(nu)), "n_nonfinite": n_bad,
+            "pass": bool(slope_pass and all(out_pass.values()) and n_bad == 0)}
+
+
 def v7_noise_scaling(noise_cells: dict[float, Cell], config: StudyConfig) -> dict:
-    """V7: ``delta`` scales linearly with ``rho`` (per-state log-log slope in [0.9, 1.1]).
+    """V7 on the cells of the noise sweep: extract the arrays, then :func:`v7_efficiency`.
 
     Parameters
     ----------
@@ -50,22 +129,12 @@ def v7_noise_scaling(noise_cells: dict[float, Cell], config: StudyConfig) -> dic
     Returns
     -------
     dict
-        Median slope with interval, efficiency ``delta / (rho nu)`` per level.
+        The result of :func:`v7_efficiency` (levels sorted ascending).
     """
     levels = sorted(noise_cells)
-    log_rho = np.log(levels)
     deltas = np.column_stack([noise_cells[r].splits["test"].moments.est_seed for r in levels])
-    log_delta = np.log(deltas)
-    centered = log_rho - log_rho.mean()
-    slopes = (log_delta - log_delta.mean(axis=1, keepdims=True)) @ centered / \
-        np.sum(centered**2)
-    est, lo, hi = _boot(config, lambda idx: float(np.median(slopes[idx])), len(slopes))
     nu = noise_cells[levels[0]].oracles["test"].nu
-    efficiency = {f"{r:g}": float(np.median(deltas[:, i] / (r * nu)))
-                  for i, r in enumerate(levels)}
-    return {"median_slope": est, "ci": [lo, hi], "threshold": [0.9, 1.1],
-            "efficiency_median_by_noise": efficiency,
-            "pass": bool(0.9 <= est <= 1.1)}
+    return v7_efficiency(np.array(levels), deltas, nu, config)
 
 
 def _floor_power_law(log_n: np.ndarray, log_c2: float, exponent: float,
@@ -297,7 +366,8 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> 
         return HistGradientBoostingRegressor(max_iter=300, learning_rate=0.05,
                                              max_leaf_nodes=15, min_samples_leaf=20,
                                              l2_regularization=1.0,
-                                             random_state=config.seed)
+                                             random_state=sklearn_seed(config.seed,
+                                                                       "qn-regressor"))
 
     def r2(y: np.ndarray, pred: np.ndarray, idx: np.ndarray) -> float:
         resid = np.sum((y[idx] - pred[idx]) ** 2)
@@ -635,9 +705,11 @@ def h3_regimes(cell: Cell, rules: FittedRules, scores: dict[str, RuleScores],
     w_t = oracle_weight(con.moments)[:, col]
     c_t = curvature(con.moments)[:, col]
     t_t = np.log(state_horizon_target(con.moments, cell.noise, config.primary_threshold))
-    tree_w = DecisionTreeRegressor(max_leaf_nodes=max(chosen, 4), random_state=config.seed)
+    tree_w = DecisionTreeRegressor(max_leaf_nodes=max(chosen, 4),
+                                   random_state=sklearn_seed(config.seed, "h3b-weight-tree"))
     tree_w.fit(flat, np.repeat(w_t, n_draws), sample_weight=np.repeat(c_t, n_draws))
-    tree_t = DecisionTreeRegressor(max_leaf_nodes=max(chosen, 4), random_state=config.seed)
+    tree_t = DecisionTreeRegressor(max_leaf_nodes=max(chosen, 4),
+                                   random_state=sklearn_seed(config.seed, "h3b-horizon-tree"))
     tree_t.fit(flat, np.repeat(t_t, n_draws))
     imp_w, imp_t = tree_w.feature_importances_, tree_t.feature_importances_
     names = list(PROFILE_NAMES)

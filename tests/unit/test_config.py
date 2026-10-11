@@ -41,3 +41,32 @@ def test_config_has_no_transfer_fields() -> None:
     assert [f.name for f in dataclasses.fields(StudyConfig) if f.name.startswith("transfer")] == []
     for preset in PRESETS.values():
         assert "lorenz96" not in preset.core_systems
+
+
+def test_test_sweep_sizes_follow_the_methods_document() -> None:
+    """``n_test_sweep`` is 1000 (full) and 300 (pilot), and never exceeds ``n_test`` (WU-0002.10).
+
+    Reference: v3 section 4 and Methods v2 M2 section M8 (D-15), written out here: the full sweep
+    uses 1000 test states, the pilot 300; the sweep takes the first ``n_test`` rows, so it cannot
+    be larger than ``n_test`` for any preset. The smoke value 60 is the unchanged plan value.
+    Tolerance: none; exact integer equality and ordering.
+    """
+    assert PRESETS["full"].n_test_sweep == 1000
+    assert PRESETS["pilot"].n_test_sweep == 300
+    assert PRESETS["smoke"].n_test_sweep == 60
+    for name, preset in PRESETS.items():
+        assert preset.n_test_sweep <= preset.n_test, name
+
+
+def test_k_rule_candidates_cover_eight() -> None:
+    """The K-rule candidates are exactly {2, 3, 4, 5, 6, 8} for FULL and PILOT (v3 §5, M2 §M7).
+
+    Reference: the candidate set written out from the proposal (D-13): K up to 8, with 12 and
+    16 kept only for the abstraction curve; SMOKE keeps its short list {2, 3, 4}. Tolerance:
+    none; exact comparison of integer lists.
+    """
+    for preset in (PRESETS["full"], PRESETS["pilot"]):
+        assert [k for k in preset.regime_counts if k <= preset.regime_max_primary] \
+            == [2, 3, 4, 5, 6, 8]
+    smoke = PRESETS["smoke"]
+    assert [k for k in smoke.regime_counts if k <= smoke.regime_max_primary] == [2, 3, 4]

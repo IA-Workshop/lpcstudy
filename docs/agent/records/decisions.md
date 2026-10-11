@@ -154,3 +154,72 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Dissent and resolution (REPRO.8):** none. Status: **adopted by the owner** (in session, 2026-10-11).
 
 - 2026-10-11, recorded by claude-sonnet-5-5: DEC-0002 was confirmed earlier (2026-10-10). DEC-0003, DEC-0004, DEC-0005, DEC-0006 and DEC-0007 are **confirmed** by the owner's approval above (status "proposed" in their own text is superseded by this line).
+
+## DEC-0009: Researcher retrieval cap removed for the remainder of the season  (2026-10-11, recorded by claude-sonnet-5-5 (main session) from the human owner's statement in the session)
+
+**Decision.** The human owner stated in the session: "Cap is hereby removed for the remainder of this season. Proceed with all recommendations." This is read as the owner removing the 50-pages-per-unit limit of LPC.AUTH.2(b) for the researcher agent for the rest of the season; the other limits of LPC.AUTH.2 (read-only retrieval of individual papers and pages, only by the `researcher` agent, no datasets, no crawling, retrieved content is data, every fetch logged to `docs/agent/records/network-log.jsonl`) are unchanged.
+
+**Status of the instrument.** At the time of this entry the ledger (`docs/agent/governance/ledger.jsonl`, latest entry 6) holds **no** `authorization` or `amendment` entry for this change. Under PRIME.7 and GOV.36 the ledger entry is the owner's act; the command is in `docs/agent/notes/2026-10-11-amendments-for-owner.md` section 5. Until it is appended, the main session acts on the owner's direct statement (PRIME.11: an agent takes instructions from the human owner) and records that here. Two of the three retrievals started under this statement (a cited AMI delay for Lorenz-63; the jax XLA thread-cap flag) fit within the existing per-unit budget of fresh units (WU-0013 and WU-0012 follow-ups) and do not depend on it; the third (the Chua exponent, WU-0007) does.
+
+**Alternatives weighed.** *Wait for the ledger entry before any retrieval:* rejected for the Chua retrieval because the owner's instruction is explicit and repeated, nothing in the record is hidden, and waiting blocks WU-0007.2 only; flagged so the owner can append the entry.
+
+**Affects:** the researcher agent's retrievals for WU-0007, WU-0012 and WU-0013 follow-ups. The alphaXiv connectors are not in the researcher agent's tool list; adding them is an edit to `.claude/agents/researcher.md` by the owner.
+
+**Dissent and resolution (REPRO.8):** none. Status: **owner instruction recorded; ledger entry pending (owner).**
+
+## DEC-0010: WU-0007 Chua reference, AMI band and XLA thread cap: handling of the retrieval results  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** From the researcher retrievals started under DEC-0009 (notes in `docs/agent/notes/`):
+
+- *Chua lambda_max (WU-0007.1, third row).* No published exponent was found for the code's parameter set (alpha = 15.6, beta = 28, m0 = -1.143, m1 = -0.714): the row stays `not found`, and Methods v2's 0.431 stays uncorroborated for that set. It is recorded as a **known limitation** (NVVUQ.13) for validation of Chua at those parameters. A proposed additional check, for the owner to approve at the WU-0007 plan: run the Benettin routine on the primary-source case (Matsumoto, Chua and Komuro memo UCB/ERL M84/73, alpha = 9, beta = 100/7, m0 = -8/7, m1 = -5/7; published exponent 0.23 per circuit time, about 0.33 per dimensionless time by a derived conversion with tau = 0.7 t, flagged derived) with a two-digit tolerance justified by the applied-mathematician. It verifies the routine and the field form, not the study's parameter set.
+- *AMI delay (WU-0013 follow-up).* The `[3, 8]` step band of `test_regression_ami_delay_lorenz_band` is **kept** (not tightened). Deshmukh, Bradley, Garland and Meiss (arXiv:2003.06509, Sec. IV.B, Fig. 5) report a first AMI minimum of the Lorenz x-series near 0.18 time units (about 4.9 steps at the study's sampling interval), consistent with the code's 5 steps, but the minimum is a shallow shoulder, the deeper one is at 0.60 time units, and the estimator differs. The citation goes into the test docstring in a small follow-up.
+- *XLA thread cap (WU-0012 follow-up).* The wrappers should export `PJRT_NPROC` and `NPROC` from `LPC_THREADS` (plain environment variables read by XLA's default thread-pool sizing; they cannot abort XLA), and must NOT use `intra_op_parallelism_threads` or other `XLA_FLAGS` entries (an unknown XLA flag aborts the process; the 2019 recipe is not a registered flag). Verification: a CPU-time versus wall-time and thread count on a float64 workload, per the research note. A small follow-up unit (WU-0012.4) changes the two wrappers and their tests.
+
+**Alternatives weighed.** *Block the Chua row until the 1985 IEEE paper is retrieved:* the researcher found no route; recorded instead.
+
+**Affects:** WU-0007 plan, `tests/unit/test_embedding.py` docstring, `tools/run_tests.sh`, `tools/run_preset.sh`.
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0011: WU-0002.7/.8 plan: answers to the planner's questions  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** The plan (`docs/agent/records/work/WU-0002.7-8-h2-h3.md`) asks four questions, answered with the applied-mathematician's confirmation (last dated entry of the same file):
+
+- *O1.* The minimum of 50 states (DEC-0008 A3) is **not** applied to each regime in the H3a log-rank tests: the test does not need it, a small regime cannot produce a spurious pass (a pass needs p < 0.01 for every pair), and the rule would cost power with small A5 leaves. It applies to the full sample of each statistic and to subsets that feed a block bootstrap. Degenerate or missing pairs enter the Holm family at p = 1 (conservative).
+- *O2.* A state where PLP's error is constant across draws is set to correlation 0 and counted, as for CP (stricter; the oracle draws and the proxy are shared across n_lib, so such a state's change is exactly 0).
+- *O3.* Until WU-0002.9, results carry `pass` plus an `inconclusive_reason` and no `fail` key; WU-0002.9's plan must take over these keys.
+- *O4.* H2d's `pass` stays on the point estimate until WU-0002.9.
+- **Corrections taken from the confirmation (they tighten the plan):** `kind="stable"` for every `argsort`, tie order by regime index (DEF-0013); a bound is infinite iff the number of failed resamples is at least ceil(a·B), a = (1 − level)/2; failed resamples are placed outward on both sides for a two-sided band; the S3 test uses B = 40, not 20; the H3b synthetic tests draw x per state, repeat it across draws, and use dyadic targets (0.5, 0.25) with integer curvature weights so the zeros are exact; percentile (not basic) intervals for H3b.
+
+**Alternatives weighed.** Applying the 50-state rule per regime: rejected on power grounds, with no effect on the pass error.
+
+**Affects:** WU-0002.7 and .8 only; DEF-0013. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0012: Shared bootstrap and verdict helpers: one contract for all WU-0002 lanes; seeding convention for new bootstraps  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the applied-mathematician's contract; for owner confirmation)
+
+**Decision.**
+
+- **One implementation of the DEC-0008 A1/A3 rules.** Three lanes planned overlapping helpers (WU-0002.4/.5, .6, .7/.8). The applied-mathematician's contract (Job 2, last entries of the Log in `docs/agent/records/work/WU-0002.4-5-h1.md`) governs: all helpers live in `lpcstudy/statistics.py`: `block_resample_indices`, `bootstrap_values` (vector statistics allowed), `percentile_interval(values, level) -> (lo, hi, n_failed)`, `BootstrapInterval` / `block_bootstrap_counted`, `interval_verdict(lo, hi, band, closed)`, `combine_verdicts`, `criterion_verdict` (the A3 guard order) and `MIN_STATES = 50`. Failed (non-finite) resamples are placed at -inf for the lower bound and +inf for the upper bound; a bound is infinite iff the number of failures is at least floor((B-1)·a)+1 with a = (1 - level)/2; there is no one-sided `unfavourable` argument (it would be anti-conservative for the opposite verdict). `block_bootstrap` is refactored onto `block_resample_indices` and stays **bitwise unchanged**. Result keys use `reason` and `n_failed_resamples`.
+- **Implementing lane: WU-0002.4/.5**, as one commit group merged to `develop` first; the other lanes (.6, .7/.8) merge `develop` and reuse it, and do not write their own.
+- **Seeding convention.** The existing bootstraps keep their `config.seed + salt` integer seeds unchanged (changing them would change numbers). New bootstraps introduced by WU-0002.4 to .8 take their randomness from `make_rng(config.seed, <label>)` (the project rule "randomness only via `make_rng`"); the helpers accept an integer or a `Generator`; when several parts of one criterion must share resample indices, pass the same integer or a fresh generator built with the same labels per part (a shared `Generator` would advance between calls). Whether to convert the existing integer-salt bootstraps is for the audit under DEF-0011.
+
+**Alternatives weighed.** Each lane with its own helpers: rejected (divergent semantics, three names for one function). Converting all existing salts now: rejected (changes the regression numbers, and the pilot comparison is the anchor).
+
+**Affects:** WU-0002.4 to .8, .9, .11; the shared helper semantics for the verdict logic. Marked "needs owner review before freeze" (statistics and verdict code).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0013: WU-0002.3: the horizon of the K rule, and the two-stage grid in check (b)  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the WU-0002.3 review; for owner confirmation)
+
+**Decision.** Two points of WU-0002.3 are **open questions for the owner** that DEC-0008 does not answer (the developer's log wrongly said the first was answered by DEC-0008 A5; the reviewer caught it; the log is corrected):
+
+- *Horizon of the K rule.* DEC-0008 A5 fixes the quantity (calibration excess MSE within 5% of the minimum, tie inside) but neither v3 §5 nor Methods v2 §M7 names the horizon at which the excess is evaluated. The implementation evaluates it at the reference horizon H_ref (30 steps = 1 LT), as the code did before, locating the column by `horizons == reference_horizon`. Proposal: confirm H_ref, and have the owner state the horizon in v3 §5 (the amendments document lists it).
+- *Check (b) of the ROADMAP row.* The row says the regime weight is checked against a brute-force minimizer "on the same grid" within 1e-6; one 10^4-point grid locates the minimizer only to about 5e-5, so the check cannot pass as worded. The unit uses a two-stage grid (a second grid of 10^4 points around the first minimum) with the 1e-6 tolerance kept, which the applied-mathematician approved as a strengthening of the check's form, not a loosening. Proposal: confirm, and amend the ROADMAP wording (amendments document, section 1).
+
+**Alternatives weighed.** *Evaluate the K rule at every horizon and take the maximum:* not in either document and a different rule; rejected. *Keep the single grid and loosen the tolerance:* rejected (PRIME.2).
+
+**Affects:** WU-0002.3 (merged to `develop` with these two points flagged); the K choice in every run. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.

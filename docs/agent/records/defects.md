@@ -18,6 +18,8 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - 2026-10-10: opened (Claude).
 - 2026-10-10 (claude-sonnet-5-5, main session, on the WU-0013.2 reviewer's finding R3; both sites checked): two further silent cases that WU-0002.11 must count and report: `lpcstudy/statistics.py:61` (`kaplan_meier` sets the hazard to 0 where no subject is at risk) and `lpcstudy/statistics.py:95-96` (`logrank_test` returns p = 1.0 when the variance is not positive). Both feed H3a. Any fix is statistics code and needs owner review before the freeze.
 - 2026-10-10 (claude-sonnet-5-5, main session, on the WU-0005 reviewer's observation; checked): a third uncounted silent case for WU-0002.11: `lpcstudy/oracle.py:62` (`local_dimension`) clamps zero neighbour distances with `np.maximum(dist, 1e-300)` (duplicate library points) without counting them.
+- 2026-10-11 (claude-sonnet-5-5, on the WU-0002.10 reviewer's finding R4): V7's `n_nonfinite` counts non-finite or non-positive delta and nu, but `ParametricEstimator.estimate` (`lpcstudy/estimation.py:141-142`) replaces non-finite estimates with the state mean upstream, so `n_nonfinite` is 0 in real runs and 0 does not mean nothing diverged. WU-0002.11 must report the replacement count beside V7.
+- 2026-10-11 (claude-sonnet-5-5, on the WU-0002.3 reviewer's finding R3): the K-choice fallback this defect lists (to K = 5 when no K is within 5% of best-single) was removed by WU-0002.3 (the rule now picks the smallest K within 5% of the minimum excess). Still uncounted and to be counted in WU-0002.11: the `1e-300` floors at `lpcstudy/oracle.py:131` and `lpcstudy/allocation.py:368` (deferred by WU-0002.3) and the empty-leaf weight fallback at `lpcstudy/allocation.py:404-405`.
 
 **DEF-0002: Excess MSE uses c(w − w\*)² with clipped w\*** (VV.1)
 
@@ -95,6 +97,7 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Resolution:** to be planned in WU-0002 (the owner decides whether the pool should depend on the seed id; the pilot used the fixed pool, so a change affects the WU-0002.12 regression).
 - 2026-10-10: opened (claude-sonnet-5-5, main session, on the WU-0014 reviewer's finding).
 - 2026-10-11 (claude-sonnet-5-5, recording the owner's ruling, DEC-0008 B): option 1: keep until the WU-0002.12 regression, then route through `make_rng(config.seed, "oracle-pool")`; audit the other `default_rng` sites in WU-0002.11.
+- 2026-10-11 (claude-sonnet-5-5, on the WU-0002.10 reviewer's finding R3): add to the WU-0002.11 audit list the new report-only V7 interval seeds `config.seed + 7000 + i` (`analysis.py`, WU-0002.10), another integer-salt seed that bypasses `make_rng` (DEC-0012 convention: existing integer salts are not converted until the audit decides).
 
 **DEF-0012: k-d tree queries use all cores and ignore the `LPC_THREADS` cap** (RSRC.11, RSRC.12; `.claude/rules/test-discipline.md` "Device and threads")
 
@@ -104,3 +107,19 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Resolution:** pass the `LPC_THREADS` value as `workers`. This does not change any number (a query's result does not depend on the worker count); a test can pin that. To be done in a small unit after WU-0002.1 and .2 (it touches `ensemble.py` and `oracle.py`).
 - 2026-10-10: opened (claude-sonnet-5-5, main session).
 - 2026-10-11 (claude-sonnet-5-5, recording the owner's ruling, DEC-0008 B): pass `LPC_THREADS` as `workers`; a small unit after WU-0002.1 and .2 (done); no numbers change.
+
+**DEF-0013: Regime ordering uses a default (unstable) `argsort`; tie order depends on the CPU** (LPC.PC.18, REPRO)
+
+- **Blocking:** no (tracked); fixed inside WU-0002.8.
+- **Affects:** H3a (the pairs of consecutive regimes tested) and anything downstream of the A5 regime ordering when two regimes have equal horizons or when NaN horizons are mapped to infinity and tie.
+- **Description.** `lpcstudy/analysis.py:613` orders regimes with `np.argsort(np.nan_to_num(rmap.horizons_km, nan=np.inf))`. NumPy's default sort is not stable and its tie order depends on the CPU's vector instructions: the WU-0002.7/.8 mathematician measured that the default `argsort` differs from `kind="stable"` on tied arrays in 19,534 of 30,000 trials on this machine. With integer Kaplan–Meier medians and NaN to infinity, ties are realistic, so the pairs tested could differ between machines. The pilot was produced on different hardware; a mismatch in H3a at the WU-0002.12 regression is a candidate explanation. The other sort-order-dependent sites in `lpcstudy/` were checked by the main session: `statistics.py:114` (`holm_adjust`) gives identical adjusted values to tied p-values under either order; `np.searchsorted` and `np.unique` are deterministic.
+- **Resolution:** WU-0002.8 rewrites this ordering with `kind="stable"` and tie order by regime index (confirmed by the applied-mathematician); a test pins it with tied horizons.
+- 2026-10-11: opened (claude-sonnet-5-5, main session, on the WU-0002.7/.8 mathematician's finding M6).
+
+**DEF-0014: The V7 estimator-efficiency check fails at the smoke preset sizes, so the validation gate is false on every smoke run** (VV.3, NVVUQ.20; found while implementing WU-0002.10)
+
+- **Blocking:** no for plumbing; to be ruled on by the owner (referral in `docs/agent/records/work/WU-0002.10-v7.md`) before any rule is written that treats `gate_pass` at smoke as meaningful.
+- **Affects:** the smoke preset only (tests, `RESULTS.md` header of smoke runs, the WU-0001.5 / WU-0002.x regression style comparisons that include `gate_pass`). Pilot and full sizes are not yet measured with V7.
+- **Description.** On DEV-0 at the smoke preset, V7's median per-state slope of ln delta on ln rho is 1.00072 (inside [0.9, 1.1]) and the median efficiency delta/(rho nu) is 1.0960 at rho = 1% (inside) and 5.8535 at rho = 2% (outside), so `V7.pass` and `gate_pass` are false. The applied-mathematician's analysis (Log of the unit) shows the estimators are sound and that sampling error (SD about 0.02 at smoke size) is not the cause; the cause is the untrained estimator network at smoke size (validation loss 1.73, against 0.0025 in the pilot), which puts many states in the wrong basin. The earlier v1 smoke run already had the same V7 values under the v1 key `H1a`, but the v1 gate did not include V7, so `gate_pass` was true.
+- **Resolution:** pending the owner's ruling (options in the referral). No threshold, sample size or training setting was changed (tuning is excluded by the plan and by PRIME.2).
+- 2026-10-11: opened (claude-sonnet-5-5, main session).
