@@ -189,6 +189,289 @@ Result of run 4: `10 passed in 67.52s (0:01:07)`.
 
 **DEV-0 smoke comparison (A1-style): deferred.** `pgrep -fa 'lpcstudy --preset'` shows the `v1-baseline` pilot (started 20:05 UTC, on its second system at 20:15) after the work above, so the new smoke at the branch head was not started. The base smoke (branch base 7dc4f45, clean tree, DEV-0, `LPC_THREADS=4`) is in `runs/base/smoke` of this worktree. To finish: `LPC_THREADS=4 tools/run_preset.sh smoke DEV-0 runs/new` when no run shows, then `.venv/bin/python <scratchpad>/leafcmp.py runs/base/smoke/results.json runs/new/smoke/results.json` (the script packs every float as IEEE bytes, type-checks ints, strings, bools, None, and prints the counts with and without `provenance` and `seconds`). Evidence so far: the report-only run on the base results at the branch head gives 4393 leaves, 0 different, none only on one side (same script), and `RESULTS.md` differs by additions only.
 
+### 2026-10-11: WU-0008 mathematician design (M1–M9)
+
+Applied-mathematician (claude-opus-5-5), branch `wu/0008-report-budget`; plan at ad2eee1. No library code, no study run, no confirmatory seed. Inputs read:
+
+- the DEV-0 pilot outputs `lpcstudy-wt/run/pilot-dev0/runs/dev/wu0002-12/pilot/results.json` (B = 500, n = 500 test and 300 sweep states, M = 200, V4 on 40 states);
+- `docs/study/dev_regression_dev0.md`;
+- the WU-0006 Log (run 2) and the reference note `docs/agent/notes/2026-10-11-math-wu0006.md` (at bd21e76).
+
+Every pilot number below is **DEVELOPMENT (DEV-0)**. The synthetic studies ran on CPU with literal seeds, none registered. Scripts and their logs are in `docs/agent/notes/2026-10-11-math-wu0008-scripts/` (`m2_e1`, `m2_e2`, `m2_median`, `m2_ratio`, `m3_m5_pilot`, `m7`, `m7b`).
+
+**Decisions in brief.**
+
+- **(a) Oracle draw noise.** Its variance is already inside every primary interval, because states are resampled together with their M-draw estimates. Only the finite-M bias is outside. "hw/√n" is therefore not an uncovered error. The row reports the bias direction always, a size where one exists (F1, F2 below), and no 10% flag.
+- **(b) Endpoint error and its tests.** The formula is confirmed. Failed resamples get one added None rule. E1 is tightened to 2%. **E2 as planned is unsound:** a correct helper fails it with probability 0.13. It is replaced by a median-over-repetitions check at a factor of 1.4, with a false-alarm probability of about 2·10⁻⁴.
+- **(c) Iterative error.** The LM row cannot be converted to the QoI scale: "not estimated" with the reason in M4.
+- **(d) Round-off.** 10⁻⁴ × max(|lo|, |hi|), from the measured cross-platform perturbation.
+- **(e) Discretization.** 0 by LPC.NV.1, with V6 printed.
+- **(f) Interval procedure.** H2b(i) maps to C8, not C1. The size should come from the WU-0006 *reference* rates (SE ≤ 0.0013), not from the run-2 counts alone (SE of the shortfall ±0.036).
+- **(g) The 10% rule** is strict.
+
+#### M1. Rows per QoI (type; included in the reported interval; what each QoI's cell holds)
+
+| # | Row | Type | Included? | H2a(i) | H2a(ii) zero / interior | H2b(i) | H2b(ii) | H3c |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Oracle Monte Carlo (M draws) | aleatory | variance: yes (propagated); finite-M bias: no | bias upward; indicative bound F1 | bias toward 0; not estimated | bias toward 0; not estimated | bias not estimated; variance share F2 | not estimated: enters only through the fitted A4/A5 inputs |
+| 2 | Sampling of test states | aleatory | yes | hw of `range_ci` | hw per part | hw, n = sweep | hw, n = sweep | hw; conditional on the fitted A4, A5 |
+| 3 | Bootstrap Monte Carlo error | numerical | no | `ci_mc_se` (M2) | per part | yes | yes | yes |
+| 4 | Discretization (RK4) | numerical | no | 0 by LPC.NV.1; V6 printed (M6) | same | same | same | same |
+| 5 | Iterative (LM) | numerical | no | not estimated (M4) | same | same | same | same |
+| 6 | Round-off | numerical | no | 10⁻⁴·max(\|lo\|, \|hi\|) (M5) | per part | same | same | same |
+| 7 | Proxy | estimator | reported separately | 0 by construction (oracle only) | 0 | 0 | 0 | not estimated: deployable QoI; fidelity reported (M8) |
+| 8 | Model form | epistemic | no | not estimated: v3 §8 | same | same | same | same |
+| 9 | Interval procedure | statistical method | no | C3 (proxy) | zero: not measured / C7 | C8 | C8 | C4, C4h |
+
+Two sentences go under every table, in addition to the plan's label and seed lines:
+
+- "Conditional on one realization per system of the trajectory, the library noise and the trained networks. Between-realization variability is not estimated (v3 §8, future work)."
+- For H3c only: "Conditional on the fitted A4 and A5. Fit-stage variability is outside the interval and not estimated."
+
+#### M2. Endpoint Monte Carlo error
+
+**Specification.** Inputs:
+
+- `values`: all B resamples, failed ones included;
+- `level`, with a = (1 − level)/2.
+
+For each endpoint q ∈ {a, 1 − a}, d = √(a(1 − a)/B); d is the same at both ends. Then SE_q = (Q̂(q + d) − Q̂(q − d))/2. Q̂ is `np.quantile` (linear) on the same array `percentile_interval` uses: failures are replaced by the finite minimum for the lower endpoint and by the finite maximum for the upper.
+
+**Why this is the right quantity.** The rank of the bootstrap distribution's q-quantile among B resamples is Binomial(B, q), so the empirical CDF has SD d there. [Q̂(q − d), Q̂(q + d)] is the ±1 SE order-statistic interval of that quantile. Its half-length estimates d/f(F⁻¹(q)), the asymptotic SD of the endpoint (Bahadur). It is the Monte Carlo error from finite B given the data, not sampling error.
+
+**Both values are None when any of these holds:**
+
+1. **The bound is infinite** (A3 rule): F ≥ ⌊(B − 1)a⌋ + 1.
+2. **Failed resamples reach the binomial window:** F ≥ ⌊(B − 1)(a − d)⌋ + 1, evaluated in float64 as in `percentile_interval`. Then Q̂(q − d) for the lower endpoint, and Q̂(q + d) for the upper, weights a failed value. The bound can then become infinite under another bootstrap seed, so its MC error is unbounded. At B = 2000 the window thresholds are 43 (95%) and 13 (1 − 0.05/3), against bound thresholds of 50 and 17. Checked: with F = 13, `np.quantile` at a − d gives −inf; with F = 12 it is finite.
+3. **The window leaves (0, 1):** q − d ≤ 0 or q + d ≥ 1. This happens with B = 50 at 1 − 0.05/3 (smoke).
+
+The budget derives the reason from (ci, n_failed, B, level):
+
+- "bound infinite (A3)";
+- "failed resamples (F = …) within one binomial SE of the endpoint";
+- "B = … too small for the binomial window".
+
+**Ties.** SE = 0 iff Q̂(q − d) = Q̂(q + d), which happens when the endpoint sits on an atom of the bootstrap distribution. Report it as "0 (tie at the endpoint)". It is a correct reading, because the endpoint does not move under a ±1 SE change of rank.
+
+I simulated an H2a(i)-like median with eligibility and an atom at 0 (`m2_median`):
+
+- with the atom at 0–20% of states, P(SE = 0) < 1%;
+- with the atom at 45%, P(SE = 0) is 30–50% at the lower endpoints.
+
+**Precision of the estimate itself.** The relative SD is about 1/√(2dB): simulated 0.27 at 95% and 0.34 at 1 − 0.05/3 for B = 2000; about 0.38 and 0.50 at B = 500 (order of magnitude only). Its median, relative to the true MC SD, is:
+
+- 0.98 for a mean;
+- 0.83–0.95 for a median on average, and as low as 0.36 in single data sets, where the discreteness of the bootstrap distribution pulls it down.
+
+**Expected size against the half-width.** For a near-normal bootstrap distribution, SE/hw = √(a(1 − a)/B)/(φ(z)z):
+
+| B | 95% | 1 − 0.05/3 |
+| --- | --- | --- |
+| 2000 | 3.05% | 3.74% |
+| 500 | 6.1% | 7.5% |
+
+For heavy-tailed ratios (H3c-like, log-normal σ = 1 to 2; `m2_ratio`):
+
+- at B = 2000 the upper endpoint has median 3.7–5.1% and p95 6.0–8.3%, and P(flag) ≤ 0.02;
+- at B = 500, P(flag) is 0.32–0.42.
+
+At the study's B = 2000 the row should therefore read "yes". On the DEV-0 pilot (B = 500) some rows will read "no". That reflects the setting, not a defect.
+
+**E1, tightened to 2%** (was 3%). The deterministic deviations (`m2_e1`) are −0.334% at 95% and −0.909% at 1 − 0.05/3. These are curvature (+0.52% and +1.72%) partly cancelled by grid interpolation. 2% is 2.2 times the larger deviation. A formula error (missing /2, n in place of B, wrong q) gives at least 29%.
+
+**E2, replaced: the planned check is unsound** (`m2_e2`, 1000 synthetic data sets × 100 bootstraps; φ = 0.3, n = 500, mean, block 5, B = 2000).
+
+- A single first-bootstrap helper SE has relative SD 0.27–0.34. The probability that it falls outside a factor of 2 of the reference is 0.016–0.019 per endpoint at 95% and 0.052–0.054 at 1 − 0.05/3, so **P(any of the 4 fails | correct code) = 0.13**. A fixed seed does not cure this.
+- **Replacement.** For each of the 4 endpoints, the median over the 100 bootstraps of the helper SE must lie within a factor of 1.4 of the SD of that endpoint over the same 100 bootstraps.
+  - log(median ratio) has mean −0.02 and SD 0.08 (0.076–0.085), so the false alarm is about 2·10⁻⁴ (normal approximation). None of 1000 simulated data sets failed; the extremes were 0.73 and 1.28.
+  - It catches any systematic error of 1.4× or more. The old check passed a helper that was 1.6× off about 80% of the time.
+- Same data (`make_rng(8008, "wu0008", "nested")`), R = 100, B = 2000 and cost as planned. The first-bootstrap ratio is printed in the assertion message, not asserted.
+- Answer to "should the median also be checked": yes. The median replaces the single check.
+
+**E3 additions.** At B = 2000 and level 1 − 0.05/3: F = 13 gives (None, None) with finite bounds; F = 12 gives finite values.
+
+#### M3. Oracle Monte Carlo row
+
+**Principle.** Each state's M draws are its own stream. The library noise is common to all states but is part of the conditioning realization. Draw noise is therefore independent across states, and the block bootstrap over states resamples it with the states. So the reported interval includes the draw-noise variance: exactly for means, and asymptotically for the median, the ratio and the partial correlation. What it does not include is the finite-M bias of a statistic that is nonlinear in the per-state estimate. The row states that bias:
+
+- **Included?** "variance: yes (propagated); finite-M bias: no".
+- **Flag:** "not estimated", never compared as a size.
+
+**V4 inputs.** V4 runs at the core cell (ρ = 1%, N_lib = 10⁴), at H_ref only, on 100 states (40 at the pilot).
+
+- h = `convergence[str(M)].median_half_width`, a = `convergence[str(M)].mean_abs_dev_from_max`, M = `used_M`, M_max = the largest key.
+- s_med = h/z₀.₉₇₅.
+- s_mean = a/(√(2/π)·√(1 − M/M_max)) = a/0.690988. This uses nested draws, Var(ŵ_M − ŵ_Mmax) = (1 − M/M_max)s², and the Gaussian E|X| = √(2/π)σ.
+- Pilot: s_med = 0.0189, 0.0199, 0.0157 and s_mean = 0.0438, 0.0241, 0.0230 (Lorenz-63, Rössler, Chua). Lorenz-63's heavy tail fits wrong-basin draws.
+- Neither is an RMS. The Gaussian factor understates heavy tails, and RMS ≥ mean.
+
+**H2a(i), F1.** E[range(ŵ)] ≥ range(E ŵ), because max is convex and min concave. The median range is therefore biased **upward, toward a fail**. A pass is robust to it; a fail is not certified against it.
+
+- Indicative worst case, assuming draw noise independent across the k = 3 horizons and SD s_med at each: **F1 = (3/√π)·h/z₀.₉₇₅ = 0.86362·h** (E range of 3 iid N(0, 1) = 3/√π). Use 2/√π if k = 2.
+- Common draws across horizons make the true bias smaller. Under exact separation it is zero, because the sample ŵ is then the same at every horizon.
+- Pilot: F1 = 0.032, 0.034 and 0.027, that is 0.86, 0.57 and 0.43 of the half-width.
+  - The Rössler fail survives: 0.211 − 0.034 = 0.177 > 0.1.
+  - **The Chua pilot fail does not survive the worst case:** 0.1135 − 0.027 = 0.087.
+- Cell: "not estimated: finite-M bias upward (toward fail); indicative worst case ≤ F1 (independent draw noise across horizons; V4 at H_ref only)".
+- Follow-up (not this unit): V4 at 1, 2 and 4 LT on the same draws, giving the per-state range's own spread.
+
+**H2a(ii).**
+
+- **Interior part.** Λ̃ is noise-free: `o.growth` comes from the true state. The classical part of the draw noise in logit ŵ (zero mean, independent of Λ̃ given Q) leaves the covariance unchanged and inflates the residual variance. Each partial correlation is therefore attenuated by A = (1 − σ²_e/σ²_{y|Q})^½. This works **toward 0, that is toward the band (−0.1, 0.1): it favours a pass and works against a fail.** A fail is robust to it; a pass is not certified against it. Its size at the band edge is 0.1·(1 − A).
+  - σ²_e is not stored. V4 is on the w scale at the median state, and the logit noise s_i/(w_i(1 − w_i)) needs the per-state w.
+  - It is probably small: the part of the noise in span[1, Q] is removed, because ε̂_s and δ̂ come from the same draws.
+  - A non-classical part (the O(s²) logit bias depends on w and s, which can depend on Λ̃) has unknown sign.
+  - Noisy controls (ln ε̂_s and ln δ̂, with relative SD about 1/√(2M) = 5%) leave residual confounding of order 1 − reliability. That is small, of unknown sign.
+- **Zero part.** Misclassification of 1{ŵ = 0} near u = 0 attenuates toward 0 if it is nondifferential. It is differential if its rate depends on Λ̃, and then the sign is unknown.
+- Cell: "not estimated: per-state draw variance on the logit scale not stored; the classical part attenuates toward 0 (favours a pass; a fail is robust)".
+- Follow-up: split-half reliability (draws 1–100 against 101–200) in the WU-0003 per-state dump.
+
+**H2b(i).** Draw noise flips ranks across the four ρ cells. For symmetric noise, a state with constant w has E[ρ_S] = 0 by global sign symmetry, and a monotone state is pulled toward 0. So the mean is attenuated **toward 0, against a pass** of "lower bound > 0": a pass is robust to it, a fail is not certified against it. Common random numbers across ρ reduce flips. The size needs the per-state gaps between levels relative to s, and V4 exists only at ρ = 1%: not estimated.
+
+**H2b(ii), F2.** The variance is inside the interval.
+
+- **F2 = z_L·√2·s_mean/√n**, with n = `library_change.n_states`. It is an upper estimate of the share: it assumes zero correlation of draw noise across N_lib and V4's 10⁴ s at 10³.
+- Pilot: 0.0086, 0.0047 and 0.0045, that is 0.21, 0.12 and 0.10 of the half-width. With M = ∞ the half-width would shrink to √(hw² − F2²), at most 2.2% narrower. More draws would not change the verdict.
+- Bias: interior terms are O(1/M) and cancel in the pair. At the clip bounds the bias is O(s): for unclipped u = 0, E[max(0, u + e)] = s/√(2π) = 0.40s. It is upward at 0 and downward at 1, and partly cancels in the pair. |bias| ≤ 0.40·s·f_b, where f_b (the fraction of states within about 2s of a bound) is not stored.
+- Cell: "not estimated: finite-M clip-boundary bias (≤ 0.40·s per state near a clip bound, partly cancelling in the pair); variance inside the interval, share ≈ F2".
+
+**H3c.** The text in the M1 table is confirmed. The per-state test MSE uses E evaluation draws, not the M oracle draws: E = 4, and 2 at the pilot. Given the weights it is linear and unbiased, its variance is in the interval, and the ratio-of-means bias is O(1/n). M-draw noise reaches H3c only through the A4 coefficients (construction) and the A5 leaf weights (calibration), each an average over hundreds of states. The interval conditions on them.
+
+**B5** tests F1 and F2 only, against one float expression each.
+
+#### M4. Iterative (LM) row: no conversion to the QoI scale
+
+The stop is a fixed budget of 15 iterations with no tolerance stop. The WU-0005.4 keys are: residual c (sum of D = 7 squares in σ_x units), accepted steps, fraction with no decrease, and non-finite count. None of them maps to w* or to the forecast errors:
+
+1. **The residual.** At the MLE, c ≈ ρ²χ²₄: median 3.36ρ², p95 9.49ρ². The excess of c over that floor bounds the iterative error ‖J(û − u*)‖² in the *observation* metric. δ and the forecast errors live in the *state* metric, and ‖û − u*‖² ≤ excess/λ_min(JᵀJ) is vacuous at cond(JᵀJ) ≈ 10⁷.
+2. **The counts.** Accepted-step counts and no-decrease fractions say nothing about the distance to the optimum.
+
+A conversion needs one of two things:
+
+- the last accepted step length in the state metric relative to δ, per estimate (not recorded; WU-0005.4 M4's default is not to add it);
+- an iteration-doubling refinement of the QoI: 15 → 30 iterations, same draws, and w* and the five statistics recomputed. That is a study run, outside this unit.
+
+Wrong-basin estimates (about 2% for Lorenz-63) are kept by design (v3 §4). They are part of the forecaster, not iterative error.
+
+**Cell.**
+
+- If the keys are absent: "not estimated: WU-0005.4 summary absent from results".
+- If present: "not estimated: residual and iteration summary do not convert to the QoI scale (excess residual bounds the error in the observation metric only; cond(JᵀJ) ≈ 1e7); needs a 15 → 30 iteration refinement of the QoI; diagnostic (core cell): median residual/(3.36ρ²) = …, fraction no decrease = …".
+- Flag: "not estimated".
+
+**Consequence (PRIME.3, NVVUQ.9).** With this row unestimated, each primary's numerical error is partly unverified (iterative), and its label must say so. The alternative is an owner convention like LPC.NV.1 for the estimator: "PLP is defined by the fixed 15-iteration LM". Then the row is 0 by definition and the summary a diagnostic. That is the owner's governance decision. It is not proposed here.
+
+#### M5. Round-off row
+
+**Analytic bounds, all negligible.** Everything is float64 (u = 1.1·10⁻¹⁶):
+
+- per-state moments are sums of M = 200 terms: relative error ≤ Mu ≈ 2·10⁻¹⁴;
+- `curvature` = E_C + E_P − 2C cancels, but c ≥ ρ²/k (P1(a)), so at H_ref the relative error is ≲ 10³u;
+- ν comes from a forward formula, and Q (cond ≈ 10⁷) is never inverted. Inverting it would have cost ≤ cond·u ≈ 10⁻⁹.
+
+**Empirical bound, which dominates and sets the row.** I compared DEV-0 with the v1 pilot on another host, where the BLAS kernel and the XLA thread count differ (DEF-0023, DEF-0024). The ulp-level input perturbations are amplified by the flow, the LM and the network training. Over 2458 differing leaves (fitted coefficients at a floor near 0 excluded as chain-head events; `m3_m5_pilot`):
+
+- **QoI-type statistics** (MSE means, H2c and H2d interval endpoints, oracle recovery) change by at most **6.0·10⁻⁵ relative**;
+- **oracle w\* medians up to 4 LT** change by at most 9.5·10⁻⁶ (1.3·10⁻⁴ at 7 LT);
+- **discrete-event statistics** move by one state's share. In `gain_bound` that is 0.3–0.7% for the fractions and 33% for a maximum; none of these is a primary.
+
+The primaries themselves were changed by design in that comparison, so this is a transfer from the same ingredients. Their direct cross-host check belongs to WU-0003.4.
+
+**Cell.** `ROUNDOFF_RELATIVE = 1e-4`; size 10⁻⁴·max(|lo|, |hi|) with finite bounds, in QoI units. Label: "empirical cross-platform perturbation, DEVELOPMENT (DEV-0); excludes a discrete flip (one state's share in a median or a K choice)". At pilot magnitudes this is ≤ 1.4·10⁻⁴ absolute against hw ≥ 0.037, so the flag reads "yes".
+
+#### M6. Discretization row
+
+The size is 0 for all five primaries by LPC.NV.1. Each is a function of forecast errors computed against a truth from the same RK4 map: PLP shares the map, CP copies observations of it, and Λ̃ is that map's growth.
+
+V6 is printed in the cell as the distance between the map and the half-step map over 1 LT. Pilot values are 3.9·10⁻⁵, 3.3·10⁻⁵ and 7.5·10⁻⁵ σ_x, against a gate of 10⁻³. V6 bears on whether the discrete map stands for the published system (with WU-0007's λ_max), not on the QoI. It checks magnitude, not order (NVVUQ.5 gap, WU-0005).
+
+Cell: "0 (LPC.NV.1: truth and model share the discrete map); V6 = … σ_x (map against half step over 1 LT; not added)". Flag: "yes".
+
+#### M7. Interval-procedure row
+
+**Mapping (one correction).**
+
+- **H2a(i) → C3** (median, n = 500). C3 is a proxy only. The eligibility re-evaluated in each resample, the atom at range 0 and the eligible n (322–465 at the pilot) were not simulated (WU-0006 Out).
+- **H2a(ii) interior → C7.** C7 has 500 interior states; the pilot interior domain has 334–352, so the real coverage is slightly worse.
+- **H2a(ii) zero part:** "not estimated: no WU-0006 case has a binary target (C7's zero column is constant)".
+- **H2b(i) → C8, not C1.** H2b(i) is a mean of one per-state series at n = `n_test_sweep` (300 at the pilot). That is C8's estimator and size, since the `_paired_change` mean is a mean of one series. Per-state Spearman values are bounded, so tails are not an issue. C1 (n = 500) may be cited beside it.
+- **H2b(ii) → C8** (exact match).
+- **H3c → C4 and C4h** (σ = 1.5 and 2, φ = 0). The O4 proxy gives a per-state MSE log-SD of 1.7–2.0, so σ = 2 is the realistic row.
+
+**Conversion.** If the interval behaves like est ± k·z_nom·SE, then p = 2Φ(k·z_nom) − 1, so k = z_obs/z_nom with z_obs = Φ⁻¹((1 + p)/2).
+
+- The half-width needed for nominal coverage is hw/k, so the **shortfall as a fraction of the reported half-width is f = z_nom/z_obs − 1**. The size in QoI units is f·hw; for f ≤ 0 the cell reads "none (coverage ≥ nominal)".
+- MC error: SE_f = (z_nom/z_obs²)·SE_p/(2φ(z_obs)).
+- At nominal 0.98333, f = 10% ⇔ p = 0.9705, and f = 5% ⇔ p = 0.9774.
+- The formula assumes the two tails share the undercoverage. Where WU-0006 has edge rates for a one-sided decision (C4, C7, C8), the cell may cite them as the direct measure.
+
+**Precision: use the reference rates.** From the run-2 counts (R = 1000), SE_f ≈ 0.036, so the 10% flag is undecidable for f between about 0.03 and 0.17. The WU-0006 reference rates (math note, R_ref 10⁴ to 4·10⁴) come from an independent implementation that matches production to 4·10⁻¹⁶, and all run-2 counts lie inside their consistency ranges. Their SE_p is 0.0007–0.0013, giving SE_f = 0.005–0.008.
+
+**Recommended amendment.** The size comes from the reference rate, with SE and R_ref. The run-2 count goes beside it as the production check (`m7b`, `m7`).
+
+| QoI | case | φ = 0: reference p (f ± SE) | φ = 0.3: reference p (f ± SE) | run 2: count (f), φ = 0 / 0.3 |
+| --- | --- | --- | --- | --- |
+| H2a(i) | C3 (proxy) | 0.9807 (+0.023 ± 0.009) | 0.9732 (+0.081 ± 0.008) | 984 (−0.006) / 973 (+0.083) |
+| H2a(ii) interior | C7 | 0.9794 (+0.034 ± 0.008) | 0.9762 (+0.059 ± 0.008) | 972 (+0.090) / 977 (+0.053) |
+| H2b(i), H2b(ii) | C8 | 0.9806 (+0.024 ± 0.006) | 0.9682 (+0.115 ± 0.006) | 987 (−0.036) / 972 (+0.090) |
+| (H2b(i), cited) | C1 | 0.9800 (+0.029 ± 0.006) | 0.9695 (+0.107 ± 0.006) | 983 (+0.003) / 969 (+0.110) |
+| H3c | C4 | 0.9772 (+0.052 ± 0.005) | 0.9715 (+0.093 ± 0.006) | 971 (+0.096) / 961 (+0.160) |
+| H3c | C4h σ = 1.5 | 0.9744 (+0.073 ± 0.008) | — | 965 (+0.135) / — |
+| H3c | C4h σ = 2 | 0.9669 (+0.124 ± 0.008) | — | 984 (−0.006) / — |
+
+**Flag.** The flag reads the largest f shown. The study's residual lag-1 is unmeasured (DEC-0018 O4), φ = 0.3 is the stress case and σ = 2 the realistic tail.
+
+- H2a(i): yes (0.081; proxy).
+- H2a(ii): interior yes (0.059); zero part not estimated.
+- H2b(i) and H2b(ii): **no** (0.115 at φ = 0.3; 0.024 at φ = 0).
+- H3c: **no** (0.124 at σ = 2).
+
+Each cell names the case, n, the synthetic design ("seed 6006, not a registered seed"), DEF-0020 and the pending Option C or K.
+
+#### M8. Proxy row
+
+- **H2a(i), H2a(ii), H2b(i), H2b(ii):** "0: by construction (oracle w*, oracle seeds, oracle Λ̃; no deployable proxy enters)".
+- **H3c:** "not estimated: the QoI compares two deployable rules, so proxy error is not an error of this QoI". Then, reported separately:
+  - A4 recovers `A4_vs_A4o` of A4o's gain over A2, and A5 recovers `A5_vs_Astar` of A\*'s;
+  - H1d Spearman values, proxy against oracle: analog seed, estimation seed and growth, with N̂ reported only;
+  - if the denominator is ≤ 0 (NaN), the cell reads "not computable (A2 ≤ A4o)".
+- **Pilot values.** `A4_vs_A4o` = −0.44, −0.68, −0.39: A4 is worse than A2 while A4o beats it, which is the pre-registered reading "H2c fails but A4o beats A2". `A5_vs_Astar` = 0.10, 0.11, 0.28. H1d: 0.68–0.99.
+- Flag: "—".
+
+#### M9. The 10% rule
+
+- **Strict.** "Below 10%" is coded as `size < 0.1 * half_width`, in float64 with no tolerance. B3 holds: 0.1 × 1.0 == 0.1 exactly, so 0.09, 0.10 and 0.11 give yes, no and no. The skill's "at least 10 times smaller" differs only at equality; strict is the conservative reading.
+- **Half-width.** hw = (hi − lo)/2 per part. Rows 3 (bootstrap MC error) and 6 (round-off) compare their sizes with it; row 3 compares max(se_lo, se_hi). If hw is not finite, the flag reads "not estimated: interval unbounded".
+- **Flag column per row:**
+  - rows 3 and 6: yes or no;
+  - row 4: "yes" (size 0);
+  - row 5: "not estimated" (M4);
+  - row 9: yes or no on the largest f (M7);
+  - row 1: always "not estimated", since its bias is never a certified size;
+  - rows 2, 7 and 8: "—".
+
+#### Plan amendments needed (for the planner and the owner; nothing is loosened)
+
+1. **E2 replaced** by the median check at a factor of 1.4 (M2). The planned single-value factor-2 check has P(false fail) = 0.13.
+2. **E1 tolerance:** 3% → 2%.
+3. **E3** gains the failure-window case, and `endpoint_mc_error` gains None rule 2.
+4. **M7 mapping and constants:**
+   - H2b(i) → C8;
+   - `COVERAGE_WU0006` holds the reference rates (p, SE, R_ref; from the WU-0006 math note) as the size, with the run-2 counts beside them;
+   - B4 also checks the reference constants against the note's table.
+5. **Row 1 semantics:** "variance included (propagated), bias not". F1 and F2 are the only formulas, and B5 tests them.
+6. **Row 6:** the empirical constant 10⁻⁴ (M5), not cond·u.
+7. **Row 5:** "not estimated: <reason>" even when the WU-0005.4 keys are present. The QoI label carries "iterative error unverified" unless the owner adopts a convention.
+8. **Flag column per row** as in M9. B1 should accept a cell that starts with a number ("0: …", "0 (tie …)").
+9. **The two under-table sentences** of M1.
+
+**Follow-ups, outside this unit.**
+
+- V4 gains a signed mean deviation and runs at 1, 2 and 4 LT (bias of the mean-type and range QoIs).
+- Split-half logit reliability in the WU-0003 per-state dump.
+- An LM iteration-doubling study.
+- Cross-host primaries in WU-0003.4.
+
 
 ## Review
 

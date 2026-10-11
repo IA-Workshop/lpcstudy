@@ -1,0 +1,6 @@
+sigma 1.0 B 500: SE/hw lower: median 0.061 p95 0.121; upper: median 0.071 p95 0.138; P(max >= 0.1) 0.315
+sigma 1.0 B 2000: SE/hw lower: median 0.031 p95 0.051; upper: median 0.037 p95 0.060; P(max >= 0.1) 0.000
+sigma 1.5 B 500: SE/hw lower: median 0.049 p95 0.115; upper: median 0.074 p95 0.157; P(max >= 0.1) 0.395
+sigma 1.5 B 2000: SE/hw lower: median 0.027 p95 0.048; upper: median 0.044 p95 0.067; P(max >= 0.1) 0.000
+sigma 2.0 B 500: SE/hw lower: median 0.038 p95 0.084; upper: median 0.088 p95 0.187; P(max >= 0.1) 0.420
+sigma 2.0 B 2000: SE/hw lower: median 0.021 p95 0.038; upper: median 0.051 p95 0.083; P(max >= 0.1) 0.020
