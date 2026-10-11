@@ -377,3 +377,113 @@ def test_fit_rules_records_fit_counters(monkeypatch) -> None:
                              "empty_regime_fallback_by_K": {"2": 1, "3": 1},
                              "empty_regime_fallback_chosen": 1, "pooled_curvature_floor": 0,
                              "regime_target_constant": 1}
+
+
+def _counted_split(n: int, handled: np.ndarray, clip: dict, cp_cells: list) -> SplitData:
+    """A split whose moments and draws carry planned counts (what ``run_cell`` would store)."""
+    moments = _flag_moments(n, cp_cells, [], horizons=(10, 30, 60))
+    moments.handled, moments.clip_entries = handled, dict(clip)
+    zeros = np.zeros((n, 2, 3))
+    evals = EvaluationDraws(
+        horizons=moments.horizons, cp_err=zeros, plp_err=zeros, verify_noise=zeros,
+        distance=np.zeros((n, 2)), est_nu=np.full((n, 2), 3.0), growth_proxy=np.zeros((n, 2)),
+        gain_proxy=zeros, inputs=np.zeros((n, 2, 1)), noise_sens=np.zeros((n, 2)),
+        handled=handled + 1, clip_entries={k: v + 1 for k, v in clip.items()})
+    return SplitData(moments=moments, evals=evals)
+
+
+def test_cell_handling_and_system_assembly_a11(tmp_path) -> None:
+    """A11: every counter is present as an int; totals are the sums of the parts; JSON round-trips.
+
+    Reference: hand sums. Two cells of 4 test states, 2 oracle draws (M) and 2 evaluation draws,
+    3 horizons: cell 1 has ``handled`` all 1 in the six columns (so each oracle column sums to 4)
+    and the evaluation draws ``handled + 1`` (each sums to 8), entry totals (cp, plp, nonfinite)
+    (1, 2, 3) for the oracle kind and (2, 3, 4) for the evaluation kind, one CP-constant entry;
+    cell 2 has ``handled`` all 2 with entry totals (0, 0, 5) and (1, 1, 6), no constant entry.
+    Hand totals: ``invariant_mean_replacements``: cell 1 oracle 4 + eval 8, cell 2 oracle 8 + eval
+    12 = 32; ``error_clips`` = cell 1 (1+2+3) + (2+3+4) = 15, cell 2 5 + (1+1+6) = 13, total 28;
+    ``zero_variance_corr`` = 1 (cell 1 oracle). Oracle blocks 1, 0, 2 flags; the
+    fit block counts 1, 1, 0, 1. The system total of each counter equals the sum over cells,
+    their evaluation sub-blocks, the oracle blocks and the fit; the run total equals the sum
+    over two systems. ``json.dumps`` round-trips. The denominators follow n, M, E, nH.
+    """
+    import json
+    from types import SimpleNamespace
+
+    from lpcstudy.experiments import run_handling
+    from lpcstudy.oracle import StateOracles
+    from lpcstudy.pipeline import ALL_COUNTERS, Study, cell_handling, cell_id
+
+    n, m_draws = 4, 2
+    study = Study(StudyConfig(), tmp_path)
+    clip_1 = {"error_clips_cp": 1, "error_clips_plp": 2, "error_clips_nonfinite": 3}
+    clip_2 = {"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 5}
+    one = cell_handling({"test": _counted_split(n, np.ones((n, 6), dtype=np.int64), clip_1,
+                                                [(0, 0)])}, m_draws, 30)
+    two = cell_handling({"test": _counted_split(n, np.full((n, 6), 2, dtype=np.int64), clip_2,
+                                                [])}, m_draws, 30)
+    assert one["counts"]["invariant_mean_replacements"] == 4 + 8
+    assert one["by_kind"]["oracle"]["counts"]["invariant_mean_replacements"] == 4
+    assert one["by_kind"]["eval"]["counts"]["invariant_mean_replacements"] == 8
+    assert two["counts"]["invariant_mean_replacements"] == 8 + 12
+    assert one["counts"]["error_clips"] == (1 + 2 + 3) + (2 + 3 + 4) == 15
+    assert one["counts"]["error_clips_cp"] == 1 + 2 and one["counts"]["zero_variance_corr"] == 1
+    assert two["counts"]["error_clips"] == 5 + (1 + 1 + 6)
+    assert one["denominators"]["estimates"] == n * m_draws + n * 2 and \
+        one["denominators"]["error_entries"] == n * m_draws * 3 + n * 2 * 3
+    assert one["denominators"]["moment_entries"] == n * 3 and one["denominators"]["states"] == n
+    assert one["denominators"]["eval_draws"] == n * 2 and one["denominators"]["href_draws"] == \
+        n * m_draws + n * 2
+    for record in (one, two):
+        for kind in record["by_kind"].values():
+            assert set(kind["counts"]) == set(record["counts"])
+        assert all(type(v) is int for v in record["counts"].values())
+        assert all(record["counts"][k] == sum(kind["counts"][k] for kind in
+                                              record["by_kind"].values())
+                   for k in record["counts"])
+
+    study.record_cell("lorenz63", "base", cell_id("base", 0.01, 10_000, True), one)
+    study.record_cell("lorenz63", "base", cell_id("base", 0.02, 10_000, False), two)
+    flags = np.array([[0, 1, 0], [0, 0, 0], [1, 0, 1], [0, 0, 1]], dtype=np.int64)
+    study._oracles[("lorenz63", 7, 3, "test")] = StateOracles(
+        nu=np.ones(n), gains=np.ones((n, 2)), growth=np.ones(n), local_dim=np.ones(n),
+        handled=flags)
+    rules = SimpleNamespace(
+        proxies=SimpleNamespace(nu_cap=2.0, seeds=lambda ev, noise: (np.zeros((n, 2)),
+                                                                     np.zeros((n, 2)))),
+        handled={"empty_regime_fallback": 1, "empty_regime_fallback_by_K": {"2": 1},
+                 "empty_regime_fallback_chosen": 1, "pooled_curvature_floor": 0,
+                 "regime_target_constant": 1}, regimes={2: None}, chosen_regimes=2)
+    cell1 = SimpleNamespace(label="base", noise=0.01, library_size=10_000, horizons=np.arange(3),
+                            splits={"construction": SplitData(_counted_split(
+                                n, np.ones((n, 6), dtype=np.int64), clip_1, []).moments, None),
+                                    "test": _counted_split(n, np.ones((n, 6), dtype=np.int64),
+                                                           clip_1, [(0, 0)])})
+    # est_nu = 3 > cap 2 on every draw; the construction split has no draws, so only the test split counts.
+    study.record_rules("lorenz63", cell1, rules)
+    handling = study.system_handling("lorenz63", {"H1b/n_failed_resamples": 2})
+    assert handling["schema"] == "lpcstudy.handling/1"
+    assert set(handling["totals"]) == set(ALL_COUNTERS)
+    assert all(type(v) is int for v in handling["totals"].values())
+    evaluation = handling["cells"][cell_id("base", 0.01, 10_000, True)]["evaluation"]
+    assert evaluation["counts"] == {"nu_cap_clips": n * 2, "closed_form_floor_a4": n * 2,
+                                    "closed_form_floor_a4o": 0}
+    assert evaluation["by_split"] == {"nu_cap_clips": {"test": n * 2}}
+    t = handling["totals"]
+    assert t["invariant_mean_replacements"] == 12 + 20
+    assert t["error_clips"] == 15 + 13 and t["zero_variance_corr"] == 1
+    assert (t["local_dim_zero_distance"], t["oracle_gain_floor"], t["oracle_nonfinite"]) == (1, 1, 2)
+    assert (t["nu_cap_clips"], t["closed_form_floor_a4"], t["closed_form_floor_a4o"]) == (8, 8, 0)
+    assert (t["empty_regime_fallback"], t["empty_regime_fallback_chosen"],
+            t["pooled_curvature_floor"], t["regime_target_constant"]) == (1, 1, 0, 1)
+    assert handling["result_counts"] == {"H1b/n_failed_resamples": 2}
+    assert handling["fitting"]["empty_regime_fallback_by_K"] == {"2": 1}
+    assert handling["fitting"]["denominators"] == {"regimes": 2, "chosen_regimes": 2,
+                                                    "pools": 3 * 3, "targets": 2}
+    assert json.loads(json.dumps(handling)) == handling
+    # the run level: two systems with the same block
+    results = {"systems": {"lorenz63": {"handling": handling}, "rossler": {"handling": handling}}}
+    run = run_handling(study, results)
+    assert run["totals"] == {k: 2 * v for k, v in t.items()} and run["failed_variants"] == 0
+    assert run["by_system"]["rossler"] == t and run["robustness"] == {}
+    assert json.loads(json.dumps(run)) == run

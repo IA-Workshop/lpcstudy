@@ -21,10 +21,12 @@ from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
 from .data import make_rng
 from .dynamics import make_finite_growth
-from .ensemble import CORRELATION_FIELDS, AnalogLibrary, forecast_draws
+from .ensemble import CORRELATION_FIELDS, DRAW_COLUMN, DRAW_COUNTERS, ENTRY_COUNTERS, \
+    AnalogLibrary, forecast_draws
 from .identifiers import check_keys
 from .oracle import oracle_weight
-from .pipeline import Cell, FittedRules, Study, fit_rules, rule_weights, score_rules
+from .pipeline import ALL_COUNTERS, COUNTER_DENOMINATOR, HANDLING_SCHEMA, Cell, FittedRules, \
+    Study, check_record, fit_rules, rule_weights, score_rules
 from .validation import check_cp_horizon, check_cramer_rao, check_integrator, \
     check_jacobians, check_kaplan_meier, gate_status
 
@@ -66,7 +68,9 @@ def convergence_check(study: Study, cell: Cell) -> dict:
     Returns
     -------
     dict
-        Median half-width and mean deviation from the largest-``M`` estimate.
+        Median half-width and mean deviation from the largest-``M`` estimate. The handling counts
+        of its forecasts (both errors at ``H_ref`` matter here) are recorded on the study under
+        the id ``V4-convergence``, not in this dict.
     """
     cfg = study.config
     ctx = cell.ctx
@@ -76,12 +80,21 @@ def convergence_check(study: Study, cell: Cell) -> dict:
     library = AnalogLibrary.build(ctx, cell.noise, cell.library_size, cfg.horizon_max)
     horizons = np.array([cfg.reference_horizon])
     cp, plp = [], []
+    handled = dict.fromkeys(DRAW_COUNTERS, 0)
+    clipped = dict.fromkeys(ENTRY_COUNTERS, 0)
     for start in range(0, n, 5):
         rows = np.arange(start, min(n, start + 5))
-        batch = forecast_draws(cell.setup, library, "test", rows, noise[rows], horizons)
+        batch = forecast_draws(cell.setup, library, "test", rows, noise[rows], horizons,
+                               cfg.reference_horizon)
         cp.append(batch.cp_err[:, :, 0])
         plp.append(batch.plp_err[:, :, 0])
+        for name in DRAW_COUNTERS:
+            handled[name] += int(batch.handled[:, DRAW_COLUMN[name]].sum())
+        for name in ENTRY_COUNTERS:
+            clipped[name] += batch.clip_entries[name]
     cp, plp = np.concatenate(cp), np.concatenate(plp)
+    study.record_cell(cell.system, cell.label, "V4-convergence",
+                      check_record(handled, clipped, n, noise.shape[1], 1))
 
     def weight(c: np.ndarray, p: np.ndarray) -> np.ndarray:
         num = np.mean(p * (p - c), axis=-1)
@@ -110,6 +123,192 @@ def _evaluate(cell: Cell, rules: FittedRules, config: StudyConfig, split: str = 
     weights = rule_weights(rules, data, cell.noise, config, cell.horizons)
     return weights, score_rules(weights, data, cell.horizons, config,
                                 config.primary_threshold)
+
+
+def _cp_horizon_check(study: Study, core: Cell, library: AnalogLibrary, vt: np.ndarray,
+                      vv: np.ndarray) -> dict:
+    """V3 (``check_cp_horizon``) with its handling counts recorded on the study as ``V3-cp-horizon``.
+
+    Only the CP clip count can affect V3 (PLP is computed and not used), so the PLP counters of
+    that block are inert; ``log_handling`` says so.
+    """
+    cfg = study.config
+    out = check_cp_horizon(core.setup, library, vt, vv, cfg.horizon_max, 0.4,
+                           cfg.steps_per_lyapunov, cfg.reference_horizon)
+    study.record_cell(core.system, core.label, "V3-cp-horizon", check_record(**out.pop("handling")))
+    return out
+
+
+def v7_replacements(noise_cells: dict[float, Cell]) -> dict[str, int]:
+    """Estimates with a replaced coordinate per noise level, on the V7 states (``V7`` leaf, N1).
+
+    V7's own non-finite rule never fires, because ``StateEstimator`` replaces a non-finite state
+    by the invariant mean upstream (S2). This count, from the oracle draws of the test-sweep
+    states of each noise cell, makes those replacements visible next to the V7 result. It is
+    reported only; V7 is not changed (WU-0002.11 Q5).
+
+    Parameters
+    ----------
+    noise_cells : dict[float, Cell]
+        The cells of the noise sweep (as passed to ``v7_noise_scaling``).
+
+    Returns
+    -------
+    dict[str, int]
+        ``f"{rho:g}"`` to the count of (state, draw) estimates replaced.
+    """
+    column = DRAW_COLUMN["invariant_mean_replacements"]
+    out = {}
+    for rho in sorted(noise_cells):
+        handled = noise_cells[rho].splits["test"].moments.handled
+        if handled is None:
+            raise ValueError(f"the noise cell at rho={rho:g} carries no handled counts")
+        out[f"{rho:g}"] = int(handled[:, column].sum())
+    return out
+
+
+RESULT_COUNT_KEYS: frozenset[str] = frozenset({
+    "degenerate_fits", "n_excluded_nonfinite", "n_excluded_states", "n_failed_resamples",
+    "n_km_not_reached", "n_nonfinite", "nan_resamples", "range_n_failed_resamples",
+    "zero_variance_corr"})
+"""Result keys that are counts of excluded, failed, replaced or constant cases (DEF-0001); the
+walker copies every integer below such a key into ``handling.result_counts``. The result key
+stays the authority. Lane .11b adds the keys of the new statistics counters."""
+
+
+def collect_result_counts(result: object, path: str = "") -> dict[str, int]:
+    """Copy of the integer counts below every key of ``RESULT_COUNT_KEYS`` (a read-only walk).
+
+    The walk descends through dicts and lists. Below a counted key every ``int`` leaf (not a
+    ``bool``) is recorded under its path (keys joined by ``/``, since keys such as ``0.01``
+    contain dots); other leaves (floats, strings, ``None``) are skipped.
+
+    Parameters
+    ----------
+    result : object
+        A nested result (dicts, lists, scalars).
+    path : str, optional
+        Path prefix (used by the recursion).
+
+    Returns
+    -------
+    dict[str, int]
+        Path to count.
+    """
+    out: dict[str, int] = {}
+
+    def leaves(node: object, where: str) -> None:
+        if isinstance(node, bool):
+            return
+        if isinstance(node, (int, np.integer)):
+            out[where] = int(node)
+        elif isinstance(node, dict):
+            for key, value in node.items():
+                leaves(value, f"{where}/{key}")
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                leaves(value, f"{where}/{i}")
+
+    def walk(node: object, where: str) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                child = f"{where}/{key}" if where else str(key)
+                if key in RESULT_COUNT_KEYS:
+                    leaves(value, child)
+                else:
+                    walk(value, child)
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                walk(value, f"{where}/{i}" if where else str(i))
+
+    walk(result, path)
+    return out
+
+
+_V3_INERT: frozenset[str] = frozenset({
+    "invariant_mean_replacements", "nu_replacements", "error_clips_plp", "error_clips_nonfinite",
+    "error_clips_plp_href", "error_clips_nonfinite_href"})
+
+
+def _log_block(system: str, block_id: str, counts: dict, denominators: dict) -> int:
+    """One WARNING line per nonzero counter of a block; returns the number of lines."""
+    lines = 0
+    for name, value in counts.items():
+        if not value:
+            continue
+        key = COUNTER_DENOMINATOR.get(name)
+        of = f"{denominators.get(key)} {key}" if key else "no denominator (total)"
+        inert = " [inert: V3 uses CP only]" if block_id.startswith("V3-") and name in _V3_INERT \
+            else ""
+        LOG.warning("handling %s %s: %s = %d of %s%s", system, block_id, name, value, of, inert)
+        lines += 1
+    return lines
+
+
+def log_handling(system: str, handling: dict) -> None:
+    """Write the ``handling`` of a system to the run log (PRIME.4: a handled case is never silent).
+
+    One ``WARNING`` line per nonzero counter per block, ``handling <system> <block>: <counter> =
+    <k> of <denominator>``, and one ``INFO`` summary line. A zero counter writes nothing.
+    Blocks: each cell (with its ``evaluation`` and ``fitting`` sub-blocks), each oracle split and
+    the fit.
+
+    Parameters
+    ----------
+    system : str
+        System name (for the line text).
+    handling : dict
+        A ``handling`` block of a system or of its robustness variants.
+    """
+    lines = blocks = 0
+    for block_id, record in handling.get("cells", {}).items():
+        for suffix, part in (("", record), ("/evaluation", record.get("evaluation")),
+                             ("/fitting", record.get("fitting"))):
+            if part:
+                blocks += 1
+                lines += _log_block(system, block_id + suffix, part["counts"], part["denominators"])
+    for split, record in handling.get("oracles", {}).items():
+        blocks += 1
+        lines += _log_block(system, f"oracles/{split}", record["counts"], record["denominators"])
+    if handling.get("fitting"):
+        blocks += 1
+        lines += _log_block(system, "fitting", handling["fitting"]["counts"],
+                            handling["fitting"]["denominators"])
+    LOG.info("handling %s: %d nonzero counters in %d blocks", system, lines, blocks)
+
+
+def run_handling(study: Study, results: dict) -> dict:
+    """The run-level ``handling`` block, after the robustness sweep.
+
+    Parameters
+    ----------
+    study : Study
+        The study (its robustness records and failed variants).
+    results : dict
+        The results so far: ``systems`` (each with its ``handling``) and, if run, ``robustness``.
+
+    Returns
+    -------
+    dict
+        ``schema``; ``totals`` (every counter, the sum over the main systems); ``by_system`` (each
+        system's totals); ``robustness`` (per system: ``cells``, ``oracles``, ``result_counts``,
+        ``totals``, kept apart from the totals); ``failed_variants`` (robustness variants that
+        raised; their result entries read ``{"error": ...}``).
+    """
+    by_system = {s: dict(r["handling"]["totals"]) for s, r in results["systems"].items()}
+    totals = {name: sum(t[name] for t in by_system.values()) for name in ALL_COUNTERS}
+    robustness = {}
+    n_variants = 0
+    for system, variants in results.get("robustness", {}).items():
+        robustness[system] = study.robustness_handling(system, collect_result_counts(variants))
+        log_handling(f"{system} robustness", robustness[system])
+        n_variants += sum(1 for k in variants if k != "base" and not k.startswith("Lambda_fin"))
+    failed = sum(len(labels) for labels in study.failed_variants.values())
+    if failed:
+        LOG.warning("handling run: failed_variants = %d of %d variants (%s)", failed, n_variants,
+                    "; ".join(f"{s}: {', '.join(v)}" for s, v in study.failed_variants.items()))
+    return {"schema": HANDLING_SCHEMA, "totals": totals, "by_system": by_system,
+            "robustness": robustness, "failed_variants": failed}
 
 
 def run_system(study: Study, system: str) -> dict:
@@ -146,13 +345,13 @@ def run_system(study: Study, system: str) -> dict:
     res["validation"] = {
         **check_jacobians(ctx), **check_cramer_rao(ctx), **check_kaplan_meier(),
         **check_integrator(ctx),
-        **check_cp_horizon(core.setup, library, vt, vv, cfg.horizon_max, 0.4,
-                           cfg.steps_per_lyapunov),
+        **_cp_horizon_check(study, core, library, vt, vv),
         "convergence": convergence_check(study, core),
         "estimators": {k: v for k, v in study.estimator_log.items() if system in k}}
     LOG.info("%s validation (V1-V6; the gate is set after V7): %s", system, res["validation"])
 
     rules = fit_rules([core], cfg)
+    study.record_rules(system, core, rules)
     _, scores = _evaluate(core, rules, cfg)
     res["fitted"] = {"analog_proxy": vars(rules.proxies.analog),
                      "estimation_proxy": vars(rules.proxies.estimation),
@@ -189,6 +388,7 @@ def run_system(study: Study, system: str) -> dict:
 
     # Hypotheses.
     res["V7"] = an.v7_noise_scaling(noise_cells, cfg)
+    res["V7"]["invariant_mean_replacements"] = v7_replacements(noise_cells)
     res["validation"]["gate"] = gate_status(res["validation"], res["V7"])  # V7 needs E1
     if not res["validation"]["gate"]["gate_pass"]:
         LOG.warning("%s: VALIDATION GATE FAILED %s; results are flagged as provisional",
@@ -208,6 +408,8 @@ def run_system(study: Study, system: str) -> dict:
     res.update(an.h3_regimes(core, rules, scores, cfg))
     res["oracle_recovery"] = an.oracle_recovery(scores, cfg)
     check_keys(res)
+    res["handling"] = study.system_handling(system, collect_result_counts(res))
+    log_handling(system, res["handling"])
     res["seconds"] = time.time() - t0
     study.core_cells[system] = core
     study.fitted[system] = rules
@@ -292,9 +494,12 @@ def run_robustness(study: Study, system: str) -> dict:
         try:
             cell = study.run_cell(system, cfg.core_noise, cfg.core_library, core=True,
                                   with_evals=True, label=label, **kwargs)
-            out[label] = _variant_summary(cell, fit_rules([cell], cfg), cfg)
+            rules = fit_rules([cell], cfg)
+            study.record_rules(system, cell, rules)
+            out[label] = _variant_summary(cell, rules, cfg)
         except Exception as exc:  # noqa: BLE001 - a failed variant is reported, not fatal
             LOG.exception("variant %s failed", label)
+            study.record_failed_variant(system, label)  # counted: handling.failed_variants
             out[label] = {"error": repr(exc)}
     for scale in cfg.perturbation_scales:
         out[f"Lambda_fin(eps={scale:g}rho)"] = _perturbation_scale_variant(
