@@ -367,7 +367,8 @@ def test_convergence_check_records_the_lm_block_of_its_forecasts(monkeypatch, tm
     late progress i mod 2, and ``handled`` ones. Then n = 300; the residual values 0.5..9.5 each
     occur 30 times, so the median is 5.0 (the 150th and 151st values are 4.5 and 5.5) and the p95
     is x_(285) = 9.5; accepted 0..9 gives median 4.5 and 30 zeros (0.1); late 0.5; every residual
-    exceeds 18.47 * 0.01^2, so 1.0. Each ``handled`` column sums to 10. No array is kept in the
+    exceeds the dof-7 threshold 24.32 * 0.01^2 (the cell has embed_dim 10 and state dimension 3),
+    so 1.0. Each ``handled`` column sums to 10. No array is kept in the
     record, and it round-trips JSON. Exact.
     """
     import json

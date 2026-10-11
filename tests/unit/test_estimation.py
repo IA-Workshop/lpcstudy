@@ -299,7 +299,7 @@ def test_late_progress_flags_unconverged_estimates() -> None:
 
 
 def test_late_progress_counts_a_first_accept_from_a_nonfinite_start() -> None:
-    """R4: leaving an infinite cost for a finite one in the last 3 iterations sets the flag.
+    """R4 and R7: leaving an infinite cost for a finite one in the last iterations sets the flag.
 
     Reference: construction. The model step is the identity, so G(u) = (u_0 - mean)/sigma for every
     delay and the objective is a parabola in u_0 alone. Row 0 starts at u_0 = 2e155: the residual is
@@ -307,19 +307,35 @@ def test_late_progress_counts_a_first_accept_from_a_nonfinite_start() -> None:
     (``nonfinite_cost`` True) while the Jacobian and the right-hand side are finite; the damped step
     (damping 1e-3) removes 99.97% of u_0, the candidate cost is about 5e302 and finite, and it is
     accepted from an infinite carried cost, where ``inf - c > 1e-6 inf`` is False in
-    floating point. With 3 iterations every iteration is among the last 3, so the expected flag is
-    1 by the definition (a finite step out of an infinite cost is unboundedly material). Row 1
-    starts at the minimum (cost exactly 0, nothing can be accepted): flag 0, accepted 0. Exact.
+    floating point. With ``refine_steps = 1`` the single iteration is the inf -> finite accept, so
+    it is the only candidate for the flag: the rule before the fix, ``c_u - c_cand > 1e-6 c_u``,
+    gives False (inf > inf), and the rule with the ``isinf(c_u)`` term gives True; this is asserted
+    from the trace, and the production flag must be 1 (it would be 0 before the fix; with 3
+    iterations the later accepts, with relative decrease ~1 - 1e-8, would have set it under the old
+    rule too, R7). The expected flag is 1 by the definition (a finite step out of an infinite cost
+    is unboundedly material). Row 1 starts at the minimum (cost exactly 0, nothing can be
+    accepted): flag 0, accepted 0. Exact.
     """
     ctx = _world(1)[2]
     network = _StubNetwork()
     network.u0 = np.array([[2e155, 0.0, 0.0], [ctx.obs_mean, 0.0, 0.0]])
-    est = StateEstimator(ctx=ctx, network=network, model_step=lambda s: s, refine_steps=3)
-    *_, lm = est.estimate_counted(np.zeros((2, EMBED)))
+    est = StateEstimator(ctx=ctx, network=network, model_step=lambda s: s, refine_steps=1)
+    x = np.zeros((2, EMBED))
+    *_, lm = est.estimate_counted(x)
     assert lm.nonfinite_cost.tolist() == [True, False]
-    assert lm.accepted[0] >= 1 and np.isfinite(lm.residual[0])
-    assert lm.accepted[1] == 0 and lm.residual[1] == 0.0
+    assert lm.accepted.tolist() == [1, 0] and np.isfinite(lm.residual[0])
+    assert 1e300 < lm.residual[0] < 1e305 and lm.residual[1] == 0.0
     assert lm.late_progress.tolist() == [1, 0]
+    # The old rule on the same inputs, from the trace: the carried cost before the step is inf and
+    # the one after is finite, so `c_u - c_cand > 1e-6 c_u` is False (the test discriminates).
+    parts = est.refinement()
+    _, _, (_, cs, accept) = jax.jit(jax.vmap(parts.trace))(jnp.asarray(network.u0),
+                                                           jnp.asarray(x))
+    c0 = np.asarray(jax.jit(jax.vmap(parts.cost))(jnp.asarray(network.u0), jnp.asarray(x)))
+    cs, accept = np.asarray(cs), np.asarray(accept)
+    assert np.isinf(c0[0]) and np.isfinite(cs[0, 0]) and accept[0, 0]
+    assert not (c0[0] - cs[0, 0] > 1e-6 * c0[0])  # the pre-fix expression
+    assert np.array_equal(_expected_late(c0, cs, accept, 1), [1, 0])  # with the isinf term
 
 
 def test_l3_nonfinite_target_row_is_counted_per_estimate() -> None:
@@ -621,7 +637,8 @@ def test_lm_summary_threshold_follows_the_degrees_of_freedom() -> None:
 
     Reference: hand fractions. noise 1.0 and residuals [13, 14, 19, 21, 25]. Thresholds
     (0.999 quantiles): dof 2: 13.82 (2 ln 1000), so 14, 19, 21, 25 exceed it: 0.8; dof 4: 18.47:
-    19, 21, 25: 0.6; dof 7: 24.32: only 25: 0.2. No value is within 0.3 of a threshold.
+    19, 21, 25: 0.6; dof 7: 24.32: only 25: 0.2. The closest value to a threshold is 14
+    against 13.82 (0.18 away), far above the round-off of the quantile (1e-15).
     ``gof_dof`` is stored. Exact (multiples of 1/5).
     """
     values = [13.0, 14.0, 19.0, 21.0, 25.0]

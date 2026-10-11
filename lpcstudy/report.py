@@ -594,9 +594,14 @@ def _lm_lines(results: dict, systems: list[str], config: StudyConfig) -> list[st
         f"last 3 iterations that lowered the cost by more than 1e-6 relative (or left an infinite "
         f"cost): a screen for an "
         f"estimate still moving at the budget. The fraction with c/ρ² above the 0.999 quantile of "
-        f"χ²(dof) (18.47 for dof 4) mixes wrong-basin and still-unconverged estimates; it is "
-        f"printed as a diagnostic, with no gate or verdict role. Neither column estimates the iterative error "
-        f"of any reported quantity (NVVUQ.9)."]
+        f"χ²(dof) (18.47 for dof 4) is 0.001 under the reference (a converged estimate in the "
+        f"correct basin with an exact model); it also counts wrong-basin estimates, estimates "
+        f"still unconverged at the budget, and model error (a misspecified model gives a "
+        f"non-central χ²: in a probe at 5% misspecification 100% exceeded at ρ = 0.01 and 23% at "
+        f"ρ = 0.05). Infinite residuals count in this fraction and also in the non-finite "
+        f"residuals column, so the two overlap. It is printed as a diagnostic, with no gate or "
+        f"verdict role. Neither column estimates the iterative error of any reported quantity "
+        f"(NVVUQ.9)."]
 
 
 def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:

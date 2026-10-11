@@ -911,7 +911,11 @@ def test_lm_lines_exact_rows_note_and_missing_block() -> None:
     for phrase in ("fixed 15 Levenberg–Marquardt iterations with no tolerance stop",
                    "sum of D squared terms in the units of σ_x", "χ²(dof)", "median 3.36, p95 9.49",
                    "round-off accepts after convergence included",
-                   "printed as a diagnostic, with no gate or verdict role", "not a hypothesis test"):
+                   "printed as a diagnostic, with no gate or verdict role", "not a hypothesis test",
+                   "is 0.001 under the reference", "and model error (a misspecified model gives a "
+                   "non-central χ²", "100% exceeded at ρ = 0.01 and 23% at ρ = 0.05",
+                   "Infinite residuals count in this fraction and also in the non-finite residuals "
+                   "column, so the two overlap"):
         assert phrase in note, phrase
     old, config = fake_results("DEV-0")
     old["systems"] = {"lorenz63": fake_system(config)}
