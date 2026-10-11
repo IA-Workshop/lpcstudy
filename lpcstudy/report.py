@@ -282,6 +282,111 @@ def header_lines(provenance: dict | None) -> list[str]:
     return lines
 
 
+SENTINEL_COUNTERS: frozenset[str] = frozenset({
+    "error_clips_cp", "curvature_floor", "pooled_curvature_floor", "decisive_floor",
+    "closed_form_floor_a4", "closed_form_floor_a4o", "local_dim_zero_distance",
+    "oracle_nonfinite", "oracle_gain_floor"})
+"""Counters that should be 0 by a theorem hypothesis (P1(a), P3) or by construction (the
+applied-mathematician's table (3), WU-0002.11): a nonzero one is a finding. The Handling section
+labels them; it marks no result provisional (Q6 of DEC-0017 is the owner's ruling)."""
+
+SENTINEL_RESULT_PATHS: frozenset[str] = frozenset({"H1b/PLP/n_floored"})
+"""Result-count paths that are sentinels (the PLP regression of H1b has floor 0, so its squared
+error floors only below 1e-12, which is unreachable for rho >= 0.005)."""
+
+
+def _handling_blocks(handling: dict) -> list[tuple[str, dict]]:
+    """The ``(block id, record)`` pairs of a system's ``handling`` that carry ``counts``: each
+    cell, its ``evaluation`` and ``fitting`` sub-blocks, each oracle split and the fit."""
+    blocks = []
+    for block_id, record in handling.get("cells", {}).items():
+        blocks.append((block_id, record))
+        for suffix in ("evaluation", "fitting"):
+            if record.get(suffix):
+                blocks.append((f"{block_id}/{suffix}", record[suffix]))
+    blocks += [(f"oracles/{split}", record)
+               for split, record in handling.get("oracles", {}).items()]
+    if handling.get("fitting"):
+        blocks.append(("fitting", handling["fitting"]))
+    return blocks
+
+
+def _counter_text(name: str, value: int) -> str:
+    return f"{name} = {value}" + (" (sentinel)" if name in SENTINEL_COUNTERS else "")
+
+
+def handling_lines(results: dict, systems: list[str]) -> list[str]:
+    """The ``## Handling`` section of RESULTS.md (DEF-0001, WU-0002.11b): every nonzero counter.
+
+    It reads ``results["handling"]`` (the run totals and the count of robustness variants that
+    raised) and each system's ``handling`` (cells with their ``evaluation`` and ``fitting``
+    sub-blocks, oracle splits, the fit, and ``result_counts``), and lists only what is nonzero:
+    the full block, zeros included, stays in ``results.json``. Counters in ``SENTINEL_COUNTERS``
+    (and the result paths in ``SENTINEL_RESULT_PATHS``) are labelled. The section is a report:
+    it changes no verdict and marks no result provisional (Q6, DEC-0017). Results written before
+    the ``handling`` block existed get one line saying so, never an exception.
+
+    Parameters
+    ----------
+    results : dict
+        Study results.
+    systems : list[str]
+        The systems to list, in report order.
+
+    Returns
+    -------
+    list[str]
+        The Markdown lines of the section.
+    """
+    head = ["## Handling (DEF-0001: nothing silent)", ""]
+    run = results.get("handling")
+    if run is None:
+        return [*head, "No `handling` block in these results (written before WU-0002.11)."]
+    totals = [_counter_text(name, value) for name, value in run["totals"].items() if value]
+    lines = [*head,
+             f"Schema `{run['schema']}`. Counts only: no number in this report depends on them, "
+             "and none marks a result provisional (rate counters are report-only; whether a "
+             "nonzero sentinel, or a collapsed nu cap, should mark results provisional is the "
+             "owner's ruling, DEC-0017 Q6). Only nonzero counters of the main systems are listed "
+             "here; the full block, with the zeros and the denominators of every block, is "
+             "`handling` in `results.json` (the counters of the robustness variants are there too, "
+             "under `handling.robustness`, and are not listed here). `run.log` has one line per "
+             "nonzero cell, oracle or fit counter; result counts have no log line. A counter "
+             "marked *sentinel* should be 0 by a theorem hypothesis or by construction: a nonzero "
+             "one is a finding.", "",
+             "Run totals (main systems): "
+             + ("; ".join(totals) + "." if totals else "no counter is nonzero."), "",
+             f"Robustness variants that raised (`failed_variants`): {run['failed_variants']}."]
+    for system in systems:
+        handling = results["systems"][system].get("handling")
+        lines += ["", f"### {system}", ""]
+        if handling is None:
+            lines.append("No `handling` block for this system.")
+            continue
+        rows = []
+        for block_id, record in _handling_blocks(handling):
+            nonzero = [_counter_text(name, value) for name, value in record["counts"].items()
+                       if value]
+            if nonzero:
+                denominators = "; ".join(f"{name} {value}"
+                                         for name, value in record["denominators"].items())
+                rows.append(f"| `{_cell(block_id)}` | {'; '.join(nonzero)} | {denominators} |")
+        if rows:
+            lines += ["| Block | Nonzero counters | Denominators of the block |", "|---|---|---|",
+                      *rows]
+        else:
+            lines.append("No counter of any block is nonzero.")
+        counts = [(path, value) for path, value in handling["result_counts"].items() if value]
+        lines.append("")
+        if counts:
+            lines += ["| Result count | Value |", "|---|---|"]
+            lines += [f"| `{_cell(path)}`{' (sentinel)' if path in SENTINEL_RESULT_PATHS else ''} "
+                      f"| {value} |" for path, value in counts]
+        else:
+            lines.append("No result count is nonzero.")
+    return lines
+
+
 def _v7_rows(results: dict, systems: list[str], config: StudyConfig) -> list[str]:
     """The two V7 rows of the validation table (WU-0002.10): efficiency at every rho, slope.
 
@@ -525,6 +630,8 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
                         f"{_fmt(100 * v['A4_vs_A2_relative'], 3)}% | {_fmt(v['A4_over_A3'], 3)} | "
                         f"{_fmt(100 * v['A5_regret_ratio'], 3)}% | "
                         f"{_fmt(v['H1b']['CP']['slope'], 3)} | {_fmt(v['H1b']['PLP']['slope'], 3)} |")
+
+    lines += ["", *handling_lines(results, systems)]  # WU-0002.11b: Handling section
     path.write_text("\n".join(lines) + "\n")
 
 

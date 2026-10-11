@@ -50,7 +50,8 @@ def test_smoke_preset_writes_outputs_and_gate_flag(tmp_path: Path) -> None:
 
 
 COUNT_KEY_PATTERN = re.compile(r"n_(failed|excluded|nonfinite|dropped|km_not_reached|degenerate|"
-                               r"floored|constant|empty)|nan_resamples|degenerate_fits|"
+                               r"floored|constant|empty|exponent|covariance|ineligible|screened|"
+                               r"zero_difference)|nan_resamples|degenerate_fits|"
                                r"zero_variance_corr")
 
 
@@ -100,7 +101,7 @@ def assert_handling(results: dict) -> None:
     assert results["handling"]["failed_variants"] == 0
 
     # A13 guard: every count-like key of the results is copied by the walker.
-    not_handling = {"n_zero_difference", "n_noncontiguous_states"}  # properties of a statistic
+    not_handling = {"n_noncontiguous_states"}  # a property of a statistic (does not match anyway)
 
     def keys(node: object):
         if isinstance(node, dict):

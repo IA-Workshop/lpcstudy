@@ -78,15 +78,24 @@ def test_collect_result_counts_walks_nested_dicts_and_lists_a13() -> None:
     (``n_failed_resamples``), a dict of ints (``zero_variance_corr`` by rho and n_lib, with a
     nested float and a ``bool``, which are skipped), a list of dicts, an int under a list index,
     a dict whose leaves are ints and ``None`` (``degenerate_fits``). Uncounted keys
-    (``n_states``, ``n_zero_difference``) are not copied; a key holding the dotted rho ``0.01`` keeps its dot
+    (``n_states``, also when it sits below a counted key such as ``zero_variance_corr``: it is a
+    size, fix R1 of WU-0002.11b) are not copied, while ``n_zero_difference`` is since WU-0002.11b; a key holding the dotted rho ``0.01`` keeps its dot
     in the path (``/`` separates). Exact paths and values; the input is not modified.
     """
     import copy
 
     from lpcstudy.experiments import RESULT_COUNT_KEYS, collect_result_counts
 
-    tree = {"H1b": {"PLP": {"n_failed_resamples": 3}, "n_states": 40},
+    tree = {"H1b": {"PLP": {"n_failed_resamples": 3, "n_floored": 2}, "n_states": 40,
+                    "CP": {"n_dropped_resamples": 5}},
+            "H1a": {"by_noise": {"0.01": {"n_exponent_at_bound": {"point": 1, "resamples": 7},
+                                          "n_covariance_warnings": {"point": 0, "resamples": 9}}}},
+            "H1c": {"CP": {"n_ineligible_states": 11}},
+            "H3a": {"n_empty_regimes": 1, "n_degenerate_pairs": 2,
+                    "n_screened_out": {"growth_nonpositive": 4}},
+            "H2b": {"noise": {"n_constant_states": 6, "n_dropped_resamples": 0}},
             "H2e": {"zero_variance_corr": {"0.01": {"1000": {"cp_constant": 2, "n_nonfinite": 0,
+                                                              "n_states": 60,
                                                               "frac": 0.5, "flag": True}}},
                     "by_noise": [{"n_zero_difference": 9, "n_failed_resamples": 4},
                                  {"n_failed_resamples": 7}]},
@@ -95,7 +104,16 @@ def test_collect_result_counts_walks_nested_dicts_and_lists_a13() -> None:
             "n_nonfinite": np.int64(8)}
     before = copy.deepcopy(tree)
     got = collect_result_counts(tree)
-    assert got == {"H1b/PLP/n_failed_resamples": 3,
+    assert got == {"H1b/PLP/n_failed_resamples": 3, "H1b/PLP/n_floored": 2,
+                   "H1b/CP/n_dropped_resamples": 5,
+                   "H1a/by_noise/0.01/n_exponent_at_bound/point": 1,
+                   "H1a/by_noise/0.01/n_exponent_at_bound/resamples": 7,
+                   "H1a/by_noise/0.01/n_covariance_warnings/point": 0,
+                   "H1a/by_noise/0.01/n_covariance_warnings/resamples": 9,
+                   "H1c/CP/n_ineligible_states": 11, "H3a/n_empty_regimes": 1,
+                   "H3a/n_degenerate_pairs": 2, "H3a/n_screened_out/growth_nonpositive": 4,
+                   "H2b/noise/n_constant_states": 6, "H2b/noise/n_dropped_resamples": 0,
+                   "H2e/by_noise/0/n_zero_difference": 9,
                    "H2e/zero_variance_corr/0.01/1000/cp_constant": 2,
                    "H2e/zero_variance_corr/0.01/1000/n_nonfinite": 0,
                    "H2e/by_noise/0/n_failed_resamples": 4, "H2e/by_noise/1/n_failed_resamples": 7,
@@ -103,7 +121,13 @@ def test_collect_result_counts_walks_nested_dicts_and_lists_a13() -> None:
                    "n_nonfinite": 8}
     assert all(type(v) is int for v in got.values())
     assert tree["H1b"] == before["H1b"] and tree["H2e"] == before["H2e"]
-    assert "n_zero_difference" not in RESULT_COUNT_KEYS and "n_states" not in RESULT_COUNT_KEYS
+    # n_zero_difference joined the counted keys in WU-0002.11b (review R3 of lane .11a: it is a
+    # product of the zero-variance convention); n_states and n_noncontiguous_states stay out.
+    assert {"n_zero_difference", "n_floored", "n_dropped_resamples", "n_exponent_at_bound",
+            "n_covariance_warnings", "n_constant_states", "n_empty_regimes", "n_degenerate_pairs",
+            "n_ineligible_states", "n_screened_out"} <= RESULT_COUNT_KEYS
+    assert "n_states" not in RESULT_COUNT_KEYS and "n_noncontiguous_states" not in \
+        RESULT_COUNT_KEYS
 
 
 def _handled_cell(handled: np.ndarray) -> Cell:
