@@ -4,6 +4,7 @@ H2a and Q-N (WU-0002.6)."""
 from __future__ import annotations
 
 import dataclasses
+import itertools
 import json
 import math
 import warnings
@@ -111,15 +112,17 @@ def test_per_state_spearman_partial_ties_and_non_monotone() -> None:
 
 
 def test_h2d_is_the_in_distribution_part_only() -> None:
-    """H2d has no shift part: ``pass`` equals ``in_distribution_pass`` and no shift key remains.
+    """H2d has no shift part and no point-estimate flag: the key set is the six written out below.
 
     Reference: hand calculation. With A4 per-state squared error exactly 1.05 (1.2) times A3's,
     the excess ``mean(A4)/mean(A3) - 1`` is 0.05 (0.2), so the 10% criterion (v1 and v3 H2d part
-    (i), unchanged) passes (fails). The set of keys is the four written out below (WU-0002.1
-    removed part (ii) and its three ``shift_*`` keys; DL: "H2d, part (ii) dropped").
+    (i), unchanged) passes (fails): the whole 95% interval is that single value to a few ulp. The
+    set of keys is the six below (WU-0002.1 removed part (ii) and its three ``shift_*`` keys;
+    WU-0002.9 removed ``in_distribution_pass``, which lifts DEC-0011 O4, and added
+    ``n_failed_resamples``, ``verdict`` and ``reason``; a plan-listed edit of this test).
     Tolerance ``abs=1e-12`` on the excess: two means and a quotient of float64 numbers of
     order 1 (relative round-off a few 1e-16, times about 6 operations), 1e-12 is a margin of
-    three orders. The booleans and the key set are exact.
+    three orders. The booleans, the verdict and the key set are exact.
     """
     import pytest
 
@@ -136,9 +139,11 @@ def test_h2d_is_the_in_distribution_part_only() -> None:
 
     for factor, excess, ok in ((1.05, 0.05, True), (1.2, 0.2, False)):
         out = h2d_empirical_comparison(scores(factor), SMOKE)
-        assert set(out) == {"in_distribution_excess", "ci", "in_distribution_pass", "pass"}
+        assert set(out) == {"in_distribution_excess", "ci", "n_failed_resamples", "verdict",
+                            "reason", "pass"}
         assert out["in_distribution_excess"] == pytest.approx(excess, abs=1e-12)
-        assert out["pass"] is ok and out["in_distribution_pass"] is ok
+        assert out["pass"] is ok and out["verdict"] == ("pass" if ok else "fail")
+        assert out["reason"] is None and out["n_failed_resamples"] == 0
 
 
 # ------------------------------------------------------------------ H2a (WU-0002.6(b))
@@ -2090,10 +2095,12 @@ def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o
     """
     from lpcstudy.analysis import h2c_state_dependence
 
-    a2 = np.array([1.0, 1.5, 2.0, 2.5, 3.0, 3.5])
+    # WU-0002.9 plan-listed edit: the six hand states are tiled ten times (60 states), because
+    # each part now carries the 50-state minimum of DEC-0008 A3; every mean is unchanged.
+    a2 = np.tile(np.array([1.0, 1.5, 2.0, 2.5, 3.0, 3.5]), 10)
     a4 = a2 - 0.5
-    a4o = a2 - np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
-    scores = _scores(A2=a2, A4=a4, A4o=a4o, A0=np.full(6, 0.2), A1=np.full(6, 0.1))
+    a4o = a2 - np.tile(np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]), 10)
+    scores = _scores(A2=a2, A4=a4, A4o=a4o, A0=np.full(60, 0.2), A1=np.full(60, 0.1))
     out = h2c_state_dependence(scores, _calibration(0.25, 4.0), CONFIG)
     assert out["best_single"] == "A0"
     assert out["calibration_mse"] == {"A0": 0.25, "A1": 4.0}
@@ -2103,7 +2110,7 @@ def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o
     assert reported["mean"] == pytest.approx(-0.35, abs=1e-12)  # mean of -0.1 .. -0.6
     # Review R4: counted bootstrap, same resamples as the other H2c parts (seed + 5), bitwise
     # equal to the pre-existing block_bootstrap when nothing fails; failures would be counted.
-    reference = block_bootstrap(lambda idx: float(np.mean((a4o - a2)[idx])), 6, 200, 5,
+    reference = block_bootstrap(lambda idx: float(np.mean((a4o - a2)[idx])), 60, 200, 5,
                                 CONFIG.seed + 5, 0.95)
     assert reported["ci"] == [reference[1], reference[2]] and reported["mean"] == reference[0]
     assert reported["n_failed_resamples"] == 0
@@ -2309,3 +2316,329 @@ def test_h3b_weight_band_is_open_at_0_2(monkeypatch: pytest.MonkeyPatch) -> None
         assert out["weight_lambda"]["pass"] is (verdict == "pass")
         if verdict == "inconclusive":
             assert out["weight_lambda"]["reason"] == "interval meets band edge"
+
+
+# ------------------------------------------------ WU-0002.9: H1c, H2c, H2d and gain-bound verdicts
+# Plan checks V3 to V7 of WU-0002.9 with the main-session amendments (B1, N3, N5). Every
+# reference is a hand table, a closed-form value, a polyfit slope, or the pre-existing
+# ``block_bootstrap`` (an independent code path); nothing is classified by the code under test.
+
+def test_h1c_ratio_block_closed_band_edges_and_state_minimum() -> None:
+    """H1c band [0.8, 1.25] is closed; fewer than 50 states is inconclusive; fewer than 10 no number.
+
+    Reference: hand cases (plan V4). 60 ratios equal to 1.25 (0.8) give the interval [1.25, 1.25]
+    ([0.8, 0.8]): the median of 60 equal floats is that float exactly (an even count averages
+    x and x, which is x), so the interval touches the closed edge and passes. 1.5 is outside:
+    fail. Values alternating 0.7 and 1.0 (60 states) have resample medians in [0.7, 1.0] and
+    the 95% interval straddles 0.8: inconclusive "interval meets band edge". 49 equal ratios
+    give inconclusive "n_states < 50" although the interval would pass, and still report it; 9
+    ratios give no median and no interval (None), with the same reason; ``with_verdict=False``
+    (the CP) adds no verdict key. Two non-finite ratios among 60 finite ones are excluded and
+    counted (N3). Exact comparisons.
+    """
+    from lpcstudy.analysis import h1c_ratio_block
+
+    def block(value: float, n: int = 60) -> dict:
+        return h1c_ratio_block(np.full(n, value), CONFIG)
+
+    for value, ci, verdict in ((1.25, [1.25, 1.25], "pass"), (0.8, [0.8, 0.8], "pass"),
+                               (1.5, [1.5, 1.5], "fail")):
+        out = block(value)
+        assert out["median_ratio"] == value and out["ci"] == ci and out["n_states"] == 60
+        assert out["verdict"] == verdict and out["reason"] is None
+        assert out["pass"] is (verdict == "pass")
+        assert out["n_failed_resamples"] == 0 and out["n_excluded_nonfinite"] == 0
+    alternating = h1c_ratio_block(np.tile([0.7, 1.0], 30), CONFIG)
+    assert alternating["verdict"] == "inconclusive"
+    assert alternating["reason"] == "interval meets band edge" and alternating["pass"] is False
+    assert 0.7 <= alternating["ci"][0] < 0.8 < alternating["ci"][1] <= 1.0
+    short = block(1.0, 49)
+    assert short["verdict"] == "inconclusive" and short["reason"] == "n_states < 50"
+    assert short["ci"] == [1.0, 1.0] and short["n_states"] == 49
+    tiny = block(1.0, 9)
+    assert tiny["median_ratio"] is None and tiny["ci"] is None and tiny["n_states"] == 9
+    assert tiny["verdict"] == "inconclusive" and tiny["reason"] == "n_states < 50"
+    reported = h1c_ratio_block(np.full(60, 1.0), CONFIG, with_verdict=False)
+    assert set(reported) == {"median_ratio", "ci", "n_states", "n_excluded_nonfinite",
+                             "n_failed_resamples"}
+    mixed = h1c_ratio_block(np.concatenate([np.full(60, 1.0), [np.nan, np.inf]]), CONFIG)
+    assert mixed["n_states"] == 60 and mixed["n_excluded_nonfinite"] == 2
+    assert mixed["verdict"] == "pass"
+
+
+@pytest.mark.parametrize("n_states", [51, 60])
+def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_seed(n_states: int
+                                                                               ) -> None:
+    """The counted intervals equal the earlier ``block_bootstrap`` bitwise (plan V7).
+
+    This is a regression guard against the previous code path, which stays in
+    ``lpcstudy.statistics``: with no failed resample the estimate and both bounds of the H1c
+    median (integer seed ``config.seed``), the H2c mean differences (``seed + 5``) and the H2d
+    excess (``seed + 6``) are the same floats. 51 is the smoke size of the H1c PLP ratios. Synthetic
+    data from ``default_rng(11)``. Exact (``==``) on floats; non-finite ratios are excluded
+    before the median, so the reference runs on the finite ones.
+    """
+    from lpcstudy.analysis import h1c_ratio_block, h2c_state_dependence, h2d_empirical_comparison
+
+    rng = np.random.default_rng(11)
+    ratios = rng.uniform(0.5, 1.5, n_states)
+    block = h1c_ratio_block(np.concatenate([ratios, [np.nan]]), CONFIG)
+    est, lo, hi = block_bootstrap(lambda idx: float(np.median(ratios[idx])), n_states, 200, 5,
+                                  CONFIG.seed, 0.95)
+    assert (block["median_ratio"], *block["ci"]) == (est, lo, hi) and block["n_failed_resamples"] == 0
+
+    a2 = rng.uniform(1.0, 2.0, n_states)
+    a4 = a2 * rng.uniform(0.7, 1.1, n_states)
+    a0 = a2 * rng.uniform(0.9, 1.3, n_states)
+    a3 = a2 * rng.uniform(0.8, 1.0, n_states)
+    scores = _scores(A2=a2, A4=a4, A4o=a4, A0=a0, A1=a0, A3=a3)
+    h2c = h2c_state_dependence(scores, _calibration(0.25, 4.0), CONFIG)
+    for name, other in (("A4_minus_A2", a2), ("A4_minus_A0", a0)):
+        diff = a4 - other
+        est, lo, hi = block_bootstrap(lambda idx: float(np.mean(diff[idx])), n_states, 200, 5,
+                                      CONFIG.seed + 5, 0.95)
+        assert (h2c[name]["mean"], *h2c[name]["ci"]) == (est, lo, hi)
+        assert h2c[name]["n_failed_resamples"] == 0
+    h2d = h2d_empirical_comparison(scores, CONFIG)
+    est, lo, hi = block_bootstrap(lambda idx: float(a4[idx].mean() / a3[idx].mean() - 1.0),
+                                  n_states, 200, 5, CONFIG.seed + 6, 0.95)
+    assert (h2d["in_distribution_excess"], *h2d["ci"]) == (est, lo, hi)
+    assert h2d["n_failed_resamples"] == 0
+
+
+def _horizon_stub(tables: dict[str, np.ndarray], growth: np.ndarray, h_max: int = 40) -> Cell:
+    """A cell whose first-passage horizons at thresholds (0.1, 0.2, 0.3, 0.5) are the tables.
+
+    ``tables["PLP"]`` and ``tables["CP"]`` are ``(n, 4)`` integer first horizons (0 = never). The
+    r.m.s. error is a step function: 0.05 up to the first passage, then the midpoint between the
+    crossed threshold and the next one (1.0 above the last), so the first horizon above
+    threshold k is exactly the table entry (noise 0).
+    """
+    thetas = np.array([0.1, 0.2, 0.3, 0.5])
+    levels = np.append((thetas[:-1] + thetas[1:]) / 2.0, 1.0)
+
+    def curves(table: np.ndarray) -> np.ndarray:
+        out = np.full((len(table), h_max), 0.05)
+        for i, row in enumerate(table):
+            for k, first in enumerate(row):
+                if first > 0:
+                    out[i, first - 1:] = levels[k]
+        return out ** 2
+
+    zeros = np.zeros((len(growth), h_max))
+    moments = EnsembleMoments(
+        horizons=np.arange(1, h_max + 1), mean_cp=zeros, mean_plp=zeros, sq_cp=curves(tables["CP"]),
+        sq_plp=curves(tables["PLP"]), cross=zeros, analog_seed=np.ones(len(growth)),
+        est_seed=np.ones(len(growth)), noise_sens=np.zeros(len(growth)))
+    return Cell(system="lorenz63", noise=0.0, library_size=0, label="stub", setup=None,
+                splits={"test": SplitData(moments, None)},
+                oracles={"test": SimpleNamespace(growth=growth)},
+                horizons=np.arange(1, h_max + 1))
+
+
+def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_without_verdict() -> None:
+    """H1c end to end on a stub cell: PLP verdict from the interval; CP reported; exclusions counted.
+
+    Reference: hand-built first-passage tables and ``np.polyfit`` of T on ln(theta) (independent
+    of ``ols_slope``). Good states have PLP horizons [10, 14, 17, 21] + a shift 0..4 (a shift
+    does not change the slope) and growth set to 1/slope, so every PLP ratio is 1 to round-off
+    (abs 1e-12: a few operations of order 1). Their CP horizons [6, 12, 16, 24] give the ratio
+    slope_cp/slope_plp, about 1.6, outside the band, and the CP must carry no verdict. Extra
+    states (N3 count rules): two with growth <= 0, one with the same horizon at every threshold
+    (zero range), two censored with two events (under three), all ineligible (5), and one with
+    infinite growth, whose ratio is inf: excluded as non-finite (1). With 60 good states the PLP
+    passes; with 40 good states it is inconclusive "n_states < 50" although the numbers are
+    reported. Counts are exact; the keys of CP are exactly those of the helper without a verdict.
+    """
+    from lpcstudy.analysis import h1c_horizon_law
+
+    thetas = np.log([0.1, 0.2, 0.3, 0.5])
+    slope = lambda row: np.polyfit(thetas, row, 1)[0]
+    plp_row, cp_row = np.array([10, 14, 17, 21]), np.array([6, 12, 16, 24])
+
+    def build(n_good: int) -> tuple[Cell, float]:
+        shifts = np.arange(n_good) % 5
+        constant, censored = np.array([12, 12, 12, 12]), np.array([10, 14, 0, 0])
+        plp = [plp_row + s for s in shifts] + [constant, censored, censored] + [plp_row] * 3
+        cp = [cp_row + s for s in shifts] + [constant, censored, censored] + [cp_row] * 3
+        # the last three: growth 0, growth -0.1 (ineligible) and infinite growth (inf ratio)
+        growth = [1.0 / slope(plp_row)] * n_good + [1.0, 1.0, 1.0, 0.0, -0.1, np.inf]
+        cell = _horizon_stub({"PLP": np.array(plp), "CP": np.array(cp)}, np.array(growth))
+        return cell, slope(cp_row) / slope(plp_row)
+
+    cell, cp_ratio = build(60)
+    out = h1c_horizon_law(cell, CONFIG)
+    assert out["thresholds"] == [0.1, 0.2, 0.3, 0.5] and out["threshold"] == [0.8, 1.25]
+    plp, cp = out["PLP"], out["CP"]
+    assert plp["median_ratio"] == pytest.approx(1.0, abs=1e-12)
+    assert plp["ci"] == pytest.approx([1.0, 1.0], abs=1e-12)
+    assert plp["n_states"] == 60 and plp["n_excluded_nonfinite"] == 1
+    assert plp["n_ineligible_states"] == 5 and plp["n_failed_resamples"] == 0
+    assert plp["verdict"] == "pass" and plp["reason"] is None and plp["pass"] is True
+    assert (out["verdict"], out["reason"], out["pass"]) == ("pass", None, True)
+    assert cp["median_ratio"] == pytest.approx(cp_ratio, abs=1e-12) and cp_ratio > 1.25
+    assert cp["n_states"] == 60 and cp["n_excluded_nonfinite"] == 1
+    assert cp["n_ineligible_states"] == 5
+    assert not {"verdict", "reason", "pass"} & set(cp)
+    small, _ = build(40)
+    out = h1c_horizon_law(small, CONFIG)
+    assert out["PLP"]["n_states"] == 40 and out["PLP"]["median_ratio"] is not None
+    assert (out["verdict"], out["reason"], out["pass"]) == ("inconclusive", "n_states < 50", False)
+
+
+def _h2c_stub_scores(d_a2: np.ndarray, d_best: np.ndarray) -> dict[str, RuleScores]:
+    """Scores for 60 states with A4 - A2 = d_a2 and A4 - A0 = d_best exactly (small integers)."""
+    n = len(d_a2)
+    base = 5.0 + (np.arange(n) % 7)
+    a4 = base + d_a2
+    return _scores(A2=base, A4=a4, A4o=base.copy(), A0=a4 - d_best, A1=np.full(n, 99.0))
+
+
+def test_h2c_multi_part_verdicts_all_nine_combinations_and_the_open_edge() -> None:
+    """H2c: each part is pass (diff -1), fail (+1) or inconclusive (straddling); 9 combinations.
+
+    Reference (plan V3, V5): the hand table of v3 section 7 for two parts, classified by counting
+    labels: fail if either fails, pass if both pass, else inconclusive; the reason lists the
+    inconclusive parts and is None otherwise. A part with a constant difference -1 (+1) has the
+    interval [-1, -1] ([1, 1]) in every resample, so pass (fail); the alternating -1/+1
+    difference (60 states, block 5) has resample means S/60 with S even, so its 2.5% quantile is
+    strictly negative and its 97.5% quantile strictly positive: inconclusive "interval meets band
+    edge" at any seed. Open edge (V5, DEC-0008 A1): a difference identically 0 has the interval
+    [0, 0], which is not inside the open band (-inf, 0) and lies in its closed complement:
+    **fail**, for both parts. The best single forecaster is A0 (calibration 0.25 against 4.0).
+    The top-level ``n_failed_resamples`` is 0. Exact.
+    """
+    from lpcstudy.analysis import h2c_state_dependence
+
+    n = 60
+    parts = {"pass": np.full(n, -1.0), "fail": np.full(n, 1.0),
+             "inconclusive": np.where(np.arange(n) % 2 == 0, -1.0, 1.0)}
+    calibration = _calibration(0.25, 4.0, n=n)
+    combos = list(itertools.product(parts, repeat=2))
+    assert len(combos) == 9
+    for first, second in combos:
+        out = h2c_state_dependence(_h2c_stub_scores(parts[first], parts[second]), calibration,
+                                   CONFIG)
+        assert out["best_single"] == "A0"
+        assert out["A4_minus_A2"]["verdict"] == first and out["A4_minus_A0"]["verdict"] == second
+        want = ("fail" if "fail" in (first, second) else
+                "pass" if (first, second) == ("pass", "pass") else "inconclusive")
+        assert out["verdict"] == want, (first, second)
+        assert out["pass"] is (want == "pass")
+        names = [name for name, v in (("A4_minus_A2", first), ("A4_minus_A0", second))
+                 if v == "inconclusive"]
+        assert out["reason"] == ("; ".join(f"{name}: interval meets band edge" for name in names)
+                                 if want == "inconclusive" else None), (first, second)
+        for name in ("A4_minus_A2", "A4_minus_A0"):
+            assert out[name]["pass"] is (out[name]["verdict"] == "pass")
+            assert out[name]["n_failed_resamples"] == 0
+        assert out["n_failed_resamples"] == 0
+    zero = np.zeros(n)
+    edge = h2c_state_dependence(_h2c_stub_scores(zero, zero), calibration, CONFIG)
+    assert edge["A4_minus_A2"]["ci"] == [0.0, 0.0] and edge["A4_minus_A0"]["ci"] == [0.0, 0.0]
+    assert edge["A4_minus_A2"]["verdict"] == "fail" and edge["A4_minus_A0"]["verdict"] == "fail"
+    assert edge["verdict"] == "fail" and edge["pass"] is False
+    short = h2c_state_dependence(_h2c_stub_scores(parts["pass"][:49], parts["pass"][:49]),
+                                 calibration, CONFIG)
+    assert short["verdict"] == "inconclusive"
+    assert short["reason"] == "A4_minus_A2: n_states < 50; A4_minus_A0: n_states < 50"
+
+
+def test_h2d_closed_edge_at_one_tenth_through_the_real_percentile_interval(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """H2d band (-inf, 0.10] is closed at 0.10, tested on the real interval code (plan V6, B1).
+
+    Reference: hand cases and the mathematician's exact construction. (a) A4 = A3 gives the
+    excess 0 in every resample, so [0, 0] inside the band: pass; A4 = 2 A3 gives exactly 1:
+    [1, 1] above 0.10: fail. (b) No single resample value can equal 0.10 (fl(0.1) is not a
+    multiple of 2**-52, and y - 1.0 is exact there), but the interpolated 97.5% quantile can: with
+    1950 values of lo = 0.09999999999999987 and 50 of lo + k * 2**-52 returned in place of the
+    bootstrap (``bootstrap_values`` is replaced; ``block_bootstrap_counted`` and
+    ``percentile_interval`` are the real code), the upper bound is 0.1 exactly for k = 25 (index
+    1999 * 0.975 = 1949.025, weight 0.025 on the step, 0.025 * 25 * 2**-52 = 0.625 * 2**-52, which
+    lifts lo to fl(0.1)): pass. For k = 27 it is 0.10000000000000002, one ulp above the edge:
+    inconclusive "interval meets band edge". The values were checked once by running
+    ``percentile_interval`` before this test was relied on (k = 23: 0.09999999999999999, 24..26:
+    0.1, 27: 0.10000000000000002). (c) A spy on ``criterion_verdict`` records the band and the
+    closedness that the function passes. Exact comparisons.
+    """
+    import lpcstudy.analysis as analysis
+    import lpcstudy.statistics as statistics_module
+
+    rng = np.random.default_rng(5)
+    a3 = rng.uniform(1.0, 2.0, 60)
+    make = lambda e: RuleScores(mse=np.zeros(1), state_mse_ref=e, regret=np.zeros(1),
+                                agreement=0.0, km_median=0.0, rmst=0.0)
+    same = analysis.h2d_empirical_comparison({"A3": make(a3), "A4": make(a3)}, CONFIG)
+    assert same["ci"] == [0.0, 0.0] and same["verdict"] == "pass" and same["pass"] is True
+    double = analysis.h2d_empirical_comparison({"A3": make(a3), "A4": make(2.0 * a3)}, CONFIG)
+    assert double["ci"] == [1.0, 1.0] and double["verdict"] == "fail" and double["pass"] is False
+
+    low = 0.09999999999999987
+    scores = {"A3": make(a3), "A4": make(1.05 * a3)}
+    calls = []
+    real = analysis.criterion_verdict
+    monkeypatch.setattr(analysis, "criterion_verdict",
+                        lambda *args, **kwargs: calls.append((args, kwargs)) or real(*args, **kwargs))
+    for k, verdict, upper in ((25, "pass", 0.1), (27, "inconclusive", 0.10000000000000002)):
+        values = np.array([low] * 1950 + [low + k * 2.0 ** -52] * 50)
+        monkeypatch.setattr(statistics_module, "bootstrap_values",
+                            lambda *args, _v=values: (0.05, _v))
+        out = analysis.h2d_empirical_comparison(scores, CONFIG)
+        assert out["ci"][1] == upper and out["verdict"] == verdict
+        assert out["reason"] == (None if verdict == "pass" else "interval meets band edge")
+        assert out["pass"] is (verdict == "pass") and out["n_failed_resamples"] == 0
+    assert out["ci"][0] == low
+    assert [(args[3], args[4], kwargs) for args, kwargs in calls[-2:]] == \
+        [((-np.inf, 0.1), (True, True), {"n_states": 60})] * 2
+
+
+def test_gain_bound_has_no_bar_and_reports_each_screen() -> None:
+    """The gain bound is reported with no ``pass`` or ``threshold``; the screens' counts are given.
+
+    Reference: hand-built stub with cross = 0 and zero means, so the oracle hybrid is
+    V = E_C E_P / (E_C + E_P) (closed form). Both forecasters have E = 0.05 from step T0 (r.m.s.
+    0.2236 > theta 0.2: first passage T0) and E = 0.09 from T1 (V = 0.045 > 0.04 = theta^2, while
+    at 0.05 V = 0.025 < 0.04): the hybrid crosses at T1 and the gain is T1 - T0. Growth 0.05 gives
+    the bound ln2 / 0.1 = 6.93 and the +1 step tolerance 7.93: gains 5 and 3 are within, 10 is
+    not. Seven states: three good (gains 5, 10, 3), a CP-censored one, one with a negative cross
+    moment, one with growth 0, and one with growth -1 and CP censored (overlap). So n_states = 3,
+    the fraction is 2/3 (two of three), growth screen 2, censored screen 2, covariance screen 1,
+    median gain 5 steps and maximum 10 over 30 steps per Lyapunov time. Exact up to the division
+    by 30 (abs 1e-12).
+    """
+    from lpcstudy.analysis import gain_horizon_bound
+
+    h_max = 20
+    horizons = np.arange(1, h_max + 1)
+    # (T0, T1, growth, CP censored, negative cross)
+    spec = [(4, 9, 0.05, False, False), (3, 13, 0.05, False, False), (5, 8, 0.05, False, False),
+            (4, 9, 0.05, True, False), (4, 9, 0.05, False, True), (4, 9, 0.0, False, False),
+            (4, 9, -1.0, True, False)]
+    sq_cp, sq_plp, cross = (np.zeros((len(spec), h_max)) for _ in range(3))
+    for i, (first, second, _, censored, negative) in enumerate(spec):
+        energy = np.full(h_max, 0.01)
+        energy[first - 1:] = 0.05
+        energy[second - 1:] = 0.09
+        sq_plp[i] = energy
+        sq_cp[i] = 0.01 if censored else energy
+        cross[i] = -0.02 if negative else 0.0
+    zeros = np.zeros_like(sq_cp)
+    moments = EnsembleMoments(
+        horizons=horizons, mean_cp=zeros, mean_plp=zeros, sq_cp=sq_cp, sq_plp=sq_plp,
+        cross=cross, analog_seed=np.ones(len(spec)), est_seed=np.ones(len(spec)),
+        noise_sens=np.zeros(len(spec)))
+    cell = Cell(system="lorenz63", noise=0.0, library_size=0, label="stub", setup=None,
+                splits={"test": SplitData(moments, None)},
+                oracles={"test": SimpleNamespace(growth=np.array([s[2] for s in spec]))},
+                horizons=horizons)
+    out = gain_horizon_bound(cell, CONFIG)
+    assert set(out) == {"fraction_within_bound", "n_states", "n_total_states", "n_screened_out",
+                        "median_gain_lyapunov", "max_gain_lyapunov"}
+    assert "pass" not in out and "threshold" not in out
+    assert out["n_states"] == 3 and out["n_total_states"] == 7
+    assert out["n_screened_out"] == {"growth_nonpositive": 2, "censored_single_forecaster": 2,
+                                     "negative_covariance": 1}
+    assert out["fraction_within_bound"] == pytest.approx(2.0 / 3.0, abs=1e-12)
+    assert out["median_gain_lyapunov"] == pytest.approx(5.0 / 30.0, abs=1e-12)
+    assert out["max_gain_lyapunov"] == pytest.approx(10.0 / 30.0, abs=1e-12)
