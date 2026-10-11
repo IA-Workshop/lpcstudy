@@ -187,12 +187,18 @@ zero-variance in both cells has difference 0). Left out: ``n_states`` (a size) a
 property of the H2a(i) statistic)."""
 
 
+UNCOUNTED_LEAF_KEYS: frozenset[str] = frozenset({"n_states"})
+"""Integer leaves below a counted key that are sizes, not handled cases: the walker skips them
+(``H2e.zero_variance_corr.<rho>.<n_lib>.n_states`` is a denominator and always nonzero)."""
+
+
 def collect_result_counts(result: object, path: str = "") -> dict[str, int]:
     """Copy of the integer counts below every key of ``RESULT_COUNT_KEYS`` (a read-only walk).
 
     The walk descends through dicts and lists. Below a counted key every ``int`` leaf (not a
     ``bool``) is recorded under its path (keys joined by ``/``, since keys such as ``0.01``
-    contain dots); other leaves (floats, strings, ``None``) are skipped.
+    contain dots); other leaves (floats, strings, ``None``) are skipped, and so is every leaf keyed in
+    ``UNCOUNTED_LEAF_KEYS`` (``n_states``: a size).
 
     Parameters
     ----------
@@ -215,7 +221,8 @@ def collect_result_counts(result: object, path: str = "") -> dict[str, int]:
             out[where] = int(node)
         elif isinstance(node, dict):
             for key, value in node.items():
-                leaves(value, f"{where}/{key}")
+                if key not in UNCOUNTED_LEAF_KEYS:
+                    leaves(value, f"{where}/{key}")
         elif isinstance(node, list):
             for i, value in enumerate(node):
                 leaves(value, f"{where}/{i}")

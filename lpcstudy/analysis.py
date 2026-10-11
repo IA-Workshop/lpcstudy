@@ -1298,6 +1298,12 @@ def _per_state_spearman_counted(levels: np.ndarray, values: np.ndarray
     sign); the states that get it, those with a zero rank denominator, are returned as an
     ``int`` count (DEF-0001, row N6; ``H2b.noise.n_constant_states``).
 
+    The count is of ``not (denom > 0)``, which also includes a NaN denominator (``rankdata``
+    propagates NaN, so a row with a non-finite weight would be scored 0 by ``np.where`` and must
+    be counted too; ``denom == 0`` would leave it zeroed and uncounted). Such a row cannot occur
+    today: the weights are ``oracle_weight`` of moments built from errors clipped at +-10, so they
+    are finite (``h2b_knob_response`` takes them as they are).
+
     Returns
     -------
     tuple[np.ndarray, int]
@@ -1399,8 +1405,10 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
       bound is above 0 (strict), fail iff the whole interval is at or below 0, else inconclusive
       (``criterion_verdict``, including the 50-state guard). Two counts sit beside it (DEF-0001;
       report only, no treatment changes): ``n_constant_states``, the states scored 0 because their
-      weight is the same at every level (the tie convention, conservative for "> 0": it shrinks
-      the mean toward 0; at pilot size 20-40% of the states have ``w* = 0`` at every level), and
+      weight is the same at every level (a zero rank denominator; the tie convention,
+      conservative for "> 0": it shrinks the mean toward 0; at pilot size 20-40% of the states
+      have ``w* = 0`` at every level; the count would also include a non-finite row, which cannot
+      occur since the weights are finite), and
       ``n_dropped_resamples``, the NaN resamples that this still-``_boot`` interval drops (a mean
       of finite correlations cannot be NaN, so 0 is expected; the A3 tail is WU-0002.9's).
     * (ii) ``library_change``: the mean over states of ``w*_i(H_ref, 10^4) - w*_i(H_ref, 10^3)``

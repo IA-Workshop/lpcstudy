@@ -510,6 +510,129 @@ SMOKE_NOTE = ("Note: at the smoke preset a gate FAIL is expected. V7 is a plumbi
               "judged at pilot size and above (DEC-0015).")
 
 
+# ---------------------------------------------------------------------------------------
+# WU-0002.11b: the Handling section of RESULTS.md (DEF-0001: nothing silent).
+# (A delimited block, kept away from the end of the file.)
+# ---------------------------------------------------------------------------------------
+def _handling_results(tmp_path: Path) -> tuple[list[str], dict]:
+    """A hand-built ``handling`` block in a fake results dict, and the lines of its RESULTS.md."""
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    zero = {"invariant_mean_replacements": 0, "error_clips_cp": 1, "curvature_floor": 0,
+            "zero_variance_corr": 5, "zero_variance_corr_cp": 5}
+    system["handling"] = {
+        "schema": "lpcstudy.handling/1",
+        "cells": {
+            "base|rho=0.01|n_lib=10000|core": {
+                "counts": dict(zero), "by_kind": {},
+                "denominators": {"estimates": 100, "moment_entries": 40},
+                "evaluation": {"counts": {"nu_cap_clips": 8, "closed_form_floor_a4": 0},
+                               "by_split": {"nu_cap_clips": {"test": 8}},
+                               "denominators": {"nu_cap_estimates": 260}}},
+            "V3-cp-horizon": {"counts": dict.fromkeys(zero, 0), "by_kind": {},
+                              "denominators": {"estimates": 7}}},
+        "oracles": {"test": {"counts": {"oracle_nonfinite": 0, "local_dim_zero_distance": 2},
+                             "denominators": {"states": 80}}},
+        "fitting": {"counts": {"empty_regime_fallback": 0, "pooled_curvature_floor": 0},
+                    "denominators": {"regimes": 9}},
+        "result_counts": {"H1b/PLP/n_floored": 2, "H1b/CP/n_floored": 3,
+                          "H2b/noise/n_dropped_resamples": 0,
+                          "H1a/by_noise/0.01/n_exponent_at_bound/point": 1},
+        "totals": {}}
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    results["handling"] = {"schema": "lpcstudy.handling/1",
+                           "totals": {"zero_variance_corr": 5, "error_clips_cp": 1,
+                                      "nu_cap_clips": 8, "curvature_floor": 0},
+                           "by_system": {}, "robustness": {}, "failed_variants": 2}
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    return lines[lines.index("## Handling (DEF-0001: nothing silent)"):], results
+
+
+def test_handling_section_lists_only_nonzero_counters_with_blocks_and_denominators(
+        tmp_path: Path) -> None:
+    """The section lists every nonzero counter by block and result path, and nothing else.
+
+    Reference: the hand-built block of ``_handling_results``, whose nonzero entries are written
+    in the expected lines below (exact string checks; a zero counter, the V3 block with only zeros
+    and the zero result count must not appear). Pipes in a block id are escaped so each table row
+    keeps its cells. Sentinels (counters that should be 0 by a theorem hypothesis or by
+    construction: ``error_clips_cp``, ``local_dim_zero_distance``, ``H1b/PLP/n_floored``) are
+    labelled; rate counters are not.
+    """
+    section, _ = _handling_results(tmp_path)
+    text = "\n".join(section)
+    assert section[0] == "## Handling (DEF-0001: nothing silent)"
+    assert "### lorenz63" in section
+    assert ("| `base\\|rho=0.01\\|n_lib=10000\\|core` | error_clips_cp = 1 (sentinel); "
+            "zero_variance_corr = 5; zero_variance_corr_cp = 5 | "
+            "estimates 100; moment_entries 40 |") in section  # counters in the block's own order
+    assert ("| `base\\|rho=0.01\\|n_lib=10000\\|core/evaluation` | nu_cap_clips = 8 | "
+            "nu_cap_estimates 260 |") in section
+    assert "| `oracles/test` | local_dim_zero_distance = 2 (sentinel) | states 80 |" in section
+    assert "| `H1b/PLP/n_floored` (sentinel) | 2 |" in section
+    assert "| `H1b/CP/n_floored` | 3 |" in section
+    assert "| `H1a/by_noise/0.01/n_exponent_at_bound/point` | 1 |" in section
+    for absent in ("V3-cp-horizon", "n_dropped_resamples", "pooled_curvature_floor",
+                   "empty_regime_fallback", "curvature_floor", "oracle_nonfinite",
+                   "invariant_mean_replacements"):
+        assert absent not in text, absent
+    assert "Run totals (main systems): zero_variance_corr = 5; error_clips_cp = 1 (sentinel); " \
+        "nu_cap_clips = 8." in section
+    assert "Robustness variants that raised (`failed_variants`): 2." in section
+
+
+def test_handling_section_marks_nothing_provisional_and_says_so(tmp_path: Path) -> None:
+    """The section reports only: it states that no result is marked provisional (Q6, DEC-0017).
+
+    Reference: the plan (Q6 proposed "report only"; the rule for sentinels and a collapsed nu cap
+    is the owner's). The text must say both facts, and the validation-gate sentence of the
+    verdict table is unchanged (the section adds no "provisional" mark anywhere else).
+    """
+    section, _ = _handling_results(tmp_path)
+    text = "\n".join(section)
+    assert "none marks a result provisional" in text and "owner" in text
+    # fix R3 of WU-0002.11b: the two statements about what is not listed or not logged
+    assert "result counts have no log line" in text
+    assert "counters of the robustness variants are there too, under `handling.robustness`, " \
+        "and are not listed here" in text
+    assert "`run.log` has one line per nonzero counter." not in text
+    assert "FAIL (results provisional)" not in text  # the gate's mark is not added here
+
+
+def test_handling_section_all_zero_and_absent_block(tmp_path: Path) -> None:
+    """All-zero counters read "none nonzero"; results with no handling block say so (not silent).
+
+    Reference: the two branches written out by hand. Exact lines.
+    """
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    system["handling"] = {"schema": "lpcstudy.handling/1", "cells": {
+        "core": {"counts": {"error_clips_cp": 0}, "denominators": {"estimates": 3}}},
+        "oracles": {}, "fitting": {"counts": {"empty_regime_fallback": 0}, "denominators": {}},
+        "result_counts": {"H2b/noise/n_dropped_resamples": 0}, "totals": {}}
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    results["handling"] = {"schema": "lpcstudy.handling/1", "totals": {"error_clips_cp": 0},
+                           "by_system": {}, "robustness": {}, "failed_variants": 0}
+    write_markdown(results, config, tmp_path / "ZERO.md")
+    zero = (tmp_path / "ZERO.md").read_text().splitlines()
+    zero = zero[zero.index("## Handling (DEF-0001: nothing silent)"):]
+    assert "Run totals (main systems): no counter is nonzero." in zero
+    assert "No counter of any block is nonzero." in zero
+    assert "No result count is nonzero." in zero
+    assert not any(line.startswith("| `") for line in zero)
+
+    del results["handling"]
+    del system["handling"]
+    write_markdown(results, config, tmp_path / "OLD.md")
+    old = (tmp_path / "OLD.md").read_text().splitlines()
+    old = old[old.index("## Handling (DEF-0001: nothing silent)"):]
+    assert old[-1] == "No `handling` block in these results (written before WU-0002.11)."
+# ------------------------------------------------------------ end of the WU-0002.11b block
+
+
 def _three_systems(config: StudyConfig, h2a: tuple[str, str, str]) -> dict:
     """Results of three systems whose H2a verdicts are ``h2a`` (all other rows pass)."""
     systems = {name: fake_system(config) for name in THREE}
@@ -677,118 +800,3 @@ def test_key_numbers_show_inconclusive_h1c_h2c_h2d_with_their_reasons() -> None:
     assert _key_number("H2d", system) == \
         "A4/A3-1 = 5% [4, 6]%: inconclusive (interval meets band edge)"
 
-
-# ---------------------------------------------------------------------------------------
-# WU-0002.11b: the Handling section of RESULTS.md (DEF-0001: nothing silent).
-# ---------------------------------------------------------------------------------------
-def _handling_results(tmp_path: Path) -> tuple[list[str], dict]:
-    """A hand-built ``handling`` block in a fake results dict, and the lines of its RESULTS.md."""
-    results, config = fake_results("DEV-0")
-    system = fake_system(config)
-    zero = {"invariant_mean_replacements": 0, "error_clips_cp": 1, "curvature_floor": 0,
-            "zero_variance_corr": 5, "zero_variance_corr_cp": 5}
-    system["handling"] = {
-        "schema": "lpcstudy.handling/1",
-        "cells": {
-            "base|rho=0.01|n_lib=10000|core": {
-                "counts": dict(zero), "by_kind": {},
-                "denominators": {"estimates": 100, "moment_entries": 40},
-                "evaluation": {"counts": {"nu_cap_clips": 8, "closed_form_floor_a4": 0},
-                               "by_split": {"nu_cap_clips": {"test": 8}},
-                               "denominators": {"nu_cap_estimates": 260}}},
-            "V3-cp-horizon": {"counts": dict.fromkeys(zero, 0), "by_kind": {},
-                              "denominators": {"estimates": 7}}},
-        "oracles": {"test": {"counts": {"oracle_nonfinite": 0, "local_dim_zero_distance": 2},
-                             "denominators": {"states": 80}}},
-        "fitting": {"counts": {"empty_regime_fallback": 0, "pooled_curvature_floor": 0},
-                    "denominators": {"regimes": 9}},
-        "result_counts": {"H1b/PLP/n_floored": 2, "H1b/CP/n_floored": 3,
-                          "H2b/noise/n_dropped_resamples": 0,
-                          "H1a/by_noise/0.01/n_exponent_at_bound/point": 1},
-        "totals": {}}
-    results["systems"] = {"lorenz63": system}
-    results["verdicts"] = verdicts(results, config)
-    results["handling"] = {"schema": "lpcstudy.handling/1",
-                           "totals": {"zero_variance_corr": 5, "error_clips_cp": 1,
-                                      "nu_cap_clips": 8, "curvature_floor": 0},
-                           "by_system": {}, "robustness": {}, "failed_variants": 2}
-    write_markdown(results, config, tmp_path / "RESULTS.md")
-    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
-    return lines[lines.index("## Handling (DEF-0001: nothing silent)"):], results
-
-
-def test_handling_section_lists_only_nonzero_counters_with_blocks_and_denominators(
-        tmp_path: Path) -> None:
-    """The section lists every nonzero counter by block and result path, and nothing else.
-
-    Reference: the hand-built block of ``_handling_results``, whose nonzero entries are written
-    in the expected lines below (exact string checks; a zero counter, the V3 block with only zeros
-    and the zero result count must not appear). Pipes in a block id are escaped so each table row
-    keeps its cells. Sentinels (counters that should be 0 by a theorem hypothesis or by
-    construction: ``error_clips_cp``, ``local_dim_zero_distance``, ``H1b/PLP/n_floored``) are
-    labelled; rate counters are not.
-    """
-    section, _ = _handling_results(tmp_path)
-    text = "\n".join(section)
-    assert section[0] == "## Handling (DEF-0001: nothing silent)"
-    assert "### lorenz63" in section
-    assert ("| `base\\|rho=0.01\\|n_lib=10000\\|core` | error_clips_cp = 1 (sentinel); "
-            "zero_variance_corr = 5; zero_variance_corr_cp = 5 | "
-            "estimates 100; moment_entries 40 |") in section  # counters in the block's own order
-    assert ("| `base\\|rho=0.01\\|n_lib=10000\\|core/evaluation` | nu_cap_clips = 8 | "
-            "nu_cap_estimates 260 |") in section
-    assert "| `oracles/test` | local_dim_zero_distance = 2 (sentinel) | states 80 |" in section
-    assert "| `H1b/PLP/n_floored` (sentinel) | 2 |" in section
-    assert "| `H1b/CP/n_floored` | 3 |" in section
-    assert "| `H1a/by_noise/0.01/n_exponent_at_bound/point` | 1 |" in section
-    for absent in ("V3-cp-horizon", "n_dropped_resamples", "pooled_curvature_floor",
-                   "empty_regime_fallback", "curvature_floor", "oracle_nonfinite",
-                   "invariant_mean_replacements"):
-        assert absent not in text, absent
-    assert "Run totals (main systems): zero_variance_corr = 5; error_clips_cp = 1 (sentinel); " \
-        "nu_cap_clips = 8." in section
-    assert "Robustness variants that raised (`failed_variants`): 2." in section
-
-
-def test_handling_section_marks_nothing_provisional_and_says_so(tmp_path: Path) -> None:
-    """The section reports only: it states that no result is marked provisional (Q6, DEC-0017).
-
-    Reference: the plan (Q6 proposed "report only"; the rule for sentinels and a collapsed nu cap
-    is the owner's). The text must say both facts, and the validation-gate sentence of the
-    verdict table is unchanged (the section adds no "provisional" mark anywhere else).
-    """
-    section, _ = _handling_results(tmp_path)
-    text = "\n".join(section)
-    assert "none marks a result provisional" in text and "owner" in text
-    assert "FAIL (results provisional)" not in text  # the gate's mark is not added here
-
-
-def test_handling_section_all_zero_and_absent_block(tmp_path: Path) -> None:
-    """All-zero counters read "none nonzero"; results with no handling block say so (not silent).
-
-    Reference: the two branches written out by hand. Exact lines.
-    """
-    results, config = fake_results("DEV-0")
-    system = fake_system(config)
-    system["handling"] = {"schema": "lpcstudy.handling/1", "cells": {
-        "core": {"counts": {"error_clips_cp": 0}, "denominators": {"estimates": 3}}},
-        "oracles": {}, "fitting": {"counts": {"empty_regime_fallback": 0}, "denominators": {}},
-        "result_counts": {"H2b/noise/n_dropped_resamples": 0}, "totals": {}}
-    results["systems"] = {"lorenz63": system}
-    results["verdicts"] = verdicts(results, config)
-    results["handling"] = {"schema": "lpcstudy.handling/1", "totals": {"error_clips_cp": 0},
-                           "by_system": {}, "robustness": {}, "failed_variants": 0}
-    write_markdown(results, config, tmp_path / "ZERO.md")
-    zero = (tmp_path / "ZERO.md").read_text().splitlines()
-    zero = zero[zero.index("## Handling (DEF-0001: nothing silent)"):]
-    assert "Run totals (main systems): no counter is nonzero." in zero
-    assert "No counter of any block is nonzero." in zero
-    assert "No result count is nonzero." in zero
-    assert not any(line.startswith("| `") for line in zero)
-
-    del results["handling"]
-    del system["handling"]
-    write_markdown(results, config, tmp_path / "OLD.md")
-    old = (tmp_path / "OLD.md").read_text().splitlines()
-    old = old[old.index("## Handling (DEF-0001: nothing silent)"):]
-    assert old[-1] == "No `handling` block in these results (written before WU-0002.11)."

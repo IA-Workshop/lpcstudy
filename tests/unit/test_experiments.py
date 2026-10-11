@@ -78,7 +78,8 @@ def test_collect_result_counts_walks_nested_dicts_and_lists_a13() -> None:
     (``n_failed_resamples``), a dict of ints (``zero_variance_corr`` by rho and n_lib, with a
     nested float and a ``bool``, which are skipped), a list of dicts, an int under a list index,
     a dict whose leaves are ints and ``None`` (``degenerate_fits``). Uncounted keys
-    (``n_states``) are not copied, while ``n_zero_difference`` is since WU-0002.11b; a key holding the dotted rho ``0.01`` keeps its dot
+    (``n_states``, also when it sits below a counted key such as ``zero_variance_corr``: it is a
+    size, fix R1 of WU-0002.11b) are not copied, while ``n_zero_difference`` is since WU-0002.11b; a key holding the dotted rho ``0.01`` keeps its dot
     in the path (``/`` separates). Exact paths and values; the input is not modified.
     """
     import copy
@@ -94,6 +95,7 @@ def test_collect_result_counts_walks_nested_dicts_and_lists_a13() -> None:
                     "n_screened_out": {"growth_nonpositive": 4}},
             "H2b": {"noise": {"n_constant_states": 6, "n_dropped_resamples": 0}},
             "H2e": {"zero_variance_corr": {"0.01": {"1000": {"cp_constant": 2, "n_nonfinite": 0,
+                                                              "n_states": 60,
                                                               "frac": 0.5, "flag": True}}},
                     "by_noise": [{"n_zero_difference": 9, "n_failed_resamples": 4},
                                  {"n_failed_resamples": 7}]},

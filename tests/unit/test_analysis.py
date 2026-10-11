@@ -2801,14 +2801,20 @@ def test_h1a_real_fit_at_the_lower_bound_is_flagged_and_matches_the_warning_reco
 
 def test_h1a_library_scaling_reports_the_bound_and_warning_counts_per_noise(
         monkeypatch: pytest.MonkeyPatch) -> None:
-    """End to end: ``by_noise[rho]`` carries point and resample counts; the old keys are unchanged.
+    """Wiring and regression guard (LPC.PC.21), not value evidence: ``by_noise[rho]`` carries point
+    and resample counts, and the old keys are still those of the earlier bootstrap.
 
-    Reference: a fit stub that always returns the lower bound (0.01) and emits one OptimizeWarning
-    per call, so the point fit counts 1 and the ``B = 200`` resamples count 200 each, by
-    construction. The ratio, its interval and ``n_failed_resamples`` equal what
-    ``block_bootstrap_counted`` gives for the closure ``h1a_ratio`` (the pre-existing bootstrap
-    of the ratio) at the same generator, bitwise. Without the stub, on ordinary data, the real
-    result has the same keys with nonnegative ints.
+    The counts are exact by construction: a fit stub that always returns the lower bound (0.01)
+    and emits one OptimizeWarning per call, so the point fit counts 1 and the ``B = 200`` resamples
+    count 200 each. The comparison of ``ratio``, ``ratio_ci`` and ``n_failed_resamples`` with
+    ``block_bootstrap_counted`` of ``analysis.h1a_ratio`` compares the code with itself
+    (``h1a_ratio`` is ``_median_fit_stats(...)[0]``, and under the stub the ratio is constant), so
+    it only guards the wiring of the joint bootstrap. The evidence that the H1a numbers are
+    unchanged is the DEV-0 smoke comparison (V1: 0 leaves changed) together with the older tests of
+    this file, which compare with an independent hand ratio and the hand median fit
+    (``test_h1a_ratio_is_the_hand_value_and_the_interval_is_the_joint_bootstrap``,
+    ``test_h1a_median_fit_recovers_inverse_dimension_with_heavy_tail``). Without the stub, on
+    ordinary data, the real result has the same keys with nonnegative ints.
     """
     from scipy.optimize import OptimizeWarning
 

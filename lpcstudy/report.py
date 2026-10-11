@@ -347,11 +347,13 @@ def handling_lines(results: dict, systems: list[str]) -> list[str]:
              f"Schema `{run['schema']}`. Counts only: no number in this report depends on them, "
              "and none marks a result provisional (rate counters are report-only; whether a "
              "nonzero sentinel, or a collapsed nu cap, should mark results provisional is the "
-             "owner's ruling, DEC-0017 Q6). Only nonzero counters are listed here; the full "
-             "block, with the zeros and the denominators of every block, is `handling` in "
-             "`results.json`, and `run.log` has one line per nonzero counter. A counter marked "
-             "*sentinel* should be 0 by a theorem hypothesis or by construction: a nonzero one "
-             "is a finding.", "",
+             "owner's ruling, DEC-0017 Q6). Only nonzero counters of the main systems are listed "
+             "here; the full block, with the zeros and the denominators of every block, is "
+             "`handling` in `results.json` (the counters of the robustness variants are there too, "
+             "under `handling.robustness`, and are not listed here). `run.log` has one line per "
+             "nonzero cell, oracle or fit counter; result counts have no log line. A counter "
+             "marked *sentinel* should be 0 by a theorem hypothesis or by construction: a nonzero "
+             "one is a finding.", "",
              "Run totals (main systems): "
              + ("; ".join(totals) + "." if totals else "no counter is nonzero."), "",
              f"Robustness variants that raised (`failed_variants`): {run['failed_variants']}."]
