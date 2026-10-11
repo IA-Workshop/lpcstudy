@@ -555,7 +555,7 @@ def test_graph_equals_hand_derived_fixture() -> None:
 
 
 def test_fixture_schema() -> None:
-    """The fixture has the 21 module stems as keys and sorted lists of keys as values.
+    """The fixture has the 22 module stems as keys and sorted lists of keys as values.
 
     Reference: the file listing of ``lpcstudy/`` (``*.py`` stems) and the schema of the plan.
     """
@@ -563,7 +563,7 @@ def test_fixture_schema() -> None:
     assert set(data) == {"description", "source_commit", "graph"}
     graph = data["graph"]
     stems = sorted(path.stem for path in (ROOT / "lpcstudy").glob("*.py"))
-    assert sorted(graph) == stems and len(stems) == 21
+    assert sorted(graph) == stems and len(stems) == 22
     for deps in graph.values():
         assert deps == sorted(set(deps)) and set(deps) <= set(stems)
 

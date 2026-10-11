@@ -124,6 +124,26 @@ Each hunk is wrapped in `# --- WU-0008.k begin ---` / `# --- WU-0008.k end ---`;
 
 <dated entries: what was done, commands, results, commits>
 
+### 2026-10-11, developer claude-sonnet-5-5: WU-0008.3 and .4 (labels, captions, QoI table)
+
+Scope of this session: .3 and .4 only. Not done here: the budget tables (.1), `endpoint_mc_error` and `ci_mc_se` (.2), `analysis.py`, `statistics.py` (the mathematician's M1 to M9 run in parallel).
+
+- `git merge develop` (own command): merged cleanly (DEC-0021 only), no conflict markers (grep over docs, lpcstudy, tests, tools). Base smoke for the A1-style comparison was run at the branch base (7dc4f45, clean tree) before any edit: `LPC_THREADS=4 tools/run_preset.sh smoke DEV-0 runs/base`, exit 0, 64 s.
+- Graph fixture, derived by reading the imports: `budget.py` has `from .config import StudyConfig` and `from .identifiers import HYPOTHESIS_TABLE, Hypothesis` (stdlib `textwrap`): `budget -> [config, identifiers]`; `report.py` gains `from .budget import ...`: `report -> [allocation, budget, config, identifiers, statistics]`. Module count 21 to 22 (`test_fixture_schema` count updated; a count, not a tolerance).
+
+**Test run 1 (.3 code: budget.py labels and captions, report hunks R1, R2, R4, R6, R7).** Checklist:
+1. Change set: `lpcstudy/budget.py` (new), `lpcstudy/report.py`, `tests/unit/test_budget.py` (new), `tests/unit/fixtures/lpcstudy_graph.json`, `tests/unit/test_tools_test_impact.py` (docstring and count), this unit file.
+2. Radius: `tools/test_impact.py --base develop --explain` gives unit `test___main__`, `test_budget`, `test_report`, `test_tools_test_impact` (rule: `budget` module = own + direct dependents; `report` = pipeline module = own + dependents + integration; the fixture selects the tests naming it); plus by hand, as the main session asked, `test_data.py` and `test_validation.py`. Smaller than the whole suite; no gate. The integration pair runs once at the end, with the smoke by hand.
+3. Already run? No: first run of this code.
+4. Device: `JAX_PLATFORMS=cpu` (the wrapper sets it).
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s.
+6. Contention: no `lpcstudy --preset` run active (`pgrep` empty before the base smoke; that smoke has finished).
+7. Output: wrapper's `-q --tb=short -rfE`; summary and failures only.
+8. Command: `LPC_THREADS=4 tools/run_tests.sh unit tests/unit/test___main__.py tests/unit/test_budget.py tests/unit/test_report.py tests/unit/test_tools_test_impact.py tests/unit/test_data.py tests/unit/test_validation.py`.
+
+Result of run 1: `148 passed in 14.06s`. Self-check of the diff for `clip|nan_to_num|isfinite|where(|try:|except` and for `default_rng|random.|PRNGKey`: none in `budget.py` or the report hunks (two `try:` in `test_budget.py` close figures in a `finally`; no handling of a value). No tolerance in an assert or approx was touched (the changes to `test_tools_test_impact.py` are a docstring and the module count 21 to 22).
+
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
