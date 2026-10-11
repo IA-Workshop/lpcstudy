@@ -661,9 +661,9 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
             res["library_change_reported"][f"{other:g}"] = {
                 **fields, "role": "reported", "unavailable_reason": (
                     "missing cell(s): " + ", ".join(gone)) if gone else None}
-    res["threshold"] = ("(i) per-state Spearman of w* with rho: CI lower bound > 0; (ii) mean paired "
-                        "change in w*(H_ref) from n_lib 10^3 to 10^4 at rho = 1%: CI lower bound > 0 "
-                        "(both at level 1 - 0.05/3)")
+    res["threshold"] = ("(i) per-state Spearman of w* with rho: CI lower bound > 0; (ii) mean "
+                        "paired change in w*(H_ref) from n_lib 10^3 to 10^4 at rho = 1%: CI lower "
+                        "bound > 0 (both at level 1 - 0.05/3)")
     res["pass"] = bool(res["noise"]["pass"] and res["library_change"]["pass"])
     res["inconclusive_reason"] = res["library_change"]["inconclusive_reason"]
     return res
@@ -679,7 +679,7 @@ def h2e_noise_matching(library_cells: dict[tuple[float, int], Cell], config: Stu
     ``r_i(rho, 10^5) - r_i(rho, 10^3)`` with a 95% block-bootstrap interval (one index array);
     ``pass`` needs the lower bound above 0 (strict) at both 1% and 2%. A state whose CP or PLP
     error is constant over the draws has correlation exactly 0 in both cells (DEC-0011 O2,
-    Methods v2 M11 H2f); the counts of such states per cell (``zero_variance_corr``, split into
+    Methods v2 section M11); the counts of such states per cell (``zero_variance_corr``, split into
     CP-constant, PLP-constant and both) and of states whose change is exactly 0
     (``n_zero_difference``) are reported. A median with an atom at 0 can put the lower bound at
     exactly 0, which is inconclusive; that is intended. Any cell missing for a ``rho``
@@ -982,7 +982,7 @@ def _state_rows(idx: np.ndarray, n_draws: int) -> np.ndarray:
 
 def h3b_importances(con_profile: np.ndarray, w_target: np.ndarray, curvature_ref: np.ndarray,
                     t_target: np.ndarray, config: StudyConfig) -> dict:
-    """H3b: impurity importances of ``Lambda_tilde`` in a weight tree and a horizon tree, with intervals.
+    """H3b: impurity importances of ``Lambda_tilde`` in a weight tree and a horizon tree.
 
     Two regression trees with ``max_leaf_nodes = 8`` (DEC-0008 A3, A4(e); fixed so that the
     estimand does not depend on the data-chosen K) are fitted on the construction states'
@@ -1056,9 +1056,10 @@ def h3b_importances(con_profile: np.ndarray, w_target: np.ndarray, curvature_ref
         tree_w.fit(flat[rows], np.repeat(w_target[idx], n_draws),
                    sample_weight=np.repeat(curvature_ref[idx], n_draws))
         tree_t.fit(flat[rows], np.repeat(t_target[idx], n_draws))
+        failed = np.full(n_coords, np.nan)  # a single-leaf tree has no importance (0/0)
         return np.concatenate([
-            tree_w.feature_importances_ if tree_w.tree_.n_leaves > 1 else np.full(n_coords, np.nan),
-            tree_t.feature_importances_ if tree_t.tree_.n_leaves > 1 else np.full(n_coords, np.nan)])
+            tree_w.feature_importances_ if tree_w.tree_.n_leaves > 1 else failed,
+            tree_t.feature_importances_ if tree_t.tree_.n_leaves > 1 else failed])
 
     point, values = bootstrap_values(importances, n_states, config.bootstrap_resamples,
                                      config.bootstrap_block, make_rng(config.seed, "h3b-bootstrap"))

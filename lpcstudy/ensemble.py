@@ -284,7 +284,7 @@ def draw_correlation(cp_err: np.ndarray, plp_err: np.ndarray
     ``(E[cp] - E[c]E[p]) / (sd_c sd_p)`` cancels catastrophically for a nearly constant
     error and is not used. A state whose CP error is constant over the draws (identical
     retrieval for every draw, so the errors are bitwise equal) has no variance, hence no
-    correlation: its value is set to exactly 0.0 (Methods v2 section M11, H2f) and flagged in
+    correlation: its value is set to exactly 0.0 (Methods v2 section M11) and flagged in
     ``cp_constant``. The same holds for a PLP-constant state (DEC-0011 O2), flagged in
     ``plp_constant``. Constancy is the exact test ``np.ptp(err, axis=1) == 0``. A state that
     is not constant but whose variance underflows gives NaN (counted by the caller, never
