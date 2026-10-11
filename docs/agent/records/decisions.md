@@ -385,3 +385,20 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Finding for the owner.** In test configurations, 2 to 13% of estimates were still moving by more than 10% of their error at iteration 15 (worst in whitened coordinates with large start errors). The production rate is unknown, and nothing in the unit measures it (the unit meets NVVUQ.10 literally, not NVVUQ.9). It bears on the estimator-convention point of DEC-0024.
 
 **Affects:** WU-0005.4, WU-0008 (LM row), WU-0003.4. Marked "needs owner review before freeze". **Status:** proposed.
+
+## DEC-0024 addendum A1: WU-0008 wording amendments from review round 1 (2026-10-11, recorded by claude-sonnet-5-5 (main session) from the applied-mathematician's reply; for owner confirmation)
+
+Amends M1 (a), M7 and the row-9 text of the accepted design (DEC-0024). The mathematician's finding: decision (a) of M1, 'the finite-M variance is inside every primary interval', is false for H3c (the test-state M draws do not enter the H3c quantity; the fit-stage M-draw noise is conditioned on). It holds, with the finite-M bias outside, for the other four.
+
+**Row 1 'Included' cells (each at most 140 characters).**
+- H2a(i): `variance: yes (states resampled with their M-draw w*; eligibility redone in each resample; asymptotic for a median); finite-M bias: no`
+- H2a(ii), all parts: `variance: yes in every part (target, domain and seed controls resampled with the states; asymptotic); finite-M bias: no` (caveat in the notes: whether the 'one' part is added at all is decided once on the full sample and is not resampled)
+- H2b(i): `variance: yes (mean of per-state Spearman values, each from that state's own draws); finite-M bias: no`
+- H2b(ii): `variance: yes (mean of per-state paired changes; same unit draws at both N_lib); finite-M clip-boundary bias: no`
+- H3c: `no: test-state M draws do not enter the QoI; fit-stage M-draw noise (A4 proxies; A5 tree, leaf weights, K) is conditioned on`
+
+**Row 9 (DEF-0020).** `DEF-0020: Option C or K (DEC-0018; owner, pending; K in force by default via ASSERT_ROADMAP_BOUNDS = True) decides only whether the WU-0006 ROADMAP-bound coverage rows stay asserted (K) or become recorded characterization rows with the consistency ranges as the defect test (C); neither changes a bound, level or R. Whether the study widens its intervals or uses another procedure (longer block, studentized, BCa) is a separate, undecided design question for the owner and the applied-mathematician.` The widening sentence cites the uq-budget rule ('widen the interval or refine') only: neither DEF-0020 nor DEC-0018 decides widening.
+
+**M7 constants.** Reference rates: scratch seed 20261011 (`m2_coverage.py`; `m7b.py` only transcribes them); run-2 counts: seed 6006 (`make_rng(6006, "wu0006", ...)`); neither registered. R_ref (98.3% column): C1, C4, C8 at both phi: 40000; C3 and C7: 20000 (C7's pooled 60000 applies to the C7 verdict counts only; the coverage constants 0.9794 and 0.9762 are the 20000 values); C4h1.5 and C4h2 (c 0.8): 20000. The range '10^4 to 4 10^4' belongs to C6, which no QoI uses; the cases used span 2 10^4 to 4 10^4.
+
+**Status:** proposed, with DEC-0024.
