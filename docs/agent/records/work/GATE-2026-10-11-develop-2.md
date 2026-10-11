@@ -20,3 +20,14 @@ Gate: merge (DEVELOPMENT_WORKFLOW.md 4.3), run by the main session with `LPC_GAT
 ## Results
 
 (appended below after the runs)
+
+- `LPC_GATE=merge tools/run_tests.sh unit tests/unit`: `902 passed in 88.83s`.
+- `LPC_GATE=merge tools/run_tests.sh integration tests/integration`: `11 passed in 205.04s (0:03:25)`.
+- No failure, no rerun. The tree was clean for both runs (`git status --porcelain` empty before each).
+- **Gate result: pass** for `develop` tip `a74d6b0` (this log commit follows it).
+
+## Items the gate does not settle (owner checkpoints, needs owner review before freeze)
+
+- Verdict and statistics code (WU-0002.4 to .10, WU-0008.2a `endpoint_mc_error`; DEC-0011 to DEC-0014, DEC-0021, DEC-0024 proposed), seed and provenance code (WU-0012.5, WU-0001.6), the LM estimator diagnostics (WU-0005.4; `estimation.py` values bitwise unchanged; handling schema `/2`; DEC-0025 proposed) and the Chua memo row (DEC-0010 proposed).
+- The slow tier is not part of this gate (WU-0006 and the WU-0008 exact checks C4/C7/C8 were run on their branches).
+- Open, so not "fully green" for `main` (the owner's reservation): DEF-0017 (seed-independent start states; blocks WU-0002.11c), DEF-0018, DEF-0019 confirmation, DEF-0020 (Option C or K), DEF-0025, WU-0002.11c, .11d (owner ruling), .11e (owner decisions OD1 to OD8), the WU-0003 rehearsal, the WU-0004 freeze items, the owner's ledger entries and the confirmation of the proposed DECs. No request for `main` is made.
