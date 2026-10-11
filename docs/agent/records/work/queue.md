@@ -85,3 +85,5 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
   - .11d, the DEF-0011 audit: a table now, conversions after WU-0002.12.
 
   DEF-0012 is proposed as a separate small unit. The LM-internal sites go to WU-0005.4. Owner questions Q1 to Q7; Q1 blocks .11c only. The applied-mathematician checks M1 to M8 before execution.
+
+- 2026-10-11, claude-opus-5-5 (planner): WU-0002.12 **plan written** on branch `wu/0002-12-pilot-regression` (`WU-0002.12-pilot-regression.md`). Step 1, the tool `tools/compare_pilot.py` and its tests T1 to T10, can start now. Steps 2 and 3, the CPU pilot run on DEV-0 and the comparison, are **BLOCKED** until the owner records the fallback criterion (risk R1; referral in the unit file; proposed text F1 to F5 with tightenings (a) to (c)). The applied-mathematician's tasks AM1 to AM5 come before the owner's ruling. Further owner decisions: O2 (`LPC_THREADS`), O3 (order: WU-0002.9b before the run, DEF-0017 and .11d after it), O4, O5.
