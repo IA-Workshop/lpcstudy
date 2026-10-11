@@ -124,6 +124,47 @@ def test_a_pipe_in_a_value_cannot_break_the_table() -> None:
     assert row == "| platform | Linux\\|odd name |"
 
 
+def test_header_has_the_platform_line_under_the_label_a8() -> None:
+    """The header prints one ``Platform:`` line under the label (A8, WU-0001.6).
+
+    Reference: the exact string fixed by the plan, for a hand-built block (not the live probe):
+    ``Platform: CPU <model> · BLAS <library> <corename>, ...``. The per-key table is unchanged:
+    it still has a row for every key (including ``cpu`` and ``blas``) except ``config``. A
+    library whose probe failed (corename ``None``) prints ``unknown``; no libraries print
+    ``BLAS none recorded``. Exact.
+    """
+    results, _ = fake_results("DEV-0")
+    block = dict(results["provenance"])
+    block["cpu"] = {"model": "Test CPU @ 1GHz", "source": "/proc/cpuinfo", "isa": ["avx"],
+                    "error": None}
+    block["blas"] = {"libraries": [
+        {"library": "numpy.libs/libx.so", "corename": "Haswell", "config": "c", "error": None},
+        {"library": "scipy.libs/liby.so", "corename": None, "config": None, "error": "E: x"}],
+        "error": None}
+    lines = header_lines(block)
+    assert lines[2] == ("Platform: CPU Test CPU @ 1GHz · BLAS numpy.libs/libx.so Haswell, "
+                        "scipy.libs/liby.so unknown")
+    assert lines[1] == "" and lines[3] == "" and lines[4] == "| Provenance | Value |"
+    rows = [ln for ln in lines if ln.startswith("| ") and not ln.startswith("| Provenance")]
+    assert [ln.split(" | ")[0][2:] for ln in rows] == [k for k in block if k != "config"]
+    block["blas"] = {"libraries": [], "error": "OSError: no maps"}
+    assert header_lines(block)[2] == "Platform: CPU Test CPU @ 1GHz · BLAS none recorded"
+
+
+def test_platform_line_says_not_recorded_for_an_older_block_a8() -> None:
+    """A block without ``cpu`` and ``blas`` (a ``/1`` block, ``--report-only``) is flagged (A8).
+
+    Reference: the plan. Exact; the table rows are those of the block's own keys.
+    """
+    results, _ = fake_results("DEV-0")
+    old = {k: v for k, v in results["provenance"].items()
+           if k not in ("cpu", "blas", "numpy_simd")}
+    lines = header_lines(old)
+    assert lines[2] == "Platform: not recorded" and lines[3] == ""
+    rows = [ln for ln in lines if ln.startswith("| ") and not ln.startswith("| Provenance")]
+    assert [ln.split(" | ")[0][2:] for ln in rows] == [k for k in old if k != "config"]
+
+
 def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
     """One system's results with the minimal content ``verdicts`` and ``write_markdown`` read.
 

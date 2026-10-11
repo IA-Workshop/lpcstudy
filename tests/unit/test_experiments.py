@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import struct
 
 from types import SimpleNamespace
 
@@ -11,7 +13,7 @@ import pytest
 
 from lpcstudy.config import SMOKE
 from lpcstudy.ensemble import EvaluationDraws
-from lpcstudy.experiments import _sweep_subset
+from lpcstudy.experiments import _sweep_subset, context_record
 from lpcstudy.pipeline import Cell, SplitData
 from unit_helpers import _moments_from_draws
 
@@ -328,3 +330,34 @@ def test_p2c_verification_uses_the_core_draws_and_logs_a_mismatch(caplog) -> Non
     core.setup.n_analogs = 2
     with pytest.raises(ValueError, match="single nearest analog"):
         p2c_verification(study, core, library)
+
+
+def test_context_record_adds_the_four_digests_and_leaves_meta_alone() -> None:
+    """``context_record`` is ``ctx.meta`` plus four digests of the stored arrays (A2, WU-0001.6).
+
+    Reference: ``hashlib.sha256(struct.pack("<...d", ...))`` over the row-major values, written
+    in the test (not numpy ``tobytes``). The fake context is a ``SimpleNamespace`` with a
+    non-symmetric ``whiten`` so that a transposed read would change the digest. ``ctx.meta`` is
+    the same object afterwards with the same content (it is logged and shared by the cached
+    context). Exact (a digest is a deterministic function of the bytes; no tolerance).
+    """
+    def ref(array: np.ndarray) -> str:
+        values = array.ravel().tolist()
+        return hashlib.sha256(struct.pack("<%dd" % len(values), *values)).hexdigest()
+
+    meta = {"lambda_max": 0.9, "delay": 4}
+    ctx = SimpleNamespace(
+        meta=meta, state_mean=np.array([0.1, -2.5, 1.0 / 3.0]),
+        state_cov=np.array([[2.0, 0.5, 0.0], [0.5, 3.0, 1e-300], [0.0, 1e-300, 4.0]]),
+        whiten=np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.5]]),
+        unwhiten=np.array([[0.5, 0.25, 0.125], [0.0, 1.0, -0.0], [5e-324, 2.0, 3.0]]))
+    before = dict(meta)
+    record = context_record(ctx)
+    assert list(record) == ["lambda_max", "delay", "state_mean_digest", "cov_digest",
+                            "whiten_digest", "unwhiten_digest"]
+    assert record["state_mean_digest"] == ref(ctx.state_mean)
+    assert record["cov_digest"] == ref(ctx.state_cov)
+    assert record["whiten_digest"] == ref(ctx.whiten)
+    assert record["unwhiten_digest"] == ref(ctx.unwhiten)
+    assert record["whiten_digest"] != ref(ctx.whiten.T)
+    assert ctx.meta is meta and meta == before and record is not meta

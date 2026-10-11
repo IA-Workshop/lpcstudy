@@ -255,6 +255,30 @@ def _cell(value: object) -> str:
     return text.replace("|", "\\|").replace("\n", " ")
 
 
+def platform_line(provenance: dict) -> str:
+    """Return the ``Platform:`` header line: the CPU model and each OpenBLAS runtime kernel.
+
+    Parameters
+    ----------
+    provenance : dict
+        The provenance block. A block without ``cpu`` and ``blas`` (schema ``/1``, written
+        before WU-0001.6) gives ``Platform: not recorded``.
+
+    Returns
+    -------
+    str
+        ``Platform: CPU <model> · BLAS <library> <corename>, ...`` (a library whose probe failed
+        shows ``unknown``; no libraries show ``none recorded``).
+    """
+    if "cpu" not in provenance and "blas" not in provenance:
+        return "Platform: not recorded"
+    model = provenance.get("cpu", {}).get("model", "unknown")
+    libraries = provenance.get("blas", {}).get("libraries", [])
+    blas = ", ".join(f"{entry['library']} {entry['corename'] or 'unknown'}"
+                     for entry in libraries) or "none recorded"
+    return f"Platform: CPU {model} · BLAS {blas}"
+
+
 def header_lines(provenance: dict | None) -> list[str]:
     """Return the Markdown lines of the RESULTS.md provenance header (LPC.PC.13, LPC.PC.18).
 
@@ -267,14 +291,14 @@ def header_lines(provenance: dict | None) -> list[str]:
     Returns
     -------
     list[str]
-        The label line, then a two-column table of every key except ``config``, then the
-        full configuration as JSON in a ``<details>`` block.
+        The label line, the ``Platform:`` line (WU-0001.6), then a two-column table of every key
+        except ``config``, then the full configuration as JSON in a ``<details>`` block.
     """
     if provenance is None:
         return ["**UNPROMOTED** · provenance absent (output written before WU-0001)"]
     label = provenance["label"]
     lines = [f"**{label}**" if "UNPROMOTED" in label else f"**{label}** · **UNPROMOTED**", "",
-             "| Provenance | Value |", "|---|---|"]
+             platform_line(provenance), "", "| Provenance | Value |", "|---|---|"]
     lines += [f"| {key} | {_cell(value)} |" for key, value in provenance.items()
               if key != "config"]
     lines += ["", "<details><summary>Full configuration</summary>", "", "```json",

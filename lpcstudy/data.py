@@ -119,6 +119,9 @@ class SystemContext:
         Mean of the invariant measure.
     whiten, unwhiten : np.ndarray
         ``C^{-1/2}`` and ``C^{1/2}``.
+    state_cov : np.ndarray
+        The covariance ``C = np.cov(stats.T)`` of the invariant measure that was rooted to
+        give ``whiten`` and ``unwhiten`` (kept for the platform record, WU-0001.6).
     library_states : np.ndarray
         Latent library states, shape ``(L, m)``.
     library_clean : np.ndarray
@@ -153,6 +156,7 @@ class SystemContext:
     state_mean: np.ndarray
     whiten: np.ndarray
     unwhiten: np.ndarray
+    state_cov: np.ndarray
     library_states: np.ndarray
     library_clean: np.ndarray
     library_unit_noise: np.ndarray
@@ -270,7 +274,8 @@ def build_context(system: str, config: StudyConfig, cache_dir: Path,
     obs_raw = stats[:, spec.observed_index]
     obs_mean, obs_scale = float(obs_raw.mean()), float(obs_raw.std())
     state_mean = stats.mean(axis=0)
-    whiten, unwhiten = _symmetric_root(np.cov(stats.T))
+    state_cov = np.cov(stats.T)
+    whiten, unwhiten = _symmetric_root(state_cov)
     obs_norm = (obs_raw - obs_mean) / obs_scale
     # tau_d: first AMI minimum, capped so that the delay window (D-1) tau_d spans at
     # most one Lyapunov time (keeps the window inverse problem well conditioned).
@@ -314,7 +319,7 @@ def build_context(system: str, config: StudyConfig, cache_dir: Path,
     return SystemContext(
         spec=spec, lambda_max=lam, interval=interval, delay=delay, embed_dim=dim,
         acf_time=acf_time, spacing=spacing, obs_mean=obs_mean, obs_scale=obs_scale,
-        state_mean=state_mean, whiten=whiten, unwhiten=unwhiten,
+        state_mean=state_mean, whiten=whiten, unwhiten=unwhiten, state_cov=state_cov,
         library_states=library_states, library_clean=observe(library_states),
         library_unit_noise=noise_rng.standard_normal(library_len),
         eval_states=main, eval_clean=observe(main), split_indices=offsets,
