@@ -2,7 +2,7 @@
 # Run an lpcstudy preset on a registered DEVELOPMENT seed under the limits of LPC.AUTH.3.
 #
 # Usage: tools/run_preset.sh <preset> <seed-id> <out-dir> [--device cpu|gpu]
-#                            [--systems S...] [--skip-transfer] [--skip-robustness]
+#                            [--systems S...] [--skip-robustness]
 #
 #   preset   smoke | pilot | full
 #   seed-id  a DEV-n id listed in seeds/development_seeds.json (never a raw integer)
@@ -128,7 +128,7 @@ for arg in "$@"; do
     [[ "$lower" != *confirmatory* ]] || refuse "an argument names the confirmatory path, which is owner-only (LPC.PC.7)"
 done
 
-[ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-transfer] [--skip-robustness]"
+[ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-robustness]"
 preset="$1"
 seed="$2"
 out_arg="$3"
@@ -154,7 +154,7 @@ while [ "$#" -gt 0 ]; do
             done
             [ "${#systems[@]}" -ge 1 ] || refuse "--systems needs at least one system name"
             ;;
-        --skip-transfer | --skip-robustness)
+        --skip-robustness)
             passthrough+=("$1")
             shift
             ;;

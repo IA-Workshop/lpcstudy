@@ -101,27 +101,6 @@ def chua_field(state: jnp.ndarray, params: dict[str, float]) -> jnp.ndarray:
     ])
 
 
-def lorenz96_field(state: jnp.ndarray, params: dict[str, float]) -> jnp.ndarray:
-    """Lorenz-96 vector field with cyclic boundary conditions.
-
-    Parameters
-    ----------
-    state : jnp.ndarray
-        State of length ``m``.
-    params : dict[str, float]
-        Key ``forcing``.
-
-    Returns
-    -------
-    jnp.ndarray
-        Time derivative of the state.
-    """
-    ahead = jnp.roll(state, -1)
-    back_two = jnp.roll(state, 2)
-    back_one = jnp.roll(state, 1)
-    return (ahead - back_two) * back_one - state + params["forcing"]
-
-
 @dataclass(frozen=True)
 class SystemSpec:
     """Static description of a dynamical system.
@@ -167,11 +146,6 @@ SYSTEMS: dict[str, SystemSpec] = {
         name="chua", field_fn=chua_field,
         params={"alpha": 15.6, "beta": 28.0, "m0": -1.143, "m1": -0.714},
         dim=3, observed_index=0, initial_state=(0.7, 0.0, 0.0), max_dt=0.005),
-    "lorenz96": SystemSpec(
-        name="lorenz96", field_fn=lorenz96_field,
-        params={"forcing": 8.0},
-        dim=6, observed_index=0,
-        initial_state=(8.01, 8.0, 8.0, 8.0, 8.0, 8.0), max_dt=0.01),
 }
 
 

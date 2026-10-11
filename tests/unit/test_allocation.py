@@ -5,7 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lpcstudy.allocation import SeedProxy, closed_form_weight
+from lpcstudy import allocation
+from lpcstudy.allocation import RULE_LABELS, SeedProxy, closed_form_weight
 from lpcstudy.oracle import oracle_weight
 from unit_helpers import _moments_from_draws
 
@@ -68,3 +69,14 @@ def test_seed_proxy_recovers_parameters() -> None:
     proxy = SeedProxy.fit(feature**2, floor**2, seed_sq)
     assert proxy.slope == pytest.approx(2.0, rel=0.02)
     assert proxy.floor == pytest.approx(3.0, rel=0.05)
+
+
+def test_rule_set_is_the_v3_rule_set() -> None:
+    """The rule labels are exactly A0-A5, A4o and A*; A4f and its function are gone (WU-0002.1).
+
+    Reference: proposal and methods v3 section 5 (rules A0 to A5, A4o, A*) and the decision
+    log (A4f is dropped), written out in the test, not read from the code.
+    Tolerance: none; equality of a discrete set of strings.
+    """
+    assert set(RULE_LABELS) == {"A0", "A1", "A2", "A3", "A4", "A5", "A4o", "A*"}
+    assert not hasattr(allocation, "full_form_weight")

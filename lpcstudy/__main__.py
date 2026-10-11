@@ -13,7 +13,7 @@ from pathlib import Path
 
 from . import provenance
 from .config import PRESETS
-from .experiments import run_robustness, run_system, run_transfer, run_transfer_target
+from .experiments import run_robustness, run_system
 from .pipeline import Study
 from .report import make_figures, save_json, verdicts, write_markdown
 from .seeds import (LEDGER_PATH, REGISTRY_PATH, SeedRefusal, confirmatory_seed, load_registry,
@@ -37,7 +37,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out", default="results", type=Path)
     parser.add_argument("--systems", nargs="*", default=None,
                         help="Subset of core systems (default: all in the preset).")
-    parser.add_argument("--skip-transfer", action="store_true")
     parser.add_argument("--skip-robustness", action="store_true")
     parser.add_argument("--report-only", action="store_true",
                         help="Rebuild RESULTS.md and figures from an existing results.json.")
@@ -107,7 +106,11 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     out_dir.mkdir(parents=True, exist_ok=True)
     if args.report_only:
         results = json.loads((out_dir / "results.json").read_text())
-        results["verdicts"] = verdicts(results, config)
+        try:
+            results["verdicts"] = verdicts(results, config)  # refuses a pre-v3 file, writes nothing
+        except ValueError as stale:
+            print(f"lpcstudy: refused (stale results schema): {stale}", file=sys.stderr)
+            return REFUSAL_EXIT
         save_json(results, out_dir / "results.json")
         write_markdown(results, config, out_dir / "RESULTS.md")
         make_figures(results, config, out_dir / "figures")
@@ -132,12 +135,6 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
                      "provenance": block}
     for system in config.core_systems:
         results["systems"][system] = run_system(study, system)
-        save_json(results, out_dir / "results.json")
-    if not args.skip_transfer and config.transfer_targets:
-        for target in config.transfer_targets:
-            if target not in study.core_cells:
-                run_transfer_target(study, target)
-        results["transfer"] = run_transfer(study)
         save_json(results, out_dir / "results.json")
     if not args.skip_robustness:
         results["robustness"] = {s: run_robustness(study, s)

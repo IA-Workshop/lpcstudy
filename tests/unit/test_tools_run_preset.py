@@ -242,14 +242,28 @@ def test_smoke_foreground_command_environment_and_meta(fake: FakeRoot) -> None:
 
 
 def test_pass_through_arguments_follow_the_seed(fake: FakeRoot) -> None:
-    """``--systems a b --skip-transfer --skip-robustness`` reach the CLI unchanged."""
+    """``--systems a b --skip-robustness`` reach the CLI unchanged."""
     done = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/DEV-2", "--systems", "lorenz63",
-                    "rossler", "--skip-transfer", "--skip-robustness")
+                    "rossler", "--skip-robustness")
     assert done.returncode == 0, done.stderr
     (call,) = cli_calls(fake)
     assert call["argv"][call["argv"].index("--seed-id") + 1] == "DEV-2"
     tail = call["argv"][call["argv"].index("--systems"):]
-    assert tail == ["--systems", "lorenz63", "rossler", "--skip-transfer", "--skip-robustness"]
+    assert tail == ["--systems", "lorenz63", "rossler", "--skip-robustness"]
+
+
+def test_removed_skip_transfer_option_is_refused(fake: FakeRoot) -> None:
+    """``--skip-transfer`` no longer exists: exit 64, one line, nothing started (WU-0002.1).
+
+    Reference: the wrapper's refusal contract (an unknown argument gives exit 64 and one stderr
+    line naming it; no fake is called and no meta file is written), as in the refusal table.
+    Tolerance: none; exit code and counts compared for equality.
+    """
+    done = fake.run("run_preset.sh", "smoke", "DEV-1", "runs/d", "--skip-transfer")
+    assert done.returncode == 64, (done.stdout, done.stderr)
+    assert len(done.stderr.strip().splitlines()) == 1 and "--skip-transfer" in done.stderr
+    assert not list(fake.root.rglob("run.meta.json*"))
+    assert fake.calls() == [] and fake.timeout_calls() == [] and fake.tally_calls() == []
 
 
 def test_seed_flag_is_passed_when_the_help_lists_it(fake: FakeRoot) -> None:
