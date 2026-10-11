@@ -342,6 +342,15 @@ Tightened: Lorenz 3% → 1%. Unchanged: Rössler 3% (both references) and memo 1
 
 **Self-check.** Grep of the library diff for `clip|nan_to_num|isfinite|where(|try:|except|default_rng|random.|PRNGKey`: no hits. No tolerance in any assert or approx grew (Lorenz tightened to 1% from the roadmap's 3% by amendment A2; the others are as the amendment states). float64 throughout (the orbit dtype is float64, checked). Rössler observed max|x| 11.43 is below 16.7: no referral.
 
+### 2026-10-11 Fix round 1 (developer, claude-sonnet-5-5): R1 and R4
+
+- R1: the `test_data.py` docstring now says the tolerances were derived from the error budget alone with no observed gap, that the Lorenz and Rössler pilot values were already visible (VV.3), and that the memo value was measured before the 10% was confirmed. Docstring only; no assertion, tolerance, reference or seed changed.
+- R4: chose the smaller change: `LYAPUNOV_REFERENCES[s]` in `_lyapunov_lines` (one line), so a system without an entry raises `KeyError` instead of printing Chua's limitation text. No new test: the three registry systems are all in the table, and the existing report test exercises all three. The report text is unchanged for them, so no `results.json` leaf can change (the report runs after the results are written); the smoke comparison is therefore not redone.
+
+**§4.9 checklist before the fix-round run.** 1. Change set: ` M lpcstudy/report.py` (one line), ` M tests/unit/test_data.py` (docstring), this unit file. 2. Radius: `report.py` (pipeline tier): `test_report.py`, `test___main__.py`, `test_identifiers.py`, plus `test_data.py` by hand for the docstring edit (the AST `random_state` scan and the lambda rows live there); no integration (no pipeline or output-text change that the integration tests read; the integration set passed on the previous code and the single changed line only removes a default). 3. Already run? The set ran on the previous code; the code has changed, so one run now. 4. CPU via the wrapper. 5. Threads 4, unit timeout 300 s. 6. No lock needed. 7. Wrapper's quiet flags. 8. Two calls: `tools/run_tests.sh unit tests/unit/test_report.py tests/unit/test___main__.py tests/unit/test_identifiers.py` and `tools/run_tests.sh unit tests/unit/test_data.py`.
+
+**Results.** First call: `54 passed in 2.22s`. Second call: `13 passed in 3.55s`. Each run once.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
@@ -379,6 +388,7 @@ Scope: commits a3526db, 80d8fa8 and 7c3161f (WU-0007.2 and .3) against the plan,
   - The code's values (0.905494 and 0.0719398) were visible in `pilot_results_v1.json` and in the plan itself (line 24, the VV.3 caveat) before the mathematician derived 1% and confirmed 3%.
   - The research-note addendum states this correctly. The test docstring, which is the evidence record a later reader will see (LPC.PC.21), does not.
   - Fix: reword to "Tolerances derived from the error budget alone, without using any observed gap. The code's pilot values were already visible (VV.3), and the memo value was measured before the 10% was confirmed." Docstring only; no rerun is required beyond the file's radius after the edit.
+  - **Answer (developer): fixed in the WU-0007 fix-round-1 commit** (docstring reworded as proposed; no assertion changed).
 - **R2. `docs/agent/records/decisions.md:227` (develop; main session, not the developer): the DEC-0010 update does not record the VV.3 order for the memo tolerance.**
   - It gives "tolerance 10% (the mathematician's computation: combined sigma about 3.9%)" without saying that the code's memo value (0.3235) was measured and seen before the 10% was confirmed.
   - The record is not dishonest, but a reader of the decision log alone could take the 10% as blind.
@@ -391,6 +401,7 @@ Scope: commits a3526db, 80d8fa8 and 7c3161f (WU-0007.2 and .3) against the plan,
 - **R4. `lpcstudy/report.py:243`: `LYAPUNOV_REFERENCES.get(s, [])` is a silent fallback (PRIME.4).**
   - Any system name missing from the table, such as a renamed or added system, would be reported as "not validated: no published reference at these parameters (known limitation, NVVUQ.13, DEC-0010)". That attributes a Chua-specific, recorded limitation to a system for which nobody made that decision.
   - Fix: use `LYAPUNOV_REFERENCES[s]` so that a missing entry raises. Alternatively, print a distinct "no entry in LYAPUNOV_REFERENCES" text and test it. Add one assertion to the `test_report` test if the text route is taken.
+  - **Answer (developer): fixed in the WU-0007 fix-round-1 commit** (indexed with `[s]`, which raises; no new test, see the Log).
 
 **Merge with develop (91c31f7).**
 - I did a trial `git merge-tree` (no write to any branch). `lpcstudy/report.py` and `tests/unit/test_report.py` **auto-merge cleanly**: develop's H1 phase-2 hunks (`_verdict_text`, `_key_number`, `fake_system` H1 keys, a new test) do not overlap this branch's additions.

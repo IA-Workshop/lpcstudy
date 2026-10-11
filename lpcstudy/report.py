@@ -240,7 +240,7 @@ def _lyapunov_lines(results: dict, systems: list[str]) -> list[str]:
     for s in systems:
         found = results["systems"][s].get("context", {}).get("lambda_max")
         code = "n/a" if found is None else _fmt(found, 6)
-        references = LYAPUNOV_REFERENCES.get(s, [])
+        references = LYAPUNOV_REFERENCES[s]  # a system without an entry raises (PRIME.4)
         if not references:
             lines.append(f"| {s} | {code} | none | no confirmed published value | n/a | "
                          "not validated: no published reference at these parameters "

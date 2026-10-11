@@ -334,8 +334,10 @@ def test_lyapunov_cached_matches_published_reference(spec: SystemSpec,
       the memo itself (the sum must equal the mean divergence, about -1.54 per t) and are
       deliberately NOT asserted.
 
-    Tolerances, fixed before the result was seen (the applied-mathematician's DEVELOPMENT
-    standard errors at 10^5 Benettin steps, burn-in 5000; no observed gap was used):
+    Tolerances, derived from the error budget alone, with no observed gap used (the
+    applied-mathematician's DEVELOPMENT standard errors at 10^5 Benettin steps, burn-in 5000).
+    The code's pilot values for Lorenz and Rossler were already visible when they were derived
+    (VV.3), so they are not blind; the memo value was measured before the 10% was confirmed:
 
     - Lorenz 1%: code SE 0.0012 (0.13%); Sprott's own uncertainty is unstated, so Hartl's
       +-0.003 (0.33%) stands in. 3 * sqrt(0.13^2 + 0.33^2) = 1.06%. The RK4 bias is below 1e-4
