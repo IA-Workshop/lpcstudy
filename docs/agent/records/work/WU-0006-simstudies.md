@@ -479,6 +479,8 @@ The full form is the addendum A1 to A8 of `docs/agent/notes/2026-10-11-math-wu00
 
 **Test run 6 (the one fixed test), §4.9 checklist.** 1. Change set: as run 5 plus this fix, committed first. 2. Radius: `test_wu0006_harness.py::test_evaluate_delta_applies_the_a9_ranges_exactly` only (a changed test, rerun with `--lf` semantics by node id). 3. Already run? Yes, on the previous code, where it failed; it changed. 4 to 7 as run 5, about 5 s. 8. `tools/run_tests.sh slow --background tests/slow/test_wu0006_harness.py::test_evaluate_delta_applies_the_a9_ranges_exactly`.
 
+**Test run 6 result.** `1 passed in 0.79s` (`runs/tests/slow-20261011T175548Z.log`, exit 0). The A9 ranges are applied inclusively, row by row, at both phi in the fake-data test. Open: the 12 real consistency nodes and the N1, N2, N3 study nodes await a delta-R2 study rerun (main session's call; identical design and seeds).
+
 ## Review
 
 ## Audit
