@@ -21,8 +21,10 @@ H3a has no equivalence margin, so its ``verdict`` is only ``pass`` or ``inconclu
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
-from scipy.optimize import curve_fit
+from scipy.optimize import OptimizeWarning, curve_fit
 from scipy.stats import rankdata
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.tree import DecisionTreeRegressor
@@ -34,9 +36,9 @@ from .identifiers import check_keys
 from .oracle import characteristic_horizon, curvature, hybrid_mse, inverse_dimension, \
     oracle_weight
 from .pipeline import Cell, FittedRules, RuleScores, SplitData
-from .statistics import MIN_STATES, block_bootstrap, block_bootstrap_counted, bootstrap_values, \
-    combine_verdicts, criterion_verdict, holm_adjust, kaplan_meier, logrank_parts, logrank_test, \
-    ols_slope, partial_correlation, percentile_interval, spearman
+from .statistics import MIN_STATES, block_bootstrap_counted, block_bootstrap_dropped, \
+    bootstrap_values, combine_verdicts, criterion_verdict, holm_adjust, kaplan_meier, \
+    logrank_parts, logrank_test, ols_slope, partial_correlation, percentile_interval, spearman
 
 PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
 PROFILE_NAMES = ("log_eps_tilde", "log_nu_tilde", "lambda_tilde", "log_noise_sens")
@@ -63,12 +65,25 @@ H2C_BAND = (float("-inf"), 0.0)  # v3 H2c: both upper bounds < 0, the edge 0 is 
 H2C_CLOSED = (True, False)
 H2D_BAND = (float("-inf"), 0.10)  # v3 H2d: upper bound <= 0.10, the edge is closed (DEC-0008 A1)
 H1_LEVEL = 0.95
+H1A_EXPONENT_BOUNDS = (0.01, 10.0)
+"""Bounds of the fitted ``2/d`` in :func:`_fit_seed_law` (``curve_fit``); a fit at a bound is a
+constrained estimate, counted in ``n_exponent_at_bound`` (DEF-0001, row N3)."""
+H1A_BOUND_TOL = 1e-6
+"""A ``2/d`` within this distance of a bound counts as at the bound. The trust-region solver keeps
+its iterates strictly inside the bounds: an exponent constrained at 0.01 returned 0.0100000000250
+(a distance of 2.5e-11), so 1e-6 separates a constrained fit from a free one by four orders."""
 
 
 def _boot(config: StudyConfig, stat, n_items: int, level: float = 0.95, salt: int = 0
-          ) -> tuple[float, float, float]:
-    return block_bootstrap(stat, n_items, config.bootstrap_resamples,
-                           config.bootstrap_block, config.seed + salt, level)
+          ) -> tuple[float, float, float, int]:
+    """Block bootstrap at the integer seed ``config.seed + salt``: the estimate, the interval and
+    the number of NaN resamples that ``np.nanquantile`` dropped (DEF-0001, row T3).
+
+    The estimate and bounds are those of ``statistics.block_bootstrap``. The three callers (V7,
+    H1b CP, H2b(i)) report the count as ``n_dropped_resamples``; none converts it to the A3 tail.
+    """
+    return block_bootstrap_dropped(stat, n_items, config.bootstrap_resamples,
+                                   config.bootstrap_block, config.seed + salt, level)
 
 
 # ------------------------------------------------------------------------ RQ1
@@ -105,7 +120,9 @@ def v7_efficiency(levels: np.ndarray, deltas: np.ndarray, nu: np.ndarray,
         ``median_slope`` with block-bootstrap interval ``ci`` (reported only), ``threshold``,
         ``slope_pass``; ``efficiency_median_by_noise``, its interval
         ``efficiency_ci_by_noise`` (reported only) and ``efficiency_pass_by_noise`` per level;
-        ``n_states``, ``n_nonfinite`` and ``pass`` (slope and every level, bands closed).
+        ``n_states``, ``n_nonfinite``, ``n_dropped_resamples`` (NaN resamples that the reported
+        intervals dropped: ``slope`` and ``efficiency[rho]``; DEF-0001) and ``pass`` (slope and
+        every level, bands closed).
 
     Raises
     ------
@@ -132,21 +149,31 @@ def v7_efficiency(levels: np.ndarray, deltas: np.ndarray, nu: np.ndarray,
         np.sum(centered**2)
     efficiency = safe_deltas / (levels[None, :] * safe_nu[:, None])
     nan_ci = (float("nan"), float("nan"))  # no bootstrap on NaN statistics (all-NaN quantile)
-    est, lo, hi = (float(np.median(slopes)), *nan_ci) if n_bad else \
-        _boot(config, lambda idx: float(np.median(slopes[idx])), len(slopes))
-    out_eff, out_ci, out_pass = {}, {}, {}
+    dropped_slope = 0  # no bootstrap runs when a state is bad, so nothing is dropped
+    if n_bad:
+        est, lo, hi = float(np.median(slopes)), *nan_ci
+    else:
+        est, lo, hi, dropped_slope = _boot(config, lambda idx: float(np.median(slopes[idx])),
+                                           len(slopes))
+    out_eff, out_ci, out_pass, out_dropped = {}, {}, {}, {}
     for i, rho in enumerate(levels):
         key = f"{rho:g}"
         out_eff[key] = float(np.median(efficiency[:, i]))
-        out_ci[key] = list(nan_ci) if n_bad else list(_boot(
-            config, lambda idx: float(np.median(efficiency[idx, i])), len(efficiency),
-            salt=7000 + i)[1:])
+        out_dropped[key] = 0
+        if n_bad:
+            out_ci[key] = list(nan_ci)
+        else:
+            _, boot_lo, boot_hi, dropped = _boot(
+                config, lambda idx: float(np.median(efficiency[idx, i])), len(efficiency),
+                salt=7000 + i)
+            out_ci[key], out_dropped[key] = [boot_lo, boot_hi], int(dropped)
         out_pass[key] = bool(low <= out_eff[key] <= high)
     slope_pass = bool(low <= est <= high)
     return {"median_slope": est, "ci": [lo, hi], "threshold": [low, high],
             "slope_pass": slope_pass, "efficiency_median_by_noise": out_eff,
             "efficiency_ci_by_noise": out_ci, "efficiency_pass_by_noise": out_pass,
             "n_states": int(len(nu)), "n_nonfinite": n_bad,
+            "n_dropped_resamples": {"slope": int(dropped_slope), "efficiency": out_dropped},
             "pass": bool(slope_pass and all(out_pass.values()) and n_bad == 0)}
 
 
@@ -177,38 +204,68 @@ def _floor_power_law(log_n: np.ndarray, log_c2: float, exponent: float,
 
 
 def _fit_seed_law(sizes: np.ndarray, mean_sq: np.ndarray) -> tuple[float, float]:
-    """Fit ``eps^2 = c^2 n_lib^{-2/d} + f^2``; return ``(2/d, f^2)``."""
+    """Fit ``eps^2 = c^2 n_lib^{-2/d} + f^2``; return ``(2/d, f^2)``.
+
+    ``2/d`` is bounded to ``H1A_EXPONENT_BOUNDS`` (a silent clip: the solver cannot leave the
+    bounds), so a result at a bound is a constrained estimate; the caller flags it
+    (:func:`_median_fit_stats`, ``n_exponent_at_bound``). ``curve_fit`` also warns that the
+    covariance of the parameters could not be estimated (``OptimizeWarning``; the covariance is not
+    used, and the fit has three parameters, so it warns whenever there are three library sizes or
+    fewer, as in the smoke preset); the caller counts those warnings (``n_covariance_warnings``).
+    """
     log_n = np.log(sizes)
     guess = (np.log(mean_sq[0]) + 2 * 0.5 * log_n[0], 1.0, np.log(mean_sq[-1] * 0.5))
     try:
         params, _ = curve_fit(_floor_power_law, log_n, np.log(mean_sq), p0=guess,
-                              bounds=([-50, 0.01, -60], [50, 10.0, 10]), maxfev=20_000)
+                              bounds=([-50, H1A_EXPONENT_BOUNDS[0], -60],
+                                      [50, H1A_EXPONENT_BOUNDS[1], 10]), maxfev=20_000)
     except RuntimeError:
         return float("nan"), float("nan")
     return float(params[1]), float(np.exp(params[2]))
 
 
+def _at_bound(two_over_d: float) -> bool:
+    """True if a fitted ``2/d`` lies within ``H1A_BOUND_TOL`` of a bound of the fit."""
+    return bool(np.isfinite(two_over_d)
+                and min(abs(two_over_d - bound) for bound in H1A_EXPONENT_BOUNDS) <= H1A_BOUND_TOL)
+
+
 def _median_fit_stats(seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.ndarray,
                       rows: np.ndarray) -> np.ndarray:
-    """``[ratio, fitted 1/d, floor f^2]`` of the median fit and the mean reference on ``rows``.
+    """``[ratio, fitted 1/d, floor f^2, at bound, n warnings]`` of the median fit on ``rows``.
 
     The fit is :func:`_fit_seed_law` of the column medians of ``seed_sq[rows]``; the reference
     is the mean of ``inverse_dim[rows]``. A median that is not positive and finite, a fit that
     raises ``ValueError`` (``curve_fit`` does for non-finite residuals, and ``_fit_seed_law``
-    catches only ``RuntimeError``) or a fit that returns NaN gives NaN for all three, and so a
-    failed (counted) bootstrap resample. A reference that is not positive gives a NaN ratio.
+    catches only ``RuntimeError``) or a fit that returns NaN gives NaN for the first three, and so
+    a failed (counted) bootstrap resample. A reference that is not positive gives a NaN ratio.
+
+    The last two entries are counts, never NaN (DEF-0001, rows N2 and N3; they leave the first
+    three unchanged): 1.0 if the fitted ``2/d`` is at a bound of the fit (0 if no fit), and the
+    number of ``OptimizeWarning`` the fit emitted. The fit runs under ``catch_warnings(record=True)``
+    with every warning recorded; the ``OptimizeWarning`` are counted and **not** re-issued, and every
+    other warning is re-issued unchanged.
     """
     medians = np.median(seed_sq[rows], axis=0)
     two_over_d, floor_sq = float("nan"), float("nan")
+    n_warnings = 0
     if np.all(np.isfinite(medians) & (medians > 0)):
         try:
-            two_over_d, floor_sq = _fit_seed_law(sizes, medians)
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                two_over_d, floor_sq = _fit_seed_law(sizes, medians)
         except ValueError:
             pass
+        for note in caught:
+            if issubclass(note.category, OptimizeWarning):
+                n_warnings += 1
+            else:
+                warnings.warn_explicit(note.message, note.category, note.filename, note.lineno,
+                                       source=note.source)
     fitted = two_over_d / 2.0
     reference = float(inverse_dim[rows].mean())
     ratio = fitted / reference if np.isfinite(fitted) and reference > 0 else float("nan")
-    return np.array([ratio, fitted, floor_sq])
+    return np.array([ratio, fitted, floor_sq, float(_at_bound(two_over_d)), float(n_warnings)])
 
 
 def h1a_ratio(seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.ndarray,
@@ -275,8 +332,11 @@ def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
         ``inverse_dim_reference``, ``reference_estimator``, ``n_states``, ``n_excluded_nonfinite``,
         ``band``, ``level``, ``verdict``, ``reason``, ``pass`` and ``by_noise[rho]`` with
         ``fitted_inverse_dim``, ``ci_inverse_dim`` (marginal, reported only), ``ratio``,
-        ``ratio_ci``, ``n_failed_resamples``, ``verdict``, ``reason``, ``floor_rms`` and
-        ``median_seed_by_n_lib`` (square root of the median).
+        ``ratio_ci``, ``n_failed_resamples``, ``n_exponent_at_bound`` and
+        ``n_covariance_warnings`` (each ``{point, resamples}``: the fits whose ``2/d`` is at a bound
+        of ``curve_fit`` and the ``OptimizeWarning`` emitted; counts only, DEF-0001),
+        ``verdict``, ``reason``, ``floor_rms`` and ``median_seed_by_n_lib`` (square root of the
+        median).
 
     Raises
     ------
@@ -325,7 +385,8 @@ def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
             inv_lo, inv_hi, _ = percentile_interval(values[:, 1], H1_LEVEL)
             medians = np.median(sq, axis=0)
         else:
-            point = np.full(3, np.nan)
+            point = np.array([np.nan, np.nan, np.nan, 0.0, 0.0])
+            values = np.zeros((0, 5))
             ratio_lo = ratio_hi = inv_lo = inv_hi = float("nan")
             n_failed, medians = 0, np.full(len(sizes), np.nan)
         verdict, reason = criterion_verdict(float(point[0]), ratio_lo, ratio_hi, H1A_BAND,
@@ -333,8 +394,11 @@ def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
         out["by_noise"][f"{rho:g}"] = {
             "fitted_inverse_dim": float(point[1]), "ci_inverse_dim": [inv_lo, inv_hi],
             "ratio": float(point[0]), "ratio_ci": [ratio_lo, ratio_hi],
-            "n_failed_resamples": int(n_failed), "verdict": verdict, "reason": reason,
-            "floor_rms": float(np.sqrt(point[2])),
+            "n_failed_resamples": int(n_failed),
+            "n_exponent_at_bound": {"point": int(point[3]), "resamples": int(values[:, 3].sum())},
+            "n_covariance_warnings": {"point": int(point[4]),
+                                      "resamples": int(values[:, 4].sum())},
+            "verdict": verdict, "reason": reason, "floor_rms": float(np.sqrt(point[2])),
             "median_seed_by_n_lib": {str(int(n)): float(np.sqrt(v))
                                      for n, v in zip(sizes, medians)}}
     parts = out["by_noise"]
@@ -356,10 +420,15 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     States whose regression pair (``x``, ``y``) is not finite are excluded from that regression
     and counted (``n_excluded_nonfinite``; DEC-0008 A3); the PLP verdict applies the minimum of
     50 states after exclusion, and a CP exclusion never shrinks the PLP regression.
+    The squared error enters as ``max(E e^2 - floor, 1e-12)``; a regression state where the floor
+    binds (``E e^2 - floor < 1e-12``, so ``y`` is pinned at ``0.5 ln 1e-12 = -13.8``, a
+    high-leverage vertical outlier) is kept and counted in ``n_floored`` (DEF-0001, row N4; for the
+    PLP regression, whose floor is 0, it is a sentinel that should read 0).
     The bootstrap seed is the integer ``config.seed`` as before, so slopes and intervals are
     those of the earlier code when no resample fails; failed resamples of the PLP slope are
     counted (``PLP.n_failed_resamples``) and placed at the unfavourable tail. The CP interval
-    still drops non-finite resamples (``block_bootstrap``); it is reported only.
+    still drops non-finite resamples (``block_bootstrap_dropped``); it is reported only, and the
+    drops are counted (``CP.n_dropped_resamples``).
 
     Parameters
     ----------
@@ -371,8 +440,8 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     Returns
     -------
     dict
-        ``CP`` (``slope``, ``ci``), ``PLP`` (``slope``, ``ci``, ``n_failed_resamples``),
-        ``threshold`` [0.8, 1.2], ``n_states`` and ``n_excluded_nonfinite`` (of the PLP
+        ``CP`` (``slope``, ``ci``, ``n_floored``, ``n_dropped_resamples``), ``PLP`` (``slope``,
+        ``ci``, ``n_floored``, ``n_failed_resamples``), ``threshold`` [0.8, 1.2], ``n_states`` and ``n_excluded_nonfinite`` (of the PLP
         regression), ``verdict``, ``reason`` and ``pass``.
     """
     m = cell.splits["test"].moments
@@ -389,20 +458,25 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
         keep = np.isfinite(x_all) & np.isfinite(y_all)  # excluded and counted (DEC-0008 A3)
         x, y = x_all[keep], y_all[keep]
         n_excluded = int(len(x_all) - len(x))
+        n_floored = int(((sq - floor) < 1e-12)[keep].sum())  # the floor binds: y = -13.8
         stat = lambda idx: ols_slope(x[idx], y[idx])
+        n_dropped = 0
         if len(x) == 0:
             est = lo = hi = float("nan")
             n_failed = 0
         elif name == "CP":
-            est, lo, hi = _boot(config, stat, len(x))
+            est, lo, hi, n_dropped = _boot(config, stat, len(x))
             n_failed = 0
         else:
             interval = block_bootstrap_counted(stat, len(x), config.bootstrap_resamples,
                                                config.bootstrap_block, config.seed, H1_LEVEL)
             est, lo, hi, n_failed = interval.estimate, interval.lower, interval.upper, \
                 interval.n_failed
-        res[name] = {"slope": est, "ci": [lo, hi], "n_excluded_nonfinite": n_excluded}
-        if name == "PLP":
+        res[name] = {"slope": est, "ci": [lo, hi], "n_excluded_nonfinite": n_excluded,
+                     "n_floored": n_floored}
+        if name == "CP":
+            res[name]["n_dropped_resamples"] = int(n_dropped)
+        else:
             res[name]["n_failed_resamples"] = int(n_failed)
             n_states = int(len(x))
     verdict, reason = criterion_verdict(res["PLP"]["slope"], *res["PLP"]["ci"], H1B_BAND,
@@ -1214,18 +1288,33 @@ def h2a_separation(cell: Cell, config: StudyConfig) -> dict:
     return out
 
 
-def _per_state_spearman(levels: np.ndarray, values: np.ndarray) -> np.ndarray:
-    """Spearman correlation of each row of ``values`` with ``levels``.
+def _per_state_spearman_counted(levels: np.ndarray, values: np.ndarray
+                                ) -> tuple[np.ndarray, int]:
+    """Spearman correlation of each row of ``values`` with ``levels``, and the constant rows.
 
     Ties (e.g. weights clipped to 0 at several levels) receive average ranks, so
-    a state whose weight does not change across levels scores 0, not +1.
+    a state whose weight does not change across levels scores 0, not +1. That 0 is the tie
+    convention that defines the H2b(i) estimand (it shrinks the mean toward 0 and cannot flip its
+    sign); the states that get it, those with a zero rank denominator, are returned as an
+    ``int`` count (DEF-0001, row N6; ``H2b.noise.n_constant_states``).
+
+    Returns
+    -------
+    tuple[np.ndarray, int]
+        The per-state correlations and the number of states scored 0 by the convention.
     """
     ranks = rankdata(values, axis=1)
     lev = rankdata(levels)
     lev_c = lev - lev.mean()
     ranks_c = ranks - ranks.mean(axis=1, keepdims=True)
     denom = np.sqrt(np.sum(ranks_c**2, axis=1) * np.sum(lev_c**2))
-    return np.where(denom > 0, ranks_c @ lev_c / np.maximum(denom, 1e-300), 0.0)
+    return (np.where(denom > 0, ranks_c @ lev_c / np.maximum(denom, 1e-300), 0.0),
+            int((~(denom > 0)).sum()))
+
+
+def _per_state_spearman(levels: np.ndarray, values: np.ndarray) -> np.ndarray:
+    """Spearman correlation of each row of ``values`` with ``levels`` (see the counted form)."""
+    return _per_state_spearman_counted(levels, values)[0]
 
 
 def _decision(verdict: str, reason: str | None) -> dict:
@@ -1308,7 +1397,12 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     * (i) ``noise``: the mean over states of the per-state Spearman correlation of ``w*(H_ref)``
       with ``rho``; the interval is at level ``1 - 0.05/3`` (salt 3, unchanged), pass iff its lower
       bound is above 0 (strict), fail iff the whole interval is at or below 0, else inconclusive
-      (``criterion_verdict``, including the 50-state guard).
+      (``criterion_verdict``, including the 50-state guard). Two counts sit beside it (DEF-0001;
+      report only, no treatment changes): ``n_constant_states``, the states scored 0 because their
+      weight is the same at every level (the tie convention, conservative for "> 0": it shrinks
+      the mean toward 0; at pilot size 20-40% of the states have ``w* = 0`` at every level), and
+      ``n_dropped_resamples``, the NaN resamples that this still-``_boot`` interval drops (a mean
+      of finite correlations cannot be NaN, so 0 is expected; the A3 tail is WU-0002.9's).
     * (ii) ``library_change``: the mean over states of ``w*_i(H_ref, 10^4) - w*_i(H_ref, 10^3)``
       at ``rho = config.core_noise`` (1%), one block-bootstrap index array for both sizes, level
       ``1 - 0.05/3``, pass iff the lower bound is above 0 (strict; DEC-0008 A1). A missing cell
@@ -1343,13 +1437,14 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     res: dict = {}
     rho_levels = np.array(sorted(noise_cells))
     w_rho = np.column_stack([_split_weights(noise_cells[r], config) for r in rho_levels])
-    rho_corr = _per_state_spearman(rho_levels, w_rho)
-    est, lo, hi = _boot(config, lambda idx: float(np.mean(rho_corr[idx])), len(rho_corr),
-                        PRIMARY_LEVEL, salt=3)
+    rho_corr, n_constant = _per_state_spearman_counted(rho_levels, w_rho)
+    est, lo, hi, n_dropped = _boot(config, lambda idx: float(np.mean(rho_corr[idx])),
+                                   len(rho_corr), PRIMARY_LEVEL, salt=3)
     medians = np.median(w_rho, axis=0)
     res["noise"] = {"median_w_by_noise": dict(zip(map(str, rho_levels), medians.tolist())),
                     "mean_state_spearman": est, "ci": [lo, hi],
-                    "monotone_medians": bool(np.all(np.diff(medians) > 0))}
+                    "monotone_medians": bool(np.all(np.diff(medians) > 0)),
+                    "n_constant_states": n_constant, "n_dropped_resamples": int(n_dropped)}
     noise_verdict, noise_reason = criterion_verdict(est, lo, hi, (0.0, np.inf), (False, True),
                                                     n_states=len(rho_corr))
     res["noise"].update(_decision(noise_verdict, noise_reason))
@@ -1696,8 +1791,11 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
     -------
     dict
         ``chosen_K``, ``pairs`` (regime indices, in test order), ``logrank_p_raw`` (None where
-        not computed), ``logrank_p_holm``, ``n_per_regime``, ``n_km_not_reached``, ``iqr_lt``
-        (interquartile range of
+        not computed), ``logrank_p_holm``, ``n_per_regime``, ``n_km_not_reached``,
+        ``n_empty_regimes`` (regimes with no test state; independent of ``n_km_not_reached``, which
+        counts the regimes whose Kaplan-Meier median, from the calibration split, is not reached), ``n_degenerate_pairs`` (pairs not computed because
+        the log-rank variance is 0; ``logrank_test`` would return p = 1 for them, DEF-0001 row T2;
+        a pair with an empty regime is not counted here), ``iqr_lt`` (interquartile range of
         the characteristic horizon in Lyapunov times per regime, None below 2 states),
         ``iqr_lt_mean`` (their mean weighted by regime size, the v1 ``mean_iqr_lyapunov``; None
         if no regime has 2 states), ``threshold``, ``verdict``, ``reason``, ``pass``.
@@ -1713,6 +1811,7 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
             iqr.append(float(q75 - q25))
         else:
             iqr.append(None)
+    n_empty_regimes = int(sum(c == 0 for c in counts))
     spread = [(v, c) for v, c in zip(iqr, counts) if v is not None]
     iqr_mean = float(np.average([v for v, _ in spread], weights=[c for _, c in spread])) \
         if spread else None
@@ -1721,6 +1820,7 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
     pairs = [(int(a), int(b)) for a, b in zip(order[:-1], order[1:])]
     raw: list[float | None] = []
     why: list[str] = []
+    n_degenerate_pairs = 0
     for a, b in pairs:
         in_a, in_b = first_regime == a, first_regime == b
         if not (in_a.any() and in_b.any()):
@@ -1729,6 +1829,7 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
         elif logrank_parts(durations[in_a], events[in_a], durations[in_b], events[in_b])[1] <= 0:
             raw.append(None)
             why.append(f"pair ({a}, {b}): zero log-rank variance")
+            n_degenerate_pairs += 1
         else:
             raw.append(logrank_test(durations[in_a], events[in_a], durations[in_b], events[in_b]))
     adjusted = holm_adjust([1.0 if p is None else p for p in raw]) if pairs else []
@@ -1746,7 +1847,9 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
                                            f">= {H3A_ALPHA}")
     return {"chosen_K": chosen_k, "pairs": [list(pair) for pair in pairs],
             "logrank_p_raw": raw, "logrank_p_holm": adjusted, "n_per_regime": counts,
-            "n_km_not_reached": int(np.isnan(horizons_km).sum()), "iqr_lt": iqr,
+            "n_km_not_reached": int(np.isnan(horizons_km).sum()),
+            "n_empty_regimes": n_empty_regimes, "n_degenerate_pairs": n_degenerate_pairs,
+            "iqr_lt": iqr,
             "iqr_lt_mean": iqr_mean,
             "threshold": f"all Holm-adjusted log-rank p between consecutive regimes < {H3A_ALPHA}",
             **_decision(verdict, reason)}

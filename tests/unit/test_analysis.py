@@ -1159,7 +1159,8 @@ def test_h1a_rejects_cells_that_do_not_share_the_states_and_has_the_documented_k
                         "by_noise"}
     assert set(out["by_noise"]["0.01"]) == {
         "fitted_inverse_dim", "ci_inverse_dim", "ratio", "ratio_ci", "n_failed_resamples",
-        "verdict", "reason", "floor_rms", "median_seed_by_n_lib"}
+        "verdict", "reason", "floor_rms", "median_seed_by_n_lib",
+        "n_exponent_at_bound", "n_covariance_warnings"}  # the last two: WU-0002.11b counters
     assert isinstance(out["reference_estimator"], str) and out["pass"] == (out["verdict"] == "pass")
     assert list(out["by_noise"]["0.01"]["median_seed_by_n_lib"]) == [str(int(n)) for n in SIZES]
     cells[(0.01, 3162)].oracles["test"].local_dim = local_dim[::-1].copy()
@@ -1220,9 +1221,11 @@ def test_h1b_verdict_uses_the_plp_slope_only() -> None:
     assert ok["CP"]["slope"] == pytest.approx(1.6, abs=1e-12, rel=0)
     assert ok["PLP"]["slope"] == pytest.approx(1.0, abs=1e-12, rel=0)
     assert ok["verdict"] == "pass" and ok["pass"] is True and ok["reason"] is None
-    assert set(ok["CP"]) == {"slope", "ci", "n_excluded_nonfinite"}
-    assert set(ok["PLP"]) == {"slope", "ci", "n_failed_resamples", "n_excluded_nonfinite"} and \
-        ok["PLP"]["n_failed_resamples"] == 0
+    # n_floored and CP.n_dropped_resamples are the WU-0002.11b counters (DEF-0001)
+    assert set(ok["CP"]) == {"slope", "ci", "n_excluded_nonfinite", "n_floored",
+                             "n_dropped_resamples"}
+    assert set(ok["PLP"]) == {"slope", "ci", "n_failed_resamples", "n_excluded_nonfinite",
+                              "n_floored"} and ok["PLP"]["n_failed_resamples"] == 0
     assert set(ok) == {"CP", "PLP", "threshold", "n_states", "n_excluded_nonfinite", "verdict",
                        "reason", "pass"}
     assert ok["n_excluded_nonfinite"] == 0
@@ -2179,7 +2182,8 @@ def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -
 
     assert set(out) == {"H3a", "H3b", "H3c", "regime_curve"} and "p_eff" not in json.dumps(out)
     assert set(out["H3a"]) == {"chosen_K", "pairs", "logrank_p_raw", "logrank_p_holm",
-                               "n_per_regime", "n_km_not_reached", "iqr_lt", "iqr_lt_mean",
+                               "n_per_regime", "n_km_not_reached", "n_empty_regimes",
+                               "n_degenerate_pairs", "iqr_lt", "iqr_lt_mean",
                                "threshold", "verdict", "pass", "reason"}
     assert set(out["H3b"]) == {"weight_lambda", "D", "stability", "weight_tree_importance",
                                "horizon_tree_importance", "degenerate_fits", "nan_resamples",
@@ -2644,3 +2648,312 @@ def test_gain_bound_has_no_bar_and_reports_each_screen() -> None:
     assert out["fraction_within_bound"] == pytest.approx(2.0 / 3.0, abs=1e-12)
     assert out["median_gain_lyapunov"] == pytest.approx(5.0 / 30.0, abs=1e-12)
     assert out["max_gain_lyapunov"] == pytest.approx(10.0 / 30.0, abs=1e-12)
+
+
+# ----------------------------------------------------------------------------------------
+# WU-0002.11b: counters for the cases that were handled silently (DEF-0001, inventory rows
+# T3, N2, N3, N4, N6, N7). Every count is an exact integer from a hand-built input; the values
+# the counters sit beside are the earlier code's (bitwise), checked in the older tests of this
+# file and again below where a closure of the old expression is available.
+# ----------------------------------------------------------------------------------------
+def test_boot_returns_the_old_interval_and_the_dropped_count() -> None:
+    """B1 at the call site: ``_boot`` is ``block_bootstrap`` at ``seed + salt`` plus the NaN count.
+
+    Reference: ``statistics.block_bootstrap`` (separately tested against a verbatim pre-refactor
+    copy) at the integer seed ``CONFIG.seed + 3``, with a statistic that is NaN on calls 4, 11
+    and 25 of the 200 resamples (a fresh closure per function: the call order is resamples, then
+    the point). Count 3 by construction. Tolerance: none (``==``).
+    """
+    from lpcstudy.analysis import _boot
+
+    x_values = np.random.default_rng(31).standard_normal(60)
+
+    def nan_on(calls: set[int]):
+        counter = itertools.count()
+        return lambda idx: float("nan") if next(counter) in calls else float(np.mean(x_values[idx]))
+
+    got = _boot(CONFIG, nan_on({4, 11, 25}), 60, LEVEL, salt=3)
+    assert got[3] == 3
+    assert got[:3] == block_bootstrap(nan_on({4, 11, 25}), 60, CONFIG.bootstrap_resamples,
+                                      CONFIG.bootstrap_block, CONFIG.seed + 3, LEVEL)
+
+
+def test_v7_reports_the_dropped_resamples_of_each_bootstrap(monkeypatch: pytest.MonkeyPatch
+                                                            ) -> None:
+    """Wiring check: ``V7.n_dropped_resamples`` maps the counts of the slope and each level.
+
+    This is a wiring test, not numerical evidence: ``block_bootstrap_dropped`` is replaced by a
+    stub returning the counts 5, 6, 7 in call order (slope, then rho = 0.01 and 0.02, the order
+    of the code), and the result must carry them under the right keys. With a bad state (a
+    non-finite delta) no bootstrap runs and the counts are 0. On ordinary data (medians of finite
+    numbers cannot be NaN) the real counts are 0.
+    """
+    from lpcstudy import analysis
+
+    levels = np.array([0.01, 0.02])
+    nu = np.linspace(1.0, 2.0, 60)
+    deltas = np.outer(nu, levels) * np.exp(np.random.default_rng(32).normal(0, 0.05, (60, 2)))
+    real = analysis.v7_efficiency(levels, deltas, nu, CONFIG)
+    assert real["n_dropped_resamples"] == {"slope": 0, "efficiency": {"0.01": 0, "0.02": 0}}
+
+    counts = iter([5, 6, 7])
+    monkeypatch.setattr(analysis, "block_bootstrap_dropped",
+                        lambda *a, **k: (1.0, 0.9, 1.1, next(counts)))
+    stub = analysis.v7_efficiency(levels, deltas, nu, CONFIG)
+    assert stub["n_dropped_resamples"] == {"slope": 5, "efficiency": {"0.01": 6, "0.02": 7}}
+
+    bad = deltas.copy()
+    bad[3, 0] = np.nan
+    flagged = analysis.v7_efficiency(levels, bad, nu, CONFIG)
+    assert flagged["n_nonfinite"] == 1 and flagged["pass"] is False
+    assert flagged["n_dropped_resamples"] == {"slope": 0, "efficiency": {"0.01": 0, "0.02": 0}}
+
+
+def _stats_with_fit(monkeypatch: pytest.MonkeyPatch, fit) -> np.ndarray:
+    """``_median_fit_stats`` on a benign table with ``_fit_seed_law`` replaced by ``fit``."""
+    from lpcstudy import analysis
+
+    monkeypatch.setattr(analysis, "_fit_seed_law", fit)
+    table = np.tile(SIZES ** -0.5, (8, 1)) + 1e-4
+    return analysis._median_fit_stats(table, np.full(8, 0.5), SIZES, np.arange(8))
+
+
+def test_h1a_fit_at_a_bound_and_covariance_warnings_are_counted(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """B2: ``_median_fit_stats`` flags a 2/d at a bound of ``curve_fit`` and counts OptimizeWarnings.
+
+    Reference: hand-built fits. ``_fit_seed_law`` is replaced by stubs that return a chosen 2/d
+    and emit a chosen number of ``OptimizeWarning`` (the class scipy's ``curve_fit`` uses), so the
+    expected counts are known by construction. The bounds are [0.01, 10.0] (``H1A_EXPONENT_BOUNDS``)
+    and "at a bound" means within 1e-6 (``H1A_BOUND_TOL``): 0.01, 0.010000099 (distance 9.9e-8)
+    and 10.0, 9.9999995 are flagged; 0.01001 (distance 1e-5), 9.99 and 0.5 are not. The tolerance
+    comes from the solver, which keeps iterates strictly inside the bounds: an exponent
+    constrained at 0.01 returned 0.0100000000250 (a distance of 2.5e-11), four orders below 1e-6.
+    A different warning class is re-issued (not swallowed), and a fit that returns NaN is not
+    at a bound. The first three entries (ratio, fitted 1/d, floor) are those of the fit, bitwise.
+    """
+    from scipy.optimize import OptimizeWarning
+
+    def make_fit(two_over_d: float, n_optimize: int, n_other: int = 0):
+        def fit(sizes, medians):
+            for _ in range(n_optimize):
+                warnings.warn("Covariance of the parameters could not be estimated",
+                              OptimizeWarning)
+            for _ in range(n_other):
+                warnings.warn("something else", UserWarning)
+            return two_over_d, 1e-6
+        return fit
+
+    for value, flagged in ((0.01, 1.0), (0.010000099, 1.0), (10.0, 1.0), (9.9999995, 1.0),
+                           (0.01001, 0.0), (9.99, 0.0), (0.5, 0.0)):
+        out = _stats_with_fit(monkeypatch, make_fit(value, 0))
+        assert out[3] == flagged and out[4] == 0.0, value
+        assert out[1] == value / 2.0 and out[2] == 1e-6  # fitted 1/d and floor of the fit
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # an OptimizeWarning must not reach the caller
+        assert _stats_with_fit(monkeypatch, make_fit(0.5, 3))[4] == 3.0
+    with pytest.warns(UserWarning, match="something else") as seen:
+        out = _stats_with_fit(monkeypatch, make_fit(0.5, 2, n_other=1))
+    assert out[4] == 2.0 and len(seen) == 1  # the other warning is passed on, once
+    assert math.isnan(_stats_with_fit(monkeypatch, lambda s, m: (np.nan, np.nan))[0])
+    nan_fit = _stats_with_fit(monkeypatch, lambda s, m: (np.nan, np.nan))
+    assert nan_fit[3] == 0.0 and nan_fit[4] == 0.0
+
+    def raises(sizes, medians):
+        warnings.warn("Covariance", OptimizeWarning)
+        raise ValueError("non-finite residuals")
+
+    raised = _stats_with_fit(monkeypatch, raises)
+    assert math.isnan(raised[0]) and raised[3] == 0.0 and raised[4] == 1.0
+
+
+def test_h1a_real_fit_at_the_lower_bound_is_flagged_and_matches_the_warning_record() -> None:
+    """B2 on the real ``curve_fit``: data whose least-squares 2/d is below 0.01 is flagged.
+
+    Reference: the medians ``n^(-0.001) + 1e-8`` (a true exponent 2/d = 0.001, below the lower
+    bound 0.01) on the three library sizes 1e3, 1e4, 1e5. The constrained fit ends at the bound
+    (probe: 0.0100000000250), so the flag is 1. The warning count is compared with an
+    independent record of the warnings of the same ``_fit_seed_law`` call made here with
+    ``warnings.catch_warnings(record=True)`` (three data points for three parameters leave no
+    degrees of freedom, so scipy warns that the covariance cannot be estimated: expected 1).
+    A well-determined data set (exponent 0.5 over 5 sizes) is not at a bound.
+    """
+    from scipy.optimize import OptimizeWarning
+
+    from lpcstudy.analysis import _fit_seed_law, _median_fit_stats
+
+    sizes = np.array([1e3, 1e4, 1e5])
+    medians = sizes ** -0.001 + 1e-8
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        two_over_d, _ = _fit_seed_law(sizes, medians)
+    expected_warnings = sum(issubclass(w.category, OptimizeWarning) for w in record)
+    assert two_over_d == pytest.approx(0.01, abs=1e-6)  # premise: the fit sits at the bound
+    table = np.tile(medians, (6, 1))
+    out = _median_fit_stats(table, np.full(6, 0.5), sizes, np.arange(6))
+    assert out[3] == 1.0 and out[4] == float(expected_warnings) and expected_warnings >= 1
+
+    good = np.tile(SIZES ** -0.5 + 1e-4, (6, 1))
+    mild = _median_fit_stats(good, np.full(6, 0.5), SIZES, np.arange(6))
+    assert mild[3] == 0.0
+
+
+def test_h1a_library_scaling_reports_the_bound_and_warning_counts_per_noise(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """End to end: ``by_noise[rho]`` carries point and resample counts; the old keys are unchanged.
+
+    Reference: a fit stub that always returns the lower bound (0.01) and emits one OptimizeWarning
+    per call, so the point fit counts 1 and the ``B = 200`` resamples count 200 each, by
+    construction. The ratio, its interval and ``n_failed_resamples`` equal what
+    ``block_bootstrap_counted`` gives for the closure ``h1a_ratio`` (the pre-existing bootstrap
+    of the ratio) at the same generator, bitwise. Without the stub, on ordinary data, the real
+    result has the same keys with nonnegative ints.
+    """
+    from scipy.optimize import OptimizeWarning
+
+    from lpcstudy import analysis
+    from lpcstudy.oracle import inverse_dimension
+
+    rng = np.random.default_rng(31001)
+    sq = _seed_sq(rng, 80, floor_index=1)
+    local_dim = _gamma_local_dim(rng, 80, D_TRUE)
+    cells = _fake_cells({0.01: sq}, local_dim)
+    config = _config(200)
+
+    def pinned(sizes, medians):
+        warnings.warn("Covariance of the parameters could not be estimated", OptimizeWarning)
+        return 0.01, 1e-6
+
+    monkeypatch.setattr(analysis, "_fit_seed_law", pinned)
+    out = analysis.h1a_library_scaling(cells, config)["by_noise"]["0.01"]
+    assert out["n_exponent_at_bound"] == {"point": 1, "resamples": 200}
+    assert out["n_covariance_warnings"] == {"point": 1, "resamples": 200}
+    sq_cells = np.column_stack([np.sqrt(sq[:, j]) ** 2 for j in range(len(SIZES))])
+    joint = block_bootstrap_counted(
+        lambda idx: analysis.h1a_ratio(sq_cells, inverse_dimension(local_dim), SIZES, idx), 80,
+        200, config.bootstrap_block, make_rng(config.seed, "lorenz63", "bootstrap", "H1a", "0.01"),
+        0.95)
+    assert out["ratio_ci"] == [joint.lower, joint.upper] and out["ratio"] == joint.estimate
+    assert out["n_failed_resamples"] == joint.n_failed
+
+    monkeypatch.undo()
+    real = analysis.h1a_library_scaling(cells, config)["by_noise"]["0.01"]
+    for key in ("n_exponent_at_bound", "n_covariance_warnings"):
+        assert set(real[key]) == {"point", "resamples"}
+        assert all(type(v) is int and v >= 0 for v in real[key].values())
+    assert real["n_exponent_at_bound"]["resamples"] <= 200
+
+
+def test_h1b_counts_floored_states_among_the_regression_states_and_dropped_cp_resamples() -> None:
+    """B3: ``n_floored`` counts regression states with ``E e^2 - floor < 1e-12``; CP drops are counted.
+
+    Reference: hand-built squared errors. PLP (floor 0): states 0, 1, 2 have E e^2 = 0.0,
+    5e-13 and exactly 1e-12; the first two are below the floor and count, the third equals it
+    and does not (the floor ``max(., 1e-12)`` changes nothing there). State 9 has a NaN gain,
+    so it is excluded from both regressions and not counted even though its E e^2 is 0
+    (the count is over the states of the regression). CP (floor ``copied = rho^2/k``): states 5
+    and 6 have E e^2 equal to ``copied``, a difference of exactly 0.0, and count. Expected
+    PLP = 2, CP = 2, exact. The slopes and intervals equal ``block_bootstrap`` of the earlier
+    expressions on the same arrays (the floored y values are finite, so no resample fails and the
+    counted PLP bootstrap is bitwise equal), and the other states are untouched. A constant CP
+    regressor (all x = 0) makes every CP resample NaN: ``CP.n_dropped_resamples == B``.
+    """
+    from lpcstudy.analysis import h1b_seed_amplifier
+    from lpcstudy.statistics import ols_slope
+
+    config = _config(100)
+    cell = _fake_h1b_cell(np.random.default_rng(31002), 100, 1.0, 1.0, log_noise=0.1)
+    m = cell.splits["test"].moments
+    copied = cell.noise**2 / cell.setup.n_analogs
+    m.sq_plp[:3, 0] = [0.0, 5e-13, 1e-12]
+    m.sq_cp[5:7, 0] = copied
+    cell.oracles["test"].gains[9, :] = np.nan
+    m.sq_plp[9, 0] = 0.0
+    out = h1b_seed_amplifier(cell, config)
+    assert out["PLP"]["n_floored"] == 2 and out["CP"]["n_floored"] == 2
+    assert out["CP"]["n_dropped_resamples"] == 0 and "n_dropped_resamples" not in out["PLP"]
+    gain = cell.oracles["test"].gains[:, 29]
+    for name, seed, sq, floor in (("CP", m.analog_seed, m.sq_cp[:, 0], copied),
+                                  ("PLP", m.est_seed, m.sq_plp[:, 0], 0.0)):
+        x_all = np.log(gain * seed / np.sqrt(cell.ctx.spec.dim))
+        y_all = 0.5 * np.log(np.maximum(sq - floor, 1e-12))
+        keep = np.isfinite(x_all) & np.isfinite(y_all)
+        x, y = x_all[keep], y_all[keep]
+        old = block_bootstrap(lambda idx: ols_slope(x[idx], y[idx]), len(x),
+                              config.bootstrap_resamples, config.bootstrap_block, config.seed)
+        assert (out[name]["slope"], *out[name]["ci"]) == old and len(x) == 99
+
+    flat = _fake_h1b_cell(np.random.default_rng(31003), 100, 1.0, 1.0)
+    flat.splits["test"].moments.analog_seed = np.full(100, np.sqrt(3.0))  # CP x = ln(1) = 0
+    flat.oracles["test"].gains[:, :] = 1.0
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        flat_out = h1b_seed_amplifier(flat, config)
+    assert flat_out["CP"]["n_dropped_resamples"] == config.bootstrap_resamples
+    assert math.isnan(flat_out["CP"]["slope"]) and all(math.isnan(v) for v in flat_out["CP"]["ci"])
+
+
+def test_per_state_spearman_counted_reports_the_constant_states_and_h2b_carries_them() -> None:
+    """B3: states whose weight is the same at every noise level get 0 and are counted.
+
+    Reference: the count is formed by hand as the number of rows with a single distinct value
+    (an independent definition of "zero rank denominator"); rows 0, 1 and 4 are constant, row 5
+    is tied only in part (not constant). The correlations of the other rows are
+    ``scipy.stats.spearmanr`` (independent), the constant rows 0 by the stated convention;
+    ``abs=1e-12`` (a rank computation and one division). The counted function returns the same
+    array as ``_per_state_spearman`` bitwise. In ``h2b_knob_response`` the key
+    ``noise.n_constant_states`` is 3 and ``noise.n_dropped_resamples`` is 0 (a mean of finite
+    correlations cannot fail), and the mean of the per-state values is the hand mean.
+    """
+    from lpcstudy.analysis import _per_state_spearman, _per_state_spearman_counted, \
+        h2b_knob_response
+
+    levels = np.array([0.01, 0.02, 0.04])
+    table = np.array([[0.0, 0.0, 0.0], [0.5, 0.5, 0.5], [0.0, 0.25, 0.5], [0.25, 0.125, 0.0],
+                      [0.75, 0.75, 0.75], [0.0, 0.0, 0.5]])
+    rho, n_constant = _per_state_spearman_counted(levels, table)
+    hand_constant = sum(len(np.unique(row)) == 1 for row in table)
+    assert n_constant == hand_constant == 3 and type(n_constant) is int
+    assert np.array_equal(rho, _per_state_spearman(levels, table))
+    reference = [0.0 if len(np.unique(row)) == 1 else sps.spearmanr(levels, row).statistic
+                 for row in table]
+    assert rho == pytest.approx(reference, abs=1e-12, rel=0)
+
+    noise_cells = {float(r): _stub_cell(table[:, j]) for j, r in enumerate(levels)}
+    out = h2b_knob_response(noise_cells, _library_cells(TABLE), CONFIG)["noise"]
+    assert out["n_constant_states"] == 3 and out["n_dropped_resamples"] == 0
+    assert out["mean_state_spearman"] == pytest.approx(np.mean(reference), abs=1e-12, rel=0)
+
+
+def test_h3a_counts_empty_regimes_and_degenerate_pairs() -> None:
+    """B3: ``n_empty_regimes`` (no test state) and ``n_degenerate_pairs`` (zero log-rank variance).
+
+    Reference: hand-built situation, K = 4. Regime 0 has 30 states with events (geometric
+    hazard 0.1, seed 41), regimes 2 and 3 have 30 states each, all censored at 40, and regime 1
+    has no state. Kaplan-Meier medians [5, nan, 10, 20] give the order 0, 2, 3, 1 and the pairs
+    (0, 2), (2, 3), (3, 1): the first has events in one group (variance positive), the second has
+    no event at all (variance exactly 0, a degenerate pair), the third contains the empty regime
+    (counted as empty, not as degenerate). So ``n_empty_regimes == 1`` (K minus the regimes that
+    occur, an independent definition), ``n_degenerate_pairs == 1`` and ``n_km_not_reached == 1``.
+    A well-populated example has both counts 0. The raw p-values and reasons are those of the
+    earlier code (the zero-variance and empty pairs are None).
+    """
+    from lpcstudy.analysis import h3a_logrank
+
+    rng = np.random.default_rng(41)
+    regime = np.repeat([0, 2, 3], 30)
+    durations = np.concatenate([rng.geometric(0.1, 30), np.full(60, 40)])
+    events = np.concatenate([np.ones(30, dtype=bool), np.zeros(60, dtype=bool)])
+    out = h3a_logrank(regime, durations, events, np.array([5.0, np.nan, 10.0, 20.0]),
+                      np.ones(90), 30, 4)
+    assert out["pairs"] == [[0, 2], [2, 3], [3, 1]]
+    assert out["n_empty_regimes"] == 4 - len(np.unique(regime)) == 1
+    assert out["n_degenerate_pairs"] == 1 and out["n_km_not_reached"] == 1
+    assert out["logrank_p_raw"][0] is not None and out["logrank_p_raw"][1:] == [None, None]
+    assert "zero log-rank variance" in out["reason"] and "empty regime" in out["reason"]
+
+    regime3, durations3, target3 = _regime_data((0.05, 0.45, 0.15), 60, 3)
+    clean = h3a_logrank(regime3, durations3, np.ones(len(durations3), dtype=bool),
+                        np.array([14.0, 2.0, 5.0]), target3, 30, 3)
+    assert clean["n_empty_regimes"] == 0 and clean["n_degenerate_pairs"] == 0
