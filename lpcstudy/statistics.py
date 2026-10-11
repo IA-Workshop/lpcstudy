@@ -47,7 +47,7 @@ def kaplan_meier(durations: np.ndarray, events: np.ndarray, horizon_max: int
                  ) -> SurvivalCurve:
     """Kaplan-Meier estimator for discrete first-passage times.
 
-    The hazard is 0 where nobody is at risk (the ``np.where`` below; DEF-0001, inventory row T1).
+    The hazard is 0 where nobody is at risk (the ``np.where`` below; DEF-0001, the Kaplan-Meier row of the WU-0002.11 inventory).
     That branch never changes a value of the formula, and its two cases are these.
 
     * Since ``deaths(t) <= at_risk(t)``, ``at_risk = 0`` implies ``deaths = 0``, so
