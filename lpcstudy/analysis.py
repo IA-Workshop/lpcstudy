@@ -14,7 +14,8 @@ use Bonferroni-adjusted intervals at level ``1 - 0.05/3``; all others use 95% in
 For the statistics of WU-0002.7 and .8 (H2b(ii), H2e, H3a, H3b, H3c) a result that cannot be
 computed, or whose interval meets a band edge, is *inconclusive* and says why (``reason``); failed
 bootstrap resamples are counted (``n_failed_resamples``) and widen the interval, never dropped.
-H3a has no equivalence margin, so its ``verdict`` is only ``pass`` or ``inconclusive`` (DEC-0008 A3).
+H3a has no equivalence margin, so its ``verdict`` is only ``pass`` or ``inconclusive``
+(DEC-0008 A3).
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ from .oracle import characteristic_horizon, curvature, hybrid_mse, inverse_dimen
     oracle_weight
 from .pipeline import Cell, FittedRules, RuleScores, SplitData
 from .statistics import block_bootstrap, block_bootstrap_counted, bootstrap_values, \
-    combine_verdicts, criterion_verdict, holm_adjust, kaplan_meier, logrank_parts, \
+    MIN_STATES, combine_verdicts, criterion_verdict, holm_adjust, kaplan_meier, logrank_parts, \
     logrank_test, ols_slope, partial_correlation, percentile_interval, spearman
 
 PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
@@ -740,16 +741,17 @@ def _per_state_spearman(levels: np.ndarray, values: np.ndarray) -> np.ndarray:
 
 
 def _decision(verdict: str, reason: str | None) -> dict:
-    """The ``pass`` and ``inconclusive_reason`` keys of a result (no ``fail`` key until WU-0002.9).
+    """The ``verdict``, ``reason`` and ``pass`` keys of a result (DEC-0012, as in the H1 lane).
 
-    ``pass`` is True only for a pass; ``inconclusive_reason`` is the reason given by
-    ``criterion_verdict`` for an inconclusive result and None for a pass or a fail.
+    ``verdict`` is "pass", "fail" or "inconclusive"; ``reason`` is the one given by
+    ``criterion_verdict`` for an inconclusive result and None for a pass or a fail; ``pass`` is
+    ``verdict == "pass"``.
     """
-    return {"pass": verdict == "pass", "inconclusive_reason": reason}
+    return {"verdict": verdict, "reason": reason, "pass": verdict == "pass"}
 
 
 def _combined_decision(parts: dict[str, tuple[str, str | None]]) -> dict:
-    """``pass`` and ``inconclusive_reason`` of a criterion with several named parts.
+    """``verdict``, ``reason`` and ``pass`` of a criterion with several named parts.
 
     The verdict is ``combine_verdicts`` of the parts (v3 section 7: all must pass; one fail
     fails it). The reason lists the inconclusive parts, and is None unless the combination is
@@ -816,14 +818,17 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     """H2b (primary): ``w*`` rises with the noise level and with the library size.
 
     * (i) ``noise``: the mean over states of the per-state Spearman correlation of ``w*(H_ref)``
-      with ``rho``; the interval is at level ``1 - 0.05/3``, pass iff its lower bound is above 0.
+      with ``rho``; the interval is at level ``1 - 0.05/3`` (salt 3, unchanged), pass iff its lower
+      bound is above 0 (strict), fail iff the whole interval is at or below 0, else inconclusive
+      (``criterion_verdict``, including the 50-state guard).
     * (ii) ``library_change``: the mean over states of ``w*_i(H_ref, 10^4) - w*_i(H_ref, 10^3)``
       at ``rho = config.core_noise`` (1%), one block-bootstrap index array for both sizes, level
       ``1 - 0.05/3``, pass iff the lower bound is above 0 (strict; DEC-0008 A1). A missing cell
-      gives ``mean_change = None``, ``pass = False`` and the missing cells in
-      ``inconclusive_reason``; an interval with the lower bound at or below 0, or with failed
+      gives ``mean_change = None``, an inconclusive verdict and the missing cells in
+      ``reason``; an interval with the lower bound at or below 0, or with failed
       resamples at or above the threshold, is inconclusive (DEC-0008 A3).
-    * ``pass`` = (i) and (ii) (v3 section 2).
+    * The verdict is ``combine_verdicts`` of (i) and (ii) (v3 section 7: one fail fails it; the
+      reason lists the inconclusive parts), ``pass`` is ``verdict == "pass"``.
 
     Reported only, at 95% (v3 section 7, Methods v2 M2 section M12): ``library_curves``, the mean
     and the median of ``w*(H_ref)`` with intervals for every ``n_lib`` at every
@@ -845,7 +850,7 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     -------
     dict
         ``noise``, ``library_change``, ``library_curves``, ``library_change_reported``,
-        ``threshold``, ``pass`` and ``inconclusive_reason`` (the reason of part (ii)).
+        ``threshold``, ``verdict``, ``reason`` and ``pass``.
     """
     res: dict = {}
     rho_levels = np.array(sorted(noise_cells))
@@ -856,8 +861,10 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     medians = np.median(w_rho, axis=0)
     res["noise"] = {"median_w_by_noise": dict(zip(map(str, rho_levels), medians.tolist())),
                     "mean_state_spearman": est, "ci": [lo, hi],
-                    "monotone_medians": bool(np.all(np.diff(medians) > 0)),
-                    "pass": bool(lo > 0)}
+                    "monotone_medians": bool(np.all(np.diff(medians) > 0))}
+    noise_verdict, noise_reason = criterion_verdict(est, lo, hi, (0.0, np.inf), (False, True),
+                                                    n_states=len(rho_corr))
+    res["noise"].update(_decision(noise_verdict, noise_reason))
 
     rho = config.core_noise
     wanted = [(rho, n) for n in H2B_LIBRARY_SIZES]
@@ -903,8 +910,9 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     res["threshold"] = ("(i) per-state Spearman of w* with rho: CI lower bound > 0; (ii) mean "
                         "paired change in w*(H_ref) from n_lib 10^3 to 10^4 at rho = 1%: CI lower "
                         "bound > 0 (both at level 1 - 0.05/3)")
-    res["pass"] = bool(res["noise"]["pass"] and res["library_change"]["pass"])
-    res["inconclusive_reason"] = res["library_change"]["inconclusive_reason"]
+    res.update(_combined_decision({
+        "noise": (res["noise"]["verdict"], res["noise"]["reason"]),
+        "library_change": (res["library_change"]["verdict"], res["library_change"]["reason"])}))
     return res
 
 
@@ -937,9 +945,9 @@ def h2e_noise_matching(library_cells: dict[tuple[float, int], Cell], config: Stu
     -------
     dict
         ``by_noise`` (per ``rho``: ``median_change``, ``ci``, ``level``, ``n_states``,
-        ``n_failed_resamples``, ``n_zero_difference``, ``pass``, ``inconclusive_reason``),
+        ``n_failed_resamples``, ``n_zero_difference``, ``verdict``, ``reason``, ``pass``),
         ``corr_curve[rho][n_lib]`` (median correlation for every available cell),
-        ``zero_variance_corr[rho][n_lib]``, ``threshold``, ``pass``, ``inconclusive_reason``.
+        ``zero_variance_corr[rho][n_lib]``, ``threshold``, ``verdict``, ``reason``, ``pass``.
 
     Raises
     ------
@@ -991,8 +999,10 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
     noise-free truth, the same definition as on test; a tie goes to A0. The two values are
     reported as ``calibration_mse``. The entry ``A4o_minus_A2`` (A4 with the oracle seeds against
     A2; reported only, no pass; D-20) is the paired mean difference of the per-state squared
-    errors at ``H_ref``, 95%, on the same states and the same resamples (salt 5) as the other
-    differences.
+    errors at ``H_ref``, 95%, on the same states and the same resamples (integer seed
+    ``config.seed + 5``) as the other differences; it is a new bootstrap, so it goes through
+    ``block_bootstrap_counted`` and reports ``n_failed_resamples`` (DEC-0012; bitwise equal to
+    ``block_bootstrap`` when no resample fails).
 
     Parameters
     ----------
@@ -1036,9 +1046,12 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
                                     "pass": bool(hi < 0)}
     out["pass"] = bool(out["A4_minus_A2"]["pass"] and out[f"A4_minus_{best_single}"]["pass"])
     diff_o = scores["A4o"].state_mse_ref - scores["A2"].state_mse_ref
-    est, lo, hi = _boot(config, lambda idx: float(np.mean(diff_o[idx])), len(diff_o), salt=5)
-    out["A4o_minus_A2"] = {"mean": est, "ci": [lo, hi], "level": 0.95,
-                           "relative": est / float(scores["A2"].state_mse_ref.mean()),
+    boot = block_bootstrap_counted(lambda idx: float(np.mean(diff_o[idx])), len(diff_o),
+                                   config.bootstrap_resamples, config.bootstrap_block,
+                                   config.seed + 5, 0.95)
+    out["A4o_minus_A2"] = {"mean": boot.estimate, "ci": [boot.lower, boot.upper], "level": 0.95,
+                           "n_failed_resamples": boot.n_failed,
+                           "relative": boot.estimate / float(scores["A2"].state_mse_ref.mean()),
                            "role": "reported"}
     return out
 
@@ -1128,7 +1141,9 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
     all ``K_real - 1`` consecutive pairs. A pair with an empty regime or with zero log-rank
     variance (``logrank_parts``) is not computed: its raw p is ``None`` and it enters the Holm
     family at p = 1 (conservative; DEC-0011 O1). No minimum number of states per regime is
-    imposed (DEC-0011 O1). ``pass`` needs every pair computed and every adjusted p < 0.01
+    imposed (DEC-0011 O1), but the full sample (the test states) needs at least ``MIN_STATES`` = 50
+    (DEC-0008 A3), else the result is inconclusive with the reason ``"n_states < 50"``. ``pass`` needs
+    every pair computed and every adjusted p < 0.01
     (strict). No equivalence margin is set, so H3a cannot fail (DEC-0008 A3): anything else is
     inconclusive, with the reason. With fewer than two regimes there is no pair and the result
     is inconclusive.
@@ -1152,12 +1167,14 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
     -------
     dict
         ``chosen_K``, ``pairs`` (regime indices, in test order), ``logrank_p_raw`` (None where
-        not computed), ``logrank_p_holm``, ``n_per_regime``, ``n_km_not_reached``, ``iqr_lt`` (interquartile range of
+        not computed), ``logrank_p_holm``, ``n_per_regime``, ``n_km_not_reached``, ``iqr_lt``
+        (interquartile range of
         the characteristic horizon in Lyapunov times per regime, None below 2 states),
         ``iqr_lt_mean`` (their mean weighted by regime size, the v1 ``mean_iqr_lyapunov``; None
-        if no regime has 2 states), ``threshold``, ``pass``, ``inconclusive_reason``.
+        if no regime has 2 states), ``threshold``, ``verdict``, ``reason``, ``pass``.
     """
     n_regimes = len(horizons_km)
+    n_states = len(first_regime)
     counts = [int(np.sum(first_regime == k)) for k in range(n_regimes)]
     iqr: list[float | None] = []
     for k in range(n_regimes):
@@ -1187,7 +1204,9 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
             raw.append(logrank_test(durations[in_a], events[in_a], durations[in_b], events[in_b]))
     adjusted = holm_adjust([1.0 if p is None else p for p in raw]) if pairs else []
     decided = bool(pairs) and not why
-    if decided and max(adjusted) < H3A_ALPHA:
+    if n_states < MIN_STATES:  # the full-sample minimum of DEC-0008 A3 (DEC-0011 O1)
+        verdict, reason = "inconclusive", f"n_states < {MIN_STATES}"
+    elif decided and max(adjusted) < H3A_ALPHA:
         verdict, reason = "pass", None
     elif not pairs:
         verdict, reason = "inconclusive", "fewer than two regimes: no pair to test"
@@ -1198,7 +1217,8 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
                                            f">= {H3A_ALPHA}")
     return {"chosen_K": chosen_k, "pairs": [list(pair) for pair in pairs],
             "logrank_p_raw": raw, "logrank_p_holm": adjusted, "n_per_regime": counts,
-            "n_km_not_reached": int(np.isnan(horizons_km).sum()), "iqr_lt": iqr, "iqr_lt_mean": iqr_mean,
+            "n_km_not_reached": int(np.isnan(horizons_km).sum()), "iqr_lt": iqr,
+            "iqr_lt_mean": iqr_mean,
             "threshold": f"all Holm-adjusted log-rank p between consecutive regimes < {H3A_ALPHA}",
             **_decision(verdict, reason)}
 
@@ -1273,7 +1293,7 @@ def h3b_importances(con_profile: np.ndarray, w_target: np.ndarray, curvature_ref
         ``weight_lambda``, ``D``, ``stability``, ``weight_tree_importance`` and
         ``horizon_tree_importance`` (full-data vectors by coordinate, None if degenerate),
         ``degenerate_fits``, ``nan_resamples``, ``n_states``, ``n_resamples``,
-        ``max_leaf_nodes``, ``threshold``, ``pass`` and ``inconclusive_reason``.
+        ``max_leaf_nodes``, ``threshold``, ``verdict``, ``reason`` and ``pass``.
 
     Raises
     ------
@@ -1361,7 +1381,7 @@ def h3c_ratio(a5_state_mse: np.ndarray, a4_state_mse: np.ndarray, config: StudyC
     -------
     dict
         ``A5_over_A4_mse``, ``ci``, ``level``, ``n_states``, ``n_failed_resamples``,
-        ``threshold``, ``pass`` and ``inconclusive_reason``.
+        ``threshold``, ``verdict``, ``reason`` and ``pass``.
     """
     if a5_state_mse.shape != a4_state_mse.shape or a5_state_mse.ndim != 1:
         raise ValueError(f"need two (n,) arrays; got {a5_state_mse.shape}, {a4_state_mse.shape}")

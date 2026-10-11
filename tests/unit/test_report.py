@@ -148,17 +148,21 @@ def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
         "H2a": {"median_range": 0.05, "range_ci": [0.01, 0.08], "partial_corr": 0.02},
         "H2b": {"noise": {"mean_state_spearman": 0.9},
                 "library_change": {"mean_change": 0.2, "ci": [0.1, 0.3]},
-                "library_curves": {"0.01": {"1000": {"median": 0.7}, "10000": {"median": 0.8}}}},
+                "library_curves": {"0.01": {"1000": {"median": 0.7}, "10000": {"median": 0.8}}},
+                "verdict": "pass", "reason": None},
         "H2c": {"A4_minus_A2": {"relative": -0.1}, "best_single": "A1",
                 "A4_minus_A1": {"relative": -0.05}, "A4o_minus_A2": {"relative": -0.2}},
         "H2d": {"in_distribution_excess": 0.05},
         "H2e": {"by_noise": {"0.01": {"median_change": 0.1, "ci": [0.05, 0.15]},
-                             "0.02": {"median_change": None, "ci": None}}},
+                             "0.02": {"median_change": None, "ci": None}},
+                "verdict": "pass", "reason": None},
         "gain_bound": {"fraction_within_bound": 0.95, "n_states": 40, "max_gain_lyapunov": 1.5},
-        "H3a": {"chosen_K": 3, "logrank_p_holm": [0.004, 0.001], "iqr_lt_mean": 0.4},
+        "H3a": {"chosen_K": 3, "logrank_p_holm": [0.004, 0.001], "iqr_lt_mean": 0.4,
+                "verdict": "pass", "reason": None},
         "H3b": {"weight_lambda": {"importance": 0.1, "ci": [0.0, 0.15]},
-                "D": {"value": 0.6, "ci": [0.3, 0.8]}, "stability": 0.97},
-        "H3c": {"A5_over_A4_mse": 1.0123, "ci": [0.99, 1.04]},
+                "D": {"value": 0.6, "ci": [0.3, 0.8]}, "stability": 0.97,
+                "verdict": "pass", "reason": None},
+        "H3c": {"A5_over_A4_mse": 1.0123, "ci": [0.99, 1.04], "verdict": "pass", "reason": None},
     }
     system = {key: dict(value, **{"pass": True}) for key, value in results.items()
               if key not in skip}
@@ -249,14 +253,14 @@ def test_key_numbers_are_exact_for_every_v3_key() -> None:
         "H1d": "eps 0.8, delta 0.9, Lambda 0.7, N 0.6: pass",
         "Q-N": "redundant: dR2 w 0.01 [0, 0.02], T 0.02 [0.01, 0.03]; oracle: adds information",
         "H2a": "range 0.05 (CI hi 0.08); partial r 0.02",
-        "H2b": "rho rank corr 0.9; n_lib 10^3->10^4 change 0.2 [0.1, 0.3]",
+        "H2b": "rho rank corr 0.9; n_lib 10^3->10^4 change 0.2 [0.1, 0.3]: pass",
         "H2c": "A4-A2 -10%; A4-A1 -5%; A4o-A2 -20% (reported)",
         "H2d": "A4/A3-1 = 5%",
-        "H2e": "rho=0.01: median change 0.1 [0.05, 0.15]; rho=0.02: median change n/a n/a",
+        "H2e": "rho=0.01: median change 0.1 [0.05, 0.15]; rho=0.02: median change n/a n/a: pass",
         "gain_bound": "within bound 0.95 (n=40, max gain 1.5 LT)",
-        "H3a": "K=3: largest Holm p 0.004, IQR 0.4 LT",
-        "H3b": "Lambda imp: weight 0.1 [0, 0.15], D 0.6 [0.3, 0.8], stability 0.97",
-        "H3c": "A5/A4 1.012 [0.99, 1.04]",
+        "H3a": "K=3: largest Holm p 0.004, IQR 0.4 LT: pass",
+        "H3b": "Lambda imp: weight 0.1 [0, 0.15], D 0.6 [0.3, 0.8], stability 0.97: pass",
+        "H3c": "A5/A4 1.012 [0.99, 1.04]: pass",
     }
     assert {key: _key_number(key, system) for key in expected} == expected
     assert set(expected) == {h.key for h in HYPOTHESIS_TABLE}
@@ -285,6 +289,25 @@ def test_key_numbers_of_h1a_h1b_h1d_show_fail_and_inconclusive_with_the_reason()
     assert _key_number("H1d", system) == "eps 0.8, delta 0.9, Lambda 0.7, N 0.6: fail"
     assert _key_number("H1a", system) == ("rho=0.01: 1/d (n_lib fit)=0.5, ratio 1 [0.9, 1.1] "
                                           "inconclusive (n_states < 50) (1/d_LB=0.5)")
+
+
+def test_key_numbers_of_wu_0002_7_8_rows_show_the_verdict_and_the_reason() -> None:
+    """The H2b, H2e, H3a, H3b and H3c key numbers end with the verdict, and the reason if inconclusive.
+
+    Reference: hand strings with the ``_fmt`` rules, as in the H1 test above (DEC-0012 contract
+    `verdict` and `reason`, review R1): an inconclusive result must read as such, not as a fail.
+    Exact string checks.
+    """
+    system = fake_system(SMOKE)
+    system["H3b"] = dict(system["H3b"], verdict="inconclusive", reason="D: interval meets band edge")
+    system["H3a"] = dict(system["H3a"], verdict="inconclusive", reason="n_states < 50")
+    system["H2b"] = dict(system["H2b"], verdict="fail", reason=None)
+    assert _key_number("H3b", system) == ("Lambda imp: weight 0.1 [0, 0.15], D 0.6 [0.3, 0.8], "
+                                          "stability 0.97: inconclusive (D: interval meets band "
+                                          "edge)")
+    assert _key_number("H3a", system) == \
+        "K=3: largest Holm p 0.004, IQR 0.4 LT: inconclusive (n_states < 50)"
+    assert _key_number("H2b", system).endswith("[0.1, 0.3]: fail")
 
 
 def test_library_figure_axis_reads_n_lib(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

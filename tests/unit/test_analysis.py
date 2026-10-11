@@ -822,10 +822,13 @@ def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> No
     reference = block_bootstrap(lambda idx: float(np.mean(diff[idx])), 6, 200, 5,
                                 make_rng(CONFIG.seed, "h2b-library-change", "0.01"), LEVEL)
     assert change["ci"] == [reference[1], reference[2]]
-    assert change["pass"] is False and change["inconclusive_reason"] == "n_states < 50"
+    assert change["pass"] is False and change["reason"] == "n_states < 50"
+    assert change["verdict"] == "inconclusive"
     assert change["n_failed_resamples"] == 0 and change["n_zero_difference"] == 1
     assert "fail" not in change and "fail" not in out
-    assert out["pass"] is False and out["inconclusive_reason"] == "n_states < 50"
+    # both parts rest on 6 states: the combined verdict is inconclusive and names both parts
+    assert out["verdict"] == "inconclusive" and out["pass"] is False
+    assert out["reason"] == "noise: n_states < 50; library_change: n_states < 50"
 
 
 def test_regression_h2b_noise_part_keeps_salt_three() -> None:
@@ -858,7 +861,7 @@ def test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing() 
     resample mean is at least 0.175 and the lower bound is above 0: pass True, reason None. (b) Identical columns for 10^3 and 10^4: every
     resample mean is exactly 0.0, the interval is [0, 0], which is not above 0 (strict;
     DEC-0008 A1) and lies entirely below the open band: pass False and, since this is a fail and
-    not an inconclusive, ``inconclusive_reason`` is None. (c) The 10^3 cell missing at rho = 1%:
+    not an inconclusive, ``reason`` is None. (c) The 10^3 cell missing at rho = 1%:
     ``mean_change`` None, ``ci`` None, pass False, the reason names the cell, and the result has no
     NaN. Exact comparisons of booleans, None and strings.
     """
@@ -868,21 +871,22 @@ def test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing() 
                    0.02: _stub_cell(np.tile(np.minimum(TABLE[:, 2] + 0.125, 1.0), 10))}
     tiled = np.tile(TABLE, (10, 1))
     out = h2b_knob_response(noise_cells, _library_cells(tiled), CONFIG)["library_change"]
-    assert out["pass"] is True and out["inconclusive_reason"] is None and out["ci"][0] > 0.0
+    assert out["pass"] is True and out["reason"] is None and out["ci"][0] > 0.0
+    assert out["verdict"] == "pass"
     assert out["mean_change"] == pytest.approx(0.1875, abs=1e-12)
 
     flat = tiled.copy()
     flat[:, 2] = flat[:, 0]
     out = h2b_knob_response(noise_cells, _library_cells(flat), CONFIG)["library_change"]
     assert out["mean_change"] == 0.0 and out["ci"] == [0.0, 0.0]
-    assert out["pass"] is False and out["inconclusive_reason"] is None
+    assert out["pass"] is False and out["reason"] is None
 
     cells = _library_cells(tiled)
     del cells[(0.01, 1_000)]
     result = h2b_knob_response(noise_cells, cells, CONFIG)
     out = result["library_change"]
     assert out["mean_change"] is None and out["ci"] is None and out["pass"] is False
-    assert "rho=0.01 n_lib=1000" in out["inconclusive_reason"]
+    assert "rho=0.01 n_lib=1000" in out["reason"]
     assert result["pass"] is False and not _has_nan(result)
     json.dumps(result, allow_nan=False)
 
@@ -961,7 +965,7 @@ def test_h2e_median_change_with_a_cp_constant_state_and_the_counts() -> None:
     for rho in ("0.01", "0.02"):
         entry = out["by_noise"][rho]
         assert entry["median_change"] == pytest.approx(0.27, abs=1e-12)
-        assert entry["pass"] is True and entry["inconclusive_reason"] is None
+        assert entry["pass"] is True and entry["reason"] is None
         assert entry["level"] == 0.95 and entry["n_states"] == 50
         assert out["zero_variance_corr"][rho]["1000"] == {
             "cp_constant": 1, "plp_constant": 0, "both_constant": 0, "n_nonfinite": 0,
@@ -973,7 +977,7 @@ def test_h2e_median_change_with_a_cp_constant_state_and_the_counts() -> None:
     reference = block_bootstrap(lambda i: float(np.median(diff[i])), 50, 200, 5,
                                 make_rng(CONFIG.seed, "h2e", "0.01"), 0.95)
     assert out["by_noise"]["0.01"]["ci"] == [reference[1], reference[2]]
-    assert out["pass"] is True and out["inconclusive_reason"] is None and not _has_nan(out)
+    assert out["pass"] is True and out["reason"] is None and not _has_nan(out)
 
 
 def test_h2e_no_change_is_not_a_pass_and_missing_cells_are_named() -> None:
@@ -990,7 +994,7 @@ def test_h2e_no_change_is_not_a_pass_and_missing_cells_are_named() -> None:
 
     low = np.linspace(0.0, 0.4, 50)
     out = h2e_noise_matching(_h2e_cells(low, low.copy()), CONFIG)
-    assert out["pass"] is False and out["inconclusive_reason"] is None
+    assert out["pass"] is False and out["reason"] is None
     assert out["by_noise"]["0.01"]["ci"] == [0.0, 0.0]
     assert out["by_noise"]["0.01"]["n_zero_difference"] == 50
 
@@ -1002,9 +1006,9 @@ def test_h2e_no_change_is_not_a_pass_and_missing_cells_are_named() -> None:
     for rho in ("0.01", "0.02"):
         assert out["by_noise"][rho]["median_change"] is None and out["by_noise"][rho]["ci"] is None
         assert out["by_noise"][rho]["pass"] is False
-    assert "rho=0.01 n_lib=100000" in out["by_noise"]["0.01"]["inconclusive_reason"]
-    assert "rho=0.02 n_lib=1000" in out["by_noise"]["0.02"]["inconclusive_reason"]
-    assert out["pass"] is False and "rho=0.02" in out["inconclusive_reason"] and not _has_nan(out)
+    assert "rho=0.01 n_lib=100000" in out["by_noise"]["0.01"]["reason"]
+    assert "rho=0.02 n_lib=1000" in out["by_noise"]["0.02"]["reason"]
+    assert out["pass"] is False and "rho=0.02" in out["reason"] and not _has_nan(out)
     json.dumps(out, allow_nan=False)
 
     with pytest.raises(ValueError, match="err_corr"):
@@ -1055,7 +1059,7 @@ def test_h3a_holm_and_raw_p_match_independent_references() -> None:
     assert out["logrank_p_holm"] == pytest.approx([hand[p] for p in out["logrank_p_raw"]],
                                                   rel=0, abs=1e-15)
     assert out["logrank_p_holm"] == holm_adjust(out["logrank_p_raw"])
-    assert out["pass"] is True and out["inconclusive_reason"] is None
+    assert out["pass"] is True and out["reason"] is None and out["verdict"] == "pass"
     assert out["n_per_regime"] == [60, 60, 60]
     assert out["iqr_lt"] == pytest.approx([29.5 * (k + 1) / 30 for k in range(3)], abs=1e-12)
     assert out["iqr_lt_mean"] == pytest.approx(29.5 * 2 / 30, abs=1e-12)
@@ -1071,9 +1075,12 @@ def test_h3a_inconclusive_paths_and_small_regimes() -> None:
     0 and 2 only, K = 3): the pair containing it has raw p None, enters Holm at 1, pass False
     with reason "empty regime". (c) Two regimes in which no event occurs (all censored): the
     log-rank variance is 0, raw p None (not 1.0), reason "zero log-rank variance". (d) DEC-0011
-    O1: regimes of 20 states each, hazards 0.5 and 0.05, are not rejected for size: pass True when
-    scipy's p is below 0.01 (premise). (e) One regime: no pair, inconclusive. All results have the
-    keys ``pass`` and ``inconclusive_reason`` and no ``fail`` key. Exact comparisons.
+    O1: three regimes of 20 states each (60 in all), hazards 0.5, 0.15 and 0.04, are not rejected
+    for the size of a regime: pass when scipy's p of both pairs is below 0.005 (premise). Review
+    R3: the full-sample minimum of 50 states (DEC-0008 A3) still applies: 20 + 20 states with
+    p < 0.01 are inconclusive with reason "n_states < 50". (e) One regime (60 states): no pair,
+    inconclusive. All results have ``verdict`` (only pass or inconclusive: no equivalence margin
+    is set), ``reason`` and ``pass``, and no ``fail`` key. Exact comparisons.
     """
     from lpcstudy.analysis import h3a_logrank
 
@@ -1082,33 +1089,45 @@ def test_h3a_inconclusive_paths_and_small_regimes() -> None:
     p_same = sps.logrank(durations[regime == 0], durations[regime == 1]).pvalue
     assert p_same > 0.01  # premise
     out = h3a_logrank(regime, durations, ones, np.array([7.0, 8.0]), target, 30, 2)
-    assert out["pass"] is False and "largest Holm-adjusted p" in out["inconclusive_reason"]
+    assert out["pass"] is False and "largest Holm-adjusted p" in out["reason"]
     assert out["logrank_p_holm"] == pytest.approx([p_same], rel=1e-10)
 
     regime3 = np.where(regime == 1, 2, 0)
     out = h3a_logrank(regime3, durations, ones, np.array([5.0, 6.0, 7.0]), target, 30, 3)
     assert out["pairs"] == [[0, 1], [1, 2]] and out["logrank_p_raw"] == [None, None]
     assert out["logrank_p_holm"] == [1.0, 1.0] and out["pass"] is False
-    assert "empty regime" in out["inconclusive_reason"]
+    assert "empty regime" in out["reason"]
     assert out["n_per_regime"] == [60, 0, 60] and out["iqr_lt"][1] is None
 
     out = h3a_logrank(regime, durations, np.zeros(len(durations), dtype=bool),
                       np.array([7.0, 8.0]), target, 30, 2)
     assert out["logrank_p_raw"] == [None] and out["logrank_p_holm"] == [1.0]
-    assert out["pass"] is False and "zero log-rank variance" in out["inconclusive_reason"]
+    assert out["pass"] is False and "zero log-rank variance" in out["reason"]
 
-    small_regime, small_dur, small_target = _regime_data((0.5, 0.05), 20, 8)
-    small = h3a_logrank(small_regime, small_dur, np.ones(40, dtype=bool), np.array([2.0, 14.0]),
-                        small_target, 30, 2)
-    assert sps.logrank(small_dur[:20], small_dur[20:]).pvalue < 0.01  # premise
-    assert small["pass"] is True and small["n_per_regime"] == [20, 20]
+    small_regime, small_dur, small_target = _regime_data((0.5, 0.15, 0.04), 20, 8)
+    small = h3a_logrank(small_regime, small_dur, np.ones(60, dtype=bool),
+                        np.array([2.0, 5.0, 14.0]), small_target, 30, 3)
+    assert max(sps.logrank(small_dur[:20], small_dur[20:40]).pvalue,
+               sps.logrank(small_dur[20:40], small_dur[40:]).pvalue) < 0.005  # premise
+    assert small["pass"] is True and small["verdict"] == "pass"
+    assert small["n_per_regime"] == [20, 20, 20]
 
-    one = h3a_logrank(np.zeros(10, dtype=int), durations[:10], ones[:10], np.array([5.0]),
-                      target[:10], 30, 1)
-    assert one["pass"] is False and "fewer than two regimes" in one["inconclusive_reason"]
+    one = h3a_logrank(np.zeros(60, dtype=int), durations[:60], ones[:60], np.array([5.0]),
+                      target[:60], 30, 1)
+    assert one["pass"] is False and "fewer than two regimes" in one["reason"]
     assert one["pairs"] == [] and one["logrank_p_holm"] == []
     for result in (out, small, one):
-        assert "fail" not in result and {"pass", "inconclusive_reason"} <= set(result)
+        assert "fail" not in result and {"verdict", "reason", "pass"} <= set(result)
+        assert result["verdict"] in ("pass", "inconclusive")  # H3a has no fail side (A3)
+
+    # Review R3: the 50-state minimum of the full sample (DEC-0008 A3, DEC-0011 O1) applies even
+    # when the p-values are tiny: 20 + 20 states, hazards 0.5 and 0.05, p < 0.01 (premise).
+    forty_regime, forty_dur, forty_target = _regime_data((0.5, 0.05), 20, 8)
+    assert sps.logrank(forty_dur[:20], forty_dur[20:]).pvalue < 0.01
+    forty = h3a_logrank(forty_regime, forty_dur, np.ones(40, dtype=bool), np.array([2.0, 14.0]),
+                        forty_target, 30, 2)
+    assert forty["pass"] is False and forty["verdict"] == "inconclusive"
+    assert forty["reason"] == "n_states < 50" and forty["logrank_p_holm"][0] < 0.01
 
 
 def test_h3a_orders_tied_and_missing_horizons_by_regime_index() -> None:
@@ -1170,7 +1189,7 @@ def test_h3b_known_ordering_lambda_irrelevant_for_the_weight_and_first_for_the_h
     assert weight["importance"] == 0.0 and weight["ci"] == [0.0, 0.0]
     assert weight["pass"] is True and weight["n_failed_resamples"] == 0
     assert out["stability"] == 1.0 and out["D"]["ci"][0] >= 0.9 and out["D"]["value"] >= 0.9
-    assert out["D"]["pass"] is True and out["pass"] is True and out["inconclusive_reason"] is None
+    assert out["D"]["pass"] is True and out["pass"] is True and out["reason"] is None
     assert out["degenerate_fits"] == {"weight_tree": 0, "horizon_tree": 0,
                                       "full_data": {"weight_tree": False, "horizon_tree": False}}
     assert out["nan_resamples"] == 0 and out["max_leaf_nodes"] == 8 and out["n_resamples"] == 200
@@ -1196,7 +1215,7 @@ def test_h3b_reversed_ordering_fails_both_parts() -> None:
     assert out["weight_lambda"]["importance"] == 1.0 and out["weight_lambda"]["ci"] == [1.0, 1.0]
     assert out["weight_lambda"]["pass"] is False
     assert out["D"]["ci"][1] <= -0.9 and out["stability"] == 0.0 and out["D"]["pass"] is False
-    assert out["pass"] is False and out["inconclusive_reason"] is None
+    assert out["pass"] is False and out["reason"] is None
 
 
 def test_h3b_construction_leaf_count_row_expansion_and_point_fit() -> None:
@@ -1259,7 +1278,7 @@ def test_h3b_degenerate_fits_are_counted_failed_resamples_and_not_zeros() -> Non
     out = h3b_importances(profile, constant, curvature, log_t, CONFIG)
     weight = out["weight_lambda"]
     assert weight["importance"] is None and weight["pass"] is False
-    assert "degenerate full-data fit" in weight["inconclusive_reason"]
+    assert "degenerate full-data fit" in weight["reason"]
     assert out["degenerate_fits"]["weight_tree"] == 200 and out["nan_resamples"] == 200
     assert out["degenerate_fits"]["full_data"] == {"weight_tree": True, "horizon_tree": False}
     assert out["weight_tree_importance"]["lambda_tilde"] is None
@@ -1277,7 +1296,7 @@ def test_h3b_degenerate_fits_are_counted_failed_resamples_and_not_zeros() -> Non
 
     out = h3b_importances(profile, 0.5 * (x[:, 0] > 0.5), curvature, constant, CONFIG)
     assert out["D"]["value"] is None and out["D"]["pass"] is False
-    assert "degenerate full-data fit" in out["D"]["inconclusive_reason"]
+    assert "degenerate full-data fit" in out["D"]["reason"]
     assert out["stability"] == 0.0 and out["degenerate_fits"]["horizon_tree"] == 200
 
 
@@ -1304,11 +1323,11 @@ def test_h3c_ratio_of_means_paired_resampling_and_closed_bound() -> None:
     a4 = rng.uniform(1.0, 2.0, 60)
     same = h3c_ratio(a4, a4, CONFIG)
     assert same["ci"] == [1.0, 1.0] and same["A5_over_A4_mse"] == 1.0
-    assert same["pass"] is True and same["inconclusive_reason"] is None
+    assert same["pass"] is True and same["reason"] is None
     assert same["level"] == LEVEL and same["n_states"] == 60 and same["n_failed_resamples"] == 0
     worse = h3c_ratio(1.2 * a4, a4, CONFIG)
     assert worse["ci"] == pytest.approx([1.2, 1.2], abs=1e-12)
-    assert worse["pass"] is False and worse["inconclusive_reason"] is None
+    assert worse["pass"] is False and worse["reason"] is None
     assert "fail" not in worse
 
     a5 = a4 * (1.0 + 0.1 * rng.uniform(size=60))
@@ -1319,7 +1338,7 @@ def test_h3c_ratio_of_means_paired_resampling_and_closed_bound() -> None:
     assert out["ci"] == [reference[1], reference[2]]
 
     short = h3c_ratio(a4[:30], a4[:30], CONFIG)
-    assert short["pass"] is False and short["inconclusive_reason"] == "n_states < 50"
+    assert short["pass"] is False and short["reason"] == "n_states < 50"
     with pytest.raises(ValueError):
         h3c_ratio(a4[:30], a4[:20], CONFIG)
 
@@ -1372,6 +1391,12 @@ def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o
     assert out["A4_minus_A0"]["mean"] == pytest.approx(np.mean(a4 - 0.2), abs=1e-12)
     reported = out["A4o_minus_A2"]
     assert reported["mean"] == pytest.approx(-0.35, abs=1e-12)  # mean of -0.1 .. -0.6
+    # Review R4: counted bootstrap, same resamples as the other H2c parts (seed + 5), bitwise
+    # equal to the pre-existing block_bootstrap when nothing fails; failures would be counted.
+    reference = block_bootstrap(lambda idx: float(np.mean((a4o - a2)[idx])), 6, 200, 5,
+                                CONFIG.seed + 5, 0.95)
+    assert reported["ci"] == [reference[1], reference[2]] and reported["mean"] == reference[0]
+    assert reported["n_failed_resamples"] == 0
     assert reported["level"] == 0.95 and reported["role"] == "reported" and "pass" not in reported
     assert reported["relative"] == pytest.approx(-0.35 / np.mean(a2), abs=1e-12)
     assert out["A4_minus_A2"]["pass"] is True  # a4 - a2 = -0.5 in every resample
@@ -1438,13 +1463,13 @@ def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -
     assert set(out) == {"H3a", "H3b", "H3c", "regime_curve"} and "p_eff" not in json.dumps(out)
     assert set(out["H3a"]) == {"chosen_K", "pairs", "logrank_p_raw", "logrank_p_holm",
                                "n_per_regime", "n_km_not_reached", "iqr_lt", "iqr_lt_mean",
-                               "threshold", "pass", "inconclusive_reason"}
+                               "threshold", "verdict", "pass", "reason"}
     assert set(out["H3b"]) == {"weight_lambda", "D", "stability", "weight_tree_importance",
                                "horizon_tree_importance", "degenerate_fits", "nan_resamples",
-                               "n_states", "n_resamples", "max_leaf_nodes", "threshold", "pass",
-                               "inconclusive_reason"}
+                               "n_states", "n_resamples", "max_leaf_nodes", "threshold", "verdict",
+                               "pass", "reason"}
     assert set(out["H3c"]) == {"A5_over_A4_mse", "ci", "level", "n_states", "n_failed_resamples",
-                               "threshold", "pass", "inconclusive_reason"}
+                               "threshold", "verdict", "pass", "reason"}
     assert out["H3c"] == analysis.h3c_ratio(a5.state_mse_ref, a4.state_mse_ref, CONFIG)
     col = CONFIG.reference_horizon - 1
     assert out["H3b"] == analysis.h3b_importances(
@@ -1454,3 +1479,123 @@ def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -
     assert out["H3a"]["n_per_regime"] == [int(np.sum(first == k)) for k in range(3)]
     assert out["H3a"]["chosen_K"] == 3 and set(out["regime_curve"]) == {"regret_ratio_by_K",
                                                                        "realized_K"}
+
+
+def test_h2c_a4o_minus_a2_counts_failed_resamples() -> None:
+    """A non-finite state in A4o - A2 makes resamples fail; they are counted, not dropped (R4).
+
+    Reference: hand-built situation. One of 60 states has a NaN squared error for A4o, so every
+    resample that contains it has a NaN mean. With blocks of 5 over 60 states a resample misses
+    it with probability about (1 - 5/56)^12 = 0.33, so many of the 200 resamples fail. The counted
+    helper puts failures at the unfavourable tail (``percentile_interval``): the bounds become
+    infinite once the count reaches floor((B - 1) a) + 1 = 5 at B = 200, level 0.95 (a = 0.025).
+    The point estimate is NaN. The number of failures equals a replay of the same resamples with
+    ``block_resample_indices`` at the seed ``config.seed + 5`` (independent use of the tested
+    helper). Exact.
+    """
+    from lpcstudy.analysis import h2c_state_dependence
+    from lpcstudy.statistics import block_resample_indices
+
+    n = 60
+    a2 = np.linspace(1.0, 2.0, n)
+    a4o = a2 - 0.1
+    a4o[7] = np.nan
+    scores = _scores(A2=a2, A4=a2 - 0.5, A4o=a4o, A0=np.full(n, 0.2), A1=np.full(n, 0.1))
+    out = h2c_state_dependence(scores, _calibration(0.25, 4.0, n=n), CONFIG)["A4o_minus_A2"]
+    expected = sum(bool((idx == 7).any()) for idx in
+                   block_resample_indices(n, 200, 5, CONFIG.seed + 5))
+    assert expected >= 5  # premise: enough failures to reach the threshold
+    assert out["n_failed_resamples"] == expected
+    assert out["ci"] == [-np.inf, np.inf] and np.isnan(out["mean"])
+
+
+def test_h2b_combined_verdict_uses_both_parts() -> None:
+    """H2b combines (i) and (ii): a straddling (i) is inconclusive, a failing (i) fails (R2).
+
+    Reference: hand-built outcomes with 60 states (above the 50-state minimum). The library part
+    (ii) is the tiled six-state table (every resample mean at least 0.175: a pass, see
+    ``test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing``). Part (i):
+    (a) all states fixed at 0.5 for rho = 1% and 0.5 +- 0.125 (alternating by state) at 2%: the
+    per-state Spearman is +1/-1 alternately, every block of 5 has mean +-0.2 and the resample
+    means straddle 0, so (i) is inconclusive ("interval meets band edge") although ``pass`` was
+    False before the fix; the combined verdict is inconclusive, ``pass`` False, and the reason
+    names ``noise`` and not ``library_change``. (b) All states fall with rho: Spearman -1 in
+    every resample, interval [-1, -1], entirely below the open band: (i) fails; with (ii) missing
+    (inconclusive) one fail still fails the criterion (v3 section 7): verdict "fail", reason
+    None. (c) (i) rising in every state and (ii) passing: verdict pass. Exact comparisons.
+    """
+    from lpcstudy.analysis import h2b_knob_response
+
+    n = 60
+    tiled = np.tile(TABLE, (10, 1))
+    sign = np.where(np.arange(n) % 2 == 0, 1.0, -1.0)
+    base = np.full(n, 0.5)
+    straddle = {0.01: _stub_cell(base), 0.02: _stub_cell(base + 0.125 * sign)}
+    out = h2b_knob_response(straddle, _library_cells(tiled), CONFIG)
+    assert out["noise"]["verdict"] == "inconclusive" and out["noise"]["pass"] is False
+    assert out["noise"]["ci"][0] < 0.0 < out["noise"]["ci"][1]  # premise: it straddles 0
+    assert out["library_change"]["verdict"] == "pass"
+    assert out["verdict"] == "inconclusive" and out["pass"] is False
+    assert out["reason"].startswith("noise: ") and "library_change" not in out["reason"]
+
+    falling = {0.01: _stub_cell(base), 0.02: _stub_cell(base - 0.125)}
+    cells = _library_cells(tiled)
+    del cells[(0.01, 1_000)]
+    out = h2b_knob_response(falling, cells, CONFIG)
+    assert out["noise"]["verdict"] == "fail" and out["noise"]["ci"] == [-1.0, -1.0]
+    assert out["library_change"]["verdict"] == "inconclusive"
+    assert out["verdict"] == "fail" and out["pass"] is False and out["reason"] is None
+
+    rising = {0.01: _stub_cell(base), 0.02: _stub_cell(base + 0.125)}
+    out = h2b_knob_response(rising, _library_cells(tiled), CONFIG)
+    assert out["verdict"] == "pass" and out["pass"] is True and out["reason"] is None
+
+
+def test_h3c_closed_edge_at_exactly_1_05_passes() -> None:
+    """The H3c bound is closed: an interval whose upper bound is exactly 1.05 passes (R5).
+
+    Reference: DEC-0008 A1 (H3c closed, v3 section 2) and exact arithmetic. With A4 = 20.0 and
+    A5 = 21.0 in all 60 states every resample mean is an exact integer, so every resample ratio
+    is the correctly rounded 21/20, which is the float literal 1.05 (both are the nearest double
+    to the real number 1.05). The interval is [1.05, 1.05]: pass. A5 = 21.000001 gives a ratio
+    above the bound: not a pass (a fail, no reason). Exact comparisons.
+    """
+    from lpcstudy.analysis import h3c_ratio
+
+    edge = h3c_ratio(np.full(60, 21.0), np.full(60, 20.0), CONFIG)
+    assert edge["ci"] == [1.05, 1.05] and edge["A5_over_A4_mse"] == 1.05
+    assert edge["verdict"] == "pass" and edge["pass"] is True and edge["reason"] is None
+    over = h3c_ratio(np.full(60, 21.000001), np.full(60, 20.0), CONFIG)
+    assert over["verdict"] == "fail" and over["pass"] is False and over["reason"] is None
+
+
+def test_h3b_weight_band_is_open_at_0_2(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The weight-importance band is [0, 0.2): an interval with upper bound exactly 0.2 is no pass (R5).
+
+    Reference: DEC-0008 A1 (H3b weight band strict at 0.2, v3 section 2). The interval of the
+    weight column is replaced by the hand value (0.0, 0.2, 0) through a wrapper around
+    ``percentile_interval`` (first call, the weight column; the second call, for D, is the real
+    function), on the data of the known-ordering test, where the real interval is [0, 0]. The unit
+    under test is the edge convention passed to ``criterion_verdict``. With upper 0.2: not inside
+    the open band and not entirely outside it, so inconclusive ("interval meets band edge"); with
+    upper 0.19999999999999998 (the float below): pass. Exact.
+    """
+    from lpcstudy import analysis
+
+    x, profile, curvature = _h3b_data(31)
+    w_star = 0.5 * (x[:, 0] > 0.5) + 0.25 * (x[:, 1] > 0.3)
+    log_t = 3.0 * x[:, 2] + 0.5 * x[:, 0]
+    real = analysis.percentile_interval
+    for upper, verdict in ((0.2, "inconclusive"), (np.nextafter(0.2, 0.0), "pass")):
+        calls = []
+
+        def fake(values, level, upper=upper, calls=calls):
+            calls.append(1)
+            return (0.0, float(upper), 0) if len(calls) == 1 else real(values, level)
+
+        monkeypatch.setattr(analysis, "percentile_interval", fake)
+        out = analysis.h3b_importances(profile, w_star, curvature, log_t, CONFIG)
+        assert out["weight_lambda"]["verdict"] == verdict, upper
+        assert out["weight_lambda"]["pass"] is (verdict == "pass")
+        if verdict == "inconclusive":
+            assert out["weight_lambda"]["reason"] == "interval meets band edge"

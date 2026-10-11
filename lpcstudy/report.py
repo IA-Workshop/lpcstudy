@@ -145,7 +145,7 @@ def _key_number(key: str, res: dict) -> str:
             change = r["library_change"]
             return f"rho rank corr {_fmt(r['noise']['mean_state_spearman'], 2)}; " \
                    f"n_lib 10^3->10^4 change {_fmt(change['mean_change'], 2)} " \
-                   f"{_interval(change['ci'], 2)}"
+                   f"{_interval(change['ci'], 2)}: {_verdict_text(r)}"
         case "H2c":
             return f"A4-A2 {_fmt(100 * r['A4_minus_A2']['relative'], 3)}%; " \
                    f"A4-{r['best_single']} " \
@@ -158,18 +158,20 @@ def _key_number(key: str, res: dict) -> str:
                    f"(n={r['n_states']}, max gain {_fmt(r['max_gain_lyapunov'], 2)} LT)"
         case "H2e":
             return "; ".join(f"rho={k}: median change {_fmt(v['median_change'], 2)} "
-                             f"{_interval(v['ci'], 2)}" for k, v in r["by_noise"].items())
+                             f"{_interval(v['ci'], 2)}" for k, v in r["by_noise"].items()) \
+                   + f": {_verdict_text(r)}"
         case "H3a":
             holm = r["logrank_p_holm"]
             return f"K={r['chosen_K']}: largest Holm p {_fmt(max(holm) if holm else None, 3)}, " \
-                   f"IQR {_fmt(r['iqr_lt_mean'], 2)} LT"
+                   f"IQR {_fmt(r['iqr_lt_mean'], 2)} LT: {_verdict_text(r)}"
         case "H3b":
             w, d = r["weight_lambda"], r["D"]
             return f"Lambda imp: weight {_fmt(w['importance'], 2)} {_interval(w['ci'], 2)}, " \
                    f"D {_fmt(d['value'], 2)} {_interval(d['ci'], 2)}, " \
-                   f"stability {_fmt(r['stability'], 2)}"
+                   f"stability {_fmt(r['stability'], 2)}: {_verdict_text(r)}"
         case "H3c":
-            return f"A5/A4 {_fmt(r['A5_over_A4_mse'], 4)} {_interval(r['ci'], 4)}"
+            return f"A5/A4 {_fmt(r['A5_over_A4_mse'], 4)} {_interval(r['ci'], 4)}: " \
+                   f"{_verdict_text(r)}"
     return ""
 
 
@@ -335,10 +337,7 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
         cells = []
         for s in systems:
             flag = "PASS" if ver[row.key]["by_system"][s] else "FAIL"
-            res = results["systems"][s][row.key]
-            note = f" [inconclusive: {res['inconclusive_reason']}]" \
-                if res.get("inconclusive_reason") else ""
-            cells.append(f"{flag}: {_key_number(row.key, results['systems'][s])}{note}")
+            cells.append(f"{flag}: {_key_number(row.key, results['systems'][s])}")
         lines.append(f"| {row.v3_id} | {HYPOTHESES[row.key]} | " + " | ".join(cells)
                      + f" | {ver[row.key]['verdict']} |")
 
