@@ -540,3 +540,242 @@ def test_initial_segments_band_is_open_at_the_upper_edge() -> None:
     kw = {"n_resamples": 30, "block": 5, "seed": 2, "level": PRIMARY}
     assert h2a_initial_segments(flat, small, ["1", "2", "4"], **kw)["part_i_verdict"] == "pass"
     assert h2a_initial_segments(wide, small, ["1", "2", "4"], **kw)["part_i_verdict"] == "fail"
+
+
+# ------------------------------------------------------------------ Q-N (WU-0002.6(c))
+# Plan checks T1 to T3 of WU-0002.6 (DEC-0008 A4(a), A4(c); v3 section 7 table).
+
+
+def test_qn_reading_returns_each_reading_at_the_table_boundaries() -> None:
+    """T1: ``qn_reading`` follows the v3 section 7 table, exactly, on unrounded float64 bounds.
+
+    Reference: the table, enumerated by hand: upper < 0.05 and lower <= 0: "reduces"; lower > 0
+    and upper < 0.05: "distinct but small"; lower > 0 and upper >= 0.05: "substantial";
+    otherwise "undetermined". Cases: (0, 0.04) reduces; (0, 0.05) undetermined (an upper bound
+    of exactly 0.05 is "not < 0.05" and a lower bound of exactly 0 is "not > 0");
+    (nextafter(0, 1), nextafter(0.05, 0)) distinct but small; (0.01, 0.05) substantial;
+    (-0.01, 0.06) undetermined; a NaN bound is undetermined. Tolerance: exact strings.
+    """
+    from lpcstudy.analysis import qn_reading
+
+    assert qn_reading(0.0, 0.04) == "reduces"
+    assert qn_reading(-0.2, 0.0499) == "reduces"
+    assert qn_reading(0.0, 0.05) == "undetermined"
+    assert qn_reading(np.nextafter(0.0, 1.0), np.nextafter(0.05, 0.0)) == "distinct but small"
+    assert qn_reading(0.01, 0.05) == "substantial"
+    assert qn_reading(0.2, 0.9) == "substantial"
+    assert qn_reading(-0.01, 0.06) == "undetermined"
+    assert qn_reading(float("nan"), 0.01) == "undetermined"
+    assert qn_reading(0.01, float("nan")) == "undetermined"
+    assert qn_reading(-np.inf, np.inf) == "undetermined"
+
+
+def test_qn_regressor_parameters_and_seed() -> None:
+    """T2: the regressor has the Methods v2 E3 / DEC-0008 A4(c) parameters and routes the seed.
+
+    Reference: the literal parameter values of Methods v2 section M10 E3 (max_iter 300,
+    learning_rate 0.05, max_leaf_nodes 15, min_samples_leaf 20) and A4(c) (l2_regularization
+    1.0), early_stopping False. The seed is ``sklearn_seed(seed, "qn-regressor")``: the raw
+    seed for DEV-0 and a 32-bit value for a 62-bit seed, so a fit does not raise (DEF-0010; the
+    DEV-1 value is read from the registry by ``json.load``). Tolerance: exact.
+    """
+    import json
+
+    from lpcstudy.analysis import qn_regressor
+    from lpcstudy.data import sklearn_seed
+    from lpcstudy.seeds import REGISTRY_PATH
+
+    params = qn_regressor(20261005).get_params()
+    expected = {"max_iter": 300, "learning_rate": 0.05, "max_leaf_nodes": 15,
+                "min_samples_leaf": 20, "l2_regularization": 1.0, "early_stopping": False,
+                "random_state": 20261005}
+    assert {k: params[k] for k in expected} == expected
+    with REGISTRY_PATH.open() as handle:
+        dev1 = next(e["value"] for e in json.load(handle)["seeds"] if e["id"] == "DEV-1")
+    model = qn_regressor(dev1)
+    assert model.get_params()["random_state"] == sklearn_seed(dev1, "qn-regressor") < 2**32
+    rng = np.random.default_rng(21)
+    model.fit(rng.normal(size=(60, 3)), rng.normal(size=60))  # would raise for a raw 62-bit seed
+
+
+def test_delta_r2_equals_sklearn_r2_score_difference() -> None:
+    """T3: ``delta_r2`` equals ``r2_score(y, p4) - r2_score(y, p3)`` and handles resampled rows.
+
+    Reference: ``sklearn.metrics.r2_score`` on a fixed synthetic case (n = 200, ``make_rng``),
+    for a continuous target and a 0/1 target, on all rows and on a resample with repeats
+    (``r2_score(y[idx], p[idx])``). Tolerance 1e-12: both compute 1 - SS_res/SS_tot in float64
+    with different summation orders; the error is about n eps = 5e-14. A constant target or an
+    empty row set gives NaN (a failed resample).
+    """
+    from sklearn.metrics import r2_score
+
+    from lpcstudy.analysis import delta_r2
+    from lpcstudy.data import make_rng
+
+    rng = make_rng(7, "delta-r2")
+    for y in (rng.normal(size=200), (rng.uniform(size=200) < 0.3).astype(float)):
+        p3 = y + rng.normal(scale=0.8, size=200)
+        p4 = y + rng.normal(scale=0.5, size=200)
+        full = np.arange(200)
+        assert abs(delta_r2(y, p3, p4, full) - (r2_score(y, p4) - r2_score(y, p3))) < 1e-12
+        idx = rng.integers(0, 200, 200)
+        ref = r2_score(y[idx], p4[idx]) - r2_score(y[idx], p3[idx])
+        assert abs(delta_r2(y, p3, p4, idx) - ref) < 1e-12
+    constant = np.zeros(200)
+    assert np.isnan(delta_r2(constant, p3, p4, np.arange(200)))
+    assert np.isnan(delta_r2(y, p3, p4, np.array([], dtype=int)))
+
+
+def _qn_synthetic(n_train: int, n_test: int, seed: int) -> dict:
+    """Profiles with a known dependence: w* depends on the first coordinates and a little on N."""
+    rng = np.random.default_rng(seed)
+
+    def draw(n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        x = rng.normal(size=(n, 4))
+        score = 1.2 * x[:, 0] - 0.8 * x[:, 1] + 0.6 * x[:, 3] + 0.5 * rng.normal(size=n)
+        weight = 1.0 / (1.0 + np.exp(-score))
+        weight = np.where(score < -1.5, 0.0, np.where(score > 2.2, 1.0, weight))
+        return x, weight, x[:, 0] + 0.3 * x[:, 3] + 0.3 * rng.normal(size=n)
+
+    x_tr, w_tr, t_tr = draw(n_train)
+    x_te, w_te, t_te = draw(n_test)
+    return {"x_train": x_tr, "w_train": w_tr, "log_t_train": t_tr,
+            "x_test": x_te, "w_test": w_te, "log_t_test": t_te}
+
+
+def test_qn_profile_block_matches_an_independent_fit_and_scores() -> None:
+    """The Q-N block: targets, training sets, point values, counts and readings are as specified.
+
+    Reference: built independently in the test from the definition (DEC-0008 A4(a)): the logit is
+    fitted on the interior (0 < w* < 1) training states only and scored on the interior test
+    states; the indicator 1{w* = 0} by a squared-loss regressor on all states; the log horizon on
+    all; all with ``HistGradientBoostingRegressor`` built from the literal parameters of T2
+    (not ``qn_regressor``) and ``sklearn.metrics.r2_score``. Tolerance 1e-12 on R^2 and
+    Delta R^2 (same data, same deterministic fits; only the summation order of the R^2
+    differs, about n eps). Counts are exact. The out-of-[0,1] predictions of the indicator are
+    counted, not clipped. Also checks ``reading == qn_reading(*ci)`` for both profiles' interior
+    and indicator targets (T1), and that log_horizon has no reading (D-04).
+    """
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    from sklearn.metrics import r2_score
+
+    from lpcstudy.analysis import qn_profile_block, qn_reading
+
+    d = _qn_synthetic(500, 200, 31)
+
+    def fit_predict(cols, rows, y, x_test):
+        model = HistGradientBoostingRegressor(
+            max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=20,
+            l2_regularization=1.0, early_stopping=False, random_state=5)
+        return model.fit(d["x_train"][rows][:, cols], y[rows]).predict(x_test[:, cols])
+
+    int_tr = (d["w_train"] > 0) & (d["w_train"] < 1)
+    int_te = (d["w_test"] > 0) & (d["w_test"] < 1)
+    logit_tr = np.log(np.where(int_tr, d["w_train"], 0.5) / (1 - np.where(int_tr, d["w_train"], 0.5)))
+    logit_te = np.log(np.where(int_te, d["w_test"], 0.5) / (1 - np.where(int_te, d["w_test"], 0.5)))
+    everyone = np.ones(500, bool)
+    ref = {}
+    for name, rows, y_tr, y_te, keep in (
+            ("logit_w_interior", int_tr, logit_tr, logit_te, int_te),
+            ("w_zero_indicator", everyone, (d["w_train"] == 0).astype(float),
+             (d["w_test"] == 0).astype(float), np.ones(200, bool)),
+            ("log_horizon", everyone, d["log_t_train"], d["log_t_test"], np.ones(200, bool))):
+        p3 = fit_predict([0, 1, 2], rows, y_tr, d["x_test"])
+        p4 = fit_predict([0, 1, 2, 3], rows, y_tr, d["x_test"])
+        ref[name] = (r2_score(y_te[keep], p3[keep]), r2_score(y_te[keep], p4[keep]),
+                     int(rows.sum()), int(keep.sum()), p3, p4)
+    out = qn_profile_block(d["x_train"], d["x_test"], d["w_train"], d["w_test"],
+                           d["log_t_train"], d["log_t_test"], seed=5, n_resamples=100, block=5,
+                           boot_seed=11)
+    for name, (r2_3, r2_4, n_train, n_test, p3, p4) in ref.items():
+        got = out[name]
+        assert abs(got["r2_three"] - r2_3) < 1e-12 and abs(got["r2_four"] - r2_4) < 1e-12
+        assert abs(got["delta_r2"] - (r2_4 - r2_3)) < 1e-12
+        assert got["n_train"] == n_train and got["n_test"] == n_test
+        assert got["ci"][0] <= got["delta_r2"] or got["n_failed_resamples"] > 0
+        assert ("reading" in got) == (name != "log_horizon")
+        if "reading" in got:
+            assert got["reading"] == qn_reading(*got["ci"]) and got["reason"] is None
+    outside = out["w_zero_indicator"]["n_pred_outside_unit"]
+    p3z, p4z = ref["w_zero_indicator"][4], ref["w_zero_indicator"][5]
+    assert outside["three"] == int(np.sum((p3z < 0) | (p3z > 1)))
+    assert outside["four"] == int(np.sum((p4z < 0) | (p4z > 1)))
+    n_model = HistGradientBoostingRegressor(
+        max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=20,
+        l2_regularization=1.0, early_stopping=False, random_state=5)
+    n_pred = n_model.fit(d["x_train"][:, :3], d["x_train"][:, 3]).predict(d["x_test"][:, :3])
+    assert abs(out["noise_sens_r2_from_three"] - r2_score(d["x_test"][:, 3], n_pred)) < 1e-12
+
+
+def test_qn_block_intervals_share_resamples_across_targets_and_profiles() -> None:
+    """The three intervals of one block come from the same index sets as an independent loop.
+
+    Reference: an independent loop over ``block_resample_indices`` (same integer seed) that
+    evaluates ``sklearn.metrics.r2_score`` differences on the resampled rows, with the interior
+    filter applied inside each resample, using predictions refitted in the test; the intervals
+    equal ``percentile_interval`` of those values. Tolerance 1e-10 (r2_score against the code's
+    sums; quantile interpolation of two values each about 1e-14 apart).
+    """
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    from sklearn.metrics import r2_score
+
+    from lpcstudy.analysis import qn_profile_block
+    from lpcstudy.statistics import block_resample_indices, percentile_interval
+
+    d = _qn_synthetic(400, 150, 32)
+
+    def predict(cols, rows, y):
+        model = HistGradientBoostingRegressor(
+            max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=20,
+            l2_regularization=1.0, early_stopping=False, random_state=5)
+        return model.fit(d["x_train"][rows][:, cols], y[rows]).predict(d["x_test"][:, cols])
+
+    int_tr = (d["w_train"] > 0) & (d["w_train"] < 1)
+    int_te = (d["w_test"] > 0) & (d["w_test"] < 1)
+    safe = lambda w, m: np.log(np.where(m, w, 0.5) / (1 - np.where(m, w, 0.5)))  # noqa: E731
+    y_logit_te = safe(d["w_test"], int_te)
+    p3 = predict([0, 1, 2], int_tr, safe(d["w_train"], int_tr))
+    p4 = predict([0, 1, 2, 3], int_tr, safe(d["w_train"], int_tr))
+    p3h = predict([0, 1, 2], np.ones(400, bool), d["log_t_train"])
+    p4h = predict([0, 1, 2, 3], np.ones(400, bool), d["log_t_train"])
+    ref_logit, ref_hor = [], []
+    for idx in block_resample_indices(150, 80, 5, 11):
+        sel = idx[int_te[idx]]
+        ref_logit.append(r2_score(y_logit_te[sel], p4[sel]) - r2_score(y_logit_te[sel], p3[sel]))
+        ref_hor.append(r2_score(d["log_t_test"][idx], p4h[idx])
+                       - r2_score(d["log_t_test"][idx], p3h[idx]))
+    out = qn_profile_block(d["x_train"], d["x_test"], d["w_train"], d["w_test"],
+                           d["log_t_train"], d["log_t_test"], seed=5, n_resamples=80, block=5,
+                           boot_seed=11)
+    for name, values in (("logit_w_interior", ref_logit), ("log_horizon", ref_hor)):
+        lo, hi, n_failed = percentile_interval(np.array(values), 0.95)
+        assert out[name]["n_failed_resamples"] == n_failed == 0
+        assert np.allclose(out[name]["ci"], [lo, hi], atol=1e-10, rtol=0)
+
+
+def test_qn_block_reading_needs_fifty_test_states_and_rejects_bad_input() -> None:
+    """With fewer than 50 test states in a domain the reading is "undetermined" with a reason (A3).
+
+    Reference: DEC-0008 A3 (a subset statistic needs at least 50 states) applied to the Q-N
+    reading, and the contract of the function. Tolerance: exact strings. Bad input raises.
+    """
+    import pytest
+
+    from lpcstudy.analysis import qn_profile_block
+
+    d = _qn_synthetic(300, 40, 33)
+    out = qn_profile_block(d["x_train"], d["x_test"], d["w_train"], d["w_test"],
+                           d["log_t_train"], d["log_t_test"], seed=5, n_resamples=20, block=5,
+                           boot_seed=1)
+    for name in ("logit_w_interior", "w_zero_indicator"):
+        assert out[name]["reading"] == "undetermined" and out[name]["reason"] == "n_states < 50"
+    kw = {"seed": 5, "n_resamples": 5, "block": 5, "boot_seed": 1}
+    with pytest.raises(ValueError):
+        qn_profile_block(d["x_train"][:, :3], d["x_test"], d["w_train"], d["w_test"],
+                         d["log_t_train"], d["log_t_test"], **kw)
+    with pytest.raises(ValueError):
+        qn_profile_block(d["x_train"], d["x_test"], d["w_train"] + 0.5, d["w_test"],
+                         d["log_t_train"], d["log_t_test"], **kw)
+    with pytest.raises(ValueError):
+        qn_profile_block(d["x_train"], d["x_test"], d["w_train"][:-1], d["w_test"],
+                         d["log_t_train"], d["log_t_test"], **kw)

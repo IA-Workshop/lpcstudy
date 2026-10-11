@@ -63,7 +63,7 @@ HYPOTHESIS_TABLE: tuple[Hypothesis, ...] = (
     Hypothesis(
         "Q-N", "Q-N", "Q-N", "estimate",
         "Out-of-sample gain in R² (ΔR²) for predicting logit w*, with exact (oracle) values; "
-        "pass if read by the table in §7", ("WU-0002.6",)),
+        "pass if read by the table in §7"),
     Hypothesis(
         "H2a", "H2a", "H2a", "primary",
         "(i) median range of w* over 1, 2, 4 LT in the small-error regime; (ii) partial "

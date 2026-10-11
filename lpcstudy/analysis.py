@@ -15,6 +15,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.stats import rankdata
+from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.tree import DecisionTreeRegressor
 
 from .allocation import deployable_profile
@@ -23,13 +24,12 @@ from .data import make_rng, sklearn_seed
 from .identifiers import check_keys
 from .oracle import characteristic_horizon, curvature, hybrid_mse, oracle_weight
 from .pipeline import Cell, FittedRules, RuleScores
-from .statistics import block_bootstrap, bootstrap_values, combine_verdicts, criterion_verdict, \
-    holm_adjust, kaplan_meier, logrank_test, ols_slope, partial_correlation, percentile_interval, \
-    spearman
+from .statistics import MIN_STATES, block_bootstrap, bootstrap_values, combine_verdicts, \
+    criterion_verdict, holm_adjust, kaplan_meier, logrank_test, ols_slope, partial_correlation, \
+    percentile_interval, spearman
 
 PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
 PROFILE_NAMES = ("log_eps_tilde", "log_nu_tilde", "lambda_tilde", "log_noise_sens")
-REDUNDANCY_MARGIN = 0.01
 
 
 def _boot(config: StudyConfig, stat, n_items: int, level: float = 0.95, salt: int = 0
@@ -313,21 +313,239 @@ def _oracle_profile(cell: Cell, split: str, config: StudyConfig) -> np.ndarray:
                             np.log(m.noise_sens + NOISE_SENS_FLOOR)])
 
 
+QN_SMALL = 0.05
+"""Upper bound separating a small from a substantial gain in the Q-N reading (v3 section 7)."""
+
+
+def qn_regressor(seed: int) -> HistGradientBoostingRegressor:
+    """Gradient-boosted regressor of Q-N (Methods v2 M10 E3; DEC-0008 A4(c)).
+
+    ``l2_regularization=1.0`` is part of the design (A4(c)): it was in the pilot code and is
+    documented here. ``early_stopping=False`` is explicit; at 10^4 samples or fewer it is what
+    the default ``'auto'`` does, so no earlier result changes. The scikit-learn seed is
+    ``sklearn_seed(seed, "qn-regressor")`` (DEF-0010).
+
+    Parameters
+    ----------
+    seed : int
+        Master seed (``config.seed``).
+
+    Returns
+    -------
+    HistGradientBoostingRegressor
+        Unfitted regressor.
+    """
+    return HistGradientBoostingRegressor(
+        max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=20,
+        l2_regularization=1.0, early_stopping=False,
+        random_state=sklearn_seed(seed, "qn-regressor"))
+
+
+def _r2(y: np.ndarray, pred: np.ndarray, idx: np.ndarray) -> float:
+    """``1 - SS_res / SS_tot`` of ``pred`` against ``y`` on the rows ``idx``; NaN if undefined."""
+    if idx.size == 0:
+        return float("nan")
+    total = np.sum((y[idx] - y[idx].mean()) ** 2)
+    if total == 0.0:
+        return float("nan")
+    return float(1.0 - np.sum((y[idx] - pred[idx]) ** 2) / total)
+
+
+def delta_r2(y: np.ndarray, pred_three: np.ndarray, pred_four: np.ndarray,
+             idx: np.ndarray) -> float:
+    """Out-of-sample gain ``R^2(F4) - R^2(F3)`` on the rows ``idx`` (Q-N).
+
+    Each ``R^2`` is ``1 - SS_res / SS_tot`` with ``SS_tot`` about the mean of ``y[idx]``, so a
+    resample with repeated rows is handled by passing the resampled ``idx``. NaN if the rows
+    are empty or ``y`` is constant on them (the bootstrap then counts a failed resample).
+
+    Parameters
+    ----------
+    y : np.ndarray
+        Target ``(n,)``.
+    pred_three, pred_four : np.ndarray
+        Predictions of the three- and four-coordinate models ``(n,)``.
+    idx : np.ndarray
+        Row indices (repeats allowed).
+
+    Returns
+    -------
+    float
+        ``R^2(F4) - R^2(F3)``.
+    """
+    return _r2(y, pred_four, idx) - _r2(y, pred_three, idx)
+
+
+def qn_reading(lower: float, upper: float) -> str:
+    """Reading of a Q-N interval for ``Delta R^2`` by the table of v3 section 7.
+
+    Unrounded float64 bounds are compared.
+
+    * upper bound < 0.05 and lower bound <= 0: ``"reduces"`` (N reduces to the other three);
+    * lower bound > 0 and upper bound < 0.05: ``"distinct but small"``;
+    * lower bound > 0 and upper bound >= 0.05: ``"substantial"``;
+    * otherwise (including a NaN bound): ``"undetermined"``.
+
+    Parameters
+    ----------
+    lower, upper : float
+        Interval bounds.
+
+    Returns
+    -------
+    str
+        One of the four readings.
+    """
+    if np.isnan(lower) or np.isnan(upper):
+        return "undetermined"
+    if upper < QN_SMALL and lower <= 0.0:
+        return "reduces"
+    if lower > 0.0 and upper < QN_SMALL:
+        return "distinct but small"
+    if lower > 0.0 and upper >= QN_SMALL:
+        return "substantial"
+    return "undetermined"
+
+
+def _qn_reading_reason(lower: float, upper: float, n_test: int) -> tuple[str, str | None]:
+    """Reading and the reason it is "undetermined" for a cause other than the table (A3)."""
+    if n_test < MIN_STATES:
+        return "undetermined", f"n_states < {MIN_STATES}"
+    reading = qn_reading(lower, upper)
+    if np.isnan(lower) or np.isnan(upper):
+        return reading, "not computable"
+    if np.isinf(lower) or np.isinf(upper):
+        return reading, "failed resamples >= threshold"
+    return reading, None
+
+
+def qn_profile_block(x_train: np.ndarray, x_test: np.ndarray, w_train: np.ndarray,
+                     w_test: np.ndarray, log_t_train: np.ndarray, log_t_test: np.ndarray, *,
+                     seed: int, n_resamples: int, block: int, boot_seed: int | np.random.Generator,
+                     level: float = 0.95) -> dict:
+    """Q-N for one profile: ``Delta R^2`` of F4 against F3 for three targets (DEC-0008 A4(a)).
+
+    F3 is the first three coordinates of the profile, F4 all four. Targets, each fitted by
+    ``qn_regressor`` under squared loss:
+
+    * ``logit_w_interior``: ``logit w*`` trained on the interior states (``0 < w* < 1``) of the
+      training splits, evaluated on the interior test states;
+    * ``w_zero_indicator``: ``1{w* = 0}`` on all states, so ``R^2`` is the Brier skill score;
+      predictions outside ``[0, 1]`` are not clipped, only counted;
+    * ``log_horizon``: the log state horizon on all states, reported without a reading (D-04).
+
+    The three intervals come from one bootstrap (one vector statistic), so they share the
+    resample index sets; the interior filter is applied inside each resample over all test
+    states in time order. A non-finite resample is failed and counted (A3). The intervals
+    resample test states with the fitted models held fixed, so they omit training variability
+    (v3 and Methods v2 E3). Passing the same integer ``boot_seed`` for several profiles shares
+    their resamples. The reading of the first two targets is ``qn_reading`` of the interval, or
+    "undetermined" with a reason if fewer than 50 test states are in the domain.
+
+    Parameters
+    ----------
+    x_train, x_test : np.ndarray
+        Profiles ``(n, 4)`` of the training (construction plus calibration) and test splits.
+    w_train, w_test : np.ndarray
+        Oracle weights ``w*(H_ref)`` in ``[0, 1]``.
+    log_t_train, log_t_test : np.ndarray
+        Log state horizons.
+    seed : int
+        Master seed for ``qn_regressor``.
+    n_resamples, block : int
+        Bootstrap resamples and block length.
+    boot_seed : int or np.random.Generator
+        Randomness of the resample indices.
+    level : float, optional
+        Confidence level (95%: Q-N is an estimate, v3 section 7).
+
+    Returns
+    -------
+    dict
+        ``logit_w_interior``, ``w_zero_indicator`` and ``log_horizon`` (each ``r2_three``,
+        ``r2_four``, ``delta_r2``, ``ci``, ``n_failed_resamples``, ``n_train``, ``n_test``; the
+        first two also ``reading`` and ``reason``; the indicator also ``n_pred_outside_unit``),
+        and ``noise_sens_r2_from_three`` (how well N is predicted from the other three).
+
+    Raises
+    ------
+    ValueError
+        If the profiles do not have four columns, lengths disagree, or ``w*`` leaves ``[0, 1]``.
+    """
+    if x_train.shape[1] != 4 or x_test.shape[1] != 4:
+        raise ValueError("profiles need four columns")
+    if not (len(x_train) == len(w_train) == len(log_t_train)
+            and len(x_test) == len(w_test) == len(log_t_test)):
+        raise ValueError("profile, weight and horizon lengths disagree")
+    for weight in (w_train, w_test):
+        if not np.all(np.isfinite(weight)) or weight.min() < 0.0 or weight.max() > 1.0:
+            raise ValueError("w* must be finite and inside [0, 1]")
+
+    def logit_of(weight: np.ndarray, rows: np.ndarray) -> np.ndarray:
+        inner = np.where(rows, weight, 0.5)  # placeholder outside the interior, never read
+        return np.log(inner / (1.0 - inner))
+
+    interior_train = (w_train > 0.0) & (w_train < 1.0)
+    interior_test = (w_test > 0.0) & (w_test < 1.0)
+    everywhere_train = np.ones(len(w_train), bool)
+    everywhere_test = np.ones(len(w_test), bool)
+    targets = {
+        "logit_w_interior": (interior_train, logit_of(w_train, interior_train),
+                             interior_test, logit_of(w_test, interior_test)),
+        "w_zero_indicator": (everywhere_train, (w_train == 0.0).astype(float),
+                             everywhere_test, (w_test == 0.0).astype(float)),
+        "log_horizon": (everywhere_train, log_t_train, everywhere_test, log_t_test),
+    }
+    names = list(targets)
+    pred3, pred4 = {}, {}
+    for name, (rows_train, y_train, _, _) in targets.items():
+        pred3[name] = qn_regressor(seed).fit(x_train[rows_train][:, :3],
+                                             y_train[rows_train]).predict(x_test[:, :3])
+        pred4[name] = qn_regressor(seed).fit(x_train[rows_train],
+                                             y_train[rows_train]).predict(x_test)
+
+    def stat(idx: np.ndarray) -> np.ndarray:
+        out = []
+        for name in names:
+            _, _, rows_test, y_test = targets[name]
+            out.append(delta_r2(y_test, pred3[name], pred4[name], idx[rows_test[idx]]))
+        return np.array(out)
+
+    point, values = bootstrap_values(stat, len(w_test), n_resamples, block, boot_seed)
+    out: dict = {}
+    for col, name in enumerate(names):
+        rows_train, _, rows_test, y_test = targets[name]
+        full = np.flatnonzero(rows_test)
+        interval, n_failed = _interval_block(values[:, col], level)
+        entry = {"r2_three": _r2(y_test, pred3[name], full),
+                 "r2_four": _r2(y_test, pred4[name], full),
+                 "delta_r2": float(point[col]), "ci": interval,
+                 "n_failed_resamples": n_failed, "n_train": int(rows_train.sum()),
+                 "n_test": int(rows_test.sum())}
+        if name != "log_horizon":
+            entry["reading"], entry["reason"] = _qn_reading_reason(
+                interval[0], interval[1], entry["n_test"])
+        if name == "w_zero_indicator":
+            entry["n_pred_outside_unit"] = {
+                "three": int(np.sum((pred3[name] < 0.0) | (pred3[name] > 1.0))),
+                "four": int(np.sum((pred4[name] < 0.0) | (pred4[name] > 1.0)))}
+        out[name] = entry
+    n_pred = qn_regressor(seed).fit(x_train[:, :3], x_train[:, 3]).predict(x_test[:, :3])
+    out["noise_sens_r2_from_three"] = _r2(x_test[:, 3], n_pred, np.arange(len(x_test)))
+    return out
+
+
 def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
     """Q-N: is the fourth LPC (noise sensitivity) reducible to the other three?
 
-    Nested out-of-sample comparison. Gradient-boosted regressors are trained on
-    the construction and calibration states with the first three profile
-    coordinates (F3) or all four (F4), for two targets: ``logit w*(H_ref)`` and the
-    log state horizon. The statistic is ``Delta R^2 = R^2(F4) - R^2(F3)`` on the
-    test states, with a block-bootstrap interval. Pre-registered reading (margin
-    0.01):
-
-    * ``redundant`` (FW Remark 1 prediction; pass): both upper bounds < margin;
-    * ``adds information``: either lower bound > margin;
-    * ``inconclusive``: otherwise.
-
-    Run on the deployable profile (primary) and on the oracle profile.
+    An estimate, not a pass/fail criterion (v3 section 7; DEC-0008 A4(a)). Nested out-of-sample
+    comparison on the construction plus calibration states (training) and the test states, for
+    the oracle profile (primary) and the deployable profile (secondary): see
+    ``qn_profile_block`` for the three targets (interior logit of ``w*``, the indicator
+    ``1{w* = 0}``, the log horizon), the intervals and the readings. The resamples are shared
+    across targets and across the two profiles (one integer seed, ``config.seed + 11``: the
+    salt of the earlier bootstrap, kept so that the log-horizon interval is unchanged,
+    DEC-0012). The counts of ``w* = 0`` and ``w* = 1`` over the test states are reported.
 
     Parameters
     ----------
@@ -341,21 +559,18 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> 
     Returns
     -------
     dict
-        R^2 values, Delta R^2 with intervals, verdicts, and how well N is
-        predicted from the other three coordinates.
+        ``role`` ("estimate"), ``primary`` ("oracle"), ``n_w_zero``, ``n_w_one``, ``n_test``,
+        and the blocks ``oracle`` and ``deployable`` of ``qn_profile_block``.
     """
-    from sklearn.ensemble import HistGradientBoostingRegressor
-
     from .allocation import state_horizon_target
 
     col = config.reference_horizon - 1
     lt = config.steps_per_lyapunov
 
-    def targets(split: str) -> dict[str, np.ndarray]:
+    def targets(split: str) -> tuple[np.ndarray, np.ndarray]:
         m = cell.splits[split].moments
-        w = np.clip(oracle_weight(m)[:, col], 0.01, 0.99)
         t = state_horizon_target(m, cell.noise, config.primary_threshold)
-        return {"logit_w": np.log(w / (1 - w)), "log_horizon": np.log(t)}
+        return oracle_weight(m)[:, col], np.log(t)
 
     def profiles(kind: str, split: str) -> np.ndarray:
         if kind == "oracle":
@@ -363,51 +578,25 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> 
         ev = cell.splits[split].evals
         return deployable_profile(ev, rules.proxies, cell.noise, lt)[:, 0, :]
 
-    def model() -> HistGradientBoostingRegressor:
-        return HistGradientBoostingRegressor(max_iter=300, learning_rate=0.05,
-                                             max_leaf_nodes=15, min_samples_leaf=20,
-                                             l2_regularization=1.0,
-                                             random_state=sklearn_seed(config.seed,
-                                                                       "qn-regressor"))
-
-    def r2(y: np.ndarray, pred: np.ndarray, idx: np.ndarray) -> float:
-        resid = np.sum((y[idx] - pred[idx]) ** 2)
-        total = np.sum((y[idx] - y[idx].mean()) ** 2)
-        return float(1.0 - resid / total)
-
     train_splits = ("construction", "calibration")
-    y_train = {k: np.concatenate([targets(s)[k] for s in train_splits])
-               for k in ("logit_w", "log_horizon")}
-    y_test = targets("test")
-    out: dict = {"margin": REDUNDANCY_MARGIN}
-    for kind in ("deployable", "oracle"):
+    pairs = [targets(s) for s in train_splits]
+    w_train = np.concatenate([w for w, _ in pairs])
+    log_t_train = np.concatenate([t for _, t in pairs])
+    w_test, log_t_test = targets("test")
+    out: dict = {"role": "estimate", "primary": "oracle",
+                 "n_w_zero": int(np.sum(w_test == 0.0)), "n_w_one": int(np.sum(w_test == 1.0)),
+                 "n_test": int(len(w_test))}
+    for kind in ("oracle", "deployable"):
         x_train = np.concatenate([profiles(kind, s) for s in train_splits])
-        x_test = profiles(kind, "test")
-        res_kind: dict = {}
-        verdicts = []
-        for name in ("logit_w", "log_horizon"):
-            pred3 = model().fit(x_train[:, :3], y_train[name]).predict(x_test[:, :3])
-            pred4 = model().fit(x_train, y_train[name]).predict(x_test)
-            y = y_test[name]
-            stat = lambda idx: r2(y, pred4, idx) - r2(y, pred3, idx)
-            est, lo, hi = _boot(config, stat, len(y), salt=11)
-            full = np.arange(len(y))
-            res_kind[name] = {"r2_three": r2(y, pred3, full), "r2_four": r2(y, pred4, full),
-                              "delta_r2": est, "ci": [lo, hi]}
-            verdicts.append((lo, hi))
-        if all(hi < REDUNDANCY_MARGIN for _, hi in verdicts):
-            verdict = "redundant"
-        elif any(lo > REDUNDANCY_MARGIN for lo, _ in verdicts):
-            verdict = "adds information"
-        else:
-            verdict = "inconclusive"
-        n_pred = model().fit(x_train[:, :3], x_train[:, 3]).predict(x_test[:, :3])
-        res_kind["noise_sens_r2_from_three"] = r2(x_test[:, 3], n_pred, np.arange(len(x_test)))
-        res_kind["verdict"] = verdict
-        out[kind] = res_kind
-    out["threshold"] = ("redundant if Delta R^2 upper bound < 0.01 for both targets "
-                        "(deployable profile)")
-    out["pass"] = bool(out["deployable"]["verdict"] == "redundant")
+        out[kind] = qn_profile_block(
+            x_train, profiles(kind, "test"), w_train, w_test, log_t_train, log_t_test,
+            seed=config.seed, n_resamples=config.bootstrap_resamples,
+            block=config.bootstrap_block, boot_seed=config.seed + 11)
+    out["threshold"] = ("estimate, no pass/fail: reading of the oracle Delta R^2 interval for "
+                        "the interior logit and for 1{w*=0} by the table of v3 section 7 "
+                        "(upper bound < 0.05 and lower bound <= 0: reduces; lower bound > 0 "
+                        "and upper bound < 0.05: distinct but small; lower bound > 0 and upper "
+                        "bound >= 0.05: substantial; otherwise undetermined)")
     return out
 
 

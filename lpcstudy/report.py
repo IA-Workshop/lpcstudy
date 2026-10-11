@@ -52,6 +52,11 @@ VALIDATION_CRITERIA = {
 }
 
 
+def _qn_primary_reading(res: dict) -> str:
+    """Reading of the primary profile's interior-logit interval of a Q-N result (v3 section 7)."""
+    return res[res["primary"]]["logit_w_interior"]["reading"]
+
+
 def verdicts(results: dict, config: StudyConfig) -> dict:
     """Aggregate per-system pass flags into supported / partial / not supported.
 
@@ -87,6 +92,11 @@ def verdicts(results: dict, config: StudyConfig) -> dict:
     for row in HYPOTHESIS_TABLE:
         if not any(row.key in results["systems"][s] for s in systems):
             continue  # no result yet (v3 H2e until WU-0002.7); write_markdown lists the row
+        if row.role == "estimate":  # Q-N: an estimate is read, not passed (v3 section 7)
+            readings = {s: _qn_primary_reading(results["systems"][s][row.key])
+                        for s in systems}
+            out[row.key] = {"by_system": readings, "verdict": "estimate (read, no pass/fail)"}
+            continue
         flags = {s: bool(results["systems"][s][row.key]["pass"]) for s in systems}
         n_pass = sum(flags.values())
         verdict = ("supported" if flags and n_pass == len(flags) else
@@ -118,12 +128,18 @@ def _key_number(key: str, res: dict) -> str:
             return f"eps {_fmt(s['analog_seed'], 2)}, delta {_fmt(s['estimation_seed'], 2)}, " \
                    f"Lambda {_fmt(s['growth'], 2)}, N {_fmt(s['noise_sensitivity'], 2)}"
         case "Q-N":
-            d = r["deployable"]
-            return f"{d['verdict']}: dR2 w {_fmt(d['logit_w']['delta_r2'], 2)} " \
-                   f"[{_fmt(d['logit_w']['ci'][0], 2)}, {_fmt(d['logit_w']['ci'][1], 2)}], " \
-                   f"T {_fmt(d['log_horizon']['delta_r2'], 2)} " \
-                   f"[{_fmt(d['log_horizon']['ci'][0], 2)}, {_fmt(d['log_horizon']['ci'][1], 2)}]; " \
-                   f"oracle: {r['oracle']['verdict']}"
+            def block(profile: str, target: str) -> str:
+                d = r[profile][target]
+                return (f"{d['reading']} (dR2 {_fmt(d['delta_r2'], 2)} "
+                        f"[{_fmt(d['ci'][0], 2)}, {_fmt(d['ci'][1], 2)}])" if "reading" in d else
+                        f"dR2 {_fmt(d['delta_r2'], 2)} "
+                        f"[{_fmt(d['ci'][0], 2)}, {_fmt(d['ci'][1], 2)}]")
+            return (f"{r['primary']}: interior {block(r['primary'], 'logit_w_interior')}, "
+                    f"w*=0 {block(r['primary'], 'w_zero_indicator')}, "
+                    f"log T {block(r['primary'], 'log_horizon')}; "
+                    f"deployable interior {r['deployable']['logit_w_interior']['reading']}, "
+                    f"w*=0 {r['deployable']['w_zero_indicator']['reading']} "
+                    f"(w*=0: {r['n_w_zero']}, w*=1: {r['n_w_one']})")
         case "H2a":
             two = r["part_ii"]
             return f"(i) {r['part_i_verdict']}: range {_fmt(r['median_range'])} " \
@@ -252,6 +268,10 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
             continue
         cells = []
         for s in systems:
+            if row.role == "estimate":
+                cells.append(f"{ver[row.key]['by_system'][s]}: "
+                             f"{_key_number(row.key, results['systems'][s])}")
+                continue
             flag = "PASS" if ver[row.key]["by_system"][s] else "FAIL"
             cells.append(f"{flag}: {_key_number(row.key, results['systems'][s])}")
         lines.append(f"| {row.v3_id} | {HYPOTHESES[row.key]} | " + " | ".join(cells)
