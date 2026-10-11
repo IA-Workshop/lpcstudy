@@ -210,3 +210,16 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0002.4 to .8, .9, .11; the shared helper semantics for the verdict logic. Marked "needs owner review before freeze" (statistics and verdict code).
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0013: WU-0002.3: the horizon of the K rule, and the two-stage grid in check (b)  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the WU-0002.3 review; for owner confirmation)
+
+**Decision.** Two points of WU-0002.3 are **open questions for the owner** that DEC-0008 does not answer (the developer's log wrongly said the first was answered by DEC-0008 A5; the reviewer caught it; the log is corrected):
+
+- *Horizon of the K rule.* DEC-0008 A5 fixes the quantity (calibration excess MSE within 5% of the minimum, tie inside) but neither v3 §5 nor Methods v2 §M7 names the horizon at which the excess is evaluated. The implementation evaluates it at the reference horizon H_ref (30 steps = 1 LT), as the code did before, locating the column by `horizons == reference_horizon`. Proposal: confirm H_ref, and have the owner state the horizon in v3 §5 (the amendments document lists it).
+- *Check (b) of the ROADMAP row.* The row says the regime weight is checked against a brute-force minimizer "on the same grid" within 1e-6; one 10^4-point grid locates the minimizer only to about 5e-5, so the check cannot pass as worded. The unit uses a two-stage grid (a second grid of 10^4 points around the first minimum) with the 1e-6 tolerance kept, which the applied-mathematician approved as a strengthening of the check's form, not a loosening. Proposal: confirm, and amend the ROADMAP wording (amendments document, section 1).
+
+**Alternatives weighed.** *Evaluate the K rule at every horizon and take the maximum:* not in either document and a different rule; rejected. *Keep the single grid and loosen the tolerance:* rejected (PRIME.2).
+
+**Affects:** WU-0002.3 (merged to `develop` with these two points flagged); the K choice in every run. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
