@@ -223,3 +223,5 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0002.3 (merged to `develop` with these two points flagged); the K choice in every run. Marked "needs owner review before freeze".
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+- 2026-10-11 (claude-sonnet-5-5, main session; status of DEC-0010 itself is still **proposed**): update to DEC-0010 after the researcher's re-read of the Chua memo (`docs/agent/notes/2026-10-10-research-lyapunov.md`, 'Chua memo re-read'). The memo's quoted mu3 and sum of exponents are internally inconsistent with its own Jacobian, so they are NOT used. The memo case enters WU-0007.2 for **lambda_max only**: reference 0.23 per circuit time divided by 0.7 = 0.3286 per dimensionless time (conversion tau = 0.7 t confirmed from the memo's parameters and equation (1.3); a weak second source states 0.33), tolerance 10% (the mathematician's computation: combined sigma about 3.9%), with the orbit-boundedness guard (DEF-0015). Chua at the study's own parameters (alpha = 15.6, beta = 28) remains `not found`: a recorded known limitation.
