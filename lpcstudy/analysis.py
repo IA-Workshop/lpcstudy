@@ -220,9 +220,11 @@ def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
     Implements DEC-0008 A4(h), A5, A1 and A3. At each noise level the fit is to the *median*
     over states of the squared analog seed error at each library size (heavy-tail robust). The
     reference ``1/d_LB`` is the mean over states of ``S / (k - 1)``
-    (:func:`lpcstudy.oracle.inverse_dimension`; the median would be biased by 3.7%). The
-    statistic is the ratio ``(1/d_fit)/(1/d_LB)``; its 95% moving-block-bootstrap interval is
-    joint: one resampled state set per resample feeds the numerator and the denominator. Pass at
+    (:func:`lpcstudy.oracle.inverse_dimension`, exactly unbiased for ``1/d``; the median of
+    ``S / (k - 1)`` would be biased by -1.7%, and the v1 reference ``1 / median(local_dim)``
+    by +3.7%). The statistic is the ratio ``(1/d_fit)/(1/d_LB)``; its 95% moving-block-bootstrap
+    interval is joint: one resampled state set per resample feeds the numerator and the
+    denominator. Pass at
     a noise level iff the interval lies in the closed band [0.75, 1.25]; fail iff it misses the
     band; otherwise inconclusive. The whole passes iff every noise level passes (v3 section 7).
     The floor ``f`` is reported only (the v1 condition "floor increasing in rho" is removed).
@@ -325,6 +327,9 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     lie in the closed band [0.8, 1.2] (pass), miss it (fail), or else the verdict is
     inconclusive (DEC-0008 A1, A3). The CP slope and interval are reported with no verdict
     (the CP regression is contaminated by the copied observation noise and is a diagnostic).
+    States whose regression pair (``x``, ``y``) is not finite are excluded from that regression
+    and counted (``n_excluded_nonfinite``; DEC-0008 A3); the PLP verdict applies the minimum of
+    50 states after exclusion, and a CP exclusion never shrinks the PLP regression.
     The bootstrap seed is the integer ``config.seed`` as before, so slopes and intervals are
     those of the earlier code when no resample fails; failed resamples of the PLP slope are
     counted (``PLP.n_failed_resamples``) and placed at the unfavourable tail. The CP interval
@@ -341,7 +346,8 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     -------
     dict
         ``CP`` (``slope``, ``ci``), ``PLP`` (``slope``, ``ci``, ``n_failed_resamples``),
-        ``threshold`` [0.8, 1.2], ``n_states``, ``verdict``, ``reason`` and ``pass``.
+        ``threshold`` [0.8, 1.2], ``n_states`` and ``n_excluded_nonfinite`` (of the PLP
+        regression), ``verdict``, ``reason`` and ``pass``.
     """
     m = cell.splits["test"].moments
     o = cell.oracles["test"]
@@ -352,21 +358,32 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     res: dict = {}
     for name, seed, sq, floor in (("CP", m.analog_seed, m.sq_cp[:, col], copied),
                                   ("PLP", m.est_seed, m.sq_plp[:, col], 0.0)):
-        x = np.log(gain * seed / np.sqrt(dim))
-        y = 0.5 * np.log(np.maximum(sq - floor, 1e-12))
+        x_all = np.log(gain * seed / np.sqrt(dim))
+        y_all = 0.5 * np.log(np.maximum(sq - floor, 1e-12))
+        keep = np.isfinite(x_all) & np.isfinite(y_all)  # excluded and counted (DEC-0008 A3)
+        x, y = x_all[keep], y_all[keep]
+        n_excluded = int(len(x_all) - len(x))
         stat = lambda idx: ols_slope(x[idx], y[idx])
-        if name == "CP":
+        if len(x) == 0:
+            est = lo = hi = float("nan")
+            n_failed = 0
+        elif name == "CP":
             est, lo, hi = _boot(config, stat, len(x))
-            res[name] = {"slope": est, "ci": [lo, hi]}
+            n_failed = 0
         else:
             interval = block_bootstrap_counted(stat, len(x), config.bootstrap_resamples,
                                                config.bootstrap_block, config.seed, H1_LEVEL)
-            res[name] = {"slope": interval.estimate, "ci": [interval.lower, interval.upper],
-                         "n_failed_resamples": interval.n_failed}
+            est, lo, hi, n_failed = interval.estimate, interval.lower, interval.upper, \
+                interval.n_failed
+        res[name] = {"slope": est, "ci": [lo, hi], "n_excluded_nonfinite": n_excluded}
+        if name == "PLP":
+            res[name]["n_failed_resamples"] = int(n_failed)
+            n_states = int(len(x))
     verdict, reason = criterion_verdict(res["PLP"]["slope"], *res["PLP"]["ci"], H1B_BAND,
-                                        n_states=len(x))
-    res.update({"threshold": list(H1B_BAND), "n_states": int(len(x)), "verdict": verdict,
-                "reason": reason, "pass": bool(verdict == "pass")})
+                                        n_states=n_states)
+    res.update({"threshold": list(H1B_BAND), "n_states": n_states,
+                "n_excluded_nonfinite": res["PLP"]["n_excluded_nonfinite"],
+                "verdict": verdict, "reason": reason, "pass": bool(verdict == "pass")})
     return res
 
 

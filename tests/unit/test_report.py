@@ -135,10 +135,12 @@ def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
         "H1a": {"by_noise": {"0.01": {"fitted_inverse_dim": 0.5, "ratio": 1.02,
                                       "ratio_ci": [0.9, 1.1], "verdict": "pass"}},
                 "inverse_dim_reference": 0.5},
-        "H1b": {"CP": {"slope": 1.0}, "PLP": {"slope": 0.9}},
+        "H1b": {"CP": {"slope": 1.0}, "PLP": {"slope": 0.9, "ci": [0.85, 0.95]},
+                "verdict": "pass", "reason": None},
         "H1c": {"PLP": {"median_ratio": 1.0}, "CP": {"median_ratio": 0.5}},
         "H1d": {"rows": {"analog_seed": {"spearman": 0.8}, "estimation_seed": {"spearman": 0.9},
-                         "growth": {"spearman": 0.7}, "nhat": {"spearman": 0.6}}},
+                         "growth": {"spearman": 0.7}, "nhat": {"spearman": 0.6}},
+                "verdict": "pass", "reason": None},
         "Q-N": {"deployable": {"verdict": "redundant", "logit_w": {"delta_r2": 0.01,
                                                                     "ci": [0.0, 0.02]},
                                "log_horizon": {"delta_r2": 0.02, "ci": [0.01, 0.03]}},
@@ -239,9 +241,9 @@ def test_key_numbers_are_exact_for_every_v3_key() -> None:
     system = fake_system(SMOKE)
     expected = {
         "H1a": "rho=0.01: 1/d (n_lib fit)=0.5, ratio 1.02 [0.9, 1.1] pass (1/d_LB=0.5)",
-        "H1b": "CP 1, PLP 0.9",
+        "H1b": "CP 1, PLP 0.9 [0.85, 0.95]: pass",
         "H1c": "PLP 1, CP 0.5",
-        "H1d": "eps 0.8, delta 0.9, Lambda 0.7, N 0.6",
+        "H1d": "eps 0.8, delta 0.9, Lambda 0.7, N 0.6: pass",
         "Q-N": "redundant: dR2 w 0.01 [0, 0.02], T 0.02 [0.01, 0.03]; oracle: adds information",
         "H2a": "range 0.05 (CI hi 0.08); partial r 0.02",
         "H2b": "rho rank corr 0.9; n_lib@0.01: w*(n_lib max)=0.8",
@@ -254,6 +256,31 @@ def test_key_numbers_are_exact_for_every_v3_key() -> None:
     }
     assert {key: _key_number(key, system) for key in expected} == expected
     assert set(expected) == {h.key for h in HYPOTHESIS_TABLE} - {"H2e"}
+
+
+def test_key_numbers_of_h1a_h1b_h1d_show_fail_and_inconclusive_with_the_reason() -> None:
+    """The H1 key numbers carry the three-valued verdict, and the reason when inconclusive (R1).
+
+    Reference: v3 section 7 (pass, fail and inconclusive are separate categories) and the
+    strings of the developer's review fix R1, written out by hand with the ``.3g`` rule of
+    ``_fmt``. An inconclusive row must not read as a fail: the H1b string for the smoke's
+    PLP slope 0.801 [0.744, 0.95] says "inconclusive (interval meets band edge)", an H1d with a
+    failing row says "fail", and an H1a rho with fewer than 50 states says "n_states < 50".
+    Exact string checks.
+    """
+    system = fake_system(SMOKE)
+    system["H1b"] = {"CP": {"slope": 1.51}, "PLP": {"slope": 0.801, "ci": [0.744, 0.95]},
+                     "verdict": "inconclusive", "reason": "interval meets band edge"}
+    system["H1d"] = dict(system["H1d"], verdict="fail", reason=None)
+    system["H1a"] = {"by_noise": {"0.01": {"fitted_inverse_dim": 0.5, "ratio": 1.0,
+                                           "ratio_ci": [0.9, 1.1], "verdict": "inconclusive",
+                                           "reason": "n_states < 50"}},
+                     "inverse_dim_reference": 0.5}
+    assert _key_number("H1b", system) == \
+        "CP 1.51, PLP 0.801 [0.744, 0.95]: inconclusive (interval meets band edge)"
+    assert _key_number("H1d", system) == "eps 0.8, delta 0.9, Lambda 0.7, N 0.6: fail"
+    assert _key_number("H1a", system) == ("rho=0.01: 1/d (n_lib fit)=0.5, ratio 1 [0.9, 1.1] "
+                                          "inconclusive (n_states < 50) (1/d_LB=0.5)")
 
 
 def test_library_figure_axis_reads_n_lib(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

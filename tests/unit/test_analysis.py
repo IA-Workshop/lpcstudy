@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import warnings
 from types import SimpleNamespace
 
 import numpy as np
@@ -437,8 +438,9 @@ def test_h1b_verdict_uses_the_plp_slope_only() -> None:
     inside [0.8, 1.2] (pass) or entirely above it (fail). The CP and PLP slopes agree with 1.6
     and 1.0 to 1e-12 (OLS on 100 values of order 10 after a ``log(sq - floor)`` round trip:
     relative error a few 1e-16 times the condition number of the design, below 1e-14; 1e-12
-    leaves two orders). The CP entry has only ``slope`` and ``ci``; the PLP entry adds
-    ``n_failed_resamples``; the top-level keys are the plan's. Exact verdicts.
+    leaves two orders). The CP entry has only ``slope``, ``ci`` and the exclusion count; the
+    PLP entry adds ``n_failed_resamples``; the top-level keys are the plan's plus the
+    exclusion count (fix R2). Exact verdicts.
     """
     from lpcstudy.analysis import h1b_seed_amplifier
 
@@ -447,10 +449,12 @@ def test_h1b_verdict_uses_the_plp_slope_only() -> None:
     assert ok["CP"]["slope"] == pytest.approx(1.6, abs=1e-12, rel=0)
     assert ok["PLP"]["slope"] == pytest.approx(1.0, abs=1e-12, rel=0)
     assert ok["verdict"] == "pass" and ok["pass"] is True and ok["reason"] is None
-    assert set(ok["CP"]) == {"slope", "ci"}
-    assert set(ok["PLP"]) == {"slope", "ci", "n_failed_resamples"} and \
+    assert set(ok["CP"]) == {"slope", "ci", "n_excluded_nonfinite"}
+    assert set(ok["PLP"]) == {"slope", "ci", "n_failed_resamples", "n_excluded_nonfinite"} and \
         ok["PLP"]["n_failed_resamples"] == 0
-    assert set(ok) == {"CP", "PLP", "threshold", "n_states", "verdict", "reason", "pass"}
+    assert set(ok) == {"CP", "PLP", "threshold", "n_states", "n_excluded_nonfinite", "verdict",
+                       "reason", "pass"}
+    assert ok["n_excluded_nonfinite"] == 0
     assert ok["threshold"] == [0.8, 1.2] and ok["n_states"] == 100
 
     swapped = h1b_seed_amplifier(_fake_h1b_cell(np.random.default_rng(21002), 100, 1.0, 1.6),
@@ -467,13 +471,13 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
     bootstrap, not evidence of correctness (T8 above is). On noisy data (log-scale noise 0.1) the
     CP interval equals ``block_bootstrap`` and the PLP interval equals it too, because no
     resample fails and ``block_bootstrap_counted`` is bitwise equal then. Edge cases (exact): a
-    NaN gain makes the PLP slope NaN, the verdict is "inconclusive" with reason "not computable"
-    and the failed resamples are counted: exactly those whose indices include the NaN state
-    (counted here by replaying the index draws of ``block_resample_indices`` with the same
-    seed); 40 states give "n_states < 50".
+    NaN gain state is excluded and counted (fix R2): the PLP slope and interval equal
+    ``block_bootstrap`` on the arrays with that state deleted; 50 remaining states are enough
+    and 49 give "n_states < 50"; a constant regressor gives a 0/0 slope, "not computable", and
+    every resample counted failed; 40 states give "n_states < 50".
     """
     from lpcstudy.analysis import h1b_seed_amplifier
-    from lpcstudy.statistics import block_bootstrap, block_resample_indices, ols_slope
+    from lpcstudy.statistics import block_bootstrap, ols_slope
 
     config = _config(100)
     cell = _fake_h1b_cell(np.random.default_rng(21003), 100, 1.1, 0.9, log_noise=0.1)
@@ -489,15 +493,41 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
         assert (out[name]["slope"], *out[name]["ci"]) == old
     assert out["PLP"]["n_failed_resamples"] == 0
 
-    broken = _fake_h1b_cell(np.random.default_rng(21004), 100, 1.0, 1.0)
+    # A non-finite gain removes that state from both regressions and counts it (R2, plan (g)).
+    broken = _fake_h1b_cell(np.random.default_rng(21004), 100, 1.0, 1.0, log_noise=0.1)
+    clean = _fake_h1b_cell(np.random.default_rng(21004), 100, 1.0, 1.0, log_noise=0.1)
     broken.oracles["test"].gains[3, :] = np.nan
     nan_out = h1b_seed_amplifier(broken, config)
-    assert nan_out["verdict"] == "inconclusive" and nan_out["reason"] == "not computable"
-    hit = sum(3 in idx for idx in block_resample_indices(
-        100, config.bootstrap_resamples, config.bootstrap_block, config.seed))
-    assert 0 < hit < config.bootstrap_resamples
-    assert nan_out["PLP"]["n_failed_resamples"] == hit
-    assert nan_out["pass"] is False
+    assert nan_out["n_excluded_nonfinite"] == 1 and nan_out["n_states"] == 99
+    assert nan_out["CP"]["n_excluded_nonfinite"] == 1
+    mp, gain_p = clean.splits["test"].moments, clean.oracles["test"].gains[:, 29]
+    keep = np.delete(np.arange(100), 3)
+    xp = np.log(gain_p * mp.est_seed / np.sqrt(3))[keep]
+    yp = 0.5 * np.log(mp.sq_plp[:, 0])[keep]
+    kept = block_bootstrap(lambda idx: ols_slope(xp[idx], yp[idx]), 99,
+                           config.bootstrap_resamples, config.bootstrap_block, config.seed)
+    assert (nan_out["PLP"]["slope"], *nan_out["PLP"]["ci"]) == kept
+    assert nan_out["PLP"]["n_failed_resamples"] == 0 and nan_out["reason"] != "not computable"
+
+    # Fifty remaining states are enough, 49 are not (MIN_STATES applies after exclusion).
+    for n_bad, reason in ((50, None), (51, "n_states < 50")):
+        few = _fake_h1b_cell(np.random.default_rng(21006), 100, 1.0, 1.0)
+        few.oracles["test"].gains[:n_bad, :] = np.nan
+        out = h1b_seed_amplifier(few, config)
+        assert out["n_states"] == 100 - n_bad and out["n_excluded_nonfinite"] == n_bad
+        assert (out["reason"] == "n_states < 50") == (reason is not None)
+
+    # Constant regressor (x = 0 exactly): the slope is 0/0, not computable; every resample
+    # fails and is counted.
+    flat = _fake_h1b_cell(np.random.default_rng(21007), 100, 1.0, 1.0)
+    flat.splits["test"].moments.est_seed = np.full(100, np.sqrt(3.0))  # x = ln(1) = 0 exactly
+    flat.oracles["test"].gains[:, :] = 1.0
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        flat_out = h1b_seed_amplifier(flat, config)
+    assert flat_out["verdict"] == "inconclusive" and flat_out["reason"] == "not computable"
+    assert flat_out["PLP"]["n_failed_resamples"] == config.bootstrap_resamples
+    assert flat_out["pass"] is False
 
     short = h1b_seed_amplifier(_fake_h1b_cell(np.random.default_rng(21005), 40, 1.0, 1.0), config)
     assert short["verdict"] == "inconclusive" and short["reason"] == "n_states < 50"

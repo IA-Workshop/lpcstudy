@@ -100,6 +100,12 @@ def _fmt(value: float, digits: int = 3) -> str:
         else f"{value:.{digits}g}"
 
 
+def _verdict_text(res: dict) -> str:
+    """The three-valued verdict of a result, with the reason when it is inconclusive."""
+    reason = f" ({res['reason']})" if res.get("reason") else ""
+    return f"{res['verdict']}{reason}"
+
+
 def _key_number(key: str, res: dict) -> str:
     """One-line numeric summary of a result (by its table key) for one system."""
     r = res[key]
@@ -107,18 +113,19 @@ def _key_number(key: str, res: dict) -> str:
         case "H1a":
             parts = [f"rho={k}: 1/d (n_lib fit)={_fmt(v['fitted_inverse_dim'])}, "
                      f"ratio {_fmt(v['ratio'])} [{_fmt(v['ratio_ci'][0])}, "
-                     f"{_fmt(v['ratio_ci'][1])}] {v['verdict']}"
+                     f"{_fmt(v['ratio_ci'][1])}] {_verdict_text(v)}"
                      for k, v in r["by_noise"].items()]
             return "; ".join(parts) + f" (1/d_LB={_fmt(r['inverse_dim_reference'])})"
         case "H1b":
-            return f"CP {_fmt(r['CP']['slope'])}, PLP {_fmt(r['PLP']['slope'])}"
+            return f"CP {_fmt(r['CP']['slope'])}, PLP {_fmt(r['PLP']['slope'])} " \
+                   f"[{_fmt(r['PLP']['ci'][0])}, {_fmt(r['PLP']['ci'][1])}]: {_verdict_text(r)}"
         case "H1c":
             return f"PLP {_fmt(r['PLP'].get('median_ratio', float('nan')))}, " \
                    f"CP {_fmt(r['CP'].get('median_ratio', float('nan')))}"
         case "H1d":
             s = {name: row["spearman"] for name, row in r["rows"].items()}
             return f"eps {_fmt(s['analog_seed'], 2)}, delta {_fmt(s['estimation_seed'], 2)}, " \
-                   f"Lambda {_fmt(s['growth'], 2)}, N {_fmt(s['nhat'], 2)}"
+                   f"Lambda {_fmt(s['growth'], 2)}, N {_fmt(s['nhat'], 2)}: {_verdict_text(r)}"
         case "Q-N":
             d = r["deployable"]
             return f"{d['verdict']}: dR2 w {_fmt(d['logit_w']['delta_r2'], 2)} " \
