@@ -28,7 +28,7 @@ from .ensemble import AnalogLibrary, EnsembleMoments, EvaluationDraws, ForecastS
     ensemble_moments, evaluation_draws
 from .estimation import StateEstimator
 from .networks import train_estimator
-from .oracle import StateOracles, curvature, oracle_weight, realized_horizon, \
+from .oracle import StateOracles, excess_mse, oracle_weight, realized_horizon, \
     state_oracles
 from .statistics import kaplan_meier
 from .systems import make_flow_step
@@ -416,7 +416,7 @@ class RuleScores:
     state_mse_ref : np.ndarray
         Per-state realized squared error at ``H_ref`` averaged over draws ``(n,)``.
     regret : np.ndarray
-        Mean ``c (w - w*)^2`` per horizon ``(nH,)``.
+        Mean exact excess error ``V(w) - V(w*)`` per horizon ``(nH,)`` (Theorem P1(a)).
     agreement : float
         Fraction of decisive states at ``H_ref`` where the rule weights the
         better forecaster more.
@@ -461,8 +461,6 @@ def score_rules(weights: dict[str, np.ndarray], split: SplitData, horizons: np.n
     """
     ev, moments = split.evals, split.moments
     ref = int(np.nonzero(horizons == config.reference_horizon)[0][0])
-    w_star = oracle_weight(moments)
-    curv = curvature(moments)
     decisive_ratio = np.sqrt(moments.sq_cp[:, ref] / np.maximum(moments.sq_plp[:, ref],
                                                                  1e-300))
     decisive = np.abs(np.log(decisive_ratio)) >= np.log(1.1)
@@ -473,7 +471,7 @@ def score_rules(weights: dict[str, np.ndarray], split: SplitData, horizons: np.n
     for name, w in weights.items():
         err = w * ev.cp_err + (1 - w) * ev.plp_err
         sq = err**2
-        regret = np.mean(curv[:, None, :] * (w - w_star[:, None, :]) ** 2, axis=(0, 1))
+        regret = np.mean(excess_mse(moments, w), axis=(0, 1))
         favours_cp = w[:, :, ref].mean(axis=1) > 0.5
         agreement = float(np.mean(favours_cp[decisive] == cp_better[decisive])) \
             if decisive.any() else float("nan")

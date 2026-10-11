@@ -9,7 +9,7 @@ A4o and A*.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 from scipy.optimize import least_squares, nnls
@@ -17,8 +17,8 @@ from sklearn.tree import DecisionTreeRegressor
 
 from .ensemble import EnsembleMoments, EvaluationDraws
 from .networks import TrainedNetwork, train_mlp
-from .oracle import characteristic_horizon, curvature, hybrid_mse, oracle_weight, \
-    realized_horizon
+from .oracle import characteristic_horizon, curvature, excess_mse, hybrid_mse, \
+    oracle_weight, realized_horizon
 from .statistics import kaplan_meier
 
 RULE_LABELS: dict[str, str] = {
@@ -396,13 +396,17 @@ def regime_regret(regime_map: RegimeMap, profile: np.ndarray, moments: EnsembleM
     Returns
     -------
     tuple[float, float]
-        Mean regret ``c (w_k - w*)^2`` and its ratio to the mean
-        ``min(E e_C^2, E e_P^2)``.
+        Mean exact excess error ``V(w_k) - V(w*)`` (Theorem P1(a); it equals
+        ``c (w_k - w*)^2`` only for states with ``w*`` unclipped) and its ratio to
+        the mean ``min(E e_C^2, E e_P^2)``.
     """
     regime = regime_map.assign(profile)
     w_k = regime_map.weights[regime, column]  # (n, E)
-    w_star = oracle_weight(moments)[:, column][:, None]
-    curv = curvature(moments)[:, column][:, None]
-    regret = float(np.mean(curv * (w_k - w_star) ** 2))
+    # Only the three second moments enter ``excess_mse``; slice them to one column.
+    one_column = replace(moments, horizons=moments.horizons[column:column + 1],
+                         sq_cp=moments.sq_cp[:, column:column + 1],
+                         sq_plp=moments.sq_plp[:, column:column + 1],
+                         cross=moments.cross[:, column:column + 1])
+    regret = float(np.mean(excess_mse(one_column, w_k[:, :, None])))
     best = float(np.mean(np.minimum(moments.sq_cp[:, column], moments.sq_plp[:, column])))
     return regret, regret / best
