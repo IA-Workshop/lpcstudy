@@ -636,6 +636,28 @@ def test_when_condition_of_the_calibration_choice() -> None:
     assert status("A1", True)["systems/lorenz63/H2c/A4_minus_A1/mean"] == "equal"
 
 
+def test_r3_when_condition_also_skips_a_present_leaf() -> None:
+    """R3: ``H2c/pass`` is always present; if the new best single is not A1 it is a different
+    quantity (A4 - A2 with A4 - A0) and is skipped, not compared with v1's."""
+    old = {"systems": {"lorenz63": {"H2c": {"best_single": "A1", "pass": True}}}}
+    new = {"systems": {"lorenz63": {"H2c": {"best_single": "A0", "pass": False}}}}
+    status = {cp.show(r.path): r.status for r in sides(old, new)[2]}
+    assert status["systems/lorenz63/H2c/pass"] == "skipped"
+    new["systems"]["lorenz63"]["H2c"]["best_single"] = "A1"
+    status = {cp.show(r.path): r.status for r in sides(old, new)[2]}
+    assert status["systems/lorenz63/H2c/pass"] == "FAIL-differs"
+
+
+def test_r4_relative_has_no_interval_of_its_own() -> None:
+    """R4: the ci of an H2c comparison brackets ``mean`` (MSE units), not ``relative``."""
+    def rule(text: str):
+        return cp.TABLE.classify(p(text))
+
+    for other in ("A2", "A1"):
+        assert rule(f"systems/lorenz63/H2c/A4_minus_{other}/mean").interval == "ci"
+        assert rule(f"systems/lorenz63/H2c/A4_minus_{other}/relative").interval == ""
+
+
 def test_timing_is_not_compared() -> None:
     """``seconds`` leaves are wall-clock: any two values, or one side only."""
     res = cp.compare_leaves({p("seconds"): 1.0, p("systems/lorenz63/seconds"): 5.0},
@@ -750,29 +772,58 @@ def test_t7_n1_network_independent_chains_must_be_bitwise() -> None:
     (1.03125, True)])
 def test_t7_n3_upper_arm(new_value, ok) -> None:
     """N3: SE_arm = (hi - est) / z on the side of delta; |delta| <= 0.25 SE_arm, closed.
-    The slope's chain-head event is an integer count (v1 H1d/PLP/n_states) that differs."""
-    old = {"H1c": {"PLP": {"slope": 1.0, "ci": [0.5, 1.5]}}, "H1d": {"PLP": {"n_states": 100}}}
-    new = {"H1b": {"PLP": {"slope": new_value, "ci": [0.5, 1.5]}}, "H1c": {"PLP": {"n_states": 120}}}
+    The licensing event is a per-system head: a ``fitted`` coefficient beyond the N2 bound.
+    (Changed in fix round 1, R1: this test used a count in another result block, H1c n_states, as
+    the licence of an H1b slope; N3 now scopes a count to its own block, so a system head is used.)"""
+    old = {"H1c": {"PLP": {"slope": 1.0, "ci": [0.5, 1.5]}},
+           "fitted": {"estimation_proxy": {"slope": 4.0}}}
+    new = {"H1b": {"PLP": {"slope": new_value, "ci": [0.5, 1.5]}},
+           "fitted": {"estimation_proxy": {"slope": 6.0}}}
     rep = n_report(old, new, NC3)
     (row,) = rep.n3
     assert row[0] == "systems/lorenz63/H1b/PLP/slope"
+    assert row[4] == "systems/lorenz63/fitted/estimation_proxy/slope"      # the licensing event
     assert (row[5], row[6], row[7], row[8], row[9]) == (0.5, 1.5, 0.95, 0.25, 0.0625)
     assert row[10] is ok and rep.passed is ok
-    assert [e[1] for e in rep.events] == ["integer count"]
+    assert [e[1] for e in rep.events] == ["fitted coefficient"]
 
 
 def test_t7_n3_lower_arm_and_primary_level() -> None:
     """N3: delta < 0 uses the lower arm (est - lo); the primary level has its own z (4 here).
     Lower arm 1.0 - 0.25 = 0.75, SE_arm 0.1875, bound 0.046875, delta -0.09375: beyond."""
     old = {"H2b": {"noise": {"mean_state_spearman": 1.0, "ci": [0.25, 2.0]}},
-           "H1d": {"PLP": {"n_states": 100}}}
+           "fitted": {"estimation_proxy": {"slope": 4.0}}}
     new = {"H2b": {"noise": {"mean_state_spearman": 0.90625, "ci": [0.25, 2.0]}},
-           "H1c": {"PLP": {"n_states": 120}}}
+           "fitted": {"estimation_proxy": {"slope": 6.0}}}
     rep = n_report(old, new, NC3)
     (row,) = rep.n3
     assert (row[8], row[9], row[7]) == (0.1875, 0.046875, PRIMARY)
     assert row[10] is False and not rep.passed
     assert "N3: systems/lorenz63/H2b/noise/mean_state_spearman moves -0.09375" in rep.findings[0]
+
+
+def test_r1_a_count_licenses_only_its_own_block() -> None:
+    """R1: an integer count in another block of the system does not license a ``scores`` leaf; a
+    count in the leaf's own block does; a ``val_loss_by_width`` head licenses the whole system."""
+    scores_old, scores_new = {"scores": {"A3": {"mse_href": 4.0}}}, {"scores": {"A3": {"mse_href": 6.0}}}
+    # H1c/PLP/n_states (v1 H1d) is a count of the H1c block, not of scores.
+    rep = n_report({**scores_old, "H1d": {"PLP": {"n_states": 1}}},
+                   {**scores_new, "H1c": {"PLP": {"n_states": 2}}})
+    assert [e[6] for e in rep.events] == ["systems/lorenz63/H1c"] and not rep.passed
+    assert "no chain-head event upstream" in rep.findings[0]
+    # The same count licenses a leaf of its own block (the PLP median ratio, no interval here).
+    rep = n_report({"H1d": {"PLP": {"n_states": 1, "median_ratio": 4.0}}},
+                   {"H1c": {"PLP": {"n_states": 2, "median_ratio": 6.0}}})
+    assert rep.passed and rep.n3[0][4] == "systems/lorenz63/H1c/PLP/n_states"
+    # A val_loss_by_width leaf beyond the bound is a system head (key of the estimators block).
+    key = "('lorenz63', 7, 5, 0.01)"
+    old_l, new_l, res = sides(
+        {"systems": {"lorenz63": {"context": dict(LAM), **scores_old}},
+         "estimators": {key: {"val_loss_by_width": {"64": 2.0}}}},
+        {"systems": {"lorenz63": {"context": dict(LAM), **scores_new}},
+         "estimators": {key: {"val_loss_by_width": {"64": 3.0}}}})
+    rep = cp.evaluate_n(res, old_l, new_l, cp.TABLE, NC)
+    assert [(e[1], e[6]) for e in rep.events] == [("val_loss beyond bound", "system")] and rep.passed
 
 
 def test_t7_event_kinds_and_scope() -> None:
@@ -801,7 +852,8 @@ def test_t7_event_kinds_and_scope() -> None:
         {"systems": {"lorenz63": {"context": dict(LAM), **new3}},
          "estimators": {key: {"chosen_width": 128}}})
     rep = cp.evaluate_n(res, old_l, new_l, cp.TABLE, NC)
-    assert [(e[1], e[4]) for e in rep.events] == [("integer count", "lorenz63")] and rep.passed
+    assert [(e[1], e[4], e[6]) for e in rep.events] == [("chosen width", "lorenz63", "system")]
+    assert rep.passed
 
 
 def test_t7_n5_regret_allowance_and_the_sentinel() -> None:
@@ -812,8 +864,9 @@ def test_t7_n5_regret_allowance_and_the_sentinel() -> None:
             "A0": {"regret": {"1LT": 1.0}}, "A*": {"regret": {"1LT": 0.5}}}}}}
         new = {"systems": {"lorenz63": {"context": dict(LAM), "scores": {
             "A0": {"regret": {"1LT": a_new}}, "A*": {"regret": {"1LT": star_new}}}}}}
-        if floor is not None:
-            new["handling"] = {"by_system": {"lorenz63": {"curvature_floor": floor}}}
+        if floor is not None:   # the core cell's counter (R6), not the system total
+            new["systems"]["lorenz63"]["handling"] = {"cells": {
+                "base|rho=0.01|n_lib=10000|core": {"counts": {"curvature_floor": floor}}}}
         old_l, new_l, res = sides(old, new)
         return cp.evaluate_n(res, old_l, new_l, cp.TABLE, cp.FALLBACK_CONSTANTS), res
     rep, res = run(1.0 * (1 - 5e-7))
@@ -823,6 +876,18 @@ def test_t7_n5_regret_allowance_and_the_sentinel() -> None:
     assert not rep.passed and "N5: systems/lorenz63/scores/A0/regret/1LT" in rep.findings[0]
     rep, _ = run(1.0 * (1 - 2e-6), floor=3)
     assert rep.passed and [r[4] for r in rep.n5 if r[3] is False] == [True]
+    assert [r[5] for r in rep.n5 if r[3] is False] == [
+        "systems/lorenz63/handling/cells/base|rho=0.01|n_lib=10000|core/counts/curvature_floor"]
+    rep, _ = run(1.0 * (1 - 2e-6), floor=0)     # a zero core-cell counter excuses nothing
+    assert not rep.passed
+    # R6: a counter elsewhere (system total, a sweep cell) does not excuse a violation.
+    old = {"systems": {"lorenz63": {"context": dict(LAM), "scores": {"A0": {"regret": {"1LT": 1.0}}}}}}
+    new = {"systems": {"lorenz63": {"context": dict(LAM), "scores": {"A0": {"regret": {"1LT": 0.5}}},
+                                    "handling": {"cells": {"base|rho=0.02|n_lib=10000|sweep": {
+                                        "counts": {"curvature_floor": 7}}}}}},
+           "handling": {"by_system": {"lorenz63": {"curvature_floor": 7}}}}
+    old_l, new_l, res = sides(old, new)
+    assert not cp.evaluate_n(res, old_l, new_l, cp.TABLE, cp.FALLBACK_CONSTANTS).passed
     rep, _ = run(1.5, star_new=1e-300)
     assert not rep.passed
 
@@ -963,6 +1028,56 @@ def test_robustness_v3_keys_classify() -> None:
     assert status["robustness/lorenz63/base/mse_href/A5"] == "changed-new-only"
 
 
+def test_r7_a_missing_regret_or_oracle_leaf_is_a_finding() -> None:
+    """R7: R3 and N5 are "at every horizon": a regret or A* leaf absent on one side is a structure
+    finding (changed rules without a direction stay informational)."""
+    old = {"systems": {"lorenz63": {"scores": {"A0": {"regret": {"1LT": 1.0, "2LT": 2.0}},
+                                               "A*": {"regret": {"1LT": 0.5}}}}}}
+    new = {"systems": {"lorenz63": {"scores": {"A0": {"regret": {"1LT": 1.5}},
+                                               "A*": {"regret": {"1LT": 0.0, "2LT": 0.0}}}}}}
+    status = {cp.show(r.path): r for r in sides(old, new)[2]}
+    assert status["systems/lorenz63/scores/A0/regret/2LT"].status == "FAIL-direction-missing"
+    assert status["systems/lorenz63/scores/A*/regret/2LT"].status == "FAIL-direction-missing"
+    assert all(r.is_finding for k, r in status.items() if r.status == "FAIL-direction-missing")
+    assert status["systems/lorenz63/scores/A0/regret/1LT"].status == "changed"
+
+
+def test_r8_d1_report_prints_the_reference_path_and_sha256(tmp_path) -> None:
+    """R8: the D1 section names the reference file and its SHA-256 (hashlib, not the tool)."""
+    old, new = branch_d_trees(lambda_max=0.9056 + 0.0030)
+    reference = old_tree()
+    reference["systems"]["lorenz63"]["context"]["lambda_max"] = 0.9056 + 0.0030
+    done, report = run_cli_with(tmp_path, old, new, reference=reference)
+    assert done.returncode == 0, done.stdout + done.stderr
+    ref = tmp_path / "ref.json"
+    text = report.read_text()
+    assert f"D1 reference run (the v1 code run locally): {ref}" in text
+    assert f"- sha256: {hashlib.sha256(ref.read_bytes()).hexdigest()}" in text
+
+
+def test_r9_a_system_delay_of_two_is_not_the_removed_variant() -> None:
+    """R9: an estimator key with delay 2 is the removed ``delay/2`` variant only if the system's own
+    context delay is not 2 (Rossler's AMI delay is 3 in the pilot but may become 2 in regime D)."""
+    key = "('rossler', 7, 2, 0.01)"
+
+    def classes(own_delay: int) -> dict:
+        tree = {"systems": {"rossler": {"context": {"delay": own_delay}}},
+                "estimators": {key: {"chosen_width": 64, "seconds": 1.0}}}
+        old, new, _ = cp.load_sides(tree, tree)
+        return {cp.show(r.path): (r.rule.cls, r.status) for r in cp.compare_leaves(old, new)}
+
+    own3 = classes(3)      # delay 2 is not the system's own: the removed variant (also on the new side)
+    assert own3["estimators/delay2-variant:('rossler', 7, 2, 0.01)/chosen_width"] == (
+        "removed", "FAIL-removed-rule-new-present")
+    own2 = classes(2)      # delay 2 is the system's own: a core estimator, unchanged
+    assert own2["estimators/('rossler', 7, 2, 0.01)/chosen_width"] == ("unchanged", "equal")
+    assert own2["estimators/('rossler', 7, 2, 0.01)/seconds"] == ("timing", "timing")
+    old_only, _, _ = cp.load_sides({"systems": {"rossler": {"context": {"delay": 3}}},
+                                    "estimators": {key: {"chosen_width": 64}}}, {})
+    res = cp.compare_leaves(old_only, {})
+    assert [r.status for r in res if r.path[0] == "estimators"] == ["removed"]
+
+
 # ---------------------------------------------------------------------------------- T8
 V1_INTERVAL_PATHS = {  # v1 interval leaves of the pilot (one per kind) -> expected level
     "systems/lorenz63/H2a/range_ci/[0]": PRIMARY,                # analysis.py l. 369-370
@@ -1073,7 +1188,6 @@ def test_t9_spot_classifications_from_the_sub_task_logs() -> None:
         "verdicts/H3b/verdict": ("removed", "WU-0002.2, .9"),
         "verdicts/H3c/verdict": ("changed", "WU-0002.9"),
         "estimators/('lorenz96', 7, 5, 0.01)/chosen_width": ("removed", "WU-0002.1"),
-        "estimators/('lorenz63', 7, 2, 0.01)/chosen_width": ("removed", "WU-0002.1"),
         "estimators/('lorenz63', 7, 5, 0.01)/chosen_width": ("unchanged", ""),
         "estimators/('lorenz63', 7, 5, 0.01)/seconds": ("timing", ""),
         "robustness/lorenz63/delay%2F2/chosen_K": ("removed", "WU-0002.1"),
@@ -1099,7 +1213,15 @@ def test_chain_tags_follow_the_plan_paragraph_on_bitwise_chains() -> None:
     assert chain("systems/lorenz63/validation/cp_median_vpt_lyapunov") == "cp"
     assert chain("systems/lorenz63/scores/A0/mse/1LT") == "cp"
     assert chain("systems/lorenz63/km_curves/A0/[7]") == "cp"
-    assert chain("systems/lorenz63/fitted/analog_proxy/slope") == "cp"
+    # R2: the plan calls the analog proxy a CP-chain leaf, but it is fitted on the estimated nu
+    # (allocation.py:123), so it follows the network chain.
+    assert chain("systems/lorenz63/fitted/analog_proxy/slope") == "network"
+    assert chain("systems/lorenz63/H1c/CP/slope") == "cp"                 # R5
+    assert chain("systems/lorenz63/H1d/CP/median_ratio") == "cp"
+    assert chain("systems/lorenz63/H1d/CP/n_states") == "cp"
+    assert chain("systems/lorenz63/H1c/PLP/slope") == "network"
+    assert chain("robustness/lorenz63/base/H1c/CP/ci/[0]") == "cp"
+    assert chain("robustness/lorenz63/Lambda_fin(eps=1rho)/corr_fin_vs_linear") == "oracle"
     assert chain("systems/lorenz63/scores/A3/mse/1LT") == "network"
     assert chain("systems/lorenz63/scores/A0/agreement_href") == "network"  # needs the PLP errors
     assert chain("systems/lorenz63/weight_profile/median/[0]") == "network"

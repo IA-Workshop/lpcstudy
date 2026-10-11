@@ -431,9 +431,12 @@ def _build_rules() -> list[Rule]:
     # ---- estimators (top level and per system) ------------------------------------------
     # Keys of ``estimators`` are tuples (system, embedding dim, delay, noise); no literal spaces
     # (the rule strings are split on white space).
-    kept = r"re:\('(lorenz63|rossler|chua)',\s\d+,\s(?!2,)\d+,\s[\d.]+\)"
+    # The delay/2 variant of v1 has a key whose delay differs from the system's own ``delay``; those
+    # keys are renamed with the prefix ``delay2-variant:`` by ``mark_delay_variants`` (a system whose
+    # own delay is 2 keeps its core estimators).
+    kept = r"re:\('(lorenz63|rossler|chua)',\s\d+,\s\d+,\s[\d.]+\)"
     gone96 = r"re:\('lorenz96',.*"
-    gone2 = r"re:\('\w+',\s\d+,\s2,\s[\d.]+\)"
+    gone2 = r"re:delay2-variant:.*"
     add(_rules("unchanged", f"estimators/{kept}/chosen_width", chain="network", discrete=True,
                item="R2", reason="psi training is unchanged (network chain, R1 exposure)"))
     add(_rules("unchanged", f"estimators/{kept}/val_loss_by_width/*", chain="network",
@@ -474,11 +477,11 @@ def _build_rules() -> list[Rule]:
     add(_rules("new", f"{S}/handling/** handling/**", "WU-0002.11", "D-18",
                "counted handling of clips, replacements and fallbacks"))
     # ---- fitted ----------------------------------------------------------------------------
-    add(_rules("unchanged", f"{S}/fitted/analog_proxy/{{floor,slope}}",
-               chain="cp", item="R2", reason="the analog proxy fit is unchanged (CP chain)"))
-    add(_rules("unchanged", f"{S}/fitted/estimation_proxy/{{floor,slope}}",
+    add(_rules("unchanged", f"{S}/fitted/{{analog_proxy,estimation_proxy}}/{{floor,slope}}",
                chain="network", item="R2",
-               reason="the estimation proxy is fitted to the psi errors (network chain)"))
+               reason=("both proxies are fitted on the estimated nu (analog_f = distance * "
+                       "min(nu_hat, nu_cap), allocation.py:123): network chain, so the plan's "
+                       "CP-chain remark does not hold for this leaf")))
     add(_rules("unchanged", f"{S}/fitted/nu_cap", chain="network", item="R2",
                reason="the nu cap is unchanged"))
     add(_rules("changed", f"{S}/fitted/chosen_K", "WU-0002.3", "D-13 (DEF-0003)",
@@ -565,10 +568,14 @@ def _build_rules() -> list[Rule]:
                "WU-0002.4, .9, .11", "D-01, D-14, D-25(h)", "median fit, ratio and verdict"))
     # ---- H1b (v1 H1c) ----------------------------------------------------------------------
     h1b = f"{S}/H1b"
-    add(_rules("unchanged", f"{h1b}/{{CP,PLP}}/slope", chain="network", interval="ci", item="R2",
+    add(_rules("unchanged", f"{h1b}/PLP/slope", chain="network", interval="ci", item="R2",
                reason="slope unchanged (PLP only is the verdict)"))
-    add(_rules("unchanged", f"{h1b}/{{CP,PLP}}/ci/[]", chain="network", level=CI_LEVEL, item="R2",
+    add(_rules("unchanged", f"{h1b}/PLP/ci/[]", chain="network", level=CI_LEVEL, item="R2",
                reason="interval unchanged"))
+    add(_rules("unchanged", f"{h1b}/CP/slope", chain="cp", interval="ci", item="R2",
+               reason="CP slope uses analog_seed, sq_cp and the oracle gains only (CP chain)"))
+    add(_rules("unchanged", f"{h1b}/CP/ci/[]", chain="cp", level=CI_LEVEL, item="R2",
+               reason="interval unchanged (CP chain)"))
     add(_rules("unchanged", f"{h1b}/threshold/[]", item=smoke, reason="band [0.8, 1.2]"))
     add(_rules("removed", f"{h1b}/{{CP,PLP}}/pass", "WU-0002.4", "D-02",
                "v3 H1b is decided on the PLP interval"))
@@ -578,12 +585,18 @@ def _build_rules() -> list[Rule]:
                "WU-0002.4, .9, .11", "D-02, D-14, A4", "counts and verdict"))
     # ---- H1c (v1 H1d) ----------------------------------------------------------------------
     h1c = f"{S}/H1c"
-    add(_rules("unchanged", f"{h1c}/{{CP,PLP}}/median_ratio", chain="network", interval="ci",
+    add(_rules("unchanged", f"{h1c}/PLP/median_ratio", chain="network", interval="ci",
                item="R2", reason="median ratio unchanged"))
-    add(_rules("unchanged", f"{h1c}/{{CP,PLP}}/ci/[]", chain="network", level=CI_LEVEL, item="R2",
+    add(_rules("unchanged", f"{h1c}/PLP/ci/[]", chain="network", level=CI_LEVEL, item="R2",
                reason="interval unchanged"))
-    add(_rules("unchanged", f"{h1c}/{{CP,PLP}}/n_states", chain="network", item=smoke,
+    add(_rules("unchanged", f"{h1c}/PLP/n_states", chain="network", item=smoke,
                reason="state count unchanged"))
+    add(_rules("unchanged", f"{h1c}/CP/median_ratio", chain="cp", interval="ci",
+               item="R2", reason="median ratio unchanged (CP chain)"))
+    add(_rules("unchanged", f"{h1c}/CP/ci/[]", chain="cp", level=CI_LEVEL, item="R2",
+               reason="interval unchanged (CP chain)"))
+    add(_rules("unchanged", f"{h1c}/CP/n_states", chain="cp", item=smoke,
+               reason="state count unchanged (CP chain)"))
     add(_rules("unchanged", f"{h1c}/threshold/[] {h1c}/thresholds/[]", item=smoke,
                reason="band unchanged"))
     add(_rules("removed", f"{h1c}/CP/pass", "WU-0002.9", "D-14, DEC-0016",
@@ -665,12 +678,18 @@ def _build_rules() -> list[Rule]:
                "verdict}", "WU-0002.7, .9, .9b, .11", "D-05, DEF-0019", "H2b(ii), counts, verdicts"))
     # ---- H2c --------------------------------------------------------------------------------
     h2c = f"{S}/H2c"
-    add(_rules("unchanged", f"{h2c}/A4_minus_A2/{{mean,relative,pass}}", chain="network",
+    add(_rules("unchanged", f"{h2c}/A4_minus_A2/{{mean,pass}}", chain="network",
                interval="ci", item="R2", reason="A4 - A2 unchanged"))
+    add(_rules("unchanged", f"{h2c}/A4_minus_A2/relative", chain="network", item="R2",
+               reason=("A4 - A2 relative to the other MSE: no interval of its own (the ci "
+                       "brackets the mean, in MSE units)")))
     add(_rules("unchanged", f"{h2c}/A4_minus_A2/ci/[]", chain="network", level=CI_LEVEL, item="R2",
                reason="A4 - A2 interval unchanged"))
-    add(_rules("unchanged", f"{h2c}/A4_minus_A1/{{mean,relative,pass}}", chain="network",
+    add(_rules("unchanged", f"{h2c}/A4_minus_A1/{{mean,pass}}", chain="network",
                interval="ci", item="R2", reason="pilot best single was A1",
+               when=(("H2c", "best_single"), "A1")))
+    add(_rules("unchanged", f"{h2c}/A4_minus_A1/relative", chain="network", item="R2",
+               reason="pilot best single was A1; no interval of its own",
                when=(("H2c", "best_single"), "A1")))
     add(_rules("unchanged", f"{h2c}/A4_minus_A1/ci/[]", chain="network", level=CI_LEVEL, item="R2",
                reason="pilot best single was A1", when=(("H2c", "best_single"), "A1")))
@@ -760,10 +779,14 @@ def _build_rules() -> list[Rule]:
     var = r"re:(base|D=\d+|k=\d+|misspec=[\d.]+)"
     fin = r"re:Lambda_fin\(.*\)"
     rb = f"robustness/*/{var}"
-    add(_rules("unchanged", f"{rb}/H1b/{{CP,PLP}}/slope", chain="network", interval="ci",
+    add(_rules("unchanged", f"{rb}/H1b/PLP/slope", chain="network", interval="ci",
                item="R2", reason="robustness H1b (v1 H1c) unchanged; key renamed (D-16)"))
-    add(_rules("unchanged", f"{rb}/H1b/{{CP,PLP}}/ci/[]", chain="network", level=CI_LEVEL,
+    add(_rules("unchanged", f"{rb}/H1b/PLP/ci/[]", chain="network", level=CI_LEVEL,
                item="R2", reason="robustness H1b interval unchanged"))
+    add(_rules("unchanged", f"{rb}/H1b/CP/slope", chain="cp", interval="ci",
+               item="R2", reason="robustness H1b CP slope unchanged (CP chain)"))
+    add(_rules("unchanged", f"{rb}/H1b/CP/ci/[]", chain="cp", level=CI_LEVEL,
+               item="R2", reason="robustness H1b CP interval unchanged (CP chain)"))
     add(_rules("unchanged", f"{rb}/H1b/threshold/[]", item="R2", reason="band [0.8, 1.2]"))
     add(_rules("removed", f"{rb}/H1b/{{CP,PLP}}/pass", "WU-0002.4", "D-02", "PLP-only criterion"))
     add(_rules("changed", f"{rb}/H1b/pass", "WU-0002.4, .9", "D-02, D-14", "pass from the PLP interval"))
@@ -785,8 +808,11 @@ def _build_rules() -> list[Rule]:
     add(_rules("new", "robustness/*/*/error", "WU-0002.11", "A14",
                "a robustness variant failed (handling.failed_variants)", alert=True))
     fin_rb = f"robustness/*/{fin}"
-    add(_rules("unchanged", f"{fin_rb}/{{corr_fin_vs_linear,scale_times_rho}}", chain="network",
-               item="R2", reason="finite-amplitude growth agreement unchanged"))
+    add(_rules("unchanged", f"{fin_rb}/corr_fin_vs_linear", chain="oracle", item="R2",
+               reason=("finite-amplitude growth agreement unchanged: true states and the oracle "
+                       "growth only (experiments.py:522-539)")))
+    add(_rules("unchanged", f"{fin_rb}/scale_times_rho", item="R2",
+               reason="the scale of the perturbation (a config constant)"))
     add(_rules("removed", f"{fin_rb}/H2a_partial_corr_fin", "WU-0002.6", "D-25(a)",
                "replaced by the zero and interior parts"))
     add(_rules("removed", f"{fin_rb}/ci/[]", "WU-0002.6", "D-25(a)",
@@ -818,8 +844,9 @@ class LeafResult:
     status : str
         ``equal``, ``equal_nan``, ``within_tol``, ``changed``, ``changed-old-only``,
         ``changed-new-only``, ``new``, ``removed``, ``timing``, ``skipped`` (an unchanged leaf whose
-        condition is false), or a finding: ``FAIL-differs``, ``FAIL-type``, ``FAIL-missing-new``,
-        ``FAIL-new-only``, ``FAIL-new-rule-old-present``, ``FAIL-removed-rule-new-present``,
+        condition is false, whether or not the leaf is present), or a finding: ``FAIL-differs``,
+        ``FAIL-type``, ``FAIL-missing-new``, ``FAIL-new-only``, ``FAIL-direction-missing`` (a regret
+        or A* leaf absent on one side), ``FAIL-new-rule-old-present``, ``FAIL-removed-rule-new-present``,
         ``ALERT``.
     same : bool or None
         For ``changed`` leaves present on both sides: the values are equal (the rule allows a change).
@@ -850,7 +877,7 @@ class LeafResult:
         return self.status == "FAIL-differs" or self.direction_ok is False
 
 
-STRUCTURE_FINDINGS = ("FAIL-type", "FAIL-missing-new", "FAIL-new-only",
+STRUCTURE_FINDINGS = ("FAIL-type", "FAIL-missing-new", "FAIL-new-only", "FAIL-direction-missing",
                       "FAIL-new-rule-old-present", "FAIL-removed-rule-new-present", "ALERT")
 
 
@@ -877,9 +904,9 @@ def judge(path: Path_, rule: Rule, old: object, new: object,
     if rule.cls == "timing":
         return LeafResult(path, rule, old, new, "timing")
     if rule.cls == "unchanged":
+        if rule.when and not _condition_holds(rule, path, new_leaves):
+            return LeafResult(path, rule, old, new, "skipped")   # present or not: not comparable
         if new is MISSING:
-            if rule.when and not _condition_holds(rule, path, new_leaves):
-                return LeafResult(path, rule, old, new, "skipped")
             return LeafResult(path, rule, old, new, "FAIL-missing-new")
         if old is MISSING:
             return LeafResult(path, rule, old, new, "FAIL-new-only")
@@ -888,6 +915,8 @@ def judge(path: Path_, rule: Rule, old: object, new: object,
         return LeafResult(path, rule, old, new, status)
     if rule.cls == "changed":
         if not both:
+            if rule.direction:   # a regret or A* leaf missing on one side escapes R3 and N5
+                return LeafResult(path, rule, old, new, "FAIL-direction-missing")
             return LeafResult(path, rule, old, new,
                               "changed-old-only" if new is MISSING else "changed-new-only")
         same = values_equal(old, new) in ("equal", "equal_nan")
@@ -943,6 +972,27 @@ def compare_leaves(old: dict[Path_, object], new: dict[Path_, object],
     return [judge(p, rules[p], old.get(p, MISSING), new.get(p, MISSING), new) for p in paths]
 
 
+def mark_delay_variants(leaves: dict[Path_, object]) -> dict[Path_, object]:
+    """Rename the ``estimators`` keys of the removed ``delay/2`` variant (WU-0002.1, D-17).
+
+    An estimator key ``(system, D, delay, noise)`` with delay 2 is that variant unless the system's
+    own ``context/delay`` is 2 (then it is a core estimator). The variant keys get the prefix
+    ``delay2-variant:`` so that the rule table can remove them; a new run that still has one then
+    fails ``FAIL-removed-rule-new-present``. Without the system's context nothing is renamed.
+    """
+    own = {p[1]: v for p, v in leaves.items()
+           if p[0] == "systems" and len(p) == 4 and p[2:] == ("context", "delay")}
+    out = {}
+    for path, value in leaves.items():
+        if path[0] == "estimators" and len(path) > 1:
+            found = re.match(r"\('(\w+)',\s\d+,\s(\d+),\s[\d.]+\)$", path[1])
+            if found and found.group(2) == "2" and found.group(1) in own \
+                    and own[found.group(1)] != 2:
+                path = (path[0], "delay2-variant:" + path[1], *path[2:])
+        out[path] = value
+    return out
+
+
 def load_sides(old_tree: object, new_tree: object) -> tuple[dict, dict, int]:
     """Flatten both trees, transform the v1 paths and drop the new side's provenance.
 
@@ -966,7 +1016,7 @@ def load_sides(old_tree: object, new_tree: object) -> tuple[dict, dict, int]:
         raise ToolError("the v1 side has a provenance block: not expected")
     flat_new = flatten(new_tree)
     new = {p: v for p, v in flat_new.items() if p[0] != "provenance"}
-    return old, new, len(flat_new) - len(new)
+    return mark_delay_variants(old), mark_delay_variants(new), len(flat_new) - len(new)
 
 
 # ------------------------------------------------------------------------------ branches B, N, D
@@ -1121,13 +1171,16 @@ def evaluate_n(results: list[LeafResult], old: dict[Path_, object], new: dict[Pa
       under N2 instead.
     * N2: every other continuous ``unchanged`` leaf has ``|new - old| <= n2_rel * |old|`` (closed),
       or meets N3.
-    * N3: a leaf beyond that has a chain-head event upstream (a differing discrete quantity, an
-      integer count, or a ``fitted`` coefficient beyond ``n2_rel``, in the same system and chain),
-      and, if it has a pilot interval, ``|delta| <= n3_fraction * SE_arm``. Every N3 leaf and every
-      event is listed; any other excess is a finding.
+    * N3: a leaf beyond that has a chain-head event upstream, and, if it has a pilot interval,
+      ``|delta| <= n3_fraction * SE_arm``. Every N3 leaf (with the events that license it) and every
+      event is listed; any other excess is a finding. An event has a scope. A per-system head
+      (``chosen_width``, ``val_loss_by_width`` or a ``fitted`` coefficient beyond ``n2_rel``)
+      licenses every leaf of its system and chain. A local event (an integer count, ``realized_K``,
+      any other discrete flip) licenses only the leaves of its own result block (``path[:3]``).
     * N5: regret(v3) >= regret(v1) * (1 - 1e-6) for the rules with direction ``new>=old``, and
-      A* exactly 0.0. A violation in a system whose ``curvature_floor`` counter is not 0 is
-      attributed to that sentinel (listed, not a finding).
+      A* exactly 0.0. A violation is attributed to the sentinel (listed, not a finding) if the
+      ``curvature_floor`` counter of the core cell (``systems/<s>/handling/cells/base|...|core``)
+      is not 0 (AM3 H3 concerns the scored entries; the cell record sums the three splits).
 
     Returns
     -------
@@ -1136,11 +1189,15 @@ def evaluate_n(results: list[LeafResult], old: dict[Path_, object], new: dict[Pa
     """
     n2_rel, fraction = constants["n2_rel"], constants["n3_fraction"]
     n1, n2, events, candidates, findings = [], [], [], [], []
+
+    def head(r: LeafResult, kind: str, scope: str) -> None:
+        events.append((show(r.path), kind, r.old, r.new, system_of(r.path), r.rule.chain, scope))
+
     for r in results:
         if (r.rule.cls != "unchanged" or r.status != "FAIL-differs"
                 or r.old is MISSING or r.new is MISSING):
             continue
-        chain, system, path = r.rule.chain, system_of(r.path), r.path
+        chain, path = r.rule.chain, r.path
         if chain in NETWORK_INDEPENDENT and not obs_scale_differs:
             n1.append((show(path), r.old, r.new, chain))
             findings.append(f"N1: {show(path)} ({chain} chain) differs: {r.old!r} -> {r.new!r}")
@@ -1148,38 +1205,44 @@ def evaluate_n(results: list[LeafResult], old: dict[Path_, object], new: dict[Pa
             rel = _rel_diff(r.old, r.new)
             if rel <= n2_rel:
                 n2.append((show(path), r.old, r.new, rel, "within"))
+            elif "val_loss_by_width" in path:
+                head(r, "val_loss beyond bound", "system")
+                n2.append((show(path), r.old, r.new, rel, "chain-head event"))
             elif len(path) > 2 and path[2] == "fitted":
-                events.append((show(path), "fitted coefficient", r.old, r.new, system, chain))
+                head(r, "fitted coefficient", "system")
                 n2.append((show(path), r.old, r.new, rel, "chain-head event"))
             else:
                 candidates.append((r, rel))
+        elif path[-1] == "chosen_width":
+            head(r, "chosen width", "system")
         elif type(r.old) is int or r.rule.discrete:
-            events.append((show(path), "integer count" if type(r.old) is int else "discrete",
-                           r.old, r.new, system, chain))
+            head(r, "integer count" if type(r.old) is int else "discrete", "/".join(path[:3]))
         else:
             findings.append(f"N2: discrete leaf {show(path)} differs without being a counted "
                             f"event: {r.old!r} -> {r.new!r}")
     n3 = []
     for r, rel in candidates:
-        system, chain = system_of(r.path), r.rule.chain
-        upstream = [e for e in events if e[5] == chain and e[4] in (None, system)]
+        system, chain, block = system_of(r.path), r.rule.chain, "/".join(r.path[:3])
+        upstream = [e for e in events if e[5] == chain and e[4] in (None, system)
+                    and e[6] in ("system", block)]
         if not upstream:
             findings.append(f"N2: {show(r.path)} differs by {rel!r} relative (beyond {n2_rel!r}) "
-                            f"with no chain-head event upstream in the {chain or 'untagged'} chain")
+                            f"with no chain-head event upstream in the {chain or 'untagged'} chain "
+                            "(a count licenses only its own block)")
             n2.append((show(r.path), r.old, r.new, rel, "NO EVENT"))
             continue
         n2.append((show(r.path), r.old, r.new, rel, "N3"))
+        names = "; ".join(e[0] for e in upstream)
         pair = interval_of(old, table, r.path, r.rule)
         if pair is None:
-            n3.append((show(r.path), r.old, r.new, rel, len(upstream), None, None, None, None,
-                       None, True))
+            n3.append((show(r.path), r.old, r.new, rel, names, None, None, None, None, None, True))
             continue
         lo, hi, level = pair
         delta = r.new - r.old  # type: ignore[operator]
         se = se_arm(r.old, lo, hi, delta, z_of(constants, level))  # type: ignore[arg-type]
         bound = fraction * se
         ok = bool(abs(delta) <= bound)
-        n3.append((show(r.path), r.old, r.new, rel, len(upstream), lo, hi, level, se, bound, ok))
+        n3.append((show(r.path), r.old, r.new, rel, names, lo, hi, level, se, bound, ok))
         if not ok:
             findings.append(f"N3: {show(r.path)} moves {delta!r}, more than {fraction} SE_arm "
                             f"= {bound!r} (level {level!r})")
@@ -1187,14 +1250,26 @@ def evaluate_n(results: list[LeafResult], old: dict[Path_, object], new: dict[Pa
     for r in results:
         if not r.rule.direction or r.old is MISSING or r.new is MISSING:
             continue
-        system = system_of(r.path)
-        floor = new.get(("handling", "by_system", system or "", "curvature_floor"))
+        floor_path, floor = core_curvature_floor(new, system_of(r.path))
         attributed = r.direction_ok_n is False and isinstance(floor, int) and floor > 0
-        n5.append((show(r.path), r.old, r.new, r.direction_ok_n, attributed))
+        n5.append((show(r.path), r.old, r.new, r.direction_ok_n, attributed,
+                   show(floor_path) if attributed and floor_path else ""))
         if r.direction_ok_n is False and not attributed:
             findings.append(f"N5: {show(r.path)}: {r.old!r} -> {r.new!r} violates the "
                             f"{r.rule.direction} direction")
     return NReport(n1, n2, n3, events, n5, locus_table(results), findings)
+
+
+def core_curvature_floor(new: dict[Path_, object], system: str | None
+                         ) -> tuple[Path_ | None, object]:
+    """The ``curvature_floor`` counter of the core cell of a system (sum of its splits), or
+    ``(None, None)``. The core cell of ``handling.cells`` is the key ``base|...|core``."""
+    for path in sorted(new):
+        if (path[:3] == ("systems", system, "handling") and len(path) == 7 and path[3] == "cells"
+                and path[4].startswith("base|") and path[4].endswith("|core")
+                and path[5:] == ("counts", "curvature_floor")):
+            return path, new[path]
+    return None, None
 
 
 def gate_rows(new: dict[Path_, object]) -> list[tuple[str, str, object, bool]]:
@@ -1521,19 +1596,20 @@ def _n_lines(rep: NReport, heading: str) -> list[str]:
                        [(a, fmt(b), fmt(c), repr(d), e) for a, b, c, d, e in rep.n2])
     out += [("N3 (beyond the bound: chain-head event upstream, and 0.2 SE_arm when the pilot has an "
             "interval):"), ""]
-    out += table_lines(("path", "v1 pilot", "new", "relative", "events upstream", "lower", "upper",
+    out += table_lines(("path", "v1 pilot", "new", "relative", "licensing events", "lower", "upper",
                         "level", "SE_arm", "0.2 SE_arm", "ok"),
                        [(a, fmt(b), fmt(c), repr(d), e, fmt(f), fmt(g), fmt(h), fmt(i), fmt(j),
                          "yes" if k else "NO") for a, b, c, d, e, f, g, h, i, j, k in rep.n3])
     out += [("Chain-head events (differing discrete quantities, integer counts, fitted "
             "coefficients beyond 1e-6):"), ""]
-    out += table_lines(("path", "kind", "v1 pilot", "new", "system", "chain"),
-                       [(a, b, fmt(c), fmt(d), e, f) for a, b, c, d, e, f in rep.events])
+    out += table_lines(("path", "kind", "v1 pilot", "new", "system", "chain", "scope"),
+                       [(a, b, fmt(c), fmt(d), e, f, g) for a, b, c, d, e, f, g in rep.events])
     out += ["N5 (regret(v3) >= regret(v1) (1 - 1e-6); A* regret exactly 0.0):", ""]
     bad = [r for r in rep.n5 if r[3] is False]
     out.append(f"checked {len(rep.n5)} leaves; violations {len(bad)}")
-    out += table_lines(("path", "v1 pilot", "new", "attributed to curvature_floor"),
-                       [(a, fmt(b), fmt(c), "yes" if e else "no") for a, b, c, d, e in bad])
+    out += table_lines(("path", "v1 pilot", "new", "attributed to curvature_floor (counter)"),
+                       [(a, fmt(b), fmt(c), f"yes ({g})" if e else "no")
+                        for a, b, c, d, e, g in bad])
     return out
 
 
@@ -1561,6 +1637,8 @@ def _d_lines(rep: DReport, branch_note: str) -> list[str]:
                        [(a, fmt(b), fmt(c)) for a, b, c in rep.int_diffs])
     if rep.mode == "D1" and rep.d1 is not None:
         sub = rep.d1
+        out += [f"D1 reference run (the v1 code run locally): {sub.info.get('old_path')}",
+                f"- sha256: {sub.info.get('sha256_old')}", ""]
         out += [(f"D1: the new run against the local v1 run is in branch {sub.branch}; exit code of "
                 f"that comparison {sub.exit_code()}."), ""]
         if sub.reasons:
@@ -1740,7 +1818,7 @@ def provenance_info(new_tree: object, old_path: Path, new_path: Path, run_dir: s
     except AttributeError:
         affinity = "n/a"
     return {"commit": prov.get("commit", "n/a"), "dirty": prov.get("dirty", "n/a"),
-            "run_dir": run_dir, "sha256_old": sha256_of(old_path),
+            "run_dir": run_dir, "old_path": str(old_path), "sha256_old": sha256_of(old_path),
             "sha256_new": sha256_of(new_path), "manifest_row": manifest_row,
             "lpc_threads": f"{env.get('LPC_THREADS', 'n/a')} (run); nproc {env.get('NPROC', 'n/a')} "
                            "(run env)",
