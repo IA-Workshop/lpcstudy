@@ -449,4 +449,21 @@ Scope: `git diff develop...HEAD` at `b69032f` (commits c011e9e, 4f70254, 309b84f
 
 **Verdict: approve with fixes** (R1, R2, R3; 3 findings). The re-review covers only these three.
 
+#### Re-review, fix round 1 (2026-10-10, `reviewer`, claude-opus-5-5): commit 15bd84f
+
+Read only: `git show 15bd84f` and the code paths it touches. No tests were run, on the coordinator's instruction. The developer's log reports 55 unit and 8 integration tests passed. The commit touches only `__main__.py`, `analysis.py` (docstring), `identifiers.py`, `report.py`, three test files and the Log. No existing assertion is weakened. Two expected sets in tests were extended by the gain-bound row, which strengthens them.
+
+- **R1: fixed.** The gain-bound row now has `pending=("WU-0002.9",)`. WU-0002.9 is the right sub-task. The ROADMAP .8 row does not name the gain bound. The .9 row is the verdict logic, which decides whether a row gets a verdict. D-21(a) puts the removal of the bar "also in WU-0002.9 (role 'reported')". `gain_horizon_bound` (0.9 bar, `pass`) and `verdicts` are unchanged. The Markdown row now reads the v3 sentence followed by "[computed with the v1 statistic until WU-0002.9]", so the v3 text is no longer presented as the rule that produced the PASS/FAIL next to it. This is the same mechanism as the other pending rows. `test_report` (vii) and `test_identifiers` pin both.
+- **R2: fixed.** `report.verdicts` calls `check_keys` on every present core system before reading any flag, and raises `ValueError` without relabelling anything. In `__main__`, the `--report-only` branch catches the error and returns 64 with one stderr line before `save_json`, `write_markdown` and `make_figures`. Nothing is written before the check on this path:
+  - `logging.basicConfig` (run.log) is set up only on the non-report path, after this branch;
+  - provenance is not collected on this path;
+  - `out_dir.mkdir(exist_ok=True)` is the one earlier side effect, and it is a no-op here because `results.json` is read from that directory. If the file is missing, the pre-existing `FileNotFoundError` path applies, which this change does not touch.
+
+  The `except ValueError` wraps only `verdicts`, which raises `ValueError` only from this check. The new tests would have caught the original defect. With the old code, the synthetic stale file and the baseline copy would have been rewritten (byte check) and then hit a `KeyError`. The `verdicts` unit test would not have raised. Non-blocking note: `BASELINE_SMOKE` is an absolute path into the main worktree, with a `skipif`. The skip is reported, not silent, and the synthetic test carries the same evidence, so this is not a finding. The owner may prefer a repo-relative fixture later.
+- **R3: fixed.** The docstring now says H2a and H2b use 1 − 0.05/3, and that H3c gets its interval in WU-0002.8 and has none until then. This is true of the code.
+
+The fix redefines no statistic, band, level, threshold or verdict rule. The owner checkpoint is unchanged: **needs owner review before freeze** (the `verdicts` guard and the `--report-only` refusal are verdict and CLI surface).
+
+**Verdict: approve** (R1-R3 fixed; 0 open findings).
+
 ## Audit
