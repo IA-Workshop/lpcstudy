@@ -291,3 +291,34 @@ def test_verdicts_refuse_a_results_file_older_than_the_v3_identifiers() -> None:
     with pytest.raises(ValueError, match="H1e.*H1f.*H3d|schema older than WU-0002.2"):
         verdicts({"systems": {"lorenz63": stale}}, config)
     assert len(verdicts({"systems": {"lorenz63": fake_system(config)}}, config)) == 14
+
+
+def test_markdown_validation_table_has_the_two_v7_rows(tmp_path: Path) -> None:
+    """The validation table lists V7 (efficiency at every rho; slope) with PASS/FAIL, or n/a.
+
+    Reference: the WU-0002.10 plan (item 5, test x), hand strings from the synthetic V7 dicts
+    with the ``.3g`` rule of ``_fmt``. System A passes everywhere (efficiencies 0.95 and 1.04,
+    slope 1.05); B fails one level (0.9 to 1.3) and the slope (1.2); C has no V7 result and must
+    render "n/a" without raising. The rows read the flags in the dict, not the numbers. Exact.
+    """
+    config = dataclasses.replace(SMOKE, core_systems=("lorenz63", "rossler", "chua"))
+    results, _ = fake_results("DEV-0")
+    systems = {name: fake_system(config) for name in config.core_systems}
+    systems["lorenz63"]["V7"] = {
+        "median_slope": 1.05, "slope_pass": True, "pass": True,
+        "efficiency_median_by_noise": {"0.01": 0.95, "0.02": 1.04},
+        "efficiency_pass_by_noise": {"0.01": True, "0.02": True}}
+    systems["rossler"]["V7"] = {
+        "median_slope": 1.2, "slope_pass": False, "pass": False,
+        "efficiency_median_by_noise": {"0.01": 0.9, "0.02": 1.3},
+        "efficiency_pass_by_noise": {"0.01": True, "0.02": False}}
+    results["systems"] = systems
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    table = lines[lines.index("## Validation gate"):]
+    assert "| V7 median δ/(ρν), every ρ | [0.9, 1.1] | 0.95–1.04 PASS | 0.9–1.3 FAIL | n/a |" \
+        in table
+    assert "| V7 median slope of ln δ on ln ρ | [0.9, 1.1] | 1.05 PASS | 1.2 FAIL | n/a |" in table
+    names = [row.split(" | ")[0][2:6] for row in table if row.startswith("| V")]
+    assert names == ["V1 d", "V1 a", "V2 l", "V3 C", "V4 w", "V5 K", "V6 R", "V7 m", "V7 m"]

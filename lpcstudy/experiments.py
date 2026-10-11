@@ -1,7 +1,8 @@
 """Experiment orchestration: stages (i)-(v) of the proposal.
 
 Stage (i)   dynamical-system generation        -> ``Study.context``
-Stage (ii)  mechanism validation               -> :func:`run_system` (V1-V6, E1, E2)
+Stage (ii)  mechanism validation               -> :func:`run_system` (V1-V6, E1, E2; the gate
+                                                  is final after V7, which needs E1)
 Stage (iii) allocation and horizon testing     -> :func:`run_system` (E3, E4)
 Stage (iv)  state abstraction and benchmarking -> :func:`run_system` (E5)
 Stage (v)   robustness                         -> :func:`run_robustness`
@@ -113,6 +114,10 @@ def _evaluate(cell: Cell, rules: FittedRules, config: StudyConfig, split: str = 
 def run_system(study: Study, system: str) -> dict:
     """Stages (ii)-(iv) for one core system.
 
+    The validation gate is computed after the noise sweep, because V7 needs it; it is set before
+    ``check_keys`` and before any result is written, and nothing is skipped when it fails (the
+    results are flagged as provisional).
+
     Parameters
     ----------
     study : Study
@@ -144,11 +149,7 @@ def run_system(study: Study, system: str) -> dict:
                            cfg.steps_per_lyapunov),
         "convergence": convergence_check(study, core),
         "estimators": {k: v for k, v in study.estimator_log.items() if system in k}}
-    res["validation"]["gate"] = gate_status(res["validation"])
-    if not res["validation"]["gate"]["gate_pass"]:
-        LOG.warning("%s: VALIDATION GATE FAILED %s; results are flagged as provisional",
-                    system, res["validation"]["gate"])
-    LOG.info("%s validation: %s", system, res["validation"])
+    LOG.info("%s validation (V1-V6; the gate is set after V7): %s", system, res["validation"])
 
     rules = fit_rules([core], cfg)
     _, scores = _evaluate(core, rules, cfg)
@@ -187,6 +188,11 @@ def run_system(study: Study, system: str) -> dict:
 
     # Hypotheses.
     res["V7"] = an.v7_noise_scaling(noise_cells, cfg)
+    res["validation"]["gate"] = gate_status(res["validation"], res["V7"])  # V7 needs E1
+    if not res["validation"]["gate"]["gate_pass"]:
+        LOG.warning("%s: VALIDATION GATE FAILED %s; results are flagged as provisional",
+                    system, res["validation"]["gate"])
+    LOG.info("%s validation gate: %s", system, res["validation"]["gate"])
     res["H1a"] = an.h1a_library_scaling(library_cells, cfg)
     res["H1b"] = an.h1b_seed_amplifier(core, cfg)
     res["H1c"] = an.h1c_horizon_law(core, cfg)

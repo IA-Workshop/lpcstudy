@@ -186,6 +186,29 @@ def header_lines(provenance: dict | None) -> list[str]:
     return lines
 
 
+def _v7_rows(results: dict, systems: list[str]) -> list[str]:
+    """The two V7 rows of the validation table (WU-0002.10): efficiency at every rho, slope.
+
+    The efficiency cell is the minimum to maximum over rho of the median ``delta / (rho nu)``,
+    flagged PASS only if every level passes; the slope cell is the median slope of ``ln delta``
+    on ``ln rho``. A system without a V7 result shows "n/a" (no flag).
+    """
+    eff_cells, slope_cells = [], []
+    for s in systems:
+        v7 = results["systems"][s].get("V7")
+        if v7 is None:
+            eff_cells.append("n/a")
+            slope_cells.append("n/a")
+            continue
+        values = list(v7["efficiency_median_by_noise"].values())
+        ok = all(v7["efficiency_pass_by_noise"].values())
+        eff_cells.append(f"{_fmt(float(np.min(values)), 3)}–{_fmt(float(np.max(values)), 3)}"
+                         + (" PASS" if ok else " FAIL"))
+        slope_cells.append(_fmt(v7["median_slope"], 3) + (" PASS" if v7["slope_pass"] else " FAIL"))
+    return ["| V7 median δ/(ρν), every ρ | [0.9, 1.1] | " + " | ".join(eff_cells) + " |",
+            "| V7 median slope of ln δ on ln ρ | [0.9, 1.1] | " + " | ".join(slope_cells) + " |"]
+
+
 def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
     """Write the human-readable results report.
 
@@ -256,6 +279,7 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
             flag = "" if ok is None else (" PASS" if ok(value) else " FAIL")
             cells.append(_fmt(value, 3) + flag)
         lines.append(f"| {label} | {criterion} | " + " | ".join(cells) + " |")
+    lines += _v7_rows(results, systems)
 
     if "robustness" in results:
         lines += ["", "## Robustness (core cell)", ""]
