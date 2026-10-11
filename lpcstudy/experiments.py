@@ -171,12 +171,20 @@ def v7_replacements(noise_cells: dict[float, Cell]) -> dict[str, int]:
 
 
 RESULT_COUNT_KEYS: frozenset[str] = frozenset({
-    "degenerate_fits", "n_excluded_nonfinite", "n_excluded_states", "n_failed_resamples",
-    "n_km_not_reached", "n_nonfinite", "nan_resamples", "range_n_failed_resamples",
-    "zero_variance_corr"})
-"""Result keys that are counts of excluded, failed, replaced or constant cases (DEF-0001); the
-walker copies every integer below such a key into ``handling.result_counts``. The result key
-stays the authority. Lane .11b adds the keys of the new statistics counters."""
+    "degenerate_fits", "n_covariance_warnings", "n_constant_states", "n_degenerate_pairs",
+    "n_dropped_resamples", "n_empty_regimes", "n_excluded_nonfinite", "n_excluded_states",
+    "n_exponent_at_bound", "n_failed_resamples", "n_floored", "n_ineligible_states",
+    "n_km_not_reached", "n_nonfinite", "n_screened_out", "n_zero_difference", "nan_resamples",
+    "range_n_failed_resamples", "zero_variance_corr"})
+"""Result keys that are counts of excluded, failed, replaced, dropped or constant cases (DEF-0001);
+the walker copies every integer below such a key into ``handling.result_counts``. The result key
+stays the authority. Lane .11b added the keys of the statistics counters (``n_dropped_resamples``,
+``n_exponent_at_bound``, ``n_covariance_warnings``, ``n_floored``, ``n_constant_states``,
+``n_empty_regimes``, ``n_degenerate_pairs``), the WU-0002.9 counts that were not copied yet
+(``n_ineligible_states``, ``n_screened_out``) and ``n_zero_difference`` (the states whose paired
+change is exactly 0; in H2e a product of the zero-variance convention, since a state that is
+zero-variance in both cells has difference 0). Left out: ``n_states`` (a size) and ``n_noncontiguous_states`` (a
+property of the H2a(i) statistic)."""
 
 
 def collect_result_counts(result: object, path: str = "") -> dict[str, int]:
