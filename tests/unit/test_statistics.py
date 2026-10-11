@@ -976,6 +976,9 @@ def test_endpoint_mc_error_is_none_when_failures_reach_the_window_or_the_window_
     window reaches a failure at 13 (floor(1999 (a - d)) + 1 = floor(12.595) + 1); with 12 failures
     both are finite and the SE equals a hand evaluation of the formula on the array with the
     failures replaced by the finite minimum (lower) and maximum (upper), wherever the failures sit.
+    That expected value re-evaluates the helper's own formula, so it is not an independent check
+    of the formula (E1 and E2 are); what it checks is the boundary (12 finite, 13 None) and the
+    replacement semantics (position of the failures does not matter).
     At B = 50 and 1 - 0.05/3 the window leaves (0, 1) (q - d < 0), at 95% it does not. All failed
     gives None. A constant array (an atom at both endpoints) gives exactly 0. Exact.
     """

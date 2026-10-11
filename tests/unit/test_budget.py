@@ -82,8 +82,13 @@ def test_every_label_has_the_four_elements_and_reads_its_config() -> None:
         assert "blocks of 5" not in label and "2000" not in label, row.key
         if row.role == "primary":
             assert "98.33%" in label and "Bonferroni" in label, row.key
+            # DEC-0024: every primary's label says the iterative error is unverified
+            assert label.endswith("iterative error: the fixed 15-iteration Levenberg–Marquardt "
+                                  "error of the PLP estimator is not estimated and is unverified "
+                                  "(DEC-0024)"), row.key
         else:
             assert "level: 95%" in label and "Bonferroni" not in label, row.key
+            assert "iterative error" not in label, row.key
     rows = {r.key: r for r in HYPOTHESIS_TABLE}
     assert "over construction states" in budget.interval_label(rows["H3b"], 0.95, config)
     h2a = budget.interval_label(rows["H2a"], 0.9833333333333333, config)
@@ -478,8 +483,10 @@ def test_old_schema_and_a_missing_result_give_the_same_rows_and_not_estimated_ce
     bootstrap = tables[budget.QOI_TITLES["H2b(ii)"]][2]
     assert bootstrap[3].startswith("not estimated: no ci_mc_se in these results")
     assert bootstrap[4] == "0.002 (lower 0.001, upper 0.002)"  # the second system has the keys
-    assert tables[budget.QOI_TITLES["H2a(i)"]][4][3] == budget.LM_ABSENT
-    assert "V4 absent" in tables[budget.QOI_TITLES["H2a(i)"]][0][3]
+    assert tables[budget.QOI_TITLES["H2a(i)"]][4][3] == budget.LM_NOT_READ
+    # the old fake V4 has convergence entries but no used_M: R12(c), a distinct reason
+    assert tables[budget.QOI_TITLES["H2a(i)"]][0][3].endswith(
+        "F1 not computable: V4 present but used_M missing")
     discretization = tables[budget.QOI_TITLES["H2a(i)"]][3][4]
     assert discretization.startswith("0 (LPC.NV.1") and "V6 not in these results" in discretization
 
@@ -524,11 +531,13 @@ def test_coverage_constants_equal_the_wu0006_documents() -> None:
         m = re.match(r"C4h s(1\.5|2) phi0\s+p_ref ([\d.]+) \(([\d.]+)\)", ln)
         if m:
             log[("C4h" + m.group(1), 0.0)] = (float(m.group(2)), float(m.group(3)))
-    assert len(counts) >= 16 and len(reference) == 18 and len(log) == 2
+    c4h = re.search(r"C4h sigma 1\.5: \d+ / (\d+).*?sigma 2: \d+ / (\d+)",
+                    WU0006_UNIT.read_text(encoding="utf-8"))
+    assert len(counts) >= 16 and len(reference) == 18 and len(log) == 2 and c4h
     for key, case in budget.COVERAGE_WU0006.items():
         if key[0].startswith("C4h"):
             assert (case.rate, case.rate_se) == log[key], key
-            assert case.count == {"C4h1.5": 965, "C4h2": 984}[key[0]]  # WU-0006 Log, F5 row
+            assert case.count == int(c4h.group(1 if key[0] == "C4h1.5" else 2)), key
             continue
         assert case.count == counts[key], key
         assert (case.rate, case.rate_se, case.n_states) == reference[key], key
@@ -701,6 +710,7 @@ def test_lm_row_reads_the_summary_when_a_path_is_set(monkeypatch: pytest.MonkeyP
     assert row[3].startswith("not estimated: residual and iteration summary do not convert")
     assert "median residual/(3.36ρ²) = 2, fraction no decrease = 0.25" in row[3]
     assert row[4] == budget.LM_ABSENT and row[6] == "not estimated"
+    assert budget.LM_ABSENT == "not estimated: WU-0005.4 summary absent from results"
 
 
 def test_text_under_every_table() -> None:
@@ -714,8 +724,9 @@ def test_text_under_every_table() -> None:
     results, systems = budget_results(full_system(), names=("lorenz63",))
     text = "\n".join(budget.budget_lines(results, systems, SMOKE))
     assert text.count("Interval label — procedure:") == 5
-    assert text.count("Seed: DEVELOPMENT (DEV-0); the interval-procedure row: synthetic, seed "
-                      "6006, not a registered seed.") == 5
+    assert text.count("Seed: DEVELOPMENT (DEV-0); the interval-procedure row: reference rates "
+                      "from scratch seed 20261011 (m2_coverage.py), run-2 counts from seed 6006 "
+                      "(make_rng(6006, \"wu0006\", ...)); neither is a registered seed.") == 5
     assert text.count(budget.WIDENING_SENTENCE) == 5 == text.count(budget.CONDITIONAL_SENTENCE)
     assert text.count(budget.H3C_SENTENCE) == 1 == text.count("Conditional on the fitted A4")
     assert text.count(budget.ITERATIVE_SENTENCE) == 5
@@ -733,3 +744,182 @@ def test_markdown_has_the_budget_section_between_validation_and_robustness(
     assert heads.count(budget.BUDGET_HEADING) == 1
     i = heads.index(budget.BUDGET_HEADING)
     assert heads[i - 1] == "## Validation gate" and heads[i + 1] == "## Figures"
+
+
+def test_coverage_r_ref_is_the_hand_transcription_of_the_math_note() -> None:
+    """R_ref of each case: 40000 for C1, C4, C8; 20000 for C3, C7 and C4h (hand transcription).
+
+    Reference: the applied-mathematician's statement (fix round 1) from the math note and its
+    scripts: the C7 pooled 60000 applies to its verdict counts only. The note gives the range
+    "10^4 to 4*10^4" generically, so this is a transcription, not a parse. Exact.
+    """
+    expected = {"C1": 40000, "C4": 40000, "C8": 40000, "C3": 20000, "C7": 20000,
+                "C4h1.5": 20000, "C4h2": 20000}
+    assert {k: v.r_ref for k, v in budget.COVERAGE_WU0006.items()} == {
+        (case, phi): r for case, r in expected.items() for phi in (0.0, 0.3)
+        if (case, phi) in budget.COVERAGE_WU0006}
+
+
+def test_interval_procedure_cell_names_both_seed_sources_and_def0020_correctly() -> None:
+    """R9 and R13: reference seed 20261011 with R_ref and run-2 seed 6006; DEF-0020 stated truly.
+
+    Reference: the review's wording (the reference rates come from the scratch seed 20261011, the
+    run-2 counts from make_rng(6006, ...)); DEF-0020's Resolution (Option C or K only decides
+    whether the WU-0006 ROADMAP-bound rows stay asserted; widening or another procedure is a
+    separate design question). The widening sentence cites the uq-budget rule, not DEF-0020 or
+    DEC-0018. Exact substring checks.
+    """
+    results, systems = budget_results(full_system(), names=("lorenz63",))
+    tables = tables_of(budget.budget_lines(results, systems, SMOKE))
+    h2b = tables[budget.QOI_TITLES["H2b(ii)"]][8][2]
+    assert "R_ref 40000" in h2b and "scratch seed 20261011" in h2b and "seed 6006" in h2b
+    assert "R_ref 20000" in tables[budget.QOI_TITLES["H3c"]][8][2]
+    assert "decides only whether the WU-0006 ROADMAP-bound coverage rows stay asserted (K) or " \
+        "become recorded characterization rows" in h2b
+    assert "separate, undecided design question for the owner and the applied-mathematician" in h2b
+    assert "widening or another procedure (Option C or K)" not in h2b
+    assert "registered seed" in h2b and "synthetic, seed 6006" not in h2b
+    assert "DEF-0020" not in budget.WIDENING_SENTENCE and "DEC-0018" not in budget.WIDENING_SENTENCE
+    assert "uq-budget skill is to widen the interval or refine" in budget.WIDENING_SENTENCE
+
+
+def test_included_cell_of_the_oracle_row_is_per_qoi() -> None:
+    """R10: the Included cell of row 1 is the applied-mathematician's wording for each QoI.
+
+    Reference: the wording supplied in fix round 1, written out here; each at most 140 characters;
+    H3c says the test-state M draws do not enter and the fit-stage noise is conditioned on; no
+    table says the variance is inside "every" primary interval; the H2a(ii) table carries the note
+    that the w* = 1 part is decided once on the full sample. Exact.
+    """
+    results, systems = budget_results(full_system(), names=("lorenz63",))
+    lines = budget.budget_lines(results, systems, SMOKE)
+    tables = tables_of(lines)
+    expected = {
+        "H2a(i)": "variance: yes (states resampled with their M-draw w*; eligibility redone in "
+                  "each resample; asymptotic for a median); finite-M bias: no",
+        "H2a(ii)": "variance: yes in every part (target, domain and seed controls resampled with "
+                   "the states; asymptotic); finite-M bias: no",
+        "H2b(i)": "variance: yes (mean of per-state Spearman values, each from that state's own "
+                  "draws); finite-M bias: no",
+        "H2b(ii)": "variance: yes (mean of per-state paired changes; same unit draws at both "
+                   "N_lib); finite-M clip-boundary bias: no",
+        "H3c": "no: test-state M draws do not enter the QoI; fit-stage M-draw noise (A4 proxies; "
+               "A5 tree, leaf weights, K) is conditioned on"}
+    for qoi, text in expected.items():
+        cell = tables[budget.QOI_TITLES[qoi]][0][4]
+        assert cell == text and len(cell) <= 140, qoi
+    text = "\n".join(lines)
+    assert "inside every primary" not in text and "propagates through the state resampling" not in text
+    assert text.count(budget.H2A_ONE_NOTE) == 1
+    assert budget.H2A_ONE_NOTE == ("Whether the w* = 1 part is added at all is decided once on "
+                                   "the full sample and is not resampled.")
+
+
+def test_not_estimated_reasons_are_true_in_each_reachable_case() -> None:
+    """R12 (a) to (e): each reason names its own cause; hand-written expected texts.
+
+    Reference: the review's wording and the code paths: (a) an unavailable H2b(ii) (``ci`` None,
+    no ``ci_mc_se``, as ``_unavailable`` writes it) reads "no interval in these results", not
+    "written before WU-0008.2a"; (b) F2 with V4's used M equal to its largest M, with no states,
+    with a non-finite deviation, each its own reason; (c) V4 absent, V4 without used_M, V4 without
+    the entry of the used M; (d) smoke has two noise levels: "across the 2 ρ cells", and the
+    pilot's four give "across the 4 ρ cells"; (e) A5_vs_Astar None reads "not computable (A2 ≤
+    A*)", A4_vs_A4o "(A2 ≤ A4o)", a missing key "not available". Exact substring checks.
+    """
+    def table(system: dict, config=SMOKE) -> dict:  # noqa: ANN001
+        results, systems = budget_results(system, names=("lorenz63",))
+        return tables_of(budget.budget_lines(results, systems, config))
+
+    unavailable = full_system()
+    unavailable["H2b"]["library_change"] = {"mean_change": None, "ci": None, "level": 1.0 - 0.05 / 3.0,
+                                            "n_states": None, "n_failed_resamples": None}
+    rows = table(unavailable)[budget.QOI_TITLES["H2b(ii)"]]
+    assert rows[2][3] == "not estimated: no interval in these results"
+    assert "written before WU-0008.2a" not in rows[2][3]
+
+    def f2_text(mutate) -> str:  # noqa: ANN001
+        system = full_system()
+        mutate(system)
+        return table(system)[budget.QOI_TITLES["H2b(ii)"]][0][3]
+
+    same_m = f2_text(lambda s: s["validation"]["convergence"].pop(str(4 * SMOKE.n_oracle_draws)))
+    assert same_m.endswith("share not computable: V4 has no larger M than the one used (M = 30)")
+    no_states = f2_text(lambda s: s["H2b"]["library_change"].update(n_states=0))
+    assert no_states.endswith("share not computable: the number of states of the change is "
+                              "missing")
+    no_dev = f2_text(lambda s: s["validation"]["convergence"][str(SMOKE.n_oracle_draws)].pop(
+        "mean_abs_dev_from_max"))
+    assert no_dev.endswith("share not computable: V4's mean_abs_dev_from_max is missing or not "
+                           "finite")
+    absent = f2_text(lambda s: s["validation"].pop("convergence"))
+    assert absent.endswith("share not computable: V4 absent from these results")
+    no_used = f2_text(lambda s: s["validation"]["convergence"].pop("used_M"))
+    assert no_used.endswith("share not computable: V4 present but used_M missing")
+    no_entry = f2_text(lambda s: s["validation"]["convergence"].pop(str(SMOKE.n_oracle_draws)))
+    assert no_entry.endswith("share not computable: V4 present but its entry for the used M = 30 "
+                             "(or its median_half_width) is missing")
+    f1_absent = table({**full_system(), "validation": {}})[budget.QOI_TITLES["H2a(i)"]][0][3]
+    assert f1_absent.endswith("; F1 not computable: V4 absent from these results")
+
+    assert "across the 2 ρ cells" in table(full_system())[budget.QOI_TITLES["H2b(i)"]][0][3]
+    four = dataclasses.replace(SMOKE, noise_levels=(0.005, 0.01, 0.02, 0.05))
+    assert "across the 4 ρ cells" in table(full_system(), four)[
+        budget.QOI_TITLES["H2b(i)"]][0][3]
+
+    proxy = full_system()
+    proxy["oracle_recovery"] = {"A4_vs_A4o": None, "A5_vs_Astar": float("nan")}
+    text = table(proxy)[budget.QOI_TITLES["H3c"]][6][3]
+    assert "A4 recovers not computable (A2 ≤ A4o) gain over A2" in text
+    assert "A5 recovers not computable (A2 ≤ A*) gain" in text
+    proxy["oracle_recovery"] = {"A4_vs_A4o": 0.5}
+    assert "A5 recovers not available (no A5_vs_Astar in these results) gain" in table(proxy)[
+        budget.QOI_TITLES["H3c"]][6][3]
+
+
+def test_f1_uses_the_number_of_long_horizons_of_the_configuration() -> None:
+    """R16: F1's horizon count k comes from ``eval_horizons_lyapunov`` (those at least 1 LT).
+
+    Reference: M3: F1 = (k/sqrt(pi)) h/z for k = 2 or 3, h = 0.01 here; the default configuration
+    has 1, 2, 4 LT (k = 3); (0.5, 1, 2) has k = 2: F1 = 2/sqrt(pi) * 0.01 / 1.959963984540054;
+    four long horizons are not tabulated: "F1 not computable: tabulated for 2 or 3 horizons, this
+    configuration has 4". Exact text; the numbers are checked at 3 significant digits.
+    """
+    from scipy.stats import norm
+
+    def cell(config) -> str:  # noqa: ANN001
+        results, systems = budget_results(full_system(), names=("lorenz63",))
+        return tables_of(budget.budget_lines(results, systems, config))[
+            budget.QOI_TITLES["H2a(i)"]][0][3]
+
+    z = norm.ppf(0.975)
+    assert f"F1 = {3 / math.sqrt(math.pi) * 0.01 / z:.3g} (independent draw noise across 3 " \
+        "horizons" in cell(SMOKE)
+    two = dataclasses.replace(SMOKE, eval_horizons_lyapunov=(0.5, 1.0, 2.0))
+    assert f"F1 = {2 / math.sqrt(math.pi) * 0.01 / z:.3g} (independent draw noise across 2 " \
+        "horizons" in cell(two)
+    four = dataclasses.replace(SMOKE, eval_horizons_lyapunov=(1.0, 2.0, 4.0, 8.0))
+    assert cell(four).endswith("F1 not computable: tabulated for 2 or 3 horizons, this "
+                               "configuration has 4")
+
+
+def test_lm_row_text_is_true_whatever_the_merge_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    """R16: with ``LM_SUMMARY_PATH`` None the row says the path is not set, and reads nothing.
+
+    Reference: the review: "not read: LM_SUMMARY_PATH not set until WU-0005.4 merges" must hold
+    even if a summary is present in the results (a WU-0005.4 that merged first). Once the path is
+    set and the summary missing the row says "absent from results"; with it present it reads it.
+    """
+    system = full_system()
+    system["handling"] = {"lm": {"median_residual": 1.0, "fraction_no_decrease": 0.0}}
+    results, systems = budget_results(system, names=("lorenz63",))
+
+    def cell() -> str:
+        return tables_of(budget.budget_lines(results, systems, SMOKE))[
+            budget.QOI_TITLES["H3c"]][4][3]
+
+    assert cell() == ("not estimated: LM_SUMMARY_PATH not set (the location of the WU-0005.4 "
+                      "summary is not read until WU-0005.4 merges)")
+    monkeypatch.setattr(budget, "LM_SUMMARY_PATH", ("handling", "missing"))
+    assert cell() == "not estimated: WU-0005.4 summary absent from results"
+    monkeypatch.setattr(budget, "LM_SUMMARY_PATH", ("handling", "lm"))
+    assert "median residual/(3.36ρ²) = " in cell()

@@ -531,6 +531,28 @@ Result of run 8: `3 failed, 369 passed in 34.03s`. (a) Two tests in `test_budget
 
 Result of run 9: `372 passed in 33.33s`. Report-only at this head: the base smoke results give 4393 leaves, 0 different (the budget section and the other additions are report text); the stored DEV-0 pilot results (old schema: no `ci_mc_se`, no LM summary, no `used_M`) render all five tables with "not estimated: no ci_mc_se in these results (written before WU-0008.2a)" and no exception. **Pending, because `pgrep -fa 'lpcstudy --preset'` still shows the `v1-baseline` pilot:** the full A1 smoke comparison at this head (base smoke is `runs/base/smoke`; `leafcmp.py` as above), the integration pair, and the slow exact-check nodes for C4, C7, C8 (DEC-0021 O6).
 
+### 2026-10-11, developer claude-sonnet-5-5: fix round 1 of the .2a and .1/.2b review (R9 to R16)
+
+Corrections to earlier Log statements (append-only; the earlier text stands): (1) the paragraph after test run 9 says the DEV-0 pilot results have no `used_M`. That is wrong: they have `convergence.used_M` (200) in all three systems and the pilot report prints F1 and F2; what the old-schema pilot lacks is `ci_mc_se` and the LM summary. (2) The `QOI_COVERAGE` docstring said C1 is "cited beside" H2b(i); the cell never printed it. Decision: the claim is dropped from the docstring (the C1 constants stay as data, checked by B4, and are not printed). (3) The `.2a` entry's "no `used_M`" has the same origin as (1).
+
+Changes: R9 `CoverageCase.r_ref` (40000 for C1, C4, C8; 20000 for C3, C7, C4h; docstring "2*10^4 to 4*10^4", the C7 pooled 60000 not used), the seed statement names both sources (`COVERAGE_SEEDS_TEXT`, replaces "synthetic, seed 6006") and R_ref is printed per case; R10 `ORACLE_INCLUDED` per QoI (the mathematician's wording, verbatim), the row-1 How text no longer says the variance propagates, a note under the H2a(ii) table about the "one" part; R11 `ITERATIVE_LABEL` appended to `interval_label` of H2a, H2b, H3c (the budget-table sentence is kept); R12 (a) `ci` None reads "no interval in these results" before the `ci_mc_se` text, (b) each F2 cause has its own reason, (c) `_v4` returns the reason (absent / used_M missing / entry missing), (d) the rho-cell count comes from `config.noise_levels`, (e) `A5_vs_Astar` reads "not computable (A2 ≤ A*)", a missing key "not available"; R13 `DEF0020_TEXT` (mathematician's wording) and `WIDENING_SENTENCE` (the uq-budget rule, the owner's choice); R14 B4 parses the C4h counts, A2 asserts H2e carries no `ci_mc_se` (H2c is not exercised: stated), the E3 docstring says what the F = 12 expectation checks; R16 `LM_NOT_READ` while `LM_SUMMARY_PATH` is None (true whatever the merge order; `LM_ABSENT` only once a path is set), F1's k from the configuration (2 or 3 horizons tabulated; otherwise "F1 not computable"). The filename elision and `test_identifiers.py` are untouched. Tests added per reason: `test_budget.py` (R9/R13 text, R10 cells, R12 a to e, R16 F1 and LM, r_ref transcription).
+
+**Test run 10 (R9 to R16).** Checklist:
+1. Change set: `lpcstudy/budget.py`, `tests/unit/test_budget.py`, `tests/unit/test_analysis.py` (A2 assertion and docstring), `tests/unit/test_statistics.py` (docstring only), this file.
+2. Radius: `tools/test_impact.py --base develop --explain`: unit `test___main__`, `test_allocation`, `test_analysis`, `test_budget`, `test_experiments`, `test_identifiers`, `test_pipeline`, `test_report`, `test_statistics`, `test_tools_test_impact`, `test_validation`; integration not run (a preset is running).
+3. Already run? No: `budget.py` and tests changed after run 9.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s.
+6. Contention: unit tier; `pgrep -fa 'lpcstudy --preset'` shows the `v1-baseline` pilot, so no preset, integration or slow run.
+7. Output: wrapper's `-q --tb=short -rfE`.
+8. Command: `LPC_THREADS=4 tools/run_tests.sh unit tests/unit/test___main__.py tests/unit/test_allocation.py tests/unit/test_analysis.py tests/unit/test_budget.py tests/unit/test_experiments.py tests/unit/test_identifiers.py tests/unit/test_pipeline.py tests/unit/test_report.py tests/unit/test_statistics.py tests/unit/test_tools_test_impact.py tests/unit/test_validation.py`.
+
+Result of run 10: `2 failed, 363 passed in 26.78s`, both test errors of mine in `test_budget.py`: (a) the old-schema assertion expected "V4 absent", but that fake V4 has convergence entries without `used_M`, which R12(c) now (correctly) reports as "V4 present but used_M missing"; (b) the R12(a) case stored the level 0.98 instead of 1 - 0.05/3, which `row_level` rightly refused. Both fixed in the tests; `--lf`: `2 passed`.
+
+**Test run 11 (radius once after those two test fixes).** Checklist: 1. change set as run 10 plus the two assertions. 2. radius as run 10. 3. already run? No: the test file changed. 4. `JAX_PLATFORMS=cpu`. 5. `LPC_THREADS=4`, unit timeout 300 s. 6. unit tier, the pilot is running, no preset started. 7. `-q --tb=short -rfE`. 8. command as run 10.
+
+Result of run 11: `365 passed in 28.31s`. Report-only on the stored DEV-0 pilot results at this head: no exception, F1 printed in the H2a(i) table, "not estimated: no ci_mc_se in these results (written before WU-0008.2a)" in the bootstrap row (the pilot predates .2a). **Still pending (the `v1-baseline` pilot is running):** (1) the A1 smoke at the head: `LPC_THREADS=4 tools/run_preset.sh smoke DEV-0 runs/new`, then `.venv/bin/python <scratchpad>/leafcmp.py runs/base/smoke/results.json runs/new/smoke/results.json`; the new-only leaves must be the `ci_mc_se` ones, all null at smoke (B = 50, rule 3); (2) the integration pair: `LPC_THREADS=4 tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`; (3) the slow exact checks: `tools/run_tests.sh slow --background "tests/slow/test_analysis_coverage.py::test_exact_checks[C4-0.0]" "...[C4-0.3]" "...[C7-0.0]" "...[C7-0.3]" "...[C8-0.0]" "...[C8-0.3]"` (node ids as in `--collect-only`, once).
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
@@ -818,6 +840,18 @@ Scope: a8bdf0b (.2a) and df40a3b (.1/.2b, R8), against the plan, the design M1 t
 - R14 to R16 are minor.
 - The merge also waits for A1, the integration pair and the slow exact checks above.
 - 8 findings (R9 to R16).
+
+### Developer answers, review of .2a and .1/.2b, round 1 (claude-sonnet-5-5)
+
+- **R9:** fixed in the commit that follows this entry (both seed sources, `r_ref`, docstring range; tests).
+- **R10:** fixed in the same commit (`ORACLE_INCLUDED` with the supplied wording; notes; test).
+- **R11:** fixed in the same commit (`ITERATIVE_LABEL` in the primary labels; label test).
+- **R12:** fixed in the same commit, (a) to (e), with a test per reason.
+- **R13:** fixed in the same commit (`DEF0020_TEXT`, `WIDENING_SENTENCE`; test).
+- **R14:** fixed in the same commit (C4h counts parsed; A2 asserts H2e and says H2c is not exercised; E3 docstring).
+- **R15:** corrected in the Log (append-only, above); the C1 claim is dropped from the docstring.
+- **R16:** fixed in the same commit (`LM_NOT_READ`; F1's k from the configuration).
+- The first-round filename elision and `test_identifiers.py` are left as instructed.
 
 ## Audit
 

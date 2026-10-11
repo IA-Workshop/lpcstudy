@@ -101,6 +101,8 @@ def _dependence(config: StudyConfig, what: str = "test states") -> str:
             f"(Künsch 1989), so dependence is kept within a block and none is assumed beyond it")
 
 
+ITERATIVE_LABEL = ("iterative error: the fixed 15-iteration Levenberg–Marquardt error of the PLP "
+                   "estimator is not estimated and is unverified (DEC-0024)")
 H3B_COVERAGE = ("coverage not measured: the interval conditions on the fitted proxies and is not "
                 "guaranteed to cover, because the split variable can switch between resamples "
                 "(the bootstrap of a non-smooth functional; the WU-0006 coverage study has no "
@@ -162,7 +164,9 @@ def interval_label(row: Hypothesis, level: float, config: StudyConfig) -> str:
                         "every part of the criterion must pass")
     label = (f"procedure: {procedure}; level: {level_text(level)}; dependence: {dependence}; "
              f"multiplicity: {multiplicity}")
-    return f"{label}; {H3B_COVERAGE}" if row.key == "H3b" else label
+    if row.key == "H3b":
+        return f"{label}; {H3B_COVERAGE}"
+    return f"{label}; {ITERATIVE_LABEL}" if row.key in PRIMARY_KEYS else label
 
 
 def interval_label_lines(results: dict, systems: list[str], config: StudyConfig) -> list[str]:
@@ -372,10 +376,15 @@ FLAG_FRACTION = 0.1
 fraction of it (M9; the skill's "at least 10 times smaller" differs only at equality)."""
 LM_SUMMARY_PATH: tuple[str, ...] | None = None
 """Key path, below a system's results, of the WU-0005.4 iteration summary (``median_residual``,
-``fraction_no_decrease``). Set when WU-0005.4 names it; until then the row reads "not estimated:
-WU-0005.4 summary absent from results"."""
+``fraction_no_decrease``). Set when WU-0005.4 names it. While it is ``None`` the row says the path
+is not set and reads nothing (true whether or not WU-0005.4 has merged); once set, the row reads
+the summary and says "absent from results" only when it is not there."""
+LM_NOT_READ = ("not estimated: LM_SUMMARY_PATH not set (the location of the WU-0005.4 summary is "
+               "not read until WU-0005.4 merges)")
 LM_ABSENT = "not estimated: WU-0005.4 summary absent from results"
-SYNTHETIC_SEED_TEXT = "synthetic, seed 6006, not a registered seed"
+COVERAGE_SEEDS_TEXT = ("reference rates from scratch seed 20261011 (m2_coverage.py), run-2 counts "
+                       "from seed 6006 (make_rng(6006, \"wu0006\", ...)); neither is a "
+                       "registered seed")
 CONDITIONAL_SENTENCE = ("Conditional on one realization per system of the trajectory, the library "
                         "noise and the trained networks. Between-realization variability is not "
                         "estimated (v3 section 8, future work).")
@@ -385,7 +394,16 @@ ITERATIVE_SENTENCE = ("The iterative (Levenberg–Marquardt) error is not estima
                       "numerical error of this QoI is partly unverified (PRIME.3, NVVUQ.9; "
                       "DEC-0024).")
 WIDENING_SENTENCE = ("A numerical row at or above 10% of the sampling half-width is flagged, not "
-                     "widened; widening an interval is the owner's decision (DEF-0020, DEC-0018).")
+                     "widened: the rule of the uq-budget skill is to widen the interval or "
+                     "refine, and which of the two is the owner's choice; this report does not "
+                     "widen.")
+DEF0020_TEXT = ("DEF-0020: Option C or K (DEC-0018; owner, pending; K in force by default via "
+                "ASSERT_ROADMAP_BOUNDS = True) decides only whether the WU-0006 ROADMAP-bound "
+                "coverage rows stay asserted (K) or become recorded characterization rows with "
+                "the consistency ranges as the defect test (C); neither changes a bound, level "
+                "or R. Whether the study widens its intervals or uses another procedure (longer "
+                "block, studentized, BCa) is a separate, undecided design question for the owner "
+                "and the applied-mathematician")
 
 
 @dataclass(frozen=True)
@@ -395,10 +413,15 @@ class CoverageCase:
     Attributes
     ----------
     rate : float
-        Reference coverage of the block-5 percentile interval (independent implementation,
-        R_ref 10^4 to 4*10^4, SE below 0.0013).
+        Reference coverage of the block-5 percentile interval (independent implementation, scratch
+        seed 20261011, R_ref 2*10^4 to 4*10^4 for the cases used here, SE below 0.0013; the
+        range 10^4 to 4*10^4 of the math note includes C6, which no QoI uses).
     rate_se : float
         Monte Carlo SE of ``rate``.
+    r_ref : int
+        Replications of the reference run (hand transcription from the math note and its scripts:
+        40000 for C1, C4, C8; 20000 for C3, C7, C4h; the C7 pooled 60000 applies to its verdict
+        counts only, not to the coverage rate).
     count : int
         Run-2 coverage count out of 1000 (the production check, beside the reference).
     n_states : int
@@ -409,6 +432,7 @@ class CoverageCase:
 
     rate: float
     rate_se: float
+    r_ref: int
     count: int
     n_states: int
     design: str
@@ -417,21 +441,23 @@ class CoverageCase:
 COVERAGE_PROVENANCE = ("WU-0006 run 2, log `runs/tests/slow-20261011…165447Z.log` (the letter "
                        "between date and time elided: it would match the stale-identifier grep "
                        "of test_identifiers), Log table at "
-                       "b73bbed; reference rates from docs/agent/notes/2026-10-11-math-wu0006.md "
-                       "and, for C4h, docs/agent/notes/2026-10-11-math-wu0008-scripts/m7b.log")
+                       "b73bbed; reference rates (scratch seed 20261011, m2_coverage.py) from "
+                       "docs/agent/notes/2026-10-11-math-wu0006.md and, for C4h, "
+                       "docs/agent/notes/2026-10-11-math-wu0008-scripts/m7b.log, which only "
+                       "transcribes them")
 COVERAGE_WU0006: dict[tuple[str, float], CoverageCase] = {
-    ("C1", 0.0): CoverageCase(0.9800, 0.0007, 983, 500, "mean, Gaussian AR(1)"),
-    ("C1", 0.3): CoverageCase(0.9695, 0.0009, 969, 500, "mean, Gaussian AR(1)"),
-    ("C3", 0.0): CoverageCase(0.9807, 0.0010, 984, 500, "median, Gaussian AR(1)"),
-    ("C3", 0.3): CoverageCase(0.9732, 0.0011, 973, 500, "median, Gaussian AR(1)"),
-    ("C4", 0.0): CoverageCase(0.9772, 0.0007, 971, 500, "ratio of means, log-normal pair, sigma 1"),
-    ("C4", 0.3): CoverageCase(0.9715, 0.0008, 961, 500, "ratio of means, log-normal pair, sigma 1"),
-    ("C7", 0.0): CoverageCase(0.9794, 0.0010, 972, 500, "partial correlation, interior part"),
-    ("C7", 0.3): CoverageCase(0.9762, 0.0011, 977, 500, "partial correlation, interior part"),
-    ("C8", 0.0): CoverageCase(0.9806, 0.0007, 987, 300, "paired mean, Gaussian AR(1)"),
-    ("C8", 0.3): CoverageCase(0.9682, 0.0009, 972, 300, "paired mean, Gaussian AR(1)"),
-    ("C4h1.5", 0.0): CoverageCase(0.9744, 0.0011, 965, 500, "ratio of means, log-normal, sigma 1.5"),
-    ("C4h2", 0.0): CoverageCase(0.9669, 0.0013, 984, 500, "ratio of means, log-normal, sigma 2"),
+    ("C1", 0.0): CoverageCase(0.9800, 0.0007, 40000, 983, 500, "mean, Gaussian AR(1)"),
+    ("C1", 0.3): CoverageCase(0.9695, 0.0009, 40000, 969, 500, "mean, Gaussian AR(1)"),
+    ("C3", 0.0): CoverageCase(0.9807, 0.0010, 20000, 984, 500, "median, Gaussian AR(1)"),
+    ("C3", 0.3): CoverageCase(0.9732, 0.0011, 20000, 973, 500, "median, Gaussian AR(1)"),
+    ("C4", 0.0): CoverageCase(0.9772, 0.0007, 40000, 971, 500, "ratio of means, log-normal pair, sigma 1"),
+    ("C4", 0.3): CoverageCase(0.9715, 0.0008, 40000, 961, 500, "ratio of means, log-normal pair, sigma 1"),
+    ("C7", 0.0): CoverageCase(0.9794, 0.0010, 20000, 972, 500, "partial correlation, interior part"),
+    ("C7", 0.3): CoverageCase(0.9762, 0.0011, 20000, 977, 500, "partial correlation, interior part"),
+    ("C8", 0.0): CoverageCase(0.9806, 0.0007, 40000, 987, 300, "paired mean, Gaussian AR(1)"),
+    ("C8", 0.3): CoverageCase(0.9682, 0.0009, 40000, 972, 300, "paired mean, Gaussian AR(1)"),
+    ("C4h1.5", 0.0): CoverageCase(0.9744, 0.0011, 20000, 965, 500, "ratio of means, log-normal, sigma 1.5"),
+    ("C4h2", 0.0): CoverageCase(0.9669, 0.0013, 20000, 984, 500, "ratio of means, log-normal, sigma 2"),
 }
 """WU-0006 coverage at level 1 - 0.05/3, by (case, phi): the reference rate with its SE as the
 size, the run-2 count beside it (O3 of DEC-0021: constants with provenance; tests parse the
@@ -452,8 +478,9 @@ QOI_COVERAGE: dict[str, dict[str, tuple[tuple[str, float], ...]]] = {
     "H2b(ii)": {"": (("C8", 0.0), ("C8", 0.3))},
     "H3c": {"": (("C4", 0.0), ("C4", 0.3), ("C4h1.5", 0.0), ("C4h2", 0.0))}}
 """WU-0006 cases mapped to each QoI and part (M7): H2a(i) is a proxy (C3); the zero and the
-w* = 1 parts of H2a(ii) have no case; H2b(i) is C8 (one per-state series at the sweep size, C1
-cited beside it)."""
+w* = 1 parts of H2a(ii) have no case; H2b(i) is C8 (one per-state series at the sweep size). The
+C1 constants are kept as data (M7 allows citing C1 beside H2b(i)) but the cell does not print
+them."""
 
 ROW_NAMES = (
     ("Oracle Monte Carlo (M draws per state)", "aleatory"),
@@ -465,8 +492,24 @@ ROW_NAMES = (
     ("Proxy error (deployable against oracle)", "estimator"),
     ("Model form: exact model, three systems, scalar observable", "epistemic"),
     ("Interval procedure (coverage of the block-5 percentile interval)", "statistical method"))
-INCLUDED = ("variance: yes (propagated); finite-M bias: no", "yes", "no", "no", "no", "no",
-            "reported separately", "no", "no")
+INCLUDED = ("", "yes", "no", "no", "no", "no", "reported separately", "no", "no")
+"""The "included in the reported interval?" cell of each row; row 0 is per QoI (``ORACLE_INCLUDED``)."""
+ORACLE_INCLUDED = {
+    "H2a(i)": "variance: yes (states resampled with their M-draw w*; eligibility redone in each "
+              "resample; asymptotic for a median); finite-M bias: no",
+    "H2a(ii)": "variance: yes in every part (target, domain and seed controls resampled with the "
+               "states; asymptotic); finite-M bias: no",
+    "H2b(i)": "variance: yes (mean of per-state Spearman values, each from that state's own "
+              "draws); finite-M bias: no",
+    "H2b(ii)": "variance: yes (mean of per-state paired changes; same unit draws at both N_lib); "
+               "finite-M clip-boundary bias: no",
+    "H3c": "no: test-state M draws do not enter the QoI; fit-stage M-draw noise (A4 proxies; A5 "
+           "tree, leaf weights, K) is conditioned on"}
+"""Row 1 of the Included column by QoI (the applied-mathematician's wording, fix round 1; it
+amends M1 and decision (a): the M-draw variance is inside the interval of H2a and H2b, and not in
+H3c's)."""
+H2A_ONE_NOTE = ("Whether the w* = 1 part is added at all is decided once on the full sample and is "
+                "not resampled.")
 BUDGET_HEADING = "## Uncertainty budget (NVVUQ.15)"
 
 NOT_ESTIMATED = "not estimated: "
@@ -603,47 +646,74 @@ def _parts_of(qoi: str, system: dict) -> list[_Part] | None:
                   block.get("n_states"))]
 
 
-def _v4(system: dict) -> tuple[float, float, int, int] | None:
-    """V4's median half-width, mean absolute deviation, used M and largest M, or ``None``."""
+def _v4(system: dict) -> tuple[tuple[float, float, int, int] | None, str]:
+    """V4's median half-width, mean absolute deviation, used M and largest M, with a reason.
+
+    Returns ``(values, "")`` or ``(None, reason)``; the reasons tell apart V4 absent, V4 present
+    without ``used_M``, and V4 present without the entry (or ``median_half_width``) of the used M.
+    """
     conv = system.get("validation", {}).get("convergence")
-    if not isinstance(conv, dict) or "used_M" not in conv:
-        return None
+    if not isinstance(conv, dict):
+        return None, "V4 absent from these results"
+    if "used_M" not in conv:
+        return None, "V4 present but used_M missing"
     used = int(conv["used_M"])
     entry = conv.get(str(used))
     if not isinstance(entry, dict) or "median_half_width" not in entry:
-        return None
+        return None, f"V4 present but its entry for the used M = {used} (or its median_half_width) is missing"
     largest = max(int(k) for k in conv if str(k).isdigit())
     return (float(entry["median_half_width"]), float(entry.get("mean_abs_dev_from_max", math.nan)),
-            used, largest)
+            used, largest), ""
 
 
-def _oracle_cell(qoi: str, part: _Part, system: dict, level: float) -> tuple[str, str]:
-    """Row 1: the finite-M bias statement of M3, with F1 or F2 where a formula exists."""
+def _long_horizons(config: StudyConfig) -> int:
+    """Number of horizons of at least 1 LT, over which H2a(i) takes its initial segments."""
+    return sum(1 for h in config.eval_horizons_lyapunov if h >= 1.0)
+
+
+def _oracle_cell(qoi: str, part: _Part, system: dict, config: StudyConfig, level: float
+                 ) -> tuple[str, str]:
+    """Row 1: the finite-M bias statement of M3, with F1 or F2 where a formula exists.
+
+    Each "not computable" reason names its own cause (V4 absent, V4 without ``used_M``, V4
+    without the entry of the used M, no larger M, a missing number of states, a non-finite
+    deviation).
+    """
     flag = "not estimated"
     if qoi == "H2a(i)":
-        v4 = _v4(system)
-        bound = ("; V4 absent from these results" if v4 is None else
-                 f"; indicative worst case ≤ F1 = {_num(oracle_range_bound(v4[0]))} (independent "
-                 "draw noise across 3 horizons; V4 at H_ref only)")
+        v4, why = _v4(system)
+        k = _long_horizons(config)
+        if v4 is None:
+            bound = f"; F1 not computable: {why}"
+        elif k not in (2, 3):
+            bound = f"; F1 not computable: tabulated for 2 or 3 horizons, this configuration has {k}"
+        else:
+            bound = (f"; indicative worst case ≤ F1 = {_num(oracle_range_bound(v4[0], k))} "
+                     f"(independent draw noise across {k} horizons; V4 at H_ref only)")
         return (NOT_ESTIMATED + "finite-M bias upward (toward fail)" + bound, flag)
     if qoi == "H2a(ii)":
         return (NOT_ESTIMATED + "per-state draw variance on the logit scale not stored; the "
                 "classical part attenuates toward 0 (favours a pass; a fail is robust)", flag)
     if qoi == "H2b(i)":
-        return (NOT_ESTIMATED + "draw noise flips ranks across the four ρ cells and attenuates "
-                "the mean toward 0 (against a pass; a fail is not certified against it); V4 "
-                "exists only at ρ = 1%", flag)
+        return (NOT_ESTIMATED + "draw noise flips ranks across the "
+                f"{len(config.noise_levels)} ρ cells and attenuates the mean toward 0 (against a "
+                "pass; a fail is not certified against it); V4 exists only at ρ = 1%", flag)
     if qoi == "H2b(ii)":
-        v4 = _v4(system)
-        share = "variance inside the interval, share not computable (V4 absent)"
-        if v4 is not None and part.n_states and v4[2] < v4[3] and math.isfinite(v4[1]):
-            share = ("variance inside the interval, share ≈ F2 = "
-                     f"{_num(oracle_change_share(v4[1], v4[2], v4[3], part.n_states, level))}")
-        elif v4 is not None:
-            share = ("variance inside the interval, share not computable (V4 has no larger M "
-                     "than the one used)")
+        v4, why = _v4(system)
+        if v4 is None:
+            reason = f"share not computable: {why}"
+        elif not part.n_states or part.n_states < 1:
+            reason = "share not computable: the number of states of the change is missing"
+        elif not math.isfinite(v4[1]):
+            reason = "share not computable: V4's mean_abs_dev_from_max is missing or not finite"
+        elif v4[2] >= v4[3]:
+            reason = (f"share not computable: V4 has no larger M than the one used (M = {v4[2]})")
+        else:
+            reason = ("share ≈ F2 = "
+                      f"{_num(oracle_change_share(v4[1], v4[2], v4[3], part.n_states, level))}")
         return (NOT_ESTIMATED + "finite-M clip-boundary bias (≤ 0.40 s per state near a clip "
-                "bound, partly cancelling in the pair); " + share, flag)
+                "bound, partly cancelling in the pair); variance inside the interval, "
+                + reason, flag)
     return (NOT_ESTIMATED + "M-draw noise enters only through the fitted A4 and A5 inputs "
             "(the interval is conditional on them)", flag)
 
@@ -651,6 +721,8 @@ def _oracle_cell(qoi: str, part: _Part, system: dict, level: float) -> tuple[str
 def _bootstrap_cell(part: _Part, half_width: float | None, config: StudyConfig, level: float
                     ) -> tuple[str, str]:
     """Row 3: the larger endpoint SE against the half-width; the reason when it is None."""
+    if part.ci is None:
+        return NOT_ESTIMATED + "no interval in these results", "not estimated"
     if part.se is None:
         return (NOT_ESTIMATED + "no ci_mc_se in these results (written before WU-0008.2a)",
                 "not estimated")
@@ -666,10 +738,12 @@ def _bootstrap_cell(part: _Part, half_width: float | None, config: StudyConfig, 
 
 def _lm_cell(system: dict, config: StudyConfig) -> tuple[str, str]:
     """Row 5: not estimated, with the WU-0005.4 diagnostic when its keys are present (M4)."""
+    if LM_SUMMARY_PATH is None:
+        return LM_NOT_READ, "not estimated"
     block: object = system
-    for key in LM_SUMMARY_PATH or ():
+    for key in LM_SUMMARY_PATH:
         block = block.get(key) if isinstance(block, dict) else None
-    if LM_SUMMARY_PATH is None or not isinstance(block, dict):
+    if not isinstance(block, dict):
         return LM_ABSENT, "not estimated"
     floor = 3.36 * config.core_noise**2
     ratio = block.get("median_residual")
@@ -691,9 +765,11 @@ def _proxy_cell(qoi: str, system: dict) -> tuple[str, str]:
     rows = system.get("H1d", {}).get("rows") if isinstance(system.get("H1d"), dict) else None
 
     def share(key: str, reference: str) -> str:
-        value = recovery.get(key) if isinstance(recovery, dict) else None
+        if not isinstance(recovery, dict) or key not in recovery:
+            return f"not available (no {key} in these results)"
+        value = recovery[key]
         if value is None or not math.isfinite(float(value)):
-            return "not computable (A2 ≤ A4o)" if key == "A4_vs_A4o" else "not computable"
+            return f"not computable (A2 ≤ {reference})"  # the denominator is not positive (M8)
         return f"{_num(100 * float(value))}% of {reference}"
 
     def rho(name: str) -> str:
@@ -726,15 +802,15 @@ def coverage_how(qoi: str, level: float) -> str:
             f, f_se = coverage_shortfall(c.rate, c.rate_se, level)
             name = case[0] + (f" φ = {case[1]:g}")
             pieces.append(f"{(label + ': ') if label else ''}{name} (n = {c.n_states}, {c.design}"
-                          f"): reference coverage {c.rate:.4f} (SE {c.rate_se:.4f}), shortfall "
-                          f"{f:+.3f} ± {f_se:.3f} of the half-width, run 2: {c.count}/1000")
+                          f"): reference coverage {c.rate:.4f} (SE {c.rate_se:.4f}, R_ref "
+                          f"{c.r_ref}), shortfall {f:+.3f} ± {f_se:.3f} of the half-width, run 2: "
+                          f"{c.count}/1000")
     tail = ("; zero and w* = 1 parts: no WU-0006 case has a binary target"
             if qoi == "H2a(ii)" else "")
     return ("shortfall f = z_nom/z_obs − 1 of the reference coverage (WU-0006, the block-5 "
             "percentile interval at level 1 − 0.05/3); " + "; ".join(pieces) + tail + "; "
-            f"{SYNTHETIC_SEED_TEXT}; the study's residual lag-1 is unmeasured (DEC-0018 O4); "
-            "DEF-0020: widening or another procedure (Option C or K) is the owner's decision, "
-            f"pending; source: {COVERAGE_PROVENANCE}")
+            f"{COVERAGE_SEEDS_TEXT}; the study's residual lag-1 is unmeasured (DEC-0018 O4); "
+            f"{DEF0020_TEXT}; source: {COVERAGE_PROVENANCE}")
 
 
 def _coverage_cell(qoi: str, part: _Part, half_width: float | None, level: float
@@ -758,7 +834,7 @@ def _cells(qoi: str, row: int, part: _Part, system: dict, config: StudyConfig, l
     half_width = _half_width(part.ci)
     finite = half_width is not None and math.isfinite(half_width)
     if row == 0:
-        return _oracle_cell(qoi, part, system, level)
+        return _oracle_cell(qoi, part, system, config, level)
     if row == 1:
         if half_width is None:
             return NOT_ESTIMATED + "no interval in these results", "—"
@@ -791,9 +867,9 @@ def _cells(qoi: str, row: int, part: _Part, system: dict, config: StudyConfig, l
 def _how(qoi: str, row: int, config: StudyConfig, level: float) -> str:
     resamples = config.bootstrap_resamples
     return (
-        "V4 convergence check (core cell, ρ = 1%, N_lib = 10⁴, H_ref only); the variance "
-        "propagates through the state resampling, the finite-M bias is stated, not sized; F1 and "
-        "F2 are indicative formulas (WU-0008 M3)",
+        "V4 convergence check (core cell, ρ = 1%, N_lib = 10⁴, H_ref only); the finite-M bias is "
+        "stated, not sized; F1 and F2 are indicative formulas (WU-0008 M3); whether the M-draw "
+        "variance is inside the interval is in the next column",
         "moving-block bootstrap percentile interval (label below); size = half-width (hi − lo)/2",
         f"binomial error of the percentile index, converted to the statistic's scale: SE = "
         f"(Q(q + d) − Q(q − d))/2, d = √(q(1 − q)/B), B = {resamples} "
@@ -850,11 +926,13 @@ def _table(qoi: str, results: dict, systems: list[str], config: StudyConfig, lev
             f"{s}: {flag}" for s, flag in zip(systems, flags))
         cells = [name, kind, _how(qoi, row, config, level).replace("|", "\\|")]
         cells += [text.replace("|", "\\|") for text in sizes]
-        cells += [INCLUDED[row], flag_cell]
+        cells += [ORACLE_INCLUDED[qoi] if row == 0 else INCLUDED[row], flag_cell]
         lines.append("| " + " | ".join(cells) + " |")
     lines += ["", f"Interval label — {label}", "",
-              f"Seed: {seed_text(results)}; the interval-procedure row: {SYNTHETIC_SEED_TEXT}.",
+              f"Seed: {seed_text(results)}; the interval-procedure row: {COVERAGE_SEEDS_TEXT}.",
               "", WIDENING_SENTENCE, "", CONDITIONAL_SENTENCE, ""]
+    if qoi == "H2a(ii)":
+        lines += [H2A_ONE_NOTE, ""]
     if qoi == "H3c":
         lines += [H3C_SENTENCE, ""]
     lines += [ITERATIVE_SENTENCE]

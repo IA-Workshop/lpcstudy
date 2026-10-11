@@ -3114,8 +3114,9 @@ def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
     tested in ``test_statistics`` (E1 to E3). H2a(i) and H2a(ii) are checked by spying on the
     helper: the array it receives for each part is the one the reported interval is the percentile
     interval of (``percentile_interval`` of that array equals ``ci``), and the key equals the
-    helper's output on it. The sites that are not primary (H2e, the reported H2b change, H2c) carry
-    no such key. Exact equality; no tolerance.
+    helper's output on it. The sites that are not primary carry no such key: asserted for the
+    reported H2b change and for each H2e noise level (H2c is not exercised here). Exact equality;
+    no tolerance.
     """
     from lpcstudy import analysis as an
     from lpcstudy.statistics import bootstrap_values, endpoint_mc_error, percentile_interval
@@ -3145,6 +3146,10 @@ def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
                                  CONFIG.seed + 3)
     assert res["noise"]["ci_mc_se"] == list(endpoint_mc_error(values, LEVEL))
     assert "ci_mc_se" not in res["library_change_reported"]["0.02"]
+    n_h2e = 50
+    low = np.arange(n_h2e) / 100.0
+    h2e = an.h2e_noise_matching(_h2e_cells(low, low + 0.3), CONFIG)
+    assert all("ci_mc_se" not in entry for entry in h2e["by_noise"].values())
 
     # H2a(i) and (ii): spy on the helper
     seen: list[tuple[np.ndarray, float]] = []
