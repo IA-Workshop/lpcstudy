@@ -118,6 +118,83 @@ Planner: claude-opus-5-5, 2026-10-11. Sources: ROADMAP WU-0007.2/.3, v3 §4 (sys
 
 **Open questions for the researcher.** None blocking. Optional: the primary source for Sprott's Rössler 0.0714 (book, 2003).
 
+### Plan amendment (2026-10-11, planner claude-opus-5-5)
+
+This follows the applied-mathematician's entry in `## Log` dated 2026-10-11 (commit 8e1dc9e). It supersedes the plan text above where they differ; the text above is kept unedited. No criterion is loosened.
+
+**A1. Standard errors at the code's length** (10⁵ Benettin steps at 20·max_dt, burn-in 5000). Lorenz 0.0012 (0.13%), Rössler 0.00055 (0.75%), registry Chua 0.0048 (1.1%), memo case 0.0050 (1.5%). These are DEVELOPMENT measurements, to be cited as such in the docstrings.
+- The roadmap's "SE near 1%" is 8× too pessimistic for Lorenz and refers to 2×10⁵ steps, which the code does not use.
+- No extra runs in the test. M1's K = 4 option is withdrawn: the SD it would give is uncertain by ±40%.
+- Start-up bias is negligible (at most 0.06% of λ) and the 5000-step burn-in is adequate (M4).
+
+**A2. Tolerances** (they replace the table's tolerance column).
+
+| Case | Assertion | Derivation |
+|---|---|---|
+| `lorenz63` | \|λ/0.90563 − 1\| ≤ **0.01** (tightened from 3%) | 3·√(0.13² + 0.33²) = 1.06%. The 0.13% is the code's SE; the 0.33% is Hartl's ±0.003, standing in for Sprott's unstated uncertainty. RK4 bias is below 1e-4 relative. No observed gap was used. |
+| `rossler` | \|λ/0.0714 − 1\| ≤ 0.03 **and** \|λ/0.07062 − 1\| ≤ 0.03 | Against 0.07062 the combined σ is √(0.75² + 0.93²) = 1.19%, so 3% ≈ 2.5σ. It cannot be tightened on SE grounds. The two references agree within about 1.2 of B&B's σ, and the family-wise false-alarm probability is at most about 2%. RK4 bias is -0.1%. |
+| `chua` (study parameters) | no λ assertion | Known limitation, not validated (NVVUQ.13; DEC-0010). λ is reported only. The orbit guard (A4) still applies. |
+| `chua_memo` | **on hold** (A3) | — |
+
+The roadmap's three-way comparison is met by Lorenz and Rössler. Chua is recorded as **not validated**, a known limitation under NVVUQ.13, unless A3's condition is met.
+
+**A3. Memo case on hold.** The memo as read gives μ₃ ≈ -0.28 and Σμ ≈ -0.05. The mathematician showed both are impossible for the assumed standard double-scroll equations: Σμ must equal the mean divergence, about -1.54 per circuit time. The memo case therefore enters the plan only if the researcher's re-read (memo pp. 22-25 and eq. (1.1)) confirms all three of:
+- (i) a verbatim (1.1) in the assumed form;
+- (ii) a time variable that gives τ = tG/C₂ = 0.7t;
+- (iii) μ₁ ≈ 0.23 as a value per that time, with the μ₃/Σμ discrepancy explained (for example, a misread scan).
+
+If all three hold, `chua_memo` is tested as `SystemSpec(alpha=9, beta=100/7, m0=-8/7, m1=-5/7, initial_state=(0.7,0,0), max_dt=0.005)`:
+- assertion: |λ/0.3286 − 1| ≤ 0.10;
+- the 10% is the mathematician's combined σ ≈ 3.9% (code SE 1.5%, memo finite-T SE 3.3%, rounding of "0.23" with SD 1.3%, discretization below 1.5%), so 10% ≈ 2.6σ;
+- the memo value is not biased low, so no one-sided allowance;
+- plus the A4 guard with max|x| ≤ 3.
+
+The code's memo value (0.3235) has already been seen in development. The 10% comes from the error budget only.
+
+If any of (i)-(iii) fails, the memo case is dropped. The unit then records the memo as an unusable reference and Chua as not validated. Q-O1 becomes moot unless the re-read confirms.
+
+**A4. Divergence guard (F1, DEF-0015).**
+- The problem: `estimate_lyapunov` returns a finite, positive, plausible value for diverging orbits (3 of 12 perturbed Chua starts), so "finite and positive" detects nothing.
+- What each case adds: build the same map, `make_flow_step(spec, spec.params, 20*spec.max_dt)`, from the same `spec.initial_state`. Run `simulate_trajectory` for 5000 + 10⁵ steps (≈ 0.2 s), and assert every value finite and max|x| ≤ B:
+  - **Chua, both sets: B = 3.** The attractor has |x| ≤ 2.26, measured by the mathematician. The registry start (0.7,0,0) is in the basin for both sets.
+  - **Lorenz: B = 40.** This is rigorous for the ODE. V = x² + y² + (z − σ − ρ)² satisfies V̇ = −2(σx² + y² + βz² − β(σ+ρ)z), which is negative outside an ellipsoid contained in the ball V ≤ (σ+ρ)²β²/(4(β−1)) = 38²·16/15, radius 39.25. So the ball is forward-invariant. The start (1,1,1) has V = 1371 < 1540, so |x| ≤ 39.25 for all t. The margin 0.75 absorbs RK4 error at h = 0.01. Any value above 40 means the map has departed from the flow.
+  - **Rössler: B = 25.** No simple global trapping region exists, so the guard rests on the escape mechanism. An escaping orbit has x > c = 5.7 persistently, and z' = b + z(x − c) then grows z exponentially into overflow within 10⁵ steps. Any bound well above the attractor separates the two cases. The developer records the observed max|x| in the Log. If it exceeds 2/3 of B (16.7), stop and `/refer`; do not raise B.
+- The guard duplicates `lyapunov_cached`'s constants (20·max_dt, 10⁵, 5000). The test names them in one place and comments that they mirror `data.py:231-233`.
+- A guard inside `estimate_lyapunov` stays out of scope (DEF-0015, main session).
+
+**A5. Tier and file: unit, in `tests/unit/test_data.py`.**
+- The slow tier is withdrawn. The only reason for it was my runtime estimate, which was about 10× too high; the measured cost is 0.4-0.6 s per case including JIT, plus 0.2 s for the guard. There is no other reason for slow.
+- Placement:
+  - The module under test is not `dynamics.py`: `estimate_lyapunov` is in `lpcstudy/systems.py` and `lyapunov_cached` in `lpcstudy/data.py`.
+  - `tools/test_impact.py` maps a module's unit tests only to `tests/unit/test_<module>.py`. A new `test_lyapunov.py` would never be selected.
+  - `test_data.py` is reached by a change to `data.py` (own test) and by a change to `systems.py` (core-module rule: `data` is a direct dependent of `systems`). The roadmap's `test_systems.py` would miss changes to `lyapunov_cached`.
+  - Form: one parametrized test, `test_lyapunov_cached_matches_published_reference[case]`, one item per case, each under 5 s.
+  - The developer records `--durations` once (§4.6) as evidence of the budget.
+- The note addendum (Methods v2 comparison) is unchanged.
+
+**A6. Affected checks and smoke** (replaces the .2 bullet above).
+- (.2): single test file changed, so `tests/unit/test_data.py` only (unit tier), run once. No `lpcstudy/` change, so no integration and no smoke.
+- (.3): unchanged.
+- Smoke consequence: unchanged (`results.json` identical; `RESULTS.md` gains the subsection).
+- (.3) text changes:
+  - The Lorenz row says "within 1%".
+  - The Rössler row lists both references, each "within 3%".
+  - The Chua row says "not validated: no published reference at these parameters (known limitation, NVVUQ.13, DEC-0010)".
+  - The memo sentence appears only if A3 is confirmed.
+  - The test's expected strings follow these changes: fake lorenz63 0.9 gives -0.62%, "within 1%".
+  - The bounds come from `LYAPUNOV_REFERENCES` per system, not from a single 3% constant.
+
+**A7. Definition of done** (replaces the .2 part):
+- The parametrized unit test is committed and run once in the radius.
+- The values, max|x| per case, durations and summary line are in the Log.
+- Each of Lorenz and Rössler passes, or has a DEF reporting the step size as the suspected cause (LPC.NV.1), with nothing tuned.
+- Chua is recorded as not validated.
+- The memo case is resolved per A3.
+
+**A8. Owner questions.**
+- Q-O2 (should the design text say Methods v2/v3's λ values are code output?) and Q-O3 (should an out-of-tolerance λ ever affect `gate_pass`?) remain open. The default is report-only, with no change to verdict code.
+- Q-O1 waits on A3.
+
 ## Log
 
 <dated entries: what was done, commands, results, commits>
