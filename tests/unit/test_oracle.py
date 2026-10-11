@@ -581,3 +581,84 @@ def test_state_oracles_attaches_handled_and_keeps_values(monkeypatch) -> None:
     assert out.growth.tobytes() == growth_exponent(gains, 4).tobytes()
     assert out.gains.tobytes() == gains.tobytes() and out.nu.tobytes() == nu.tobytes()
     np.testing.assert_array_equal(out.subset(np.array([2, 0])).handled, [[0, 1, 0], [0, 0, 1]])
+
+
+class _SpyTree:
+    """A real ``cKDTree`` behind a recorder of the keyword arguments of ``query``."""
+
+    def __init__(self, tree, calls: list) -> None:
+        self.tree = tree
+        self.calls = calls
+
+    def query(self, *args, **kwargs):
+        self.calls.append(dict(kwargs))
+        return self.tree.query(*args, **kwargs)
+
+
+def _spy_factory(calls: list):
+    from scipy.spatial import cKDTree
+
+    return lambda reference: _SpyTree(cKDTree(reference), calls)
+
+
+def _reference_and_queries() -> tuple[np.ndarray, np.ndarray]:
+    """A fixed Gaussian reference (2000, 4) and 50 queries, test seed 50121."""
+    rng = np.random.default_rng(50121)
+    return rng.standard_normal((2000, 4)), rng.standard_normal((50, 4))
+
+
+@pytest.mark.parametrize("value, expected", [(None, 4), ("2", 2), ("8", 8)])
+def test_local_dimension_passes_lpc_threads_as_workers(monkeypatch, value, expected: int
+                                                       ) -> None:
+    """``local_dimension_counted`` queries the tree with ``workers == LPC_THREADS`` (DEF-0012).
+
+    Reference: the expected integer is the environment value set by the test (4 when unset).
+    The spy forwards to a real ``cKDTree``. Exact comparison.
+    """
+    from lpcstudy import oracle
+
+    calls: list = []
+    monkeypatch.setattr(oracle, "cKDTree", _spy_factory(calls))
+    if value is None:
+        monkeypatch.delenv("LPC_THREADS", raising=False)
+    else:
+        monkeypatch.setenv("LPC_THREADS", value)
+    reference, queries = _reference_and_queries()
+    oracle.local_dimension_counted(reference, queries)
+    assert len(calls) == 1 and calls[0]["workers"] == expected
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc"])
+def test_local_dimension_rejects_invalid_lpc_threads(monkeypatch, value: str) -> None:
+    """An invalid ``LPC_THREADS`` raises ``ValueError`` and no query is made (PRIME.4)."""
+    from lpcstudy import oracle
+
+    calls: list = []
+    monkeypatch.setattr(oracle, "cKDTree", _spy_factory(calls))
+    monkeypatch.setenv("LPC_THREADS", value)
+    reference, queries = _reference_and_queries()
+    with pytest.raises(ValueError, match="LPC_THREADS"):
+        oracle.local_dimension_counted(reference, queries)
+    assert calls == []
+
+
+@pytest.mark.parametrize("threads", ["1", "4"])
+def test_local_dimension_is_bitwise_independent_of_workers(monkeypatch, threads: str) -> None:
+    """The estimates and flags are bitwise those computed from a ``workers=1`` query.
+
+    Reference: the Levina-Bickel formula written out here from ``cKDTree.query(workers=1)``
+    (the formula with ``k = 20`` neighbours, floor ``1e-300``), not the code under test.
+    The exact comparison is justified as in ``test_analog_query_is_bitwise_independent_of_workers``
+    (the worker count splits the query points and changes no arithmetic).
+    """
+    from scipy.spatial import cKDTree
+    from lpcstudy.oracle import local_dimension_counted
+
+    monkeypatch.setenv("LPC_THREADS", threads)
+    reference, queries = _reference_and_queries()
+    dims, floored = local_dimension_counted(reference, queries)
+    dist = cKDTree(reference).query(queries, k=20, workers=1)[0]
+    ref_dims = 18 / np.sum(np.log(np.maximum(dist, 1e-300)[:, -1:]
+                                  / np.maximum(dist, 1e-300)[:, :-1]), axis=1)
+    assert dims.tobytes() == ref_dims.tobytes()
+    assert not floored.any()

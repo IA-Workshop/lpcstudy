@@ -10,7 +10,7 @@ from scipy.spatial import cKDTree
 
 from .data import SystemContext
 from .dynamics import growth_exponent, make_amplification, make_observability
-from .ensemble import EnsembleMoments
+from .ensemble import EnsembleMoments, worker_count
 
 
 ORACLE_COUNTERS: tuple[str, ...] = ("local_dim_zero_distance", "oracle_gain_floor",
@@ -76,7 +76,7 @@ def local_dimension_counted(reference: np.ndarray, queries: np.ndarray, n_neighb
     floored : np.ndarray
         Boolean ``(n,)``: at least one of the ``k`` neighbour distances was below ``1e-300``.
     """
-    dist, _ = cKDTree(reference).query(queries, k=n_neighbors, workers=-1)
+    dist, _ = cKDTree(reference).query(queries, k=n_neighbors, workers=worker_count())
     floored = (dist < 1e-300).any(axis=1)
     dist = np.maximum(dist, 1e-300)
     logs = np.log(dist[:, -1:] / dist[:, :-1])
