@@ -372,3 +372,33 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Follow-ups proposed:** V4 signed mean deviation and a run at 1, 2 and 4 LT; a split-half check of logit-weight noise in WU-0003; the LM iteration-doubling study; a direct cross-host check of the primaries in WU-0003.4.
 
 **Affects:** WU-0008, WU-0003 (M for the full preset). Marked "needs owner review before freeze". **Status:** proposed.
+
+## DEC-0025: WU-0005.4: the mathematician's corrections accepted; three scope questions (D1 to D3) with defaults  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the applied-mathematician's check, commit 9b4ab35 on `wu/0005-4-lm-diagnostics`; for owner confirmation)
+
+**Decision (accepted as the plan, before any code exists, VV.3).** The corrections of the 'Mathematics check' section: the residual is reported as c and c/rho^2 (first order chi-square with 4 degrees of freedom; RMS, if printed, is sqrt(c/(D-m))/rho); the L2 non-increase tolerance is replaced by |c_k - J(u_k)| <= eta(2 sqrt(J) + eta) with eta = 1e-12 max(1, ||X||_inf), perturbation norm 0.01, refine_steps = 15 explicit (the plan's relative 1e-12 is not a valid round-off bound as J falls to about 1e-31); M3 final residual <= D eta^2 with a test target built through the same `step` object, tau <= 5, normalized X, at least 8 states; the p95 uses `method="inverted_cdf"` (the linear quantile returns NaN when the order statistic is finite); `median_iterations` is documented as including round-off null-step accepts; the NaN stub is `lambda s: s * jnp.nan`; L4 has at least 4 rows started at u_true plus one call on the NaN-stub estimator; the trace variant is built from the same `body` closure; refine_steps = 0 has a defined diagnostics value. WU-0003.4 gets two tolerance tiers (1e-8 relative if the network weights are bitwise equal; distribution-free 99% order-statistic bands otherwise). Nothing is loosened: the replacements are tighter or correct an invalid bound.
+
+**Scope questions, with defaults (all owner-confirmable).**
+- **D1** (integer flag `lm_late_progress`: an accepted step in the last 3 iterations that lowers the cost by more than 1e-6 relative). Default: **include**, as an additive, report-only integer, with no float added to the carry; kept only if the estimates and all existing leaves stay bitwise unchanged, otherwise dropped and reported.
+- **D2** (a 15-against-30 iteration study on DEV-0 smoke cells, the 'LM iteration-doubling study' of DEC-0024). Default: **not started now**; listed as a follow-up unit after the pilot regression closes (it needs CPU and a fixed protocol). Until then the LM row in WU-0008 stays 'not estimated' (DEC-0024).
+- **D3** (whether the unit's O3 measures both wrong-basin and still-unconverged estimates, using c/rho^2 > 18.47, the chi-square 0.999 quantile). Default: **report it, not decide on it**: the fraction above 18.47 is printed as a diagnostic with no gate or verdict role, since v3 section 4 covers about 2% wrong-basin estimates but not estimates unconverged at the budget; whether v3 should say so is the owner's.
+
+**Finding for the owner.** In test configurations, 2 to 13% of estimates were still moving by more than 10% of their error at iteration 15 (worst in whitened coordinates with large start errors). The production rate is unknown, and nothing in the unit measures it (the unit meets NVVUQ.10 literally, not NVVUQ.9). It bears on the estimator-convention point of DEC-0024.
+
+**Affects:** WU-0005.4, WU-0008 (LM row), WU-0003.4. Marked "needs owner review before freeze". **Status:** proposed.
+
+## DEC-0024 addendum A1: WU-0008 wording amendments from review round 1 (2026-10-11, recorded by claude-sonnet-5-5 (main session) from the applied-mathematician's reply; for owner confirmation)
+
+Amends M1 (a), M7 and the row-9 text of the accepted design (DEC-0024). The mathematician's finding: decision (a) of M1, 'the finite-M variance is inside every primary interval', is false for H3c (the test-state M draws do not enter the H3c quantity; the fit-stage M-draw noise is conditioned on). It holds, with the finite-M bias outside, for the other four.
+
+**Row 1 'Included' cells (each at most 140 characters).**
+- H2a(i): `variance: yes (states resampled with their M-draw w*; eligibility redone in each resample; asymptotic for a median); finite-M bias: no`
+- H2a(ii), all parts: `variance: yes in every part (target, domain and seed controls resampled with the states; asymptotic); finite-M bias: no` (caveat in the notes: whether the 'one' part is added at all is decided once on the full sample and is not resampled)
+- H2b(i): `variance: yes (mean of per-state Spearman values, each from that state's own draws); finite-M bias: no`
+- H2b(ii): `variance: yes (mean of per-state paired changes; same unit draws at both N_lib); finite-M clip-boundary bias: no`
+- H3c: `no: test-state M draws do not enter the QoI; fit-stage M-draw noise (A4 proxies; A5 tree, leaf weights, K) is conditioned on`
+
+**Row 9 (DEF-0020).** `DEF-0020: Option C or K (DEC-0018; owner, pending; K in force by default via ASSERT_ROADMAP_BOUNDS = True) decides only whether the WU-0006 ROADMAP-bound coverage rows stay asserted (K) or become recorded characterization rows with the consistency ranges as the defect test (C); neither changes a bound, level or R. Whether the study widens its intervals or uses another procedure (longer block, studentized, BCa) is a separate, undecided design question for the owner and the applied-mathematician.` The widening sentence cites the uq-budget rule ('widen the interval or refine') only: neither DEF-0020 nor DEC-0018 decides widening.
+
+**M7 constants.** Reference rates: scratch seed 20261011 (`m2_coverage.py`; `m7b.py` only transcribes them); run-2 counts: seed 6006 (`make_rng(6006, "wu0006", ...)`); neither registered. R_ref (98.3% column): C1, C4, C8 at both phi: 40000; C3 and C7: 20000 (C7's pooled 60000 applies to the C7 verdict counts only; the coverage constants 0.9794 and 0.9762 are the 20000 values); C4h1.5 and C4h2 (c 0.8): 20000. The range '10^4 to 4 10^4' belongs to C6, which no QoI uses; the cases used span 2 10^4 to 4 10^4.
+
+**Status:** proposed, with DEC-0024.

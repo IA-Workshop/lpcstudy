@@ -19,7 +19,7 @@ import numpy as np
 from . import analysis as an
 from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
-from .data import SPLITS, make_rng
+from .data import SPLITS, SystemContext, make_rng
 from .dynamics import make_finite_growth
 from .embedding import delay_vectors
 from .ensemble import CORRELATION_FIELDS, DRAW_COLUMN, DRAW_COUNTERS, ENTRY_COUNTERS, \
@@ -28,6 +28,7 @@ from .identifiers import check_keys
 from .oracle import oracle_weight
 from .pipeline import ALL_COUNTERS, COUNTER_DENOMINATOR, HANDLING_SCHEMA, Cell, FittedRules, \
     Study, check_record, fit_rules, rule_weights, score_rules
+from .provenance import array_digest
 from .validation import check_cp_horizon, check_cramer_rao, check_integrator, \
     check_jacobians, check_kaplan_meier, check_p2_bound, gate_status
 
@@ -381,6 +382,34 @@ def run_handling(study: Study, results: dict) -> dict:
             "robustness": robustness, "failed_variants": failed}
 
 
+def context_record(ctx: SystemContext) -> dict:
+    """Return ``ctx.meta`` plus bitwise digests of the whitening chain (WU-0001.6, DEF-0024).
+
+    The four digests localize a cross-platform difference: ``state_mean_digest`` differs
+    upstream of BLAS (the trajectory or numpy's reduction); ``cov_digest`` differs in the
+    covariance product (the BLAS kernel); ``whiten_digest`` or ``unwhiten_digest`` alone differs
+    in ``eigh`` or the 3 x 3 products. ``ctx.meta`` is not mutated (it is logged and shared by the
+    cached context).
+
+    Parameters
+    ----------
+    ctx : SystemContext
+        The system context (``state_mean``, ``state_cov``, ``whiten`` and ``unwhiten`` are
+        float64 arrays).
+
+    Returns
+    -------
+    dict
+        A new dict: the meta entries, then ``state_mean_digest``, ``cov_digest``,
+        ``whiten_digest`` and ``unwhiten_digest`` (see ``provenance.array_digest``).
+    """
+    return {**ctx.meta,
+            "state_mean_digest": array_digest(ctx.state_mean),
+            "cov_digest": array_digest(ctx.state_cov),
+            "whiten_digest": array_digest(ctx.whiten),
+            "unwhiten_digest": array_digest(ctx.unwhiten)}
+
+
 def run_system(study: Study, system: str) -> dict:
     """Stages (ii)-(iv) for one core system.
 
@@ -404,7 +433,7 @@ def run_system(study: Study, system: str) -> dict:
     cfg = study.config
     t0 = time.time()
     ctx = study.context(system)
-    res: dict = {"context": ctx.meta}
+    res: dict = {"context": context_record(ctx)}
 
     # Core cell and validation gate.
     core = study.run_cell(system, cfg.core_noise, cfg.core_library, core=True,

@@ -124,6 +124,71 @@ def test_a_pipe_in_a_value_cannot_break_the_table() -> None:
     assert row == "| platform | Linux\\|odd name |"
 
 
+def test_header_has_the_platform_line_under_the_label_a8() -> None:
+    """The header prints one ``Platform:`` line under the label (A8, WU-0001.6).
+
+    Reference: the exact string fixed by the plan, for a hand-built block (not the live probe):
+    ``Platform: CPU <model> · BLAS <library> <corename>, ...``. The per-key table is unchanged:
+    it still has a row for every key (including ``cpu`` and ``blas``) except ``config``. A
+    library whose probe failed prints ``unknown (<error>)`` (R1); a failed BLAS probe prints
+    ``BLAS probe failed (<error>)`` and a working probe with no library ``BLAS none mapped``. Exact.
+    """
+    results, _ = fake_results("DEV-0")
+    block = dict(results["provenance"])
+    block["cpu"] = {"model": "Test CPU @ 1GHz", "source": "/proc/cpuinfo", "isa": ["avx"],
+                    "error": None}
+    block["blas"] = {"libraries": [
+        {"library": "numpy.libs/libx.so", "corename": "Haswell", "config": "c", "error": None},
+        {"library": "scipy.libs/liby.so", "corename": None, "config": None, "error": "E: x"}],
+        "error": None}
+    lines = header_lines(block)
+    assert lines[2] == ("Platform: CPU Test CPU @ 1GHz · BLAS numpy.libs/libx.so Haswell, "
+                        "scipy.libs/liby.so unknown (E: x)")
+    assert lines[1] == "" and lines[3] == "" and lines[4] == "| Provenance | Value |"
+    rows = [ln for ln in lines if ln.startswith("| ") and not ln.startswith("| Provenance")]
+    assert [ln.split(" | ")[0][2:] for ln in rows] == [k for k in block if k != "config"]
+    block["blas"] = {"libraries": [], "error": "OSError: no maps"}
+    assert header_lines(block)[2] == ("Platform: CPU Test CPU @ 1GHz · "
+                                      "BLAS probe failed (OSError: no maps)")
+    block["blas"] = {"libraries": [], "error": None}
+    assert header_lines(block)[2] == "Platform: CPU Test CPU @ 1GHz · BLAS none mapped"
+
+
+def test_platform_line_never_shows_a_failed_probe_as_a_value_r1() -> None:
+    """R1: failures and fallbacks are named in the line, not printed as plain values.
+
+    Reference: hand-written expected strings (the review's R1). A library entry with an error
+    prints ``<library> unknown (<error>)``; an unknown CPU model prints its source and the read
+    error; a model from ``platform.processor`` prints its source. Exact.
+    """
+    results, _ = fake_results("DEV-0")
+    block = dict(results["provenance"])
+    block["blas"] = {"libraries": [
+        {"library": "numpy.libs/a.so", "corename": None, "config": None,
+         "error": "AttributeError: none of x is defined"}], "error": None}
+    block["cpu"] = {"model": "unknown", "source": "none", "isa": [],
+                    "error": "FileNotFoundError: gone"}
+    assert header_lines(block)[2] == (
+        "Platform: CPU unknown (source none, FileNotFoundError: gone) · "
+        "BLAS numpy.libs/a.so unknown (AttributeError: none of x is defined)")
+    block["cpu"] = {"model": "test-cpu", "source": "platform.processor", "isa": [], "error": None}
+    assert header_lines(block)[2].startswith("Platform: CPU test-cpu (source platform.processor) · ")
+
+
+def test_platform_line_says_not_recorded_for_an_older_block_a8() -> None:
+    """A block without ``cpu`` and ``blas`` (a ``/1`` block, ``--report-only``) is flagged (A8).
+
+    Reference: the plan. Exact; the table rows are those of the block's own keys.
+    """
+    results, _ = fake_results("DEV-0")
+    old = {k: v for k, v in results["provenance"].items()
+           if k not in ("cpu", "blas", "numpy_simd")}
+    lines = header_lines(old)
+    assert lines[2] == "Platform: not recorded" and lines[3] == ""
+    rows = [ln for ln in lines if ln.startswith("| ") and not ln.startswith("| Provenance")]
+    assert [ln.split(" | ")[0][2:] for ln in rows] == [k for k in old if k != "config"]
+
+
 def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
     """One system's results with the minimal content ``verdicts`` and ``write_markdown`` read.
 

@@ -9,9 +9,13 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import hashlib
 import json
 import os
+import platform
+import re
 import resource
+import struct
 import subprocess
 import sys
 import time
@@ -20,6 +24,7 @@ from pathlib import Path
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 import lpcstudy.systems  # noqa: F401  (enables x64 on import, as in a real run)
@@ -30,8 +35,8 @@ from lpcstudy.seeds import with_seed
 ROOT = Path(__file__).resolve().parents[2]
 SYNTHETIC_SEED = 987654321987654321
 KEYS = ("schema", "seed_id", "seed_kind", "label", "promoted", "commit", "dirty", "git_error",
-        "preset", "config", "argv", "python", "packages", "platform", "device", "jax_x64",
-        "jax_matmul_precision", "env", "start_utc", "end_utc", "wall_seconds",
+        "preset", "config", "argv", "python", "packages", "platform", "cpu", "blas",
+        "numpy_simd", "device", "jax_x64", "jax_matmul_precision", "env", "start_utc", "end_utc", "wall_seconds",
         "peak_rss_bytes", "device_peak_bytes", "complete")
 END_KEYS = ("end_utc", "wall_seconds", "peak_rss_bytes", "device_peak_bytes", "complete")
 
@@ -64,7 +69,7 @@ def test_every_lpc_pc_18_field_is_present_in_order_and_typed() -> None:
     """
     block = block_for()
     assert tuple(block) == KEYS
-    assert block["schema"] == "lpcstudy.provenance/1"
+    assert block["schema"] == "lpcstudy.provenance/2"  # DEC-0023 (O1): the key set changed
     assert block["seed_id"] == "DEV-0" and block["seed_kind"] == "development"
     assert block["promoted"] is False and block["complete"] is False
     assert isinstance(block["commit"], str) and len(block["commit"]) == 40
@@ -259,9 +264,9 @@ def test_device_is_the_cpu_backend_under_jax_platforms_cpu() -> None:
 
 def test_env_block_has_the_listed_names_and_never_the_confirmatory_variables(
         monkeypatch: pytest.MonkeyPatch) -> None:
-    """``env`` records the nine listed variables and never ``LPC_CONF_*``.
+    """``env`` records the eleven listed variables and never ``LPC_CONF_*``.
 
-    Reference: the plan's list; the variables below are set to a synthetic value that must
+    Reference: the plan's list (the nine of WU-0001.4 and WU-0012.5, then the two of WU-0001.6); the variables below are set to a synthetic value that must
     not appear anywhere in the block. Exact.
     """
     monkeypatch.setenv("LPC_CONF_SEED", "424242424242")
@@ -270,7 +275,8 @@ def test_env_block_has_the_listed_names_and_never_the_confirmatory_variables(
     block = block_for("CONF-1", ["--confirmatory"])
     assert set(block["env"]) == {"JAX_PLATFORMS", "XLA_FLAGS", "XLA_PYTHON_CLIENT_PREALLOCATE",
                                  "LPC_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
-                                 "OPENBLAS_NUM_THREADS", "PJRT_NPROC", "NPROC"}
+                                 "OPENBLAS_NUM_THREADS", "PJRT_NPROC", "NPROC",
+                                 "OPENBLAS_CORETYPE", "NPY_DISABLE_CPU_FEATURES"}
     assert block["env"]["OMP_NUM_THREADS"] == "3"
     text = json.dumps(block)
     assert "424242424242" not in text and "ab" * 16 not in text and "LPC_CONF" not in text
@@ -282,9 +288,10 @@ def test_env_block_records_the_xla_thread_cap_variables(
 
     Reference: the values the test itself puts in the environment (a synthetic "7" and "5",
     distinct from each other and from the budget of 4, so a swapped or defaulted value
-    fails); the names are appended after the earlier seven. Exact.
+    fails); the names are appended after the earlier seven (and are followed by the two
+    names of WU-0001.6). Exact.
     """
-    assert provenance.ENV_NAMES[-2:] == ("PJRT_NPROC", "NPROC")
+    assert provenance.ENV_NAMES[7:9] == ("PJRT_NPROC", "NPROC")
     monkeypatch.setenv("PJRT_NPROC", "7")
     monkeypatch.setenv("NPROC", "5")
     assert block_for("DEV-0", [])["env"]["PJRT_NPROC"] == "7"
@@ -346,3 +353,361 @@ def test_finish_completes_a_copy_and_leaves_the_original() -> None:
     assert done["device_peak_bytes"] is None
     assert {k: v for k, v in done.items() if k not in END_KEYS} == \
         {k: v for k, v in block.items() if k not in END_KEYS}
+
+
+# --- WU-0001.6: the platform record (DEC-0022 item 4; DEF-0024) ---------------------------
+
+FLAG_LIST = ("sse4_1", "sse4_2", "avx", "avx2", "fma", "f16c", "bmi1", "bmi2", "avx_vnni",
+             "avx512f", "avx512dq", "avx512cd", "avx512bw", "avx512vl", "avx512_vnni",
+             "avx512_bf16", "avx512_fp16", "amx_tile")  # the mathematician's list (M4, B)
+
+
+def reference_digest(values: list[float]) -> str:
+    """SHA-256 of the values packed as little-endian binary64 (the test's own byte writer)."""
+    return hashlib.sha256(struct.pack("<%dd" % len(values), *values)).hexdigest()
+
+
+def test_array_digest_equals_sha256_of_struct_packed_little_endian_bytes() -> None:
+    """``array_digest`` is the SHA-256 of the row-major little-endian binary64 bytes (A1).
+
+    Reference: ``hashlib.sha256(struct.pack("<%dd", ...))``, written here with ``struct``,
+    not with numpy ``tobytes``. Two matrices (one with 0.1, 1/3, 1e-300, -2.5 and the smallest
+    subnormal 5e-324). Exact (a digest is a deterministic function of the bytes; no tolerance).
+    """
+    first = [[1.0, 2.0], [3.0, 4.0]]
+    second = [[0.1, 1.0 / 3.0, 1e-300], [-2.5, 5e-324, 7.0], [0.0, 1e300, -1e-5]]
+    for matrix in (first, second):
+        flat = [v for row in matrix for v in row]
+        digest = provenance.array_digest(np.array(matrix, dtype=np.float64))
+        assert digest == reference_digest(flat)
+        assert re.fullmatch(r"[0-9a-f]{64}", digest)
+
+
+def test_array_digest_is_independent_of_layout_and_byte_order_but_not_of_order() -> None:
+    """A Fortran-ordered copy and a ``>f8`` copy give the C-order ``<f8`` digest (A1).
+
+    Reference: the struct digest of the row-major values. The digest is of the *logical*
+    row-major sequence, so the transpose (same values, other order) differs: W and U are not
+    bitwise symmetric, so the order is load-bearing (M2). Signed zeros differ (bitwise identity).
+    """
+    matrix = np.array([[0.1, 1.0 / 3.0, -2.5], [5e-324, 7.0, 1e300], [2.0, -0.5, 3.0]])
+    expected = reference_digest(matrix.ravel().tolist())
+    assert provenance.array_digest(matrix) == expected
+    assert provenance.array_digest(np.asfortranarray(matrix)) == expected
+    assert provenance.array_digest(matrix.astype(">f8")) == expected
+    assert provenance.array_digest(matrix.T) != expected
+    assert provenance.array_digest(np.array([0.0])) != provenance.array_digest(np.array([-0.0]))
+    assert provenance.array_digest(np.array([-0.0])) == reference_digest([-0.0])
+
+
+def test_array_digest_rejects_every_non_binary64_dtype() -> None:
+    """float16, float32, longdouble, int, complex and object raise ``TypeError`` (M2, PRIME.4).
+
+    Reference: the plan (a conversion would be silent). Exact.
+    """
+    for dtype in (np.float16, np.float32, np.longdouble, np.int64, np.int32, np.complex128,
+                  np.bool_, object):
+        with pytest.raises(TypeError):
+            provenance.array_digest(np.zeros(3, dtype=dtype))
+
+
+def test_provenance_env_names_append_the_two_kernel_choices() -> None:
+    """``ENV_NAMES`` ends with ``OPENBLAS_CORETYPE`` and ``NPY_DISABLE_CPU_FEATURES`` (A5).
+
+    Reference: the plan (the old tuple, then the two names). Exact.
+    """
+    assert provenance.ENV_NAMES[-2:] == ("OPENBLAS_CORETYPE", "NPY_DISABLE_CPU_FEATURES")
+    assert len(provenance.ENV_NAMES) == 11 and len(set(provenance.ENV_NAMES)) == 11
+
+
+def test_platform_keys_have_the_scope_types_and_serialize(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``cpu``, ``blas`` and ``numpy_simd`` have the planned keys and types (A5).
+
+    Reference: the plan's Scope. ``OPENBLAS_CORETYPE`` and ``NPY_DISABLE_CPU_FEATURES`` are
+    recorded as set and ``None`` when unset. Exact.
+    """
+    monkeypatch.delenv("OPENBLAS_CORETYPE", raising=False)
+    monkeypatch.delenv("NPY_DISABLE_CPU_FEATURES", raising=False)
+    block = block_for()
+    assert block["env"]["OPENBLAS_CORETYPE"] is None
+    assert block["env"]["NPY_DISABLE_CPU_FEATURES"] is None
+    assert set(block["cpu"]) == {"model", "source", "isa", "error"}
+    assert isinstance(block["cpu"]["model"], str) and block["cpu"]["model"]
+    assert block["cpu"]["source"] in ("/proc/cpuinfo", "platform.processor", "none")
+    assert isinstance(block["cpu"]["isa"], list)
+    assert set(block["blas"]) == {"libraries", "error"}
+    for entry in block["blas"]["libraries"]:
+        assert set(entry) == {"library", "corename", "config", "error"}
+    assert set(block["numpy_simd"]) == {"found", "error"}
+    assert isinstance(block["numpy_simd"]["found"], list) and block["numpy_simd"]["error"] is None
+    monkeypatch.setenv("OPENBLAS_CORETYPE", "Sandybridge")
+    monkeypatch.setenv("NPY_DISABLE_CPU_FEATURES", "AVX2")
+    env = block_for()["env"]
+    assert env["OPENBLAS_CORETYPE"] == "Sandybridge"
+    assert env["NPY_DISABLE_CPU_FEATURES"] == "AVX2"
+    json.dumps(block)
+
+
+def _own_cpuinfo() -> tuple[str, list[str]]:
+    """The test's own parse of ``/proc/cpuinfo``: first ``model name`` and ISA flag subset."""
+    text = Path("/proc/cpuinfo").read_text()
+    model = re.search(r"^model name\s*:\s*(.*)$", text, re.MULTILINE)
+    flags = re.search(r"^flags\s*:\s*(.*)$", text, re.MULTILINE)
+    assert model and flags, "this host must expose model name and flags (x86 Linux)"
+    return model.group(1).strip(), sorted(set(flags.group(1).split()) & set(FLAG_LIST))
+
+
+def test_cpu_record_equals_the_tests_own_parse_of_proc_cpuinfo() -> None:
+    """On this host ``cpu`` equals the test's own regex parse of ``/proc/cpuinfo`` (A6, B).
+
+    Reference: ``re`` over the file text, written in the test, not shared with the code; the
+    ISA is the sorted intersection of the first ``flags`` line with the fixed list. Exact.
+    """
+    model, isa = _own_cpuinfo()
+    record = provenance.cpu_record()
+    assert record == {"model": model, "source": "/proc/cpuinfo", "isa": isa, "error": None}
+    assert all(flag in FLAG_LIST for flag in record["isa"])
+
+
+class _Unreadable:
+    """A stand-in for the ``/proc/cpuinfo`` path whose ``read_text`` raises ``exc``."""
+
+    def __init__(self, exc: Exception | None, text: str = "") -> None:
+        self.exc, self.text = exc, text
+
+    def read_text(self, *args: object, **kwargs: object) -> str:
+        if self.exc is not None:
+            raise self.exc
+        return self.text
+
+
+@pytest.mark.parametrize("source", [
+    _Unreadable(FileNotFoundError("gone")),
+    _Unreadable(PermissionError("denied")),
+    _Unreadable(UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad byte")),
+    _Unreadable(None, "processor : 0\nvendor_id : Test\n"),
+])
+def test_cpu_record_never_raises_and_falls_back(source: _Unreadable,
+                                                monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unreadable or model-less ``/proc/cpuinfo`` gives the fallback record, no exception (A6).
+
+    Reference: the plan: with ``platform.processor()`` empty the record is model "unknown",
+    source "none"; with "test-cpu" it is that value with source "platform.processor"; the ISA is
+    ``[]`` (no flags line) in both. The read error is recorded (``<Type>: <msg>``), never
+    dropped; the model-less text records no error. Exact.
+    """
+    monkeypatch.setattr(provenance, "CPUINFO", source)
+    monkeypatch.setattr(platform, "processor", lambda: "")
+    record = provenance.cpu_record()
+    assert record["model"] == "unknown" and record["source"] == "none" and record["isa"] == []
+    if source.exc is None:
+        assert record["error"] is None
+    else:
+        assert str(record["error"]).startswith(type(source.exc).__name__ + ":")
+    monkeypatch.setattr(platform, "processor", lambda: "test-cpu")
+    record = provenance.cpu_record()
+    assert record["model"] == "test-cpu" and record["source"] == "platform.processor"
+    assert record["isa"] == []
+    json.dumps(record)
+
+
+def test_cpu_isa_is_sorted_and_restricted_to_the_fixed_list(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """``isa`` is the sorted intersection of the *first* ``flags`` line with the fixed list (B).
+
+    Reference: a hand-written cpuinfo text with two processors; the second line has a flag
+    (``amx_tile``) that must not be read, the first has flags outside the list (``pti``,
+    ``ibrs``, ``avx512f`` is inside) in scrambled order. Expected by hand. Exact.
+    """
+    text = ("processor\t: 0\nmodel name\t: Test CPU @ 1GHz\n"
+            "flags\t\t: fpu pti avx512f ibrs sse4_2 fma avx2 zzz sse4_1\n\n"
+            "processor\t: 1\nmodel name\t: Other\nflags\t\t: amx_tile avx\n")
+    monkeypatch.setattr(provenance, "CPUINFO", _Unreadable(None, text))
+    assert provenance.cpu_record() == {
+        "model": "Test CPU @ 1GHz", "source": "/proc/cpuinfo",
+        "isa": ["avx2", "avx512f", "fma", "sse4_1", "sse4_2"], "error": None}
+
+
+def test_regression_simd_record_equals_the_show_config_it_wraps() -> None:
+    """Regression guard (not correctness evidence): ``simd_record`` repeats the numpy call it wraps.
+
+    It compares the code with ``np.show_config(mode="dicts")``, the call under test, so it only
+    guards the key path and the ``[]`` default. The independent truth is the next test (R3).
+    """
+    config = np.show_config(mode="dicts")
+    expected = list(config.get("SIMD Extensions", {}).get("found", []))
+    assert provenance.simd_record() == {"found": expected, "error": None}
+
+
+def test_blas_record_lists_numpy_and_scipy_openblas_with_a_corename() -> None:
+    """One entry under ``numpy.libs`` and one under ``scipy.libs`` with a corename (A7).
+
+    Reference: the wheels' layout (``numpy.libs/libscipy_openblas64_*.so`` and
+    ``scipy.libs/libscipy_openblas*.so``); the corename is a non-empty string and ``error`` is
+    ``None``. Exact. (Importing ``provenance`` imports ``scipy.linalg``, so scipy's is mapped.)
+    """
+    record = provenance.blas_record()
+    assert record["error"] is None
+    libraries = [entry["library"] for entry in record["libraries"]]
+    assert sum(name.startswith("numpy.libs/") for name in libraries) == 1
+    assert sum(name.startswith("scipy.libs/") for name in libraries) == 1
+    for entry in record["libraries"]:
+        assert isinstance(entry["corename"], str) and entry["corename"]
+        assert entry["error"] is None and isinstance(entry["config"], str) and entry["config"]
+        assert "openblas" in entry["library"]
+
+
+FORCED_PROBE = (
+    "import json, sys; sys.path.insert(0, sys.argv[1]); from lpcstudy import provenance; "
+    "print(json.dumps(provenance.blas_record()))")
+
+
+@pytest.mark.parametrize("coretype", ["Sandybridge", "Haswell"])
+def test_blas_record_follows_a_forced_kernel(coretype: str) -> None:
+    """Forcing ``OPENBLAS_CORETYPE`` changes the recorded corename of both libraries (A7).
+
+    Reference: known truth by construction. A fresh interpreter (``python -I``, so nothing but
+    the forced variable differs) runs the probe with ``OPENBLAS_CORETYPE=<coretype>``; OpenBLAS
+    on x86-64 honors the request when the CPU supports it (Sandybridge and Haswell are both
+    supported on the reference platform, DEC-0022). Exact string equality.
+    """
+    assert platform.machine() == "x86_64", "the reference platform is x86-64 (DEC-0022)"
+    env = dict(os.environ, OPENBLAS_CORETYPE=coretype)
+    done = subprocess.run([sys.executable, "-I", "-c", FORCED_PROBE, str(ROOT)], env=env,
+                          capture_output=True, text=True, check=True, timeout=60)
+    record = json.loads(done.stdout)
+    assert len(record["libraries"]) == 2
+    assert [e["corename"] for e in record["libraries"]] == [coretype, coretype]
+
+
+def test_blas_record_never_raises_when_the_library_cannot_be_opened(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """``CDLL`` raising ``OSError`` gives entries with corename ``None`` and an ``OSError`` error.
+
+    Reference: the plan (every probe records ``<Type>: <msg>``, never raises). Exact.
+    """
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise OSError("refused")
+
+    monkeypatch.setattr(provenance.ctypes, "CDLL", refuse)
+    record = provenance.blas_record()
+    assert len(record["libraries"]) == 2 and record["error"] is None
+    for entry in record["libraries"]:
+        assert entry["corename"] is None and entry["config"] is None
+        assert entry["error"] == "OSError: refused"
+    json.dumps(record)
+
+
+def test_blas_record_never_raises_when_the_symbols_are_missing(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """A library object without any of the symbols gives an ``AttributeError`` error (A7).
+
+    Reference: a ``SimpleNamespace``-like object with no attributes stands in for the
+    ``CDLL`` handle. Exact prefix of the recorded error.
+    """
+    class Empty:
+        pass
+
+    monkeypatch.setattr(provenance.ctypes, "CDLL", lambda *a, **k: Empty())
+    record = provenance.blas_record()
+    assert len(record["libraries"]) == 2
+    for entry in record["libraries"]:
+        assert entry["corename"] is None and entry["error"].startswith("AttributeError")
+    json.dumps(record)
+
+
+def test_blas_record_never_raises_when_proc_self_maps_is_unreadable(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failure to read ``/proc/self/maps`` gives ``libraries == []`` and a top-level error (A7).
+
+    Reference: the plan. ``collect`` still returns a serializable block. Exact.
+    """
+    monkeypatch.setattr(provenance, "MAPS", _Unreadable(OSError("no maps")))
+    record = provenance.blas_record()
+    assert record["libraries"] == [] and record["error"] == "OSError: no maps"
+    assert json.loads(json.dumps(block_for()["blas"]))["libraries"] == []
+
+
+def test_probe_errors_lists_each_failed_probe_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``probe_errors`` is empty for a healthy block and counts each recorded failure (A7).
+
+    Reference: the plan (a failed probe is recorded, and the caller counts and logs it). The
+    healthy host block gives ``[]``; a block with a failed ``cpu`` read, an unreadable maps file
+    and a failed library each add one text. Exact.
+    """
+    assert provenance.probe_errors(block_for()) == []
+    with monkeypatch.context() as patch:
+        patch.setattr(provenance, "CPUINFO", _Unreadable(OSError("no cpuinfo")))
+        patch.setattr(provenance, "MAPS", _Unreadable(OSError("no maps")))
+        patch.setattr(platform, "processor", lambda: "")
+        patch.setattr(platform, "machine", lambda: "x86_64")
+        # the failed read, then the two silent fallbacks it causes (model source, empty ISA)
+        assert provenance.probe_errors(block_for()) == [
+            "cpu: OSError: no cpuinfo", "cpu: model from none",
+            "cpu: no ISA flags found on x86_64", "blas: OSError: no maps"]
+
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise OSError("refused")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(provenance.ctypes, "CDLL", refuse)
+        failed = provenance.probe_errors(block_for())
+    assert len(failed) == 2 and all(text.endswith("OSError: refused") for text in failed)
+
+
+def test_probe_errors_counts_each_silent_fallback_r2(monkeypatch: pytest.MonkeyPatch) -> None:
+    """R2: a fallback that raises nothing is still counted, one text per state.
+
+    Reference: hand-written expected lists (the review's R2): the CPU model from
+    ``platform.processor``; no ``flags`` line on x86-64 (and none to report elsewhere); and a
+    probe of ``/proc/self/maps`` that works but maps no OpenBLAS. Exact.
+    """
+    no_flags = "processor\t: 0\nmodel name\t: Test CPU\n"
+    with monkeypatch.context() as patch:
+        patch.setattr(provenance, "CPUINFO", _Unreadable(None, no_flags))
+        patch.setattr(platform, "machine", lambda: "x86_64")
+        assert provenance.probe_errors(block_for()) == ["cpu: no ISA flags found on x86_64"]
+        patch.setattr(platform, "machine", lambda: "aarch64")
+        assert provenance.probe_errors(block_for()) == []
+    with monkeypatch.context() as patch:
+        patch.setattr(provenance, "CPUINFO", _Unreadable(None, "processor\t: 0\n"))
+        patch.setattr(platform, "processor", lambda: "test-cpu")
+        patch.setattr(platform, "machine", lambda: "aarch64")
+        assert provenance.probe_errors(block_for()) == ["cpu: model from platform.processor"]
+    with monkeypatch.context() as patch:
+        patch.setattr(provenance, "MAPS", _Unreadable(None, "7f00-7f01 r-xp 0 00:00 0 /usr/lib/libc.so\n"))
+        block = block_for()
+        assert block["blas"] == {"libraries": [], "error": None}
+        assert provenance.probe_errors(block) == ["blas: no OpenBLAS library mapped"]
+
+
+SIMD_PROBE = ("import json, sys; sys.path.insert(0, sys.argv[1]); from lpcstudy import provenance; "
+              "print(json.dumps(provenance.simd_record()))")
+
+
+def test_simd_record_follows_a_disabled_dispatch_level_r3() -> None:
+    """Disabling ``X86_V3`` removes it from ``found`` (known truth by construction, R3).
+
+    Reference: numpy's documented ``NPY_DISABLE_CPU_FEATURES`` (planning table: ``found`` is
+    ``["X86_V3"]`` here and the key is absent under the variable). A fresh ``python -I`` runs the
+    probe with the variable set; the level must be absent. When this CPU has every feature of
+    x86-64-v3 (own parse of the flags line), a second run without the variable must list it.
+    """
+    assert platform.machine() == "x86_64", "the reference platform is x86-64 (DEC-0022)"
+    flags = set(re.search(r"^flags\s*:\s*(.*)$", Path("/proc/cpuinfo").read_text(),
+                          re.MULTILINE).group(1).split())
+
+    def found(**env: str) -> list[str]:
+        base = {k: v for k, v in os.environ.items() if k != "NPY_DISABLE_CPU_FEATURES"}
+        done = subprocess.run([sys.executable, "-I", "-c", SIMD_PROBE, str(ROOT)], env=base | env,
+                              capture_output=True, text=True, check=True, timeout=60)
+        record = json.loads(done.stdout)
+        assert record["error"] is None
+        return record["found"]
+
+    assert "X86_V3" not in found(NPY_DISABLE_CPU_FEATURES="X86_V3")
+    v3 = {"avx2", "bmi1", "bmi2", "fma", "f16c", "movbe", "abm"}
+    if not v3 <= flags:
+        pytest.skip(f"host lacks x86-64-v3 features {sorted(v3 - flags)}: the positive arm "
+                    "(X86_V3 present by default) cannot be checked here (R6)")
+    assert "X86_V3" in found()

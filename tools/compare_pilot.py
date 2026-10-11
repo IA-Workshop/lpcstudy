@@ -45,6 +45,15 @@ attributed to that sentinel). A divergence-locus table is always written. In bra
 run, N4, and the interval band with z_B = Phi^-1(1 - 0.05 / (2 m)). Every branch checks the gate and
 P2(c) (R4, R5), and the cache: ``lyapunov.json`` pre-existing is a finding.
 
+Platform (WU-0001.6, DEF-0024; information only). The report has a "Platform" section: one row per
+side (the new run, the old run and, with ``--reference``, the reference run) with the CPU model, the
+OpenBLAS corenames and ``OPENBLAS_CORETYPE`` of that side's ``provenance`` block, or "not recorded".
+When both sides of a pair are recorded and the model or a corename differs, an information line says
+that cross-host differences in the cp, oracle and fixture chains are expected. No status, branch or
+exit code depends on it. The four ``context`` digests of the new run (``state_mean_digest``,
+``cov_digest``, ``whiten_digest``, ``unwhiten_digest``) are ``new`` leaves; the branch rule does not
+read them (a v3-against-v3 comparison needs an owner ruling first, follow-up F1 of WU-0001.6).
+
 Outputs. ``--report`` (default ``docs/study/dev_regression_dev0.md``), whose first line is
 ``DEVELOPMENT (DEV-0): not a hypothesis test``, and a per-leaf JSON file (default
 ``runs/dev/wu0002-12/compare_leaves.json``, untracked). The tool reads statistics and computes
@@ -456,6 +465,8 @@ def _build_rules() -> list[Rule]:
                reason="dynamics and embedding code unchanged since v1-baseline"))
     add(_rules("unchanged", f"{S}/context/{{interval,lambda_max,obs_scale}}", chain="dynamics",
                item="R2, switch rule", reason="dynamics and embedding code unchanged"))
+    add(_rules("new", f"{S}/context/{{state_mean_digest,cov_digest,whiten_digest,unwhiten_digest}}",
+               "WU-0001.6", "DEF-0024", "platform record: SHA-256 of the whitening chain"))
     add(_rules("unchanged", f"{S}/validation/{{delay_jacobian_rel_err,gain_rel_err,"
                "integrator_max_dev_sigma,km_max_abs_dev}", chain="fixture", item="R2 (V1, V2, V5, V6)",
                reason="fixed-seed or deterministic fixtures"))
@@ -1466,6 +1477,109 @@ def cache_status(info: dict) -> tuple[str, bool]:
             "pre-existed (pass --cache-preexisted no from the launch record)"), False
 
 
+# ------------------------------------------------------------------------------ platform (WU-0001.6)
+PLATFORM_SIDES = (("new", "new run"), ("old", "old (v1 pilot)"),
+                  ("reference", "reference (local v1 run)"))
+PLATFORM_LINE = ("platform differs (DEF-0024): cross-host differences in the cp, oracle and fixture "
+                 "chains are expected")
+
+
+def platform_record(tree: object) -> dict:
+    """The platform of one ``results.json`` tree, from its ``provenance`` block.
+
+    Returns
+    -------
+    dict
+        ``{"recorded": True, "model", "corenames", "coretype", "determinate", "why"}``
+        (``corenames``: the runtime OpenBLAS kernel of each library, in the block's order, used to compare;
+        ``model_text`` and ``blas_text``: the table cells, which show a failure with its error and never
+        as a value;
+        ``coretype``: the value of ``OPENBLAS_CORETYPE`` or ``None``; ``determinate``: False when
+        a probe failed or found nothing, so two such records must not be compared as values; ``why``:
+        the reasons, as text), or ``{"recorded": False, "why": <text>}`` for a tree without a
+        provenance block or without the platform keys (a ``/1`` block).
+    """
+    block = tree.get("provenance") if isinstance(tree, dict) else None
+    if not isinstance(block, dict):
+        return {"recorded": False, "why": "no provenance block"}
+    cpu, blas, env = block.get("cpu"), block.get("blas"), block.get("env")
+    if not isinstance(cpu, dict) or not isinstance(blas, dict):
+        return {"recorded": False, "why": "no platform keys in the provenance block"}
+    libraries = [lib for lib in blas.get("libraries", []) if isinstance(lib, dict)]
+    model = str(cpu.get("model", "unknown"))
+    corenames = [str(lib.get("corename") or "unknown") for lib in libraries]
+    reasons = []
+    if model == "unknown" or cpu.get("error"):
+        reasons.append("CPU model unknown" + (f" ({cpu['error']})" if cpu.get("error") else ""))
+    if blas.get("error"):
+        reasons.append(f"BLAS probe failed ({blas['error']})")
+    elif not libraries:
+        reasons.append("no OpenBLAS library mapped")
+    reasons += [f"{lib.get('library', '?')} corename unknown"
+                + (f" ({lib['error']})" if lib.get("error") else "")
+                for lib in libraries if not lib.get("corename")]
+    if blas.get("error"):
+        blas_text = f"probe failed ({blas['error']})"
+    else:
+        blas_text = ", ".join(
+            (f"{name} ({lib['error']})" if lib.get("error") else name)
+            for name, lib in zip(corenames, libraries)) or "none mapped"
+    model_text = (f"unknown ({cpu.get('error') or 'source ' + str(cpu.get('source', 'none'))})"
+                  if model == "unknown" else model)
+    return {"recorded": True, "model": model, "corenames": corenames,
+            "coretype": env.get("OPENBLAS_CORETYPE") if isinstance(env, dict) else None,
+            "determinate": not reasons, "why": "; ".join(reasons),
+            "model_text": model_text, "blas_text": blas_text}
+
+
+def platform_mismatch(first: dict, second: dict, labels: tuple[str, str] = ("first", "second")
+                      ) -> str | None:
+    """The information line about two platforms (never a status, branch or exit code).
+
+    * A side that is recorded but not determinate (a failed probe, an unknown model or corename):
+      ``platform not determinable (<side>: <why>)``, because two unknowns are not the same platform
+      and the comparison below would call them equal.
+    * Both recorded and determinate, with a different CPU model or a different corename:
+      ``PLATFORM_LINE``. ``OPENBLAS_CORETYPE`` alone does not count (the corename is what ran).
+    * Otherwise ``None`` (a side not recorded, or the two agree).
+    """
+    bad = [f"{label}: {rec['why']}" for rec, label in zip((first, second), labels)
+           if rec["recorded"] and not rec["determinate"]]
+    if bad:
+        return "platform not determinable (" + "; ".join(bad) + ")"
+    if not (first["recorded"] and second["recorded"]):
+        return None
+    if first["model"] != second["model"] or sorted(first["corenames"]) != sorted(second["corenames"]):
+        return PLATFORM_LINE
+    return None
+
+
+def platform_rows(records: dict[str, dict]) -> tuple[list[tuple], list[str]]:
+    """The rows of the Platform table and the information lines, for the sides present.
+
+    Parameters
+    ----------
+    records : dict
+        ``platform_record`` of each side, keyed ``new``, ``old`` and (optionally) ``reference``.
+    """
+    rows: list[tuple] = []
+    for key, label in PLATFORM_SIDES:
+        if key not in records:
+            continue
+        rec = records[key]
+        if rec["recorded"]:
+            rows.append((label, rec["model_text"], rec["blas_text"], rec["coretype"] or "unset"))
+        else:
+            rows.append((label, f"not recorded ({rec['why']})", "", ""))
+    notes = []
+    for key, label in PLATFORM_SIDES[1:]:
+        if key in records and "new" in records:
+            line = platform_mismatch(records["new"], records[key], ("new run", label))
+            if line:
+                notes.append(f"new run against {label}: {line}")
+    return rows, notes
+
+
 # ------------------------------------------------------------------------------ report
 def fmt(value: object) -> str:
     """Text of a leaf value in a report cell (floats and ints by ``repr``)."""
@@ -1692,6 +1806,11 @@ def render_report(cmp: Comparison) -> str:
         out.append(f"- {key.replace('_', ' ')}: {info.get(key, 'n/a')}")
     out.append(f"- provenance leaves excluded from the new run: {cmp.n_provenance}")
     out.append(f"- lyapunov.json: {cell(cmp.cache[0])}" + (" (FINDING)" if cmp.cache[1] else ""))
+    out += ["", "## Platform", "",
+            "Information only (DEF-0024): no status, branch or exit code depends on this section.", ""]
+    rows, notes = platform_rows(info["platform"])
+    out += table_lines(("side", "CPU model", "OpenBLAS corenames", "OPENBLAS_CORETYPE"), rows)
+    out += [f"- {cell(note)}" for note in notes] + (["", ] if notes else [])
     out += ["", "## Branch", ""]
     meaning = {"B": "bitwise: every unchanged leaf equals the pilot's",
                "N": "network: the context equals the pilot's, some unchanged leaf differs",
@@ -1894,8 +2013,14 @@ def compare_files(new_path: Path, old_path: Path, run_dir: str, manifest_row: st
                                       table, None, False, cache_file, cache_flag)
         drep = evaluate_d(results, old, new, table, constants, gates, reference, no_reference)
     cache = cache_status(cache_info(new_tree, cache_file, cache_flag))
-    return Comparison(results, old, new, n_prov, branch, reasons, gates, nrep, drep, cache,
-                      provenance_info(new_tree, old_path, new_path, run_dir, manifest_row),
+    info = provenance_info(new_tree, old_path, new_path, run_dir, manifest_row)
+    info["platform"] = {"new": platform_record(new_tree), "old": platform_record(old_tree)}
+    if reference_path is not None:
+        try:
+            info["platform"]["reference"] = platform_record(json.loads(reference_path.read_text()))
+        except (OSError, ValueError):   # branch D raised above; elsewhere the row says so
+            info["platform"]["reference"] = {"recorded": False, "why": "reference unreadable"}
+    return Comparison(results, old, new, n_prov, branch, reasons, gates, nrep, drep, cache, info,
                       obs_differs)
 
 

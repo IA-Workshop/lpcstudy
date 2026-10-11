@@ -245,6 +245,26 @@ def test_provenance_is_saved_incomplete_first_and_complete_last(
     assert "handling" not in saves[0]
 
 
+def test_failed_platform_probe_is_logged_as_one_warning(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture) -> None:
+    """A failed platform probe is recorded in the block and logged as one WARNING with a count (R2 wording).
+
+    Reference: the plan (the caller counts and logs a failed probe; WU-0001.6). ``blas_record``
+    is replaced by a failure; the faked study runs; the saved block keeps the error text and
+    the log has exactly one warning naming 1 probe. Exact.
+    """
+    import lpcstudy.provenance as provenance_module
+    monkeypatch.setattr(provenance_module, "blas_record",
+                        lambda: {"libraries": [], "error": "OSError: no maps"})
+    with caplog.at_level("WARNING", logger="lpcstudy"):
+        saves = run_with_fakes(["--preset", "smoke"], tmp_path, monkeypatch)
+    assert saves[-1]["provenance"]["blas"]["error"] == "OSError: no maps"
+    warnings = [r.getMessage() for r in caplog.records if "platform probe" in r.getMessage()]
+    assert warnings == ["1 platform probe failure(s) or fallback(s), recorded in the provenance "
+                        "block: blas: OSError: no maps"]
+
+
 def test_confirmatory_run_writes_no_seed_value(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A faked confirmatory run uses the synthetic seed but saves it nowhere.
