@@ -92,3 +92,9 @@ The retrieval cap stays in force until that first entry exists: until then the r
 
 - ROADMAP: the smoke acceptance wording ('smoke passes the gate') becomes 'smoke lists V1 to V7'; WU-0002.12 acceptance adds 'V7 passes at pilot size on DEV-0'.
 - Ledger: the owner's `ruling` entry for DEF-0014 (option 1); say what 'superseded' means for the retirement of V7.
+
+## 11. Additions from the WU-0002.9 plan check, 2026-10-11 (DEC-0016)
+
+- v3 section 7: state the overall rule (supported only if all three systems pass; not supported if any fails; otherwise inconclusive; a missing system is inconclusive) and that the intersection-union remark controls only the error of "supported" (up to about 7.3% over three systems for "not supported", about 14% for H2c's two parts).
+- v3 section 2, H1c: "(PLP)" stays; CP reported without a verdict.
+- New ROADMAP row (gain bound): screen on the raw C >= 0 at every horizon, report the subset and the per-screen counts, no bar (concordance D-21(b), (c)).
