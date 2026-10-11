@@ -611,6 +611,51 @@ Scope: only .3 (labels, captions) and .4 (QoI table), at f1129a7 (commits dff369
 - **R6:** fixed in e066aff (`H3B_COVERAGE` appended to the H3b label; asserted).
 - **R7:** no code change; recorded in the Log (test run 4, item 6). Integration pair not run since.
 
+### 2026-10-11, reviewer claude-opus-5-5 (fresh context): WU-0008.3 and .4, re-review (fix round 1)
+
+Scope: R1 to R6 and the answer to R7 only, at e066aff (code and tests), 2656b62 (answers) and the develop merge 3837cae. References read: DEC-0008 A1, A3, A4; v3 §7 (lines 320–367); Methods v2 §M12 table; `analysis.py` (`h2a_initial_segments`, `h2a_part_ii`, `h2a_separation`, `_paired_change`, `h2e_noise_matching`, `h3a_logrank`, `h3b_importances`, `h2c`); `report._key_number`; the WU-0006 unit (no H3b case, line 60). **No test was run:** nothing in `lpcstudy/` or `tests/` changed after the developer's run 5 at e066aff (`245 passed`; 244 in run 2 plus the one new test), so a rerun would break the once-rule. Read-only checks instead: the labels printed from the code at HEAD; `stored_levels` evaluated on real results; the key-sorted JSON of `runs/base/smoke/results.json` and `runs/rep/smoke/results.json` (report-only at e066aff, written 16:35:41) are equal, and that `RESULTS.md` carries the new H2a and H3b label text.
+
+**Per finding.**
+- **R1: resolved.** The H2a label now reads "blocks of 5 consecutive test states (all of them, not only the eligible ones) …, with the eligibility of part (i) and the domain of part (ii) re-evaluated inside each resample (DEC-0008 A4)". The dependence clause is the plain "test states" one. This matches `analysis.py:1118–1121` (eligibility inside `stat`) and `:1211–1219` (interior filter inside `stat`; zero and one parts on all resampled states), and DEC-0008 A4(b). The test asserts the new phrases and the absence of the old ones, and cites A4(b).
+- **R2: resolved.** Every clause was checked against the code and the decision log:
+  - the indicator 1{w\* = 0} over all states, logit w\* on 0 < w\* < 1, and 1{w\* = 1} added at strictly more than 5% (`:1202–1208`, `20 * n_one > n_states`), all at H_ref;
+  - quadratic controls in ln ε_s/ρ and ln δ/ρ with squares and product (A4(a2); `:1276–1277`);
+  - the initial segment of 1, 2 and 4 LT with eligibility L ≥ 2 (`:1107–1109`; `long_horizons` = h ≥ 1 gives 1, 2, 4);
+  - "at most 0.5 σ_x" (`:1268`, `<=`, `linear_regime_rms` = 0.5);
+  - "the edge is the bound 0.1": the band is (−∞, 0.1), open at the top. Pass iff hi < 0.1, fail iff lo ≥ 0.1 (`:1071–1073`, `(True, False)`);
+  - M12 pilot medians 0.12 / 0.28 / 0.17 and projected half-width 0.04;
+  - the (ii) clause matches v3 §7 line 363.
+- **R3: resolved.** D is defined as `analysis.py:1915–1917` and A3 define it. "The stability index … is reported only" matches `:1918`, `:1992` and A3. Lower bound of D within one half-width of 0 is the decision edge of the open band (0, ∞) (`:1983`).
+- **R4: resolved.**
+  - (a) "H3a cannot fail" is true: DEC-0008 A3, and `h3a_logrank` has no `fail` branch (`:1854–1864`).
+  - The listed causes are correct: n < 50, a pair not computed, adjusted p ≥ 0.01. Each gives inconclusive.
+  - (b) The H3c cell quotes v3 §7 line 358 verbatim. The test reads the proposal file as its reference, and "not as a failure" is gone.
+- **R5: resolved.**
+  - `STORED_LEVEL_PATHS` now has H2e `by_noise/*/level` and H3b `D/level` beside `weight_lambda/level`.
+  - On the real results (`runs/base/smoke` and the DEV-0 pilot, all three systems), every path resolves. That gives H1a [0.95], H1d [0.95], H2b [0.9833], H2e [0.95, 0.95], H3b [0.95, 0.95] and H3c [0.9833]: 9 levels per system, all equal to the role level.
+  - The other stored levels are reported-only intervals that the verdict table does not print: `H2b/library_curves/*/*`, `H2b/library_change_reported/*` and `H2c/A4o_minus_A2`.
+  - The mismatch test now covers H3b D, H3b weight_lambda, and H2e at each ρ separately. Each one raises `ValueError`. The wildcard is exercised on a mismatch in only the second ρ.
+- **R6: resolved.** `H3B_COVERAGE` is appended to the H3b label only. Its text matches the `h3b_importances` docstring (`:1909–1911`) and the WU-0006 gap (Log line 60, "no H3b case"). The test asserts it is present on H3b and absent from every other row.
+- **R7: accepted** (main session's). The record is in the Log, and no integration run has happened since.
+
+**Neutrality and consistency (d), (e).**
+- No assert or tolerance was loosened. The diff of `test_budget.py` adds lines only, apart from the renamed `stored_level(...) is None` → `stored_levels(...) == []`, which is equivalent.
+- No producer (`analysis`, `experiments`, `pipeline`, `statistics`, `__main__`) references `budget`, `QOI_DECLARATIONS` or `QOI_FIELDS`. The report-only `results.json` equals the base.
+- `budget.py` imports only `.config` and `.identifiers`, which agrees with the fixture rows `budget` and `report` and with the module count of 22.
+- The develop merge brought a one-line docstring change in `statistics.py`, plus decisions, defects and notes. It changed no import and added no module, so the fixture stands.
+- No new text in `budget.py` or `QOI_DECLARATIONS` matches the stale-id pattern `H1e|H1f|H2f|H3d|T1|h1e_|h1f_`. The only matches are in the pre-existing id tables.
+- e066aff and 2656b62 name the unit and carry `Agent: claude-sonnet-5-5`. The sync merge 3837cae uses git's default message, as earlier sync merges did.
+
+**New findings.**
+- **R8 (minor, not blocking): `STORED_LEVEL_PATHS` is tied to the producers only through the hand-built `fake_system`** (`lpcstudy/budget.py:35–41`; `tests/unit/test_report.py:127`).
+  - Why it matters: if a producer renames a key on a path (`D`, `weight_lambda`, `by_noise`, `library_change`), `stored_levels` returns `[]`. The label then silently uses the role level, which looks exactly like the documented old-schema case, so the L2 cross-check would disappear unnoticed. Every test would stay green, because `fake_system` would not change with the producer (PRIME.4: a silent fallback).
+  - Today every path resolves on real results (see R5), so there is no present defect.
+  - Fix (follow-up or .1/.2 commit group): one check that runs on producer output. Either assert, in the smoke-pipeline integration test, that `budget.stored_levels(row, result)` is non-empty for every key of `STORED_LEVEL_PATHS` (two entries for H3b, one per ρ for H2e), or call the five producers on small synthetic inputs in `test_analysis` and check the same.
+
+**Owner checkpoint.** Unchanged from round 1. The change adds no statistics, seed, provenance or dependency code, but its report statements govern how verdicts are read, and the 14-row table rests on DEC-0021 O1 (proposed). **Needs owner review before freeze.**
+
+**Verdict: approve.** R1 to R6 are resolved and R7 is accepted. R8 is one minor new finding that does not block the merge of .3 and .4 into the branch line. The branch merge still waits for the A1 smoke at the .2a head, as round 1 required. 1 new finding.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
