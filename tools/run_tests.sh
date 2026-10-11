@@ -14,7 +14,8 @@
 # per tier: LPC_GATE=merge tools/run_tests.sh unit tests/unit
 #
 # Environment (set here, overriding what is inherited): JAX_PLATFORMS=cpu (cuda,cpu for gpu),
-# XLA_PYTHON_CLIENT_PREALLOCATE=false, OMP/MKL/OPENBLAS_NUM_THREADS=$LPC_THREADS (default 4).
+# XLA_PYTHON_CLIENT_PREALLOCATE=false, OMP/MKL/OPENBLAS_NUM_THREADS=$LPC_THREADS (default 4) and
+# PJRT_NPROC=NPROC=$LPC_THREADS (the XLA CPU thread pools). XLA_FLAGS is never set or altered.
 # LPC_PYTHON selects the interpreter (else <root>/.venv/bin/python, else python3).
 # LPC_GPU_LOCK is the lock file (default /tmp/lpcstudy-gpu.lock); LPC_GPU_WAIT shortens the wait.
 #
@@ -108,6 +109,10 @@ else
 fi
 
 export OMP_NUM_THREADS="$threads" MKL_NUM_THREADS="$threads" OPENBLAS_NUM_THREADS="$threads"
+# XLA's CPU client sizes its thread pools from PJRT_NPROC, then NPROC (plain environment variables
+# read by getenv, not XLA flags, so they cannot abort XLA); unset it uses every schedulable CPU.
+# Verified for jaxlib 0.11.2 in WU-0012.4. Never put a thread cap in XLA_FLAGS: an unknown entry aborts.
+export PJRT_NPROC="$threads" NPROC="$threads"
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 if [ "$tier" = gpu ]; then
     export JAX_PLATFORMS=cuda,cpu

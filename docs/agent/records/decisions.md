@@ -223,3 +223,17 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0002.3 (merged to `develop` with these two points flagged); the K choice in every run. Marked "needs owner review before freeze".
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+- 2026-10-11 (claude-sonnet-5-5, main session; status of DEC-0010 itself is still **proposed**): update to DEC-0010 after the researcher's re-read of the Chua memo (`docs/agent/notes/2026-10-10-research-lyapunov.md`, 'Chua memo re-read'). The memo's quoted mu3 and sum of exponents are internally inconsistent with its own Jacobian, so they are NOT used. The memo case enters WU-0007.2 for **lambda_max only**: reference 0.23 per circuit time divided by 0.7 = 0.3286 per dimensionless time (conversion tau = 0.7 t confirmed from the memo's parameters and equation (1.3); a weak second source states 0.33), tolerance 10% (the mathematician's computation: combined sigma about 3.9%), with the orbit-boundedness guard (DEF-0015). Chua at the study's own parameters (alpha = 15.6, beta = 28) remains `not found`: a recorded known limitation.
+
+## DEC-0014: WU-0002.6: the 50-state minimum applies to the Q-N reading  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the WU-0002.6 review R4; for owner confirmation)
+
+**Decision.** The Q-N reading (interior logit w* and the indicator 1{w* = 0}) applies the 50-state minimum (`MIN_STATES`): a part with fewer than 50 states is inconclusive with the reason recorded. The developer chose this; the plan did not state it. It follows DEC-0008 A3 (subset statistics with fewer than 50 states are inconclusive) and DEC-0011 O1, and is the conservative side (it can only turn a verdict into inconclusive).
+
+**Alternatives weighed.** No minimum for Q-N: rejected (DEC-0008 A3 names no exemption, and an R² on a handful of states is unstable).
+
+**Affects:** WU-0002.6; v3 Q-N wording (add to the owner's amendment list, `docs/agent/notes/2026-10-11-amendments-for-owner.md` section 2). Marked "needs owner review before freeze" (verdict and statistics code).
+
+**Dissent and resolution (REPRO.8):** none. Status: proposed.
+
+- 2026-10-11 (claude-sonnet-5-5, main session; DEC-0010 still **proposed**): correction on the memo case's 10% tolerance, from the WU-0007.2 review R2. The 10% was proposed by the planner before any code value was computed (commit 431a482, 07:58). The applied-mathematician measured the code's lambda_max = 0.3235 afterwards (8e1dc9e, 08:06) and then confirmed the 10% from the error budget (combined sigma about 3.9%). So the 10% was confirmed after the value was seen; it was not changed after seeing it. The measured gap is -1.53% (0.323544 against 0.3286), well inside the bound. Also note: the memo row is in the test and in every RESULTS.md while DEC-0010 is unconfirmed (review R3); if the owner rejects it, the row is removed from both.
