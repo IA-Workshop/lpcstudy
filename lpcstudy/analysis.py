@@ -4,12 +4,13 @@ The identifiers are the v3 ones of :mod:`lpcstudy.identifiers`: H1a-H1d, Q-N, H2
 the reported gain bound, and the validation check V7.
 
 Every function returns a plain ``dict`` (JSON-serializable) with the point
-estimate, its block-bootstrap interval, the pre-registered threshold and a
-``pass`` flag. H1a, H1b and H1d (WU-0002.4 and .5) and the statistics of WU-0002.7 and .8 (H2b,
-H2e, H3a, H3b, H3c) also carry the three-valued ``verdict`` of DEC-0008 A1/A3 (``pass``, ``fail``,
-``inconclusive``, with a ``reason`` for an inconclusive one) from the shared helpers of
-:mod:`lpcstudy.statistics`; ``pass`` is ``verdict == "pass"``. Primary endpoints H2a, H2b and H3c
-use Bonferroni-adjusted intervals at level ``1 - 0.05/3``; all others use 95% intervals.
+estimate, its block-bootstrap interval and the pre-registered threshold. Every criterion that
+carries a pass/fail rule also carries the three-valued ``verdict`` of DEC-0008 A1/A3 (``pass``,
+``fail``, ``inconclusive``, with a ``reason`` for an inconclusive one) from the shared helpers of
+:mod:`lpcstudy.statistics`, and ``pass`` is ``verdict == "pass"`` (DEC-0012; v3 section 7). The
+gain bound has no bar (v3 section 2, "without a pass/fail bar") and so no verdict. Primary
+endpoints H2a, H2b and H3c use Bonferroni-adjusted intervals at level ``1 - 0.05/3``; all others
+use 95% intervals.
 
 For the statistics of WU-0002.7 and .8 (H2b(ii), H2e, H3a, H3b, H3c) a result that cannot be
 computed, or whose interval meets a band edge, is *inconclusive* and says why (``reason``); failed
@@ -54,6 +55,13 @@ H3C_BOUND = 1.05
 H1A_BAND = (0.75, 1.25)  # DEC-0008 A1/A4(h): the ratio (1/d_fit)/(1/d_LB), closed band
 H1B_BAND = (0.8, 1.2)  # v3 H1b: closed
 H1D_BAND = (0.7, float("inf"))  # v3 H1d: [0.7, inf), closed
+H1C_BAND = (0.8, 1.25)  # v3 H1c (PLP): closed (DEC-0008 A1)
+H1C_MIN_INTERVAL = 10
+"""H1c: fewest finite ratios for which an interval is computed at all (reported for 10 to 49 states,
+though the verdict then reads ``n_states < 50``; fewer than 10 states give no number)."""
+H2C_BAND = (float("-inf"), 0.0)  # v3 H2c: both upper bounds < 0, the edge 0 is open (DEC-0008 A1)
+H2C_CLOSED = (True, False)
+H2D_BAND = (float("-inf"), 0.10)  # v3 H2d: upper bound <= 0.10, the edge is closed (DEC-0008 A1)
 H1_LEVEL = 0.95
 
 
@@ -405,8 +413,67 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     return res
 
 
+def h1c_ratio_block(ratios: np.ndarray, config: StudyConfig, *, with_verdict: bool = True
+                    ) -> dict:
+    """Median of the per-state ratios with its 95% block-bootstrap interval (H1c; WU-0002.9).
+
+    Non-finite ratios are excluded and counted (``n_excluded_nonfinite``; DEC-0008 A3).
+    ``n_states`` is the number of finite ratios. With at least ``H1C_MIN_INTERVAL`` (10) of them
+    the interval is computed by ``block_bootstrap_counted`` at the integer seed ``config.seed``
+    (the seed the median had before this helper; bitwise-equal output when no resample fails),
+    with failed resamples counted (``n_failed_resamples``). With fewer, ``median_ratio`` and
+    ``ci`` are None (a number that was not computed is not shown). The 50-state minimum of
+    DEC-0008 A3 replaces the earlier "fewer than 10 states" branch: it is applied by
+    ``criterion_verdict`` (inconclusive, ``n_states < 50``) and can only turn a verdict into
+    inconclusive. The band is [0.8, 1.25], closed (v3 H1c).
+
+    Parameters
+    ----------
+    ratios : np.ndarray
+        ``Lambda_bar x slope`` of each eligible state.
+    config : StudyConfig
+        Study configuration (resamples, block, seed).
+    with_verdict : bool, optional
+        Add ``verdict``, ``reason`` and ``pass``. False for the CP, which is reported with no
+        verdict (v3 H1c names the PLP; DEC-0016 O3).
+
+    Returns
+    -------
+    dict
+        ``median_ratio``, ``ci``, ``n_states``, ``n_excluded_nonfinite``,
+        ``n_failed_resamples`` and, with a verdict, ``verdict``, ``reason`` and ``pass``.
+    """
+    values = np.asarray(ratios, dtype=float)
+    finite = np.isfinite(values)
+    kept = values[finite]
+    out: dict = {"median_ratio": None, "ci": None, "n_states": int(kept.size),
+                 "n_excluded_nonfinite": int((~finite).sum()), "n_failed_resamples": 0}
+    estimate = lower = upper = float("nan")
+    if kept.size >= H1C_MIN_INTERVAL:
+        interval = block_bootstrap_counted(
+            lambda idx: float(np.median(kept[idx])), int(kept.size), config.bootstrap_resamples,
+            config.bootstrap_block, config.seed, H1_LEVEL)
+        estimate, lower, upper = interval.estimate, interval.lower, interval.upper
+        out.update(median_ratio=estimate, ci=[lower, upper],
+                   n_failed_resamples=int(interval.n_failed))
+    if with_verdict:
+        verdict, reason = criterion_verdict(estimate, lower, upper, H1C_BAND,
+                                            n_states=int(kept.size))
+        out.update(_decision(verdict, reason))
+    return out
+
+
 def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
     """H1c: state-wise slope of ``T`` against ``ln theta`` equals ``1 / Lambda_bar``.
+
+    The verdict rests on the PLP median only (v3 H1c "(PLP)"): its 95% block-bootstrap interval
+    must lie in the closed band [0.8, 1.25] (pass), miss it (fail), or else the verdict is
+    inconclusive, with the 50-state minimum (DEC-0008 A1, A3; DEC-0016 O3). The CP median and
+    interval are reported with no verdict. A state is eligible when it has at least three
+    events at the admissible thresholds, horizons above one step, positive growth and varying
+    horizons; the others are counted (``n_ineligible_states``), as are the non-finite ratios
+    (``n_excluded_nonfinite``). The statistic and the bootstrap seed are those of the earlier
+    code, so the median and interval are unchanged when no resample fails.
 
     Parameters
     ----------
@@ -418,7 +485,9 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
     Returns
     -------
     dict
-        Median of ``Lambda_bar x slope`` per forecaster (PLP is primary).
+        ``thresholds``; ``PLP`` and ``CP`` (``h1c_ratio_block`` plus ``n_ineligible_states``;
+        ``verdict``, ``reason`` and ``pass`` for the PLP only); ``threshold`` [0.8, 1.25]; and
+        the PLP ``verdict``, ``reason`` and ``pass`` at the top level.
     """
     m = cell.splits["test"].moments
     growth = cell.oracles["test"].growth
@@ -435,15 +504,10 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
             if ok.sum() >= 3 and growth[i] > 0 and np.ptp(horizons[i][ok]) > 0:
                 ratios.append(growth[i] * ols_slope(np.log(thetas[ok]),
                                                     horizons[i][ok].astype(float)))
-        ratios = np.asarray(ratios)
-        if ratios.size < 10:
-            res[name] = {"n_states": int(ratios.size), "pass": False}
-            continue
-        est, lo, hi = _boot(config, lambda idx: float(np.median(ratios[idx])), len(ratios))
-        res[name] = {"median_ratio": est, "ci": [lo, hi], "n_states": int(ratios.size),
-                     "pass": bool(0.8 <= est <= 1.25)}
-    res["threshold"] = [0.8, 1.25]
-    res["pass"] = bool(res["PLP"].get("pass", False))
+        res[name] = h1c_ratio_block(np.asarray(ratios), config, with_verdict=name == "PLP")
+        res[name]["n_ineligible_states"] = int(len(horizons) - len(ratios))
+    res["threshold"] = list(H1C_BAND)
+    res.update({key: res["PLP"][key] for key in ("verdict", "reason", "pass")})
     return res
 
 
@@ -1426,6 +1490,14 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
     ``block_bootstrap_counted`` and reports ``n_failed_resamples`` (DEC-0012; bitwise equal to
     ``block_bootstrap`` when no resample fails).
 
+    Each decided part goes through ``block_bootstrap_counted`` at the same integer seed as
+    before (bitwise-equal means and intervals when no resample fails; failed resamples are
+    counted and widen the interval). Its verdict is ``criterion_verdict`` against the band
+    ``(-inf, 0)`` with the upper edge open (DEC-0008 A1: a difference whose upper bound is 0
+    is not below 0, so it fails), at 95% and with the 50-state minimum. The criterion is
+    ``combine_verdicts`` of the two parts (v3 section 7). The top-level ``n_failed_resamples``
+    is the larger of the two parts' counts (the parts share the same resamples).
+
     Parameters
     ----------
     scores : dict[str, RuleScores]
@@ -1440,8 +1512,9 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
     -------
     dict
         ``best_single``, ``calibration_mse``, the mean paired differences with intervals
-        (``A4_minus_A2``, ``A4_minus_<best>`` with ``pass``; ``A4o_minus_A2`` reported only), and
-        ``pass``.
+        (``A4_minus_A2``, ``A4_minus_<best>``, each with ``n_failed_resamples``, ``verdict``,
+        ``reason`` and ``pass``; ``A4o_minus_A2`` reported only), and the criterion's
+        ``verdict``, ``reason``, ``pass`` and ``n_failed_resamples``.
 
     Raises
     ------
@@ -1462,11 +1535,19 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
     out = {"best_single": best_single, "calibration_mse": calibration_mse}
     for other in ("A2", best_single):
         diff = a4 - scores[other].state_mse_ref
-        est, lo, hi = _boot(config, lambda idx: float(np.mean(diff[idx])), len(diff), salt=5)
-        out[f"A4_minus_{other}"] = {"mean": est, "ci": [lo, hi],
-                                    "relative": est / float(scores[other].state_mse_ref.mean()),
-                                    "pass": bool(hi < 0)}
-    out["pass"] = bool(out["A4_minus_A2"]["pass"] and out[f"A4_minus_{best_single}"]["pass"])
+        boot = block_bootstrap_counted(lambda idx: float(np.mean(diff[idx])), len(diff),
+                                       config.bootstrap_resamples, config.bootstrap_block,
+                                       config.seed + 5, H1_LEVEL)
+        verdict, reason = criterion_verdict(boot.estimate, boot.lower, boot.upper, H2C_BAND,
+                                            H2C_CLOSED, n_states=len(diff))
+        out[f"A4_minus_{other}"] = {
+            "mean": boot.estimate, "ci": [boot.lower, boot.upper],
+            "relative": boot.estimate / float(scores[other].state_mse_ref.mean()),
+            "n_failed_resamples": boot.n_failed, **_decision(verdict, reason)}
+    parts = {name: out[name] for name in ("A4_minus_A2", f"A4_minus_{best_single}")}
+    out.update(_combined_decision({name: (part["verdict"], part["reason"])
+                                   for name, part in parts.items()}))
+    out["n_failed_resamples"] = max(part["n_failed_resamples"] for part in parts.values())
     diff_o = scores["A4o"].state_mse_ref - scores["A2"].state_mse_ref
     boot = block_bootstrap_counted(lambda idx: float(np.mean(diff_o[idx])), len(diff_o),
                                    config.bootstrap_resamples, config.bootstrap_block,
@@ -1481,6 +1562,15 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
 def h2d_empirical_comparison(scores: dict[str, RuleScores], config: StudyConfig) -> dict:
     """H2d: A4 within 10% of A3 in-distribution (part (ii) is removed in v3).
 
+    The statistic is ``mean(A4) / mean(A3) - 1`` over states. The verdict is the 95%
+    block-bootstrap interval (integer seed ``config.seed + 6``, as before) against the band
+    ``(-inf, 0.10]``, closed at 0.10 (v3 H2d: "upper bound <= 0.10"; DEC-0008 A1; DEC-0011 O4 is
+    lifted by WU-0002.9): pass if the upper bound is at most 0.10, fail if the lower bound is
+    above it, else inconclusive, with the 50-state minimum. Failed resamples are counted and
+    widen the interval (bitwise-equal output when none fails). No single resample value can
+    equal 0.10 (for a result near 0.1 the subtraction is exact on a multiple of ``2**-52``,
+    which 0.1 is not), but the interpolated percentile bound can, so the edge is a live case.
+
     Parameters
     ----------
     scores : dict[str, RuleScores]
@@ -1491,21 +1581,30 @@ def h2d_empirical_comparison(scores: dict[str, RuleScores], config: StudyConfig)
     Returns
     -------
     dict
-        In-distribution excess of A4 over A3 with its interval, and the pass flags.
+        ``in_distribution_excess``, ``ci``, ``n_failed_resamples``, ``verdict``, ``reason`` and
+        ``pass``.
     """
     a3, a4 = scores["A3"].state_mse_ref, scores["A4"].state_mse_ref
-    stat = lambda idx: float(a4[idx].mean() / a3[idx].mean() - 1.0)
-    est, lo, hi = _boot(config, stat, len(a3), salt=6)
-    in_dist_ok = est <= 0.10
-    return {"in_distribution_excess": est, "ci": [lo, hi], "in_distribution_pass":
-            bool(in_dist_ok), "pass": bool(in_dist_ok)}
+    boot = block_bootstrap_counted(lambda idx: float(a4[idx].mean() / a3[idx].mean() - 1.0),
+                                   len(a3), config.bootstrap_resamples, config.bootstrap_block,
+                                   config.seed + 6, H1_LEVEL)
+    verdict, reason = criterion_verdict(boot.estimate, boot.lower, boot.upper, H2D_BAND,
+                                        (True, True), n_states=len(a3))
+    return {"in_distribution_excess": boot.estimate, "ci": [boot.lower, boot.upper],
+            "n_failed_resamples": boot.n_failed, **_decision(verdict, reason)}
 
 
 def gain_horizon_bound(cell: Cell, config: StudyConfig) -> dict:
     """Gain bound: hybrid horizon gain over the better forecaster <= ``ln 2 / (2 Lambda_bar)``.
 
-    Evaluated on states with positive growth, uncensored single-forecaster
-    horizons and nonnegative error covariance at the better forecaster's crossing.
+    Reported against the P1 bound with no pass/fail bar (v3 section 2; concordance D-21(a)), so
+    there is no ``pass`` and no ``threshold``. Evaluated on states with positive growth,
+    uncensored single-forecaster horizons and nonnegative error covariance at the better
+    forecaster's crossing. The number of states each screen excludes is reported next to
+    ``n_states`` (``n_screened_out``; the screens overlap, so each count is over all
+    ``n_total_states``, and a state may be in several). The screen is the v1 one: the covariance
+    screen is centered and at one horizon, and the subset that satisfies P1's hypotheses at every
+    horizon is not computed (concordance D-21(b), (c); the report row stays marked pending).
 
     Parameters
     ----------
@@ -1517,7 +1616,10 @@ def gain_horizon_bound(cell: Cell, config: StudyConfig) -> dict:
     Returns
     -------
     dict
-        Fraction of states within the bound (+1 step discretization tolerance).
+        Fraction of states within the bound (+1 step discretization tolerance), ``n_states``
+        (those that pass every screen), ``n_total_states``, ``n_screened_out``
+        (``growth_nonpositive``, ``censored_single_forecaster``, ``negative_covariance``;
+        a NaN covariance counts as negative) and the median and maximum gain in Lyapunov times.
     """
     m = cell.splits["test"].moments
     growth = cell.oracles["test"].growth
@@ -1536,11 +1638,14 @@ def gain_horizon_bound(cell: Cell, config: StudyConfig) -> dict:
     within = gain <= bound + 1.0
     frac = float(within.mean()) if within.size else float("nan")
     return {"fraction_within_bound": frac, "n_states": int(ok.sum()),
+            "n_total_states": int(len(growth)),
+            "n_screened_out": {"growth_nonpositive": int((~(growth > 0)).sum()),
+                               "censored_single_forecaster": int((~(ev_cp & ev_plp)).sum()),
+                               "negative_covariance": int((~(cov >= 0)).sum())},
             "median_gain_lyapunov": float(np.median(gain)) / config.steps_per_lyapunov
             if gain.size else float("nan"),
             "max_gain_lyapunov": float(np.max(gain)) / config.steps_per_lyapunov
-            if gain.size else float("nan"),
-            "threshold": 0.9, "pass": bool(frac >= 0.9)}
+            if gain.size else float("nan")}
 
 
 # ------------------------------------------------------------------------ RQ3

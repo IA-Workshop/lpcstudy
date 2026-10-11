@@ -10,10 +10,16 @@ Markdown escapes removed (for the gain bound, the sentence after the RQ3 table).
 This module defines no statistic, band, level or verdict rule: it names things. The v2 ids and
 the v1 keys that appear below are historical data of the map, not live identifiers of the code.
 
-WU-0002.2. WU-0002.9 and WU-0002.10 will consume ``role`` and ``pending``.
+WU-0002.2. WU-0002.9 consumes ``role`` (verdict rows) and ``pending`` (the gain bound only).
 """
 
 from dataclasses import dataclass
+
+GAIN_BOUND_PENDING = ("the gain-bound screen row (amendments note section 11; "
+                      "ROADMAP row not yet opened)")
+"""What the gain-bound row waits for: concordance D-21(b), (c) (screen on the raw covariance at
+every horizon, report the subset and the per-screen counts, no bar). It has no WU number yet
+(DEC-0016 O2)."""
 
 
 @dataclass(frozen=True)
@@ -33,8 +39,9 @@ class Hypothesis:
     criterion : str
         ``"<statistic>; pass if <rule>"`` from v3 section 2 (the sentence itself for ``reported``).
     pending : tuple[str, ...]
-        ROADMAP sub-tasks whose row names this id and may change the statistic computed under
-        ``key``. While non-empty, the report marks the row as computed with the v1 statistic.
+        ROADMAP sub-tasks (or the named gap, if its row is not yet opened) whose row names this id
+        and may change the statistic computed under ``key``. While non-empty, the report marks
+        the row as computed with the v1 statistic.
     """
 
     v3_id: str
@@ -77,7 +84,7 @@ HYPOTHESIS_TABLE: tuple[Hypothesis, ...] = (
         "Paired MSE differences at H_ref; pass if both upper bounds < 0"),
     Hypothesis(
         "H2d", "H2d", "H2d", "secondary",
-        "MSE ratio minus 1 at H_ref; pass if upper bound ≤ 0.10", ("WU-0002.9",)),
+        "MSE ratio minus 1 at H_ref; pass if upper bound ≤ 0.10"),
     Hypothesis(
         "H2e", "H2f", "H2e", "secondary",
         "Median per-state change in error correlation, N_lib 10³ → 10⁵; pass if lower bound > 0 "
@@ -85,7 +92,7 @@ HYPOTHESIS_TABLE: tuple[Hypothesis, ...] = (
     Hypothesis(
         "(reported)", "H2e", "gain_bound", "reported",
         "The hybrid's horizon gain over the better forecaster is reported against the P1 bound, "
-        "without a pass/fail bar.", ("WU-0002.9",)),
+        "without a pass/fail bar.", (GAIN_BOUND_PENDING,)),
     Hypothesis(
         "H3a", "H3a", "H3a", "secondary",
         "Holm-adjusted log-rank tests between consecutive regimes; pass if all p < 0.01"),
