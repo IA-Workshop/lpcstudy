@@ -18,6 +18,7 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - 2026-10-10: opened (Claude).
 - 2026-10-10 (claude-sonnet-5-5, main session, on the WU-0013.2 reviewer's finding R3; both sites checked): two further silent cases that WU-0002.11 must count and report: `lpcstudy/statistics.py:61` (`kaplan_meier` sets the hazard to 0 where no subject is at risk) and `lpcstudy/statistics.py:95-96` (`logrank_test` returns p = 1.0 when the variance is not positive). Both feed H3a. Any fix is statistics code and needs owner review before the freeze.
 - 2026-10-10 (claude-sonnet-5-5, main session, on the WU-0005 reviewer's observation; checked): a third uncounted silent case for WU-0002.11: `lpcstudy/oracle.py:62` (`local_dimension`) clamps zero neighbour distances with `np.maximum(dist, 1e-300)` (duplicate library points) without counting them.
+- 2026-10-11 (claude-sonnet-5-5, on the WU-0002.10 reviewer's finding R4): V7's `n_nonfinite` counts non-finite or non-positive delta and nu, but `ParametricEstimator.estimate` (`lpcstudy/estimation.py:141-142`) replaces non-finite estimates with the state mean upstream, so `n_nonfinite` is 0 in real runs and 0 does not mean nothing diverged. WU-0002.11 must report the replacement count beside V7.
 
 **DEF-0002: Excess MSE uses c(w − w\*)² with clipped w\*** (VV.1)
 
@@ -95,6 +96,7 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Resolution:** to be planned in WU-0002 (the owner decides whether the pool should depend on the seed id; the pilot used the fixed pool, so a change affects the WU-0002.12 regression).
 - 2026-10-10: opened (claude-sonnet-5-5, main session, on the WU-0014 reviewer's finding).
 - 2026-10-11 (claude-sonnet-5-5, recording the owner's ruling, DEC-0008 B): option 1: keep until the WU-0002.12 regression, then route through `make_rng(config.seed, "oracle-pool")`; audit the other `default_rng` sites in WU-0002.11.
+- 2026-10-11 (claude-sonnet-5-5, on the WU-0002.10 reviewer's finding R3): add to the WU-0002.11 audit list the new report-only V7 interval seeds `config.seed + 7000 + i` (`analysis.py`, WU-0002.10), another integer-salt seed that bypasses `make_rng` (DEC-0012 convention: existing integer salts are not converted until the audit decides).
 
 **DEF-0012: k-d tree queries use all cores and ignore the `LPC_THREADS` cap** (RSRC.11, RSRC.12; `.claude/rules/test-discipline.md` "Device and threads")
 
