@@ -15,7 +15,7 @@ from scipy import stats as sps
 from lpcstudy.statistics import MIN_STATES, BootstrapInterval, block_bootstrap, \
     block_bootstrap_counted, block_resample_indices, bootstrap_values, \
     combine_verdicts, criterion_verdict, holm_adjust, interval_verdict, kaplan_meier, \
-    logrank_test, partial_correlation, percentile_interval
+    logrank_parts, logrank_test, partial_correlation, percentile_interval
 
 
 def test_kaplan_meier_matches_geometric_survival() -> None:
@@ -120,6 +120,37 @@ def test_logrank_matches_scipy() -> None:
     as_data = lambda dur, ev: sps.CensoredData(uncensored=dur[ev], right=dur[~ev])
     expected = sps.logrank(as_data(dur_a, ev_a), as_data(dur_b, ev_b)).pvalue
     assert logrank_test(dur_a, ev_a, dur_b, ev_b) == pytest.approx(expected, rel=1e-10)
+
+
+def test_logrank_parts_hand_values_and_zero_variance_cases() -> None:
+    """``logrank_parts`` returns the O - E sum and the variance of the hand-worked data set.
+
+    Reference: the hand computation of ``test_logrank_hand_worked_ties_and_censoring``
+    (O - E = 5/7 and V = 97/98, derived there term by term from the Mantel-Haenszel
+    definition; independent of the code). The p-value is checked against
+    ``math.erfc(sqrt(chi2/2))`` (exact for one degree of freedom, independent of
+    ``scipy.stats.chi2``), with chi2 = (O - E)^2 / V from the parts, and equals
+    ``logrank_test`` to 1e-15 (the same arithmetic). Zero-variance cases, in which
+    ``logrank_test`` returns 1.0 (DEF-0001): no event at all (O - E = V = 0 exactly), and one
+    empty group (every risk set has n_A = 0, so each term is exactly 0).
+    Tolerance ``rel=1e-13`` on the parts: about 30 float64 operations on O(1) numbers, error
+    below 1e-14; the zero cases are exact equalities.
+    """
+    dur_a, ev_a = np.array([1, 2, 2, 3]), np.array([True, True, True, False])
+    dur_b, ev_b = np.array([2, 3, 3, 4]), np.array([True, True, True, True])
+    obs_minus_exp, variance = logrank_parts(dur_a, ev_a, dur_b, ev_b)
+    assert obs_minus_exp == pytest.approx(5.0 / 7.0, rel=1e-13)
+    assert variance == pytest.approx(97.0 / 98.0, rel=1e-13)
+    chi2 = obs_minus_exp**2 / variance
+    assert logrank_test(dur_a, ev_a, dur_b, ev_b) == pytest.approx(
+        math.erfc(math.sqrt(chi2 / 2.0)), rel=1e-12)
+    assert logrank_test(dur_a, ev_a, dur_b, ev_b) == float(sps.chi2.sf(chi2, df=1))
+
+    none = np.zeros(4, dtype=bool)
+    assert logrank_parts(dur_a, none, dur_b, none) == (0.0, 0.0)
+    assert logrank_test(dur_a, none, dur_b, none) == 1.0
+    empty = np.array([], dtype=int)
+    assert logrank_parts(dur_a, ev_a, empty, empty.astype(bool)) == (0.0, 0.0)
 
 
 def test_holm() -> None:

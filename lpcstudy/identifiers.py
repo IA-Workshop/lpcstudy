@@ -71,33 +71,31 @@ HYPOTHESIS_TABLE: tuple[Hypothesis, ...] = (
     Hypothesis(
         "H2b", "H2b", "H2b", "primary",
         "(i) mean per-state rank correlation of w* with ρ; (ii) mean paired change in w* from "
-        "N_lib = 10³ to 10⁴ at ρ = 1%; pass if both lower bounds > 0", ("WU-0002.7",)),
+        "N_lib = 10³ to 10⁴ at ρ = 1%; pass if both lower bounds > 0"),
     Hypothesis(
         "H2c", "H2c", "H2c", "secondary",
         "Paired MSE differences at H_ref; pass if both upper bounds < 0"),
     Hypothesis(
         "H2d", "H2d", "H2d", "secondary",
-        "MSE ratio minus 1 at H_ref; pass if upper bound ≤ 0.10", ("WU-0002.8",)),
+        "MSE ratio minus 1 at H_ref; pass if upper bound ≤ 0.10", ("WU-0002.9",)),
     Hypothesis(
         "H2e", "H2f", "H2e", "secondary",
         "Median per-state change in error correlation, N_lib 10³ → 10⁵; pass if lower bound > 0 "
-        "at ρ = 1% and 2%", ("WU-0002.7",)),
+        "at ρ = 1% and 2%"),
     Hypothesis(
         "(reported)", "H2e", "gain_bound", "reported",
         "The hybrid's horizon gain over the better forecaster is reported against the P1 bound, "
         "without a pass/fail bar.", ("WU-0002.9",)),
     Hypothesis(
         "H3a", "H3a", "H3a", "secondary",
-        "Holm-adjusted log-rank tests between consecutive regimes; pass if all p < 0.01",
-        ("WU-0002.8",)),
+        "Holm-adjusted log-rank tests between consecutive regimes; pass if all p < 0.01"),
     Hypothesis(
         "H3b", "H3c", "H3b", "secondary",
         "Importances in a weight tree and a horizon tree; pass if weight tree: Λ̃ < 0.2; "
         "horizon tree: Λ̃ highest"),
     Hypothesis(
         "H3c", "H3d", "H3c", "primary",
-        "MSE ratio, regimes / closed form, at H_ref; pass if upper bound ≤ 1.05",
-        ("WU-0002.8",)),
+        "MSE ratio, regimes / closed form, at H_ref; pass if upper bound ≤ 1.05"),
 )
 
 def check_keys(result: dict) -> None:

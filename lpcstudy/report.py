@@ -91,7 +91,7 @@ def verdicts(results: dict, config: StudyConfig) -> dict:
                              ) from None
     for row in HYPOTHESIS_TABLE:
         if not any(row.key in results["systems"][s] for s in systems):
-            continue  # no result yet (v3 H2e until WU-0002.7); write_markdown lists the row
+            continue  # no result in any system; write_markdown lists the row
         if row.role == "estimate":  # Q-N: an estimate is read, not passed (v3 section 7)
             readings = {s: _qn_primary_reading(results["systems"][s][row.key])
                         for s in systems}
@@ -108,6 +108,11 @@ def verdicts(results: dict, config: StudyConfig) -> dict:
 def _fmt(value: float, digits: int = 3) -> str:
     return "n/a" if value is None or (isinstance(value, float) and np.isnan(value)) \
         else f"{value:.{digits}g}"
+
+
+def _interval(ci: list | None, digits: int = 3) -> str:
+    """``[lo, hi]`` of a stored interval, or ``n/a`` when the statistic could not be computed."""
+    return "n/a" if ci is None else f"[{_fmt(ci[0], digits)}, {_fmt(ci[1], digits)}]"
 
 
 def _verdict_text(res: dict) -> str:
@@ -160,26 +165,36 @@ def _key_number(key: str, res: dict) -> str:
                    f"[{_fmt(two['interior']['ci'][0], 2)}, {_fmt(two['interior']['ci'][1], 2)}] " \
                    f"(w*=0: {r['n_w_zero']}, w*=1: {r['n_w_one']})"
         case "H2b":
-            lib = "; ".join(f"n_lib@{k}: w*(n_lib max)={_fmt(v['median_at_largest_n_lib'], 2)}"
-                            for k, v in r["library"].items())
-            return f"rho rank corr {_fmt(r['noise']['mean_state_spearman'], 2)}; {lib}"
+            change = r["library_change"]
+            return f"rho rank corr {_fmt(r['noise']['mean_state_spearman'], 2)}; " \
+                   f"n_lib 10^3->10^4 change {_fmt(change['mean_change'], 2)} " \
+                   f"{_interval(change['ci'], 2)}: {_verdict_text(r)}"
         case "H2c":
             return f"A4-A2 {_fmt(100 * r['A4_minus_A2']['relative'], 3)}%; " \
                    f"A4-{r['best_single']} " \
-                   f"{_fmt(100 * r['A4_minus_' + r['best_single']]['relative'], 3)}%"
+                   f"{_fmt(100 * r['A4_minus_' + r['best_single']]['relative'], 3)}%; " \
+                   f"A4o-A2 {_fmt(100 * r['A4o_minus_A2']['relative'], 3)}% (reported)"
         case "H2d":
             return f"A4/A3-1 = {_fmt(100 * r['in_distribution_excess'], 3)}%"
         case "gain_bound":
             return f"within bound {_fmt(r['fraction_within_bound'], 3)} " \
                    f"(n={r['n_states']}, max gain {_fmt(r['max_gain_lyapunov'], 2)} LT)"
+        case "H2e":
+            return "; ".join(f"rho={k}: median change {_fmt(v['median_change'], 2)} "
+                             f"{_interval(v['ci'], 2)}" for k, v in r["by_noise"].items()) \
+                   + f": {_verdict_text(r)}"
         case "H3a":
-            return f"K={r['chosen_K']}: regret {_fmt(100 * r['regret_ratio'], 3)}%, " \
-                   f"IQR {_fmt(r['mean_iqr_lyapunov'], 2)} LT"
+            holm = r["logrank_p_holm"]
+            return f"K={r['chosen_K']}: largest Holm p {_fmt(max(holm) if holm else None, 3)}, " \
+                   f"IQR {_fmt(r['iqr_lt_mean'], 2)} LT: {_verdict_text(r)}"
         case "H3b":
-            return f"Lambda imp: weight {_fmt(r['weight_tree_importance']['lambda_tilde'], 2)}, " \
-                   f"horizon {_fmt(r['horizon_tree_importance']['lambda_tilde'], 2)}"
+            w, d = r["weight_lambda"], r["D"]
+            return f"Lambda imp: weight {_fmt(w['importance'], 2)} {_interval(w['ci'], 2)}, " \
+                   f"D {_fmt(d['value'], 2)} {_interval(d['ci'], 2)}, " \
+                   f"stability {_fmt(r['stability'], 2)}: {_verdict_text(r)}"
         case "H3c":
-            return f"A5/A4 {_fmt(r['A5_over_A4_mse'], 4)}"
+            return f"A5/A4 {_fmt(r['A5_over_A4_mse'], 4)} {_interval(r['ci'], 4)}: " \
+                   f"{_verdict_text(r)}"
     return ""
 
 
@@ -499,10 +514,10 @@ def make_figures(results: dict, config: StudyConfig, out_dir: Path) -> list[Path
 
     fig, axes = plt.subplots(1, len(systems), figsize=(4.2 * len(systems), 3.4), squeeze=False)
     for ax, s in zip(axes[0], systems):
-        lib = results["systems"][s]["H2b"]["library"]
-        for color, (rho, v) in zip(SERIES, lib.items()):
-            sizes = np.array(list(map(int, v["median_w_by_n_lib"])))
-            ax.semilogx(sizes, list(v["median_w_by_n_lib"].values()), color=color, linewidth=2,
+        lib = results["systems"][s]["H2b"]["library_curves"]
+        for color, (rho, curve) in zip(SERIES, lib.items()):
+            sizes = np.array([int(n) for n in curve])
+            ax.semilogx(sizes, [v["median"] for v in curve.values()], color=color, linewidth=2,
                         marker="o", markersize=5, label=f"rho = {float(rho) * 100:g}% sigma_x")
         ax.set(xlabel="Library size n_lib", ylabel="Median w*(H_ref)", ylim=(0, 1),
                title=f"{s}: weight vs library size")

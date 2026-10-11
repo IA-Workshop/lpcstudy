@@ -275,6 +275,55 @@ def retrieval_spread(analog_vecs: np.ndarray, noise: float) -> np.ndarray:
     return np.sqrt(np.mean(np.sum(centered**2, axis=-1), axis=-1) / dim) / noise
 
 
+def draw_correlation(cp_err: np.ndarray, plp_err: np.ndarray
+                     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Per-state correlation over the noise draws of the CP and PLP errors (H2e, Methods v2 M11).
+
+    Two-pass Pearson over the draw axis: both errors are centered by their own mean first,
+    then ``corr = sum(c p) / (sqrt(sum c^2) sqrt(sum p^2))``. The moment formula
+    ``(E[cp] - E[c]E[p]) / (sd_c sd_p)`` cancels catastrophically for a nearly constant
+    error and is not used. A state whose CP error is constant over the draws (identical
+    retrieval for every draw, so the errors are bitwise equal) has no variance, hence no
+    correlation: its value is set to exactly 0.0 (Methods v2 section M11) and flagged in
+    ``cp_constant``. The same holds for a PLP-constant state (DEC-0011 O2), flagged in
+    ``plp_constant``. Constancy is the exact test ``np.ptp(err, axis=1) == 0``. A state that
+    is not constant but whose variance underflows gives NaN (counted by the caller, never
+    replaced).
+
+    Parameters
+    ----------
+    cp_err, plp_err : np.ndarray
+        Errors against the noise-free truth, both ``(n, M, nH)`` (``M >= 2`` draws).
+
+    Returns
+    -------
+    corr : np.ndarray
+        Correlation, ``(n, nH)``; 0.0 where either error is constant.
+    cp_constant, plp_constant : np.ndarray
+        Boolean ``(n, nH)``: the CP (PLP) error is constant over the draws.
+
+    Raises
+    ------
+    ValueError
+        If the shapes differ, are not 3-D, or there are fewer than 2 draws.
+    """
+    if cp_err.shape != plp_err.shape or cp_err.ndim != 3 or cp_err.shape[1] < 2:
+        raise ValueError(f"need two (n, M >= 2, nH) arrays of one shape; got {cp_err.shape} "
+                         f"and {plp_err.shape}")
+    cp_constant = np.ptp(cp_err, axis=1) == 0.0
+    plp_constant = np.ptp(plp_err, axis=1) == 0.0
+    cp_c = cp_err - cp_err.mean(axis=1, keepdims=True)
+    plp_c = plp_err - plp_err.mean(axis=1, keepdims=True)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        corr = np.sum(cp_c * plp_c, axis=1) / (np.sqrt(np.sum(cp_c**2, axis=1))
+                                               * np.sqrt(np.sum(plp_c**2, axis=1)))
+    return np.where(cp_constant | plp_constant, 0.0, corr), cp_constant, plp_constant
+
+
+CORRELATION_FIELDS: tuple[str, ...] = ("err_corr", "cp_constant", "plp_constant")
+"""The ``(n, nH)`` fields of ``EnsembleMoments`` that ``draw_correlation`` fills."""
+
+
 @dataclass
 class EnsembleMoments:
     """Per-state moments over oracle noise draws.
@@ -296,6 +345,12 @@ class EnsembleMoments:
         (``(n,)``).
     kept : dict[str, np.ndarray]
         Per-draw arrays retained for learned allocators (may be empty).
+    err_corr : np.ndarray or None
+        Correlation over the oracle draws of the CP and PLP errors, ``(n, nH)``
+        (``draw_correlation``; H2e). ``None`` for moments built without it.
+    cp_constant, plp_constant : np.ndarray or None
+        Boolean ``(n, nH)``: the CP (PLP) error is constant over the draws, so
+        ``err_corr`` was set to 0.0 there.
     """
 
     horizons: np.ndarray
@@ -308,6 +363,9 @@ class EnsembleMoments:
     est_seed: np.ndarray
     noise_sens: np.ndarray
     kept: dict[str, np.ndarray] = field(default_factory=dict)
+    err_corr: np.ndarray | None = None
+    cp_constant: np.ndarray | None = None
+    plp_constant: np.ndarray | None = None
 
     def at(self, horizon: int) -> int:
         """Column index of a horizon."""
@@ -321,7 +379,9 @@ class EnsembleMoments:
             sq_plp=self.sq_plp[rows], cross=self.cross[rows],
             analog_seed=self.analog_seed[rows], est_seed=self.est_seed[rows],
             noise_sens=self.noise_sens[rows],
-            kept={k: v[rows] for k, v in self.kept.items()})
+            kept={k: v[rows] for k, v in self.kept.items()},
+            **{k: None if getattr(self, k) is None else getattr(self, k)[rows]
+               for k in CORRELATION_FIELDS})
 
 
 def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
@@ -362,6 +422,9 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
     analog_seed = np.zeros(n_states)
     est_seed = np.zeros(n_states)
     noise_sens = np.zeros(n_states)
+    err_corr = np.zeros((n_states, len(horizons)))
+    cp_constant = np.zeros((n_states, len(horizons)), dtype=bool)
+    plp_constant = np.zeros((n_states, len(horizons)), dtype=bool)
     kept: dict[str, list[np.ndarray]] = {"cp_err": [], "plp_err": [], "inputs": []}
     keep_cols = None if keep_horizons is None else np.searchsorted(horizons, keep_horizons)
     for start in range(0, n_states, per_chunk):
@@ -375,6 +438,8 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
         analog_seed[rows] = np.sqrt(batch.analog_seed_sq.mean(axis=1))
         est_seed[rows] = np.sqrt(batch.est_seed_sq.mean(axis=1))
         noise_sens[rows] = retrieval_spread(batch.analog_vecs, setup.noise)
+        err_corr[rows], cp_constant[rows], plp_constant[rows] = draw_correlation(
+            batch.cp_err, batch.plp_err)
         if keep_cols is not None and keep_draws > 0:
             kept["cp_err"].append(batch.cp_err[:, :keep_draws][:, :, keep_cols])
             kept["plp_err"].append(batch.plp_err[:, :keep_draws][:, :, keep_cols])
@@ -382,7 +447,8 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
     kept_arrays = {k: np.concatenate(v) for k, v in kept.items() if v}
     return EnsembleMoments(horizons=np.asarray(horizons), analog_seed=analog_seed,
                            est_seed=est_seed, noise_sens=noise_sens, kept=kept_arrays,
-                           **out)
+                           err_corr=err_corr, cp_constant=cp_constant,
+                           plp_constant=plp_constant, **out)
 
 
 @dataclass

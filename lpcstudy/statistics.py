@@ -68,9 +68,14 @@ def kaplan_meier(durations: np.ndarray, events: np.ndarray, horizon_max: int
     return SurvivalCurve(times=times, survival=np.cumprod(1.0 - hazard))
 
 
-def logrank_test(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
-                 ev_b: np.ndarray) -> float:
-    """Two-sample log-rank test p-value.
+def logrank_parts(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
+                  ev_b: np.ndarray) -> tuple[float, float]:
+    """Observed minus expected events of group A and the log-rank variance.
+
+    The sum over event times of ``d_A - d n_A / n`` and of the tie-corrected hypergeometric
+    variance ``d (n_A/n)(1 - n_A/n)(n - d)/(n - 1)`` (terms with ``n = 1`` skipped). A
+    variance of 0 is the case that ``logrank_test`` maps to ``p = 1.0``; a caller that must
+    tell "no information" from "no evidence" (H3a, DEC-0011) reads it here.
 
     Parameters
     ----------
@@ -81,8 +86,8 @@ def logrank_test(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
 
     Returns
     -------
-    float
-        Two-sided p-value (chi-square, 1 degree of freedom).
+    tuple[float, float]
+        ``(O - E, V)``.
     """
     dur = np.concatenate([dur_a, dur_b]).ravel()
     ev = np.concatenate([ev_a, ev_b]).ravel().astype(bool)
@@ -98,6 +103,27 @@ def logrank_test(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
         if n_total > 1:
             variance += d_total * (n_a / n_total) * (1 - n_a / n_total) * \
                 (n_total - d_total) / (n_total - 1)
+    return float(observed_minus_expected), float(variance)
+
+
+def logrank_test(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
+                 ev_b: np.ndarray) -> float:
+    """Two-sample log-rank test p-value.
+
+    Parameters
+    ----------
+    dur_a, ev_a : np.ndarray
+        Durations and event indicators of group A.
+    dur_b, ev_b : np.ndarray
+        Durations and event indicators of group B.
+
+    Returns
+    -------
+    float
+        Two-sided p-value (chi-square, 1 degree of freedom); 1.0 if the variance is 0
+        (see ``logrank_parts``).
+    """
+    observed_minus_expected, variance = logrank_parts(dur_a, ev_a, dur_b, ev_b)
     if variance <= 0:
         return 1.0
     return float(sps.chi2.sf(observed_minus_expected**2 / variance, df=1))

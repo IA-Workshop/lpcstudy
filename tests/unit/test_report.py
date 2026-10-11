@@ -156,17 +156,22 @@ def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
                 "part_ii": {"zero": {"partial_corr": 0.02, "ci": [-0.05, 0.08]},
                             "interior": {"partial_corr": -0.03, "ci": [-0.09, 0.04]}}},
         "H2b": {"noise": {"mean_state_spearman": 0.9},
-                "library": {"0.01": {"median_at_largest_n_lib": 0.8,
-                                         "median_w_by_n_lib": {"1000": 0.7, "10000": 0.8}}}},
+                "library_change": {"mean_change": 0.2, "ci": [0.1, 0.3]},
+                "library_curves": {"0.01": {"1000": {"median": 0.7}, "10000": {"median": 0.8}}},
+                "verdict": "pass", "reason": None},
         "H2c": {"A4_minus_A2": {"relative": -0.1}, "best_single": "A1",
-                "A4_minus_A1": {"relative": -0.05}},
+                "A4_minus_A1": {"relative": -0.05}, "A4o_minus_A2": {"relative": -0.2}},
         "H2d": {"in_distribution_excess": 0.05},
-        "H2e": {"median_change": 0.1},
+        "H2e": {"by_noise": {"0.01": {"median_change": 0.1, "ci": [0.05, 0.15]},
+                             "0.02": {"median_change": None, "ci": None}},
+                "verdict": "pass", "reason": None},
         "gain_bound": {"fraction_within_bound": 0.95, "n_states": 40, "max_gain_lyapunov": 1.5},
-        "H3a": {"chosen_K": 3, "regret_ratio": 0.04, "mean_iqr_lyapunov": 0.4},
-        "H3b": {"weight_tree_importance": {"lambda_tilde": 0.1},
-                "horizon_tree_importance": {"lambda_tilde": 0.6}},
-        "H3c": {"A5_over_A4_mse": 1.0123},
+        "H3a": {"chosen_K": 3, "logrank_p_holm": [0.004, 0.001], "iqr_lt_mean": 0.4,
+                "verdict": "pass", "reason": None},
+        "H3b": {"weight_lambda": {"importance": 0.1, "ci": [0.0, 0.15]},
+                "D": {"value": 0.6, "ci": [0.3, 0.8]}, "stability": 0.97,
+                "verdict": "pass", "reason": None},
+        "H3c": {"A5_over_A4_mse": 1.0123, "ci": [0.99, 1.04], "verdict": "pass", "reason": None},
     }
     system = {key: dict(value, **{"pass": True}) for key, value in results.items()
               if key not in skip}
@@ -191,13 +196,15 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
     """The verdict table has one row per table id, in table order; pending rows say so.
 
     Reference: the 14 rows of the identifier table (decision-log map, order of v3 section 2) and
-    the ROADMAP pending sub-tasks, written out below. The fake results have no ``H2e``, so that
-    row reads "[not computed until WU-0002.7]", its cell "n/a: no result" and its verdict
-    "no result"; the rows with a result and a pending sub-task read "computed with the v1
-    statistic". Exact string checks.
+    the ROADMAP pending sub-tasks, written out below. WU-0002.7 and .8 computed H2b, H2e, H3a and
+    H3c, so those rows are no longer pending; H2d stays pending on WU-0002.9 (review R6), and Q-N
+    is done (WU-0002.6). The no-result example is H2d (a plan edit of this test, which used H2e):
+    the fake results have no ``H2d``, so that row reads "[not computed until WU-0002.9]", its cell
+    "n/a: no result" and its verdict "no result"; the rows with a result and a pending sub-task
+    ("(reported)") read "computed with the v1 statistic". Exact string checks.
     """
     results, config = fake_results("DEV-0")
-    system = fake_system(config, skip=("H2e",))
+    system = fake_system(config, skip=("H2d",))
     results["systems"] = {"lorenz63": system}
     results["verdicts"] = verdicts(results, config)
     write_markdown(results, config, tmp_path / "RESULTS.md")
@@ -210,13 +217,12 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
     assert ids == [h.v3_id for h in HYPOTHESIS_TABLE]
     marked = {row.split(" | ")[0][2:]: "[computed with the v1 statistic until " in row
               for row in rows}
-    assert {i for i, m in marked.items() if m} == {"H2b", "H2d",
-                                                   "H3a", "H3c", "(reported)"}
+    assert {i for i, m in marked.items() if m} == {"(reported)"}
     qn = rows[ids.index("Q-N")]  # an estimate: read, never PASS or FAIL (v3 section 7)
     assert "reduces: oracle: interior reduces" in qn and "PASS" not in qn and "FAIL" not in qn
     assert qn.endswith("| estimate (read, no pass/fail) |")
-    h2e = rows[ids.index("H2e")]
-    assert h2e.endswith("[not computed until WU-0002.7] | n/a: no result | no result |")
+    h2d = rows[ids.index("H2d")]
+    assert h2d.endswith("[not computed until WU-0002.9] | n/a: no result | no result |")
     gain = rows[ids.index("(reported)")]
     assert "within bound 0.95 (n=40, max gain 1.5 LT)" in gain and "PASS" in gain
 
@@ -253,7 +259,8 @@ def test_key_numbers_are_exact_for_every_v3_key() -> None:
     Reference: hand formatting of the synthetic values of ``fake_system`` with the ``.3g`` rule of
     ``_fmt`` (``.2g`` where the report asks for two digits, ``.4g`` for A5/A4), worked out from
     the values, e.g. 100 * 0.05 = 5 so "5%". The H1a and H2b strings name ``n_lib``. Exact.
-    The v3 H2e has no number yet (it is not computed), so it is not in the table below.
+    H2e (WU-0002.7) has a number now, with a missing 2% value shown as ``n/a`` (a plan edit of this
+    test).
     """
     system = fake_system(SMOKE)
     expected = {
@@ -266,16 +273,17 @@ def test_key_numbers_are_exact_for_every_v3_key() -> None:
                "undetermined, w*=0 substantial (w*=0: 30, w*=1: 4)",
         "H2a": "(i) pass: range 0.05 (CI hi 0.08, n=120); (ii) pass: partial r zero 0.02 "
                "[-0.05, 0.08], interior -0.03 [-0.09, 0.04] (w*=0: 30, w*=1: 4)",
-        "H2b": "rho rank corr 0.9; n_lib@0.01: w*(n_lib max)=0.8",
-        "H2c": "A4-A2 -10%; A4-A1 -5%",
+        "H2b": "rho rank corr 0.9; n_lib 10^3->10^4 change 0.2 [0.1, 0.3]: pass",
+        "H2c": "A4-A2 -10%; A4-A1 -5%; A4o-A2 -20% (reported)",
         "H2d": "A4/A3-1 = 5%",
+        "H2e": "rho=0.01: median change 0.1 [0.05, 0.15]; rho=0.02: median change n/a n/a: pass",
         "gain_bound": "within bound 0.95 (n=40, max gain 1.5 LT)",
-        "H3a": "K=3: regret 4%, IQR 0.4 LT",
-        "H3b": "Lambda imp: weight 0.1, horizon 0.6",
-        "H3c": "A5/A4 1.012",
+        "H3a": "K=3: largest Holm p 0.004, IQR 0.4 LT: pass",
+        "H3b": "Lambda imp: weight 0.1 [0, 0.15], D 0.6 [0.3, 0.8], stability 0.97: pass",
+        "H3c": "A5/A4 1.012 [0.99, 1.04]: pass",
     }
     assert {key: _key_number(key, system) for key in expected} == expected
-    assert set(expected) == {h.key for h in HYPOTHESIS_TABLE} - {"H2e"}
+    assert set(expected) == {h.key for h in HYPOTHESIS_TABLE}
 
 
 def test_key_numbers_of_h1a_h1b_h1d_show_fail_and_inconclusive_with_the_reason() -> None:
@@ -301,6 +309,25 @@ def test_key_numbers_of_h1a_h1b_h1d_show_fail_and_inconclusive_with_the_reason()
     assert _key_number("H1d", system) == "eps 0.8, delta 0.9, Lambda 0.7, N 0.6: fail"
     assert _key_number("H1a", system) == ("rho=0.01: 1/d (n_lib fit)=0.5, ratio 1 [0.9, 1.1] "
                                           "inconclusive (n_states < 50) (1/d_LB=0.5)")
+
+
+def test_key_numbers_of_wu_0002_7_8_rows_show_the_verdict_and_the_reason() -> None:
+    """The H2b, H2e, H3a, H3b and H3c key numbers end with the verdict, and the reason if inconclusive.
+
+    Reference: hand strings with the ``_fmt`` rules, as in the H1 test above (DEC-0012 contract
+    `verdict` and `reason`, review R1): an inconclusive result must read as such, not as a fail.
+    Exact string checks.
+    """
+    system = fake_system(SMOKE)
+    system["H3b"] = dict(system["H3b"], verdict="inconclusive", reason="D: interval meets band edge")
+    system["H3a"] = dict(system["H3a"], verdict="inconclusive", reason="n_states < 50")
+    system["H2b"] = dict(system["H2b"], verdict="fail", reason=None)
+    assert _key_number("H3b", system) == ("Lambda imp: weight 0.1 [0, 0.15], D 0.6 [0.3, 0.8], "
+                                          "stability 0.97: inconclusive (D: interval meets band "
+                                          "edge)")
+    assert _key_number("H3a", system) == \
+        "K=3: largest Holm p 0.004, IQR 0.4 LT: inconclusive (n_states < 50)"
+    assert _key_number("H2b", system).endswith("[0.1, 0.3]: fail")
 
 
 def test_library_figure_axis_reads_n_lib(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

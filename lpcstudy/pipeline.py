@@ -25,8 +25,8 @@ from .allocation import ErrorPredictor, ProfileProxies, RegimeMap, calibrate_reg
     state_horizon_target
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, build_context, make_rng
-from .ensemble import AnalogLibrary, EnsembleMoments, EvaluationDraws, ForecastSetup, \
-    ensemble_moments, evaluation_draws
+from .ensemble import CORRELATION_FIELDS, AnalogLibrary, EnsembleMoments, EvaluationDraws, \
+    ForecastSetup, ensemble_moments, evaluation_draws
 from .estimation import StateEstimator
 from .networks import train_estimator
 from .oracle import StateOracles, excess_mse, oracle_weight, realized_horizon, \
@@ -390,10 +390,17 @@ def _concat_moments(parts: list[EnsembleMoments]) -> EnsembleMoments:
     keys = ("mean_cp", "mean_plp", "sq_cp", "sq_plp", "cross", "analog_seed", "est_seed",
             "noise_sens")
     kept_keys = set.intersection(*(set(p.kept) for p in parts))
+    correlation = {}
+    for key in CORRELATION_FIELDS:  # all parts carry the field, or none does
+        present = [getattr(p, key) is not None for p in parts]
+        if any(present) and not all(present):
+            raise ValueError(f"cannot stack moments: only some carry {key!r}")
+        correlation[key] = np.concatenate([getattr(p, key) for p in parts]) if all(present) \
+            else None
     return EnsembleMoments(
         horizons=parts[0].horizons,
         kept={k: np.concatenate([p.kept[k] for p in parts]) for k in kept_keys},
-        **{k: np.concatenate([getattr(p, k) for p in parts]) for k in keys})
+        **correlation, **{k: np.concatenate([getattr(p, k) for p in parts]) for k in keys})
 
 
 def _concat_evals(parts: list[EvaluationDraws]) -> EvaluationDraws:
