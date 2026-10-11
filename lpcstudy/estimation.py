@@ -46,6 +46,15 @@ class StateEstimator:
         Flow map of the model used for refinement and for ``nu``.
     refine_steps : int
         Levenberg-Marquardt iterations (0 disables refinement).
+
+    Notes
+    -----
+    Handling (DEF-0001, WU-0002.11). Inside the refinement, the ``1e-12`` added to the damping
+    scale and the accept-or-reject step are part of the algorithm, not data handling. A
+    non-finite candidate cost (mapped to ``inf``, so the step is rejected) and a non-finite
+    Jacobian entry (set to 0) are algorithm-internal too; counting them needs the scan carry and
+    belongs to WU-0005.4. After the compiled function, a non-finite ``nu`` and a non-finite state
+    coordinate are replaced and counted by :meth:`estimate_counted`.
     """
 
     ctx: SystemContext

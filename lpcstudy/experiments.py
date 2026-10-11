@@ -97,6 +97,9 @@ def convergence_check(study: Study, cell: Cell) -> dict:
                       check_record(handled, clipped, n, noise.shape[1], 1))
 
     def weight(c: np.ndarray, p: np.ndarray) -> np.ndarray:
+        # The clip to [0, 1] is the definition of the admissible weight (P1), and 1e-300 the floor
+        # of oracle_weight; neither is counted here (DEF-0001, J). The errors themselves come from
+        # forecast_draws, whose clips are counted in the V4-convergence block.
         num = np.mean(p * (p - c), axis=-1)
         den = np.mean((c - p) ** 2, axis=-1)
         return np.clip(num / np.maximum(den, 1e-300), 0, 1)

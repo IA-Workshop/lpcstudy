@@ -50,6 +50,13 @@ class SeedProxy:
     at another. ``(a, b)`` are fitted by least squares on the log scale (the
     weight depends on seed *ratios*, so multiplicative accuracy is what
     matters), initialized by non-negative least squares.
+
+    Notes
+    -----
+    Two floors here are not data handling (DEF-0001, WU-0002.11, J): the ``1e-6`` under the
+    logarithm of the NNLS start is an initial guess, and the ``1e-300`` inside the residual's
+    logarithm cannot bind, because every design row is positive (the floor columns are
+    ``rho^2 nu^2 > 0`` and ``rho^2 > 0``).
     """
 
     slope: float
@@ -289,6 +296,10 @@ class ErrorPredictor:
     CP and PLP from the raw delay vector and combines them by inverse expected
     squared error, ``w = e_P^2 / (e_C^2 + e_P^2)`` (Bates-Granger weighting
     with learned, state-dependent error variances).
+
+    ``weights`` clips the log ratio of the two predicted errors to ``+-50`` before ``exp``: an
+    overflow guard that changes the weight by less than ``2e-22`` and so is not counted
+    (DEF-0001, WU-0002.11, J).
     """
 
     network: TrainedNetwork
@@ -488,6 +499,12 @@ def calibrate_regimes(tree: DecisionTreeRegressor, profile: np.ndarray,
     fallback : np.ndarray
         Weights ``(nH,)`` for a regime with no calibration states.
 
+    Notes
+    -----
+    The Kaplan-Meier horizon is computed only when the horizons are contiguous from 1. This
+    function sees only the core cells, whose horizons are ``1..H_max`` (``fit_rules``), so the
+    branch always runs here (DEF-0001, WU-0002.11, J: not a silent skip).
+
     Returns
     -------
     RegimeMap
@@ -540,7 +557,8 @@ def regime_regret(regime_map: RegimeMap, profile: np.ndarray, moments: EnsembleM
     tuple[float, float]
         Mean exact excess error ``V(w_k) - V(w*)`` (Theorem P1(a); it equals
         ``c (w_k - w*)^2`` only for states with ``w*`` unclipped) and its ratio to
-        the mean ``min(E e_C^2, E e_P^2)``.
+        the mean ``min(E e_C^2, E e_P^2)`` (the definition of the best single forecaster per
+        state, not a guard; DEF-0001, J).
     """
     regime = regime_map.assign(profile)
     w_k = regime_map.weights[regime, column]  # (n, E)

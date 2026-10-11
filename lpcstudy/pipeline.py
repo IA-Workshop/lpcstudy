@@ -915,7 +915,7 @@ class RuleScores:
         Mean exact excess error ``V(w) - V(w*)`` per horizon ``(nH,)`` (Theorem P1(a)).
     agreement : float
         Fraction of decisive states at ``H_ref`` where the rule weights the
-        better forecaster more.
+        better forecaster more (NaN when no state is decisive: visible, not replaced; DEF-0001, J).
     km_median, rmst : float
         Kaplan-Meier median and restricted mean of realized horizons
         (Lyapunov times; ``nan`` if horizons are not contiguous).
