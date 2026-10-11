@@ -93,8 +93,10 @@ def test_refit_reproduces_the_returned_gain_bitwise(pool, cache: wu.RunCache, ph
 @pytest.mark.parametrize("row", ("n1", "n2", "n3"))
 def test_count_is_consistent_with_the_reference(pool, cache: wu.RunCache, row: str, target: str,
                                                 phi: float) -> None:
-    """The count of N1, N2 or N3 lies in its pre-registered range (addendum A9: central 0.9995 of
-    Bin(500, p_ref) mixed over the reference's error, R_ref = 1000). Always asserted; a count outside
+    """The count of N1, N2 or N3 lies in its reference range (addendum A9: central 0.9995 of
+    Bin(500, p_ref) mixed over the reference's error, R_ref = 1000). These ranges were fixed after
+    run 2's counts were known (VV.3), so until a run whose counts are not known in advance a pass is
+    a regression guard (determinism), not independent confirmation. Always asserted; a count outside
     is a defect candidate (DEF class "code")."""
     evaluation = cache.delta(pool, phi)
     assert evaluation.consistency_rows[f"{row}|{target}"] is None, \
