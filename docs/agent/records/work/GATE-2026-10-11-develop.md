@@ -20,3 +20,14 @@ Gate: merge (DEVELOPMENT_WORKFLOW.md 4.3), run by the main session with `LPC_GAT
 ## Results
 
 (appended below after the runs)
+
+- `LPC_GATE=merge tools/run_tests.sh unit tests/unit`: `589 passed in 58.19s`.
+- `LPC_GATE=merge tools/run_tests.sh integration tests/integration`: `11 passed in 207.87s (0:03:27)`.
+- No failure, no rerun. The tree was clean for both runs (`git status --porcelain` empty before each).
+- **Gate result: pass** for `develop` tip `f039310` (this log commit follows it).
+
+## Items the gate does not settle (owner checkpoints, needs owner review before freeze)
+
+- Verdict and statistics code (WU-0002.4 to .8, .10; DEC-0011 to DEC-0014 proposed), seed and provenance code (WU-0012.5), and the Chua memo row (DEC-0010 proposed, WU-0007 review R3).
+- Until WU-0002.9, the flag and Verdict columns of RESULTS.md show an inconclusive result as FAIL / "not supported"; take no verdict from them.
+- Smoke still fails V7 (`gate_pass` false at smoke size; DEF-0014, owner ruling pending).
