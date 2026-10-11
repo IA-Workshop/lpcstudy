@@ -166,3 +166,17 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** the researcher agent's retrievals for WU-0007, WU-0012 and WU-0013 follow-ups. The alphaXiv connectors are not in the researcher agent's tool list; adding them is an edit to `.claude/agents/researcher.md` by the owner.
 
 **Dissent and resolution (REPRO.8):** none. Status: **owner instruction recorded; ledger entry pending (owner).**
+
+## DEC-0010: WU-0007 Chua reference, AMI band and XLA thread cap: handling of the retrieval results  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** From the researcher retrievals started under DEC-0009 (notes in `docs/agent/notes/`):
+
+- *Chua lambda_max (WU-0007.1, third row).* No published exponent was found for the code's parameter set (alpha = 15.6, beta = 28, m0 = -1.143, m1 = -0.714): the row stays `not found`, and Methods v2's 0.431 stays uncorroborated for that set. It is recorded as a **known limitation** (NVVUQ.13) for validation of Chua at those parameters. A proposed additional check, for the owner to approve at the WU-0007 plan: run the Benettin routine on the primary-source case (Matsumoto, Chua and Komuro memo UCB/ERL M84/73, alpha = 9, beta = 100/7, m0 = -8/7, m1 = -5/7; published exponent 0.23 per circuit time, about 0.33 per dimensionless time by a derived conversion with tau = 0.7 t, flagged derived) with a two-digit tolerance justified by the applied-mathematician. It verifies the routine and the field form, not the study's parameter set.
+- *AMI delay (WU-0013 follow-up).* The `[3, 8]` step band of `test_regression_ami_delay_lorenz_band` is **kept** (not tightened). Deshmukh, Bradley, Garland and Meiss (arXiv:2003.06509, Sec. IV.B, Fig. 5) report a first AMI minimum of the Lorenz x-series near 0.18 time units (about 4.9 steps at the study's sampling interval), consistent with the code's 5 steps, but the minimum is a shallow shoulder, the deeper one is at 0.60 time units, and the estimator differs. The citation goes into the test docstring in a small follow-up.
+- *XLA thread cap (WU-0012 follow-up).* The wrappers should export `PJRT_NPROC` and `NPROC` from `LPC_THREADS` (plain environment variables read by XLA's default thread-pool sizing; they cannot abort XLA), and must NOT use `intra_op_parallelism_threads` or other `XLA_FLAGS` entries (an unknown XLA flag aborts the process; the 2019 recipe is not a registered flag). Verification: a CPU-time versus wall-time and thread count on a float64 workload, per the research note. A small follow-up unit (WU-0012.4) changes the two wrappers and their tests.
+
+**Alternatives weighed.** *Block the Chua row until the 1985 IEEE paper is retrieved:* the researcher found no route; recorded instead.
+
+**Affects:** WU-0007 plan, `tests/unit/test_embedding.py` docstring, `tools/run_tests.sh`, `tools/run_preset.sh`.
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
