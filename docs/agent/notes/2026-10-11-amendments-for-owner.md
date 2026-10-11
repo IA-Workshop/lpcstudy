@@ -69,3 +69,15 @@ The retrieval cap stays in force until that first entry exists: until then the r
 
 - Concordance plan gaps D-19 to D-21 and D-28 (extra pass condition on H1a; no interval on A4o − A2; the gain bound's 0.9 bar and its covariance screen; V7 slope part) were proposed to WU-0002.4, .8, .9, .10 in the concordance; DEC-0008 covers V7 (A2), H1a's pass condition (above) and A4o − A2 (above) but not the gain bound beyond "reported, no bar" (v3). Planners follow the concordance's proposals and flag them in each plan.
 - C8: refuse a confirmatory run on a dirty tree or unknown commit; record `VmHWM`. Decide at the pre-freeze review.
+
+## 7. Additions after the XLA thread-cap work (WU-0012.4), 2026-10-11
+
+- `DEVELOPMENT_WORKFLOW.md` §4.5 "Thread cap" says the XLA thread count goes through `XLA_FLAGS`. It does not: an unknown `XLA_FLAGS` entry aborts XLA, and the flag named in the 2019 jax issue is not registered. The cap is the plain environment variables `PJRT_NPROC` and `NPROC` (verified on jax and jaxlib 0.11.2 on this machine: the XLA pool equals the variable; unset it uses all 32 logical CPUs). Amend the text accordingly.
+- `.claude/settings.json` `env` block: a direct `python -m lpcstudy` outside the wrappers still spawns 32 XLA threads. Add `"PJRT_NPROC": "4"` and `"NPROC": "4"` next to `LPC_THREADS` so interactive runs honor the budget too.
+- Note for everyone: this machine has **32 logical CPUs**; "4 cores" is the thread budget (`LPC_THREADS`), and `nproc` shows 4 only because it reads `OMP_NUM_THREADS`.
+- `PJRT_NPROC` is an undocumented knob (documented only in an XLA source comment): re-check it on every jax pin change.
+
+## 8. Additions after the WU-0002.6 review, 2026-10-11
+
+- v3 Q-N (lines 83, 345): add "a part with fewer than 50 states is inconclusive" (DEC-0014).
+- WU-0011 follow-up (a main-session item, not an owner edit): a change to any `lpcstudy/*.py` should select `tests/unit/test_tools_test_impact.py` (the hand-written graph fixture is checked there), and `test_validation.py` was missing from the radius of the WU-0002.6 (b) and (c) runs because the tool's graph misses it (related to DEC-0003 Q2).

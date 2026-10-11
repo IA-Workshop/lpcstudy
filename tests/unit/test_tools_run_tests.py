@@ -78,6 +78,59 @@ def test_lpc_threads_is_copied_to_the_thread_variables(fake: FakeRoot) -> None:
         ("3", "3", "3")
 
 
+@pytest.mark.parametrize("tier", ["unit", "gpu"])
+@pytest.mark.parametrize(("threads", "expected"), [(None, "4"), ("2", "2"), ("17", "17")])
+def test_xla_thread_cap_is_exported_from_lpc_threads(fake: FakeRoot, tier: str,
+                                                     threads: str | None, expected: str) -> None:
+    """PJRT_NPROC and NPROC equal the validated LPC_THREADS (default 4) in the child (WU-0012.4, 1).
+
+    Reference: the criterion text of WU-0012.4 and the research note
+    ``2026-10-11-research-xla-threads.md`` (XLA's ``DefaultThreadPoolSize()`` reads these two plain
+    environment variables); the expected strings are written literally (4, 2, 17), not taken from
+    the wrapper. Larger values inherited from the caller (``9``) must be overridden, as OMP is.
+    Tolerance: none, exact string equality.
+    """
+    extra = {"PJRT_NPROC": "9", "NPROC": "9"}
+    if threads is not None:
+        extra["LPC_THREADS"] = threads
+    done = fake.run("run_tests.sh", tier, f"tests/{tier}/test_x.py", env=fake.environment(**extra))
+    assert done.returncode == 0, done.stderr
+    got = only_call(fake)["env"]
+    assert (got["PJRT_NPROC"], got["NPROC"]) == (expected, expected)
+    assert got["OMP_NUM_THREADS"] == expected
+
+
+@pytest.mark.parametrize("threads", ["0", "100", "four", "-1", "2.5"])
+def test_invalid_lpc_threads_still_refused_and_no_cap_is_set(fake: FakeRoot, threads: str) -> None:
+    """An invalid LPC_THREADS gives 64 and one line, before any child starts (WU-0012.4, 1)."""
+    done = fake.run("run_tests.sh", "unit", "tests/unit/test_x.py",
+                    env=fake.environment(LPC_THREADS=threads))
+    assert done.returncode == 64, (done.stdout, done.stderr)
+    assert len(done.stderr.strip().splitlines()) == 1, done.stderr
+    assert fake.calls() == [] and fake.timeout_calls() == []
+
+
+@pytest.mark.parametrize("tier", ["unit", "gpu"])
+def test_xla_flags_is_passed_through_unchanged_and_never_added(fake: FakeRoot, tier: str) -> None:
+    """The wrapper neither sets nor alters XLA_FLAGS (WU-0012.4, 1; research note, claims 1, 2).
+
+    An unknown XLA_FLAGS token aborts XLA, so the cap must not travel through it. Reference: the
+    behaviour before WU-0012.4 (inherited value passes unchanged, absent stays absent) and a
+    literal scan of the script: no code line (comments excluded) names XLA_FLAGS. Tolerance: none.
+    """
+    absent = fake.run("run_tests.sh", tier, f"tests/{tier}/test_x.py")
+    assert absent.returncode == 0, absent.stderr
+    assert "XLA_FLAGS" not in only_call(fake)["env"]
+    supplied = "--xla_cpu_multi_thread_eigen=false"
+    done = fake.run("run_tests.sh", tier, f"tests/{tier}/test_x.py",
+                    env=fake.environment(XLA_FLAGS=supplied))
+    assert done.returncode == 0, done.stderr
+    assert fake.calls()[-1]["env"]["XLA_FLAGS"] == supplied
+    code = [line for line in (REPO / "tools" / "run_tests.sh").read_text().splitlines()
+            if not line.lstrip().startswith("#")]
+    assert not [line for line in code if "XLA_FLAGS" in line]
+
+
 @pytest.mark.parametrize("tier", ["integration", "slow"])
 def test_other_cpu_tiers_force_cpu(fake: FakeRoot, tier: str) -> None:
     """The integration and slow tiers also run with JAX_PLATFORMS=cpu (4.5: CPU-only tiers)."""

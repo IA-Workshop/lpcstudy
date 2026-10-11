@@ -91,7 +91,9 @@ def test_smoke_through_the_wrapper_matches_a_direct_run() -> None:
     env = {k: v for k, v in os.environ.items() if not k.startswith(("LPC_", "JAX_", "XLA_"))}
     env.update(LPC_THREADS="4", OMP_NUM_THREADS="4", MKL_NUM_THREADS="4", OPENBLAS_NUM_THREADS="4",
                JAX_PLATFORMS="cpu", XLA_PYTHON_CLIENT_PREALLOCATE="false",
-               LPC_PYTHON=sys.executable)
+               # WU-0012.5: provenance ``env`` now records the XLA thread cap; the wrapper sets 4, so the
+               # direct run gets the same 4 (the budget) and ``env`` stays in the stable-field equality.
+               PJRT_NPROC="4", NPROC="4", LPC_PYTHON=sys.executable)
     try:
         help_text = subprocess.run(
             [sys.executable, "-m", "lpcstudy", "--help"], cwd=REPO, env=env, capture_output=True,

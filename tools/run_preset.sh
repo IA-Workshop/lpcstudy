@@ -14,7 +14,8 @@
 # <out-dir>/<preset>/run.meta.json (it would erase GPU hours), or a seed the CLI cannot take.
 #
 # Device: cpu for smoke, gpu for pilot and full (JAX_PLATFORMS cpu or cuda); thread variables
-# are set from LPC_THREADS (1..99, default 4); XLA_PYTHON_CLIENT_PREALLOCATE=false.
+# are set from LPC_THREADS (1..99, default 4), as are PJRT_NPROC and NPROC (the XLA CPU thread
+# pools); XLA_PYTHON_CLIENT_PREALLOCATE=false. XLA_FLAGS is never set or altered.
 # Lock: pilot, full and any gpu run take `flock -n` on ${LPC_GPU_LOCK:-/tmp/lpcstudy-gpu.lock} at
 # once (exit 75 if held, never wait). A smoke run on CPU takes no lock (4.5).
 # Tally: pilot, full and any gpu run call `python3 -I tools/gpu_hours.py check --hours H` while
@@ -214,6 +215,10 @@ fi
 
 cd "$root" || exit 64
 export OMP_NUM_THREADS="$threads" MKL_NUM_THREADS="$threads" OPENBLAS_NUM_THREADS="$threads"
+# XLA's CPU client sizes its thread pools from PJRT_NPROC, then NPROC (plain environment variables
+# read by getenv, not XLA flags, so they cannot abort XLA); unset it uses every schedulable CPU.
+# Verified for jaxlib 0.11.2 in WU-0012.4. Never put a thread cap in XLA_FLAGS: an unknown entry aborts.
+export PJRT_NPROC="$threads" NPROC="$threads"
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 # Lock first (cheap, exit 75 at once), then the tally while holding it, then the probe.

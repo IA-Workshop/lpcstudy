@@ -132,11 +132,15 @@ def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
     """
     hours = ["0.25", "0.5", "1", "2", "4"]
     results = {
-        "H1a": {"by_noise": {"0.01": {"fitted_inverse_dim": 0.5}}, "local_dimension_median": 2.0},
-        "H1b": {"CP": {"slope": 1.0}, "PLP": {"slope": 0.9}},
+        "H1a": {"by_noise": {"0.01": {"fitted_inverse_dim": 0.5, "ratio": 1.02,
+                                      "ratio_ci": [0.9, 1.1], "verdict": "pass"}},
+                "inverse_dim_reference": 0.5},
+        "H1b": {"CP": {"slope": 1.0}, "PLP": {"slope": 0.9, "ci": [0.85, 0.95]},
+                "verdict": "pass", "reason": None},
         "H1c": {"PLP": {"median_ratio": 1.0}, "CP": {"median_ratio": 0.5}},
-        "H1d": {"spearman": {"analog_seed": 0.8, "estimation_seed": 0.9, "growth": 0.7,
-                             "noise_sensitivity": 0.6}},
+        "H1d": {"rows": {"analog_seed": {"spearman": 0.8}, "estimation_seed": {"spearman": 0.9},
+                         "growth": {"spearman": 0.7}, "nhat": {"spearman": 0.6}},
+                "verdict": "pass", "reason": None},
         "Q-N": {"deployable": {"verdict": "redundant", "logit_w": {"delta_r2": 0.01,
                                                                     "ci": [0.0, 0.02]},
                                "log_horizon": {"delta_r2": 0.02, "ci": [0.01, 0.03]}},
@@ -181,13 +185,13 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
     Reference: the 14 rows of the identifier table (decision-log map, order of v3 section 2) and
     the ROADMAP pending sub-tasks, written out below. WU-0002.7 and .8 computed H2b, H2d, H2e, H3a
     and H3c, so those rows are no longer pending (a plan edit of this test: the no-result example
-    was H2e and is now H1d, still pending on WU-0002.5). The fake results have no ``H1d``, so that
-    row reads "[not computed until WU-0002.5]", its cell "n/a: no result" and its verdict
+    was H2e and is now Q-N, still pending on WU-0002.6; H2d stays pending on WU-0002.9, review
+    R6). The fake results have no ``Q-N``, so that row reads "[not computed until WU-0002.6]", its cell "n/a: no result" and its verdict
     "no result"; the rows with a result and a pending sub-task read "computed with the v1
     statistic". Exact string checks.
     """
     results, config = fake_results("DEV-0")
-    system = fake_system(config, skip=("H1d",))
+    system = fake_system(config, skip=("Q-N",))
     results["systems"] = {"lorenz63": system}
     results["verdicts"] = verdicts(results, config)
     write_markdown(results, config, tmp_path / "RESULTS.md")
@@ -200,9 +204,9 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
     assert ids == [h.v3_id for h in HYPOTHESIS_TABLE]
     marked = {row.split(" | ")[0][2:]: "[computed with the v1 statistic until " in row
               for row in rows}
-    assert {i for i, m in marked.items() if m} == {"H1a", "H1b", "Q-N", "(reported)"}
-    h1d = rows[ids.index("H1d")]
-    assert h1d.endswith("[not computed until WU-0002.5] | n/a: no result | no result |")
+    assert {i for i, m in marked.items() if m} == {"H2d", "(reported)"}
+    qn = rows[ids.index("Q-N")]
+    assert qn.endswith("[not computed until WU-0002.6] | n/a: no result | no result |")
     gain = rows[ids.index("(reported)")]
     assert "within bound 0.95 (n=40, max gain 1.5 LT)" in gain and "PASS" in gain
 
@@ -239,10 +243,10 @@ def test_key_numbers_are_exact_for_every_v3_key() -> None:
     """
     system = fake_system(SMOKE)
     expected = {
-        "H1a": "rho=0.01: 1/d (n_lib fit)=0.5 (1/d_LB=0.5)",
-        "H1b": "CP 1, PLP 0.9",
+        "H1a": "rho=0.01: 1/d (n_lib fit)=0.5, ratio 1.02 [0.9, 1.1] pass (1/d_LB=0.5)",
+        "H1b": "CP 1, PLP 0.9 [0.85, 0.95]: pass",
         "H1c": "PLP 1, CP 0.5",
-        "H1d": "eps 0.8, delta 0.9, Lambda 0.7, N 0.6",
+        "H1d": "eps 0.8, delta 0.9, Lambda 0.7, N 0.6: pass",
         "Q-N": "redundant: dR2 w 0.01 [0, 0.02], T 0.02 [0.01, 0.03]; oracle: adds information",
         "H2a": "range 0.05 (CI hi 0.08); partial r 0.02",
         "H2b": "rho rank corr 0.9; n_lib 10^3->10^4 change 0.2 [0.1, 0.3]",
@@ -256,6 +260,31 @@ def test_key_numbers_are_exact_for_every_v3_key() -> None:
     }
     assert {key: _key_number(key, system) for key in expected} == expected
     assert set(expected) == {h.key for h in HYPOTHESIS_TABLE}
+
+
+def test_key_numbers_of_h1a_h1b_h1d_show_fail_and_inconclusive_with_the_reason() -> None:
+    """The H1 key numbers carry the three-valued verdict, and the reason when inconclusive (R1).
+
+    Reference: v3 section 7 (pass, fail and inconclusive are separate categories) and the
+    strings of the developer's review fix R1, written out by hand with the ``.3g`` rule of
+    ``_fmt``. An inconclusive row must not read as a fail: the H1b string for the smoke's
+    PLP slope 0.801 [0.744, 0.95] says "inconclusive (interval meets band edge)", an H1d with a
+    failing row says "fail", and an H1a rho with fewer than 50 states says "n_states < 50".
+    Exact string checks.
+    """
+    system = fake_system(SMOKE)
+    system["H1b"] = {"CP": {"slope": 1.51}, "PLP": {"slope": 0.801, "ci": [0.744, 0.95]},
+                     "verdict": "inconclusive", "reason": "interval meets band edge"}
+    system["H1d"] = dict(system["H1d"], verdict="fail", reason=None)
+    system["H1a"] = {"by_noise": {"0.01": {"fitted_inverse_dim": 0.5, "ratio": 1.0,
+                                           "ratio_ci": [0.9, 1.1], "verdict": "inconclusive",
+                                           "reason": "n_states < 50"}},
+                     "inverse_dim_reference": 0.5}
+    assert _key_number("H1b", system) == \
+        "CP 1.51, PLP 0.801 [0.744, 0.95]: inconclusive (interval meets band edge)"
+    assert _key_number("H1d", system) == "eps 0.8, delta 0.9, Lambda 0.7, N 0.6: fail"
+    assert _key_number("H1a", system) == ("rho=0.01: 1/d (n_lib fit)=0.5, ratio 1 [0.9, 1.1] "
+                                          "inconclusive (n_states < 50) (1/d_LB=0.5)")
 
 
 def test_library_figure_axis_reads_n_lib(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -326,3 +355,67 @@ def test_markdown_validation_table_has_the_two_v7_rows(tmp_path: Path) -> None:
     assert "| V7 median slope of ln δ on ln ρ | [0.9, 1.1] | 1.05 PASS | 1.2 FAIL | n/a |" in table
     names = [row.split(" | ")[0][2:6] for row in table if row.startswith("| V")]
     assert names == ["V1 d", "V1 a", "V2 l", "V3 C", "V4 w", "V5 K", "V6 R", "V7 m", "V7 m"]
+
+
+def test_markdown_lyapunov_section_has_comparisons_convention_and_referent(tmp_path: Path) -> None:
+    """The validation section compares lambda_max with published values and states two sentences.
+
+    Reference: hand strings (WU-0007.3 plan and amendment A6). Fake lambda_max: lorenz63 0.9
+    gives 0.9 / 0.90563 - 1 = -0.00622, "-0.62%", inside 1% (PASS). rossler 0.08 gives
+    0.08 / 0.0714 - 1 = +0.12045, "+12.04%", and 0.08 / 0.07062 - 1 = +0.13282, "+13.28%", both
+    outside 3% (FAIL, with the LPC.NV.1 phrase). chua 0.43 has no reference: the limitation text,
+    no difference. The memo row names the unit test and says the set is a different one. The
+    LPC.NV.1 convention and the NVVUQ.13 referent sentences are checked verbatim, as is the
+    report-only sentence. A lorenz63 result without ``context`` gives "n/a" cells, not a skipped
+    row (PRIME.4). Tolerance: none (exact strings; the percentages are rounded to 2 decimals by
+    ``:+.2f``; the hand values 12.0448 and 13.2822 are far from float round-off, 1e-12).
+    """
+    config = dataclasses.replace(SMOKE, core_systems=("lorenz63", "rossler", "chua"))
+    results, _ = fake_results("DEV-0")
+    values = {"lorenz63": 0.9, "rossler": 0.08, "chua": 0.43}
+    systems = {name: fake_system(config) for name in config.core_systems}
+    for name, value in values.items():
+        systems[name]["context"] = {"lambda_max": value}
+    results["systems"] = systems
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    start = lines.index("### Largest Lyapunov exponent against published values")
+    assert start > lines.index("## Validation gate")
+    section = lines[start:]
+    assert "| lorenz63 | 0.9 | 0.9056 | Sprott, sprott.physics.wisc.edu/chaos/lespec.htm " \
+        "(confirmed) | -0.62% | PASS: within 1% |" in section
+    assert "| rossler | 0.08 | 0.0714 | Sprott as cited by Bogdanov and Bogdanova, " \
+        "arXiv:1412.2242 (secondary) | +12.04% | FAIL: outside 3%; step size suspected " \
+        "(LPC.NV.1), reported, not tuned |" in section
+    assert "| rossler | 0.08 | 0.07062 | Bogdanov and Bogdanova, arXiv:1412.2242, own estimate " \
+        "0.07062 ± 0.00066 (primary) | +13.28% | FAIL: outside 3%; step size suspected " \
+        "(LPC.NV.1), reported, not tuned |" in section
+    assert "| chua | 0.43 | none | no confirmed published value | n/a | not validated: no " \
+        "published reference at these parameters (known limitation, NVVUQ.13, DEC-0010) |" \
+        in section
+    memo = next(row for row in section if row.startswith("| chua, memo parameter set"))
+    assert "| 0.3286 |" in memo and "within 10% is asserted by `tests/unit/test_data.py::" \
+        "test_lyapunov_cached_matches_published_reference[chua_memo]`" in memo
+    assert "a different parameter set from the study's: validates the routine and the field " \
+        "form, not the study's Chua parameters |" in memo
+    assert ("Every quantity is defined for the fixed-step RK4 flow map at the configured "
+            "observation interval, not for the continuous ODE (LPC.NV.1). λ_max is estimated "
+            "on that map by Benettin's method and compared in natural time units with "
+            "published values for the continuous systems.") in section
+    assert ("Validation against a real-world referent does not apply: the three systems are "
+            "mathematical models (NVVUQ.13).") in section
+    assert ("Chua at the study's own parameters (α=15.6, β=28, m0=−1.143, m1=−0.714) has no "
+            "confirmed published value (known limitation, NVVUQ.13, DEC-0010): its λ_max is "
+            "reported but not validated.") in section
+    assert ("This comparison is report-only: it does not enter the validation gate or any "
+            "verdict.") in section
+
+    bare_config = dataclasses.replace(SMOKE, core_systems=("lorenz63",))
+    bare, _ = fake_results("DEV-0")
+    bare["systems"] = {"lorenz63": fake_system(bare_config)}
+    bare["verdicts"] = verdicts(bare, bare_config)
+    write_markdown(bare, bare_config, tmp_path / "BARE.md")
+    rows = (tmp_path / "BARE.md").read_text().splitlines()
+    assert "| lorenz63 | n/a | 0.9056 | Sprott, sprott.physics.wisc.edu/chaos/lespec.htm " \
+        "(confirmed) | n/a | n/a: no λ_max in the results |" in rows

@@ -114,14 +114,16 @@ def test_pending_names_the_roadmap_rows() -> None:
 
     Reference: ROADMAP rows WU-0002.4 to .8, read by hand: .4 names H1a and H1b; .5 H1d; .6 Q-N;
     .7 H2b and H2e; .8 H3a, H3c and H2d. WU-0002.7 and .8 are implemented, so their rows (H2b,
-    H2e, H2d, H3a, H3c) are no longer pending (a plan edit of this test). No other row of .3 to
+    H2e, H3a, H3c) are no longer pending (a plan edit of this test); H2d is pending on WU-0002.9
+    because its ``pass`` still uses the point estimate (DEC-0011 O4; review R6). No other row of .3 to
     .13 names a table id, so the other rows have no pending sub-task, with one exception added in
     the fix round (review R1): the
     gain bound keeps its v1 0.9 pass bar although v3 says "without a pass/fail bar", and the
     concordance (D-21 (a)) proposes removing it in WU-0002.9, so that row is pending on .9.
+    WU-0002.4-5 phase 2 removes each id from ``pending`` in the commit that implements its
+    statistic (H1a, H1b, H1d); the rows still pending are those of the remaining sub-tasks.
     """
-    expected = {"H1a": ("WU-0002.4",), "H1b": ("WU-0002.4",), "H1d": ("WU-0002.5",),
-                "Q-N": ("WU-0002.6",), "(reported)": ("WU-0002.9",)}
+    expected = {"Q-N": ("WU-0002.6",), "H2d": ("WU-0002.9",), "(reported)": ("WU-0002.9",)}
     assert {h.v3_id: h.pending for h in HYPOTHESIS_TABLE if h.pending} == expected
 
 

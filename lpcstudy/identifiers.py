@@ -49,17 +49,16 @@ HYPOTHESIS_TABLE: tuple[Hypothesis, ...] = (
     Hypothesis(
         "H1a", "H1b", "H1a", "secondary",
         "Fit of the median ε_s² to b² N_lib^(−2/d) + f²; pass if interval of 1/d within ±25% "
-        "of the independently estimated 1/d", ("WU-0002.4",)),
+        "of the independently estimated 1/d"),
     Hypothesis(
         "H1b", "H1c", "H1b", "secondary",
-        "Slope of log r.m.s. PLP error on log(g_H δ/√m) at H_ref; pass if in [0.8, 1.2]",
-        ("WU-0002.4",)),
+        "Slope of log r.m.s. PLP error on log(g_H δ/√m) at H_ref; pass if in [0.8, 1.2]"),
     Hypothesis(
         "H1c", "H1d", "H1c", "secondary",
         "Median of Λ̄ × dT/d ln θ (PLP); pass if in [0.8, 1.25]"),
     Hypothesis(
         "H1d", "H1e", "H1d", "secondary",
-        "Spearman correlation, each; pass if ≥ 0.7", ("WU-0002.5",)),
+        "Spearman correlation, each; pass if ≥ 0.7"),
     Hypothesis(
         "Q-N", "Q-N", "Q-N", "estimate",
         "Out-of-sample gain in R² (ΔR²) for predicting logit w*, with exact (oracle) values; "
@@ -78,7 +77,7 @@ HYPOTHESIS_TABLE: tuple[Hypothesis, ...] = (
         "Paired MSE differences at H_ref; pass if both upper bounds < 0"),
     Hypothesis(
         "H2d", "H2d", "H2d", "secondary",
-        "MSE ratio minus 1 at H_ref; pass if upper bound ≤ 0.10"),
+        "MSE ratio minus 1 at H_ref; pass if upper bound ≤ 0.10", ("WU-0002.9",)),
     Hypothesis(
         "H2e", "H2f", "H2e", "secondary",
         "Median per-state change in error correlation, N_lib 10³ → 10⁵; pass if lower bound > 0 "
