@@ -344,3 +344,31 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 - **O6.** For the endpoint-error change (.2a): the unit tiers of `statistics` and its dependants, the integration tier, and the slow `test_exact_checks` nodes for C4, C7 and C8 at both phi, once.
 
 **Affects:** WU-0008. Marked "needs owner review before freeze". **Status:** proposed.
+
+## DEC-0022: WU-0002.12: the local v1 re-reference becomes the new baseline; N1 kept as written; the platform record is added  (2026-10-11, owner instructions relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner instructed, in the session on 2026-10-11, in these words: "Redo the v1 baseline and make that the new baseline. The old platform is not available. N1 I agree with the recommendation. Explain N3. Do 4, since this is our reference platform." Recorded as:
+1. **New baseline.** The v1 code (tag `v1-baseline`, commit f01360d) is re-run at the pilot preset on DEV-0 on this host (CPU, `LPC_THREADS=8`, same wrapper settings as the v3 pilot run) and its results become the regression baseline of this platform (the 'Pilot v1' row of the results manifest gets a dated line, the original pilot file is kept unmodified as the historical record). The v3 run (commit a5cd75b) is compared against it with branches B and N of DEC-0019, which also settles N1 and N3. The old platform is unavailable, so the original v1 pilot is no longer a bitwise target.
+2. **N1** is kept as written (the mathematician's recommendation); any cross-host tolerance is fixed before the results it applies to exist (WU-0003.4, WU-0016.3); the 69 differing leaves are DEF-0024.
+3. **N3** is explained to the owner (the licensing scope, the weakness found by the mathematician); a decision on its scope is pending the owner's reading of the explanation.
+4. **Item 4 (the platform record)**: add a digest of the whitening matrices W and U to `context` and record the CPU model and the BLAS kernel in the provenance block, as a unit (WU-0001.6) with planner, mathematician, developer and independent review; marked "needs owner review before freeze" (provenance code).
+
+**Affects:** WU-0002.12, WU-0004.3, WU-0001.6 (new), WU-0003.4, WU-0016.3. **Status:** owner instruction; recorded pending the owner's ledger entry.
+
+## DEC-0023: WU-0001.6 (platform record): defaults for the planner's questions O1 to O3  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision (defaults).** **O1:** the provenance schema is bumped to `lpcstudy.provenance/2` (the top-level key set changes; only `test_provenance.py` pins the string; a `/2` block distinguishes a never-recorded platform, as in the a5cd75b pilot, from a failed probe). **O2:** the unit keeps the name WU-0001.6 given in DEC-0022; ROADMAP section 2 already uses WU-0001.6 for the WU-0001 review sub-task (done), so the owner appends a ROADMAP line naming this unit WU-0001.6b or renumbers (amendments note). **O3:** the local v1 re-run has no provenance block (v1 code), so the main session appends this host's probe output (CPU model, BLAS kernels, package versions) to the manifest's dated line for the new baseline. **F1** (once both sides of a comparison carry digests, DEC-0019's literal 'any context difference means branch D' would send a digest difference to D) needs an owner ruling before such a comparison exists (WU-0003.4, a cross-host regeneration).
+
+**Affects:** WU-0001.6a/b. Marked "needs owner review before freeze" (provenance code). **Status:** proposed.
+
+## DEC-0024: WU-0008: the budget design (M1 to M9) and two points for the owner  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the applied-mathematician's design; for owner confirmation)
+
+**Decision.** The mathematician's design (WU-0008 Log, block 'WU-0008 mathematician design (M1-M9)', commit 28dfbd1) is accepted as the plan for WU-0008.1 and .2: its amendments are tightenings (E1 tolerance 3% to 2%; E2 replaced by 'the median over the 100 bootstraps within a factor of 1.4 of the reference SD, per endpoint', because the planned single-SE test would fail a correct helper with probability 0.13; E3 failed-resample case F = 13 gives None and F = 12 finite; the coverage constants use the WU-0006 reference rates (SE <= 0.0013) with the run-2 counts beside them; row and flag wording; two sentences under every table: results are conditional on one trajectory, library and network realization, and H3c is conditional on the fitted A4 and A5). Row decisions: oracle draws (M3) state the finite-M bias and its direction per QoI; LM row (M4) 'not estimated' even after WU-0005.4 (the residual bounds the error in observation space only, cond(J'J) about 1e7), with each primary's label stating its iterative error is unverified; round-off row (M5) 1e-4 times max(|lo|, |hi|), from the DEV-0 against v1 cross-host comparison; discretization (M6) 0 by LPC.NV.1 with V6 printed; interval procedure (M7) from WU-0006 with H2b(i) mapped to C8; proxy row (M8) 0 for H2a and H2b, 'not estimated' for H3c; the 10% rule is strict (M9).
+
+**For the owner.**
+1. **Estimator convention.** Whether to adopt a convention like LPC.NV.1 for the estimator ('PLP is the fixed 15-iteration LM'), which would make the LM row 0 by definition; otherwise an LM iteration-doubling study (15 to 30) is the way to size it.
+2. **The Chua pilot H2a(i) fail is not robust to the finite-M bias bound.** The mathematician's indicative worst-case bound for the finite-M (oracle draws) bias in the H2a(i) median range is 0.86 of the V4 median half-width, i.e. 43 to 86% of the interval half-width on the DEV-0 pilot: the Chua pilot's fail does not survive it (a pass is not certified either). This is a development-run observation (DEV-0, not a hypothesis test); it bears on how many oracle draws M the full preset needs and on whether H2a(i) should be reported with that bias.
+
+**Follow-ups proposed:** V4 signed mean deviation and a run at 1, 2 and 4 LT; a split-half check of logit-weight noise in WU-0003; the LM iteration-doubling study; a direct cross-host check of the primaries in WU-0003.4.
+
+**Affects:** WU-0008, WU-0003 (M for the full preset). Marked "needs owner review before freeze". **Status:** proposed.
