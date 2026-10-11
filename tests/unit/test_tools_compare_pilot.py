@@ -268,7 +268,8 @@ def test_t4_statuses_of_equal_nan_and_timing() -> None:
 
 # ---------------------------------------------------------------------------------- fixtures
 GATE = {"V1": True, "V2": True, "V4": True, "V5": True, "V6": True, "gate_pass": True}
-CONTEXT = {"delay": 5, "lambda_max": 0.9056, "interval": 0.0333}
+CONTEXT = {"delay": 5, "lambda_max": 0.9056, "interval": 0.0333, "obs_scale": 2.0}
+V7_LEVELS = {"0.01": 1.0, "0.02": 1.01}
 
 
 def old_tree() -> dict:
@@ -280,6 +281,7 @@ def old_tree() -> dict:
             "validation": {"gate": dict(GATE)},
             "scores": {"A0": {"regret": {"1LT": 0.0354}, "mse": {"1LT": 0.25}},
                        "A*": {"regret": {"1LT": 0.01}}},
+            "H1a": {"median_slope": 1.0, "efficiency_median_by_noise": dict(V7_LEVELS)},
             "H1c": {"CP": {"slope": 1.0, "ci": [0.5, 1.5], "pass": True}, "pass": True},
             "H3b": {"p_eff": 2.0, "realized_K": {"2": 2}},
             "shift": {"core_ratio": {"A2": 1.0, "A3": 2.0}},
@@ -298,6 +300,8 @@ def new_tree() -> dict:
             "validation": {"gate": gate},
             "scores": {"A0": {"regret": {"1LT": 0.0364}, "mse": {"1LT": 0.25}},
                        "A*": {"regret": {"1LT": 0.0}}},
+            "V7": {"median_slope": 1.0, "efficiency_median_by_noise": dict(V7_LEVELS),
+                   "n_nonfinite": 0},
             "H1b": {"CP": {"slope": 1.0, "ci": [0.5, 1.5]}, "pass": False, "verdict": "fail"},
             "regime_curve": {"realized_K": {"2": 2}},
             "verification": {"P2c": {"n_violations": 0, "n_chain_violations": {
@@ -357,24 +361,135 @@ def test_cli_unreadable_input_exits_two(tmp_path) -> None:
     assert "cannot read input" in done.stderr
 
 
-def test_cli_unchanged_difference_exits_one(tmp_path) -> None:
-    """Exit 1: an unchanged leaf that differs in the last bit is a finding under the bitwise branch."""
+def test_cli_unchanged_difference_in_a_network_independent_chain_exits_one(tmp_path) -> None:
+    """Exit 1: A0's MSE is the CP chain; with the context equal (branch N) a last-bit difference
+    there violates N1, whatever the 1e-6 allowance of the network chain."""
     new = new_tree()
     new["systems"]["lorenz63"]["scores"]["A0"]["mse"]["1LT"] = math.nextafter(0.25, 1.0)
     done, report, _ = run_cli(tmp_path, old_tree(), new)
     assert done.returncode == 1
     text = report.read_text()
+    assert "- branch: N (" in text
     assert "| FAIL-differs | systems/lorenz63/scores/A0/mse/1LT | 0.25 | 0.25000000000000006 |" in text
+    assert "N1: systems/lorenz63/scores/A0/mse/1LT (cp chain) differs" in text
 
 
-def test_cli_fallback_without_constants_exits_three(tmp_path) -> None:
-    """T7: the switch fires (a context float 2e-12 relative off) and no constants exist: exit 3."""
+def test_cli_network_chain_difference_within_1e6_passes(tmp_path) -> None:
+    """Branch N passes when only a network-chain leaf differs, by less than 1e-6 relative."""
+    old, new = old_tree(), new_tree()
+    old["systems"]["lorenz63"]["scores"]["A3"] = {"mse": {"1LT": 0.25}}
+    new["systems"]["lorenz63"]["scores"]["A3"] = {"mse": {"1LT": math.nextafter(0.25, 1.0)}}
+    done, report, _ = run_cli(tmp_path, old, new)
+    assert done.returncode == 0, done.stdout + done.stderr
+    text = report.read_text()
+    assert "- branch: N (" in text
+    assert "| systems/lorenz63/scores/A3/mse/1LT | 0.25 | 0.25000000000000006 |" in text
+
+
+def branch_d_trees(**context):
+    """Old tree and a new tree whose context differs from the pilot's (branch D)."""
     new = new_tree()
-    new["systems"]["lorenz63"]["context"]["lambda_max"] = 0.9056 * (1.0 + 2e-12)
-    done, report, _ = run_cli(tmp_path, old_tree(), new)
+    new["systems"]["lorenz63"]["context"].update(context or {"lambda_max": 0.9060})
+    return old_tree(), new
+
+
+def test_cli_branch_d_without_reference_exits_three(tmp_path) -> None:
+    """Branch D needs the local v1 run (D1) or --no-reference (D3): exit 3, and the report says so."""
+    old, new = branch_d_trees()
+    done, report, _ = run_cli(tmp_path, old, new)
     assert done.returncode == 3
-    assert "DEC is missing" in done.stderr
-    assert "REFUSED" in report.read_text()
+    assert "--reference" in done.stderr and "--no-reference" in done.stderr
+    text = report.read_text()
+    assert "- branch: D (" in text and "mode: missing" in text
+
+
+def run_cli_with(tmp_path: Path, old: dict, new: dict, *flags: str, reference: dict | None = None):
+    """``run_cli`` with extra flags; a reference tree is written and passed with --reference."""
+    old_path, new_path = write_pair(tmp_path, old, new)
+    extra = list(flags)
+    if reference is not None:
+        ref_path = tmp_path / "ref.json"
+        ref_path.write_text(json.dumps(reference))
+        extra += ["--reference", str(ref_path)]
+    report, leaves = tmp_path / "report.md", tmp_path / "leaves.json"
+    done = subprocess.run(
+        [sys.executable, "-I", str(TOOL), str(new_path), "--old", str(old_path), "--report",
+         str(report), "--leaves-json", str(leaves), "--run-dir", "RUN-DIR", *extra],
+        capture_output=True, text=True, timeout=60, check=False)
+    return done, report
+
+
+def test_cli_branch_d3_inside_the_lambda_band_passes(tmp_path) -> None:
+    """D3: lambda 0.0030 above the pilot's, k SE = 5 * 0.0012 = 0.0060 (closed band): pass."""
+    old, new = branch_d_trees(lambda_max=0.9056 + 0.0030)
+    done, report = run_cli_with(tmp_path, old, new, "--no-reference")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "mode: D3" in report.read_text()
+
+
+def test_cli_branch_d3_outside_the_lambda_band_fails(tmp_path) -> None:
+    """D3: lambda 0.0100 above the pilot's is beyond k SE = 0.0060."""
+    old, new = branch_d_trees(lambda_max=0.9056 + 0.0100)
+    done, report = run_cli_with(tmp_path, old, new, "--no-reference")
+    assert done.returncode == 1
+    assert "D2: lambda of lorenz63" in report.read_text()
+
+
+def test_cli_branch_d1_with_a_reference_run(tmp_path) -> None:
+    """D1: the new run equals the local v1 run in the context (so B or N applies against it), and
+    the local run's lambda is inside the pilot's 5 SE band (D2)."""
+    old, new = branch_d_trees(lambda_max=0.9056 + 0.0030)
+    reference = old_tree()
+    reference["systems"]["lorenz63"]["context"]["lambda_max"] = 0.9056 + 0.0030
+    done, report = run_cli_with(tmp_path, old, new, reference=reference)
+    assert done.returncode == 0, done.stdout + done.stderr
+    text = report.read_text()
+    assert "mode: D1" in text and "against the local v1 run is in branch B" in text
+    assert (tmp_path / "leaves.d1.json").exists()
+
+
+def test_cli_branch_d1_fails_if_the_reference_is_far_from_the_pilot(tmp_path) -> None:
+    """D2 on the local run: lambda 0.0100 from the pilot's is beyond 5 SE, though B holds in D1."""
+    old, new = branch_d_trees(lambda_max=0.9056 + 0.0100)
+    reference = old_tree()
+    reference["systems"]["lorenz63"]["context"]["lambda_max"] = 0.9056 + 0.0100
+    done, report = run_cli_with(tmp_path, old, new, reference=reference)
+    assert done.returncode == 1
+    assert "D2: lambda of lorenz63: local" in report.read_text()
+
+
+def test_cli_branch_d1_fails_if_the_reference_context_differs_from_the_new_run(tmp_path) -> None:
+    """D1 needs B or N against the local run: a reference with another context is still D."""
+    old, new = branch_d_trees(lambda_max=0.9056 + 0.0030)
+    reference = old_tree()  # the pilot's own context, which differs from the new run's
+    done, report = run_cli_with(tmp_path, old, new, reference=reference)
+    assert done.returncode == 1
+    assert "D1: the new run is still in branch D against the local v1 run" in report.read_text()
+
+
+def test_cli_reference_and_no_reference_exclude_each_other(tmp_path) -> None:
+    """Both flags together are a usage error (exit 2)."""
+    old, new = branch_d_trees()
+    done, _ = run_cli_with(tmp_path, old, new, "--no-reference", reference=old_tree())
+    assert done.returncode == 2
+
+
+def test_cli_cache_flag_yes_is_a_finding(tmp_path) -> None:
+    """The launch record says lyapunov.json pre-existed: a finding (the run must be repeated)."""
+    done, report = run_cli_with(tmp_path, old_tree(), new_tree(), "--cache-preexisted", "yes")
+    assert done.returncode == 1
+    assert "lyapunov.json: launch record: lyapunov.json pre-existed in the cache directory (FINDING)" \
+        in report.read_text()
+
+
+def test_cache_status_cases() -> None:
+    """The cache statement: flag yes, a file older than the run's start, flag no, no information."""
+    status = cp.cache_status
+    assert status({"flag": "yes", "cache_mtime": None, "start": None})[1] is True
+    assert status({"flag": None, "cache_mtime": 100.0, "start": 200.0})[1] is True    # older than start
+    assert status({"flag": None, "cache_mtime": 300.0, "start": 200.0})[1] is False   # written in the run
+    assert status({"flag": "no", "cache_mtime": 300.0, "start": 200.0})[1] is False
+    assert status({"flag": None, "cache_mtime": None, "start": None})[1] is False
 
 
 def test_cli_gate_failure_exits_one(tmp_path) -> None:
@@ -528,109 +643,269 @@ def test_timing_is_not_compared() -> None:
     assert [r.status for r in res] == ["timing", "timing"]
 
 
-# ---------------------------------------------------------------------------------- T6
+# ---------------------------------------------------------------------------------- T6 (DEC-0019)
 def context_pair(**changes):
-    """Old/new context dicts for the switch rule; ``changes`` replace new values."""
+    """Old/new context trees for the branch selection; ``changes`` replace new values."""
     old = {"systems": {"lorenz63": {"context": dict(CONTEXT)}}}
     new = {"systems": {"lorenz63": {"context": {**CONTEXT, **changes}}}}
-    return cp.load_sides(old, new)[:2]
-
-
-def test_t6_identical_context_selects_bitwise() -> None:
-    """T6: identical context leaves give the bitwise branch."""
-    assert cp.context_switch(*context_pair()) == ("bitwise", [])
-
-
-def test_t6_float_beyond_1e12_selects_fallback() -> None:
-    """T6: one float at 2e-12 relative fires the switch; 5e-13 does not."""
-    branch, reasons = cp.context_switch(*context_pair(interval=0.0333 * (1.0 + 2e-12)))
-    assert branch == "fallback" and "systems/lorenz63/context/interval" in reasons[0]
-    assert cp.context_switch(*context_pair(interval=0.0333 * (1.0 + 5e-13)))[0] == "bitwise"
-
-
-def test_t6_integer_context_difference_fires_and_fails_f1() -> None:
-    """T6: a differing integer fires the switch, and F1 lists it as failed."""
-    old, new = context_pair(delay=6)
-    assert cp.context_switch(old, new)[0] == "fallback"
-    res = cp.compare_leaves(old, new)
-    report = cp.evaluate_fallback(res, old, new, cp.TABLE,
-                                  {"dec": "DEC-TEST", "k": 2.0, "se": {"lorenz63": 0.5}})
-    assert report.f1 == [("systems/lorenz63/context/delay", 5, 6, False)]
-    assert not report.passed
-
-
-def test_t6_missing_context_leaf_fires() -> None:
-    """A context leaf missing from the new run selects the fallback branch."""
-    old = cp.load_sides({"systems": {"lorenz63": {"context": dict(CONTEXT)}}}, {})[0]
-    assert cp.context_switch(old, {})[0] == "fallback"
-
-
-# ---------------------------------------------------------------------------------- T7
-CONSTANTS = {"dec": "DEC-TEST", "k": 2.0, "se": {"lorenz63": 0.5}}  # tolerance k SE = 1.0 exactly
-
-
-def fallback_for(old_extra: dict, new_extra: dict, new_lambda: float = 0.9056):
-    """Evaluate the fallback criterion on small trees (lambda, plus extra system blocks)."""
-    old = {"systems": {"lorenz63": {"context": {"lambda_max": 0.9056}, **old_extra}}}
-    new = {"systems": {"lorenz63": {"context": {"lambda_max": new_lambda}, **new_extra}}}
     old_l, new_l, res = sides(old, new)
-    return cp.evaluate_fallback(res, old_l, new_l, cp.TABLE, CONSTANTS)
+    return res, old_l, new_l
 
 
-@pytest.mark.parametrize("new_lambda, ok", [(1.5, True), (2.0, True), (2.5, False)])
-def test_t7_lambda_inside_on_outside(new_lambda, ok) -> None:
-    """T7 (F2): |new - pilot| <= k SE with the bound closed. Here lambda_pilot = 1.0, k SE = 1.0."""
-    old = {"systems": {"lorenz63": {"context": {"lambda_max": 1.0}}}}
-    new = {"systems": {"lorenz63": {"context": {"lambda_max": new_lambda}}}}
+def test_t6_identical_context_and_leaves_select_b() -> None:
+    """T6: everything equal gives branch B."""
+    assert cp.select_branch(*context_pair()) == ("B", [], False)
+
+
+@pytest.mark.parametrize("change", [
+    {"lambda_max": math.nextafter(0.9056, 1.0)},     # one ulp: lambda and interval are bitwise
+    {"interval": math.nextafter(0.0333, 1.0)},
+    {"obs_scale": 2.0 * (1.0 + 2e-12)},              # beyond 1e-12 relative
+    {"delay": 6},                                     # an integer
+])
+def test_t6_any_other_context_difference_selects_d(change) -> None:
+    """T6: the approved text: only obs_scale within 1e-12 relative may differ outside branch D."""
+    branch, reasons, _ = cp.select_branch(*context_pair(**change))
+    assert branch == "D" and len(reasons) == 1
+    assert next(iter(change)) in reasons[0]
+
+
+def test_t6_obs_scale_within_1e12_is_n_and_flagged() -> None:
+    """T6: obs_scale at 5e-13 relative: not D; the unchanged leaf differs, so N, with the flag."""
+    branch, reasons, obs_differs = cp.select_branch(*context_pair(obs_scale=2.0 * (1.0 + 5e-13)))
+    assert (branch, obs_differs) == ("N", True)
+    assert reasons == ["1 unchanged leaves differ from the pilot"]
+
+
+def test_t6_missing_context_leaf_selects_d() -> None:
+    """T6: a context leaf missing from the new run is a context difference."""
+    old = {"systems": {"lorenz63": {"context": dict(CONTEXT)}}}
+    new = {"systems": {"lorenz63": {"context": {k: v for k, v in CONTEXT.items() if k != "delay"}}}}
     old_l, new_l, res = sides(old, new)
-    report = cp.evaluate_fallback(res, old_l, new_l, cp.TABLE, CONSTANTS)
-    assert report.f2 == [("lorenz63", 1.0, new_lambda, abs(new_lambda - 1.0), 1.0, ok)]
+    branch, reasons, _ = cp.select_branch(res, old_l, new_l)
+    assert branch == "D" and "context/delay missing from the new run" in reasons[0]
 
 
-@pytest.mark.parametrize("new_value, inside", [
-    (1.0, True), (0.5, True), (1.5, True),                   # inside and both closed bounds
-    (math.nextafter(1.5, 2.0), False), (math.nextafter(0.5, 0.0), False)])
-def test_t7_statistic_against_its_pilot_interval(new_value, inside) -> None:
-    """T7 (F3): a v1 statistic with a ci lies in [lo, hi] (closed), at the level of the interval."""
-    old = {"H1c": {"PLP": {"slope": 1.0, "ci": [0.5, 1.5]}}}      # v1 names: H1c is v3 H1b
-    new = {"H1b": {"PLP": {"slope": new_value, "ci": [0.5, 1.5]}}}
-    rep = fallback_for(old, new)
-    rows = [r for r in rep.f3 if r[0].endswith("PLP/slope")]
-    assert rows == [("systems/lorenz63/H1b/PLP/slope", 1.0, new_value, 0.5, 1.5, 0.95, inside)]
+def test_t6_context_equal_and_another_unchanged_leaf_differs_selects_n() -> None:
+    """T6: the context equals the pilot's but a network-chain leaf differs: branch N."""
+    old = {"systems": {"lorenz63": {"context": dict(CONTEXT), "scores": {"A3": {"mse_href": 0.25}}}}}
+    new = {"systems": {"lorenz63": {"context": dict(CONTEXT),
+                                    "scores": {"A3": {"mse_href": math.nextafter(0.25, 1.0)}}}}}
+    old_l, new_l, res = sides(old, new)
+    assert cp.select_branch(res, old_l, new_l)[0] == "N"
 
 
-def test_t7_statistic_without_interval_is_reported() -> None:
-    """T7 (F3): a differing statistic with no pilot interval is reported with its relative
-    difference and carries no pass/fail (the value ``None``)."""
-    rep = fallback_for({"scores": {"A0": {"mse": {"1LT": 0.25}}}},
-                       {"scores": {"A0": {"mse": {"1LT": 0.26}}}})
-    (row,) = [r for r in rep.f3 if r[0].endswith("A0/mse/1LT")]
-    assert row[:6] == ("systems/lorenz63/scores/A0/mse/1LT", 0.25, 0.26, None, None, None)
-    assert row[6] is None
-    # |0.26 - 0.25| / 0.26 in floating point; subtraction error ~1e-17 / 1e-2 = 1e-15 << 1e-12.
-    assert row[7] == pytest.approx(0.01 / 0.26, rel=1e-12)
-    assert rep.passed is True  # reported rows carry no pass/fail; F2 holds (lambda equal)
+def test_approved_constants_are_the_text_of_dec_0019() -> None:
+    """The constants are the approved ones: 1e-6, 0.2 SE_arm, z 1.960 and 2.394, k = 5, SE per system."""
+    c = cp.FALLBACK_CONSTANTS
+    assert c["dec"] == "DEC-0019"
+    assert (c["n2_rel"], c["n3_fraction"], c["k"]) == (1e-6, 0.2, 5.0)
+    assert c["z"] == {0.95: 1.960, PRIMARY: 2.394}
+    assert c["se"] == {"lorenz63": 0.0012, "rossler": 0.00055, "chua": 0.0048}
 
 
-def test_t7_discrete_flip_and_gate_enter_f5_and_f4() -> None:
-    """F5 lists a discrete unchanged leaf that flipped; F4 reads the gate flags."""
-    rep = fallback_for({"H3b": {"realized_K": {"2": 2}}},
-                       {"regime_curve": {"realized_K": {"2": 3}},
-                        "validation": {"gate": {"V1": True, "V7": False}}})
-    assert rep.f5 == [("systems/lorenz63/regime_curve/realized_K/2", 2, 3)]
-    assert rep.f4 == [("systems/lorenz63/validation/gate/V1", True, True),
-                      ("systems/lorenz63/validation/gate/V7", False, False)]
+# ---------------------------------------------------------------------------------- T7 (N1 to N5)
+# Test constants with exactly representable arithmetic: the bound |delta| <= 0.25 |old| for N2,
+# 0.25 SE_arm for N3, z = 2 at 95% so that SE_arm = arm / 2.
+NC = {"dec": "TEST", "n2_rel": 0.25, "n3_fraction": 0.25, "z": {0.95: 2.0, PRIMARY: 4.0},
+      "k": 5.0, "se": {"lorenz63": 0.5}}
+NC3 = {**NC, "n2_rel": 0.01}   # small N2 bound so that the N3 leaves are beyond it
+LAM = {"lambda_max": 1.0}
+
+
+def n_report(old_extra: dict, new_extra: dict, constants: dict = NC, obs: bool = False):
+    """Evaluate N1 to N5 on small trees of one system (the context is equal)."""
+    old = {"systems": {"lorenz63": {"context": dict(LAM), **old_extra}}}
+    new = {"systems": {"lorenz63": {"context": dict(LAM), **new_extra}}}
+    old_l, new_l, res = sides(old, new)
+    return cp.evaluate_n(res, old_l, new_l, cp.TABLE, constants, obs)
+
+
+@pytest.mark.parametrize("new_value, row_outcome", [(4.5, "within"), (5.0, "within"),   # 0.125, 0.25 on
+                                                    (5.5, None)])                       # 0.375 beyond
+def test_t7_n2_bound_is_closed(new_value, row_outcome) -> None:
+    """N2: |new - old| <= bound |old|, closed (old 4.0, bound 0.25: 5.0 is on it, 5.5 beyond)."""
+    rep = n_report({"scores": {"A3": {"mse_href": 4.0}}}, {"scores": {"A3": {"mse_href": new_value}}})
+    path = "systems/lorenz63/scores/A3/mse_href"
+    if row_outcome:
+        assert [r[4] for r in rep.n2 if r[0] == path] == ["within"] and rep.passed
+    else:
+        assert [r[4] for r in rep.n2 if r[0] == path] == ["NO EVENT"]
+        assert "no chain-head event upstream in the network chain" in rep.findings[0]
+
+
+def test_t7_n1_network_independent_chains_must_be_bitwise() -> None:
+    """N1: a cp-chain leaf differing at all is a finding; with obs_scale differing it falls to N2."""
+    old, new = {"scores": {"A0": {"mse_href": 4.0}}}, {"scores": {"A0": {"mse_href": 4.0000000000000009}}}
+    rep = n_report(old, new)
+    assert [r[0] for r in rep.n1] == ["systems/lorenz63/scores/A0/mse_href"] and not rep.passed
+    rep = n_report(old, new, obs=True)
+    assert rep.n1 == [] and rep.passed
+    assert [r[4] for r in rep.n2] == ["within"]
+
+
+@pytest.mark.parametrize("new_value, ok", [
+    (1.0625, True),                      # delta +0.0625 = 0.25 * SE_arm (arm 0.5, z 2): on the bound
+    (1.0625000000000002, False),
+    (1.03125, True)])
+def test_t7_n3_upper_arm(new_value, ok) -> None:
+    """N3: SE_arm = (hi - est) / z on the side of delta; |delta| <= 0.25 SE_arm, closed.
+    The slope's chain-head event is an integer count (v1 H1d/PLP/n_states) that differs."""
+    old = {"H1c": {"PLP": {"slope": 1.0, "ci": [0.5, 1.5]}}, "H1d": {"PLP": {"n_states": 100}}}
+    new = {"H1b": {"PLP": {"slope": new_value, "ci": [0.5, 1.5]}}, "H1c": {"PLP": {"n_states": 120}}}
+    rep = n_report(old, new, NC3)
+    (row,) = rep.n3
+    assert row[0] == "systems/lorenz63/H1b/PLP/slope"
+    assert (row[5], row[6], row[7], row[8], row[9]) == (0.5, 1.5, 0.95, 0.25, 0.0625)
+    assert row[10] is ok and rep.passed is ok
+    assert [e[1] for e in rep.events] == ["integer count"]
+
+
+def test_t7_n3_lower_arm_and_primary_level() -> None:
+    """N3: delta < 0 uses the lower arm (est - lo); the primary level has its own z (4 here).
+    Lower arm 1.0 - 0.25 = 0.75, SE_arm 0.1875, bound 0.046875, delta -0.09375: beyond."""
+    old = {"H2b": {"noise": {"mean_state_spearman": 1.0, "ci": [0.25, 2.0]}},
+           "H1d": {"PLP": {"n_states": 100}}}
+    new = {"H2b": {"noise": {"mean_state_spearman": 0.90625, "ci": [0.25, 2.0]}},
+           "H1c": {"PLP": {"n_states": 120}}}
+    rep = n_report(old, new, NC3)
+    (row,) = rep.n3
+    assert (row[8], row[9], row[7]) == (0.1875, 0.046875, PRIMARY)
+    assert row[10] is False and not rep.passed
+    assert "N3: systems/lorenz63/H2b/noise/mean_state_spearman moves -0.09375" in rep.findings[0]
+
+
+def test_t7_event_kinds_and_scope() -> None:
+    """Events: integer counts, discrete leaves (chosen_width) and fitted coefficients beyond the bound
+    license excess only in the same system and chain."""
+    old = {"scores": {"A3": {"mse_href": 4.0}}, "fitted": {"estimation_proxy": {"slope": 4.0}}}
+    new = {"scores": {"A3": {"mse_href": 6.0}}, "fitted": {"estimation_proxy": {"slope": 6.0}}}
+    rep = n_report(old, new)
+    assert [(e[1], e[4], e[5]) for e in rep.events] == [("fitted coefficient", "lorenz63", "network")]
+    assert rep.passed                                    # the fitted slope is itself the head
+    # An event in another system does not license the leaf.
+    both_old = {"systems": {"lorenz63": {"context": dict(LAM), "scores": {"A3": {"mse_href": 4.0}}},
+                            "rossler": {"context": dict(LAM), "H1d": {"PLP": {"n_states": 1}}}}}
+    both_new = {"systems": {"lorenz63": {"context": dict(LAM), "scores": {"A3": {"mse_href": 6.0}}},
+                            "rossler": {"context": dict(LAM), "H1c": {"PLP": {"n_states": 2}}}}}
+    old_l, new_l, res = sides(both_old, both_new)
+    rep = cp.evaluate_n(res, old_l, new_l, cp.TABLE, NC)
+    assert [e[4] for e in rep.events] == ["rossler"] and not rep.passed
+    # chosen_width of the estimators block is a discrete event of its system.
+    key = "('lorenz63', 7, 5, 0.01)"
+    old3 = {"scores": {"A3": {"mse_href": 4.0}}}
+    new3 = {"scores": {"A3": {"mse_href": 6.0}}}
+    old_l, new_l, res = sides(
+        {"systems": {"lorenz63": {"context": dict(LAM), **old3}},
+         "estimators": {key: {"chosen_width": 64}}},
+        {"systems": {"lorenz63": {"context": dict(LAM), **new3}},
+         "estimators": {key: {"chosen_width": 128}}})
+    rep = cp.evaluate_n(res, old_l, new_l, cp.TABLE, NC)
+    assert [(e[1], e[4]) for e in rep.events] == [("integer count", "lorenz63")] and rep.passed
+
+
+def test_t7_n5_regret_allowance_and_the_sentinel() -> None:
+    """N5: regret(v3) >= regret(v1) (1 - 1e-6) (R3 allows 1e-12); A* exactly 0.0; a violation in a
+    system whose curvature_floor is not 0 is attributed to that sentinel."""
+    def run(a_new: float, star_new: float = 0.0, floor: int | None = None):
+        old = {"systems": {"lorenz63": {"context": dict(LAM), "scores": {
+            "A0": {"regret": {"1LT": 1.0}}, "A*": {"regret": {"1LT": 0.5}}}}}}
+        new = {"systems": {"lorenz63": {"context": dict(LAM), "scores": {
+            "A0": {"regret": {"1LT": a_new}}, "A*": {"regret": {"1LT": star_new}}}}}}
+        if floor is not None:
+            new["handling"] = {"by_system": {"lorenz63": {"curvature_floor": floor}}}
+        old_l, new_l, res = sides(old, new)
+        return cp.evaluate_n(res, old_l, new_l, cp.TABLE, cp.FALLBACK_CONSTANTS), res
+    rep, res = run(1.0 * (1 - 5e-7))
+    assert rep.passed and len(rep.n5) == 2
+    assert [r.direction_ok for r in res if r.rule.direction == "new>=old"] == [False]   # R3, 1e-12
+    rep, _ = run(1.0 * (1 - 2e-6))
+    assert not rep.passed and "N5: systems/lorenz63/scores/A0/regret/1LT" in rep.findings[0]
+    rep, _ = run(1.0 * (1 - 2e-6), floor=3)
+    assert rep.passed and [r[4] for r in rep.n5 if r[3] is False] == [True]
+    rep, _ = run(1.5, star_new=1e-300)
     assert not rep.passed
 
 
-def test_t7_missing_constants_raise() -> None:
-    """T7: the fallback cannot be evaluated without constants (the CLI exits 3)."""
-    with pytest.raises(cp.ToolError, match="not recorded"):
-        cp.evaluate_fallback([], {}, {}, cp.TABLE, None)
+def test_t7_locus_table_marks_the_first_differing_chain() -> None:
+    """The divergence locus: chains in the order fixture, dynamics, cp, oracle, network; the first
+    one with a differing unchanged leaf is marked FIRST, per system."""
+    old = {"scores": {"A0": {"mse_href": 4.0}, "A3": {"mse_href": 4.0, "rmst_lyapunov": 1.0}}}
+    new = {"scores": {"A0": {"mse_href": 4.0000000000000009}, "A3": {"mse_href": 4.5,
+                                                                      "rmst_lyapunov": 1.0}}}
+    rep = n_report(old, new)
+    rows = {(r[0], r[1]): r for r in rep.locus}
+    assert rows[("lorenz63", "cp")][2:4] == (1, 1) and rows[("lorenz63", "cp")][5] is True
+    assert rows[("lorenz63", "network")][2:4] == (2, 1) and rows[("lorenz63", "network")][5] is False
+    assert rows[("lorenz63", "dynamics")][2:4] == (1, 0)
+    assert rows[("lorenz63", "network")][4] == pytest.approx(0.125, rel=1e-12)   # 0.5 / 4.0, exact
+
+
+# ---------------------------------------------------------------------------------- D2, D3
+def test_t7_d2_lambda_band_is_closed() -> None:
+    """D2: |lambda_subject - lambda_pilot| <= k SE (here 5 * 0.5 = 2.5), closed. The pilot's lambda
+    is 0.0 so that the difference is computed without rounding."""
+    constants = {**NC, "se": {"lorenz63": 0.5}}
+    path = p("systems/lorenz63/context/lambda_max")
+    for subject, ok in [(2.5, True), (math.nextafter(2.5, 3.0), False), (-2.5, True),
+                        (math.nextafter(-2.5, -3.0), False)]:
+        (row,) = cp.d2_rows({path: 0.0}, {path: subject}, constants)
+        assert row == ("lorenz63", 0.0, subject, abs(subject), 2.5, ok)
     with pytest.raises(cp.ToolError, match="no SE for lorenz63"):
-        old = {p("systems/lorenz63/context/lambda_max"): 1.0}
-        cp.evaluate_fallback([], old, old, cp.TABLE, {"dec": "x", "k": 1.0, "se": {}})
-    assert cp.FALLBACK_CONSTANTS is None  # until the owner's DEC records them (LPC.AI.12)
+        cp.d2_rows({path: 0.0}, {path: 0.0}, {**NC, "se": {}})
+    (row,) = cp.d2_rows({path: 0.0}, {}, constants)           # lambda missing from the subject
+    assert row[5] is False
+
+
+def test_t7_d2_lists_integer_context_differences() -> None:
+    """D2 lists the integer context leaves that differ (no pass/fail)."""
+    old = {p("systems/lorenz63/context/delay"): 5, p("systems/lorenz63/context/spacing"): 9,
+           p("systems/lorenz63/context/lambda_max"): 1.0}
+    other = {p("systems/lorenz63/context/delay"): 6, p("systems/lorenz63/context/spacing"): 9,
+             p("systems/lorenz63/context/lambda_max"): 1.5}
+    assert cp.context_ints_differ(old, other) == [("systems/lorenz63/context/delay", 5, 6)]
+
+
+def d3_for(pairs: dict[str, tuple[float, list, float, list]], constants: dict = NC):
+    """d3_rows on H1b slopes: ``{key: (old_est, old_ci, new_est, new_ci)}`` for PLP and CP."""
+    old = {"H1c": {k: {"slope": a, "ci": ca} for k, (a, ca, _, _) in pairs.items()}}
+    new = {"H1b": {k: {"slope": b, "ci": cb} for k, (_, _, b, cb) in pairs.items()}}
+    old_l, new_l, res = sides({"systems": {"lorenz63": old}}, {"systems": {"lorenz63": new}})
+    return cp.d3_rows(res, old_l, new_l, cp.TABLE, constants)
+
+
+def test_t7_d3_band_with_one_statistic() -> None:
+    """D3, m = 1: z_B = Phi^-1(1 - 0.05/2) = 1.959964; SE from the arm on the side of delta over
+    z(level). Reference by hand: old arm 0.5 / 1.96 = 0.255102, new arm 0.3 / 1.96 = 0.153061,
+    hypot 0.297498, bound 1.959964 * 0.297498 = 0.583087 (6 digits typed; rel 1e-5)."""
+    consts = {**NC, "z": {0.95: 1.96, PRIMARY: 2.394}}
+    rows, reported, z_b = d3_for({"PLP": (1.0, [0.5, 1.5], 1.2, [0.9, 1.5])}, consts)
+    assert z_b == pytest.approx(1.959964, rel=1e-5)
+    (row,) = rows
+    assert row[3] == pytest.approx(0.2, rel=1e-12)
+    assert row[4] == pytest.approx(0.255102, rel=1e-5) and row[5] == pytest.approx(0.153061, rel=1e-5)
+    assert row[6] == pytest.approx(0.583087, rel=1e-5) and row[7] is True
+    assert reported == []
+
+
+def test_t7_d3_bonferroni_over_m_statistics_and_failure() -> None:
+    """D3, m = 2: z_B = Phi^-1(1 - 0.05/4) = Phi^-1(0.9875) = 2.241403 (table value). A shift of
+    1.0 -> 2.5 against arms 0.5 and 0.1 (z 1.96) is far outside the band."""
+    consts = {**NC, "z": {0.95: 1.96, PRIMARY: 2.394}}
+    rows, _, z_b = d3_for({"PLP": (1.0, [0.5, 1.5], 2.5, [2.4, 2.6]),
+                           "CP": (1.0, [0.5, 1.5], 1.0, [0.5, 1.5])}, consts)
+    assert z_b == pytest.approx(2.241403, rel=1e-5)
+    assert sorted((r[0].rsplit("/", 2)[1], r[7]) for r in rows) == [("CP", True), ("PLP", False)]
+
+
+def test_t7_d3_reports_leaves_without_intervals_and_discrete_flips() -> None:
+    """D3 reports (no pass/fail) the differing unchanged leaves that have no interval in both runs."""
+    old = {"systems": {"lorenz63": {"scores": {"A3": {"mse_href": 4.0}}}}}
+    new = {"systems": {"lorenz63": {"scores": {"A3": {"mse_href": 5.0}}}}}
+    old_l, new_l, res = sides(old, new)
+    rows, reported, z_b = cp.d3_rows(res, old_l, new_l, cp.TABLE, NC)
+    assert rows == [] and z_b is None
+    assert reported == [("systems/lorenz63/scores/A3/mse_href", 4.0, 5.0, 0.25)]
 
 
 # ---------------------------------------------------------------------------------- gate, P2(c)
@@ -641,7 +916,15 @@ def test_gate_rows_flag_each_false_or_missing_value() -> None:
            p("systems/lorenz63/verification/P2c/n_violations"): 1,
            p("systems/lorenz63/verification/P2c/n_chain_violations/p2a"): 0,
            p("systems/lorenz63/verification/P2c/n_chain_violations/triangle"): 0.0}
+    new[p("systems/lorenz63/V7/n_nonfinite")] = 0
+    new[p("systems/lorenz63/V7/median_slope")] = 1.1
+    new[p("systems/lorenz63/V7/efficiency_median_by_noise/0.01")] = 0.9
+    new[p("systems/lorenz63/V7/efficiency_median_by_noise/0.05")] = math.nextafter(1.1, 2.0)
     ok = {(c, path.rsplit("/", 1)[1]): good for c, path, _, good in cp.gate_rows(new)}
+    assert ok[("R4", "n_nonfinite")] is True
+    assert ok[("R4", "median_slope")] is True            # 1.1 is inside the closed band
+    assert ok[("R4", "0.01")] is True                    # 0.9 is inside the closed band
+    assert ok[("R4", "0.05")] is False                   # one ulp above 1.1
     assert ok[("R4", "V1")] is True
     assert ok[("R4", "V7")] is False
     assert ok[("R4", "V2")] is False                 # absent

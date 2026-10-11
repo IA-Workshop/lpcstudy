@@ -7,6 +7,8 @@ Usage::
         [--report docs/study/dev_regression_dev0.md]
         [--leaves-json runs/dev/wu0002-12/compare_leaves.json]
         [--run-dir DIR] [--manifest-row TEXT]
+        [--reference LOCAL_V1_RESULTS_JSON | --no-reference]
+        [--cache-file PATH] [--cache-preexisted yes|no]
 
 What it does. It reads two ``results.json`` files and flattens each to leaves addressed by tuples
 of keys (written ``a/b/c``; list items are ``[0]``, ``[1]``; a ``/`` inside a key is written
@@ -26,19 +28,30 @@ of the table ``RULES`` into one of five groups:
 
 A leaf that matches no rule or two rules is an error (exit 2) and is never classified silently.
 
-Branch. The switch rule of ROADMAP WU-0002.12: if a ``context`` leaf of the new run differs from
-the pilot (a float beyond 1e-12 relative, any other type at all) the fallback branch applies,
-else the bitwise branch. The fallback criterion is the owner's (LPC.AI.12). Until its constants
-are recorded (``FALLBACK_CONSTANTS`` is ``None``) the fallback branch is refused: exit 3 naming the
-missing decision. Both branches check the gate (V1 to V7, ``gate_pass``) and P2(c) in the new run.
+Branch (the approved criterion, DEC-0019; the text is in the WU-0002.12 unit file, "final text for
+the owner"). **D** if any ``context`` leaf differs, except that ``obs_scale`` may differ within 1e-12
+relative (``lambda_max`` and ``interval`` bitwise, every integer leaf identical). Else **B** if every
+``unchanged`` leaf is bitwise equal (R3: regret(v3) >= regret(v1) (1 - 1e-12), A* exactly 0.0), else
+**N**: N1 the network-independent chains (tagged ``dynamics``, ``cp``, ``oracle``, ``fixture`` in the
+rule table) are bitwise equal; N2 every other continuous unchanged leaf is within 1e-6 relative or
+meets N3; N3 a chain-head event (a differing discrete quantity or integer count, or a ``fitted``
+coefficient beyond 1e-6) lies upstream in its system and chain, and a leaf with a pilot interval moves
+by at most 0.2 SE_arm (z = 1.960 at 95%, 2.394 at 1 - 0.05/3); N4 the gate and the V7 rule (n_nonfinite
+0, median slope and median efficiency at every rho in [0.9, 1.1], closed); N5 regret(v3) >=
+regret(v1) (1 - 1e-6) and A* regret 0.0 (a violation under a non-zero ``curvature_floor`` is
+attributed to that sentinel). A divergence-locus table is always written. In branch D, D1 (with
+``--reference``, the v1 code run locally): the new run against the reference by B then N, and D2
+(|lambda_ref - lambda_pilot| <= 5 SE, closed, per system); D3 (``--no-reference``): D2 for the new
+run, N4, and the interval band with z_B = Phi^-1(1 - 0.05 / (2 m)). Every branch checks the gate and
+P2(c) (R4, R5), and the cache: ``lyapunov.json`` pre-existing is a finding.
 
 Outputs. ``--report`` (default ``docs/study/dev_regression_dev0.md``), whose first line is
 ``DEVELOPMENT (DEV-0): not a hypothesis test``, and a per-leaf JSON file (default
 ``runs/dev/wu0002-12/compare_leaves.json``, untracked). The tool reads statistics and computes
 none. It imports nothing but the standard library, and no ``lpcstudy`` module.
 
-Exit codes: 0 no finding; 1 findings (the report lists them); 2 a leaf without exactly one rule, or
-unreadable input, or a usage error; 3 the fallback branch applies and its constants are missing.
+Exit codes: 0 no failure; 1 failures (the report lists them); 2 a leaf without exactly one rule, or
+unreadable input, or a usage error; 3 branch D without ``--reference`` or ``--no-reference``.
 """
 
 from __future__ import annotations
@@ -53,11 +66,15 @@ import struct
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from statistics import NormalDist
 
 LABEL = "DEVELOPMENT (DEV-0): not a hypothesis test"
-EXIT_FINDINGS, EXIT_ERROR, EXIT_FALLBACK = 1, 2, 3
-SWITCH_REL_TOL = 1e-12
+EXIT_FINDINGS, EXIT_ERROR, EXIT_NEEDS_INPUT = 1, 2, 3
+SWITCH_REL_TOL = 1e-12   # obs_scale in the branch selection (DEC-0019)
+R3_REL_TOL = 1e-12       # branch B: regret(v3) >= regret(v1) * (1 - 1e-12)
+N5_REL_TOL = 1e-6        # branch N: regret(v3) >= regret(v1) * (1 - 1e-6)
 PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
 CI_LEVEL = 0.95
 CLASSES = ("unchanged", "changed", "new", "removed", "timing")
@@ -71,10 +88,14 @@ V1_TO_V3: dict[str, str | None] = {
 }
 DROPPED_PREFIX = "v1:"
 
-# The fallback criterion F2 needs k and the per-system standard errors. They are the owner's to
-# fix (LPC.AI.12; the proposal is in the WU-0002.12 plan, not in force): a dict
-# {"dec": "DEC-nnnn", "k": float, "se": {system: float}} once a DEC records them.
-FALLBACK_CONSTANTS: dict | None = None
+# The approved criterion (DEC-0019; text in the WU-0002.12 unit file, 'final text for the owner'):
+# N2 relative bound, N3 fraction of SE_arm, z of the two interval levels (1.960 at 95%,
+# 2.394 at 1 - 0.05/3), D2 with k = 5 and the WU-0007 Benettin standard errors per system.
+FALLBACK_CONSTANTS: dict = {
+    "dec": "DEC-0019", "n2_rel": 1e-6, "n3_fraction": 0.2,
+    "z": {CI_LEVEL: 1.960, PRIMARY_LEVEL: 2.394},
+    "k": 5.0, "se": {"lorenz63": 0.0012, "rossler": 0.00055, "chua": 0.0048},
+}
 
 Path_ = tuple[str, ...]
 
@@ -453,13 +474,16 @@ def _build_rules() -> list[Rule]:
     add(_rules("new", f"{S}/handling/** handling/**", "WU-0002.11", "D-18",
                "counted handling of clips, replacements and fallbacks"))
     # ---- fitted ----------------------------------------------------------------------------
-    add(_rules("unchanged", f"{S}/fitted/{{analog_proxy,estimation_proxy}}/{{floor,slope}}",
-               chain="cp", item="R2", reason="proxy fits are unchanged"))
+    add(_rules("unchanged", f"{S}/fitted/analog_proxy/{{floor,slope}}",
+               chain="cp", item="R2", reason="the analog proxy fit is unchanged (CP chain)"))
+    add(_rules("unchanged", f"{S}/fitted/estimation_proxy/{{floor,slope}}",
+               chain="network", item="R2",
+               reason="the estimation proxy is fitted to the psi errors (network chain)"))
     add(_rules("unchanged", f"{S}/fitted/nu_cap", chain="network", item="R2",
                reason="the nu cap is unchanged"))
     add(_rules("changed", f"{S}/fitted/chosen_K", "WU-0002.3", "D-13 (DEF-0003)",
                "K rule on the calibration excess MSE; the pilot K was the fallback 5",
-               discrete=True))
+               discrete=True, chain="network"))
     add(_rules("changed", f"{S}/fitted/regime_weights_href/*/[]", "WU-0002.3", "D-12 (DEF-0003)",
                "regime weight from unclipped moments; K changes", bulk=True))
     add(_rules("changed", f"{S}/fitted/regime_horizons_km_lyapunov/*/[]", "WU-0002.3", "D-12, D-13",
@@ -558,8 +582,10 @@ def _build_rules() -> list[Rule]:
                item="R2", reason="median ratio unchanged"))
     add(_rules("unchanged", f"{h1c}/{{CP,PLP}}/ci/[]", chain="network", level=CI_LEVEL, item="R2",
                reason="interval unchanged"))
-    add(_rules("unchanged", f"{h1c}/{{CP,PLP}}/n_states {h1c}/threshold/[] {h1c}/thresholds/[]",
-               item=smoke, reason="state count and band unchanged"))
+    add(_rules("unchanged", f"{h1c}/{{CP,PLP}}/n_states", chain="network", item=smoke,
+               reason="state count unchanged"))
+    add(_rules("unchanged", f"{h1c}/threshold/[] {h1c}/thresholds/[]", item=smoke,
+               reason="band unchanged"))
     add(_rules("removed", f"{h1c}/CP/pass", "WU-0002.9", "D-14, DEC-0016",
                "v3 H1c is decided on the PLP interval"))
     add(_rules("changed", f"{h1c}/{{pass,PLP/pass}}", "WU-0002.9", "D-14, DEC-0016 O3",
@@ -652,7 +678,8 @@ def _build_rules() -> list[Rule]:
                reason="both parts, with the pilot's best single A1",
                when=(("H2c", "best_single"), "A1")))
     add(_rules("changed", f"{h2c}/best_single", "WU-0002.8", "DEC-0008 A4(i), D-25(i)",
-               "chosen on the calibration split, not on test", discrete=True))
+               "chosen on the calibration split, not on test", discrete=True,
+               chain="network"))
     add(_rules("new", f"{h2c}/A4_minus_A0/** {h2c}/A4o_minus_A2/** {h2c}/calibration_mse/* "
                f"{h2c}/A4_minus_A2/{{n_failed_resamples,reason,verdict}} "
                f"{h2c}/{{n_failed_resamples,reason,verdict}}", "WU-0002.8, .9, .11",
@@ -796,8 +823,9 @@ class LeafResult:
         ``ALERT``.
     same : bool or None
         For ``changed`` leaves present on both sides: the values are equal (the rule allows a change).
-    direction_ok : bool or None
-        For rules with a ``direction``: the expected direction holds.
+    direction_ok, direction_ok_n : bool or None
+        For rules with a ``direction``: the expected direction holds with the allowance of branch B
+        (R3, 1e-12 relative) and of branch N (N5, 1e-6 relative).
     """
 
     path: Path_
@@ -807,20 +835,23 @@ class LeafResult:
     status: str
     same: bool | None = None
     direction_ok: bool | None = None
+    direction_ok_n: bool | None = None
 
     @property
     def is_finding(self) -> bool:
-        """A finding in every branch: a presence that contradicts the class, or an alert."""
-        return self.status in ("FAIL-new-rule-old-present", "FAIL-removed-rule-new-present",
-                               "ALERT")
+        """A finding in every branch: a structure that contradicts the class (a presence or a type),
+        or an alert."""
+        return self.status in STRUCTURE_FINDINGS
 
     @property
     def is_value_finding(self) -> bool:
-        """An ``unchanged`` leaf that differs, or a violated direction (bitwise branch only)."""
-        return self.status in VALUE_FINDINGS or self.direction_ok is False
+        """An ``unchanged`` leaf that differs, or a violated R3 direction (branch B only; the other
+        branches judge values by N1 to N5 and D1 to D3)."""
+        return self.status == "FAIL-differs" or self.direction_ok is False
 
 
-VALUE_FINDINGS = ("FAIL-differs", "FAIL-type", "FAIL-missing-new", "FAIL-new-only")
+STRUCTURE_FINDINGS = ("FAIL-type", "FAIL-missing-new", "FAIL-new-only",
+                      "FAIL-new-rule-old-present", "FAIL-removed-rule-new-present", "ALERT")
 
 
 def _condition_holds(rule: Rule, path: Path_, new: dict[Path_, object]) -> bool:
@@ -828,13 +859,15 @@ def _condition_holds(rule: Rule, path: Path_, new: dict[Path_, object]) -> bool:
     return new.get((*path[:2], *rel), MISSING) == expected
 
 
-def _direction_ok(direction: str, old: object, new: object) -> bool | None:
-    if not direction or not all(isinstance(v, float) for v in (old, new)):
-        return None if not direction else False
+def _direction_ok(direction: str, old: object, new: object, rel: float) -> bool | None:
+    """``new >= old * (1 - rel)`` (``new>=old``) or ``new == 0.0`` in IEEE bytes (``zero``)."""
+    if not direction:
+        return None
+    if not all(isinstance(v, float) for v in (old, new)):
+        return False
     if direction == "zero":
         return struct.pack("<d", new) == struct.pack("<d", 0.0)  # type: ignore[arg-type]
-    scale = max(abs(old), abs(new))  # type: ignore[type-var]
-    return bool(new - old >= -1e-12 * scale)  # type: ignore[operator]
+    return bool(new >= old * (1.0 - rel))  # type: ignore[operator]
 
 
 def judge(path: Path_, rule: Rule, old: object, new: object,
@@ -859,7 +892,8 @@ def judge(path: Path_, rule: Rule, old: object, new: object,
                               "changed-old-only" if new is MISSING else "changed-new-only")
         same = values_equal(old, new) in ("equal", "equal_nan")
         return LeafResult(path, rule, old, new, "changed", same,
-                          _direction_ok(rule.direction, old, new))
+                          _direction_ok(rule.direction, old, new, R3_REL_TOL),
+                          _direction_ok(rule.direction, old, new, N5_REL_TOL))
     if rule.cls == "new":
         if old is not MISSING:
             return LeafResult(path, rule, old, new, "FAIL-new-rule-old-present")
@@ -935,117 +969,239 @@ def load_sides(old_tree: object, new_tree: object) -> tuple[dict, dict, int]:
     return old, new, len(flat_new) - len(new)
 
 
-# ------------------------------------------------------------------------------ switch, fallback, gates
-def context_switch(old: dict[Path_, object], new: dict[Path_, object]) -> tuple[str, list[str]]:
-    """Apply the switch rule of ROADMAP WU-0002.12 to the ``context`` leaves.
+# ------------------------------------------------------------------------------ branches B, N, D
+NETWORK_INDEPENDENT = frozenset({"fixture", "dynamics", "cp", "oracle"})
+CHAIN_ORDER = ("fixture", "dynamics", "cp", "oracle", "network")
+V7_BAND = (0.9, 1.1)
 
-    A float that differs by more than 1e-12 relative, or any other leaf that differs in type or
-    value, or a leaf missing from the new run, selects the fallback branch.
+
+def system_of(path: Path_) -> str | None:
+    """The system a leaf belongs to (``None`` for run-level leaves)."""
+    if path[0] in ("systems", "robustness") and len(path) > 1:
+        return path[1]
+    if path[0] == "estimators" and len(path) > 1:
+        found = re.match(r"\('(\w+)'", path[1])
+        return found.group(1) if found else None
+    return None
+
+
+def select_branch(results: list[LeafResult], old: dict[Path_, object],
+                  new: dict[Path_, object]) -> tuple[str, list[str], bool]:
+    """Select the branch of the approved criterion (DEC-0019).
+
+    * **D**: any ``context`` difference other than the ones allowed for N: ``lambda_max`` and
+      ``interval`` must be bitwise equal, every integer leaf identical, ``obs_scale`` within 1e-12
+      relative; a context leaf missing from the new run is a difference.
+    * **B**: not D, and every ``unchanged`` leaf is bitwise equal (or within its rule's cited
+      ``rel_tol``).
+    * **N**: not D, and some ``unchanged`` leaf differs.
 
     Returns
     -------
-    tuple[str, list[str]]
-        ``("bitwise" | "fallback", reasons)``.
+    tuple[str, list[str], bool]
+        ``(branch, reasons, obs_scale_differs)``; ``reasons`` lists the context differences for D
+        and a count of differing unchanged leaves for N.
     """
-    reasons = []
+    reasons: list[str] = []
+    obs_differs = False
     for path in sorted(p for p in old if p[0] == "systems" and len(p) == 4 and p[2] == "context"):
         a, b = old[path], new.get(path, MISSING)
         if b is MISSING:
             reasons.append(f"{show(path)} missing from the new run")
-        elif values_equal(a, b, SWITCH_REL_TOL) not in ("equal", "equal_nan", "within_tol"):
+        elif path[3] == "obs_scale":
+            outcome = values_equal(a, b, SWITCH_REL_TOL)
+            if outcome == "within_tol":
+                obs_differs = True
+            elif outcome not in ("equal", "equal_nan"):
+                reasons.append(f"{show(path)}: {a!r} -> {b!r} (beyond 1e-12 relative)")
+        elif values_equal(a, b) not in ("equal", "equal_nan"):
             reasons.append(f"{show(path)}: {a!r} -> {b!r}")
-    return ("fallback" if reasons else "bitwise"), reasons
+    if reasons:
+        return "D", reasons, obs_differs
+    differing = [r for r in results if r.rule.cls == "unchanged" and r.status.startswith("FAIL")]
+    if differing:
+        return "N", [f"{len(differing)} unchanged leaves differ from the pilot"], obs_differs
+    return "B", [], obs_differs
+
+
+def z_of(constants: dict, level: float | None) -> float:
+    """The z value of a nominal level (1.960 at 95%, 2.394 at 1 - 0.05/3; DEC-0019)."""
+    if level is None or level not in constants["z"]:
+        raise ToolError(f"no z value for the interval level {level!r}")
+    return constants["z"][level]
+
+
+def interval_of(leaves: dict[Path_, object], table: Table, path: Path_,
+                rule: Rule) -> tuple[float, float, float | None] | None:
+    """``(lo, hi, level)`` of the interval sibling of a statistic, or ``None``."""
+    if not rule.interval:
+        return None
+    base = path[:-1]
+    lo = leaves.get((*base, rule.interval, "[0]"), MISSING)
+    hi = leaves.get((*base, rule.interval, "[1]"), MISSING)
+    if not all(isinstance(v, float) and math.isfinite(v) for v in (lo, hi)):
+        return None
+    return lo, hi, table.classify((*base, rule.interval, "[0]")).level  # type: ignore[return-value]
+
+
+def se_arm(est: float, lo: float, hi: float, delta: float, z: float) -> float:
+    """The pilot arm on the side of ``delta`` (``hi - est`` if positive, else ``est - lo``) over z."""
+    return ((hi - est) if delta > 0 else (est - lo)) / z
 
 
 @dataclass
-class FallbackReport:
-    """Result of the fallback criterion F1 to F5 (the owner's text; constants from a DEC)."""
+class NReport:
+    """Result of the checks N1 to N5 (branch N) of the approved criterion."""
 
-    f1: list[tuple]
-    f2: list[tuple]
-    f3: list[tuple]
-    f4: list[tuple]
-    f5: list[tuple]
+    n1: list[tuple]
+    n2: list[tuple]
+    n3: list[tuple]
+    events: list[tuple]
+    n5: list[tuple]
+    locus: list[tuple]
+    findings: list[str]
 
     @property
     def passed(self) -> bool:
-        """All of F1, F2, F3, F4, F5 hold ('reported' rows in F3 carry no pass/fail)."""
-        return (all(r[-1] for r in self.f1) and all(r[-1] for r in self.f2)
-                and all(r[6] for r in self.f3 if r[6] is not None)
-                and all(r[-1] for r in self.f4) and not self.f5)
+        """No finding (N4, the gate, is judged with the gate rows)."""
+        return not self.findings
 
 
-def evaluate_fallback(results: list[LeafResult], old: dict[Path_, object],
-                      new: dict[Path_, object], table: Table,
-                      constants: dict | None) -> FallbackReport:
-    """Evaluate the fallback criterion.
-
-    Parameters
-    ----------
-    results : list[LeafResult]
-        Output of ``compare_leaves``.
-    old, new : dict
-        The two leaf dicts.
-    table : Table
-        The rule table (for the level of an interval leaf).
-    constants : dict or None
-        ``{"dec": str, "k": float, "se": {system: float}}``.
+def locus_table(results: list[LeafResult]) -> list[tuple]:
+    """The divergence-locus table: per system and chain (in ``CHAIN_ORDER``), the unchanged leaves
+    compared, how many differ, the largest relative difference, and the first differing chain.
 
     Returns
     -------
-    FallbackReport
-        F1: integer context leaves identical. F2: ``|lambda_new - lambda_pilot| <= k * SE`` (closed).
-        F3: each unchanged statistic with a pilot interval lies in it (closed); other differing
-        floats are reported with their relative difference (no pass/fail). F4: the gate flags.
-        F5: discrete unchanged leaves that flipped.
-
-    Raises
-    ------
-    ToolError
-        If ``constants`` is ``None`` or lacks a system's SE.
+    list[tuple]
+        ``(system, chain, n_compared, n_differ, max_rel, first)`` with ``first`` true on the first
+        chain of the system that differs; the chains before it are all equal by construction.
     """
-    if constants is None:
-        raise ToolError("the fallback constants are not recorded")
-    f1, f2, f3, f4, f5 = [], [], [], [], []
-    for path, value in sorted(old.items()):
-        if path[0] == "systems" and len(path) == 4 and path[2] == "context":
-            if type(value) is int:
-                got = new.get(path, MISSING)
-                f1.append((show(path), value, got, got == value and type(got) is int))
-            if path[3] == "lambda_max":
-                got = new.get(path, MISSING)
-                if path[1] not in constants["se"]:
-                    raise ToolError(f"no SE for {path[1]} in the fallback constants")
-                tol = constants["k"] * constants["se"][path[1]]
-                delta = abs(got - value) if isinstance(got, float) else math.inf
-                f2.append((path[1], value, got, delta, tol, delta <= tol))
-    for res in results:
-        if res.rule.cls != "unchanged" or res.old is MISSING or res.new is MISSING:
+    stats: dict[tuple[str, str], list] = {}
+    for r in results:
+        if r.rule.cls != "unchanged" or not r.rule.chain or r.status not in (
+                "equal", "equal_nan", "within_tol", "FAIL-differs"):
             continue
-        if res.rule.discrete and res.status.startswith("FAIL"):
-            f5.append((show(res.path), res.old, res.new))
-        if not (isinstance(res.old, float) and isinstance(res.new, float)):
-            continue
-        if res.rule.interval:
-            parent = res.path[:-1]
-            lo, hi = (old.get((*parent, res.rule.interval, f"[{i}]"), MISSING) for i in (0, 1))
-            if lo is not MISSING and hi is not MISSING:
-                level = table.classify((*parent, res.rule.interval, "[0]")).level
-                f3.append((show(res.path), res.old, res.new, lo, hi, level,
-                           bool(lo <= res.new <= hi)))  # type: ignore[operator]
+        entry = stats.setdefault((system_of(r.path) or "-", r.rule.chain), [0, 0, 0.0])
+        entry[0] += 1
+        if r.status == "FAIL-differs":
+            entry[1] += 1
+            entry[2] = max(entry[2], _rel_diff(r.old, r.new))
+    rows = []
+    for system in sorted({k[0] for k in stats}):
+        first_done = False
+        for chain in CHAIN_ORDER:
+            if (system, chain) not in stats:
                 continue
-        if res.status.startswith("FAIL"):
-            scale = max(abs(res.old), abs(res.new))
-            rel = abs(res.new - res.old) / scale if scale else math.inf
-            f3.append((show(res.path), res.old, res.new, None, None, None, None, rel))
-    for path, value in sorted(new.items()):
-        if path[0] == "systems" and len(path) == 5 and path[2:4] == ("validation", "gate"):
-            f4.append((show(path), value, value is True))
-    return FallbackReport(f1, f2, f3, f4, f5)
+            n, n_diff, max_rel = stats[(system, chain)]
+            first = bool(n_diff) and not first_done
+            first_done = first_done or first
+            rows.append((system, chain, n, n_diff, max_rel, first))
+    return rows
+
+
+def _rel_diff(old: object, new: object) -> float:
+    """``|new - old| / |old|`` for floats (``inf`` if old is 0 or either is not finite), else ``inf``."""
+    if not (isinstance(old, float) and isinstance(new, float)):
+        return math.inf
+    delta = abs(new - old)
+    if delta == 0.0:
+        return 0.0
+    if not (math.isfinite(delta) and old != 0.0):
+        return math.inf
+    return delta / abs(old)
+
+
+def evaluate_n(results: list[LeafResult], old: dict[Path_, object], new: dict[Path_, object],
+               table: Table, constants: dict, obs_scale_differs: bool = False) -> NReport:
+    """Evaluate N1 to N3 and N5 (N4 is the gate: see ``gate_rows``).
+
+    * N1: an ``unchanged`` leaf of a network-independent chain (dynamics, cp, oracle, fixture, as
+      tagged in the rule table) that differs at all. If ``obs_scale`` differs, these leaves fall
+      under N2 instead.
+    * N2: every other continuous ``unchanged`` leaf has ``|new - old| <= n2_rel * |old|`` (closed),
+      or meets N3.
+    * N3: a leaf beyond that has a chain-head event upstream (a differing discrete quantity, an
+      integer count, or a ``fitted`` coefficient beyond ``n2_rel``, in the same system and chain),
+      and, if it has a pilot interval, ``|delta| <= n3_fraction * SE_arm``. Every N3 leaf and every
+      event is listed; any other excess is a finding.
+    * N5: regret(v3) >= regret(v1) * (1 - 1e-6) for the rules with direction ``new>=old``, and
+      A* exactly 0.0. A violation in a system whose ``curvature_floor`` counter is not 0 is
+      attributed to that sentinel (listed, not a finding).
+
+    Returns
+    -------
+    NReport
+        Rows per check, the events, the locus table and the findings.
+    """
+    n2_rel, fraction = constants["n2_rel"], constants["n3_fraction"]
+    n1, n2, events, candidates, findings = [], [], [], [], []
+    for r in results:
+        if (r.rule.cls != "unchanged" or r.status != "FAIL-differs"
+                or r.old is MISSING or r.new is MISSING):
+            continue
+        chain, system, path = r.rule.chain, system_of(r.path), r.path
+        if chain in NETWORK_INDEPENDENT and not obs_scale_differs:
+            n1.append((show(path), r.old, r.new, chain))
+            findings.append(f"N1: {show(path)} ({chain} chain) differs: {r.old!r} -> {r.new!r}")
+        elif isinstance(r.old, float) and isinstance(r.new, float):
+            rel = _rel_diff(r.old, r.new)
+            if rel <= n2_rel:
+                n2.append((show(path), r.old, r.new, rel, "within"))
+            elif len(path) > 2 and path[2] == "fitted":
+                events.append((show(path), "fitted coefficient", r.old, r.new, system, chain))
+                n2.append((show(path), r.old, r.new, rel, "chain-head event"))
+            else:
+                candidates.append((r, rel))
+        elif type(r.old) is int or r.rule.discrete:
+            events.append((show(path), "integer count" if type(r.old) is int else "discrete",
+                           r.old, r.new, system, chain))
+        else:
+            findings.append(f"N2: discrete leaf {show(path)} differs without being a counted "
+                            f"event: {r.old!r} -> {r.new!r}")
+    n3 = []
+    for r, rel in candidates:
+        system, chain = system_of(r.path), r.rule.chain
+        upstream = [e for e in events if e[5] == chain and e[4] in (None, system)]
+        if not upstream:
+            findings.append(f"N2: {show(r.path)} differs by {rel!r} relative (beyond {n2_rel!r}) "
+                            f"with no chain-head event upstream in the {chain or 'untagged'} chain")
+            n2.append((show(r.path), r.old, r.new, rel, "NO EVENT"))
+            continue
+        n2.append((show(r.path), r.old, r.new, rel, "N3"))
+        pair = interval_of(old, table, r.path, r.rule)
+        if pair is None:
+            n3.append((show(r.path), r.old, r.new, rel, len(upstream), None, None, None, None,
+                       None, True))
+            continue
+        lo, hi, level = pair
+        delta = r.new - r.old  # type: ignore[operator]
+        se = se_arm(r.old, lo, hi, delta, z_of(constants, level))  # type: ignore[arg-type]
+        bound = fraction * se
+        ok = bool(abs(delta) <= bound)
+        n3.append((show(r.path), r.old, r.new, rel, len(upstream), lo, hi, level, se, bound, ok))
+        if not ok:
+            findings.append(f"N3: {show(r.path)} moves {delta!r}, more than {fraction} SE_arm "
+                            f"= {bound!r} (level {level!r})")
+    n5 = []
+    for r in results:
+        if not r.rule.direction or r.old is MISSING or r.new is MISSING:
+            continue
+        system = system_of(r.path)
+        floor = new.get(("handling", "by_system", system or "", "curvature_floor"))
+        attributed = r.direction_ok_n is False and isinstance(floor, int) and floor > 0
+        n5.append((show(r.path), r.old, r.new, r.direction_ok_n, attributed))
+        if r.direction_ok_n is False and not attributed:
+            findings.append(f"N5: {show(r.path)}: {r.old!r} -> {r.new!r} violates the "
+                            f"{r.rule.direction} direction")
+    return NReport(n1, n2, n3, events, n5, locus_table(results), findings)
 
 
 def gate_rows(new: dict[Path_, object]) -> list[tuple[str, str, object, bool]]:
-    """R4 (the gate flags) and R5 (P2(c) counters) of every system of the new run.
+    """R4 (the gate flags and the V7 rule) and R5 (P2(c) counters) of every system of the new run.
+
+    The V7 rule is recomputed from the numbers: ``n_nonfinite`` is 0, the median slope and the
+    median efficiency at every noise level are in [0.9, 1.1] (closed).
 
     Returns
     -------
@@ -1053,8 +1209,12 @@ def gate_rows(new: dict[Path_, object]) -> list[tuple[str, str, object, bool]]:
         ``(check, path, value, ok)``. A missing leaf is ``ok = False`` with value ``MISSING``.
     """
     systems = sorted({p[1] for p in new if p[0] == "systems" and len(p) > 2})
+    lo, hi = V7_BAND
+    in_band = lambda v: isinstance(v, float) and lo <= v <= hi
     wanted = [("R4", ("validation", "gate", k), lambda v: v is True)
               for k in ("V1", "V2", "V4", "V5", "V6", "V7", "gate_pass")]
+    wanted += [("R4", ("V7", "n_nonfinite"), lambda v: v == 0 and type(v) is int),
+               ("R4", ("V7", "median_slope"), in_band)]
     wanted += [("R5", ("verification", "P2c", "n_violations"), lambda v: v == 0 and type(v) is int)]
     wanted += [("R5", ("verification", "P2c", "n_chain_violations", k),
                 lambda v: v == 0 and type(v) is int)
@@ -1065,7 +1225,154 @@ def gate_rows(new: dict[Path_, object]) -> list[tuple[str, str, object, bool]]:
             path = ("systems", system, *rel)
             value = new.get(path, MISSING)
             rows.append((check, show(path), value, value is not MISSING and bool(test(value))))
+        levels = sorted(p for p in new if p[:4] == ("systems", system, "V7", "efficiency_median_by_noise")
+                        and len(p) == 5)
+        if not levels:
+            rows.append(("R4", f"systems/{system}/V7/efficiency_median_by_noise/*", MISSING, False))
+        rows += [("R4", show(p), new[p], in_band(new[p])) for p in levels]
     return rows
+
+
+@dataclass
+class DReport:
+    """Result of branch D (D1 with a local v1 reference run, or D3 with ``--no-reference``)."""
+
+    mode: str                      # "D1", "D3" or "missing" (neither a reference nor the flag)
+    d2_subject: str
+    d2: list[tuple]
+    int_diffs: list[tuple]
+    d1: Comparison | None
+    d3: list[tuple]
+    d3_reported: list[tuple]
+    d3_z: float | None
+    findings: list[str]
+
+    @property
+    def passed(self) -> bool:
+        """The mode is decided and no finding was recorded."""
+        return self.mode != "missing" and not self.findings
+
+
+def context_ints_differ(old: dict[Path_, object], other: dict[Path_, object]) -> list[tuple]:
+    """Integer ``context`` leaves of ``old`` that differ in ``other`` (listed by D2)."""
+    return [(show(p), v, other.get(p, MISSING)) for p, v in sorted(old.items())
+            if p[0] == "systems" and len(p) == 4 and p[2] == "context" and type(v) is int
+            and other.get(p, MISSING) != v]
+
+
+def d2_rows(old: dict[Path_, object], subject: dict[Path_, object],
+            constants: dict) -> list[tuple]:
+    """D2: ``|lambda_subject - lambda_pilot| <= k SE`` per system (closed)."""
+    rows = []
+    for path, value in sorted(old.items()):
+        if path[0] == "systems" and len(path) == 4 and path[2:] == ("context", "lambda_max"):
+            if path[1] not in constants["se"]:
+                raise ToolError(f"no SE for {path[1]} in the fallback constants")
+            got = subject.get(path, MISSING)
+            tol = constants["k"] * constants["se"][path[1]]
+            delta = abs(got - value) if isinstance(got, float) else math.inf  # type: ignore[operator]
+            rows.append((path[1], value, got, delta, tol, bool(delta <= tol)))
+    return rows
+
+
+def d3_rows(results: list[LeafResult], old: dict[Path_, object], new: dict[Path_, object],
+            table: Table, constants: dict) -> tuple[list[tuple], list[tuple], float | None]:
+    """D3: for each ``unchanged`` statistic with an interval in both runs,
+    ``|delta| <= z_B sqrt(SE_old^2 + SE_new^2)`` with ``z_B = Phi^-1(1 - 0.05 / (2 m))`` over the
+    ``m`` such statistics. Statistics without intervals, and discrete flips, are reported only.
+
+    Returns
+    -------
+    tuple
+        ``(rows, reported, z_B)``; a row is ``(path, old, new, delta, se_old, se_new, bound, ok)``.
+    """
+    pairs = []
+    for r in results:
+        if (r.rule.cls != "unchanged" or not r.rule.interval or r.old is MISSING
+                or r.new is MISSING or not isinstance(r.old, float) or not isinstance(r.new, float)):
+            continue
+        a, b = interval_of(old, table, r.path, r.rule), interval_of(new, table, r.path, r.rule)
+        if a is not None and b is not None:
+            pairs.append((r, a, b))
+    z_b = NormalDist().inv_cdf(1.0 - 0.05 / (2 * len(pairs))) if pairs else None
+    rows = []
+    for r, a, b in pairs:
+        delta = r.new - r.old  # type: ignore[operator]
+        se_old = se_arm(r.old, a[0], a[1], delta, z_of(constants, a[2]))  # type: ignore[arg-type]
+        se_new = se_arm(r.new, b[0], b[1], delta, z_of(constants, b[2]))  # type: ignore[arg-type]
+        bound = z_b * math.hypot(se_old, se_new)  # type: ignore[operator]
+        rows.append((show(r.path), r.old, r.new, delta, se_old, se_new, bound,
+                     bool(abs(delta) <= bound)))
+    in_rows = {row[0] for row in rows}
+    reported = [(show(r.path), r.old, r.new, _rel_diff(r.old, r.new)) for r in results
+                if r.rule.cls == "unchanged" and r.status == "FAIL-differs"
+                and r.rule.level is None and show(r.path) not in in_rows
+                and r.old is not MISSING and r.new is not MISSING]
+    return rows, reported, z_b
+
+
+def evaluate_d(results: list[LeafResult], old: dict[Path_, object], new: dict[Path_, object],
+               table: Table, constants: dict, gates: list[tuple], reference: Comparison | None,
+               no_reference: bool) -> DReport:
+    """Evaluate branch D.
+
+    * D1 (a ``reference`` run of the v1 code, same machine and threads): branches B then N must
+      hold for (new run, reference), and D2 holds for the reference against the pilot.
+    * D3 (``no_reference``): D2 holds for the new run, N4 (the gate) holds, and the interval band.
+    * With neither, the mode is ``missing`` (the tool exits 3).
+    """
+    findings: list[str] = []
+    if reference is not None:
+        d2 = d2_rows(old, reference.old, constants)
+        ints = context_ints_differ(old, reference.old)
+        if reference.branch == "D":
+            findings.append("D1: the new run is still in branch D against the local v1 run: "
+                            + "; ".join(reference.reasons))
+        elif reference.exit_code() != 0:
+            findings.append(f"D1: branch {reference.branch} fails against the local v1 run")
+        findings += [f"D2: lambda of {s}: local {b!r} against pilot {a!r}, |delta| {d!r} > {t!r}"
+                     for s, a, b, d, t, ok in d2 if not ok]
+        return DReport("D1", "local v1 run", d2, ints, reference, [], [], None, findings)
+    if no_reference:
+        d2 = d2_rows(old, new, constants)
+        findings += [f"D2: lambda of {s}: new {b!r} against pilot {a!r}, |delta| {d!r} > {t!r}"
+                     for s, a, b, d, t, ok in d2 if not ok]
+        findings += [f"N4: {path} = {value!r}" for check, path, value, ok in gates
+                     if check == "R4" and not ok]
+        rows, reported, z_b = d3_rows(results, old, new, table, constants)
+        findings += [f"D3: {p} moves {d!r}, more than {b!r}" for p, _, _, d, _, _, b, ok in rows
+                     if not ok]
+        return DReport("D3", "new run", d2, context_ints_differ(old, new), None, rows, reported,
+                       z_b, findings)
+    return DReport("missing", "", [], context_ints_differ(old, new), None, [], [], None,
+                   [("branch D needs the local v1 reference run (--reference, D1) or --no-reference "
+                    "(D3)")])
+
+
+def cache_status(info: dict) -> tuple[str, bool]:
+    """Whether ``lyapunov.json`` pre-existed in the run's cache directory (DEC-0019 condition).
+
+    ``info`` has ``flag`` (``yes``, ``no`` or ``None``, from the launch record), ``cache_mtime`` (a
+    timestamp or ``None``) and ``start`` (the run's start as a timestamp or ``None``).
+
+    Returns
+    -------
+    tuple[str, bool]
+        The sentence for the report and whether it is a finding (the run must then be repeated with
+        an empty cache). A file last written before the run started cannot have been made by it.
+    """
+    if info.get("flag") == "yes":
+        return "launch record: lyapunov.json pre-existed in the cache directory", True
+    mtime, start = info.get("cache_mtime"), info.get("start")
+    if mtime is not None and start is not None and mtime < start:
+        return (("lyapunov.json was last written before the run started, so it pre-existed "
+                "(and was read instead of recomputed)"), True)
+    if info.get("flag") == "no":
+        return "launch record: the cache directory was empty at the start", False
+    if mtime is None:
+        return "no lyapunov.json found next to the new run: pre-existence cannot be judged", False
+    return ("lyapunov.json was written during the run; the run does not record whether it "
+            "pre-existed (pass --cache-preexisted no from the launch record)"), False
 
 
 # ------------------------------------------------------------------------------ report
@@ -1137,34 +1444,145 @@ LOOK_AT: list[tuple[str, object]] = [
 
 @dataclass
 class Comparison:
-    """Everything the report and the exit code need."""
+    """Everything the report and the exit code need.
+
+    Attributes
+    ----------
+    branch : str
+        ``B``, ``N`` or ``D`` (DEC-0019).
+    nreport : NReport or None
+        The N1 to N5 evaluation (branch N only).
+    dreport : DReport or None
+        The D1 to D3 evaluation (branch D only).
+    cache : tuple[str, bool]
+        The lyapunov.json statement and whether it is a finding.
+    """
 
     results: list[LeafResult]
     old: dict[Path_, object]
     new: dict[Path_, object]
     n_provenance: int
     branch: str
-    switch_reasons: list[str]
+    reasons: list[str]
     gates: list[tuple]
-    fallback: FallbackReport | None
-    fallback_missing: bool
+    nreport: NReport | None
+    dreport: DReport | None
+    cache: tuple[str, bool]
     info: dict
+    obs_scale_differs: bool = False
 
     def findings(self) -> list[LeafResult]:
-        """Leaves that make the run fail under the selected branch."""
+        """Leaf findings that fail the run: structure findings in every branch, plus the value
+        findings (a differing unchanged leaf, a violated R3 direction) in branch B."""
         out = [r for r in self.results if r.is_finding]
-        if self.branch == "bitwise":
+        if self.branch == "B":
             out += [r for r in self.results if r.is_value_finding]
         return out
 
+    def failures(self) -> list[str]:
+        """One sentence per reason the run fails (empty: exit 0)."""
+        out = [f"{r.status}: {show(r.path)}" for r in self.findings()]
+        out += [f"{c}: {p} = {fmt(v)}" for c, p, v, ok in self.gates if not ok]
+        if self.cache[1]:
+            out.append("cache: " + self.cache[0])
+        if self.nreport is not None:
+            out += self.nreport.findings
+        if self.dreport is not None:
+            out += self.dreport.findings
+        return out
+
     def exit_code(self) -> int:
-        """0, 1 or 3 (the fallback branch applies without constants)."""
-        if self.fallback_missing:
-            return EXIT_FALLBACK
-        failed = bool(self.findings()) or any(not g[3] for g in self.gates)
-        if self.branch == "fallback" and self.fallback is not None and not self.fallback.passed:
-            failed = True
-        return EXIT_FINDINGS if failed else 0
+        """0 pass; 1 findings; 3 branch D without a reference run and without ``--no-reference``."""
+        if self.dreport is not None and self.dreport.mode == "missing":
+            return EXIT_NEEDS_INPUT
+        return EXIT_FINDINGS if self.failures() else 0
+
+
+def _pack(rows_in: list[LeafResult], label) -> list[tuple]:
+    """Rows of findings: one row per leaf, one row per rule for bulk arrays."""
+    rows = [(label(r), show(r.path), fmt(r.old), fmt(r.new), r.rule.pattern, r.rule.sub)
+            for r in rows_in if not r.rule.bulk]
+    packed: dict[tuple[str, str], list[LeafResult]] = defaultdict(list)
+    for r in rows_in:
+        if r.rule.bulk:
+            packed[(label(r), r.rule.pattern)].append(r)
+    rows += [(status, f"{len(g)} leaves, first {show(g[0].path)}", fmt(g[0].old), fmt(g[0].new),
+              pattern, g[0].rule.sub) for (status, pattern), g in packed.items()]
+    return rows
+
+
+def _n_lines(rep: NReport, heading: str) -> list[str]:
+    out = [heading, ""]
+    out += ["N1 (network-independent chains bitwise equal): leaves that differ", ""]
+    out += table_lines(("path", "v1 pilot", "new", "chain"), [(a, fmt(b), fmt(c), d)
+                                                              for a, b, c, d in rep.n1])
+    out += ["N2 (continuous unchanged leaves that differ, bound 1e-6 relative, closed):", ""]
+    out += table_lines(("path", "v1 pilot", "new", "relative difference", "outcome"),
+                       [(a, fmt(b), fmt(c), repr(d), e) for a, b, c, d, e in rep.n2])
+    out += [("N3 (beyond the bound: chain-head event upstream, and 0.2 SE_arm when the pilot has an "
+            "interval):"), ""]
+    out += table_lines(("path", "v1 pilot", "new", "relative", "events upstream", "lower", "upper",
+                        "level", "SE_arm", "0.2 SE_arm", "ok"),
+                       [(a, fmt(b), fmt(c), repr(d), e, fmt(f), fmt(g), fmt(h), fmt(i), fmt(j),
+                         "yes" if k else "NO") for a, b, c, d, e, f, g, h, i, j, k in rep.n3])
+    out += [("Chain-head events (differing discrete quantities, integer counts, fitted "
+            "coefficients beyond 1e-6):"), ""]
+    out += table_lines(("path", "kind", "v1 pilot", "new", "system", "chain"),
+                       [(a, b, fmt(c), fmt(d), e, f) for a, b, c, d, e, f in rep.events])
+    out += ["N5 (regret(v3) >= regret(v1) (1 - 1e-6); A* regret exactly 0.0):", ""]
+    bad = [r for r in rep.n5 if r[3] is False]
+    out.append(f"checked {len(rep.n5)} leaves; violations {len(bad)}")
+    out += table_lines(("path", "v1 pilot", "new", "attributed to curvature_floor"),
+                       [(a, fmt(b), fmt(c), "yes" if e else "no") for a, b, c, d, e in bad])
+    return out
+
+
+def _locus_lines(rows: list[tuple]) -> list[str]:
+    out = ["## Divergence locus", "",
+           ("Per system, the chains in the order fixture, dynamics, cp, oracle, network; the first "
+           "chain with a differing unchanged leaf is marked, and every chain before it is equal."),
+           ""]
+    out += table_lines(("system", "chain", "leaves compared", "differ", ("largest relative "
+                        "difference"), "first differing chain"),
+                       [(s, c, n, d, repr(m), "FIRST" if f else "") for s, c, n, d, m, f in rows])
+    return out
+
+
+def _d_lines(rep: DReport, branch_note: str) -> list[str]:
+    out = ["## Branch D", "", branch_note, "", f"mode: {rep.mode}"]
+    if rep.mode == "missing":
+        return out + ["", *rep.findings, ""]
+    out += ["", f"D2 (lambda of the {rep.d2_subject} against the pilot, |delta| <= 5 SE, closed):", ""]
+    out += table_lines(("system", "pilot", rep.d2_subject, "delta", "k SE", "ok"),
+                       [(a, fmt(b), fmt(c), fmt(d), fmt(e), "yes" if f else "NO")
+                        for a, b, c, d, e, f in rep.d2])
+    out += [f"Integer context leaves of the pilot that differ in the {rep.d2_subject} (listed):", ""]
+    out += table_lines(("path", "pilot", rep.d2_subject),
+                       [(a, fmt(b), fmt(c)) for a, b, c in rep.int_diffs])
+    if rep.mode == "D1" and rep.d1 is not None:
+        sub = rep.d1
+        out += [(f"D1: the new run against the local v1 run is in branch {sub.branch}; exit code of "
+                f"that comparison {sub.exit_code()}."), ""]
+        if sub.reasons:
+            out += [f"- {cell(x)}" for x in sub.reasons] + [""]
+        reasons = sub.failures()
+        out += [f"Failures of that comparison: {len(reasons)}", ""]
+        out += [f"- {cell(x)}" for x in reasons[:100]]
+        if len(reasons) > 100:
+            out.append(f"- ... and {len(reasons) - 100} more (see the D1 leaves JSON)")
+        if sub.nreport is not None:
+            out += [""] + _n_lines(sub.nreport, "### D1: branch N checks against the local v1 run")
+        out.append("")
+    if rep.mode == "D3":
+        out += [(f"D3 (m = {len(rep.d3)} statistics with intervals in both runs; z_B = "
+                f"{rep.d3_z!r}):"), ""]
+        out += table_lines(("path", "pilot", "new", "delta", "SE pilot", "SE new", "bound", "ok"),
+                           [(a, fmt(b), fmt(c), fmt(d), fmt(e), fmt(f), fmt(g), "yes" if h else "NO")
+                            for a, b, c, d, e, f, g, h in rep.d3])
+        out += ["Reported only (no interval in one of the runs, or discrete):", ""]
+        out += table_lines(("path", "pilot", "new", "relative difference"),
+                           [(a, fmt(b), fmt(c), repr(d)) for a, b, c, d in rep.d3_reported])
+    return out
 
 
 def render_report(cmp: Comparison) -> str:
@@ -1172,20 +1590,23 @@ def render_report(cmp: Comparison) -> str:
     info = cmp.info
     note = ("Generated by `tools/compare_pilot.py`; do not edit. A difference between a DEV-0 run "
             "and the pilot is a regression finding for the development of the code, not evidence "
-            "about any hypothesis.")
+            "about any hypothesis. Criterion: DEC-0019.")
     out = [LABEL, "", "# DEV-0 regression against the v1 pilot (WU-0002.12)", "", note, "",
            "## Provenance", ""]
     for key in ("commit", "dirty", "run_dir", "sha256_old", "sha256_new", "manifest_row",
                 "lpc_threads", "nproc"):
         out.append(f"- {key.replace('_', ' ')}: {info.get(key, 'n/a')}")
     out.append(f"- provenance leaves excluded from the new run: {cmp.n_provenance}")
+    out.append(f"- lyapunov.json: {cell(cmp.cache[0])}" + (" (FINDING)" if cmp.cache[1] else ""))
     out += ["", "## Branch", ""]
-    out.append(f"- branch: {cmp.branch}")
-    if cmp.switch_reasons:
-        out += [f"- switch rule fired by: {cell(r)}" for r in cmp.switch_reasons]
-    else:
-        out.append("- switch rule: every context leaf equals the pilot's (floats within 1e-12 "
-                   "relative)")
+    meaning = {"B": "bitwise: every unchanged leaf equals the pilot's",
+               "N": "network: the context equals the pilot's, some unchanged leaf differs",
+               "D": "dynamics: the context differs (a new realization of the whole study)"}
+    out.append(f"- branch: {cmp.branch} ({meaning[cmp.branch]})")
+    out += [f"- {cell(r)}" for r in cmp.reasons]
+    if cmp.obs_scale_differs:
+        out.append("- obs_scale differs within 1e-12 relative: N2 applies to the network-independent "
+                   "chains too")
     out += ["", "## Counts", ""]
     by_class: dict[str, Counter] = defaultdict(Counter)
     for r in cmp.results:
@@ -1195,24 +1616,39 @@ def render_report(cmp: Comparison) -> str:
                          ", ".join(f"{s}: {n}" for s, n in sorted(by_class[c].items())))
                         for c in CLASSES if by_class[c]])
     nan_equal = sum(1 for r in cmp.results if r.status == "equal_nan")
-    out.append(f"NaN equal to NaN (counted): {nan_equal}")
-    out.append("")
+    out += [f"NaN equal to NaN (counted): {nan_equal}", ""]
 
     out += ["## Findings", ""]
-    out.append("Value findings (an unchanged leaf that differs, or a violated direction) fail the "
-               "run under the bitwise branch only; the other findings fail it under both.")
+    fails = cmp.failures()
+    out.append(f"Failures under branch {cmp.branch}: {len(fails)}")
     out.append("")
-    found = [r for r in cmp.results if r.is_finding or r.is_value_finding]
-    rows = [(("direction violated" if r.direction_ok is False else r.status),
-             show(r.path), fmt(r.old), fmt(r.new), r.rule.pattern, r.rule.sub)
-            for r in found if not r.rule.bulk]
-    packed: dict[tuple[str, str], list[LeafResult]] = defaultdict(list)
-    for r in found:
-        if r.rule.bulk:
-            packed[(r.status, r.rule.pattern)].append(r)
-    rows += [(status, f"{len(g)} leaves, first {show(g[0].path)}", fmt(g[0].old), fmt(g[0].new),
-              pattern, g[0].rule.sub) for (status, pattern), g in packed.items()]
-    out += table_lines(("status", "path", "v1 pilot", "new", "rule", "sub-task"), rows)
+    out += [f"- {cell(x)}" for x in fails[:200]]
+    if len(fails) > 200:
+        out.append(f"- ... and {len(fails) - 200} more")
+    out.append("")
+    out.append("Structure findings (a presence or a type that contradicts the class, an alert) "
+               "fail the run in every branch; a differing unchanged leaf and a violated R3 "
+               "direction fail it in branch B; in N and D the values are judged by N1 to N5 and "
+               "D1 to D3.")
+    out.append("")
+    shown = [r for r in cmp.results if r.is_finding or (cmp.branch == "B" and r.is_value_finding)]
+    out += table_lines(("status", "path", "v1 pilot", "new", "rule", "sub-task"),
+                       _pack(shown, lambda r: "direction violated" if r.direction_ok is False
+                             and r.status == "changed" else r.status))
+    if cmp.branch != "B":
+        differing = [r for r in cmp.results if r.status == "FAIL-differs"]
+        out += [(f"Unchanged leaves that differ from the pilot ({len(differing)}; judged by the "
+                "branch checks below):"), ""]
+        out += table_lines(("status", "path", "v1 pilot", "new", "rule", "sub-task"),
+                           _pack(differing, lambda r: r.status))
+
+    if cmp.nreport is not None:
+        out += _n_lines(cmp.nreport, "## Branch N: N1 to N5")
+        out += [""] + _locus_lines(cmp.nreport.locus)
+    if cmp.dreport is not None:
+        out += _d_lines(cmp.dreport, "D1 re-reference (the local v1 run), D2 and D3 of DEC-0019.")
+    if cmp.nreport is None:
+        out += _locus_lines(locus_table(cmp.results))
 
     out += ["## Changed statistics", ""]
     changed = [r for r in cmp.results if r.rule.cls == "changed"]
@@ -1258,34 +1694,6 @@ def render_report(cmp: Comparison) -> str:
     out += table_lines(("check", "path", "value", "ok"),
                        [(c, p, fmt(v), "yes" if ok else "NO") for c, p, v, ok in cmp.gates])
 
-    if cmp.branch == "fallback":
-        out += ["## Fallback criterion", ""]
-        if cmp.fallback_missing or cmp.fallback is None:
-            refused = ("REFUSED: the fallback constants are not recorded (the owner's decision, "
-                       "LPC.AI.12; ROADMAP WU-0002.12). Exit 3.")
-            out += [refused, ""]
-        else:
-            fb = cmp.fallback
-            out += ["F1 (integer context identical):", ""]
-            out += table_lines(("path", "v1 pilot", "new", "ok"),
-                               [(a, fmt(b), fmt(c), "yes" if d else "NO") for a, b, c, d in fb.f1])
-            out += ["F2 (|lambda new - lambda pilot| <= k SE):", ""]
-            out += table_lines(("system", "v1 pilot", "new", "delta", "k SE", "ok"),
-                               [(a, fmt(b), fmt(c), fmt(d), fmt(e), "yes" if f else "NO")
-                                for a, b, c, d, e, f in fb.f2])
-            out += ["F3 (unchanged statistics inside the pilot interval, closed; others reported):",
-                    ""]
-            out += table_lines(("path", "v1 pilot", "new", "lower", "upper", "level", "result"),
-                               [(r[0], fmt(r[1]), fmt(r[2]), fmt(r[3]), fmt(r[4]), fmt(r[5]),
-                                 ("inside" if r[6] else "OUTSIDE") if r[6] is not None
-                                 else f"reported, relative difference {r[7]!r}") for r in fb.f3])
-            out += ["F4 (gate flags):", ""]
-            out += table_lines(("path", "value", "ok"),
-                               [(a, fmt(b), "yes" if c else "NO") for a, b, c in fb.f4])
-            out += ["F5 (discrete unchanged leaves that flipped):", ""]
-            out += table_lines(("path", "v1 pilot", "new"),
-                               [(a, fmt(b), fmt(c)) for a, b, c in fb.f5])
-
     out += ["## Things to look at (read, no criterion)", ""]
     for title, predicate in LOOK_AT:
         rows = [(show(p), fmt(v)) for p, v in sorted(cmp.new.items())
@@ -1307,7 +1715,8 @@ def leaves_json(cmp: Comparison) -> list[dict]:
     """The per-leaf table written next to the report."""
     return [{"path": show(r.path), "group": r.rule.cls, "status": r.status, "old": _json(r.old),
              "new": _json(r.new), "sub_task": r.rule.sub, "item": r.rule.item,
-             "rule": r.rule.pattern, "same": r.same, "direction_ok": r.direction_ok}
+             "rule": r.rule.pattern, "chain": r.rule.chain, "same": r.same,
+             "direction_ok": r.direction_ok, "direction_ok_n": r.direction_ok_n}
             for r in cmp.results]
 
 
@@ -1338,15 +1747,40 @@ def provenance_info(new_tree: object, old_path: Path, new_path: Path, run_dir: s
             "nproc": f"{os.cpu_count()} cpus, affinity {affinity} (this process)"}
 
 
+def cache_info(new_tree: object, cache_file: Path | None, flag: str | None) -> dict:
+    """Inputs of ``cache_status``: the launch-record flag, the file's mtime, the run's start."""
+    prov = new_tree.get("provenance", {}) if isinstance(new_tree, dict) else {}
+    start = None
+    try:
+        start = datetime.fromisoformat(prov["start_utc"]).timestamp()
+    except (KeyError, ValueError, TypeError):
+        start = None
+    mtime = cache_file.stat().st_mtime if cache_file is not None and cache_file.exists() else None
+    return {"flag": flag, "cache_mtime": mtime, "start": start}
+
+
 def compare_files(new_path: Path, old_path: Path, run_dir: str, manifest_row: str,
-                  constants: dict | None = None, table: Table = TABLE) -> Comparison:
-    """Run the whole comparison for two files.
+                  constants: dict | None = None, table: Table = TABLE,
+                  reference_path: Path | None = None, no_reference: bool = False,
+                  cache_file: Path | None = None, cache_flag: str | None = None) -> Comparison:
+    """Run the whole comparison for two files (and the reference run in branch D).
+
+    Parameters
+    ----------
+    constants : dict or None
+        The approved criterion constants (default ``FALLBACK_CONSTANTS``).
+    reference_path : Path or None
+        ``results.json`` of the v1 code run locally (D1); compared with the new run by branch B
+        then N, and with the pilot by D2.
+    no_reference : bool
+        Branch D without a reference run: D3.
 
     Raises
     ------
     ToolError
         On unreadable input; ``Unclassified`` (a ``ToolError``) on a leaf without exactly one rule.
     """
+    constants = FALLBACK_CONSTANTS if constants is None else constants
     try:
         old_tree = json.loads(old_path.read_text())
         new_tree = json.loads(new_path.read_text())
@@ -1354,15 +1788,21 @@ def compare_files(new_path: Path, old_path: Path, run_dir: str, manifest_row: st
         raise ToolError(f"cannot read input: {exc}") from exc
     old, new, n_prov = load_sides(old_tree, new_tree)
     results = compare_leaves(old, new, table)
-    branch, reasons = context_switch(old, new)
-    fallback, missing = None, False
-    if branch == "fallback":
-        if constants is None:
-            missing = True
-        else:
-            fallback = evaluate_fallback(results, old, new, table, constants)
-    return Comparison(results, old, new, n_prov, branch, reasons, gate_rows(new), fallback, missing,
-                      provenance_info(new_tree, old_path, new_path, run_dir, manifest_row))
+    branch, reasons, obs_differs = select_branch(results, old, new)
+    gates = gate_rows(new)
+    nrep = drep = None
+    if branch == "N":
+        nrep = evaluate_n(results, old, new, table, constants, obs_differs)
+    elif branch == "D":
+        reference = None
+        if reference_path is not None:
+            reference = compare_files(new_path, reference_path, run_dir, manifest_row, constants,
+                                      table, None, False, cache_file, cache_flag)
+        drep = evaluate_d(results, old, new, table, constants, gates, reference, no_reference)
+    cache = cache_status(cache_info(new_tree, cache_file, cache_flag))
+    return Comparison(results, old, new, n_prov, branch, reasons, gates, nrep, drep, cache,
+                      provenance_info(new_tree, old_path, new_path, run_dir, manifest_row),
+                      obs_differs)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1376,10 +1816,25 @@ def main(argv: list[str] | None = None) -> int:
                     default=root / "runs/dev/wu0002-12/compare_leaves.json")
     ap.add_argument("--run-dir", default=None, help="run directory to print (default: the dir of NEW)")
     ap.add_argument("--manifest-row", default="Pilot v1 (docs/agent/records/results-manifest.md)")
+    ap.add_argument("--reference", type=Path, default=None,
+                    help="results.json of the v1-baseline code run locally (branch D1)")
+    ap.add_argument("--no-reference", action="store_true",
+                    help="branch D without a reference run (D3, only if the owner declines D1)")
+    ap.add_argument("--cache-file", type=Path, default=None,
+                    help="lyapunov.json of the new run (default: <dir of NEW>/cache/lyapunov.json)")
+    ap.add_argument("--cache-preexisted", choices=("yes", "no"), default=None,
+                    help="from the launch record: did lyapunov.json exist before the run?")
     args = ap.parse_args(argv)
+    if args.reference is not None and args.no_reference:
+        print("compare_pilot: error: --reference and --no-reference exclude each other",
+              file=sys.stderr)
+        return EXIT_ERROR
     run_dir = args.run_dir or str(args.new.resolve().parent)
+    cache_file = args.cache_file or args.new.resolve().parent / "cache" / "lyapunov.json"
     try:
-        cmp = compare_files(args.new, args.old, run_dir, args.manifest_row, FALLBACK_CONSTANTS)
+        cmp = compare_files(args.new, args.old, run_dir, args.manifest_row, FALLBACK_CONSTANTS,
+                            reference_path=args.reference, no_reference=args.no_reference,
+                            cache_file=cache_file, cache_flag=args.cache_preexisted)
     except ToolError as exc:
         print(f"compare_pilot: error: {exc}", file=sys.stderr)
         return EXIT_ERROR
@@ -1387,16 +1842,17 @@ def main(argv: list[str] | None = None) -> int:
         path.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(render_report(cmp))
     args.leaves_json.write_text(json.dumps(leaves_json(cmp), indent=1))
+    if cmp.dreport is not None and cmp.dreport.d1 is not None:
+        sub = args.leaves_json.with_name(args.leaves_json.stem + ".d1.json")
+        sub.write_text(json.dumps(leaves_json(cmp.dreport.d1), indent=1))
     code = cmp.exit_code()
     counts = Counter(r.rule.cls for r in cmp.results)
     print(f"compare_pilot: branch {cmp.branch}; "
           + ", ".join(f"{c} {counts[c]}" for c in CLASSES)
-          + f"; findings {len(cmp.findings())}; gate failures {sum(1 for g in cmp.gates if not g[3])}"
-          + f"; report {args.report}; exit {code}")
-    if cmp.fallback_missing:
-        print("compare_pilot: the switch rule selected the fallback branch, but the fallback "
-              "constants (k, SE per system) are not recorded: the owner's DEC is missing "
-              "(LPC.AI.12). Reasons: " + "; ".join(cmp.switch_reasons), file=sys.stderr)
+          + f"; failures {len(cmp.failures())}; report {args.report}; exit {code}")
+    if code == EXIT_NEEDS_INPUT:
+        print("compare_pilot: branch D selected (" + "; ".join(cmp.reasons) + "). Give the local "
+              "v1 reference run with --reference (D1) or --no-reference (D3).", file=sys.stderr)
     return code
 
 
