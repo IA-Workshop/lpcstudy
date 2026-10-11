@@ -303,3 +303,16 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0006.1 to .4, WU-0008 (interval labels and the uncertainty budget), WU-0003 (per-state dump), and the owner's reading of every interval-versus-band verdict. Marked "needs owner review before freeze".
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed; the Option C or K choice is the owner's.
+
+## DEC-0019: WU-0002.12: the fallback criterion for the DEV-0 pilot regression, the re-reference run, and the run's resources  (2026-10-11, owner approval relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner approved, in the session on 2026-10-11 ("All 3 are approved"), the three items put to them:
+1. **The criterion.** The final fallback criterion text of the applied-mathematician's review, in `docs/agent/records/work/WU-0002.12-pilot-regression.md` (branch `wu/0002-12-pilot-regression`, section 'Proposed fallback criterion: final text for the owner (O1)', commit a3783d5): branch selection B (bitwise), N (context bitwise equal, networks differ: N1 to N5) or D (any other context difference: D1 to D3), with R1 and R4 to R7 in every branch and the divergence-locus table. The text is in force from this entry; changing it after the run's result is seen is a new owner decision.
+2. **The extra run.** Branch D1: if the first run lands in branch D, run tag `v1-baseline` at the pilot preset on DEV-0 on the same machine with the same `LPC_THREADS`, on CPU under the lock (about one more CPU pilot), and apply branches B then N against that local run.
+3. **Resources.** `LPC_THREADS=8`, and the wrapper may take the GPU lock for the CPU pilot run (DEC-0005 Q6).
+
+**Conditions the main session applies (from the plan and the review):** the run starts with an empty cache directory (the cached `lyapunov.json` would hide a platform difference), from a clean detached worktree whose tree no agent writes to during the run; the order of work puts the DEF-0017 seed-dependent start states and the WU-0002.11d seed conversions strictly after this run (they change every number).
+
+**Affects:** WU-0002.12, WU-0004.3 (the regression is its evidence). Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none. Status: approved by the owner in conversation; recorded here pending the owner's ledger entry.
