@@ -27,7 +27,7 @@ SCHEMA = "lpcstudy.provenance/1"
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("jax", "jaxlib", "optax", "numpy", "scipy", "scikit-learn", "matplotlib")
 ENV_NAMES = ("JAX_PLATFORMS", "XLA_FLAGS", "XLA_PYTHON_CLIENT_PREALLOCATE", "LPC_THREADS",
-             "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")
+             "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "PJRT_NPROC", "NPROC")
 GIT_TIMEOUT_SECONDS = 30
 
 
