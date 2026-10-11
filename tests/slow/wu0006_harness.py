@@ -951,3 +951,43 @@ class ResultTable:
                 "seed": WU0006_SEED, "bootstrap": [FULL.bootstrap_resamples, FULL.bootstrap_block]}
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"_meta": meta, **self.rows}, indent=1, sort_keys=True))
+
+
+class RunCache:
+    """Runs each design once per session and records its row; shared by the tests of one table.
+
+    A design is run by the first test that needs it. An exception is cached and raised again for the
+    later tests of the same design, so a failing run is not repeated (and not paid for) per assertion
+    group.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.table = ResultTable(name)
+        self._done: dict[str, Evaluation | BaseException] = {}
+
+    def _get(self, key: str, make: Callable[[], Evaluation]) -> Evaluation:
+        if key not in self._done:
+            try:
+                evaluation = make()
+            except Exception as error:  # cached and re-raised below; never swallowed
+                self._done[key] = error
+                raise
+            self._done[key] = evaluation
+            self.table.add(key, evaluation.row)
+        done = self._done[key]
+        if isinstance(done, BaseException):
+            raise done
+        return done
+
+    def coverage(self, pool: ProcessPoolExecutor, spec: CaseSpec, phi: float) -> Evaluation:
+        """Evaluation of ``R_COVERAGE`` replications of a coverage design."""
+        return self._get(f"{spec.label}-phi{phi:g}",
+                         lambda: evaluate_coverage(run_coverage(pool, spec, phi)))
+
+    def logrank(self, pool: ProcessPoolExecutor, row: str, phi: float) -> Evaluation:
+        """Evaluation of ``R_LOGRANK`` log-rank families."""
+        return self._get(f"{row}-phi{phi:g}", lambda: evaluate_logrank(run_logrank(pool, row, phi)))
+
+    def delta(self, pool: ProcessPoolExecutor, phi: float) -> Evaluation:
+        """Evaluation of ``R_DELTA`` null delta-R2 replications."""
+        return self._get(f"DR2-phi{phi:g}", lambda: evaluate_delta(run_delta(pool, phi)))
