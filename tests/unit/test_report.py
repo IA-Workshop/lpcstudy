@@ -719,4 +719,9 @@ def test_markdown_p2c_section_is_labelled_report_only_and_shows_defects(tmp_path
     assert "| chua | n/a: no P2(c) result | | | | | | |" in section
     assert any(row.startswith("Verification check (NVVUQ.14, v3 Theorem P2(c)); not a hypothesis "
                               "test; no verdict; not in the validation gate.") for row in section)
+    paragraph = next(row for row in section if row.startswith("Verification check (NVVUQ.14"))
+    assert ("every state must satisfy N² ≤ A ≤ B, where A = mean ‖Y_r − X₁‖² / (ρ²D) is the "
+            "spread of the retrieved analogs Y_r about the clean-query analog X₁ and B = 4 mean "
+            "(r₁ + ‖η_r‖)² 1{‖η_r‖ ≥ Δ/2} / (ρ²D) is the bound, both over the M draws, in the "
+            "units of N².") in paragraph
     assert "P2c" not in "".join(lines[:lines.index("## Validation gate")])  # no verdict row

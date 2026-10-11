@@ -352,9 +352,10 @@ DIM = 7
 KAPPA = P2C_KAPPA
 
 
-def _library(vectors: np.ndarray, offset: bool = False) -> AnalogLibrary:
-    """An ``AnalogLibrary`` over ``vectors`` (time index = row), optionally with an off-by-one bug."""
-    cls = _OffsetLibrary if offset else AnalogLibrary
+def _library(vectors: np.ndarray, offset: bool = False, cls: type | None = None
+             ) -> AnalogLibrary:
+    """An ``AnalogLibrary`` over ``vectors`` (time index = row), optionally a mutant class."""
+    cls = cls or (_OffsetLibrary if offset else AnalogLibrary)
     return cls(indices=np.arange(len(vectors)), noisy_series=np.zeros(1), tree=cKDTree(vectors))
 
 
@@ -495,8 +496,8 @@ def test_p2_stable_case_generic_coordinates_is_zero_up_to_centring_round_off() -
     assert not t["violation"][0]
 
 
-def _collinear_states(r1_over_rho: float, seed: int, rho: float = 0.1, m: int = 200
-                      ) -> list[tuple[float, dict[str, np.ndarray], np.ndarray]]:
+def _collinear_states(r1_over_rho: float, seed: int, rho: float = 0.1, m: int = 200,
+                      cls: type | None = None) -> list[tuple[float, dict[str, np.ndarray], np.ndarray]]:
     """300 collinear states: X_1 = r1 e_1, X_2 = -(r1 + Delta) e_1, 20 distractors far away.
 
     Delta / rho in {0.5, 1, 2, 4, 8, 16}, 50 states each. The query is x = 0, so X_2 is retrieved
@@ -515,7 +516,8 @@ def _collinear_states(r1_over_rho: float, seed: int, rho: float = 0.1, m: int = 
             dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
             lib = np.vstack([first, second, dirs * (r1 + delta + 20 * rho)])
             noise = rng.standard_normal((1, m, DIM))
-            out.append((grid, p2_bound_terms(_library(lib), np.zeros((1, DIM)), noise, rho), noise))
+            out.append((grid, p2_bound_terms(_library(lib, cls=cls), np.zeros((1, DIM)), noise, rho),
+                        noise))
     return out
 
 
@@ -530,8 +532,11 @@ def test_p2_chain_holds_on_switching_states_against_closed_forms() -> None:
     r1 = 5 rho, ``default_rng(50056)`` (WU-0005.5a, M7). Tolerances (M4/M7): ``|N - N_ref| <=
     tau_N + kappa N_ref``, ``|A - A_ref| <= kappa A_ref``, ``|N^2 - (A - centre)| <= tau_N^2 + 2
     kappa A``; the centre term is also compared with ``L^2 p^2 / (rho^2 D)`` at relative 1e-9 (absolute
-    1e-24 for p = 0, where it is the square of a centring round-off of at most 1e-16)
-    (observed errors are at most 0.004 of these). Premises asserted: at least 100
+    1e-24 for p = 0, where it is the square of a centring round-off of at most 1e-16). Justification of
+    the 1e-9: the centring error of the mean is at most M u max|Y| = 200 * 1.1e-16 * 1.1 = 2.4e-14
+    per coordinate, against ``p L >= 0.005`` for ``p >= 1/200`` (L >= 1.05), so the relative error
+    of the squared centre term is about 1e-11 and 1e-9 leaves a margin of about 100
+    (observed errors are at most 0.004 of the other tolerances). Premises asserted: at least 100
     switching states, 40 states with B > 0 and A == 0, 40 with B == 0, and no distractor retrieved
     (``n_switch == K`` exactly). Violations: 0.
     """
@@ -552,6 +557,7 @@ def test_p2_chain_holds_on_switching_states_against_closed_forms() -> None:
         assert abs(t["a_m"][0] - a_ref) <= KAPPA * a_ref
         assert abs(t["n_m"][0] ** 2 - (t["a_m"][0] - t["centre"][0])) \
             <= t["tau"][0] ** 2 + 2 * KAPPA * t["a_m"][0]
+        # rel 1e-9: about 100 times the round-off of the centred mean (see the docstring)
         assert t["centre"][0] == pytest.approx(length**2 * p**2 / (rho**2 * DIM),
                                                rel=1e-9, abs=1e-24)
         n_switching += k > 0
@@ -597,6 +603,83 @@ def test_p2_check_detects_an_indexing_defect() -> None:
     bad = p2_bound_terms(_library(lib, offset=True), np.zeros((1, DIM)), noise, rho)
     assert not good["violation"][0]
     assert bad["violation"][0] and bad["n_consistency"][0] == m
+
+
+class _SecondNearestLibrary(AnalogLibrary):
+    """Mutant: ``query`` returns the second nearest vector, with its own true distance."""
+
+    def query(self, vectors: np.ndarray, n_analogs: int) -> tuple[np.ndarray, np.ndarray]:
+        dist, pos = self.tree.query(vectors, k=2)
+        return self.indices[pos[:, 1:2]], dist[:, 1:2]
+
+
+def test_p2_chain_items_fire_on_planted_defects(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mutation test (review R1): p2a, triangle, A_le_B, N_le_A and the headline each fire.
+
+    Reference: closed forms of the collinear design (x = 0, X_1 = r1 e_1, X_2 = -(r1 + Delta) e_1,
+    distractors far away). The unmutated run on each design must report 0 violations (so the
+    test is not vacuous); the integer counts below are exact, with no tolerance.
+
+    (a) U4 design (``default_rng(50056)``, r1 = 5 rho), a library whose ``query`` returns the
+    second nearest vector with its true distance: ``consistency`` passes (0), while on every draw
+    with ``eta < Delta/2`` the nearest is X_1, the retrieved vector is X_2 and ``||X_2 - X_1|| =
+    2 r1 + Delta > 2 (r1 + eta)``: ``n_p2a`` and ``n_triangle`` both equal the count of draws with
+    ``rho ||z|| < Delta/2`` (such a draw has ``rho z_1 > -Delta/2``, so X_1 is the nearest). On the
+    50 states with Delta/rho = 16, B = 0 < A, so ``A_le_B`` fires in all 50.
+
+    (b) U5 design (``default_rng(50057)``, r1 = 50 rho), N multiplied by f = 2 and by f = 3 through
+    patching ``retrieval_spread``. With p = K/M the switching fraction, ``N^2 = L^2 p (1-p) /
+    (rho^2 D)`` and ``A = L^2 p / (rho^2 D)``, so ``f^2 N^2 > A`` exactly when ``K > 0`` and
+    ``f^2 (M - K) > M`` (integers): ``N_le_A`` fires in exactly those states (f = 2: ``0 < K <
+    150``). The headline ``f^2 N^2 > B`` fires in exactly the states where the closed form says so
+    (B written out from ``rho ||z||``). On this design the largest ``N^2 / B`` is 0.228 (the
+    0.46 of U5 is the largest ``A / B``), below 1/4, so f = 2 is seen by ``N_le_A`` only
+    (the headline count is exactly 0), and f = 3 (9 * 0.228 > 1) by the headline too.
+    """
+    rho, m = 0.1, 200
+    honest = _collinear_states(5.0, 50056, rho, m)
+    assert not any(t["violation"][0] for _, t, _ in honest)
+    mutant = _collinear_states(5.0, 50056, rho, m, cls=_SecondNearestLibrary)
+    n_p2a = n_triangle = n_a_le_b = 0
+    for grid, t, noise in mutant:
+        delta = grid * rho
+        expected = int(np.sum(rho * np.linalg.norm(noise[0], axis=-1) < delta / 2))
+        assert t["n_p2a"][0] == t["n_triangle"][0] == expected
+        assert t["n_consistency"][0] == 0
+        if grid == 16:
+            assert t["fail_a_le_b"][0] and t["violation"][0]
+            n_a_le_b += 1
+        n_p2a += expected
+    assert n_a_le_b == 50 and n_p2a > 0
+
+    honest5 = _collinear_states(50.0, 50057, rho, m)
+    assert not any(t["violation"][0] for _, t, _ in honest5)
+    from lpcstudy import validation
+    original = validation.retrieval_spread
+    heads = {}
+    for factor in (2, 3):
+        monkeypatch.setattr(validation, "retrieval_spread",
+                            lambda y, noise, f=factor: f * original(y, noise))
+        scaled = _collinear_states(50.0, 50057, rho, m)
+        want_a = want_head = got_a = got_head = 0
+        for grid, t, noise in scaled:
+            delta, length = grid * rho, 2 * 50.0 * rho + grid * rho
+            k = int(np.sum(rho * noise[0, :, 0] < -delta / 2))
+            eta = rho * np.linalg.norm(noise[0], axis=-1)
+            b_ref = 4 / (rho**2 * DIM) * np.mean((50.0 * rho + eta) ** 2 * (eta >= delta / 2))
+            n_sq = factor**2 * length**2 * (k / m) * (1 - k / m) / (rho**2 * DIM)  # (f N_ref)^2
+            fires_a = k > 0 and factor**2 * (m - k) > m  # f^2 N^2 > A  <=>  f^2 (1 - p) > 1
+            assert bool(t["fail_n_le_a"][0]) == fires_a
+            assert bool(t["fail_headline"][0]) == (n_sq > b_ref)
+            want_a += fires_a
+            want_head += n_sq > b_ref
+            got_a += bool(t["fail_n_le_a"][0])
+            got_head += bool(t["fail_headline"][0])
+        assert (got_a, got_head) == (want_a, want_head) and want_a > 0
+        heads[factor] = want_head
+    # The largest N^2/B on this design is 0.228 < 1/4 (the reviewer's 0.46 is the largest A/B), so
+    # a factor 2 is seen by N_le_A only; a factor 3 (9 * 0.228 > 1) is seen by the headline too.
+    assert heads[2] == 0 and heads[3] > 0
 
 
 def _random_case():

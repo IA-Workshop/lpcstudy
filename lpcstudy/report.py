@@ -408,9 +408,10 @@ def _p2c_lines(results: dict, systems: list[str]) -> list[str]:
     lines += ["",
               "Verification check (NVVUQ.14, v3 Theorem P2(c)); not a hypothesis test; no "
               "verdict; not in the validation gate. At the core cell (k = 1) and on the same "
-              "oracle draws as N, every state must satisfy N² ≤ A ≤ B, where A is the spread "
-              "of the retrieved analog about the clean-query analog and B the bound "
-              "4(r₁ + ‖η‖)² 1{‖η‖ ≥ Δ/2} averaged over the draws. This holds exactly, so a "
+              "oracle draws as N, every state must satisfy N² ≤ A ≤ B, where "
+              "A = mean ‖Y_r − X₁‖² / (ρ²D) is the spread of the retrieved analogs Y_r about "
+              "the clean-query analog X₁ and B = 4 mean (r₁ + ‖η_r‖)² 1{‖η_r‖ ≥ Δ/2} / (ρ²D) "
+              "is the bound, both over the M draws, in the units of N². This holds exactly, so a "
               "violation is a code defect, not sampling noise; the slack is the round-off "
               "bound of the check (κ = 1e-13, τ_N), not a tolerance fitted to results. "
               "N/√B near 0 means the bound is loose for that state."]
