@@ -207,3 +207,21 @@ Other leads looked at and not usable: a 2007 Mathematical Problems in Engineerin
 
 ---
 Corrections to the 'Chua memo re-read (2026-10-11)' section (appended 2026-10-11 by claude-sonnet-5-5, main session, from the researcher's hand-back; nothing above is edited): (1) the sentence on which pages were read is garbled: the researcher read memo pp.1-6 and 17-32, which are PDF pp.4-11 and 22-37. (2) The description of Martins (2016) as "undergraduate-level" was not established and should be disregarded; what is established is that it is a conference paper (SBMAC, vol. 4 no. 1, DOI 10.5540/03.2016.004.01.0098) that states "o expoente de Lyapunov é 0.33" for the set alpha = 9, beta = 100/7, m0 = -8/7, m1 = -5/7, with no stated algorithm, step or error bar. (3) "three searches" for a published full spectrum should read four. Status for the main session's use: the lambda_max reference ~0.33 per dimensionless time for that set is confirmed to two digits (memo 0.23 per circuit time divided by 0.7, plus the weak second source); the memo's mu3 and Kaplan-Yorke dimension are internally contradictory in the memo (its own (3.22)) and are NOT to be tested.
+
+## Addendum (2026-10-11, WU-0007.2, claude-sonnet-5-5 as developer): the code's measured values against the references
+
+Appended; nothing above edited. Measured by `lyapunov_cached` (`estimate_lyapunov` with tangent step `20*max_dt`, 10^5 averaging steps, burn-in 5000, fixed start `spec.initial_state`; deterministic, no seed), CPU, DEVELOPMENT. The test is `tests/unit/test_data.py::test_lyapunov_cached_matches_published_reference`. Units: per natural time unit. The standard errors (SE) are the applied-mathematician's development values (WU-0007 Log, 2026-10-11): Lorenz 0.0012, Rössler 0.00055.
+
+| System | Code lambda_max | Reference | Gap (relative; absolute) | In SE | Tolerance (WU-0007 plan amendment A2) |
+|---|---|---|---|---|---|
+| Lorenz-63 | 0.905494 | 0.90563 (Sprott, confirmed) | -0.015% (-0.000136) | 0.11 code SE | 1% (passes) |
+| Rössler | 0.0719398 | 0.0714 (Sprott via Bogdanov and Bogdanova, secondary) | +0.76% (+0.00054) | 0.98 code SE | 3% (passes) |
+| Rössler | 0.0719398 | 0.07062 +- 0.00066 (Bogdanov and Bogdanova, primary) | +1.87% (+0.00132) | 1.54 combined SE (sqrt(0.00055^2 + 0.00066^2)) | 3% (passes) |
+| Chua (alpha 15.6, beta 28, m0 -1.143, m1 -0.714) | 0.431133 | none (not found; known limitation, NVVUQ.13, DEC-0010) | n/a | n/a | no assertion: not validated |
+
+- The reference values are literature values, not the code's output. The tolerances were fixed in the plan amendment before these numbers were compared (VV.3 caveat: the pilot values had been seen earlier).
+- The test also asserts that each orbit is bounded (DEF-0015): max|x| over the first coordinate was Lorenz 19.27 (bound 40), Rössler 11.43 (bound 25), Chua 2.263 (bound 3).
+
+**Methods v2 §M2 values.** The values 0.905, 0.0719 and 0.431 in Methods v2 §M2 (and v3 §4) are the code's own output rounded, not literature values. `docs/study/pilot_results_v1.json` (`systems.<s>.context.lambda_max`) holds 0.9054940534657817, 0.07193978510879935 and 0.43113260161336364, which round to them at 3, 3 and 3 significant digits (0.905, 0.0719, 0.431), and the measurement above reproduces them exactly. So the agreement of 0.905 with Hartl's 0.905 and of 0.0719 with Bogdanov and Bogdanova is an agreement of the code with the literature, not of two copies of one source; and 0.431 has no external check (Chua).
+
+Addendum 2 (2026-10-11, WU-0007.2, claude-sonnet-5-5 as developer; main-session instruction 2026-10-11, DEC-0010 update): the memo-equivalent Chua set (alpha 9, beta 100/7, m0 -8/7, m1 -5/7; NOT the study's parameters). The code's `lyapunov_cached` gives 0.323544 per dimensionless time against the derived reference 0.23 / 0.7 = 0.3286 (memo mu_1 per circuit time, tau = 0.7 t; Martins 2016 states 0.33): gap -1.53% (0.39 of the combined sigma of about 3.9%), tolerance 10%, passes; max|x| on the orbit 2.242 (bound 3). The memo's mu_3, exponent sum and Kaplan-Yorke dimension are not asserted (internally contradictory). This validates the routine and the field form, not the study's Chua exponent.
