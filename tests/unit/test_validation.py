@@ -333,7 +333,7 @@ def test_check_cp_horizon_returns_counts_under_one_key_and_keeps_the_value(monke
             lm_residual=lm_planned[0], lm_accepted=lm_planned[1], lm_late=lm_planned[2])
 
     monkeypatch.setattr(ensemble, "forecast_draws", fake)
-    setup = SimpleNamespace(noise=0.01)
+    setup = SimpleNamespace(noise=0.01, ctx=SimpleNamespace(embed_dim=7, spec=SimpleNamespace(dim=3)))
     verify = np.zeros((n_states, 1, horizon_max))
     out = check_cp_horizon(setup, None, np.zeros((n_states, 1, 2)), verify, horizon_max, 0.4, 30, 3)
     horizons = np.arange(1, horizon_max + 1)
@@ -347,7 +347,7 @@ def test_check_cp_horizon_returns_counts_under_one_key_and_keeps_the_value(monke
     assert info["clip_entries"] == entries
     assert (info["n_states"], info["n_draws"], info["n_horizons"]) == (4, 1, 6)
     # WU-0005.4: the noise level and the batch's LM arrays travel in the same dict (popped by the caller)
-    assert info["noise"] == 0.01
+    assert info["noise"] == 0.01 and info["dof"] == 4  # D - m = 7 - 3
     assert all(got is planned for got, planned in zip(info["lm"], lm_planned))
 
 

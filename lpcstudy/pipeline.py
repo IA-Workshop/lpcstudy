@@ -385,7 +385,8 @@ class Study:
             oracles[split] = full_oracles if core else full_oracles.subset(
                 np.arange(cfg.n_test_sweep))
         self.record_cell(system, label, cell_id(label, noise, library_size, core),
-                         cell_handling(splits, cfg.n_oracle_draws, cfg.reference_horizon, noise))
+                         cell_handling(splits, cfg.n_oracle_draws, cfg.reference_horizon, noise,
+                                       ctx.embed_dim - ctx.spec.dim))
         LOG.info("cell %s rho=%.3f n_lib=%d core=%s label=%s done in %.1fs", system, noise,
                  library_size, core, label, time.time() - start)
         return Cell(system=system, noise=noise, library_size=library_size, label=label,
@@ -618,7 +619,7 @@ def _lm_arrays(parts: list[tuple[np.ndarray, np.ndarray, np.ndarray]]
     return tuple(np.concatenate([part[i].ravel() for part in parts]) for i in range(3))
 
 
-def lm_block(parts: LMParts, noise: float) -> dict:
+def lm_block(parts: LMParts, noise: float, dof: int) -> dict:
     """The ``lm`` block of a cell record: the Levenberg-Marquardt summary (NVVUQ.10, WU-0005.4).
 
     Parameters
@@ -628,6 +629,9 @@ def lm_block(parts: LMParts, noise: float) -> dict:
         computation of that kind (a missing kind has none).
     noise : float
         Noise level ``rho`` of the cell.
+    dof : int
+        Degrees of freedom ``D - m`` of the cell's goodness-of-fit reference (stored as
+        ``gof_dof``): ``embed_dim - state dimension``, 4 for the main systems.
 
     Returns
     -------
@@ -637,9 +641,9 @@ def lm_block(parts: LMParts, noise: float) -> dict:
         not summed into ``totals`` (``sum_totals`` reads ``counts`` only). Report-only: no verdict
         reads it. Needs owner review before freeze.
     """
-    by_kind = {kind: lm_summary(*_lm_arrays(parts.get(kind, [])), noise) for kind in KINDS}
+    by_kind = {kind: lm_summary(*_lm_arrays(parts.get(kind, [])), noise, dof) for kind in KINDS}
     pooled = [part for kind in KINDS for part in parts.get(kind, [])]
-    return {**lm_summary(*_lm_arrays(pooled), noise), "by_kind": by_kind}
+    return {**lm_summary(*_lm_arrays(pooled), noise, dof), "by_kind": by_kind}
 
 
 def cell_record(kinds: dict[str, dict], lm: dict | None = None) -> dict:
@@ -670,7 +674,7 @@ def _lm_part(source: EnsembleMoments | EvaluationDraws, name: str, shape: tuple[
 
 
 def cell_handling(splits: dict[str, SplitData], n_oracle_draws: int, reference_horizon: int,
-                  noise: float) -> dict:
+                  noise: float, dof: int) -> dict:
     """Handling record of one cell, from the counts its computations stored.
 
     Sums over the splits: the oracle kind from the moments (per-state ``handled``, the entry
@@ -687,6 +691,9 @@ def cell_handling(splits: dict[str, SplitData], n_oracle_draws: int, reference_h
         ``H_ref`` in steps.
     noise : float
         Noise level ``rho`` of the cell (scales the goodness-of-fit reading of the ``lm`` block).
+    dof : int
+        ``D - m`` of the cell (embedding dimension minus state dimension), the degrees of freedom
+        of the chi-square reference of ``c / rho^2``.
 
     Returns
     -------
@@ -722,11 +729,11 @@ def cell_handling(splits: dict[str, SplitData], n_oracle_draws: int, reference_h
             _add_to_kind(evaluation, evals.handled, evals.clip_entries, None,
                          {"estimates": n * draws, "error_entries": n * draws * n_hor_ev,
                           "href_draws": n * draws, "eval_draws": n * draws})
-    return cell_record({"oracle": oracle, "eval": evaluation}, lm_block(lm_parts, noise))
+    return cell_record({"oracle": oracle, "eval": evaluation}, lm_block(lm_parts, noise, dof))
 
 
 def check_record(handled: dict[str, int], clip_entries: dict[str, int], n_states: int,
-                 n_draws: int, n_horizons: int, noise: float,
+                 n_draws: int, n_horizons: int, noise: float, dof: int,
                  lm: tuple[np.ndarray, np.ndarray, np.ndarray]) -> dict:
     """Handling record of a validation check that draws its own forecasts (V3, V4).
 
@@ -740,6 +747,8 @@ def check_record(handled: dict[str, int], clip_entries: dict[str, int], n_states
         Size of the check: states, draws per state, horizons.
     noise : float
         Noise level ``rho`` of the check.
+    dof : int
+        ``D - m`` of the check's system (see ``cell_handling``).
     lm : tuple of np.ndarray
         ``(residual, accepted, late_progress)`` of the check's estimates, ``n_states * n_draws``
         values each. They are summarized here and not stored.
@@ -763,7 +772,7 @@ def check_record(handled: dict[str, int], clip_entries: dict[str, int], n_states
                  {"states": n_states, "estimates": n_states * n_draws,
                   "error_entries": n_states * n_draws * n_horizons,
                   "href_draws": n_states * n_draws})
-    return cell_record({"check": kind}, lm_block({"check": [lm]}, noise))
+    return cell_record({"check": kind}, lm_block({"check": [lm]}, noise, dof))
 
 
 def oracle_block(oracles: StateOracles) -> dict:

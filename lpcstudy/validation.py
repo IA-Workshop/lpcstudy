@@ -229,7 +229,7 @@ def check_cp_horizon(setup: ForecastSetup, library: AnalogLibrary, unit_noise: n
     dict
         ``cp_median_vpt_lyapunov``: Kaplan-Meier median CP horizon in Lyapunov times; and
         ``handling``: the counts of the forecasts (``handled`` column sums, ``clip_entries``,
-        sizes, the noise level and the Levenberg-Marquardt arrays of the estimates) for the caller
+        sizes, the noise level, ``D - m`` and the Levenberg-Marquardt arrays of the estimates) for the caller
         to record and pop, so that no leaf is added to the validation result. Only the CP clip can
         affect this check (PLP is computed and unused), so the PLP counters of that record are
         inert.
@@ -248,6 +248,7 @@ def check_cp_horizon(setup: ForecastSetup, library: AnalogLibrary, unit_noise: n
                          "clip_entries": dict(batch.clip_entries), "n_states": len(rows),
                          "n_draws": unit_noise.shape[1], "n_horizons": len(horizons),
                          "noise": setup.noise,
+                         "dof": setup.ctx.embed_dim - setup.ctx.spec.dim,
                          "lm": (batch.lm_residual, batch.lm_accepted, batch.lm_late)}}
 
 

@@ -98,6 +98,7 @@ def convergence_check(study: Study, cell: Cell) -> dict:
     cp, plp = np.concatenate(cp), np.concatenate(plp)
     study.record_cell(cell.system, cell.label, "V4-convergence",
                       check_record(handled, clipped, n, noise.shape[1], 1, cell.noise,
+                                   ctx.embed_dim - ctx.spec.dim,
                                    tuple(np.concatenate([part[i].ravel() for part in lm_parts])
                                          for i in range(3))))
 
@@ -301,7 +302,8 @@ def collect_result_counts(result: object, path: str = "") -> dict[str, int]:
 
 _V3_INERT: frozenset[str] = frozenset({
     "invariant_mean_replacements", "nu_replacements", "error_clips_plp", "error_clips_nonfinite",
-    "error_clips_plp_href", "error_clips_nonfinite_href"})
+    "error_clips_plp_href", "error_clips_nonfinite_href", "lm_nonfinite_cost",
+    "lm_nonfinite_jacobian"})
 
 
 def _log_block(system: str, block_id: str, counts: dict, denominators: dict) -> int:

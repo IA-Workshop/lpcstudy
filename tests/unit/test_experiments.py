@@ -220,7 +220,8 @@ def test_log_handling_writes_one_warning_per_nonzero_counter_a12(caplog) -> None
     ``lpcstudy`` logger whose text names the system, the block, the counter, the count and the
     denominator (``handling lorenz63 base|rho=0.01|n_lib=10000|core: error_clips_cp = 4 of 1200
     error_entries``), nothing for a zero counter, and one INFO record with the number of lines
-    and blocks. A V3 block marks its PLP counters inert. Exact strings.
+    and blocks. A V3 block marks its PLP counters inert, and the two LM counters too (R3: V3 computes
+    PLP and does not use it). Exact strings.
     """
     import logging
 
@@ -232,7 +233,8 @@ def test_log_handling_writes_one_warning_per_nonzero_counter_a12(caplog) -> None
     dens = dict.fromkeys(CELL_DENOMINATORS, 0)
     dens.update(error_entries=1200, eval_draws=10)
     v3 = dict.fromkeys(CELL_COUNTERS, 0)
-    v3.update(error_clips_plp=1)
+    v3.update(error_clips_plp=1, lm_nonfinite_cost=2, lm_nonfinite_jacobian=3)  # WU-0005.4 (R3)
+    dens["estimates"] = 7
     handling = {"cells": {"base|rho=0.01|n_lib=10000|core": {"counts": counts, "denominators": dens},
                           "V3-cp-horizon": {"counts": v3, "denominators": dens}},
                 "oracles": {"test": {"counts": {"oracle_nonfinite": 0}, "denominators": {"states": 5}}}}
@@ -244,8 +246,12 @@ def test_log_handling_writes_one_warning_per_nonzero_counter_a12(caplog) -> None
         "handling lorenz63 base|rho=0.01|n_lib=10000|core: error_clips_cp = 4 of 1200 error_entries",
         "handling lorenz63 base|rho=0.01|n_lib=10000|core: gain_floor = 2 of 10 eval_draws",
         "handling lorenz63 V3-cp-horizon: error_clips_plp = 1 of 1200 error_entries "
+        "[inert: V3 uses CP only]",
+        "handling lorenz63 V3-cp-horizon: lm_nonfinite_cost = 2 of 7 estimates "
+        "[inert: V3 uses CP only]",
+        "handling lorenz63 V3-cp-horizon: lm_nonfinite_jacobian = 3 of 7 estimates "
         "[inert: V3 uses CP only]"]
-    assert infos == ["handling lorenz63: 3 nonzero counters in 3 blocks"]
+    assert infos == ["handling lorenz63: 5 nonzero counters in 3 blocks"]
     assert set(ALL_COUNTERS) >= {"error_clips_cp", "gain_floor"}
 
 
@@ -391,7 +397,7 @@ def test_convergence_check_records_the_lm_block_of_its_forecasts(monkeypatch, tm
 
     monkeypatch.setattr(experiments, "forecast_draws", fake)
     cell = SimpleNamespace(system="lorenz63", label="base", noise=0.01, library_size=10_000,
-                           ctx=SimpleNamespace(embed_dim=7), setup=None)
+                           ctx=SimpleNamespace(embed_dim=10, spec=SimpleNamespace(dim=3)), setup=None)
     experiments.convergence_check(study, cell)
     record = study._records[("lorenz63", "main")]["V4-convergence"]
     lm = record["lm"]
@@ -400,6 +406,7 @@ def test_convergence_check_records_the_lm_block_of_its_forecasts(monkeypatch, tm
     assert (lm["fraction_late_progress"], lm["fraction_above_chi2"]) == (0.5, 1.0)
     assert lm["by_kind"]["check"] == {k: v for k, v in lm.items() if k != "by_kind"}
     assert lm["by_kind"]["oracle"]["n_estimates"] == 0 and lm["noise"] == 0.01
+    assert lm["gof_dof"] == 7  # D - m = 10 - 3 (R2): a robustness-sized embedding
     assert record["counts"]["lm_nonfinite_cost"] == n_states
     assert record["denominators"]["estimates"] == lm["n_estimates"]
     assert json.loads(json.dumps(record)) == record
@@ -423,7 +430,7 @@ def test_cp_horizon_check_records_the_lm_block_of_v3(monkeypatch, tmp_path) -> N
     handling = {"handled": dict.fromkeys(DRAW_COUNTERS, 0),
                 "clip_entries": {"error_clips_cp": 0, "error_clips_plp": 0,
                                  "error_clips_nonfinite": 0},
-                "n_states": 3, "n_draws": 1, "n_horizons": 120, "noise": 1.0,
+                "n_states": 3, "n_draws": 1, "n_horizons": 120, "noise": 1.0, "dof": 4,
                 "lm": (np.array([[2.0], [4.0], [6.0]]), np.array([[0], [3], [6]]),
                        np.array([[0], [1], [1]]))}
     monkeypatch.setattr(experiments, "check_cp_horizon",

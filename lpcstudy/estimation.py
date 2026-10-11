@@ -40,16 +40,42 @@ LATE_WINDOW: int = 3
 LATE_DECREASE: float = 1e-6
 """Relative cost decrease that makes a late accepted step *material* (D1, DEC-0025)."""
 
-GOF_DEGREES: int = 4
-"""Degrees of freedom ``D - m`` of the first-order chi-square reference of ``c / rho^2``
-(``D = 7`` delay coordinates, ``m = 3`` state coordinates; applied-mathematician M1, WU-0005.4)."""
-
 GOF_QUANTILE: float = 0.999
-"""Level of the chi-square quantile ``GOF_EXCEED`` (D3, DEC-0025)."""
+"""Level of the chi-square quantile ``gof_threshold`` (D3, DEC-0025)."""
 
-GOF_EXCEED: float = float(stats.chi2.ppf(GOF_QUANTILE, GOF_DEGREES))
-"""``chi2_4`` 0.999 quantile, 18.47 to four digits. The fraction of estimates with
-``c / rho^2 > GOF_EXCEED`` is printed as a diagnostic; it has no gate or verdict role (D3)."""
+
+def gof_threshold(dof: int) -> float:
+    """Return the 0.999 quantile of chi-square with ``dof`` degrees of freedom.
+
+    To first order in ``rho`` a converged estimate in the right basin has ``c / rho^2 ~
+    chi2(D - m)``, with ``D`` delay coordinates and ``m`` fitted state components (4 at ``D = 7``,
+    ``m = 3``; applied-mathematician M1, WU-0005.4). The robustness variants ``D = 5`` and ``D = 10``
+    have 2 and 7 degrees of freedom, so the threshold depends on the cell. The value for 4 is
+    18.4668 (18.47 to four digits). The fraction of estimates above it is printed as a
+    diagnostic; it has no gate or verdict role (D3).
+
+    Parameters
+    ----------
+    dof : int
+        Degrees of freedom ``D - m``, at least 1.
+
+    Returns
+    -------
+    float
+        The quantile.
+
+    Raises
+    ------
+    ValueError
+        If ``dof`` is not a positive integer.
+    """
+    if int(dof) != dof or dof < 1:
+        raise ValueError(f"degrees of freedom must be a positive integer, got {dof}")
+    return float(stats.chi2.ppf(GOF_QUANTILE, int(dof)))
+
+
+GOF_EXCEED: float = gof_threshold(4)
+"""The threshold for ``D = 7`` (``dof = 4``), 18.4668."""
 
 
 @dataclass(frozen=True)
@@ -78,8 +104,10 @@ class LMDiagnostics:
         Bool ``(n,)``: at least one Jacobian entry was set to 0 in some iteration (S4).
     late_progress : np.ndarray
         Integer ``(n,)``, 0 or 1 (D1, DEC-0025): an accepted step in the last ``LATE_WINDOW``
-        iterations lowered the cost by more than ``LATE_DECREASE`` relative. A cheap screen for an
-        estimate that was still moving at the iteration budget. Report-only.
+        iterations lowered the cost by more than ``LATE_DECREASE`` relative, or left an infinite cost
+        (a non-finite start) for a finite one. A cheap screen for an estimate that was still moving
+        at the iteration budget. Report-only. Without noise the cost sits at the round-off floor,
+        where null-step accepts lower it by large relative amounts, so the flag means nothing there.
     """
 
     residual: np.ndarray
@@ -192,7 +220,10 @@ class StateEstimator:
             u_new = jnp.where(accept, cand, u)
             c_new = jnp.where(accept, c_cand, c_u)
             damping_new = jnp.where(accept, damping / 3.0, damping * 4.0)
-            material = accept & (c_u - c_cand > LATE_DECREASE * c_u) & (k >= first_late)
+            # An accept from an infinite carried cost (non-finite start) is a finite candidate, so
+            # it is material by definition (inf - c > 1e-6 inf is False in floating point).
+            material = accept & ((c_u - c_cand > LATE_DECREASE * c_u) | jnp.isinf(c_u)) \
+                & (k >= first_late)
             new = (u_new, c_new, damping_new, n_acc + accept.astype(jnp.int32),
                    bad_cost | jnp.isinf(c_cand), bad_jac | ~jnp.all(finite),
                    jnp.where(material, jnp.int32(1), late), k + 1)
@@ -318,7 +349,7 @@ class StateEstimator:
 
 
 def lm_summary(residual: np.ndarray, accepted: np.ndarray, late_progress: np.ndarray,
-               noise: float) -> dict:
+               noise: float, dof: int) -> dict:
     """Summarize the Levenberg-Marquardt diagnostics of a set of estimates (NVVUQ.10, WU-0005.4).
 
     Parameters
@@ -332,11 +363,15 @@ def lm_summary(residual: np.ndarray, accepted: np.ndarray, late_progress: np.nda
     noise : float
         Noise level ``rho`` (fraction of ``sigma_x``), positive: it scales the goodness-of-fit
         reading ``c / rho^2``.
+    dof : int
+        Degrees of freedom ``D - m`` of the first-order chi-square reference of ``c / rho^2``
+        (``D`` delay coordinates, ``m`` state components; 4 for the main systems). It sets the
+        threshold of ``fraction_above_chi2`` and is stored as ``gof_dof``.
 
     Returns
     -------
     dict
-        * ``n_estimates``, ``noise``;
+        * ``n_estimates``, ``noise``, ``gof_dof``;
         * ``median_residual`` (``np.median``) and ``p95_residual`` (``np.quantile`` with
           ``method="inverted_cdf"``, the order statistic ``x_(ceil(0.95 n))``, which is finite
           whenever that order statistic is; the linear method returns NaN for a finite quantile
@@ -350,10 +385,11 @@ def lm_summary(residual: np.ndarray, accepted: np.ndarray, late_progress: np.nda
           not a convergence indicator;
         * ``nonfinite_residuals``: the count of ``inf`` residuals;
         * ``fraction_late_progress`` (D1): the mean of ``late_progress``;
-        * ``fraction_above_chi2`` (D3): the fraction with ``c / rho^2`` above the ``chi2_4`` 0.999
-          quantile (18.47). It is a diagnostic: it has no gate or verdict role. To first order a
-          converged estimate in the right basin has ``c / rho^2 ~ chi2_4`` (median 3.36, p95 9.49),
-          so the fraction is about 0.001 plus the unconverged and wrong-basin estimates.
+        * ``fraction_above_chi2`` (D3): the fraction with ``c / rho^2`` above the 0.999 quantile of
+          chi-square with ``dof`` degrees of freedom (18.47 for 4; ``gof_threshold``). It is a
+          diagnostic: it has no gate or verdict role. To first order a converged estimate in the
+          right basin has ``c / rho^2 ~ chi2(dof)`` (for 4: median 3.36, p95 9.49), so the fraction
+          is about 0.001 plus the unconverged and wrong-basin estimates.
 
         With no estimates, ``n_estimates`` is 0, ``nonfinite_residuals`` is 0 and every other
         value is ``None``.
@@ -361,7 +397,8 @@ def lm_summary(residual: np.ndarray, accepted: np.ndarray, late_progress: np.nda
     Raises
     ------
     ValueError
-        If the sizes differ, ``noise`` is not positive, or a residual is NaN (the loop maps every
+        If the sizes differ, ``noise`` is not positive, ``dof`` is not a positive integer, or a
+        residual is NaN (the loop maps every
         non-finite cost to ``inf``, so a NaN is a bug and is not summarized).
 
     Notes
@@ -382,7 +419,8 @@ def lm_summary(residual: np.ndarray, accepted: np.ndarray, late_progress: np.nda
     def finite_or_none(value: float) -> float | None:
         return float(value) if np.isfinite(value) else None
 
-    out: dict = {"n_estimates": int(residual.size), "noise": float(noise),
+    threshold = gof_threshold(dof)
+    out: dict = {"n_estimates": int(residual.size), "noise": float(noise), "gof_dof": int(dof),
                  "median_residual": None, "p95_residual": None, "median_iterations": None,
                  "fraction_no_decrease": None, "nonfinite_residuals": int(np.isinf(residual).sum()),
                  "fraction_late_progress": None, "fraction_above_chi2": None}
@@ -392,5 +430,5 @@ def lm_summary(residual: np.ndarray, accepted: np.ndarray, late_progress: np.nda
         out["median_iterations"] = float(np.median(accepted))
         out["fraction_no_decrease"] = float(np.mean(accepted == 0))
         out["fraction_late_progress"] = float(np.mean(late))
-        out["fraction_above_chi2"] = float(np.mean(residual > GOF_EXCEED * noise**2))
+        out["fraction_above_chi2"] = float(np.mean(residual > threshold * noise**2))
     return out

@@ -562,7 +562,8 @@ def _lm_lines(results: dict, systems: list[str], config: StudyConfig) -> list[st
                 rho = part["noise"]
                 rows.append(
                     f"| {system} | `{_cell(cell_id)}` | {kind} | {part['n_estimates']} | "
-                    f"{_lm_number(part['median_residual'])} | {_lm_number(part['p95_residual'])} | "
+                    f"{part['gof_dof']} | {_lm_number(part['median_residual'])} | "
+                    f"{_lm_number(part['p95_residual'])} | "
                     f"{_lm_number(_lm_ratio(part['median_residual'], rho))} | "
                     f"{_lm_number(_lm_ratio(part['p95_residual'], rho))} | "
                     f"{_lm_number(part['median_iterations'])} | "
@@ -574,25 +575,27 @@ def _lm_lines(results: dict, systems: list[str], config: StudyConfig) -> list[st
                 "n > 0: written before WU-0005.4, or built by hand)."]
     steps = config.estimator_refine_steps
     return [
-        f"| System | Cell | Kind | n | median c | p95 c | median c/ρ² | p95 c/ρ² | "
+        f"| System | Cell | Kind | n | dof (D − m) | median c | p95 c | median c/ρ² | p95 c/ρ² | "
         f"median accepted steps (of {steps}) | fraction no decrease | fraction late progress | "
-        f"fraction c/ρ² > 18.47 | non-finite residuals |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|", *rows, "",
+        f"fraction c/ρ² > χ²(dof) 0.999 quantile | non-finite residuals |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|", *rows, "",
         f"Verification of the estimator's iterative stage (NVVUQ.10); not a hypothesis test; no "
         f"verdict; not in the validation gate. The stopping criterion is a fixed {steps} "
         f"Levenberg–Marquardt iterations with no tolerance stop. c is the final cost "
         f"‖X_t − G′(û)‖², the sum of D squared terms in the units of σ_x (the noise standard "
         f"deviation is ρ). The first-order reference for an estimate that converged in the "
-        f"correct basin is c/ρ² ~ χ²₄ (D − m = 4): median 3.36, p95 9.49. 'Accepted steps' counts "
+        f"correct basin is c/ρ² ~ χ²(dof) with dof = D − m delay coordinates beyond the state "
+        f"(4 at D = 7: median 3.36, p95 9.49). 'Accepted steps' counts "
         f"every iteration whose candidate cost was strictly lower, round-off accepts after "
         f"convergence included, so it is an upper bound on the productive steps and not the "
         f"number of iterations to convergence. A fraction with no decrease above 0 indicates a "
         f"failure (non-finite cost, corrupted Jacobian, or a stationary start), not slow "
         f"convergence. 'Late progress' is the fraction of estimates with an accepted step in the "
-        f"last 3 iterations that lowered the cost by more than 1e-6 relative: a screen for an "
-        f"estimate still moving at the budget. The fraction with c/ρ² above 18.47 (the χ²₄ 0.999 "
-        f"quantile) mixes wrong-basin and still-unconverged estimates; it is printed as a "
-        f"diagnostic, with no gate or verdict role. Neither column estimates the iterative error "
+        f"last 3 iterations that lowered the cost by more than 1e-6 relative (or left an infinite "
+        f"cost): a screen for an "
+        f"estimate still moving at the budget. The fraction with c/ρ² above the 0.999 quantile of "
+        f"χ²(dof) (18.47 for dof 4) mixes wrong-basin and still-unconverged estimates; it is "
+        f"printed as a diagnostic, with no gate or verdict role. Neither column estimates the iterative error "
         f"of any reported quantity (NVVUQ.9)."]
 
 

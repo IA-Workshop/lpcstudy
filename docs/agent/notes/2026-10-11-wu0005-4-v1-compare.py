@@ -10,9 +10,11 @@ contains ``seconds`` (wall-clock). Verdict (exit code 0 only if all hold):
 
 * every leaf of BEFORE is in AFTER and identical, except the schema leaves
   (``handling/schema`` and ``systems/*/handling/schema``: ``lpcstudy.handling/1`` -> ``/2``);
-* every leaf only in AFTER lies under ``handling/**/lm/**`` (the new ``lm`` blocks) or has the last
-  key ``lm_nonfinite_cost`` or ``lm_nonfinite_jacobian`` (the two new counters: cells, by_kind,
-  totals, run totals, robustness).
+* every leaf only in AFTER lies inside a ``handling`` block (``handling/...`` or
+  ``systems/*/handling/...``, including the robustness handling) and either under an ``lm`` key
+  (the new ``lm`` blocks) or has the last key ``lm_nonfinite_cost`` or ``lm_nonfinite_jacobian``
+  (the two new counters: cells, by_kind, totals, run totals). A new ``lm_nonfinite_*`` leaf outside
+  ``handling`` is not allowed.
 
 Anything else is printed and is a defect: halt and /refer (WU-0005.4 V1).
 """
@@ -46,7 +48,7 @@ def same(a, b):
 
 def is_new_ok(path):
     in_handling = "handling" in path
-    return (in_handling and "lm" in path) or path[-1] in ("lm_nonfinite_cost", "lm_nonfinite_jacobian")
+    return in_handling and ("lm" in path or path[-1] in ("lm_nonfinite_cost", "lm_nonfinite_jacobian"))
 
 
 def main(before_path, after_path):
@@ -57,7 +59,8 @@ def main(before_path, after_path):
         if path not in after:
             removed.append(path)
         elif not same(value, after[path]):
-            if path[-1] == "schema" and value == SCHEMA_OLD and after[path] == SCHEMA_NEW:
+            if (path[-1] == "schema" and "handling" in path and value == SCHEMA_OLD
+                    and after[path] == SCHEMA_NEW):
                 schema += 1
             else:
                 changed.append(path)

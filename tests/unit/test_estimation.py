@@ -4,6 +4,7 @@ and the Levenberg-Marquardt loop reports its residual and accepted steps (WU-000
 from __future__ import annotations
 
 import functools
+import math
 from types import SimpleNamespace
 
 import jax
@@ -12,7 +13,7 @@ import numpy as np
 import pytest
 
 from lpcstudy.dynamics import delay_map_forward, make_observability
-from lpcstudy.estimation import GOF_EXCEED, LMDiagnostics, StateEstimator, lm_summary
+from lpcstudy.estimation import GOF_EXCEED, LMDiagnostics, StateEstimator, gof_threshold, lm_summary
 from lpcstudy.systems import SYSTEMS, make_flow_step, simulate_trajectory
 
 STATE_MEAN = np.array([0.5, -1.0, 8.0])
@@ -188,10 +189,11 @@ def _trace(tau: int, steps: int, u0: np.ndarray, x: np.ndarray):
 def _expected_late(c0: np.ndarray, cs: np.ndarray, accept: np.ndarray, steps: int) -> np.ndarray:
     """``late_progress`` recomputed from a trace: a material accepted step in the last 3 iterations.
 
-    Material means the cost fell by more than 1e-6 of the carried cost before the step.
+    Material means the cost fell by more than 1e-6 of the carried cost before the step, or the
+    carried cost was infinite (a non-finite start left for a finite cost; R4).
     """
     prev = np.concatenate([c0[:, None], cs[:, :-1]], axis=1)
-    material = accept & ((prev - cs) > 1e-6 * prev)
+    material = accept & (((prev - cs) > 1e-6 * prev) | np.isinf(prev))  # inf - c is not > 1e-6 inf
     return material[:, max(0, steps - 3):].any(axis=1).astype(np.int32)
 
 
@@ -294,6 +296,30 @@ def test_late_progress_flags_unconverged_estimates() -> None:
         assert np.array_equal(produced[4].late_progress, expected)
         seen |= set(expected.tolist())
     assert seen == {0, 1}
+
+
+def test_late_progress_counts_a_first_accept_from_a_nonfinite_start() -> None:
+    """R4: leaving an infinite cost for a finite one in the last 3 iterations sets the flag.
+
+    Reference: construction. The model step is the identity, so G(u) = (u_0 - mean)/sigma for every
+    delay and the objective is a parabola in u_0 alone. Row 0 starts at u_0 = 2e155: the residual is
+    about 2.5e154 (sigma_x = 7.9) and its square overflows 1.8e308, so the start cost is inf
+    (``nonfinite_cost`` True) while the Jacobian and the right-hand side are finite; the damped step
+    (damping 1e-3) removes 99.97% of u_0, the candidate cost is about 5e302 and finite, and it is
+    accepted from an infinite carried cost, where ``inf - c > 1e-6 inf`` is False in
+    floating point. With 3 iterations every iteration is among the last 3, so the expected flag is
+    1 by the definition (a finite step out of an infinite cost is unboundedly material). Row 1
+    starts at the minimum (cost exactly 0, nothing can be accepted): flag 0, accepted 0. Exact.
+    """
+    ctx = _world(1)[2]
+    network = _StubNetwork()
+    network.u0 = np.array([[2e155, 0.0, 0.0], [ctx.obs_mean, 0.0, 0.0]])
+    est = StateEstimator(ctx=ctx, network=network, model_step=lambda s: s, refine_steps=3)
+    *_, lm = est.estimate_counted(np.zeros((2, EMBED)))
+    assert lm.nonfinite_cost.tolist() == [True, False]
+    assert lm.accepted[0] >= 1 and np.isfinite(lm.residual[0])
+    assert lm.accepted[1] == 0 and lm.residual[1] == 0.0
+    assert lm.late_progress.tolist() == [1, 0]
 
 
 def test_l3_nonfinite_target_row_is_counted_per_estimate() -> None:
@@ -491,22 +517,55 @@ def test_l4_no_number_changes_bitwise_against_the_pre_change_function() -> None:
     assert state_replaced.all() and lm.nonfinite_cost.all() and lm.nonfinite_jacobian.all()
 
 
-def test_regression_gof_threshold_is_the_chi2_999_quantile() -> None:
-    """``GOF_EXCEED`` is the 0.999 quantile of chi^2 with 4 degrees of freedom (D3, DEC-0025).
+def _chi2_survival(x: float, dof: int) -> float:
+    """P(chi^2_dof > x) by the closed forms of the Erlang and half-integer gamma tails.
 
-    Reference: the closed-form survival function of chi^2_4, S(x) = exp(-x/2) (1 + x/2) (the
-    Erlang(2) tail), independent of scipy; S(GOF_EXCEED) = 0.001 to 1e-12 (the quantile is
-    computed to about 1e-15 relative), and 18.47 when rounded to two decimals (the value printed).
+    Even dof: ``exp(-y) sum_{k < dof/2} y^k / k!``; odd dof, ``a = dof/2 = n + 1/2``:
+    ``erfc(sqrt y) + exp(-y) sum_{k=1..n} y^(k - 1/2) / Gamma(k + 1/2)``; with ``y = x/2``.
+    Standard identities of the regularized upper incomplete gamma function; ``math`` only,
+    independent of scipy.
     """
-    survival = np.exp(-GOF_EXCEED / 2.0) * (1.0 + GOF_EXCEED / 2.0)
-    assert abs(survival - 1e-3) < 1e-12 and round(GOF_EXCEED, 2) == 18.47
+    y = x / 2.0
+    if dof % 2 == 0:
+        return math.exp(-y) * sum(y**k / math.factorial(k) for k in range(dof // 2))
+    n = (dof - 1) // 2
+    return math.erfc(math.sqrt(y)) + math.exp(-y) * sum(
+        y ** (k - 0.5) / math.gamma(k + 0.5) for k in range(1, n + 1))
+
+
+@pytest.mark.parametrize("dof", [1, 2, 4, 7, 8])
+def test_gof_threshold_is_the_chi2_999_quantile_for_any_dof(dof: int) -> None:
+    """``gof_threshold(dof)`` is the root of P(chi^2_dof > x) = 0.001 (R2, D3, DEC-0025).
+
+    Reference: bisection (200 steps on [0, 200]) of the closed-form survival function of
+    ``_chi2_survival`` (dof 2: exp(-x/2); dof 4: exp(-x/2)(1 + x/2); dof 7 by the half-integer
+    gamma identity), independent of scipy. Tolerance: relative 1e-10; the scipy quantile is good
+    to about 1e-15 and the bisection to 1e-13, so the margin is above 1e3. For dof = 4 the value
+    is also the 18.46682695290317 of the D = 7 report, unchanged (``GOF_EXCEED``); the hand values
+    13.8155 (= 2 ln 1000) for dof 2 and 24.32 for dof 7 are checked to 4 digits.
+    """
+    lo, hi = 0.0, 200.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if _chi2_survival(mid, dof) > 1e-3 else (lo, mid)
+    assert gof_threshold(dof) == pytest.approx(0.5 * (lo + hi), rel=1e-10)
+    if dof == 4:
+        assert GOF_EXCEED == gof_threshold(4) and round(GOF_EXCEED, 4) == 18.4668
+        assert GOF_EXCEED == 18.46682695290317
+    if dof == 2:
+        assert gof_threshold(2) == pytest.approx(2.0 * math.log(1000.0), rel=1e-12)
+    if dof == 7:
+        assert round(gof_threshold(7), 2) == 24.32
+    for bad in (0, -1, 2.5):
+        with pytest.raises(ValueError, match="positive integer"):
+            gof_threshold(bad)
 
 
 def _hand(values: list[float], iterations: list[int] | None = None, late: list[int] | None = None,
-          noise: float = 0.1) -> dict:
+          noise: float = 0.1, dof: int = 4) -> dict:
     n = len(values)
     return lm_summary(np.array(values), np.array(iterations if iterations is not None else [3] * n),
-                      np.array(late if late is not None else [0] * n), noise)
+                      np.array(late if late is not None else [0] * n), noise, dof)
 
 
 @pytest.mark.parametrize("values, p95, median, infs", [
@@ -550,6 +609,22 @@ def test_l5_lm_summary_other_keys_and_empty_and_errors() -> None:
     with pytest.raises(ValueError, match="NaN"):
         _hand([1.0, np.nan])
     with pytest.raises(ValueError, match="sizes differ"):
-        lm_summary(np.zeros(3), np.zeros(2), np.zeros(3), 0.1)
+        lm_summary(np.zeros(3), np.zeros(2), np.zeros(3), 0.1, 4)
     with pytest.raises(ValueError, match="positive"):
         _hand([1.0], noise=0.0)
+    with pytest.raises(ValueError, match="degrees of freedom"):
+        _hand([1.0], dof=0)
+
+
+def test_lm_summary_threshold_follows_the_degrees_of_freedom() -> None:
+    """R2: the fraction above the chi-square quantile uses the cell's dof, which is stored.
+
+    Reference: hand fractions. noise 1.0 and residuals [13, 14, 19, 21, 25]. Thresholds
+    (0.999 quantiles): dof 2: 13.82 (2 ln 1000), so 14, 19, 21, 25 exceed it: 0.8; dof 4: 18.47:
+    19, 21, 25: 0.6; dof 7: 24.32: only 25: 0.2. No value is within 0.3 of a threshold.
+    ``gof_dof`` is stored. Exact (multiples of 1/5).
+    """
+    values = [13.0, 14.0, 19.0, 21.0, 25.0]
+    got = {dof: _hand(values, noise=1.0, dof=dof) for dof in (2, 4, 7)}
+    assert [got[d]["fraction_above_chi2"] for d in (2, 4, 7)] == [0.8, 0.6, 0.2]
+    assert [got[d]["gof_dof"] for d in (2, 4, 7)] == [2, 4, 7]

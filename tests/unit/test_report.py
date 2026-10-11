@@ -855,7 +855,7 @@ def test_markdown_p2c_section_is_labelled_report_only_and_shows_defects(tmp_path
 # ---------------------------------------------------------------------------------------
 def _lm_part(n: int, noise: float, **kwargs) -> dict:
     """A hand ``lm`` summary (the keys of ``lm_summary``); unspecified values are None."""
-    out = {"n_estimates": n, "noise": noise, "median_residual": None, "p95_residual": None,
+    out = {"n_estimates": n, "noise": noise, "gof_dof": 4, "median_residual": None, "p95_residual": None,
            "median_iterations": None, "fraction_no_decrease": None, "nonfinite_residuals": 0,
            "fraction_late_progress": None, "fraction_above_chi2": None}
     out.update(kwargs)
@@ -900,16 +900,16 @@ def test_lm_lines_exact_rows_note_and_missing_block() -> None:
     results, config = _lm_results()
     lines = report._lm_lines(results, ["lorenz63"], config)
     cell = "`base\\|rho=0.01\\|n_lib=10000\\|core`"
-    assert lines[0].startswith("| System | Cell | Kind | n | median c | p95 c | median c/ρ² | "
-                               "p95 c/ρ² | median accepted steps (of 15) |")
-    assert lines[2] == (f"| lorenz63 | {cell} | oracle | 8 | 0.000336 | 0.000949 | 3.36 | 9.49 | "
+    assert lines[0].startswith("| System | Cell | Kind | n | dof (D − m) | median c | p95 c | "
+                               "median c/ρ² | p95 c/ρ² | median accepted steps (of 15) |")
+    assert lines[2] == (f"| lorenz63 | {cell} | oracle | 8 | 4 | 0.000336 | 0.000949 | 3.36 | 9.49 | "
                         "8 | 0 | 0.125 | 0.001 | 0 |")
-    assert lines[3] == (f"| lorenz63 | {cell} | eval | 4 | 0.001 | n/a | 10 | n/a | "
+    assert lines[3] == (f"| lorenz63 | {cell} | eval | 4 | 4 | 0.001 | n/a | 10 | n/a | "
                         "7.5 | 0.25 | 0 | 0.5 | 2 |")
     assert len([x for x in lines if x.startswith("| lorenz63")]) == 2
     note = lines[-1]
     for phrase in ("fixed 15 Levenberg–Marquardt iterations with no tolerance stop",
-                   "sum of D squared terms in the units of σ_x", "χ²₄", "median 3.36, p95 9.49",
+                   "sum of D squared terms in the units of σ_x", "χ²(dof)", "median 3.36, p95 9.49",
                    "round-off accepts after convergence included",
                    "printed as a diagnostic, with no gate or verdict role", "not a hypothesis test"):
         assert phrase in note, phrase
@@ -932,10 +932,14 @@ def test_write_markdown_places_the_lm_subsection_after_p2c_and_before_handling(
     results, config = _lm_results()
     results["handling"] = {"schema": "lpcstudy.handling/2", "totals": {}, "by_system": {},
                            "robustness": {}, "failed_variants": 0}
+    results["robustness"] = {}  # the empty section still has its heading
     write_markdown(results, config, tmp_path / "LM.md")
     lines = (tmp_path / "LM.md").read_text().splitlines()
     p2c = lines.index("### Theorem P2(c) bound (verification check, not a hypothesis)")
-    assert p2c < lines.index(heading) < lines.index("## Handling (DEF-0001: nothing silent)")
+    # Ordering rule for the merger: the LM subsection follows P2(c) and precedes every later
+    # `##` section (Robustness, Handling, and the WU-0008 Uncertainty budget once it is merged).
+    assert p2c < lines.index(heading) < lines.index("## Robustness (core cell)") < \
+        lines.index("## Handling (DEF-0001: nothing silent)")
     assert any(x.startswith("| lorenz63 | `base") for x in lines)
     plain, config = fake_results("DEV-0")
     plain["systems"] = {"lorenz63": fake_system(config)}

@@ -440,9 +440,9 @@ def test_cell_handling_and_system_assembly_a11(tmp_path) -> None:
     clip_1 = {"error_clips_cp": 1, "error_clips_plp": 2, "error_clips_nonfinite": 3}
     clip_2 = {"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 5}
     one = cell_handling({"test": _counted_split(n, np.ones((n, width), dtype=np.int64), clip_1,
-                                                [(0, 0)])}, m_draws, 30, 0.01)
+                                                [(0, 0)])}, m_draws, 30, 0.01, 4)
     two = cell_handling({"test": _counted_split(n, np.full((n, width), 2, dtype=np.int64), clip_2,
-                                                [])}, m_draws, 30, 0.02)
+                                                [])}, m_draws, 30, 0.02, 4)
     assert one["counts"]["invariant_mean_replacements"] == 4 + 8
     assert one["by_kind"]["oracle"]["counts"]["invariant_mean_replacements"] == 4
     assert one["by_kind"]["eval"]["counts"]["invariant_mean_replacements"] == 8
@@ -536,7 +536,7 @@ def test_cell_handling_lm_block_hand_values() -> None:
     n, width = 4, len(DRAW_COUNTERS)
     clip = {"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 0}
     record = cell_handling({"test": _counted_split(n, np.ones((n, width), dtype=np.int64), clip,
-                                                   [])}, 2, 30, 0.5)
+                                                   [])}, 2, 30, 0.5, 4)
     lm = record["lm"]
     oracle, evaluation, check = (lm["by_kind"][k] for k in ("oracle", "eval", "check"))
     assert (oracle["n_estimates"], oracle["median_residual"], oracle["p95_residual"]) == (8, 4.5, 8.0)
@@ -555,6 +555,13 @@ def test_cell_handling_lm_block_hand_values() -> None:
     assert set(lm["by_kind"]) == {"oracle", "eval", "check"}
     assert record["denominators"]["estimates"] == lm["n_estimates"]
     assert record["by_kind"]["oracle"]["denominators"]["estimates"] == oracle["n_estimates"]
+    assert lm["gof_dof"] == oracle["gof_dof"] == evaluation["gof_dof"] == check["gof_dof"] == 4
+    # R2: with 7 degrees of freedom (D = 10, m = 3) the threshold on c is 24.32 * 0.25 = 6.08, so
+    # only the oracle residuals 7 and 8 exceed it (0.25, against 0.5 for dof 4); dof is stored.
+    wide = cell_handling({"test": _counted_split(n, np.ones((n, width), dtype=np.int64), clip,
+                                                 [])}, 2, 30, 0.5, 7)
+    assert wide["lm"]["by_kind"]["oracle"]["fraction_above_chi2"] == 0.25
+    assert wide["lm"]["gof_dof"] == 7
     assert json.loads(json.dumps(record)) == record
 
 
@@ -572,11 +579,11 @@ def test_cell_handling_refuses_moments_without_lm_arrays() -> None:
     split = _counted_split(n, np.ones((n, width), dtype=np.int64), clip, [])
     split.moments.lm_residual = None
     with pytest.raises(ValueError, match="split 'test' moments.*Levenberg"):
-        cell_handling({"test": split}, 2, 30, 0.5)
+        cell_handling({"test": split}, 2, 30, 0.5, 4)
     split = _counted_split(n, np.ones((n, width), dtype=np.int64), clip, [])
     split.evals.lm_residual = np.ones((n, 3))
     with pytest.raises(ValueError, match="evaluation draws.*shapes"):
-        cell_handling({"test": split}, 2, 30, 0.5)
+        cell_handling({"test": split}, 2, 30, 0.5, 4)
 
 
 def test_check_record_lm_block_and_size_check() -> None:
@@ -595,17 +602,18 @@ def test_check_record_lm_block_and_size_check() -> None:
     handled["lm_nonfinite_cost"], handled["lm_nonfinite_jacobian"] = 3, 1
     clip = {"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 0}
     arrays = (np.array([1.0, 2.0, 3.0, 4.0]), np.array([0, 1, 2, 3]), np.array([0, 0, 1, 0]))
-    record = check_record(handled, clip, 2, 2, 1, 0.5, arrays)
+    record = check_record(handled, clip, 2, 2, 1, 0.5, 4, arrays)
     part = record["lm"]["by_kind"]["check"]
     assert (part["n_estimates"], part["median_residual"], part["p95_residual"]) == (4, 2.5, 4.0)
     assert (part["median_iterations"], part["fraction_no_decrease"]) == (1.5, 0.25)
     assert (part["fraction_late_progress"], part["fraction_above_chi2"]) == (0.25, 0.0)
+    assert part["gof_dof"] == 4
     assert {k: v for k, v in record["lm"].items() if k != "by_kind"} == part
     assert record["lm"]["by_kind"]["oracle"]["n_estimates"] == 0
     assert record["counts"]["lm_nonfinite_cost"] == 3 and record["counts"]["lm_nonfinite_jacobian"] == 1
     assert record["denominators"]["estimates"] == part["n_estimates"]
     with pytest.raises(ValueError, match="expected 4 estimates"):
-        check_record(handled, clip, 2, 2, 1, 0.5, (arrays[0][:3], arrays[1], arrays[2]))
+        check_record(handled, clip, 2, 2, 1, 0.5, 4, (arrays[0][:3], arrays[1], arrays[2]))
 
 
 def test_concat_stacks_lm_arrays_and_refuses_partial() -> None:
