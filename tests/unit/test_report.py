@@ -141,11 +141,20 @@ def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
         "H1d": {"rows": {"analog_seed": {"spearman": 0.8}, "estimation_seed": {"spearman": 0.9},
                          "growth": {"spearman": 0.7}, "nhat": {"spearman": 0.6}},
                 "verdict": "pass", "reason": None},
-        "Q-N": {"deployable": {"verdict": "redundant", "logit_w": {"delta_r2": 0.01,
-                                                                    "ci": [0.0, 0.02]},
-                               "log_horizon": {"delta_r2": 0.02, "ci": [0.01, 0.03]}},
-                "oracle": {"verdict": "adds information"}},
-        "H2a": {"median_range": 0.05, "range_ci": [0.01, 0.08], "partial_corr": 0.02},
+        "Q-N": {"role": "estimate", "primary": "oracle", "n_w_zero": 30, "n_w_one": 4,
+                "n_test": 120,
+                "oracle": {"logit_w_interior": {"reading": "reduces", "delta_r2": 0.01,
+                                                "ci": [0.0, 0.02]},
+                           "w_zero_indicator": {"reading": "distinct but small",
+                                                "delta_r2": 0.02, "ci": [0.01, 0.03]},
+                           "log_horizon": {"delta_r2": 0.02, "ci": [0.01, 0.03]}},
+                "deployable": {"logit_w_interior": {"reading": "undetermined"},
+                               "w_zero_indicator": {"reading": "substantial"}}},
+        "H2a": {"median_range": 0.05, "range_ci": [0.01, 0.08], "n_eligible_states": 120,
+                "part_i_verdict": "pass", "part_ii_verdict": "pass", "n_w_zero": 30,
+                "n_w_one": 4,
+                "part_ii": {"zero": {"partial_corr": 0.02, "ci": [-0.05, 0.08]},
+                            "interior": {"partial_corr": -0.03, "ci": [-0.09, 0.04]}}},
         "H2b": {"noise": {"mean_state_spearman": 0.9},
                 "library_change": {"mean_change": 0.2, "ci": [0.1, 0.3]},
                 "library_curves": {"0.01": {"1000": {"median": 0.7}, "10000": {"median": 0.8}}},
@@ -187,15 +196,15 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
     """The verdict table has one row per table id, in table order; pending rows say so.
 
     Reference: the 14 rows of the identifier table (decision-log map, order of v3 section 2) and
-    the ROADMAP pending sub-tasks, written out below. WU-0002.7 and .8 computed H2b, H2d, H2e, H3a
-    and H3c, so those rows are no longer pending (a plan edit of this test: the no-result example
-    was H2e and is now Q-N, still pending on WU-0002.6; H2d stays pending on WU-0002.9, review
-    R6). The fake results have no ``Q-N``, so that row reads "[not computed until WU-0002.6]", its cell "n/a: no result" and its verdict
-    "no result"; the rows with a result and a pending sub-task read "computed with the v1
-    statistic". Exact string checks.
+    the ROADMAP pending sub-tasks, written out below. WU-0002.7 and .8 computed H2b, H2e, H3a and
+    H3c, so those rows are no longer pending; H2d stays pending on WU-0002.9 (review R6), and Q-N
+    is done (WU-0002.6). The no-result example is H2d (a plan edit of this test, which used H2e):
+    the fake results have no ``H2d``, so that row reads "[not computed until WU-0002.9]", its cell
+    "n/a: no result" and its verdict "no result"; the rows with a result and a pending sub-task
+    ("(reported)") read "computed with the v1 statistic". Exact string checks.
     """
     results, config = fake_results("DEV-0")
-    system = fake_system(config, skip=("Q-N",))
+    system = fake_system(config, skip=("H2d",))
     results["systems"] = {"lorenz63": system}
     results["verdicts"] = verdicts(results, config)
     write_markdown(results, config, tmp_path / "RESULTS.md")
@@ -208,9 +217,12 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
     assert ids == [h.v3_id for h in HYPOTHESIS_TABLE]
     marked = {row.split(" | ")[0][2:]: "[computed with the v1 statistic until " in row
               for row in rows}
-    assert {i for i, m in marked.items() if m} == {"H2d", "(reported)"}
-    qn = rows[ids.index("Q-N")]
-    assert qn.endswith("[not computed until WU-0002.6] | n/a: no result | no result |")
+    assert {i for i, m in marked.items() if m} == {"(reported)"}
+    qn = rows[ids.index("Q-N")]  # an estimate: read, never PASS or FAIL (v3 section 7)
+    assert "reduces: oracle: interior reduces" in qn and "PASS" not in qn and "FAIL" not in qn
+    assert qn.endswith("| estimate (read, no pass/fail) |")
+    h2d = rows[ids.index("H2d")]
+    assert h2d.endswith("[not computed until WU-0002.9] | n/a: no result | no result |")
     gain = rows[ids.index("(reported)")]
     assert "within bound 0.95 (n=40, max gain 1.5 LT)" in gain and "PASS" in gain
 
@@ -220,7 +232,8 @@ def test_verdicts_skip_a_row_without_results_and_raise_on_a_partial_one() -> Non
 
     Reference: the plan for WU-0002.2 (v3 H2e has no result until WU-0002.7, so it is skipped,
     not an error; V7 is not a hypothesis). With every other row true on every system, the
-    verdict is "supported" for the other 13 keys. A key present in one system only still raises
+    verdict is "supported" for the other 12 keys, and Q-N (an estimate) carries the oracle
+    interior reading and no pass/fail verdict. A key present in one system only still raises
     ``KeyError`` (a missing result is not silently dropped). Exact.
     """
     config = dataclasses.replace(SMOKE, core_systems=("lorenz63", "rossler"))
@@ -229,8 +242,12 @@ def test_verdicts_skip_a_row_without_results_and_raise_on_a_partial_one() -> Non
     out = verdicts({"systems": two}, config)
     assert "H2e" not in out and "V7" not in out
     assert list(out) == [h.key for h in HYPOTHESIS_TABLE if h.key != "H2e"]
-    assert {v["verdict"] for v in out.values()} == {"supported"}
-    assert all(v["by_system"] == {"lorenz63": True, "rossler": True} for v in out.values())
+    pass_fail = {key: v for key, v in out.items() if key != "Q-N"}
+    assert {v["verdict"] for v in pass_fail.values()} == {"supported"}
+    assert all(v["by_system"] == {"lorenz63": True, "rossler": True} for v in pass_fail.values())
+    # Q-N is an estimate (WU-0002.6(c)): the interior reading of the oracle profile, no pass/fail.
+    assert out["Q-N"] == {"by_system": {"lorenz63": "reduces", "rossler": "reduces"},
+                          "verdict": "estimate (read, no pass/fail)"}
     partial = {"lorenz63": fake_system(config), "rossler": fake_system(config, skip=("H2e",))}
     with pytest.raises(KeyError):
         verdicts({"systems": partial}, config)
@@ -251,8 +268,11 @@ def test_key_numbers_are_exact_for_every_v3_key() -> None:
         "H1b": "CP 1, PLP 0.9 [0.85, 0.95]: pass",
         "H1c": "PLP 1, CP 0.5",
         "H1d": "eps 0.8, delta 0.9, Lambda 0.7, N 0.6: pass",
-        "Q-N": "redundant: dR2 w 0.01 [0, 0.02], T 0.02 [0.01, 0.03]; oracle: adds information",
-        "H2a": "range 0.05 (CI hi 0.08); partial r 0.02",
+        "Q-N": "oracle: interior reduces (dR2 0.01 [0, 0.02]), w*=0 distinct but small "
+               "(dR2 0.02 [0.01, 0.03]), log T dR2 0.02 [0.01, 0.03]; deployable interior "
+               "undetermined, w*=0 substantial (w*=0: 30, w*=1: 4)",
+        "H2a": "(i) pass: range 0.05 (CI hi 0.08, n=120); (ii) pass: partial r zero 0.02 "
+               "[-0.05, 0.08], interior -0.03 [-0.09, 0.04] (w*=0: 30, w*=1: 4)",
         "H2b": "rho rank corr 0.9; n_lib 10^3->10^4 change 0.2 [0.1, 0.3]: pass",
         "H2c": "A4-A2 -10%; A4-A1 -5%; A4o-A2 -20% (reported)",
         "H2d": "A4/A3-1 = 5%",
