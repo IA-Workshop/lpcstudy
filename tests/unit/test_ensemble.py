@@ -375,3 +375,168 @@ def test_forecast_draws_handled_columns_per_state() -> None:
     np.testing.assert_array_equal(plain.handled[:, :4], expected[:, :4])
     with pytest.raises(ValueError):
         forecast_draws(setup, library, "test", rows, noise, horizons, reference_horizon=7)
+
+
+def test_sanitize_gains_a8_evaluation_path() -> None:
+    """A8 (evaluation path): NaN and +inf are replaced by 1e300 and counted per draw; 0.0 is a floor.
+
+    Reference: a hand array, window 4, 5 columns, 6 draws. Row 0: NaN inside the window. Row 1:
+    +inf outside the window (column 4, still replaced: the whole array is the unit). Row 2: 0.0
+    inside the window. Row 3: NaN and 0.0 (a replaced and floored draw; the NaN becomes 1e300
+    and does not floor). Row 4: 0.0 outside the window (not floored). Row 5: NaN and +inf in one
+    row (counts once: D5). Expected: replaced rows {0, 1, 3, 5} (4), floored rows {2, 3} (2),
+    read off the construction. The replaced values equal 1e300 bitwise and every other entry is
+    unchanged bitwise (the old line is ``np.nan_to_num(gains, nan=1e300, posinf=1e300)``).
+    """
+    from lpcstudy.ensemble import sanitize_gains
+
+    gains = np.full((6, 5), 2.0)
+    gains[0, 3] = np.nan
+    gains[1, 4] = np.inf
+    gains[2, 1] = 0.0
+    gains[3, 0], gains[3, 2] = np.nan, 0.0
+    gains[4, 4] = 0.0
+    gains[5, 1], gains[5, 3] = np.nan, np.inf
+    clean, replaced, floored = sanitize_gains(gains, 4)
+    assert replaced.tolist() == [True, True, False, True, False, True]
+    assert floored.tolist() == [False, False, True, True, False, False]
+    assert int(replaced.sum()) == 4 and int(floored.sum()) == 2
+    assert clean.tobytes() == np.nan_to_num(gains, nan=1e300, posinf=1e300).tobytes()
+    assert clean[0, 3] == 1e300 and clean[1, 4] == 1e300 and clean[5, 1] == 1e300
+    assert clean[2, 1] == 0.0 and clean[3, 2] == 0.0
+
+
+class _StubLibrary:
+    """Stands in for ``AnalogLibrary`` where only the shapes of the answers matter."""
+
+    def __init__(self, dim: int) -> None:
+        self.dim = dim
+
+    def query(self, vectors: np.ndarray, n_analogs: int):
+        return np.zeros((len(vectors), n_analogs), dtype=np.int64), np.zeros((len(vectors),
+                                                                              n_analogs))
+
+    def analog_vectors(self, lib_idx: np.ndarray) -> np.ndarray:
+        return np.zeros((len(lib_idx), self.dim))
+
+
+def _stubbed_forecasts(monkeypatch, handled_table: np.ndarray, entry_table: np.ndarray,
+                       n_draws: int, n_hor: int, dim: int):
+    """Monkeypatch ``forecast_draws`` to return planned errors, ``handled`` rows and entry totals.
+
+    The estimated state of flat row ``r`` (global, state-major) is ``[r, 0]``, so a stubbed
+    amplification function can look the planned gains up by row.
+    """
+    from lpcstudy import ensemble
+
+    n_states = len(handled_table)
+    rng = np.random.default_rng(31)
+    cp = rng.standard_normal((n_states, n_draws, n_hor))
+    plp = rng.standard_normal((n_states, n_draws, n_hor))
+    flat_id = np.arange(n_states * n_draws, dtype=float).reshape(n_states, n_draws)
+    est_states = np.stack([flat_id, np.zeros_like(flat_id)], axis=-1)
+
+    def fake(setup, library, split, rows, unit_noise, horizons, reference_horizon=None):
+        return ensemble.DrawBatch(
+            cp_err=cp[rows], plp_err=plp[rows], analog_seed_sq=np.ones((len(rows), n_draws)),
+            est_seed_sq=np.ones((len(rows), n_draws)), distance=np.ones((len(rows), n_draws)),
+            inputs=unit_noise, est_states=est_states[rows], est_nu=np.ones((len(rows), n_draws)),
+            analog_vecs=np.zeros((len(rows), n_draws, dim)), handled=handled_table[rows].copy(),
+            clip_entries={name: int(entry_table[rows, i].sum())
+                          for i, name in enumerate(ensemble.ENTRY_COUNTERS)})
+
+    monkeypatch.setattr(ensemble, "forecast_draws", fake)
+    return cp, plp
+
+
+def _planned_tables(n_states: int, n_draws: int):
+    rng = np.random.default_rng(91)
+    handled = rng.integers(0, n_draws + 1, size=(n_states, 6)).astype(np.int64)
+    handled[:, 2:4] = 0  # gain columns are filled by evaluation_draws only
+    entries = rng.integers(0, 50, size=(n_states, 3)).astype(np.int64)
+    return handled, entries
+
+
+@pytest.mark.parametrize("chunk_traj", [4, 10**6])
+def test_ensemble_moments_accumulates_handled_exactly_for_any_chunking(monkeypatch,
+                                                                       chunk_traj: int) -> None:
+    """A3 (oracle kind): ``handled`` and ``clip_entries`` equal the planned sums for any chunking.
+
+    Reference: hand sums. ``forecast_draws`` is monkeypatched to return a planned per-state
+    ``handled`` table and planned entry counts per state (random integers from
+    ``np.random.default_rng(91)``); the expected result is the table itself (per state) and its
+    column sums (totals). ``chunk_traj = 4`` with M = 4 draws gives one state per chunk,
+    ``10**6`` puts all 7 states in one chunk. Exact integer equality in both cases.
+    """
+    from types import SimpleNamespace
+
+    from lpcstudy.ensemble import ENTRY_COUNTERS, ensemble_moments
+
+    n_states, n_draws, n_hor, dim = 7, 4, 3, 2
+    handled, entries = _planned_tables(n_states, n_draws)
+    _stubbed_forecasts(monkeypatch, handled, entries, n_draws, n_hor, dim)
+    setup = SimpleNamespace(noise=0.01)
+    noise = np.zeros((n_states, n_draws, dim))
+    moments = ensemble_moments(setup, None, "test", noise, np.arange(1, n_hor + 1),
+                               chunk_traj=chunk_traj, reference_horizon=2)
+    np.testing.assert_array_equal(moments.handled, handled)
+    assert moments.handled.dtype == np.int64
+    assert moments.clip_entries == {name: int(entries[:, i].sum())
+                                    for i, name in enumerate(ENTRY_COUNTERS)}
+    part = moments.subset(np.array([5, 2]))
+    np.testing.assert_array_equal(part.handled, handled[[5, 2]])
+    assert part.clip_entries is None  # a view has no valid entry totals
+
+
+@pytest.mark.parametrize("chunk_traj", [4, 10**6])
+def test_evaluation_draws_accumulates_handled_and_gain_columns(monkeypatch,
+                                                               chunk_traj: int) -> None:
+    """A3 and A8 (evaluation kind): gain columns per state, other columns passed through, values kept.
+
+    Reference: hand sums. 6 states x 4 draws, horizons (1, 3, 5), window 4 (5 gain columns).
+    ``forecast_draws`` is monkeypatched (planned ``handled`` rows and entry counts, random
+    integers from ``np.random.default_rng(91)``); the stubbed amplification returns a planned
+    gain table with: flat row 2 (state 0) NaN in the window; row 5 (state 1) +inf outside the
+    window; row 9 (state 2) 0.0 in the window; row 10 (state 2) NaN and 0.0; row 13 (state 3)
+    0.0 outside the window; row 14 (state 3) NaN and +inf in one row. Expected
+    ``gain_replacements`` per state [1, 1, 1, 1, 0, 0] and ``gain_floor`` [0, 0, 2, 0, 0, 0],
+    read off the construction (D5: the row with both NaN and +inf counts once). Other columns
+    equal the planned table. ``growth_proxy`` and ``gain_proxy`` equal the old expression
+    (``nan_to_num`` then ``growth_exponent``) applied to the planned gains, bitwise. Exact.
+    """
+    from types import SimpleNamespace
+
+    from lpcstudy.dynamics import growth_exponent
+    from lpcstudy.ensemble import ENTRY_COUNTERS, evaluation_draws
+
+    n_states, n_draws, dim, window = 6, 4, 2, 4
+    horizons = np.array([1, 3, 5])
+    handled, entries = _planned_tables(n_states, n_draws)
+    _stubbed_forecasts(monkeypatch, handled, entries, n_draws, len(horizons), dim)
+    gains = np.random.default_rng(5).uniform(0.5, 3.0, size=(n_states * n_draws, 5))
+    gains[2, 3] = np.nan
+    gains[5, 4] = np.inf
+    gains[9, 1] = 0.0
+    gains[10, 0], gains[10, 2] = np.nan, 0.0
+    gains[13, 4] = 0.0
+    gains[14, 1], gains[14, 3] = np.nan, np.inf
+    amplification = lambda amp_steps: (lambda states: gains[np.asarray(states)[:, 0].astype(int)])
+    setup = SimpleNamespace(noise=0.01, n_analogs=1, amplification=amplification)
+    noise = np.zeros((n_states, n_draws, dim))
+    verify = np.zeros((n_states, n_draws, 5))
+    synth = np.zeros((n_states, n_draws, 3, dim))
+    out = evaluation_draws(setup, _StubLibrary(dim), "test", noise, verify, horizons, window,
+                           synth, chunk_traj=chunk_traj, reference_horizon=3)
+    expected = handled.copy()
+    expected[:, 2] = [1, 1, 1, 1, 0, 0]
+    expected[:, 3] = [0, 0, 2, 0, 0, 0]
+    np.testing.assert_array_equal(out.handled, expected)
+    assert out.clip_entries == {name: int(entries[:, i].sum())
+                                for i, name in enumerate(ENTRY_COUNTERS)}
+    old = np.nan_to_num(gains, nan=1e300, posinf=1e300)
+    assert out.growth_proxy.tobytes() == growth_exponent(old, window).reshape(
+        n_states, n_draws).tobytes()
+    assert out.gain_proxy.tobytes() == old[:, horizons - 1].reshape(n_states, n_draws, -1).tobytes()
+    sub = out.subset(np.array([4, 0]))
+    np.testing.assert_array_equal(sub.handled, expected[[4, 0]])
+    assert sub.clip_entries is None

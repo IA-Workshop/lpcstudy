@@ -400,6 +400,7 @@ def _concat_moments(parts: list[EnsembleMoments]) -> EnsembleMoments:
     return EnsembleMoments(
         horizons=parts[0].horizons,
         kept={k: np.concatenate([p.kept[k] for p in parts]) for k in kept_keys},
+        handled=_stack_handled(parts), clip_entries=_sum_entries(parts),
         **correlation, **{k: np.concatenate([getattr(p, k) for p in parts]) for k in keys})
 
 
@@ -407,9 +408,25 @@ def _concat_evals(parts: list[EvaluationDraws]) -> EvaluationDraws:
     """Stack evaluation draws of several cells (same horizons)."""
     if len(parts) == 1:
         return parts[0]
-    return EvaluationDraws(**{k: (parts[0].horizons if k == "horizons" else
-                                  np.concatenate([getattr(p, k) for p in parts]))
-                              for k in parts[0].__dict__})
+    stacked = {k: np.concatenate([getattr(p, k) for p in parts]) for k in parts[0].__dict__
+               if k not in ("horizons", "handled", "clip_entries")}
+    return EvaluationDraws(horizons=parts[0].horizons, handled=_stack_handled(parts),
+                           clip_entries=_sum_entries(parts), **stacked)
+
+
+def _stack_handled(parts: list) -> np.ndarray | None:
+    """Stack the per-state ``handled`` arrays of several cells; ``None`` if none carries one."""
+    present = [p.handled is not None for p in parts]
+    if any(present) and not all(present):
+        raise ValueError("cannot stack: only some parts carry 'handled'")
+    return np.concatenate([p.handled for p in parts]) if all(present) else None
+
+
+def _sum_entries(parts: list) -> dict[str, int] | None:
+    """Add the ``clip_entries`` totals of several cells; ``None`` if any part lacks them."""
+    if any(p.clip_entries is None for p in parts):
+        return None
+    return {k: sum(p.clip_entries[k] for p in parts) for k in parts[0].clip_entries}
 
 
 # ------------------------------------------------------------------- evaluation

@@ -175,3 +175,51 @@ def test_concat_moments_stacks_the_correlation_fields_and_refuses_a_mixture() ->
     np.testing.assert_array_equal(stacked.plp_constant, grid < 4)
     with pytest.raises(ValueError, match="err_corr"):
         _concat_moments([with_fields[0], plain[1]])
+
+
+def test_concat_carries_handled_and_sums_entry_totals() -> None:
+    """``_concat_moments`` and ``_concat_evals`` stack ``handled`` row-wise and add ``clip_entries``.
+
+    Reference: hand-built arrays whose entries are their own flat index (expected values read
+    off by eye) and hand-added totals. Two parts of 3 and 2 states with 6 counter columns: the
+    stacked ``handled`` is the 5 rows in order; the totals are the sums (3 + 4, 0 + 1, 5 + 6).
+    A part without ``handled`` among parts with it raises ``ValueError`` (PRIME.4); parts
+    without any give ``None``; a part whose totals are ``None`` (a view) gives ``None`` totals.
+    Exact.
+    """
+    import dataclasses
+
+    from lpcstudy.pipeline import _concat_evals, _concat_moments
+    from unit_helpers import _moments_from_draws
+
+    rng = np.random.default_rng(6)
+    plain = [_moments_from_draws(rng.standard_normal((n, 4, 3)), rng.standard_normal((n, 4, 3)))
+             for n in (3, 2)]
+    assert _concat_moments(plain).handled is None and _concat_moments(plain).clip_entries is None
+    grid = np.arange(30, dtype=np.int64).reshape(5, 6)
+    entries = [{"error_clips_cp": 3, "error_clips_plp": 0, "error_clips_nonfinite": 5},
+               {"error_clips_cp": 4, "error_clips_plp": 1, "error_clips_nonfinite": 6}]
+    parts = [dataclasses.replace(p, handled=g, clip_entries=e)
+             for p, g, e in zip(plain, (grid[:3], grid[3:]), entries)]
+    stacked = _concat_moments(parts)
+    np.testing.assert_array_equal(stacked.handled, grid)
+    assert stacked.clip_entries == {"error_clips_cp": 7, "error_clips_plp": 1,
+                                    "error_clips_nonfinite": 11}
+    with pytest.raises(ValueError, match="handled"):
+        _concat_moments([parts[0], plain[1]])
+    assert _concat_moments([parts[0], dataclasses.replace(parts[1], clip_entries=None)]
+                           ).clip_entries is None
+
+    def evals(n: int, handled, entry) -> EvaluationDraws:
+        zeros = np.zeros((n, 2, 3))
+        return EvaluationDraws(
+            horizons=np.arange(1, 4), cp_err=zeros, plp_err=zeros, verify_noise=zeros,
+            distance=np.zeros((n, 2)), est_nu=np.zeros((n, 2)), growth_proxy=np.zeros((n, 2)),
+            gain_proxy=zeros, inputs=np.zeros((n, 2, 1)), noise_sens=np.zeros((n, 2)),
+            handled=handled, clip_entries=entry)
+
+    both = _concat_evals([evals(3, grid[:3], entries[0]), evals(2, grid[3:], entries[1])])
+    np.testing.assert_array_equal(both.handled, grid)
+    assert both.clip_entries["error_clips_cp"] == 7 and both.cp_err.shape == (5, 2, 3)
+    none = _concat_evals([evals(3, None, None), evals(2, None, None)])
+    assert none.handled is None and none.clip_entries is None
