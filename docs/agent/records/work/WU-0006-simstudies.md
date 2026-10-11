@@ -515,6 +515,8 @@ The other 38 passed, including the new R1 test (`workers` = 4 through `RunCache`
 
 **Test run 9, §4.9 checklist.** 1. Change set: run 8 plus the two fixes above (harness `ResultTable`, smoke), committed first. 2. Radius: the nodes that touch `ResultTable` or were changed: `test_wu0006_harness.py::test_result_files_are_stamped_and_never_overwritten`, `::test_every_design_runs_end_to_end_and_passes_the_exact_checks`, `::test_result_table_round_trips_numpy_and_non_finite_values`, `::test_run_cache_records_the_pool_size_at_creation`. 3. Already run? On the previous code only; the code changed. 4 to 7 as run 8, about 25 s. 8. `tools/run_tests.sh slow --background` on those four node ids.
 
+**Test run 9 result.** `4 passed in 17.23s` (`runs/tests/slow-20261011T181909Z.log`, exit 0). R1 to R3 and R5 to R7 are fixed; the study files' counts were not recomputed (the Log tables of runs 2 and 7 stand); the next owed run of each study file writes stamped tables with `workers` = 4. R4 is the main session's.
+
 ## Review
 
 **2026-10-11, reviewer (claude-opus-5-5), fresh context: independent review of WU-0006.1 to .3 at 06147f9** (plan d954db9, amendment 493b5de, mathematician 9d1152e, db82ac5, bd21e76; DEC-0018 and DEF-0020 to DEF-0022 read on `develop`).
