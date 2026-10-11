@@ -706,5 +706,8 @@ def test_simd_record_follows_a_disabled_dispatch_level_r3() -> None:
         return record["found"]
 
     assert "X86_V3" not in found(NPY_DISABLE_CPU_FEATURES="X86_V3")
-    if {"avx2", "bmi1", "bmi2", "fma", "f16c", "movbe", "abm"} <= flags:
-        assert "X86_V3" in found()
+    v3 = {"avx2", "bmi1", "bmi2", "fma", "f16c", "movbe", "abm"}
+    if not v3 <= flags:
+        pytest.skip(f"host lacks x86-64-v3 features {sorted(v3 - flags)}: the positive arm "
+                    "(X86_V3 present by default) cannot be checked here (R6)")
+    assert "X86_V3" in found()

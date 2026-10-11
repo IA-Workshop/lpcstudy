@@ -1508,3 +1508,26 @@ def test_r1_the_not_determinable_line_reaches_the_report_and_changes_nothing(tmp
     assert "platform not determinable" not in outcomes[0][2]
     assert ("- new run against old (v1 pilot): platform not determinable (new run: CPU model unknown)"
             in outcomes[1][2].splitlines())
+
+
+def test_r5_a_failed_probe_is_not_a_value_in_the_platform_row() -> None:
+    """R5: the table cells of a recorded side show the failure, not "none mapped" or a bare unknown.
+
+    Reference: hand-written expected rows. A failed BLAS probe gives ``probe failed (<error>)``; a
+    library with an error gives ``unknown (<error>)``; an unknown model shows the read error (or
+    the source when there is none); a working probe with no library says ``none mapped``. The
+    comparison fields (``model``, ``corenames``) are unchanged. Exact.
+    """
+    block = platform_block(model="unknown", cores=("Haswell", None))
+    block["cpu"].update(source="none", error="FileNotFoundError: gone")
+    block["blas"]["libraries"][1]["error"] = "AttributeError: no symbol"
+    rows, _ = cp.platform_rows({"new": cp.platform_record({"provenance": block})})
+    assert rows == [("new run", "unknown (FileNotFoundError: gone)",
+                     "Haswell, unknown (AttributeError: no symbol)", "unset")]
+    block["blas"] = {"libraries": [], "error": "OSError: no maps"}
+    rows, _ = cp.platform_rows({"new": cp.platform_record({"provenance": block})})
+    assert rows[0][2] == "probe failed (OSError: no maps)"
+    block["blas"] = {"libraries": [], "error": None}
+    block["cpu"].update(error=None)
+    rows, _ = cp.platform_rows({"new": cp.platform_record({"provenance": block})})
+    assert rows == [("new run", "unknown (source none)", "none mapped", "unset")]

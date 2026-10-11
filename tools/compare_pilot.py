@@ -1491,7 +1491,9 @@ def platform_record(tree: object) -> dict:
     -------
     dict
         ``{"recorded": True, "model", "corenames", "coretype", "determinate", "why"}``
-        (``corenames``: the runtime OpenBLAS kernel of each library, in the block's order;
+        (``corenames``: the runtime OpenBLAS kernel of each library, in the block's order, used to compare;
+        ``model_text`` and ``blas_text``: the table cells, which show a failure with its error and never
+        as a value;
         ``coretype``: the value of ``OPENBLAS_CORETYPE`` or ``None``; ``determinate``: False when
         a probe failed or found nothing, so two such records must not be compared as values; ``why``:
         the reasons, as text), or ``{"recorded": False, "why": <text>}`` for a tree without a
@@ -1516,9 +1518,18 @@ def platform_record(tree: object) -> dict:
     reasons += [f"{lib.get('library', '?')} corename unknown"
                 + (f" ({lib['error']})" if lib.get("error") else "")
                 for lib in libraries if not lib.get("corename")]
+    if blas.get("error"):
+        blas_text = f"probe failed ({blas['error']})"
+    else:
+        blas_text = ", ".join(
+            (f"{name} ({lib['error']})" if lib.get("error") else name)
+            for name, lib in zip(corenames, libraries)) or "none mapped"
+    model_text = (f"unknown ({cpu.get('error') or 'source ' + str(cpu.get('source', 'none'))})"
+                  if model == "unknown" else model)
     return {"recorded": True, "model": model, "corenames": corenames,
             "coretype": env.get("OPENBLAS_CORETYPE") if isinstance(env, dict) else None,
-            "determinate": not reasons, "why": "; ".join(reasons)}
+            "determinate": not reasons, "why": "; ".join(reasons),
+            "model_text": model_text, "blas_text": blas_text}
 
 
 def platform_mismatch(first: dict, second: dict, labels: tuple[str, str] = ("first", "second")
@@ -1557,8 +1568,7 @@ def platform_rows(records: dict[str, dict]) -> tuple[list[tuple], list[str]]:
             continue
         rec = records[key]
         if rec["recorded"]:
-            rows.append((label, rec["model"], ", ".join(rec["corenames"]) or "none mapped",
-                         rec["coretype"] or "unset"))
+            rows.append((label, rec["model_text"], rec["blas_text"], rec["coretype"] or "unset"))
         else:
             rows.append((label, f"not recorded ({rec['why']})", "", ""))
     notes = []
