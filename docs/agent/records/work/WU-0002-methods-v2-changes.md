@@ -435,6 +435,10 @@ Merge-gate checklist (§4.9, §4.3). This gate runs on the branch with `develop`
 7. **Output:** `-q --tb=short -rfE`.
 8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
 
+### Incident: merge commit a26881c committed conflict markers; fixed forward, 2026-10-10, claude-sonnet-5-5 (main session)
+
+Merging `develop` into this branch conflicted in one file, `tests/unit/test_systems.py` (both WU-0002.1 and WU-0005 created it: the registry test of 4f70254 and the three RK4 tests of WU-0005). I chained `git add -A && git commit` after the merge, so merge commit `a26881c` ("resolutions and merge-gate checklist") committed the file **with conflict markers**. This was my error. History is not rewritten (PRIME.5); the fix is the next commit, which resolves the file as the union of both sides: WU-0005's file as the base with its docstring and imports extended, and the registry test appended unchanged. Verified by an `ast` comparison: every function of each side (`_linear_error`, `_spec`, the three RK4 tests, the registry test) is identical in the resolved file; no marker remains in any tracked file outside `docs/`. No gate or test run happened at `a26881c`.
+
 ## Review
 
 ### Review of WU-0002.1 and .2 (2026-10-10, `reviewer`, claude-opus-5-5, fresh context)
