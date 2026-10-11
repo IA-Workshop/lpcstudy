@@ -22,14 +22,75 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+from scipy import stats
 
 from .data import SystemContext
 from .dynamics import delay_map_forward, make_observability
 from .networks import TrainedNetwork
+
+
+LATE_WINDOW: int = 3
+"""Last iterations of the Levenberg-Marquardt loop that ``late_progress`` looks at (D1, DEC-0025)."""
+
+LATE_DECREASE: float = 1e-6
+"""Relative cost decrease that makes a late accepted step *material* (D1, DEC-0025)."""
+
+GOF_DEGREES: int = 4
+"""Degrees of freedom ``D - m`` of the first-order chi-square reference of ``c / rho^2``
+(``D = 7`` delay coordinates, ``m = 3`` state coordinates; applied-mathematician M1, WU-0005.4)."""
+
+GOF_QUANTILE: float = 0.999
+"""Level of the chi-square quantile ``GOF_EXCEED`` (D3, DEC-0025)."""
+
+GOF_EXCEED: float = float(stats.chi2.ppf(GOF_QUANTILE, GOF_DEGREES))
+"""``chi2_4`` 0.999 quantile, 18.47 to four digits. The fraction of estimates with
+``c / rho^2 > GOF_EXCEED`` is printed as a diagnostic; it has no gate or verdict role (D3)."""
+
+
+@dataclass(frozen=True)
+class LMDiagnostics:
+    """Per-estimate diagnostics of the Levenberg-Marquardt refinement (NVVUQ.10, WU-0005.4).
+
+    Attributes
+    ----------
+    residual : np.ndarray
+        Final carried cost ``c = ||X_t - G'(u_hat)||^2``, float64 ``(n,)``, in normalized
+        observation units (``sigma_x = 1``). ``inf`` where a cost evaluation was not finite and no
+        step was accepted. With ``refine_steps = 0`` it is the cost at the network's start.
+    accepted : np.ndarray
+        Integer ``(n,)``: iterations whose candidate cost was strictly lower than the carried one.
+        It includes round-off accepts after convergence (null steps), so it is an upper bound
+        on the number of productive steps, not the number of iterations to convergence.
+    nonfinite_cost : np.ndarray
+        Bool ``(n,)``: at least one of the ``1 + refine_steps`` cost evaluations (the start and
+        every candidate) was not finite (``cost`` maps it to ``inf``; S3 of DEF-0001).
+    nonfinite_jacobian : np.ndarray
+        Bool ``(n,)``: at least one Jacobian entry was set to 0 in some iteration (S4).
+    late_progress : np.ndarray
+        Integer ``(n,)``, 0 or 1 (D1, DEC-0025): an accepted step in the last ``LATE_WINDOW``
+        iterations lowered the cost by more than ``LATE_DECREASE`` relative. A cheap screen for an
+        estimate that was still moving at the iteration budget. Report-only.
+    """
+
+    residual: np.ndarray
+    accepted: np.ndarray
+    nonfinite_cost: np.ndarray
+    nonfinite_jacobian: np.ndarray
+    late_progress: np.ndarray
+
+
+class Refinement(NamedTuple):
+    """The compiled-loop pieces of one estimator (see ``StateEstimator.refinement``)."""
+
+    refine: Callable
+    trace: Callable
+    cost: Callable
+    generate: Callable
 
 
 @dataclass
@@ -49,12 +110,19 @@ class StateEstimator:
 
     Notes
     -----
-    Handling (DEF-0001, WU-0002.11). Inside the refinement, the ``1e-12`` added to the damping
-    scale and the accept-or-reject step are part of the algorithm, not data handling. A
-    non-finite candidate cost (mapped to ``inf``, so the step is rejected) and a non-finite
-    Jacobian entry (set to 0) are algorithm-internal too; counting them needs the scan carry and
-    belongs to WU-0005.4. After the compiled function, a non-finite ``nu`` and a non-finite state
-    coordinate are replaced and counted by :meth:`estimate_counted`.
+    Handling (DEF-0001, WU-0002.11, WU-0005.4). Inside the refinement, the ``1e-12`` added to the
+    damping scale and the accept-or-reject step are part of the algorithm, not data handling. A
+    non-finite candidate cost (mapped to ``inf``, so the step is rejected, S3) and a non-finite
+    Jacobian entry (set to 0, S4) are algorithm-internal too, and are now counted per estimate in
+    the scan carry (``LMDiagnostics.nonfinite_cost`` and ``nonfinite_jacobian``). After the
+    compiled function, a non-finite ``nu`` and a non-finite state coordinate are replaced and
+    counted by :meth:`estimate_counted`.
+
+    Diagnostics (NVVUQ.10, DEC-0017 Q3, WU-0005.4). The stopping criterion is a fixed
+    ``refine_steps`` iterations with no tolerance stop. Each estimate also reports the achieved
+    residual, the number of accepted iterations (round-off accepts after convergence included)
+    and ``late_progress``. None of them changes a value or a decision: the arithmetic of the loop
+    is unchanged (the carry gains integer and boolean fields only).
     """
 
     ctx: SystemContext
@@ -68,17 +136,28 @@ class StateEstimator:
         """Hidden width of the MLP."""
         return self.network.width
 
-    def _build(self) -> Callable:
+    def refinement(self) -> Refinement:
+        """Build the Levenberg-Marquardt loop of this estimator (single estimate, not vmapped).
+
+        The production loop and the test trace share one step closure, so they run the same
+        arithmetic. ``refine(u0, target)`` returns ``(u_final, diag)`` with ``diag`` the tuple
+        ``(residual, accepted, nonfinite_cost, nonfinite_jacobian, late_progress)``.
+        ``trace(u0, target)`` returns ``(u_final, diag, (u_k, c_k, accept_k))`` with the iterate,
+        the carried cost and the accept flag of every iteration (for tests only: the pipeline
+        never calls it).
+
+        Returns
+        -------
+        Refinement
+            ``refine``, ``trace``, ``cost`` and ``generate``.
+        """
         ctx = self.ctx
         root = jnp.asarray(ctx.unwhiten)
         mean = jnp.asarray(ctx.state_mean)
         fwd = delay_map_forward(self.model_step, ctx.spec.observed_index, ctx.obs_mean,
                                 ctx.obs_scale, ctx.delay, ctx.embed_dim)
-        span = ctx.history
-        step = self.model_step
-        nu_fn = make_observability(step, ctx.spec.observed_index, ctx.obs_scale,
-                                   ctx.whiten, ctx.delay, ctx.embed_dim)
         n_iter = self.refine_steps
+        first_late = max(0, n_iter - LATE_WINDOW)
 
         def generate(u: jnp.ndarray) -> jnp.ndarray:
             return fwd(mean + root @ u)
@@ -90,54 +169,99 @@ class StateEstimator:
             value = jnp.sum(resid**2)
             return jnp.where(jnp.isfinite(value), value, jnp.inf)
 
-        def refine(u0: jnp.ndarray, target: jnp.ndarray) -> jnp.ndarray:
-            dim = u0.shape[0]
+        def lm_step(carry, target):
+            # The float expressions are those of the original loop, in the same order. The
+            # carry gains integer and boolean fields only (WU-0005.4, L4 and V1 check this).
+            u, c_u, damping, n_acc, bad_cost, bad_jac, late, k = carry
+            dim = u.shape[0]
+            a_mat = jac(u)
+            finite = jnp.isfinite(a_mat)
+            a_mat = jnp.where(finite, a_mat, 0.0)
+            normal = a_mat.T @ a_mat
+            rhs = a_mat.T @ (target - generate(u))
+            scale = jnp.trace(normal) / dim + 1e-12
+            delta = jnp.linalg.solve(normal + damping * scale * jnp.eye(dim), rhs)
+            cand = u + delta
+            c_cand = cost(cand, target)
+            accept = c_cand < c_u
+            u_new = jnp.where(accept, cand, u)
+            c_new = jnp.where(accept, c_cand, c_u)
+            damping_new = jnp.where(accept, damping / 3.0, damping * 4.0)
+            material = accept & (c_u - c_cand > LATE_DECREASE * c_u) & (k >= first_late)
+            new = (u_new, c_new, damping_new, n_acc + accept.astype(jnp.int32),
+                   bad_cost | jnp.isinf(c_cand), bad_jac | ~jnp.all(finite),
+                   jnp.where(material, jnp.int32(1), late), k + 1)
+            return new, (u_new, c_new, accept)
 
+        def start(u0: jnp.ndarray, target: jnp.ndarray):
+            c0 = cost(u0, target)
+            return (u0, c0, 1e-3, jnp.int32(0), jnp.isinf(c0), jnp.bool_(False), jnp.int32(0),
+                    jnp.int32(0))
+
+        def diagnostics(carry):
+            _, c_final, _, n_acc, bad_cost, bad_jac, late, _ = carry
+            return c_final, n_acc, bad_cost, bad_jac, late
+
+        def refine(u0: jnp.ndarray, target: jnp.ndarray):
             def body(carry, _):
-                u, c_u, damping = carry
-                a_mat = jac(u)
-                a_mat = jnp.where(jnp.isfinite(a_mat), a_mat, 0.0)
-                normal = a_mat.T @ a_mat
-                rhs = a_mat.T @ (target - generate(u))
-                scale = jnp.trace(normal) / dim + 1e-12
-                delta = jnp.linalg.solve(normal + damping * scale * jnp.eye(dim), rhs)
-                cand = u + delta
-                c_cand = cost(cand, target)
-                accept = c_cand < c_u
-                u_new = jnp.where(accept, cand, u)
-                return (u_new, jnp.where(accept, c_cand, c_u),
-                        jnp.where(accept, damping / 3.0, damping * 4.0)), None
+                return lm_step(carry, target)[0], None
 
-            (u_final, _, _), _ = jax.lax.scan(body, (u0, cost(u0, target), 1e-3), None,
-                                              length=n_iter)
-            return u_final
+            carry, _ = jax.lax.scan(body, start(u0, target), None, length=n_iter)
+            return carry[0], diagnostics(carry)
+
+        def trace(u0: jnp.ndarray, target: jnp.ndarray):
+            def body(carry, _):
+                return lm_step(carry, target)
+
+            carry, ys = jax.lax.scan(body, start(u0, target), None, length=n_iter)
+            return carry[0], diagnostics(carry), ys
+
+        return Refinement(refine=refine, trace=trace, cost=cost, generate=generate)
+
+    def _build(self) -> Callable:
+        ctx = self.ctx
+        root = jnp.asarray(ctx.unwhiten)
+        mean = jnp.asarray(ctx.state_mean)
+        span = ctx.history
+        step = self.model_step
+        nu_fn = make_observability(step, ctx.spec.observed_index, ctx.obs_scale,
+                                   ctx.whiten, ctx.delay, ctx.embed_dim)
+        n_iter = self.refine_steps
+        parts = self.refinement()
 
         def advance(s_old: jnp.ndarray) -> jnp.ndarray:
             return jax.lax.fori_loop(0, span, lambda _, s: step(s), s_old)
 
-        def single(x: jnp.ndarray, u0: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-            u = refine(u0, x) if n_iter > 0 else u0
+        def single(x: jnp.ndarray, u0: jnp.ndarray):
+            if n_iter > 0:
+                u, diag = parts.refine(u0, x)
+            else:  # refinement disabled: the residual is the cost at the start (defined, not used)
+                c0 = parts.cost(u0, x)
+                u, diag = u0, (c0, jnp.int32(0), jnp.isinf(c0), jnp.bool_(False), jnp.int32(0))
             s_old = mean + root @ u
-            return advance(s_old), s_old
+            return advance(s_old), s_old, diag
 
         batched = jax.jit(jax.vmap(single))
 
-        def run(inputs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        def run(inputs: np.ndarray) -> tuple[np.ndarray, np.ndarray, LMDiagnostics]:
             u0 = jnp.asarray(self.network.predict(jnp.asarray(inputs)))
-            s_t, s_old = batched(jnp.asarray(inputs), u0)
+            s_t, s_old, diag = batched(jnp.asarray(inputs), u0)
             nu = nu_fn(s_old)
-            return np.asarray(s_t), np.asarray(nu)
+            residual, accepted, bad_cost, bad_jac, late = (np.asarray(d) for d in diag)
+            return np.asarray(s_t), np.asarray(nu), LMDiagnostics(
+                residual=residual, accepted=accepted, nonfinite_cost=bad_cost,
+                nonfinite_jacobian=bad_jac, late_progress=late)
 
         return run
 
-    def estimate_counted(self, inputs: np.ndarray
-                         ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def estimate_counted(self, inputs: np.ndarray) -> tuple[
+            np.ndarray, np.ndarray, np.ndarray, np.ndarray, LMDiagnostics]:
         """Estimate states and ``nu`` with the replacements applied and flagged (DEF-0001).
 
         The values are those of the original ``estimate``: a non-finite ``nu`` becomes ``1e6`` and
         a non-finite coordinate becomes the invariant mean of that coordinate (a replacement,
         not a wrong-basin estimate: no finite state came back). The flags are taken on the host
-        after the compiled function, so the compiled function and the values do not change.
+        after the compiled function, so the values do not depend on them.
 
         Parameters
         ----------
@@ -155,15 +279,18 @@ class StateEstimator:
             (``invariant_mean_replacements`` counts these estimates, not coordinates).
         nu_replaced : np.ndarray
             Boolean ``(n,)``: ``nu`` was not finite and was replaced (``nu_replacements``).
+        lm : LMDiagnostics
+            Residual, accepted iterations, S3/S4 flags and ``late_progress`` of the
+            Levenberg-Marquardt refinement, per estimate (NVVUQ.10).
         """
         if self._fn is None:
             self._fn = self._build()
-        states, nu = self._fn(inputs)
+        states, nu, lm = self._fn(inputs)
         finite_nu = np.isfinite(nu)
         finite_state = np.isfinite(states)
         nu = np.where(finite_nu, nu, 1e6)
         states = np.where(finite_state, states, self.ctx.state_mean)
-        return states, nu, ~finite_state.all(axis=1), ~finite_nu
+        return states, nu, ~finite_state.all(axis=1), ~finite_nu, lm
 
     def estimate(self, inputs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Estimate physical states and the observability factor at the estimate.
@@ -181,5 +308,84 @@ class StateEstimator:
             Physical state estimates ``s_hat_t`` ``(n, m)`` and ``nu(s_hat)``
             ``(n,)`` (non-finite values are replaced by a large number).
         """
-        states, nu, _, _ = self.estimate_counted(inputs)
+        states, nu, *_ = self.estimate_counted(inputs)
         return states, nu
+
+
+def lm_summary(residual: np.ndarray, accepted: np.ndarray, late_progress: np.ndarray,
+               noise: float) -> dict:
+    """Summarize the Levenberg-Marquardt diagnostics of a set of estimates (NVVUQ.10, WU-0005.4).
+
+    Parameters
+    ----------
+    residual : np.ndarray
+        Final cost ``c`` per estimate (normalized observation units); ``inf`` allowed, NaN not.
+    accepted : np.ndarray
+        Accepted iterations per estimate, same size as ``residual``.
+    late_progress : np.ndarray
+        ``LMDiagnostics.late_progress`` (0 or 1), same size.
+    noise : float
+        Noise level ``rho`` (fraction of ``sigma_x``), positive: it scales the goodness-of-fit
+        reading ``c / rho^2``.
+
+    Returns
+    -------
+    dict
+        * ``n_estimates``, ``noise``;
+        * ``median_residual`` (``np.median``) and ``p95_residual`` (``np.quantile`` with
+          ``method="inverted_cdf"``, the order statistic ``x_(ceil(0.95 n))``, which is finite
+          whenever that order statistic is; the linear method returns NaN for a finite quantile
+          next to an ``inf``). A value that is ``inf`` is reported as ``None``;
+        * ``median_iterations``: the median of ``accepted``. It counts accepted steps, including
+          the round-off accepts after the cost has converged (null steps whose candidate cost is an
+          ulp lower), so it is an upper bound on the number of productive steps and not the
+          number of iterations to convergence;
+        * ``fraction_no_decrease``: the mean of ``accepted == 0``. With a fixed budget it is a
+          failure indicator (non-finite cost, corrupted gradient, or a start already stationary),
+          not a convergence indicator;
+        * ``nonfinite_residuals``: the count of ``inf`` residuals;
+        * ``fraction_late_progress`` (D1): the mean of ``late_progress``;
+        * ``fraction_above_chi2`` (D3): the fraction with ``c / rho^2`` above the ``chi2_4`` 0.999
+          quantile (18.47). It is a diagnostic: it has no gate or verdict role. To first order a
+          converged estimate in the right basin has ``c / rho^2 ~ chi2_4`` (median 3.36, p95 9.49),
+          so the fraction is about 0.001 plus the unconverged and wrong-basin estimates.
+
+        With no estimates, ``n_estimates`` is 0, ``nonfinite_residuals`` is 0 and every other
+        value is ``None``.
+
+    Raises
+    ------
+    ValueError
+        If the sizes differ, ``noise`` is not positive, or a residual is NaN (the loop maps every
+        non-finite cost to ``inf``, so a NaN is a bug and is not summarized).
+
+    Notes
+    -----
+    Needs owner review before freeze (LPC.PC.11): the keys are the schema of the NVVUQ.10
+    evidence. Across hosts these values are not bitwise (DEF-0023, DEF-0024); see WU-0005.4.
+    """
+    residual = np.asarray(residual, dtype=np.float64).ravel()
+    accepted = np.asarray(accepted).ravel()
+    late = np.asarray(late_progress).ravel()
+    if not (residual.size == accepted.size == late.size):
+        raise ValueError(f"sizes differ: {residual.size}, {accepted.size}, {late.size}")
+    if not noise > 0.0:
+        raise ValueError(f"noise must be positive, got {noise}")
+    if np.isnan(residual).any():
+        raise ValueError("a residual is NaN; the refinement maps non-finite costs to inf")
+
+    def finite_or_none(value: float) -> float | None:
+        return float(value) if np.isfinite(value) else None
+
+    out: dict = {"n_estimates": int(residual.size), "noise": float(noise),
+                 "median_residual": None, "p95_residual": None, "median_iterations": None,
+                 "fraction_no_decrease": None, "nonfinite_residuals": int(np.isinf(residual).sum()),
+                 "fraction_late_progress": None, "fraction_above_chi2": None}
+    if residual.size:
+        out["median_residual"] = finite_or_none(np.median(residual))
+        out["p95_residual"] = finite_or_none(np.quantile(residual, 0.95, method="inverted_cdf"))
+        out["median_iterations"] = float(np.median(accepted))
+        out["fraction_no_decrease"] = float(np.mean(accepted == 0))
+        out["fraction_late_progress"] = float(np.mean(late))
+        out["fraction_above_chi2"] = float(np.mean(residual > GOF_EXCEED * noise**2))
+    return out
