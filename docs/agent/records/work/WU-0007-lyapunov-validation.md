@@ -122,6 +122,91 @@ Planner: claude-opus-5-5, 2026-10-11. Sources: ROADMAP WU-0007.2/.3, v3 §4 (sys
 
 <dated entries: what was done, commands, results, commits>
 
+### 2026-10-11 Mathematics review of the WU-0007.2 plan (applied-mathematician, claude-opus-5-5)
+
+Scope: M1 to M4 before any code is written. No library or test file was touched, and nothing was committed. The scratch scripts are in the session scratchpad (`lyap_se.py`, `refine.py`, `more.py`, `ics.py`, `memo2.py`), not in the repository. They run a verbatim copy of the body of `estimate_lyapunov` that also returns the per-step log growth; on the registry Lorenz case it reproduces 0.905494 exactly. Runs: CPU, `taskset -c 0,1`, 2 threads, about 130 runs of 0.4 to 2 s each. No seed is involved: the estimator is deterministic, and the initial conditions (ICs) are the only variable. Labelled DEVELOPMENT: these are not study outputs.
+
+**M1. Standard error at the code's settings** (10^5 Benettin steps at 20*max_dt, burn-in 5000, RK4). The SE was estimated in two ways: batch means on one run (20, 50 and 100 batches agree within 15%), and the spread across ICs.
+
+| System | T (time units) | lambda (registry IC) | SE per run: batch means | SD across ICs (n) | SE adopted (relative) |
+|---|---|---|---|---|---|
+| lorenz63 | 2e4 | 0.905494 | 1.0-1.3e-3 | 7.0e-4 (4) | 0.0012 (0.13%) |
+| rossler | 8e4 | 0.071940 | 5.0-6.2e-4 | 4.2e-4 (4), 4.5e-4 (8) | 0.00055 (0.75%) |
+| chua (registry) | 1e4 | 0.431133 | 4.2-5.2e-3 | 4.8e-3 (13 in-basin) | 0.0048 (1.1%) |
+| chua_memo (alpha 9, beta 100/7, m0 -8/7, m1 -5/7) | 1e4 | 0.323544 at (0.7,0,0) | 3.6-4.7e-3 | 4.5e-3 (13), 5.4e-3 (8) | 0.0050 (1.5%) |
+
+- The roadmap's "SE near 1%" is 8 times too pessimistic for Lorenz, about right for Rössler and Chua, and refers to the wrong run length: the code uses 10^5 Benettin steps, not 2×10^5, as the plan already notes.
+- The SE can be bounded in advance (table). The test does not need K = 4 extra runs: they would be cheap (about 2 s), but an SD from 3 degrees of freedom is uncertain by about ±40%, which is worse than the a-priori values above. The docstrings should cite these values as DEVELOPMENT measurements.
+
+**Discretization (numerical row, LPC.NV.1).** The interval was held fixed and the RK4 substep varied, with the same ICs at every level.
+- Lorenz, h = 0.01 / 0.02 / 0.04: 0.90619 / 0.90511 / 0.90549 (SE of each mean about 4e-4). No trend, even at 4h, so the bias at h = 0.01 is below 1e-4 relative.
+- Rössler (8 ICs), h = 0.01 / 0.02 / 0.04 / 0.08: 0.071569 / 0.071566 / 0.071488 / 0.070664 (SE of each mean about 1.2-2.6e-4). The map's lambda is low at large h. The observed order from 0.08→0.04→0.02 is about 3.4 (noisy; formal order 4). The bias at the code's h = 0.04 is about -8e-5 (-0.1%), below 1/7 of the SE.
+- Memo case, h = 0.0025 / 0.005 / 0.01 / 0.02: 0.32811 / 0.32744 / 0.3313 / 0.3267. There is no resolvable trend. Order 2 or lower is expected because of the diode kinks. The bias at h = 0.005 is below 1.5% (2σ bound).
+- Registry Chua, h = 0.005 / 0.01 / 0.02: 0.4323 / 0.4355 / 0.4396 (SE of each mean about 0.4%). There may be an upward trend at coarse h. The bias at 0.005 is not resolved: below about 0.7%.
+
+**M2. Lorenz and Rössler tolerances.**
+- Lorenz: the code SE is 0.13% and the discretization bias is negligible.
+  - The reference uncertainty of Sprott's 0.90563 is unknown. Hartl's stated ±0.003 (0.33%) is the largest stated uncertainty among the confirmed sources, and I use it as a stand-in.
+  - 3·sqrt(0.13² + 0.33²) = 1.06%.
+  - **Recommend tightening to |λ/0.90563 − 1| ≤ 1%** (≈2.8σ; about 7.5 code SEs). The derivation uses no observed gap.
+  - The fixed 3% is about 23 code SEs and would not detect a 1-2% defect such as a wrong time unit or a wrong parameter at the third digit.
+- Rössler: σ_code = 0.75%; B&B 0.07062 ± 0.00066 (0.93%).
+  - σ_diff = 1.19%, so 3% is 2.5σ (two-sided false-alarm probability 1.2% if all assumptions hold). For Sprott's 0.0714, of unknown uncertainty, 3% is about 2.4-4σ.
+  - **Keep 3% for both; it cannot be tightened on SE grounds.** The dual assertion is sound as two separate checks: the references differ by 1.1%, about 1.2 of B&B's σ, so they are mutually consistent. The family-wise false-alarm probability is at most about 2%.
+- Reading of the visible values, after the tolerances were fixed above:
+  - Lorenz 0.905494 is -0.015% from Sprott (0.1 SE).
+  - Rössler 0.0719398 is +0.76% from 0.0714 (≈1.0 σ_code). It is +1.87% from 0.07062 (≈1.6 σ_diff).
+  - Both gaps are within sampling error. The integrator does not explain them: the RK4 bias is -0.1%, in the opposite direction.
+  - The 8-IC mean at h = 0.04 is 0.07149, so the registry-IC run sits +0.6% (≈0.8 SE) above it by chance.
+
+**M3. Memo case.**
+- *Conversion.* Assume the standard double-scroll circuit equations: C1 v1' = G(v2 − v1) − g(v1), C2 v2' = G(v1 − v2) + iL, L iL' = −v2. Put x = v1/Bp, y = v2/Bp, z = iL/(G Bp), τ = tG/C2. Then:
+  - α = C2/C1 = 9, and the y and z equations take the code's form;
+  - β = C2/(L G²) = 7/0.49 = 100/7;
+  - the diode slopes divided by G give inner -0.8/0.7 = -8/7 (code m0) and outer -0.5/0.7 = -5/7 (code m1), with breakpoints at x = ±1 because Bp = 1;
+  - λ_τ = λ_t · C2/G = 0.23/0.7 = 0.3286.
+
+  Each step is correct, but the research note does **not** quote the memo's equations (1.1). Only (1.2) and (1.3) are quoted, so the form above is an assumption. Missing: a verbatim quote of (1.1), the definition of the memo's time variable, and confirmation that x0 is (v_C1, v_C2, i_L). If x0 is in those variables, it maps to z = 1.74606/0.7 = 2.494; this is irrelevant to the test, which uses (0.7,0,0) with burn-in.
+
+  The code's `chua_field` has the same form and naming (systems.py:94-101).
+- *Independent check of the field and time scaling: sum of exponents equals the mean divergence.* This identity is exact and needs no reference.
+  - Full spectrum of the memo case per τ: (0.3235, 0.0008, -2.5259), sum -2.2016. The sampled mean divergence is -2.2023: inner fraction 0.355 × (+2/7) + outer fraction × (-25/7).
+  - Per circuit time the spectrum is (0.2265, 0.0006, -1.768), sum -1.541.
+  - **Discrepancy.** The memo as read gives μ3 ≈ -0.28, a sum of -0.05 (3.22) and d_L = 2.82. These cannot hold for these equations: the sum must equal the mean divergence, about -1.54 per circuit time. The computed Kaplan-Yorke dimension is 2.13.
+  - So the memo's μ3 and sum are wrong in the memo, misread from the scan, or the equations differ from the assumed form. This weakens the memo as a "confirmed" reference.
+  - Recommend that the researcher re-read memo pp. 22-25 and (1.1) before the memo case is relied on. This is a status question for Q-O1, not a blocker for coding.
+- *Tolerance.*
+  - σ_code = 1.5%.
+  - Memo sampling SE at T = 3000 circuit time, which is 2100 τ: 1.5%·sqrt(10^4/2100) = 3.3%. The plan's "≈5%, scaled from Lorenz" overstates it.
+  - Rounding of "0.23": ±2.2% bounded, SD 1.3%.
+  - Start-up bias of the memo's vector alignment: O(1 nat)/(0.23·3000 ≈ 690 nats), below 0.5%.
+  - Discretization: below 1.5%.
+  - Combined σ ≈ 3.9%, so 10% ≈ 2.6σ (false-alarm probability about 1%). **Keep 10%; it cannot be tightened.**
+  - "Biased low (still increasing)" is not supported as an estimator bias: the finite-T Benettin bias is O(1/T), about 0.3% here. A running average that is still drifting at T is consistent with a fluctuation of about ±3%.
+
+**M4. Start-up bias.** Burn-in is 5000 steps: 1000, 4000 and 500 time units for Lorenz, Rössler and Chua.
+- This is ample for the state. Every IC I tried that stays bounded reaches the attractor within O(10) time units; burn-in cannot rescue an IC outside the basin.
+- The basis alignment decays as exp(-(λ1-λ2)t). The excess of the first 100 Benettin steps over the stationary rate is at most 3.4 nats in every run, which is at most 0.06% of λ (at most 1/10 SE in every case).
+- **Negligible**, and the burn-in is adequate.
+
+**Finding F1 (flag, PRIME.4): `estimate_lyapunov` returns a finite, positive, plausible value for a divergent orbit.**
+- Of 12 ICs drawn as (0.7,0,0) + N(0, 0.5²), 3 leave the double-scroll basin for both Chua parameter sets, and the state overflows.
+- The estimator then returns the real part of the outer linear region's unstable complex pair: 0.1854 for the memo case and 0.3055 for the registry Chua. The eigenvalues of the outer matrix agree to 4 digits.
+- The plan's "finite, positive λ" assertion therefore does not detect divergence. The boundedness check must be on the actual orbit: `simulate_trajectory` from the same IC and map for 5000 + 10^5 steps, asserting all finite and max|x| ≤ 3 (the attractor has |x| ≤ 2.26), at about 0.2 s.
+- The registry IC (0.7,0,0) is in the basin for both sets: x ∈ [-2.26, 2.26], with both scrolls visited.
+- A guard inside `estimate_lyapunov` is a library change and is out of scope here. It is recommended to the main session as a DEF candidate.
+
+**Runtime and tier.** Each case takes 0.4-0.6 s including JIT compilation, measured at 2 threads with the machine at load average about 4.5. The four cases plus the import take about 3-5 s. The plan's 3-10 s per case is about 10 times high, so "exceeds the 5 s unit budget" is not true per test. The tier is the planner's decision; if `slow` is kept, it needs another reason.
+
+**Plan corrections.**
+- (a) The SE is 0.13% / 0.75% / 1.1% / 1.5%, not "near 1%".
+- (b) The memo's finite-T SE is 3.3%, not 5%, and it is not biased low.
+- (c) The boundedness check needs a trajectory (F1).
+- (d) The runtime estimate is 10 times high.
+- (e) The memo's equations (1.1) are not quoted, and its μ3 and sum contradict the divergence identity.
+
+Tightened: Lorenz 3% → 1%. Unchanged: Rössler 3% (both references) and memo 10%.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
