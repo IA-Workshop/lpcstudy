@@ -437,8 +437,8 @@ def test_h1b_verdict_uses_the_plp_slope_only() -> None:
     inside [0.8, 1.2] (pass) or entirely above it (fail). The CP and PLP slopes agree with 1.6
     and 1.0 to 1e-12 (OLS on 100 values of order 10 after a ``log(sq - floor)`` round trip:
     relative error a few 1e-16 times the condition number of the design, below 1e-14; 1e-12
-    leaves two orders). The CP entry has only ``slope`` and ``ci``; the PLP entry adds ``n_failed_resamples``; the
-    top-level keys are the plan's. Exact verdicts.
+    leaves two orders). The CP entry has only ``slope`` and ``ci``; the PLP entry adds
+    ``n_failed_resamples``; the top-level keys are the plan's. Exact verdicts.
     """
     from lpcstudy.analysis import h1b_seed_amplifier
 
@@ -484,8 +484,8 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
                                   ("PLP", m.est_seed, m.sq_plp[:, 0], 0.0)):
         x = np.log(gain * seed / np.sqrt(cell.ctx.spec.dim))
         y = 0.5 * np.log(np.maximum(sq - floor, 1e-12))
-        old = block_bootstrap(lambda idx: ols_slope(x[idx], y[idx]), 100, config.bootstrap_resamples,
-                              config.bootstrap_block, config.seed)
+        old = block_bootstrap(lambda idx: ols_slope(x[idx], y[idx]), 100,
+                              config.bootstrap_resamples, config.bootstrap_block, config.seed)
         assert (out[name]["slope"], *out[name]["ci"]) == old
     assert out["PLP"]["n_failed_resamples"] == 0
 
@@ -501,3 +501,212 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
 
     short = h1b_seed_amplifier(_fake_h1b_cell(np.random.default_rng(21005), 40, 1.0, 1.0), config)
     assert short["verdict"] == "inconclusive" and short["reason"] == "n_states < 50"
+
+
+# ----------------------------------------------------------------------------------- H1d
+TESTED_ROWS = ("analog_seed", "estimation_seed", "growth")
+
+
+def _pair(rng: np.random.Generator, n: int, spearman_target: float
+          ) -> tuple[np.ndarray, np.ndarray]:
+    """Bivariate normal pair with Spearman correlation about ``spearman_target``.
+
+    For a bivariate normal with Pearson ``r``, ``rho_s = (6 / pi) arcsin(r / 2)``, so
+    ``r = 2 sin(pi rho_s / 6)`` (0.9545 for 0.95, 0.2091 for 0.2, 0.8 for ``rho_s = 0.7861``).
+    """
+    r = 2.0 * np.sin(np.pi * spearman_target / 6.0)
+    z = rng.standard_normal((n, 2))
+    return z[:, 0], r * z[:, 0] + np.sqrt(1.0 - r**2) * z[:, 1]
+
+
+def _pairs(rng: np.random.Generator, n: int, targets: tuple[float, float, float, float]) -> dict:
+    """The four H1d pairs (three tested rows and ``nhat``) with the given Spearman targets."""
+    return {name: _pair(rng, n, t) for name, t in zip((*TESTED_ROWS, "nhat"), targets)}
+
+
+def test_h1d_spearman_equals_scipy_and_the_closed_form_on_500_points() -> None:
+    """Each row's Spearman is ``scipy.stats.spearmanr`` and ``1 - 6 sum d^2 / (n (n^2 - 1))`` (T9).
+
+    Reference: scipy for the point estimate (ROADMAP: 10^-12 on 500 bivariate-normal points,
+    rho = 0.8, fixed seed), plus the closed form on the integer ranks of tie-free data (the code's
+    ``spearman`` *is* scipy's, so the closed form is the independent check; applied-mathematician,
+    WU-0002.4-5 log, Job 1 item 6). 500 draws, ``default_rng(21011)``, four independent pairs.
+
+    Tolerance: absolute 1e-12. The closed form is an exact integer sum (Sum d^2 < 5e7, exact in
+    float64) and three operations; scipy's value is the Pearson correlation of the ranks,
+    a few hundred operations on numbers of order 10^2 to 10^5 with relative error a few 1e-16
+    times 500; 1e-12 leaves about three orders.
+    """
+    from scipy.stats import rankdata, spearmanr
+
+    from lpcstudy.analysis import h1d_correlations
+
+    pairs = _pairs(np.random.default_rng(21011), 500, (0.7861,) * 4)
+    out = h1d_correlations(pairs, "lorenz63", _config(50))
+    for name, (a, b) in pairs.items():
+        got = out["rows"][name]["spearman"]
+        d = rankdata(a) - rankdata(b)
+        closed_form = 1.0 - 6.0 * np.sum(d**2) / (500 * (500**2 - 1))
+        assert got == pytest.approx(spearmanr(a, b).statistic, abs=1e-12, rel=0)
+        assert got == pytest.approx(closed_form, abs=1e-12, rel=0)
+
+
+def test_h1d_interval_is_the_seeded_block_bootstrap_at_the_study_settings() -> None:
+    """The interval contains the point and equals ``block_bootstrap_counted`` with the label (T10).
+
+    Reference: ``StudyConfig()`` has 2000 resamples and blocks of 5 (v3 section 7), and the
+    interval of each row equals bitwise the percentile interval of
+    ``block_bootstrap_counted(idx -> spearman(a[idx], b[idx]))`` with
+    ``make_rng(config.seed, system, "bootstrap", "H1d", name)`` at level 0.95. That pins the
+    seed label, the resample count and the block; a different label or count changes the
+    interval. 100 states (the cost is 2 x 4 x 2000 rank correlations), ``default_rng(21012)``.
+    The interval contains the point estimate (the percentile interval of a smooth statistic
+    does, with the observed margin far from the edge). Exact.
+    """
+    from lpcstudy.analysis import h1d_correlations
+    from lpcstudy.statistics import spearman
+
+    config = StudyConfig()
+    assert config.bootstrap_resamples == 2000 and config.bootstrap_block == 5
+    pairs = _pairs(np.random.default_rng(21012), 100, (0.8, 0.8, 0.8, 0.5))
+    out = h1d_correlations(pairs, "rossler", config)
+    assert out["level"] == 0.95 and out["threshold"] == 0.7
+    for name, (a, b) in pairs.items():
+        ref = block_bootstrap_counted(
+            lambda idx: spearman(a[idx], b[idx]), 100, 2000, 5,
+            make_rng(config.seed, "rossler", "bootstrap", "H1d", name), 0.95)
+        row = out["rows"][name]
+        assert row["interval"] == [ref.lower, ref.upper] and row["spearman"] == ref.estimate
+        assert row["n_failed_resamples"] == ref.n_failed == 0
+        assert row["interval"][0] <= row["spearman"] <= row["interval"][1]
+
+
+def test_h1d_nhat_has_no_verdict_and_does_not_move_the_overall_verdict() -> None:
+    """``nhat`` is reported (Spearman and interval) without a verdict; the three rows decide (T11).
+
+    Reference: v3 sections 2 and 8 and M2 H1e: N-hat is reported, not tested. Synthetic pairs
+    with n = 500 and Spearman targets 0.95 (three tested rows) or 0.2: on the Fisher-z scale
+    (SE = sqrt((1 + rho^2/2) / (n - 3)), applied-mathematician) the lower bound for 0.95 is
+    16 sd above 0.7 and the upper bound for 0.2 is 15 sd below it, so verdicts are pass and fail
+    with a margin that no bootstrap noise at 200 resamples can cross. Flipping the N-hat pair's
+    correlation from +0.9 to -0.9 leaves the verdict, ``pass`` and the three tested rows
+    unchanged (identical dicts), while ``nhat`` has ``spearman`` and ``interval`` and neither
+    ``pass`` nor ``verdict``. One tested row at 0.2 gives fail overall.
+    """
+    from lpcstudy.analysis import h1d_correlations
+
+    config = _config(200)
+    rng = np.random.default_rng(21013)
+    pairs = _pairs(rng, 500, (0.95, 0.95, 0.95, 0.9))
+    flipped = dict(pairs, nhat=(pairs["nhat"][0], -pairs["nhat"][1]))
+    out, out_flipped = (h1d_correlations(p, "chua", config) for p in (pairs, flipped))
+    assert out["verdict"] == out_flipped["verdict"] == "pass"
+    assert out["pass"] is out_flipped["pass"] is True and out["reason"] is None
+    assert [out["rows"][name]["verdict"] for name in TESTED_ROWS] == ["pass"] * 3
+    assert {name: out["rows"][name] for name in TESTED_ROWS} == \
+        {name: out_flipped["rows"][name] for name in TESTED_ROWS}
+    nhat, nhat_flipped = out["rows"]["nhat"], out_flipped["rows"]["nhat"]
+    assert {"spearman", "interval"} <= set(nhat) and not {"pass", "verdict"} & set(nhat)
+    assert nhat["spearman"] > 0.8 and nhat_flipped["spearman"] < -0.8
+
+    low = h1d_correlations(_pairs(rng, 500, (0.95, 0.95, 0.2, 0.95)), "chua", config)
+    assert low["rows"]["growth"]["verdict"] == "fail"
+    assert low["rows"]["analog_seed"]["verdict"] == "pass"
+    assert low["verdict"] == "fail" and low["pass"] is False
+
+
+def test_h1d_exclusions_minimum_states_and_uncomputable_rows() -> None:
+    """Non-finite pairs are excluded per row and counted; short or constant rows are inconclusive.
+
+    Reference: DEC-0008 A3 and the applied-mathematician's condition (ii) (WU-0002.4-5 log, Job 1
+    item 5): exclusion is per row, so a reported-only ``nhat`` with NaNs does not shrink the
+    tested rows. Exact counts and reasons: (i) two NaN in ``nhat`` only: the tested rows keep all
+    120 states, ``nhat`` has 118 and 2 excluded, top-level ``n_states`` 120 and
+    ``n_excluded_nonfinite`` 0; (ii) one NaN in a tested row: that row has 119 states, the
+    top level reports the smallest (119) and the largest exclusion (1); (iii) 49 states give
+    "n_states < 50" for every tested row and the whole; (iv) a constant proxy makes the
+    correlation undefined: the row is "inconclusive" with reason "not computable" and
+    every resample is counted failed. (The scipy constant-input warning is expected.)
+    """
+    import warnings
+
+    from lpcstudy.analysis import h1d_correlations
+
+    config = _config(100)
+    rng = np.random.default_rng(21014)
+    pairs = _pairs(rng, 120, (0.9, 0.9, 0.9, 0.9))
+    pairs["nhat"][0][[3, 4]] = np.nan
+    out = h1d_correlations(pairs, "lorenz63", config)
+    assert out["rows"]["nhat"]["n_states"] == 118
+    assert out["rows"]["nhat"]["n_excluded_nonfinite"] == 2
+    assert out["rows"]["analog_seed"]["n_states"] == 120
+    assert out["n_states"] == 120 and out["n_excluded_nonfinite"] == 0
+
+    pairs["growth"][1][9] = np.inf
+    out = h1d_correlations(pairs, "lorenz63", config)
+    assert out["rows"]["growth"]["n_states"] == 119 and out["n_states"] == 119
+    assert out["n_excluded_nonfinite"] == 1 and out["rows"]["growth"]["n_excluded_nonfinite"] == 1
+
+    short = h1d_correlations(_pairs(rng, 49, (0.95,) * 4), "lorenz63", config)
+    assert [short["rows"][n]["reason"] for n in TESTED_ROWS] == ["n_states < 50"] * 3
+    assert short["verdict"] == "inconclusive" and short["pass"] is False
+    assert short["reason"] == ("analog_seed: n_states < 50; estimation_seed: n_states < 50; "
+                               "growth: n_states < 50")
+
+    flat = _pairs(rng, 120, (0.9,) * 4)
+    flat["estimation_seed"] = (np.ones(120), flat["estimation_seed"][1])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        out = h1d_correlations(flat, "lorenz63", config)
+    row = out["rows"]["estimation_seed"]
+    assert row["verdict"] == "inconclusive" and row["reason"] == "not computable"
+    assert row["n_failed_resamples"] == config.bootstrap_resamples
+    assert out["verdict"] == "inconclusive" and out["reason"] == "estimation_seed: not computable"
+
+
+def test_h1d_proxies_pairs_each_proxy_with_its_oracle_on_the_first_draw() -> None:
+    """``h1d_proxies`` maps the cell onto the four pairs and keeps the Cramer-Rao comparison.
+
+    Reference: the definitions of v3 H1d (and the pre-existing code): (eps-hat, eps_s),
+    (delta-hat, delta), (Lambda-hat, Lambda-bar), (N-hat, N), all on the first evaluation draw
+    (column 0; column 1 is deliberately different noise), and the reported Spearman of the
+    estimation seed with ``rho nu``. Each value is compared with ``scipy.stats.spearmanr`` of
+    the pair built in the test, at 1e-12 absolute (ranks of 80 distinct values; round-off
+    below 1e-14). Different Spearman targets per pair (0.9, 0.7, 0.5, 0.3, 0.1) make a swapped
+    pair visible. The result carries ``estimation_seed_vs_cramer_rao`` with no interval.
+    """
+    from scipy.stats import spearmanr
+
+    from lpcstudy.analysis import h1d_proxies
+
+    rng = np.random.default_rng(21015)
+    n, noise = 80, 0.02
+    eps_hat, analog = _pair(rng, n, 0.9)
+    delta_hat, est = _pair(rng, n, 0.7)
+    growth_hat, growth = _pair(rng, n, 0.5)
+    nhat, noise_sens = _pair(rng, n, 0.3)
+    _, nu_scaled = _pair(rng, n, 0.1)
+    nu = np.exp(nu_scaled) / noise
+    other = rng.standard_normal((n, 1))  # draw 1: must not be used
+    ev = SimpleNamespace(growth_proxy=np.column_stack([growth_hat, other]),
+                         noise_sens=np.column_stack([nhat, other]))
+    rules = SimpleNamespace(proxies=SimpleNamespace(
+        seeds=lambda e, rho: (np.column_stack([eps_hat, other]),
+                              np.column_stack([delta_hat, other]))))
+    cell = SimpleNamespace(
+        system="lorenz63", noise=noise,
+        splits={"test": SimpleNamespace(evals=ev, moments=SimpleNamespace(
+            analog_seed=analog, est_seed=est, noise_sens=noise_sens))},
+        oracles={"test": SimpleNamespace(growth=growth, nu=nu)})
+    out = h1d_proxies(cell, rules, _config(50))
+    expected = {"analog_seed": (eps_hat, analog), "estimation_seed": (delta_hat, est),
+                "growth": (growth_hat, growth), "nhat": (nhat, noise_sens)}
+    for name, (a, b) in expected.items():
+        assert out["rows"][name]["spearman"] == pytest.approx(spearmanr(a, b).statistic,
+                                                              abs=1e-12, rel=0)
+    assert out["estimation_seed_vs_cramer_rao"] == pytest.approx(
+        spearmanr(est, noise * nu).statistic, abs=1e-12, rel=0)
+    assert set(out) == {"rows", "estimation_seed_vs_cramer_rao", "threshold", "level",
+                        "n_states", "n_excluded_nonfinite", "verdict", "reason", "pass"}
+    assert set(out["rows"]["growth"]) == {"spearman", "interval", "n_failed_resamples",
+                                          "n_states", "n_excluded_nonfinite", "verdict", "reason"}

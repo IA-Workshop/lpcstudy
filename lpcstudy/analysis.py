@@ -5,9 +5,11 @@ the reported gain bound, and the validation check V7 (H2e, noise matching, is ad
 
 Every function returns a plain ``dict`` (JSON-serializable) with the point
 estimate, its block-bootstrap interval, the pre-registered threshold and a
-``pass`` flag. Primary endpoints H2a and H2b use Bonferroni-adjusted
-intervals at level ``1 - 0.05/3`` (H3c, also primary, gets its interval in WU-0002.8, and
-until then has none); all others use 95% intervals.
+``pass`` flag. H1a, H1b and H1d (WU-0002.4 and .5) also carry the three-valued ``verdict`` of
+DEC-0008 A1/A3 (``pass``, ``fail``, ``inconclusive``, with a ``reason``) from the shared helpers
+of :mod:`lpcstudy.statistics`; ``pass`` is ``verdict == "pass"``. Primary endpoints H2a and
+H2b use Bonferroni-adjusted intervals at level ``1 - 0.05/3`` (H3c, also primary, gets its
+interval in WU-0002.8, and until then has none); all others use 95% intervals.
 """
 
 from __future__ import annotations
@@ -227,9 +229,10 @@ def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
 
     A state with a non-finite seed error (any library size, any noise level) or a non-finite
     reference is excluded from both parts and counted (``n_excluded_nonfinite``); fewer than
-    ``statistics.MIN_STATES`` (50) states left gives inconclusive ("n_states < 50"); a non-finite point
-    estimate gives inconclusive ("not computable"); failed resamples are counted per noise level
-    (``n_failed_resamples``) and placed at the unfavourable tail by the shared helper.
+    ``statistics.MIN_STATES`` (50) states left gives inconclusive ("n_states < 50"); a
+    non-finite point estimate gives inconclusive ("not computable"); failed resamples are
+    counted per noise level (``n_failed_resamples``) and placed at the unfavourable tail by the
+    shared helper.
 
     Parameters
     ----------
@@ -409,8 +412,94 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
     return res
 
 
+H1D_TESTED = ("analog_seed", "estimation_seed", "growth")
+H1D_REPORTED = ("nhat",)
+
+
+def h1d_correlations(pairs: dict[str, tuple[np.ndarray, np.ndarray]], system: str,
+                     config: StudyConfig) -> dict:
+    """H1d core: Spearman correlation of each proxy with its oracle, with bootstrap intervals.
+
+    Each pair gets a 95% moving-block-bootstrap percentile interval of the Spearman correlation
+    (resamples and block from ``config``: 2000 and 5 in the study), seeded by
+    ``make_rng(config.seed, system, "bootstrap", "H1d", name)``. The three tested pairs
+    (``analog_seed``, ``estimation_seed``, ``growth``) are each judged by their lower bound
+    against ``[0.7, inf)`` (closed; DEC-0008 A1, v3 H1d); the whole is ``combine_verdicts`` of the
+    three. The pair ``nhat`` (N-hat against N) is reported with its interval and **no verdict**
+    (v3 sections 2 and 8). A pair is cleaned per row: states where either member is non-finite
+    are excluded and counted, so a reported row with missing values never shrinks a tested one;
+    a row with fewer than ``statistics.MIN_STATES`` (50) states, or a correlation that cannot be
+    computed, is inconclusive (DEC-0008 A3), and failed resamples are counted.
+
+    Parameters
+    ----------
+    pairs : dict[str, tuple[np.ndarray, np.ndarray]]
+        ``(proxy, oracle)`` per name; the names are exactly ``analog_seed``, ``estimation_seed``,
+        ``growth`` and ``nhat``; the arrays are 1-D of equal length, in time order.
+    system : str
+        System name (seed label).
+    config : StudyConfig
+        Study configuration (bootstrap settings, master seed).
+
+    Returns
+    -------
+    dict
+        ``rows`` (per name: ``spearman``, ``interval``, ``n_failed_resamples``, ``n_states``,
+        ``n_excluded_nonfinite``, and for tested rows ``verdict`` and ``reason``), ``threshold``
+        0.7, ``level``, ``n_states`` (the smallest of the tested rows), ``n_excluded_nonfinite``
+        (the largest of the tested rows), ``verdict``, ``reason`` and ``pass``.
+
+    Raises
+    ------
+    ValueError
+        If the names are not the four above or a pair is not two 1-D arrays of equal length.
+    """
+    if set(pairs) != {*H1D_TESTED, *H1D_REPORTED}:
+        raise ValueError(f"pairs must be exactly {[*H1D_TESTED, *H1D_REPORTED]}; "
+                         f"got {sorted(pairs)}")
+    rows: dict = {}
+    for name in (*H1D_TESTED, *H1D_REPORTED):
+        proxy, oracle = (np.asarray(v, dtype=float) for v in pairs[name])
+        if proxy.ndim != 1 or proxy.shape != oracle.shape:
+            raise ValueError(f"{name}: need two 1-D arrays of equal length; got "
+                             f"{proxy.shape} and {oracle.shape}")
+        keep = np.isfinite(proxy) & np.isfinite(oracle)
+        a_values, b_values = proxy[keep], oracle[keep]
+        n_states = len(a_values)
+        if n_states >= 2:
+            interval = block_bootstrap_counted(
+                lambda idx: spearman(a_values[idx], b_values[idx]), n_states,
+                config.bootstrap_resamples, config.bootstrap_block,
+                make_rng(config.seed, system, "bootstrap", "H1d", name), H1_LEVEL)
+            est, lo, hi, n_failed = interval.estimate, interval.lower, interval.upper, \
+                interval.n_failed
+        else:
+            est = lo = hi = float("nan")
+            n_failed = 0
+        rows[name] = {"spearman": est, "interval": [lo, hi], "n_failed_resamples": int(n_failed),
+                      "n_states": int(n_states),
+                      "n_excluded_nonfinite": int(len(proxy) - n_states)}
+        if name in H1D_TESTED:
+            rows[name]["verdict"], rows[name]["reason"] = criterion_verdict(
+                est, lo, hi, H1D_BAND, n_states=n_states)
+    tested = [rows[name] for name in H1D_TESTED]
+    verdict = combine_verdicts(row["verdict"] for row in tested)
+    reason = "; ".join(f"{name}: {rows[name]['reason']}" for name in H1D_TESTED
+                       if rows[name]["verdict"] == "inconclusive") \
+        if verdict == "inconclusive" else None
+    return {"rows": rows, "threshold": H1D_BAND[0], "level": H1_LEVEL,
+            "n_states": min(row["n_states"] for row in tested),
+            "n_excluded_nonfinite": max(row["n_excluded_nonfinite"] for row in tested),
+            "verdict": verdict, "reason": reason, "pass": bool(verdict == "pass")}
+
+
 def h1d_proxies(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
-    """H1d: Spearman correlation of each deployable proxy with its oracle >= 0.7.
+    """H1d: Spearman correlation of each deployable proxy with its oracle, lower bound >= 0.7.
+
+    Tested pairs (first evaluation draw): (eps-hat, eps_s), (delta-hat, delta),
+    (Lambda-hat, Lambda-bar). Reported only, with an interval and no verdict: (N-hat, N), and
+    the Spearman correlation of the estimation seed with ``rho nu`` (a plain number). See
+    :func:`h1d_correlations`.
 
     Parameters
     ----------
@@ -424,19 +513,18 @@ def h1d_proxies(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
     Returns
     -------
     dict
-        Spearman correlations (first evaluation draw).
+        The result of :func:`h1d_correlations` plus ``estimation_seed_vs_cramer_rao``.
     """
     split = cell.splits["test"]
     ev, m, o = split.evals, split.moments, cell.oracles["test"]
     eps_hat, delta_hat = rules.proxies.seeds(ev, cell.noise)
-    corr = {"analog_seed": spearman(eps_hat[:, 0], m.analog_seed),
-            "estimation_seed": spearman(delta_hat[:, 0], m.est_seed),
-            "growth": spearman(ev.growth_proxy[:, 0], o.growth),
-            "noise_sensitivity": spearman(ev.noise_sens[:, 0], m.noise_sens),
-            "estimation_seed_vs_cramer_rao": spearman(m.est_seed, cell.noise * o.nu)}
-    passed = all(corr[k] >= 0.7 for k in ("analog_seed", "estimation_seed", "growth",
-                                          "noise_sensitivity"))
-    return {"spearman": corr, "threshold": 0.7, "pass": bool(passed)}
+    pairs = {"analog_seed": (eps_hat[:, 0], m.analog_seed),
+             "estimation_seed": (delta_hat[:, 0], m.est_seed),
+             "growth": (ev.growth_proxy[:, 0], o.growth),
+             "nhat": (ev.noise_sens[:, 0], m.noise_sens)}
+    out = h1d_correlations(pairs, cell.system, config)
+    out["estimation_seed_vs_cramer_rao"] = spearman(m.est_seed, cell.noise * o.nu)
+    return out
 
 
 def _oracle_profile(cell: Cell, split: str, config: StudyConfig) -> np.ndarray:

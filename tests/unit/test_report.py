@@ -137,8 +137,8 @@ def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
                 "inverse_dim_reference": 0.5},
         "H1b": {"CP": {"slope": 1.0}, "PLP": {"slope": 0.9}},
         "H1c": {"PLP": {"median_ratio": 1.0}, "CP": {"median_ratio": 0.5}},
-        "H1d": {"spearman": {"analog_seed": 0.8, "estimation_seed": 0.9, "growth": 0.7,
-                             "noise_sensitivity": 0.6}},
+        "H1d": {"rows": {"analog_seed": {"spearman": 0.8}, "estimation_seed": {"spearman": 0.9},
+                         "growth": {"spearman": 0.7}, "nhat": {"spearman": 0.6}}},
         "Q-N": {"deployable": {"verdict": "redundant", "logit_w": {"delta_r2": 0.01,
                                                                     "ci": [0.0, 0.02]},
                                "log_horizon": {"delta_r2": 0.02, "ci": [0.01, 0.03]}},
@@ -199,7 +199,7 @@ def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: 
     assert ids == [h.v3_id for h in HYPOTHESIS_TABLE]
     marked = {row.split(" | ")[0][2:]: "[computed with the v1 statistic until " in row
               for row in rows}
-    assert {i for i, m in marked.items() if m} == {"H1d", "Q-N", "H2b", "H2d",
+    assert {i for i, m in marked.items() if m} == {"Q-N", "H2b", "H2d",
                                                    "H3a", "H3c", "(reported)"}
     h2e = rows[ids.index("H2e")]
     assert h2e.endswith("[not computed until WU-0002.7] | n/a: no result | no result |")

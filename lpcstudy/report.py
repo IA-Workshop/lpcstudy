@@ -116,9 +116,9 @@ def _key_number(key: str, res: dict) -> str:
             return f"PLP {_fmt(r['PLP'].get('median_ratio', float('nan')))}, " \
                    f"CP {_fmt(r['CP'].get('median_ratio', float('nan')))}"
         case "H1d":
-            s = r["spearman"]
+            s = {name: row["spearman"] for name, row in r["rows"].items()}
             return f"eps {_fmt(s['analog_seed'], 2)}, delta {_fmt(s['estimation_seed'], 2)}, " \
-                   f"Lambda {_fmt(s['growth'], 2)}, N {_fmt(s['noise_sensitivity'], 2)}"
+                   f"Lambda {_fmt(s['growth'], 2)}, N {_fmt(s['nhat'], 2)}"
         case "Q-N":
             d = r["deployable"]
             return f"{d['verdict']}: dR2 w {_fmt(d['logit_w']['delta_r2'], 2)} " \

@@ -58,7 +58,7 @@ HYPOTHESIS_TABLE: tuple[Hypothesis, ...] = (
         "Median of Λ̄ × dT/d ln θ (PLP); pass if in [0.8, 1.25]"),
     Hypothesis(
         "H1d", "H1e", "H1d", "secondary",
-        "Spearman correlation, each; pass if ≥ 0.7", ("WU-0002.5",)),
+        "Spearman correlation, each; pass if ≥ 0.7"),
     Hypothesis(
         "Q-N", "Q-N", "Q-N", "estimate",
         "Out-of-sample gain in R² (ΔR²) for predicting logit w*, with exact (oracle) values; "

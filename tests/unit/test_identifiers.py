@@ -120,8 +120,7 @@ def test_pending_names_the_roadmap_rows() -> None:
     WU-0002.4-5 phase 2 removes each id from ``pending`` in the commit that implements its
     statistic (H1a, H1b, H1d); the rows still pending are those of the remaining sub-tasks.
     """
-    expected = {"H1d": ("WU-0002.5",),
-                "Q-N": ("WU-0002.6",), "H2b": ("WU-0002.7",), "H2e": ("WU-0002.7",),
+    expected = {"Q-N": ("WU-0002.6",), "H2b": ("WU-0002.7",), "H2e": ("WU-0002.7",),
                 "H2d": ("WU-0002.8",), "H3a": ("WU-0002.8",), "H3c": ("WU-0002.8",),
                 "(reported)": ("WU-0002.9",)}
     assert {h.v3_id: h.pending for h in HYPOTHESIS_TABLE if h.pending} == expected
