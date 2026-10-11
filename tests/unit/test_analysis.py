@@ -211,8 +211,10 @@ def test_recovery_under_the_null_models_no_part_fails() -> None:
     of Lambda_tilde is z (S0) or z (S0n: the bump lies in span[1, Q]), independent of every
     target and filter, so each part has population value 0. Tolerance: 4/sqrt(n_part) on the
     point (the SD of r-hat is at most 1.02/sqrt(n_part); 4 SD gives a false-failure probability
-    of about 1e-4 per check). Verdict: no part may fail; the near-edge margin is at least 5.75
-    SD at n = 2000, R = 2000. Seeds fixed in the test.
+    of about 1e-4 per check). Verdict: no part may fail; the no-fail margins of (ii-b) at
+    n = 2000, R = 2000 (reviewer's measurement, 40 replicates, S0) are 5.3 SD on the upper
+    bound, (E[hi] + 0.1)/SD(hi), and 5.8 SD on the lower bound, (0.1 - E[lo])/SD(lo). Seeds
+    fixed in the test.
     """
     for model, seed in (("S0", 101), ("S0n", 102)):
         data = _synthetic(model, 2000, np.random.default_rng(seed))
@@ -246,9 +248,10 @@ def test_recovery_s1_interior_part_fails_and_zero_part_does_not() -> None:
 
     Reference: closed form (the partial correlation of z + L's residual): the residual of the
     logit given the controls is bI z + 1.2 e, so r = bI / sqrt(bI^2 + 1.44), and (ii-a) is 0
-    because the hurdle does not depend on z. Tolerance 4/sqrt(n_part); the fail margin is at
-    least 8.4 SD (lower bound near 0.26 against the 0.1 edge, SD 0.034), the no-fail margin on
-    (ii-a) at least 7 SD.
+    because the hurdle does not depend on z. Tolerance 4/sqrt(n_part). Fail margin at n = 2000,
+    R = 2000, blocks of 5 (reviewer's measurement, 40 replicates): 6.9 SD of the lower bound,
+    that is (E[lo] - 0.1)/SD(lo) with E[lo] = 0.291 and SD(lo) = 0.0275. The no-fail margin on
+    (ii-a) is the math note's 7.0 SD (15 bootstraps; not re-measured by the reviewer).
     """
     result = _run_part_ii(_synthetic("S1", 2000, np.random.default_rng(104)))
     _assert_recovery(result, {"zero": 0.0, "interior": 0.3490686853})
