@@ -159,6 +159,28 @@ def test_v7_band_is_closed_and_edges_are_sharp() -> None:
         assert out["slope_pass"] is True
 
 
+def test_v7_band_edges_are_inside_exactly() -> None:
+    """An efficiency of exactly 1.1 or exactly 0.9 passes: the band [0.9, 1.1] is closed.
+
+    Reference: v3 E0 and DEC-0008 A1 (closed band), written out. Levels (0.25, 0.5) and nu = 1:
+    delta = c rho with c the float64 nearest to 1.1 (or 0.9). Multiplying by 0.25 or 0.5 is
+    exact in binary (a power of two only shifts the exponent), and so is the division by
+    rho nu back, so the ratio is bit-for-bit the double that the literal 1.1 (0.9) denotes in
+    the comparison; the median of identical values is that double. A strict inequality would
+    fail this test. Exact decisions, no tolerance. The slope is 1 up to about 1e-16, far from
+    its edges.
+    """
+    levels = np.array([0.25, 0.5])
+    nu = np.ones(5)
+    for edge in (1.1, 0.9):
+        deltas = edge * levels[None, :] * nu[:, None]
+        assert np.all(deltas / (levels[None, :] * nu[:, None]) == edge)  # exact, by construction
+        out = v7_efficiency(levels, deltas, nu, CONFIG)
+        assert list(out["efficiency_median_by_noise"].values()) == [edge, edge], edge
+        assert all(out["efficiency_pass_by_noise"].values()), edge
+        assert out["slope_pass"] is True and out["pass"] is True, edge
+
+
 def test_v7_counts_non_finite_input_and_fails() -> None:
     """A NaN delta, or a non-finite or non-positive nu, is counted and fails V7 (PRIME.4).
 
