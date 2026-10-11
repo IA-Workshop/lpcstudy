@@ -591,7 +591,7 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     ``rho`` of the library sweep (the M2 curve; all sizes share each resample), and
     ``library_change_reported``, the 10^3 to 10^4 change at every other ``rho`` of the sweep
     (``0.02``). The per-``rho`` library Spearman and the saturation rule of v1
-    (``median_at_largest_n_lib < 0.95``) are gone (D-05; M2 section M14).
+    (median w* at the largest ``n_lib`` below 0.95) are gone (D-05; M2 section M14).
 
     Parameters
     ----------
@@ -883,7 +883,8 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
     One observation per state, the first evaluation draw (DEC-0008 A4(f)): the caller passes the
     first-draw regime, realized horizon and event flag, so the test does not treat repeated
     draws of a state as independent. The regimes are ordered by their Kaplan-Meier median
-    horizon (NaN, a median not reached, last) with ``np.argsort(kind="stable")``, so a tie
+    horizon (NaN, a median not reached, mapped to infinity so that it comes last; the number of
+    such regimes is reported as ``n_km_not_reached``) with ``np.argsort(kind="stable")``, so a tie
     is ordered by regime index and the pairs do not depend on the CPU (DEF-0013). The family is
     all ``K_real - 1`` consecutive pairs. A pair with an empty regime or with zero log-rank
     variance (``logrank_parts``) is not computed: its raw p is ``None`` and it enters the Holm
@@ -912,7 +913,7 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
     -------
     dict
         ``chosen_K``, ``pairs`` (regime indices, in test order), ``logrank_p_raw`` (None where
-        not computed), ``logrank_p_holm``, ``n_per_regime``, ``iqr_lt`` (interquartile range of
+        not computed), ``logrank_p_holm``, ``n_per_regime``, ``n_km_not_reached``, ``iqr_lt`` (interquartile range of
         the characteristic horizon in Lyapunov times per regime, None below 2 states),
         ``iqr_lt_mean`` (their mean weighted by regime size, the v1 ``mean_iqr_lyapunov``; None
         if no regime has 2 states), ``threshold``, ``pass``, ``inconclusive_reason``.
@@ -958,7 +959,7 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
                                            f">= {H3A_ALPHA}")
     return {"chosen_K": chosen_k, "pairs": [list(pair) for pair in pairs],
             "logrank_p_raw": raw, "logrank_p_holm": adjusted, "n_per_regime": counts,
-            "iqr_lt": iqr, "iqr_lt_mean": iqr_mean,
+            "n_km_not_reached": int(np.isnan(horizons_km).sum()), "iqr_lt": iqr, "iqr_lt_mean": iqr_mean,
             "threshold": f"all Holm-adjusted log-rank p between consecutive regimes < {H3A_ALPHA}",
             **_decision(verdict, reason)}
 

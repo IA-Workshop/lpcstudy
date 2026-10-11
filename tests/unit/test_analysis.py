@@ -467,6 +467,7 @@ def test_h3a_orders_tied_and_missing_horizons_by_regime_index() -> None:
     out = h3a_logrank(regime, np.arange(1, 36), np.ones(35, dtype=bool),
                       np.array([7.0, 7.0, 3.0, 7.0, np.nan, 7.0, np.nan]), np.ones(35), 30, 7)
     assert out["pairs"] == [[2, 0], [0, 1], [1, 3], [3, 5], [5, 4], [4, 6]]
+    assert out["n_km_not_reached"] == 2  # the two NaN medians are counted, not hidden
 
 
 # ---------------------------------------------------------------- WU-0002.8: H3b
@@ -776,8 +777,8 @@ def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -
 
     assert set(out) == {"H3a", "H3b", "H3c", "regime_curve"} and "p_eff" not in json.dumps(out)
     assert set(out["H3a"]) == {"chosen_K", "pairs", "logrank_p_raw", "logrank_p_holm",
-                               "n_per_regime", "iqr_lt", "iqr_lt_mean", "threshold", "pass",
-                               "inconclusive_reason"}
+                               "n_per_regime", "n_km_not_reached", "iqr_lt", "iqr_lt_mean",
+                               "threshold", "pass", "inconclusive_reason"}
     assert set(out["H3b"]) == {"weight_lambda", "D", "stability", "weight_tree_importance",
                                "horizon_tree_importance", "degenerate_fits", "nan_resamples",
                                "n_states", "n_resamples", "max_leaf_nodes", "threshold", "pass",
