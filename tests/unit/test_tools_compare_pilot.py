@@ -1055,13 +1055,50 @@ def test_r8_d1_report_prints_the_reference_path_and_sha256(tmp_path) -> None:
     assert f"- sha256: {hashlib.sha256(ref.read_bytes()).hexdigest()}" in text
 
 
+def test_r10_a_delay_change_between_runs_keeps_the_core_estimators_comparable() -> None:
+    """R10 (branch D): the core estimators of the two sides are compared under a role name, whatever
+    the system's own delay and embedding dimension are on each side. Old own delay 3, new own delay
+    2 (the Rossler case of R9); the old run also has the removed delay/2 variant key (7, 2)."""
+    old_tree = {"systems": {"rossler": {"context": {"delay": 3, "embed_dim": 7}}},
+                "estimators": {"('rossler', 7, 3, 0.01)": {"chosen_width": 64, "seconds": 1.0},
+                               "('rossler', 7, 2, 0.01)": {"chosen_width": 32, "seconds": 1.0},
+                               "('rossler', 5, 3, 0.01)": {"chosen_width": 64, "seconds": 1.0}}}
+    new_tree = {"systems": {"rossler": {"context": {"delay": 2, "embed_dim": 7}}},
+                "estimators": {"('rossler', 7, 2, 0.01)": {"chosen_width": 64, "seconds": 2.0},
+                               "('rossler', 5, 3, 0.01)": {"chosen_width": 64, "seconds": 2.0}}}
+    old, new, _ = cp.load_sides(old_tree, new_tree)
+    status = {cp.show(r.path): r.status for r in cp.compare_leaves(old, new)
+              if r.path[0] == "estimators"}
+    assert status == {
+        "estimators/('rossler', core, core, 0.01)/chosen_width": "equal",
+        "estimators/('rossler', core, core, 0.01)/seconds": "timing",
+        "estimators/delay2-variant:('rossler', 7, 2, 0.01)/chosen_width": "removed",
+        "estimators/delay2-variant:('rossler', 7, 2, 0.01)/seconds": "removed",
+        "estimators/('rossler', 5, 3, 0.01)/chosen_width": "equal",
+        "estimators/('rossler', 5, 3, 0.01)/seconds": "timing"}
+    assert not any(s.startswith("FAIL") for s in status.values())
+
+
+@pytest.mark.parametrize("single", ["A1", "A0"])
+def test_h2c_verdict_keys_of_the_part_are_new_for_any_best_single(single) -> None:
+    """The pilot's best single is A1 (the smoke's is A0): the part's verdict keys are new in v3 for
+    whichever single was chosen (the A1 pilot output failed with these three keys unclassified)."""
+    for key in ("n_failed_resamples", "reason", "verdict"):
+        rule = cp.TABLE.classify(p(f"systems/chua/H2c/A4_minus_{single}/{key}"))
+        assert (rule.cls, rule.sub) == ("new", "WU-0002.8, .9, .11"), (single, key)
+    # the v1 statistics of the A1 part stay unchanged (conditional), the A0 part is new throughout
+    mean = cp.TABLE.classify(p(f"systems/chua/H2c/A4_minus_{single}/mean"))
+    assert mean.cls == ("unchanged" if single == "A1" else "new")
+    assert cp.TABLE.classify(p("systems/chua/H2c/A4_minus_A3/verdict")).cls == "new"   # generic
+
+
 def test_r9_a_system_delay_of_two_is_not_the_removed_variant() -> None:
     """R9: an estimator key with delay 2 is the removed ``delay/2`` variant only if the system's own
     context delay is not 2 (Rossler's AMI delay is 3 in the pilot but may become 2 in regime D)."""
     key = "('rossler', 7, 2, 0.01)"
 
     def classes(own_delay: int) -> dict:
-        tree = {"systems": {"rossler": {"context": {"delay": own_delay}}},
+        tree = {"systems": {"rossler": {"context": {"delay": own_delay, "embed_dim": 7}}},
                 "estimators": {key: {"chosen_width": 64, "seconds": 1.0}}}
         old, new, _ = cp.load_sides(tree, tree)
         return {cp.show(r.path): (r.rule.cls, r.status) for r in cp.compare_leaves(old, new)}
@@ -1070,8 +1107,8 @@ def test_r9_a_system_delay_of_two_is_not_the_removed_variant() -> None:
     assert own3["estimators/delay2-variant:('rossler', 7, 2, 0.01)/chosen_width"] == (
         "removed", "FAIL-removed-rule-new-present")
     own2 = classes(2)      # delay 2 is the system's own: a core estimator, unchanged
-    assert own2["estimators/('rossler', 7, 2, 0.01)/chosen_width"] == ("unchanged", "equal")
-    assert own2["estimators/('rossler', 7, 2, 0.01)/seconds"] == ("timing", "timing")
+    assert own2["estimators/('rossler', core, core, 0.01)/chosen_width"] == ("unchanged", "equal")
+    assert own2["estimators/('rossler', core, core, 0.01)/seconds"] == ("timing", "timing")
     old_only, _, _ = cp.load_sides({"systems": {"rossler": {"context": {"delay": 3}}},
                                     "estimators": {key: {"chosen_width": 64}}}, {})
     res = cp.compare_leaves(old_only, {})

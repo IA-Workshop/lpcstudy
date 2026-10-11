@@ -434,7 +434,7 @@ def _build_rules() -> list[Rule]:
     # The delay/2 variant of v1 has a key whose delay differs from the system's own ``delay``; those
     # keys are renamed with the prefix ``delay2-variant:`` by ``mark_delay_variants`` (a system whose
     # own delay is 2 keeps its core estimators).
-    kept = r"re:\('(lorenz63|rossler|chua)',\s\d+,\s\d+,\s[\d.]+\)"
+    kept = r"re:\('(lorenz63|rossler|chua)',\s(?:\d+|core),\s(?:\d+|core),\s[\d.]+\)"
     gone96 = r"re:\('lorenz96',.*"
     gone2 = r"re:delay2-variant:.*"
     add(_rules("unchanged", f"estimators/{kept}/chosen_width", chain="network", discrete=True,
@@ -699,7 +699,13 @@ def _build_rules() -> list[Rule]:
     add(_rules("changed", f"{h2c}/best_single", "WU-0002.8", "DEC-0008 A4(i), D-25(i)",
                "chosen on the calibration split, not on test", discrete=True,
                chain="network"))
-    add(_rules("new", f"{h2c}/A4_minus_A0/** {h2c}/A4o_minus_A2/** {h2c}/calibration_mse/* "
+    # The best single forecaster is chosen on the calibration split: the pilot's A1 keeps the v1
+    # statistics above; the verdict keys of its part are new in v3, like every key of any other
+    # single (A0 and, generically, any name other than A1 and A2).
+    add(_rules("new", f"{h2c}/A4_minus_A1/{{n_failed_resamples,reason,verdict}}",
+               "WU-0002.8, .9, .11", "DEC-0008 A4(i), D-20", "verdict keys of the H2c part"))
+    add(_rules("new", f"{h2c}/re:A4_minus_(?!A1$|A2$)\\w+/** {h2c}/A4o_minus_A2/** "
+               f"{h2c}/calibration_mse/* "
                f"{h2c}/A4_minus_A2/{{n_failed_resamples,reason,verdict}} "
                f"{h2c}/{{n_failed_resamples,reason,verdict}}", "WU-0002.8, .9, .11",
                "DEC-0008 A4(i), D-20", "calibration choice, A4o - A2 and verdicts"))
@@ -973,22 +979,32 @@ def compare_leaves(old: dict[Path_, object], new: dict[Path_, object],
 
 
 def mark_delay_variants(leaves: dict[Path_, object]) -> dict[Path_, object]:
-    """Rename the ``estimators`` keys of the removed ``delay/2`` variant (WU-0002.1, D-17).
+    """Normalise the ``estimators`` keys ``(system, D, delay, noise)`` of one side.
 
-    An estimator key ``(system, D, delay, noise)`` with delay 2 is that variant unless the system's
-    own ``context/delay`` is 2 (then it is a core estimator). The variant keys get the prefix
-    ``delay2-variant:`` so that the rule table can remove them; a new run that still has one then
-    fails ``FAIL-removed-rule-new-present``. Without the system's context nothing is renamed.
+    * A key whose ``(D, delay)`` equals the system's own ``(context/embed_dim, context/delay)`` on
+      this side is a core estimator: it becomes ``(system, core, core, noise)``, so that a change
+      of the delay or of the embedding dimension between two runs does not read as a missing and a
+      new estimator (R10).
+    * Any other key with delay 2 is the removed ``delay/2`` variant (WU-0002.1, D-17) unless the
+      system's own delay is 2: it gets the prefix ``delay2-variant:`` so that the rule table can
+      remove it (a new run that still has one fails ``FAIL-removed-rule-new-present``).
+    * Without the system's context nothing is renamed.
     """
-    own = {p[1]: v for p, v in leaves.items()
-           if p[0] == "systems" and len(p) == 4 and p[2:] == ("context", "delay")}
+    own = {p[1]: {} for p in leaves if p[0] == "systems" and len(p) == 4 and p[2] == "context"}
+    for p, v in leaves.items():
+        if p[0] == "systems" and len(p) == 4 and p[2] == "context" and p[3] in ("embed_dim", "delay"):
+            own[p[1]][p[3]] = v
     out = {}
     for path, value in leaves.items():
         if path[0] == "estimators" and len(path) > 1:
-            found = re.match(r"\('(\w+)',\s\d+,\s(\d+),\s[\d.]+\)$", path[1])
-            if found and found.group(2) == "2" and found.group(1) in own \
-                    and own[found.group(1)] != 2:
-                path = (path[0], "delay2-variant:" + path[1], *path[2:])
+            found = re.match(r"\('(\w+)',\s(\d+),\s(\d+),\s([\d.]+)\)$", path[1])
+            ctx = own.get(found.group(1), {}) if found else {}
+            if found and "delay" in ctx:
+                dim, delay, noise = int(found.group(2)), int(found.group(3)), found.group(4)
+                if ctx.get("embed_dim") == dim and ctx["delay"] == delay:
+                    path = (path[0], f"('{found.group(1)}', core, core, {noise})", *path[2:])
+                elif delay == 2 and ctx["delay"] != 2:
+                    path = (path[0], "delay2-variant:" + path[1], *path[2:])
         out[path] = value
     return out
 
