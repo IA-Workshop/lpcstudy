@@ -30,6 +30,85 @@ from .estimation import StateEstimator
 
 ERROR_CLIP: float = 10.0
 
+DRAW_COUNTERS: tuple[str, ...] = (
+    "invariant_mean_replacements", "nu_replacements", "gain_replacements", "gain_floor",
+    "error_clips_plp_href", "error_clips_nonfinite_href")
+"""Columns of the per-state ``handled`` array of a computation (DEF-0001, WU-0002.11a).
+
+Each column counts (state, draw) pairs and is invariant under a row subset *and* a horizon
+subset of the moments (D1 of the mathematics review, option (b)): the first four are
+horizon-free (an estimate, or the gains of an estimate), the last two are taken at ``H_ref``,
+which every horizon set contains. ``gain_*`` are filled by ``evaluation_draws`` only.
+"""
+
+ENTRY_COUNTERS: tuple[str, ...] = ("error_clips_cp", "error_clips_plp", "error_clips_nonfinite")
+"""Totals over (state, draw, horizon) error entries; they depend on the horizon set, so they are
+not columns of ``handled`` and are dropped by every state or horizon subset (``clip_entries``)."""
+
+DRAW_COLUMN: dict[str, int] = {name: i for i, name in enumerate(DRAW_COUNTERS)}
+
+
+@dataclass(frozen=True)
+class ClipMasks:
+    """Which error entries ``clip_errors`` clipped, on the pre-clip values.
+
+    Attributes
+    ----------
+    cp, plp, nonfinite : np.ndarray
+        Boolean arrays shaped like the errors. ``cp``: a CP error with ``|e| > clip``.
+        ``plp``: a finite PLP error with ``|e| > clip``. ``nonfinite``: a PLP error that is
+        NaN or infinite (replaced by ``+clip`` for NaN and +inf, ``-clip`` for -inf). The three
+        are disjoint, and an error of exactly ``+-clip`` is in none.
+    """
+
+    cp: np.ndarray
+    plp: np.ndarray
+    nonfinite: np.ndarray
+
+    def counts(self) -> dict[str, int]:
+        """Entry counts ``error_clips_cp``, ``_plp``, ``_nonfinite`` and their sum ``error_clips``."""
+        out = {"error_clips_cp": int(self.cp.sum()), "error_clips_plp": int(self.plp.sum()),
+               "error_clips_nonfinite": int(self.nonfinite.sum())}
+        out["error_clips"] = sum(out.values())
+        return out
+
+
+def clip_errors(cp: np.ndarray, plp: np.ndarray, truth: np.ndarray, clip: float = ERROR_CLIP
+                ) -> tuple[np.ndarray, np.ndarray, ClipMasks]:
+    """Errors against the noise-free truth, clipped at ``+-clip`` and counted (E1 to E3).
+
+    The values are those of the original three lines, in the same order: CP is ``np.clip`` of
+    ``cp - truth``; PLP is ``nan_to_num`` (NaN and +inf to ``+clip``, -inf to ``-clip``) and
+    then ``np.clip``. A NaN CP error is not clipped (``np.clip`` keeps it) and so is not
+    counted; it would propagate visibly. The clip is part of the estimand (v3 section 4), so
+    the counts are reported, not acted on.
+
+    Parameters
+    ----------
+    cp, plp : np.ndarray
+        Forecasts, ``(n, M, nH)``.
+    truth : np.ndarray
+        Noise-free truth, broadcastable to the forecasts (``(n, 1, nH)``).
+    clip : float, optional
+        Clip level in units of ``sigma_x``.
+
+    Returns
+    -------
+    cp_err, plp_err : np.ndarray
+        Clipped errors.
+    masks : ClipMasks
+        The entries that were clipped, from the pre-clip values.
+    """
+    cp_raw = cp - truth
+    plp_raw = plp - truth
+    cp_err = np.clip(cp_raw, -clip, clip)
+    plp_err = np.nan_to_num(plp_raw, nan=clip, posinf=clip, neginf=-clip)
+    plp_err = np.clip(plp_err, -clip, clip)
+    finite = np.isfinite(plp_raw)
+    masks = ClipMasks(cp=np.abs(cp_raw) > clip, plp=finite & (np.abs(plp_raw) > clip),
+                      nonfinite=~finite)
+    return cp_err, plp_err, masks
+
 
 @dataclass
 class AnalogLibrary:
@@ -176,6 +255,11 @@ class DrawBatch:
         Observability factor ``nu`` at the estimate, ``(n, M)``.
     analog_vecs : np.ndarray
         Delay vectors of the retrieved analogs, ``(n, M, D)``.
+    handled : np.ndarray or None
+        Per-state counts of handled (state, draw) pairs, ``(n, len(DRAW_COUNTERS))`` int64
+        (``gain_*`` columns are 0 here; ``evaluation_draws`` fills them).
+    clip_entries : dict[str, int] or None
+        ``error_clips_cp``, ``_plp``, ``_nonfinite`` totals of this batch (``ENTRY_COUNTERS``).
     """
 
     cp_err: np.ndarray
@@ -187,11 +271,13 @@ class DrawBatch:
     est_states: np.ndarray
     est_nu: np.ndarray
     analog_vecs: np.ndarray
+    handled: np.ndarray | None = None
+    clip_entries: dict[str, int] | None = None
 
 
 def forecast_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
                    states_idx: np.ndarray, unit_noise: np.ndarray,
-                   horizons: np.ndarray) -> DrawBatch:
+                   horizons: np.ndarray, reference_horizon: int | None = None) -> DrawBatch:
     """Issue CP and PLP forecasts for a chunk of states under several noise draws.
 
     Parameters
@@ -208,12 +294,27 @@ def forecast_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
         Standard-normal query noise, shape ``(n, M, D)``.
     horizons : np.ndarray
         Forecast horizons in steps (sorted, ``>= 1``).
+    reference_horizon : int, optional
+        ``H_ref`` in steps, for the two ``error_clips_*_href`` columns of ``handled``. With
+        ``None`` those two columns are 0 and mean "not computed" (every pipeline caller passes
+        the value).
 
     Returns
     -------
     DrawBatch
-        Per-draw errors, seeds and inputs.
+        Per-draw errors, seeds, inputs and the handling counts.
+
+    Raises
+    ------
+    ValueError
+        If ``reference_horizon`` is given and is not one of ``horizons``.
     """
+    ref_col = None
+    if reference_horizon is not None:
+        where = np.nonzero(np.asarray(horizons) == reference_horizon)[0]
+        if where.size == 0:
+            raise ValueError(f"reference_horizon {reference_horizon} is not in the horizons")
+        ref_col = int(where[0])
     ctx = setup.ctx
     times = ctx.split_indices[split][states_idx]
     n_states, n_draws, dim = unit_noise.shape
@@ -232,22 +333,30 @@ def forecast_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
                           - s_true_w[:, None, :]) ** 2, axis=-1)
 
     # Physics-based latent-state propagation.
-    est_phys, est_nu = setup.estimator.estimate(flat)
+    est_phys, est_nu, state_bad, nu_bad = setup.estimator.estimate_counted(flat)
     est_w = ctx.whiten_states(est_phys)
     path = np.asarray(setup.paths(int(horizons[-1]))(jnp.asarray(est_phys)))
     plp = path[:, horizons - 1].reshape(n_states, n_draws, -1)
     est_seed = np.sum((est_w.reshape(n_states, n_draws, -1) - s_true_w[:, None, :]) ** 2,
                       axis=-1)
 
-    cp_err = np.clip(cp - truth[:, None, :], -ERROR_CLIP, ERROR_CLIP)
-    plp_err = np.nan_to_num(plp - truth[:, None, :], nan=ERROR_CLIP,
-                            posinf=ERROR_CLIP, neginf=-ERROR_CLIP)
-    plp_err = np.clip(plp_err, -ERROR_CLIP, ERROR_CLIP)
+    cp_err, plp_err, masks = clip_errors(cp, plp, truth[:, None, :])
+    handled = np.zeros((n_states, len(DRAW_COUNTERS)), dtype=np.int64)
+    handled[:, DRAW_COLUMN["invariant_mean_replacements"]] = \
+        state_bad.reshape(n_states, n_draws).sum(axis=1)
+    handled[:, DRAW_COLUMN["nu_replacements"]] = nu_bad.reshape(n_states, n_draws).sum(axis=1)
+    if ref_col is not None:
+        handled[:, DRAW_COLUMN["error_clips_plp_href"]] = masks.plp[:, :, ref_col].sum(axis=1)
+        handled[:, DRAW_COLUMN["error_clips_nonfinite_href"]] = \
+            masks.nonfinite[:, :, ref_col].sum(axis=1)
+    entries = masks.counts()
     return DrawBatch(cp_err=cp_err, plp_err=plp_err, analog_seed_sq=analog_seed,
                      est_seed_sq=est_seed, distance=dist[:, 0].reshape(n_states, n_draws),
                      inputs=noisy, est_states=est_phys.reshape(n_states, n_draws, -1),
                      est_nu=est_nu.reshape(n_states, n_draws),
-                     analog_vecs=library.analog_vectors(lib_idx).reshape(n_states, n_draws, dim))
+                     analog_vecs=library.analog_vectors(lib_idx).reshape(n_states, n_draws, dim),
+                     handled=handled,
+                     clip_entries={k: entries[k] for k in ENTRY_COUNTERS})
 
 
 def retrieval_spread(analog_vecs: np.ndarray, noise: float) -> np.ndarray:

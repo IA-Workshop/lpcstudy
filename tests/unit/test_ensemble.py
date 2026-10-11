@@ -181,3 +181,197 @@ def test_subset_carries_the_correlation_fields_and_keeps_none() -> None:
     np.testing.assert_array_equal(part.err_corr, [[12.0, 13.0, 14.0, 15.0], [4.0, 5.0, 6.0, 7.0]])
     np.testing.assert_array_equal(part.cp_constant, (grid > 9)[[3, 1]])
     np.testing.assert_array_equal(part.plp_constant, (grid < 3)[[3, 1]])
+
+
+# ---------------------------------------------------------------- WU-0002.11a: counters (DEF-0001)
+def _old_error_lines(cp: np.ndarray, plp: np.ndarray, truth: np.ndarray
+                     ) -> tuple[np.ndarray, np.ndarray]:
+    """The three error lines of ``forecast_draws`` before WU-0002.11a, verbatim (bitwise reference)."""
+    clip = 10.0
+    cp_err = np.clip(cp - truth, -clip, clip)
+    plp_err = np.nan_to_num(plp - truth, nan=clip, posinf=clip, neginf=-clip)
+    return cp_err, np.clip(plp_err, -clip, clip)
+
+
+def test_clip_errors_a2_counts_and_boundary() -> None:
+    """A2: ``clip_errors`` counts CP +20, PLP +inf, NaN and -15 exactly; 10.0 is not a clip.
+
+    Reference: a hand array, truth 0. CP errors [20, 10.0, -3, 0, 0, 0, 0]: one clipped (20); 10.0
+    equals the clip and is not counted. PLP errors [0, 0, +inf, NaN, -15, 10.0, -10.0]: +inf and
+    NaN are non-finite (2), -15 is a finite clip (1); +-10.0 are not counted. Expected counts
+    (cp 1, nonfinite 2, plp 1, total 4) are read off the construction. Values are compared
+    bitwise (``tobytes``) with the three old lines (copied above).
+    """
+    from lpcstudy.ensemble import clip_errors
+
+    cp = np.array([[[20.0, 10.0, -3.0, 0.0, 0.0, 0.0, 0.0]]])
+    plp = np.array([[[0.0, 0.0, np.inf, np.nan, -15.0, 10.0, -10.0]]])
+    truth = np.zeros((1, 1, 7))
+    cp_err, plp_err, masks = clip_errors(cp, plp, truth)
+    counts = masks.counts()
+    assert counts == {"error_clips_cp": 1, "error_clips_plp": 1, "error_clips_nonfinite": 2,
+                      "error_clips": 4}
+    assert masks.cp[0, 0].tolist() == [True] + [False] * 6
+    assert masks.nonfinite[0, 0].tolist() == [False, False, True, True, False, False, False]
+    assert masks.plp[0, 0].tolist() == [False, False, False, False, True, False, False]
+    ref_cp, ref_plp = _old_error_lines(cp, plp, truth)
+    assert cp_err.tobytes() == ref_cp.tobytes() and plp_err.tobytes() == ref_plp.tobytes()
+    assert plp_err[0, 0, 2] == 10.0 and plp_err[0, 0, 3] == 10.0 and plp_err[0, 0, 4] == -10.0
+
+
+def test_clip_errors_values_bitwise_and_counts_by_loop_on_random_entries() -> None:
+    """On 10^4 random entries with injections, values equal the old lines bitwise and the counts
+    equal a plain Python loop.
+
+    Reference: (values) the three old lines, copied; (counts) a loop over the entries applying the
+    definition entry by entry (``math.isfinite`` and ``abs > 10``), independent of the vectorized
+    masks. Data: ``np.random.default_rng(1101)``; CP and PLP forecasts are 6 sigma normal (about 10%
+    of the entries beyond 10 when the truth is 5 sigma), with injected +inf (200), -inf (100), NaN
+    (300) entries in PLP, and an exact +-10.0 error in 50 entries each of CP and PLP. Exact.
+    """
+    import math
+
+    from lpcstudy.ensemble import clip_errors
+
+    rng = np.random.default_rng(1101)
+    shape = (50, 20, 10)
+    cp = 6.0 * rng.standard_normal(shape)
+    plp = 6.0 * rng.standard_normal(shape)
+    truth = 5.0 * rng.standard_normal((50, 1, 10))
+    flat_plp = plp.reshape(-1)
+    where = rng.choice(flat_plp.size, size=650, replace=False)
+    flat_plp[where[:200]] = np.inf
+    flat_plp[where[200:300]] = -np.inf
+    flat_plp[where[300:600]] = np.nan
+    exact = rng.choice(flat_plp.size, size=100, replace=False)
+    truth_full = np.broadcast_to(truth, shape)
+    flat_cp = cp.reshape(-1)
+    flat_cp[exact[:50]] = truth_full.reshape(-1)[exact[:50]] + 10.0
+    plp_view = flat_plp.copy()
+    plp_view[exact[50:]] = truth_full.reshape(-1)[exact[50:]] - 10.0
+    plp = plp_view.reshape(shape)
+    cp = flat_cp.reshape(shape)
+    cp_err, plp_err, masks = clip_errors(cp, plp, truth)
+    ref_cp, ref_plp = _old_error_lines(cp, plp, truth)
+    assert cp_err.tobytes() == ref_cp.tobytes() and plp_err.tobytes() == ref_plp.tobytes()
+    n_cp = n_plp = n_nonfinite = 0
+    for c_val, p_val, t_val in zip(cp.reshape(-1), plp.reshape(-1), truth_full.reshape(-1)):
+        n_cp += abs(float(c_val) - float(t_val)) > 10.0
+        diff = float(p_val) - float(t_val)
+        if not math.isfinite(diff):
+            n_nonfinite += 1
+        elif abs(diff) > 10.0:
+            n_plp += 1
+    counts = masks.counts()
+    # The loop subtracts in Python floats, the code in numpy float64: the same IEEE operation.
+    assert (counts["error_clips_cp"], counts["error_clips_plp"],
+            counts["error_clips_nonfinite"]) == (n_cp, n_plp, n_nonfinite)
+    assert counts["error_clips"] == n_cp + n_plp + n_nonfinite
+    # Premises (my own miscount, fixed before any rerun): 600 non-finite entries were injected and
+    # the 50 exact PLP entries may overwrite some of them, so at least 550 remain.
+    assert n_nonfinite >= 550 and n_cp > 100 and n_plp > 100
+
+
+def test_clip_errors_minus_inf_goes_to_minus_clip() -> None:
+    """-inf becomes -10 and counts as non-finite (the NaN and +inf branches map to +10).
+
+    Reference: the ``nan_to_num`` contract of the old line (``neginf=-clip``), hand array. Exact.
+    """
+    from lpcstudy.ensemble import clip_errors
+
+    _, plp_err, masks = clip_errors(np.zeros((1, 1, 3)), np.array([[[-np.inf, np.inf, np.nan]]]),
+                                    np.zeros((1, 1, 3)))
+    assert plp_err[0, 0].tolist() == [-10.0, 10.0, 10.0]
+    assert masks.counts()["error_clips_nonfinite"] == 3 and masks.counts()["error_clips_plp"] == 0
+
+
+def _fake_world(plp_diff: np.ndarray, state_bad: np.ndarray, nu_bad: np.ndarray,
+                horizons: np.ndarray, n_states: int, n_draws: int):
+    """A miniature, deterministic world for ``forecast_draws`` with stubbed estimator and paths.
+
+    The estimator returns the flags it is given; the PLP path is the truth plus ``plp_diff``
+    (a hand-planned error, flat state-major ``(n_states * n_draws, nH)``). The library is a
+    k-d tree over delay vectors of a random series; CP errors are small.
+    """
+    from types import SimpleNamespace
+
+    from scipy.spatial import cKDTree
+
+    from lpcstudy.embedding import delay_vectors
+    from lpcstudy.ensemble import AnalogLibrary, ForecastSetup
+
+    rng = np.random.default_rng(777)
+    horizons = np.asarray(horizons)
+    n_time, n_lib = 300, 200
+    ctx = SimpleNamespace(
+        eval_clean=rng.standard_normal(n_time), eval_states=rng.standard_normal((n_time, 2)),
+        library_states=rng.standard_normal((n_lib, 2)), delay=1, embed_dim=3,
+        split_indices={"test": np.arange(100, 100 + n_states)},
+        whiten_states=lambda x: x)
+    series = rng.standard_normal(n_lib)
+    indices = np.arange(2, n_lib - 10)
+    library = AnalogLibrary(indices=indices, noisy_series=series,
+                            tree=cKDTree(delay_vectors(series, indices, 1, 3)))
+    times = ctx.split_indices["test"]
+    truth = ctx.eval_clean[times[:, None] + horizons[None, :]]
+    truth_flat = np.repeat(truth, n_draws, axis=0)
+    h_last = int(horizons[-1])
+
+    def paths(states):
+        out = np.zeros((len(states), h_last))
+        out[:, horizons - 1] = truth_flat + plp_diff
+        return out
+
+    class Stub:
+        def estimate_counted(self, flat):
+            return (np.full((len(flat), 2), 0.1), np.ones(len(flat)), state_bad, nu_bad)
+
+    setup = ForecastSetup(ctx=ctx, noise=0.01, estimator=Stub(), model_step=None)
+    setup._paths[h_last] = paths
+    noise = np.random.default_rng(778).standard_normal((n_states, n_draws, 3))
+    return setup, library, noise, np.arange(n_states)
+
+
+def test_forecast_draws_handled_columns_per_state() -> None:
+    """``forecast_draws`` fills ``handled`` per state from the estimator flags and the clip masks.
+
+    Reference: hand-planned counts (a miniature world, stubbed estimator and PLP path, see
+    ``_fake_world``). 4 states x 3 draws, horizons (1, 2, 3), H_ref = 2. Flat rows are
+    state-major (row = 3 state + draw). State flags: rows 0 and 1 (state 0) and row 7 (state 2)
+    have a replaced state; rows 7 (state 2) and 10 (state 3) a replaced nu. PLP error plan: row 0
+    col 1 = +inf (non-finite at H_ref, state 0); row 1 col 1 = -25 (finite clip at H_ref, state
+    0); row 1 col 0 = NaN (non-finite, not at H_ref); row 5 col 2 = 12 (finite clip, not at
+    H_ref); row 9 col 1 = -10.0 exactly (not counted); row 10 col 1 = 11 (finite clip at H_ref,
+    state 3). Expected ``handled`` rows, written out by hand: state 0 [2,0,0,0,1,1], state 1
+    zeros, state 2 [1,1,0,0,0,0], state 3 [0,1,0,0,1,0]. Entry totals: non-finite 2, finite 3,
+    CP 0 (CP errors are differences of unit normals). Exact integers. The PLP truth + diff - truth
+    round trip is not bitwise, so the clipped values are checked to 1e-12 (u * 10 << 1e-12).
+    """
+    from lpcstudy.ensemble import DRAW_COUNTERS, forecast_draws
+
+    n_states, n_draws, horizons = 4, 3, np.array([1, 2, 3])
+    diff = np.zeros((12, 3))
+    diff[0, 1], diff[1, 1], diff[1, 0], diff[5, 2], diff[9, 1], diff[10, 1] = \
+        np.inf, -25.0, np.nan, 12.0, -10.0, 11.0
+    state_bad = np.zeros(12, dtype=bool)
+    state_bad[[0, 1, 7]] = True
+    nu_bad = np.zeros(12, dtype=bool)
+    nu_bad[[7, 10]] = True
+    setup, library, noise, rows = _fake_world(diff, state_bad, nu_bad, horizons, n_states, n_draws)
+    batch = forecast_draws(setup, library, "test", rows, noise, horizons, reference_horizon=2)
+    expected = np.array([[2, 0, 0, 0, 1, 1], [0] * 6, [1, 1, 0, 0, 0, 0], [0, 1, 0, 0, 1, 0]])
+    assert DRAW_COUNTERS == ("invariant_mean_replacements", "nu_replacements", "gain_replacements",
+                             "gain_floor", "error_clips_plp_href", "error_clips_nonfinite_href")
+    assert batch.handled.dtype == np.int64 and batch.handled.shape == (4, 6)
+    np.testing.assert_array_equal(batch.handled, expected)
+    assert batch.clip_entries == {"error_clips_cp": 0, "error_clips_plp": 3,
+                                  "error_clips_nonfinite": 2}
+    plp = batch.plp_err.reshape(12, 3)
+    assert plp[0, 1] == 10.0 and plp[1, 1] == -10.0 and plp[1, 0] == 10.0 and plp[5, 2] == 10.0
+    assert abs(plp[9, 1] - (-10.0)) < 1e-12 and plp[10, 1] == 10.0
+    # Without a reference horizon the two H_ref columns are 0 and the others are unchanged.
+    plain = forecast_draws(setup, library, "test", rows, noise, horizons)
+    assert np.all(plain.handled[:, 4:] == 0)
+    np.testing.assert_array_equal(plain.handled[:, :4], expected[:, :4])
+    with pytest.raises(ValueError):
+        forecast_draws(setup, library, "test", rows, noise, horizons, reference_horizon=7)
