@@ -318,6 +318,15 @@ def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
 def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     """H1b: ``log rms(e_H)`` against ``log(g_H seed / sqrt(m))`` has unit slope at ``H_ref``.
 
+    The verdict rests on the PLP regression only (v3 H1b): its 95% block-bootstrap interval must
+    lie in the closed band [0.8, 1.2] (pass), miss it (fail), or else the verdict is
+    inconclusive (DEC-0008 A1, A3). The CP slope and interval are reported with no verdict
+    (the CP regression is contaminated by the copied observation noise and is a diagnostic).
+    The bootstrap seed is the integer ``config.seed`` as before, so slopes and intervals are
+    those of the earlier code when no resample fails; failed resamples of the PLP slope are
+    counted (``PLP.n_failed_resamples``) and placed at the unfavourable tail. The CP interval
+    still drops non-finite resamples (``block_bootstrap``); it is reported only.
+
     Parameters
     ----------
     cell : Cell
@@ -328,7 +337,8 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     Returns
     -------
     dict
-        Slopes and intervals for CP and PLP.
+        ``CP`` (``slope``, ``ci``), ``PLP`` (``slope``, ``ci``, ``n_failed_resamples``),
+        ``threshold`` [0.8, 1.2], ``n_states``, ``verdict``, ``reason`` and ``pass``.
     """
     m = cell.splits["test"].moments
     o = cell.oracles["test"]
@@ -336,15 +346,24 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     gain = o.gains[:, config.reference_horizon - 1]
     dim = cell.ctx.spec.dim
     copied = cell.noise**2 / cell.setup.n_analogs
-    res = {}
+    res: dict = {}
     for name, seed, sq, floor in (("CP", m.analog_seed, m.sq_cp[:, col], copied),
                                   ("PLP", m.est_seed, m.sq_plp[:, col], 0.0)):
         x = np.log(gain * seed / np.sqrt(dim))
         y = 0.5 * np.log(np.maximum(sq - floor, 1e-12))
-        est, lo, hi = _boot(config, lambda idx: ols_slope(x[idx], y[idx]), len(x))
-        res[name] = {"slope": est, "ci": [lo, hi], "pass": bool(0.8 <= est <= 1.2)}
-    res["threshold"] = [0.8, 1.2]
-    res["pass"] = bool(res["CP"]["pass"] and res["PLP"]["pass"])
+        stat = lambda idx: ols_slope(x[idx], y[idx])
+        if name == "CP":
+            est, lo, hi = _boot(config, stat, len(x))
+            res[name] = {"slope": est, "ci": [lo, hi]}
+        else:
+            interval = block_bootstrap_counted(stat, len(x), config.bootstrap_resamples,
+                                               config.bootstrap_block, config.seed, H1_LEVEL)
+            res[name] = {"slope": interval.estimate, "ci": [interval.lower, interval.upper],
+                         "n_failed_resamples": interval.n_failed}
+    verdict, reason = criterion_verdict(res["PLP"]["slope"], *res["PLP"]["ci"], H1B_BAND,
+                                        n_states=len(x))
+    res.update({"threshold": list(H1B_BAND), "n_states": int(len(x)), "verdict": verdict,
+                "reason": reason, "pass": bool(verdict == "pass")})
     return res
 
 

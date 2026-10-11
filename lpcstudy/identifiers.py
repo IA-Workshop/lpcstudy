@@ -52,8 +52,7 @@ HYPOTHESIS_TABLE: tuple[Hypothesis, ...] = (
         "of the independently estimated 1/d"),
     Hypothesis(
         "H1b", "H1c", "H1b", "secondary",
-        "Slope of log r.m.s. PLP error on log(g_H δ/√m) at H_ref; pass if in [0.8, 1.2]",
-        ("WU-0002.4",)),
+        "Slope of log r.m.s. PLP error on log(g_H δ/√m) at H_ref; pass if in [0.8, 1.2]"),
     Hypothesis(
         "H1c", "H1d", "H1c", "secondary",
         "Median of Λ̄ × dT/d ln θ (PLP); pass if in [0.8, 1.25]"),

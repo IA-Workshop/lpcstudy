@@ -393,3 +393,111 @@ def test_h1a_rejects_cells_that_do_not_share_the_states_and_has_the_documented_k
     cells[(0.01, 3162)].oracles["test"].local_dim = local_dim[::-1].copy()
     with pytest.raises(ValueError, match="local_dim"):
         h1a_library_scaling(cells, _config(50))
+
+
+# ----------------------------------------------------------------------------------- H1b
+def _fake_h1b_cell(rng: np.random.Generator, n_states: int, slope_cp: float, slope_plp: float,
+                   log_noise: float = 0.0) -> SimpleNamespace:
+    """A core cell whose H1b regressions have the stated slopes (power laws, optional noise).
+
+    The CP regression is ``0.5 ln(sq_cp - noise^2/n_analogs)`` on ``ln(g seed_cp / sqrt(m))``
+    and the PLP one is ``0.5 ln(sq_plp)`` on ``ln(g seed_plp / sqrt(m))``, exactly the
+    construction of ``h1b_seed_amplifier``; the squared errors are built from the stated slope
+    and intercept 0.3 with additive Gaussian noise ``log_noise`` on the log scale (0 gives exact
+    power laws, hence exact slopes).
+    """
+    dim, noise, n_analogs, horizon = 3, 0.01, 20, 30
+    gain = np.exp(rng.normal(0.0, 0.5, n_states))
+    seed_cp = np.exp(rng.normal(-2.0, 0.4, n_states))
+    seed_plp = np.exp(rng.normal(-2.0, 0.4, n_states))
+    copied = noise**2 / n_analogs
+
+    def squared(slope: float, seed: np.ndarray) -> np.ndarray:
+        x = np.log(gain * seed / np.sqrt(dim))
+        return np.exp(2.0 * (slope * x + 0.3 + rng.normal(0.0, log_noise, n_states)))
+
+    gains = np.tile(gain[:, None], (1, horizon))
+    moments = SimpleNamespace(
+        analog_seed=seed_cp, est_seed=seed_plp, at=lambda h: 0,
+        sq_cp=(copied + squared(slope_cp, seed_cp))[:, None],
+        sq_plp=squared(slope_plp, seed_plp)[:, None])
+    return SimpleNamespace(
+        noise=noise, setup=SimpleNamespace(n_analogs=n_analogs),
+        ctx=SimpleNamespace(spec=SimpleNamespace(dim=dim)),
+        splits={"test": SimpleNamespace(moments=moments)},
+        oracles={"test": SimpleNamespace(gains=gains)})
+
+
+def test_h1b_verdict_uses_the_plp_slope_only() -> None:
+    """CP slope 1.6 with PLP slope 1.0 passes; swapped fails; CP has no verdict (T8).
+
+    Reference: the ROADMAP row of WU-0002.4 and DEC-0008 A1. The cells are noise-free power
+    laws, so every resample of the regression has the exact slope (the 100 distinct x values
+    never make a block resample constant), the interval is a point, and the PLP interval lies
+    inside [0.8, 1.2] (pass) or entirely above it (fail). The CP and PLP slopes agree with 1.6
+    and 1.0 to 1e-12 (OLS on 100 values of order 10 after a ``log(sq - floor)`` round trip:
+    relative error a few 1e-16 times the condition number of the design, below 1e-14; 1e-12
+    leaves two orders). The CP entry has only ``slope`` and ``ci``; the PLP entry adds ``n_failed_resamples``; the
+    top-level keys are the plan's. Exact verdicts.
+    """
+    from lpcstudy.analysis import h1b_seed_amplifier
+
+    config = _config(100)
+    ok = h1b_seed_amplifier(_fake_h1b_cell(np.random.default_rng(21001), 100, 1.6, 1.0), config)
+    assert ok["CP"]["slope"] == pytest.approx(1.6, abs=1e-12, rel=0)
+    assert ok["PLP"]["slope"] == pytest.approx(1.0, abs=1e-12, rel=0)
+    assert ok["verdict"] == "pass" and ok["pass"] is True and ok["reason"] is None
+    assert set(ok["CP"]) == {"slope", "ci"}
+    assert set(ok["PLP"]) == {"slope", "ci", "n_failed_resamples"} and \
+        ok["PLP"]["n_failed_resamples"] == 0
+    assert set(ok) == {"CP", "PLP", "threshold", "n_states", "verdict", "reason", "pass"}
+    assert ok["threshold"] == [0.8, 1.2] and ok["n_states"] == 100
+
+    swapped = h1b_seed_amplifier(_fake_h1b_cell(np.random.default_rng(21002), 100, 1.0, 1.6),
+                                 config)
+    assert swapped["PLP"]["slope"] == pytest.approx(1.6, abs=1e-12, rel=0)
+    assert swapped["verdict"] == "fail" and swapped["pass"] is False
+
+
+def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases() -> None:
+    """Regression guard: slopes and intervals of both forecasters are those of ``block_bootstrap``.
+
+    This compares with the old function at the seed ``config.seed`` (the pre-existing
+    ``_boot(..., salt=0)`` integer seed, DEC-0012 keeps it), so it is a guard against moving the
+    bootstrap, not evidence of correctness (T8 above is). On noisy data (log-scale noise 0.1) the
+    CP interval equals ``block_bootstrap`` and the PLP interval equals it too, because no
+    resample fails and ``block_bootstrap_counted`` is bitwise equal then. Edge cases (exact): a
+    NaN gain makes the PLP slope NaN, the verdict is "inconclusive" with reason "not computable"
+    and the failed resamples are counted: exactly those whose indices include the NaN state
+    (counted here by replaying the index draws of ``block_resample_indices`` with the same
+    seed); 40 states give "n_states < 50".
+    """
+    from lpcstudy.analysis import h1b_seed_amplifier
+    from lpcstudy.statistics import block_bootstrap, block_resample_indices, ols_slope
+
+    config = _config(100)
+    cell = _fake_h1b_cell(np.random.default_rng(21003), 100, 1.1, 0.9, log_noise=0.1)
+    out = h1b_seed_amplifier(cell, config)
+    m, gain = cell.splits["test"].moments, cell.oracles["test"].gains[:, 29]
+    copied = cell.noise**2 / cell.setup.n_analogs
+    for name, seed, sq, floor in (("CP", m.analog_seed, m.sq_cp[:, 0], copied),
+                                  ("PLP", m.est_seed, m.sq_plp[:, 0], 0.0)):
+        x = np.log(gain * seed / np.sqrt(cell.ctx.spec.dim))
+        y = 0.5 * np.log(np.maximum(sq - floor, 1e-12))
+        old = block_bootstrap(lambda idx: ols_slope(x[idx], y[idx]), 100, config.bootstrap_resamples,
+                              config.bootstrap_block, config.seed)
+        assert (out[name]["slope"], *out[name]["ci"]) == old
+    assert out["PLP"]["n_failed_resamples"] == 0
+
+    broken = _fake_h1b_cell(np.random.default_rng(21004), 100, 1.0, 1.0)
+    broken.oracles["test"].gains[3, :] = np.nan
+    nan_out = h1b_seed_amplifier(broken, config)
+    assert nan_out["verdict"] == "inconclusive" and nan_out["reason"] == "not computable"
+    hit = sum(3 in idx for idx in block_resample_indices(
+        100, config.bootstrap_resamples, config.bootstrap_block, config.seed))
+    assert 0 < hit < config.bootstrap_resamples
+    assert nan_out["PLP"]["n_failed_resamples"] == hit
+    assert nan_out["pass"] is False
+
+    short = h1b_seed_amplifier(_fake_h1b_cell(np.random.default_rng(21005), 40, 1.0, 1.0), config)
+    assert short["verdict"] == "inconclusive" and short["reason"] == "n_states < 50"
