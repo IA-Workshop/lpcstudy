@@ -429,11 +429,16 @@ def _production(spec: CaseSpec, data: dict[str, np.ndarray], cfg, seed_factory
              "n_failed": out["n_failed_resamples"], "verdict": verdict}, None)
 
 
-def _zero_column_ok(extra: dict, n_resamples: int) -> bool:
-    """C7: with all w* interior the zero part is not computable: all resamples failed (A5)."""
+def _zero_column_ok(extra: dict, interior_verdict: str, n_resamples: int) -> bool:
+    """C7: with all w* interior the zero part is not computable: all resamples failed (A5).
+
+    The combined verdict of (ii) is ``combine_verdicts`` of the parts: "fail" if the interior part
+    fails, otherwise "inconclusive" (the zero part can neither pass nor fail).
+    """
     zero = extra["zero_part"]
+    combined = "fail" if interior_verdict == "fail" else "inconclusive"
     return (zero["n_failed_resamples"] == n_resamples and zero["reason"] == "not computable"
-            and zero["verdict"] == "inconclusive" and extra["combined"] == "inconclusive")
+            and zero["verdict"] == "inconclusive" and extra["combined"] == combined)
 
 
 def _replicate(spec: CaseSpec, phi: float, r: int, identity: bool) -> tuple:
@@ -461,7 +466,7 @@ def _replicate(spec: CaseSpec, phi: float, r: int, identity: bool) -> tuple:
                 "verdict": verdict}
         same = int(produced == mine)
         if extra is not None:
-            zero_ok = int(_zero_column_ok(extra, cfg.bootstrap_resamples))
+            zero_ok = int(_zero_column_ok(extra, produced["verdict"], cfg.bootstrap_resamples))
     return (float(point), intervals[0][0], intervals[0][1], intervals[0][2], intervals[1][0],
             intervals[1][1], intervals[1][2], verdict, expected, same, zero_ok)
 

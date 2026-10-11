@@ -502,3 +502,20 @@ def test_every_design_runs_end_to_end_and_passes_the_exact_checks(pool, tmp_path
     assert all(ev.row["targets"][name]["failed_resamples"] == 0 for name in wu.DELTA_TARGETS)
     table.add("delta", ev.row)
     assert len(json.loads(table.path.read_text())) == len(specs) + 3 + 1
+
+
+def test_c7_zero_column_rule_allows_a_failing_interior_part() -> None:
+    """The combined verdict of H2a(ii) is "fail" when the interior part fails (``combine_verdicts``:
+    one fail fails the whole), else "inconclusive" because the zero part is not computable.
+
+    Added after run 2, in which the first form of the check demanded "inconclusive" and so rejected a
+    correct replication whose interior part failed (a defect of the harness's expectation, found at
+    phi = 0.3, replication with an interior "fail"; no bound moved)."""
+    zero = {"n_failed_resamples": 2000, "reason": "not computable", "verdict": "inconclusive"}
+    for interior, combined, ok in (("fail", "fail", True), ("inconclusive", "inconclusive", True),
+                                   ("pass", "inconclusive", True), ("fail", "inconclusive", False),
+                                   ("inconclusive", "fail", False)):
+        extra = {"zero_part": zero, "combined": combined}
+        assert wu._zero_column_ok(extra, interior, 2000) is ok, (interior, combined)
+    assert not wu._zero_column_ok({"zero_part": {**zero, "n_failed_resamples": 1999},
+                                   "combined": "inconclusive"}, "pass", 2000)
