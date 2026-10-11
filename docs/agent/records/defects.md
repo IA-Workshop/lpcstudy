@@ -17,6 +17,7 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Resolution:** WU-0002, item 11.
 - 2026-10-10: opened (Claude).
 - 2026-10-10 (claude-sonnet-5-5, main session, on the WU-0013.2 reviewer's finding R3; both sites checked): two further silent cases that WU-0002.11 must count and report: `lpcstudy/statistics.py:61` (`kaplan_meier` sets the hazard to 0 where no subject is at risk) and `lpcstudy/statistics.py:95-96` (`logrank_test` returns p = 1.0 when the variance is not positive). Both feed H3a. Any fix is statistics code and needs owner review before the freeze.
+- 2026-10-10 (claude-sonnet-5-5, main session, on the WU-0005 reviewer's observation; checked): a third uncounted silent case for WU-0002.11: `lpcstudy/oracle.py:62` (`local_dimension`) clamps zero neighbour distances with `np.maximum(dist, 1e-300)` (duplicate library points) without counting them.
 
 **DEF-0002: Excess MSE uses c(w − w\*)² with clipped w\*** (VV.1)
 
@@ -92,3 +93,11 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Description.** `lpcstudy/oracle.py:101` has `rng = np.random.default_rng(0)` and draws the pool with `rng.choice`. Found by the WU-0014 reviewer (who cited line 99; checked by the main session at line 101). A grep also shows other `np.random.default_rng(...)` calls that take a seed directly instead of `make_rng(seed, *labels)`: `dynamics.py:147`, `validation.py:107` and `:147`, `statistics.py:151`, `networks.py:145`, `experiments.py:88`. Whether those derive correctly from the study seed has not been audited here.
 - **Resolution:** to be planned in WU-0002 (the owner decides whether the pool should depend on the seed id; the pilot used the fixed pool, so a change affects the WU-0002.12 regression).
 - 2026-10-10: opened (claude-sonnet-5-5, main session, on the WU-0014 reviewer's finding).
+
+**DEF-0012: k-d tree queries use all cores and ignore the `LPC_THREADS` cap** (RSRC.11, RSRC.12; `.claude/rules/test-discipline.md` "Device and threads")
+
+- **Blocking:** no (tracked).
+- **Affects:** every run and every test that builds an analog search or a Levina–Bickel estimate; on a shared machine the thread budget (`LPC_THREADS`, default 4) is not honored.
+- **Description.** `lpcstudy/ensemble.py:110` and `lpcstudy/oracle.py:61` call `cKDTree.query(..., workers=-1)`, which uses every core. The `OMP_NUM_THREADS`, `MKL_NUM_THREADS` and `OPENBLAS_NUM_THREADS` caps set by the wrappers do not apply to scipy's own worker threads. Found by the WU-0005 planner; both sites checked by the main session.
+- **Resolution:** pass the `LPC_THREADS` value as `workers`. This does not change any number (a query's result does not depend on the worker count); a test can pin that. To be done in a small unit after WU-0002.1 and .2 (it touches `ensemble.py` and `oracle.py`).
+- 2026-10-10: opened (claude-sonnet-5-5, main session).

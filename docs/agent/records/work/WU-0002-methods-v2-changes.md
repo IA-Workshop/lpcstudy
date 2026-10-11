@@ -418,6 +418,23 @@ Smoke regression: not re-run. R1 and R3 change a docstring and `pending` metadat
 
 Results (each once, no failure): unit `55 passed in 1.49s`; integration `8 passed in 10.02s`. Self-check: the added `try/except ValueError` in `__main__` prints a refusal and returns 64 (not swallowed); no `clip|nan_to_num|isfinite|where(`, no randomness added; no tolerance touched. R1 to R3 are fixed in the commit "WU-0002 fix R1-R3" (the `## Review` section is left as committed by the reviewer).
 
+### Resolution of findings (WU-0002.1 and .2) and merge-gate checklist, 2026-10-10, claude-sonnet-5-5 (main session)
+
+- **R1, R2, R3: fixed in 15bd84f** (re-review: all fixed, approve). R2 matters: a stale-schema `--report-only` now refuses (exit 64, one line) and leaves `results.json` byte-identical.
+- **Owner review needed before the freeze** (LPC.PC.11): the CLI option set, `tools/run_preset.sh`, the T1 branch, H2d's `pass` rule and the `verdicts` code. `DEC-0007` is **proposed**. The ROADMAP's WU-0002.8 check "no `H3b` key exists anywhere in results" collides with the v3 `H3b` key created here; the owner's ruling A2 (docs/agent/notes/2026-10-10-rulings-for-owner.md on `develop`) is still pending. The rows H1c, H2a, H2c, v3 H3b are not marked `pending` although the referral says their statistics may change.
+- Small note from the reviewer: the baseline-copy test in `test_report.py` reads the baseline through an absolute path into the main worktree and skips (reported) if absent; a repo-relative fixture would be better later.
+
+Merge-gate checklist (§4.9, §4.3). This gate runs on the branch with `develop` merged in:
+
+1. **Change set:** the removals and renames listed in the Log; new `lpcstudy/identifiers.py` and its tests; `tools/run_preset.sh` (option removal); the hand-edited import-graph fixture (module count 21); edits to three existing tests as listed in the Log. `git status --porcelain` is empty after the commit that carries this entry, and no agent writes to this worktree during the run.
+2. **Radius:** the merge gate of §4.3, `unit` and `integration`, by the main session: `tests/unit tests/integration`.
+3. **Already run?** The sub-task radius sets ran (developer 264/55/8/10 passed; reviewer 264 passed) but never the whole unit and integration set on this merged tree. This gate is that run, once.
+4. **Device:** `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`.
+5. **Threads and time:** `LPC_THREADS=4`, `OMP/MKL/OPENBLAS_NUM_THREADS=4`, `timeout 900`.
+6. **Contention:** no other agent running; no preset; no GPU.
+7. **Output:** `-q --tb=short -rfE`.
+8. **Command:** `LPC_GATE=merge timeout 900 .venv/bin/python -m pytest -q --tb=short -rfE tests/unit tests/integration`.
+
 ## Review
 
 ### Review of WU-0002.1 and .2 (2026-10-10, `reviewer`, claude-opus-5-5, fresh context)
