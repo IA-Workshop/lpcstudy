@@ -284,6 +284,17 @@ Where the ROADMAP gives a formula and a rounded value, the stricter of the two i
 7. Output: `-q --tb=short -rfE` by the wrapper, plus `--durations=10`.
 8. Command: `tools/run_tests.sh slow --background --durations=10 tests/slow/test_statistics_coverage.py tests/slow/test_analysis_coverage.py tests/slow/test_analysis_logrank_size.py tests/slow/test_analysis_null_delta_r2.py`.
 
+**Owner authorization (conversation; ledger entry is the owner's).** Relayed by the main session on 2026-10-11, stated by the owner in the session: "For the slow job, you are authorized to run in parallel and or use the GPU if needed." Use: it permits running in parallel with other CPU work and up to 8 single-thread spawned workers, and the GPU only if measured to be needed (GPU lock rules unchanged); it changes no R, B, level, bound or seed and does not extend to any other job. **Not used:** run 2 had already finished (18 min 39 s with 4 workers, far under the 3600 s timeout), so no code or setting was changed for it; the GPU was not used and no need was measured (the simulations are numpy bootstrap and single-thread scikit-learn work).
+
+**Test run 2 result (the four study files, once).** `12 failed, 66 passed in 1119.37s (0:18:39)` (`runs/tests/slow-20261011T165447Z.log`, exit 1; 4 workers). Per-case counts are in `runs/tests/wu0006_{coverage_statistics,coverage_analysis,logrank,delta_r2}.json` (not committed; `runs/` is ignored) and in the table below.
+
+**Test run 3 (after the harness fix), §4.9 checklist.**
+1. Change set: as above plus the harness fix commit; `git status --porcelain` clean before the run.
+2. Radius: `tests/slow/test_wu0006_harness.py` (the harness changed, so the smoke reruns once) and the two nodes `test_analysis_coverage.py::test_exact_checks[C7-0.0]` and `[C7-0.3]` (the only tests whose code path changed); not the whole study.
+3. Already run? Not on this code: the harness changed after runs 1 and 2.
+4. Device: `JAX_PLATFORMS=cpu`. 5. Threads and time: `LPC_THREADS=4`, 4 workers; about 2 minutes. 6. Contention: nothing running (`pgrep` as before). 7. Output: `-q --tb=short -rfE`.
+8. Command: `tools/run_tests.sh slow --background tests/slow/test_wu0006_harness.py "tests/slow/test_analysis_coverage.py::test_exact_checks[C7-0.0]" "tests/slow/test_analysis_coverage.py::test_exact_checks[C7-0.3]"`.
+
 ## Review
 
 ## Audit
