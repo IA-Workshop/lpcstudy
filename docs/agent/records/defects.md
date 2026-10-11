@@ -85,6 +85,7 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Description.** scikit-learn accepts `random_state` only in [0, 2³² − 1]. `check_random_state(2844678021587022684)` raises `ValueError: Seed must be between 0 and 2**32 - 1` (verified in the project venv by the main session, 2026-10-10). The code passes `config.seed` directly at `lpcstudy/analysis.py:295`, `:678`, `:680` and `lpcstudy/allocation.py:358`. Found by the WU-0001 planner while planning WU-0001.1; no test catches it, because every test and the smoke preset use DEV-0.
 - **Resolution:** a fix in WU-0002 (a plan item to be added by amendment). It changes the random streams of every scikit-learn call, so it changes numbers for every seed unless the derivation keeps `config.seed` unchanged below 2³². The choice between "derive a 32-bit value with `make_rng(seed, label)` for all seeds" and "leave seeds below 2³² untouched" affects the WU-0002.12 regression against the pilot and is the owner's to rule on. Until then, only DEV-0 can be run.
 - 2026-10-10: opened (claude-sonnet-5-5, main session).
+- 2026-10-11 (claude-sonnet-5-5, recording the owner's ruling, DEC-0008 B): fix = option B: the raw seed below 2**32, a derived 32-bit value from `make_rng(seed, "sklearn", label)` otherwise; planned in WU-0002 with the `random_state` sites of `analysis.py` and `allocation.py`.
 
 **DEF-0011: Reference pool for the 1/d estimate is drawn with a fixed literal seed, outside `make_rng`** (LPC.PC.21, CLAUDE.md "Randomness only via `lpcstudy.data.make_rng`")
 
@@ -93,6 +94,7 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Description.** `lpcstudy/oracle.py:101` has `rng = np.random.default_rng(0)` and draws the pool with `rng.choice`. Found by the WU-0014 reviewer (who cited line 99; checked by the main session at line 101). A grep also shows other `np.random.default_rng(...)` calls that take a seed directly instead of `make_rng(seed, *labels)`: `dynamics.py:147`, `validation.py:107` and `:147`, `statistics.py:151`, `networks.py:145`, `experiments.py:88`. Whether those derive correctly from the study seed has not been audited here.
 - **Resolution:** to be planned in WU-0002 (the owner decides whether the pool should depend on the seed id; the pilot used the fixed pool, so a change affects the WU-0002.12 regression).
 - 2026-10-10: opened (claude-sonnet-5-5, main session, on the WU-0014 reviewer's finding).
+- 2026-10-11 (claude-sonnet-5-5, recording the owner's ruling, DEC-0008 B): option 1: keep until the WU-0002.12 regression, then route through `make_rng(config.seed, "oracle-pool")`; audit the other `default_rng` sites in WU-0002.11.
 
 **DEF-0012: k-d tree queries use all cores and ignore the `LPC_THREADS` cap** (RSRC.11, RSRC.12; `.claude/rules/test-discipline.md` "Device and threads")
 
@@ -101,3 +103,4 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Description.** `lpcstudy/ensemble.py:110` and `lpcstudy/oracle.py:61` call `cKDTree.query(..., workers=-1)`, which uses every core. The `OMP_NUM_THREADS`, `MKL_NUM_THREADS` and `OPENBLAS_NUM_THREADS` caps set by the wrappers do not apply to scipy's own worker threads. Found by the WU-0005 planner; both sites checked by the main session.
 - **Resolution:** pass the `LPC_THREADS` value as `workers`. This does not change any number (a query's result does not depend on the worker count); a test can pin that. To be done in a small unit after WU-0002.1 and .2 (it touches `ensemble.py` and `oracle.py`).
 - 2026-10-10: opened (claude-sonnet-5-5, main session).
+- 2026-10-11 (claude-sonnet-5-5, recording the owner's ruling, DEC-0008 B): pass `LPC_THREADS` as `workers`; a small unit after WU-0002.1 and .2 (done); no numbers change.
