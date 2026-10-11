@@ -14,6 +14,9 @@ MIN_STATES: int = 50
 
 Verdict = Literal["pass", "fail", "inconclusive"]
 
+V3_SYSTEMS: tuple[str, ...] = ("lorenz63", "rossler", "chua")
+"""The three systems of v3 section 7; the overall verdict is over exactly these (DEC-0016 O1)."""
+
 
 @dataclass
 class SurvivalCurve:
@@ -436,6 +439,54 @@ def combine_verdicts(parts: Iterable[Verdict]) -> Verdict:
     if "fail" in listed:
         return "fail"
     return "pass" if all(part == "pass" for part in listed) else "inconclusive"
+
+
+def overall_verdict(by_system: dict[str, Verdict], required: tuple[str, ...] = V3_SYSTEMS
+                    ) -> tuple[str, list[str]]:
+    """Overall verdict of a hypothesis over the systems (v3 section 7; DEC-0008 A1; DEC-0016 O1).
+
+    "supported" if every system in ``required`` is present and passes; "not supported" if any
+    system present fails (whatever is missing); "inconclusive" otherwise. A missing system has
+    no pass, so a run of fewer than the three v3 systems (smoke, development) can never read
+    "supported". ``required`` is the constant ``V3_SYSTEMS``, never the run's configured
+    systems. The rule is total on the three verdicts and absence; only the all-absent input and
+    bad labels raise. The intersection-union argument of v3 section 7 controls the error of
+    "supported" only; "not supported" is a union over systems (DEC-0016, error-rate note).
+
+    Parameters
+    ----------
+    by_system : dict[str, Verdict]
+        Verdict of each system that was run.
+    required : tuple[str, ...], optional
+        Systems that must all pass; defaults to the three v3 systems.
+
+    Returns
+    -------
+    tuple[str, list[str]]
+        The overall verdict and the systems of ``required`` that are absent, in the order of
+        ``required``.
+
+    Raises
+    ------
+    ValueError
+        If ``by_system`` is empty, has a system outside ``required`` (a non-v3 label must not
+        decide "not supported"), or has a value that is not "pass", "fail" or "inconclusive".
+    """
+    if not by_system:
+        raise ValueError("overall_verdict needs at least one system with a verdict")
+    outside = [name for name in by_system if name not in required]
+    if outside:
+        raise ValueError(f"system(s) {outside} are not in required {list(required)}")
+    unknown = [v for v in by_system.values() if v not in ("pass", "fail", "inconclusive")]
+    if unknown:
+        raise ValueError(f"unknown verdict(s) {unknown}")
+    missing = [name for name in required if name not in by_system]
+    values = list(by_system.values())
+    if "fail" in values:
+        return "not supported", missing
+    if not missing and all(v == "pass" for v in values):
+        return "supported", missing
+    return "inconclusive", missing
 
 
 def criterion_verdict(estimate: float, lower: float, upper: float,
