@@ -148,7 +148,31 @@ def test_header_has_the_platform_line_under_the_label_a8() -> None:
     rows = [ln for ln in lines if ln.startswith("| ") and not ln.startswith("| Provenance")]
     assert [ln.split(" | ")[0][2:] for ln in rows] == [k for k in block if k != "config"]
     block["blas"] = {"libraries": [], "error": "OSError: no maps"}
-    assert header_lines(block)[2] == "Platform: CPU Test CPU @ 1GHz · BLAS none recorded"
+    assert header_lines(block)[2] == ("Platform: CPU Test CPU @ 1GHz · "
+                                      "BLAS probe failed (OSError: no maps)")
+    block["blas"] = {"libraries": [], "error": None}
+    assert header_lines(block)[2] == "Platform: CPU Test CPU @ 1GHz · BLAS none mapped"
+
+
+def test_platform_line_never_shows_a_failed_probe_as_a_value_r1() -> None:
+    """R1: failures and fallbacks are named in the line, not printed as plain values.
+
+    Reference: hand-written expected strings (the review's R1). A library entry with an error
+    prints ``<library> unknown (<error>)``; an unknown CPU model prints its source and the read
+    error; a model from ``platform.processor`` prints its source. Exact.
+    """
+    results, _ = fake_results("DEV-0")
+    block = dict(results["provenance"])
+    block["blas"] = {"libraries": [
+        {"library": "numpy.libs/a.so", "corename": None, "config": None,
+         "error": "AttributeError: none of x is defined"}], "error": None}
+    block["cpu"] = {"model": "unknown", "source": "none", "isa": [],
+                    "error": "FileNotFoundError: gone"}
+    assert header_lines(block)[2] == (
+        "Platform: CPU unknown (source none, FileNotFoundError: gone) · "
+        "BLAS numpy.libs/a.so unknown (AttributeError: none of x is defined)")
+    block["cpu"] = {"model": "test-cpu", "source": "platform.processor", "isa": [], "error": None}
+    assert header_lines(block)[2].startswith("Platform: CPU test-cpu (source platform.processor) · ")
 
 
 def test_platform_line_says_not_recorded_for_an_older_block_a8() -> None:

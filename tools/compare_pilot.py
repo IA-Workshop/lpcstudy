@@ -1490,10 +1490,12 @@ def platform_record(tree: object) -> dict:
     Returns
     -------
     dict
-        ``{"recorded": True, "model", "corenames", "coretype"}`` (``corenames``: the runtime
-        OpenBLAS kernel of each library, in the block's order; ``coretype``: the value of
-        ``OPENBLAS_CORETYPE`` or ``None``), or ``{"recorded": False, "why": <text>}`` for a tree
-        without a provenance block or without the platform keys (a ``/1`` block).
+        ``{"recorded": True, "model", "corenames", "coretype", "determinate", "why"}``
+        (``corenames``: the runtime OpenBLAS kernel of each library, in the block's order;
+        ``coretype``: the value of ``OPENBLAS_CORETYPE`` or ``None``; ``determinate``: False when
+        a probe failed or found nothing, so two such records must not be compared as values; ``why``:
+        the reasons, as text), or ``{"recorded": False, "why": <text>}`` for a tree without a
+        provenance block or without the platform keys (a ``/1`` block).
     """
     block = tree.get("provenance") if isinstance(tree, dict) else None
     if not isinstance(block, dict):
@@ -1502,17 +1504,38 @@ def platform_record(tree: object) -> dict:
     if not isinstance(cpu, dict) or not isinstance(blas, dict):
         return {"recorded": False, "why": "no platform keys in the provenance block"}
     libraries = [lib for lib in blas.get("libraries", []) if isinstance(lib, dict)]
-    return {"recorded": True, "model": str(cpu.get("model", "unknown")),
-            "corenames": [str(lib.get("corename") or "unknown") for lib in libraries],
-            "coretype": env.get("OPENBLAS_CORETYPE") if isinstance(env, dict) else None}
+    model = str(cpu.get("model", "unknown"))
+    corenames = [str(lib.get("corename") or "unknown") for lib in libraries]
+    reasons = []
+    if model == "unknown" or cpu.get("error"):
+        reasons.append("CPU model unknown" + (f" ({cpu['error']})" if cpu.get("error") else ""))
+    if blas.get("error"):
+        reasons.append(f"BLAS probe failed ({blas['error']})")
+    elif not libraries:
+        reasons.append("no OpenBLAS library mapped")
+    reasons += [f"{lib.get('library', '?')} corename unknown"
+                + (f" ({lib['error']})" if lib.get("error") else "")
+                for lib in libraries if not lib.get("corename")]
+    return {"recorded": True, "model": model, "corenames": corenames,
+            "coretype": env.get("OPENBLAS_CORETYPE") if isinstance(env, dict) else None,
+            "determinate": not reasons, "why": "; ".join(reasons)}
 
 
-def platform_mismatch(first: dict, second: dict) -> str | None:
-    """The information line when two recorded platforms differ in the CPU model or a corename.
+def platform_mismatch(first: dict, second: dict, labels: tuple[str, str] = ("first", "second")
+                      ) -> str | None:
+    """The information line about two platforms (never a status, branch or exit code).
 
-    ``OPENBLAS_CORETYPE`` alone does not count (the corename is what ran). ``None`` when either
-    side is not recorded or the two agree. It changes no status, branch or exit code.
+    * A side that is recorded but not determinate (a failed probe, an unknown model or corename):
+      ``platform not determinable (<side>: <why>)``, because two unknowns are not the same platform
+      and the comparison below would call them equal.
+    * Both recorded and determinate, with a different CPU model or a different corename:
+      ``PLATFORM_LINE``. ``OPENBLAS_CORETYPE`` alone does not count (the corename is what ran).
+    * Otherwise ``None`` (a side not recorded, or the two agree).
     """
+    bad = [f"{label}: {rec['why']}" for rec, label in zip((first, second), labels)
+           if rec["recorded"] and not rec["determinate"]]
+    if bad:
+        return "platform not determinable (" + "; ".join(bad) + ")"
     if not (first["recorded"] and second["recorded"]):
         return None
     if first["model"] != second["model"] or sorted(first["corenames"]) != sorted(second["corenames"]):
@@ -1534,14 +1557,14 @@ def platform_rows(records: dict[str, dict]) -> tuple[list[tuple], list[str]]:
             continue
         rec = records[key]
         if rec["recorded"]:
-            rows.append((label, rec["model"], ", ".join(rec["corenames"]) or "none recorded",
+            rows.append((label, rec["model"], ", ".join(rec["corenames"]) or "none mapped",
                          rec["coretype"] or "unset"))
         else:
             rows.append((label, f"not recorded ({rec['why']})", "", ""))
     notes = []
     for key, label in PLATFORM_SIDES[1:]:
         if key in records and "new" in records:
-            line = platform_mismatch(records["new"], records[key])
+            line = platform_mismatch(records["new"], records[key], ("new run", label))
             if line:
                 notes.append(f"new run against {label}: {line}")
     return rows, notes

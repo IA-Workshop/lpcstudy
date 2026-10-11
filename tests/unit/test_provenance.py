@@ -528,10 +528,11 @@ def test_cpu_isa_is_sorted_and_restricted_to_the_fixed_list(
         "isa": ["avx2", "avx512f", "fma", "sse4_1", "sse4_2"], "error": None}
 
 
-def test_simd_record_lists_numpys_found_extensions_or_empty() -> None:
-    """``simd_record`` is the ``found`` list of numpy's own show_config, ``[]`` when absent (A5).
+def test_regression_simd_record_equals_the_show_config_it_wraps() -> None:
+    """Regression guard (not correctness evidence): ``simd_record`` repeats the numpy call it wraps.
 
-    Reference: ``np.show_config(mode="dicts")``, read in the test. Exact.
+    It compares the code with ``np.show_config(mode="dicts")``, the call under test, so it only
+    guards the key path and the ``[]`` default. The independent truth is the next test (R3).
     """
     config = np.show_config(mode="dicts")
     expected = list(config.get("SIMD Extensions", {}).get("found", []))
@@ -638,8 +639,12 @@ def test_probe_errors_lists_each_failed_probe_once(monkeypatch: pytest.MonkeyPat
     with monkeypatch.context() as patch:
         patch.setattr(provenance, "CPUINFO", _Unreadable(OSError("no cpuinfo")))
         patch.setattr(provenance, "MAPS", _Unreadable(OSError("no maps")))
-        assert provenance.probe_errors(block_for()) == ["cpu: OSError: no cpuinfo",
-                                                        "blas: OSError: no maps"]
+        patch.setattr(platform, "processor", lambda: "")
+        patch.setattr(platform, "machine", lambda: "x86_64")
+        # the failed read, then the two silent fallbacks it causes (model source, empty ISA)
+        assert provenance.probe_errors(block_for()) == [
+            "cpu: OSError: no cpuinfo", "cpu: model from none",
+            "cpu: no ISA flags found on x86_64", "blas: OSError: no maps"]
 
     def refuse(*args: object, **kwargs: object) -> None:
         raise OSError("refused")
@@ -648,3 +653,58 @@ def test_probe_errors_lists_each_failed_probe_once(monkeypatch: pytest.MonkeyPat
         patch.setattr(provenance.ctypes, "CDLL", refuse)
         failed = provenance.probe_errors(block_for())
     assert len(failed) == 2 and all(text.endswith("OSError: refused") for text in failed)
+
+
+def test_probe_errors_counts_each_silent_fallback_r2(monkeypatch: pytest.MonkeyPatch) -> None:
+    """R2: a fallback that raises nothing is still counted, one text per state.
+
+    Reference: hand-written expected lists (the review's R2): the CPU model from
+    ``platform.processor``; no ``flags`` line on x86-64 (and none to report elsewhere); and a
+    probe of ``/proc/self/maps`` that works but maps no OpenBLAS. Exact.
+    """
+    no_flags = "processor\t: 0\nmodel name\t: Test CPU\n"
+    with monkeypatch.context() as patch:
+        patch.setattr(provenance, "CPUINFO", _Unreadable(None, no_flags))
+        patch.setattr(platform, "machine", lambda: "x86_64")
+        assert provenance.probe_errors(block_for()) == ["cpu: no ISA flags found on x86_64"]
+        patch.setattr(platform, "machine", lambda: "aarch64")
+        assert provenance.probe_errors(block_for()) == []
+    with monkeypatch.context() as patch:
+        patch.setattr(provenance, "CPUINFO", _Unreadable(None, "processor\t: 0\n"))
+        patch.setattr(platform, "processor", lambda: "test-cpu")
+        patch.setattr(platform, "machine", lambda: "aarch64")
+        assert provenance.probe_errors(block_for()) == ["cpu: model from platform.processor"]
+    with monkeypatch.context() as patch:
+        patch.setattr(provenance, "MAPS", _Unreadable(None, "7f00-7f01 r-xp 0 00:00 0 /usr/lib/libc.so\n"))
+        block = block_for()
+        assert block["blas"] == {"libraries": [], "error": None}
+        assert provenance.probe_errors(block) == ["blas: no OpenBLAS library mapped"]
+
+
+SIMD_PROBE = ("import json, sys; sys.path.insert(0, sys.argv[1]); from lpcstudy import provenance; "
+              "print(json.dumps(provenance.simd_record()))")
+
+
+def test_simd_record_follows_a_disabled_dispatch_level_r3() -> None:
+    """Disabling ``X86_V3`` removes it from ``found`` (known truth by construction, R3).
+
+    Reference: numpy's documented ``NPY_DISABLE_CPU_FEATURES`` (planning table: ``found`` is
+    ``["X86_V3"]`` here and the key is absent under the variable). A fresh ``python -I`` runs the
+    probe with the variable set; the level must be absent. When this CPU has every feature of
+    x86-64-v3 (own parse of the flags line), a second run without the variable must list it.
+    """
+    assert platform.machine() == "x86_64", "the reference platform is x86-64 (DEC-0022)"
+    flags = set(re.search(r"^flags\s*:\s*(.*)$", Path("/proc/cpuinfo").read_text(),
+                          re.MULTILINE).group(1).split())
+
+    def found(**env: str) -> list[str]:
+        base = {k: v for k, v in os.environ.items() if k != "NPY_DISABLE_CPU_FEATURES"}
+        done = subprocess.run([sys.executable, "-I", "-c", SIMD_PROBE, str(ROOT)], env=base | env,
+                              capture_output=True, text=True, check=True, timeout=60)
+        record = json.loads(done.stdout)
+        assert record["error"] is None
+        return record["found"]
+
+    assert "X86_V3" not in found(NPY_DISABLE_CPU_FEATURES="X86_V3")
+    if {"avx2", "bmi1", "bmi2", "fma", "f16c", "movbe", "abm"} <= flags:
+        assert "X86_V3" in found()

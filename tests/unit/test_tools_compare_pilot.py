@@ -1301,7 +1301,7 @@ def digest_context(**changes) -> dict:
     return {**CONTEXT, **digests, **changes}
 
 
-def platform_block(model: str = "Test CPU", cores: tuple[str, ...] = ("Haswell", "Haswell"),
+def platform_block(model: str = "Test CPU", cores: tuple[str | None, ...] = ("Haswell", "Haswell"),
                    coretype: str | None = None) -> dict:
     """A hand-built provenance block with the keys of ``provenance.collect`` that the tool reads."""
     libs = [{"library": f"lib{i}.so", "corename": name, "config": "c", "error": None}
@@ -1412,9 +1412,9 @@ def test_a10_platform_section_without_a_reference_omits_that_row(tmp_path) -> No
 def test_a10_a_recorded_old_side_with_another_platform_prints_the_line(tmp_path) -> None:
     """A10: when both sides are recorded and differ, the section carries the information line.
 
-    Reference: ``compare_files`` is called on trees whose old side carries a provenance block
-    (it is rejected as input by the command line, so the section is tested through the pair
-    function ``platform_rows``). Exact.
+    Reference: hand-built trees passed through ``platform_record`` and ``platform_rows`` (the
+    old side of the command line cannot carry a provenance block: ``load_sides`` rejects it, so
+    the pair function is tested directly; ``compare_files`` is not called). Exact.
     """
     new = {"provenance": platform_block(model="A")}
     old = {"provenance": platform_block(model="B")}
@@ -1442,3 +1442,69 @@ def test_a10_platform_provenance_changes_no_status_branch_or_exit_code(tmp_path)
         branch = next(x for x in report.read_text().splitlines() if x.startswith("- branch:"))
         outcomes.append((done.returncode, rows, branch))
     assert outcomes[0] == outcomes[1]
+    texts = []
+    for index in (0, 1):
+        lines = (tmp_path / str(index) / "report.md").read_text().splitlines()
+        start, end = lines.index("## Platform"), lines.index("## Branch")
+        # The sha256 of new.json differs because the file differs; nothing else may.
+        kept = [x for x in lines[:start] + lines[end:] if not x.startswith("- sha256 new:")]
+        texts.append(kept)
+        assert lines[start:end] != []
+    assert texts[0] == texts[1]
+
+
+def test_r1_two_unknown_platforms_are_not_the_same_platform() -> None:
+    """R1: a recorded but not determinate side gets "platform not determinable", not silence.
+
+    Reference: hand-written expected strings. Two sides with model "unknown", corenames
+    ``["unknown", "unknown"]`` or no libraries compare equal as values; the rule must not call
+    them the same platform. A failed BLAS probe, an unknown model with a read error, an empty
+    library list and a library without corename each make a record indeterminate. A side that is
+    not recorded does not (it has its own row). No status, branch or exit code is involved. Exact.
+    """
+    def unknown(**changes) -> dict:
+        block = platform_block(model="unknown", cores=(None, None))
+        block["cpu"].update(source="none", error="FileNotFoundError: gone")
+        block.update(changes)
+        return {"provenance": block}
+
+    first, second = cp.platform_record(unknown()), cp.platform_record(unknown())
+    assert first["recorded"] and first["determinate"] is False
+    assert first["why"] == "CPU model unknown (FileNotFoundError: gone); lib0.so corename unknown; " \
+        "lib1.so corename unknown"
+    line = cp.platform_mismatch(first, second, ("new run", "old"))
+    assert line == ("platform not determinable (new run: CPU model unknown (FileNotFoundError: gone); "
+                    "lib0.so corename unknown; lib1.so corename unknown; old: CPU model unknown "
+                    "(FileNotFoundError: gone); lib0.so corename unknown; lib1.so corename unknown)")
+    good = cp.platform_record({"provenance": platform_block()})
+    assert good["determinate"] is True and good["why"] == ""
+    # one indeterminate side is enough; the other side may be determinate or not recorded
+    assert cp.platform_mismatch(good, first, ("a", "b")).startswith("platform not determinable (b: ")
+    assert cp.platform_mismatch(cp.platform_record({}), first, ("a", "b")).startswith(
+        "platform not determinable (b: ")
+    failed = cp.platform_record(unknown(blas={"libraries": [], "error": "OSError: no maps"}))
+    assert "BLAS probe failed (OSError: no maps)" in failed["why"]
+    empty = cp.platform_record({"provenance": {**platform_block(), "blas": {"libraries": [], "error": None}}})
+    assert empty["determinate"] is False and empty["why"] == "no OpenBLAS library mapped"
+
+
+def test_r1_the_not_determinable_line_reaches_the_report_and_changes_nothing(tmp_path) -> None:
+    """R1: an indeterminate new side prints the line under the Platform section only.
+
+    Reference: two CLI runs on the same trees, the new provenance block determinate against
+    indeterminate (model "unknown"). Same exit code, per-leaf statuses and branch; the
+    indeterminate report has the line, the other does not. Exact.
+    """
+    outcomes = []
+    for index, block in enumerate((platform_block(), platform_block(model="unknown"))):
+        new = new_tree()
+        new["provenance"] = block
+        directory = tmp_path / str(index)
+        directory.mkdir()
+        done, report, leaves = run_cli(directory, old_tree(), new)
+        statuses = [(r["path"], r["status"]) for r in json.loads(leaves.read_text())]
+        outcomes.append((done.returncode, statuses, report.read_text()))
+    assert outcomes[0][:2] == outcomes[1][:2]
+    assert "platform not determinable" not in outcomes[0][2]
+    assert ("- new run against old (v1 pilot): platform not determinable (new run: CPU model unknown)"
+            in outcomes[1][2].splitlines())

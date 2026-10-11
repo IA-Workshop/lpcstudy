@@ -259,14 +259,26 @@ def simd_record() -> dict:
 
 
 def probe_errors(block: dict) -> list[str]:
-    """Return one ``"<probe>: <error>"`` text per failed platform probe of a block.
+    """Return one text per failed platform probe and per silent fallback of a block.
 
-    The caller counts and logs them (a failed probe is recorded in the block and never silent).
+    The caller counts and logs them (a failure or fallback is recorded in the block and never
+    silent, PRIME.4). A failure is a non-null ``error``. A fallback raises nothing but is not the
+    primary source: the CPU model from ``platform.processor`` or unknown, no ISA flags on x86-64,
+    or no OpenBLAS library mapped by a probe that did not fail.
     """
     found = []
-    for name in ("cpu", "blas", "numpy_simd"):
+    cpu = block["cpu"]
+    if cpu["error"]:
+        found.append(f"cpu: {cpu['error']}")
+    if cpu["source"] != "/proc/cpuinfo":
+        found.append(f"cpu: model from {cpu['source']}")
+    if not cpu["isa"] and platform.machine() == "x86_64":
+        found.append("cpu: no ISA flags found on x86_64")
+    for name in ("blas", "numpy_simd"):
         if block[name]["error"]:
             found.append(f"{name}: {block[name]['error']}")
+    if not block["blas"]["libraries"] and not block["blas"]["error"]:
+        found.append("blas: no OpenBLAS library mapped")
     for entry in block["blas"]["libraries"]:
         if entry["error"]:
             found.append(f"blas {entry['library']}: {entry['error']}")

@@ -258,6 +258,10 @@ def _cell(value: object) -> str:
 def platform_line(provenance: dict) -> str:
     """Return the ``Platform:`` header line: the CPU model and each OpenBLAS runtime kernel.
 
+    A failed probe is never shown as a value: an unknown model carries its source (and the read
+    error), a failed BLAS probe prints ``BLAS probe failed (<error>)`` and a failed library
+    ``<library> unknown (<error>)`` (PRIME.4).
+
     Parameters
     ----------
     provenance : dict
@@ -267,16 +271,27 @@ def platform_line(provenance: dict) -> str:
     Returns
     -------
     str
-        ``Platform: CPU <model> · BLAS <library> <corename>, ...`` (a library whose probe failed
-        shows ``unknown``; no libraries show ``none recorded``).
+        ``Platform: CPU <model> · BLAS <library> <corename>, ...`` (``BLAS none mapped`` when the
+        probe worked and found no OpenBLAS).
     """
     if "cpu" not in provenance and "blas" not in provenance:
         return "Platform: not recorded"
-    model = provenance.get("cpu", {}).get("model", "unknown")
-    libraries = provenance.get("blas", {}).get("libraries", [])
-    blas = ", ".join(f"{entry['library']} {entry['corename'] or 'unknown'}"
-                     for entry in libraries) or "none recorded"
-    return f"Platform: CPU {model} · BLAS {blas}"
+    cpu, blas = provenance.get("cpu", {}), provenance.get("blas", {})
+    model = cpu.get("model", "unknown")
+    if model == "unknown" or cpu.get("error"):
+        detail = ", ".join(str(x) for x in (f"source {cpu.get('source', 'none')}", cpu.get("error"))
+                           if x)
+        model = f"{model} ({detail})"
+    elif cpu.get("source", "/proc/cpuinfo") != "/proc/cpuinfo":
+        model = f"{model} (source {cpu['source']})"
+    if blas.get("error"):
+        text = f"BLAS probe failed ({blas['error']})"
+    else:
+        parts = [f"{entry['library']} unknown ({entry['error']})" if entry.get("error")
+                 else f"{entry['library']} {entry['corename'] or 'unknown'}"
+                 for entry in blas.get("libraries", [])]
+        text = "BLAS " + (", ".join(parts) or "none mapped")
+    return f"Platform: CPU {model} · {text}"
 
 
 def header_lines(provenance: dict | None) -> list[str]:

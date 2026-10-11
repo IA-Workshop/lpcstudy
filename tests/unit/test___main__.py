@@ -248,7 +248,7 @@ def test_provenance_is_saved_incomplete_first_and_complete_last(
 def test_failed_platform_probe_is_logged_as_one_warning(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
         caplog: pytest.LogCaptureFixture) -> None:
-    """A failed platform probe is recorded in the block and logged as one WARNING with a count.
+    """A failed platform probe is recorded in the block and logged as one WARNING with a count (R2 wording).
 
     Reference: the plan (the caller counts and logs a failed probe; WU-0001.6). ``blas_record``
     is replaced by a failure; the faked study runs; the saved block keeps the error text and
@@ -261,8 +261,8 @@ def test_failed_platform_probe_is_logged_as_one_warning(
         saves = run_with_fakes(["--preset", "smoke"], tmp_path, monkeypatch)
     assert saves[-1]["provenance"]["blas"]["error"] == "OSError: no maps"
     warnings = [r.getMessage() for r in caplog.records if "platform probe" in r.getMessage()]
-    assert warnings == ["1 platform probe(s) failed, recorded in the provenance block: "
-                        "blas: OSError: no maps"]
+    assert warnings == ["1 platform probe failure(s) or fallback(s), recorded in the provenance "
+                        "block: blas: OSError: no maps"]
 
 
 def test_confirmatory_run_writes_no_seed_value(
