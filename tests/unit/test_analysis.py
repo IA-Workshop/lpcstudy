@@ -2622,7 +2622,7 @@ def test_gain_bound_has_no_bar_and_reports_each_screen() -> None:
         energy[second - 1:] = 0.09
         sq_plp[i] = energy
         sq_cp[i] = 0.01 if censored else energy
-        cross[i] = -0.02 if negative else 0.0
+        cross[i] = -0.005 if negative else 0.0  # |C| <= sqrt(E_C E_P): a possible moment
     zeros = np.zeros_like(sq_cp)
     moments = EnsembleMoments(
         horizons=horizons, mean_cp=zeros, mean_plp=zeros, sq_cp=sq_cp, sq_plp=sq_plp,
