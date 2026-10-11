@@ -29,6 +29,7 @@ from __future__ import annotations
 import pytest
 
 import wu0006_harness as wu
+import wu0006_reference as ref
 
 ROWS = ("L1", "L2")
 
@@ -75,3 +76,12 @@ def test_roadmap_size_bound(pool, cache: wu.RunCache, row: str, phi: float) -> N
     outcome is only recorded."""
     evaluation = cache.logrank(pool, row, phi)
     assert wu.enforce(evaluation.roadmap) in ("pass", "fail")
+
+
+def test_reference_table_is_the_m5_table() -> None:
+    """The study reads its references from ``wu0006_reference`` (a change there selects this file):
+    L1 and L2 at phi 0 and 0.3 (R_ref = 40 000 per row), 6 ranges of counts out of 2000 in all."""
+    assert sorted(ref.LOGRANK_REFERENCE) == [(row, f"{phi:g}") for row in ROWS for phi in wu.PHIS]
+    ranges = [entry[key][1] for entry in ref.LOGRANK_REFERENCE.values() for key in ("fwer", "pass")
+              if entry[key] is not None]
+    assert len(ranges) == 6 and all(0 <= low <= high <= wu.R_LOGRANK for low, high in ranges)

@@ -46,9 +46,12 @@ out of 500:
   run (almost all from N3): such a failure at a count inside its range is a predicted finding of class
   "method", not a defect.
 * Consistency (always asserted, any switch position): each of the 12 counts lies in its range above,
-  the defect test; family-wise false alarm at most 12 x 0.0005 = 0.6%. The ranges are fixed after run 2
-  (VV.3); their first use as an assertion is the next run, a genuine pre-registration (the run-2
-  counts lie inside all 12).
+  the defect test; family-wise false alarm at most 12 x 0.0005 = 0.6%. The ranges were fixed AFTER
+  the run-2 counts were known (VV.3), and a rerun with the same design and seeds is bitwise
+  deterministic, so their passes in run 7 (the run-2 counts lie inside all 12) are a determinism check
+  and a regression guard, not independent confirmation that they detect a defect. Their first
+  genuinely pre-registered use is the first run whose counts were not known when they were fixed (for
+  example after a change of seed derivation).
 * Exact: refitting ``qn_regressor(seed)`` on the same data reproduces the returned ``delta_r2``
   bitwise in every replication.
 
@@ -61,6 +64,7 @@ from __future__ import annotations
 import pytest
 
 import wu0006_harness as wu
+import wu0006_reference as ref
 
 
 @pytest.fixture(scope="module")
@@ -106,8 +110,7 @@ def test_roadmap_false_distinct_rate_and_conditional_coverage(pool, cache: wu.Ru
     P(fail) per row: N2 at most 0.001, N3 0.03 to 0.07 (module table). Under the switch since
     addendum A9: asserted under Option K, only recorded under Option C."""
     evaluation = cache.delta(pool, phi)
-    failures = [m for m in evaluation.roadmap if " N2 " in m or " N3 " in m]
-    assert wu.enforce(failures) in ("pass", "fail")
+    assert wu.enforce(wu.delta_rows(evaluation, "n2", "n3")) in ("pass", "fail")
 
 
 @pytest.mark.parametrize("phi", wu.PHIS)
@@ -118,4 +121,14 @@ def test_roadmap_interval_contains_zero(pool, cache: wu.RunCache, phi: float) ->
     mean is negative under the null). A failure is a finding for the owner, who may amend the ROADMAP
     row (DEC-0018), and is never tuned away. Under Option C the outcome is only recorded."""
     evaluation = cache.delta(pool, phi)
-    assert wu.enforce([m for m in evaluation.roadmap if " N1 " in m]) in ("pass", "fail")
+    assert wu.enforce(wu.delta_rows(evaluation, "n1")) in ("pass", "fail")
+
+
+def test_reference_table_is_the_a9_table() -> None:
+    """The study reads its references from ``wu0006_reference`` (a change there selects this file):
+    4 (phi, target) cells x 3 rows = 12 ranges, from R_ref = 1000 (addendum A9)."""
+    assert ref.DELTA_R2_REFERENCE_R == 1000
+    assert sorted(ref.DELTA_R2_REFERENCE) == [(f"{phi:g}", target) for phi in wu.PHIS
+                                              for target in wu.DELTA_TARGETS]
+    assert sum(len(cell[row]) == 4 for cell in ref.DELTA_R2_REFERENCE.values()
+               for row in ("n1", "n2", "n3")) == 12

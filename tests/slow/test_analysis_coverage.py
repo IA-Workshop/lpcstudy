@@ -129,7 +129,7 @@ def test_roadmap_coverage_and_verdict_bounds(pool, cache: wu.RunCache, case: str
                                              phi: float) -> None:
     """A1, A2 and A3 at R = 1000: coverage >= 930 (95%) and >= 972 (1 - 0.05/3); P(pass) and P(fail)
     at the edge <= 39 (95%) or <= 16 (98.3%). Bounds are nominal -/+ 3 SE (SE 0.00689, 0.00405,
-    0.00494, 0.00288); truth on the band edge, analytic. Predicted P(fail) per the module table; a
+    0.00494, 0.00287); truth on the band edge, analytic. Predicted P(fail) per the module table; a
     failure is a finding recorded in the unit Log, never tuned away (PRIME.2). Under Option C
     (``ASSERT_ROADMAP_BOUNDS = False``) the outcome is only recorded."""
     evaluation = cache.coverage(pool, wu.CaseSpec(case), phi)

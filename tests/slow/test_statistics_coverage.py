@@ -28,7 +28,8 @@ finding of class "method", not a defect.
 
 **Assertion groups** (each (case, phi) is a separate test, so one failure hides no other):
 
-* exact: identity of the interval with the production function in 10 replications, and no failed
+* exact: a regression guard (for these generic cases the harness path is the body of
+  ``block_bootstrap_counted``, so the identity in 10 replications is a self-comparison), and no failed
   resamples (A5). Zero tolerance.
 * consistency: the observed counts lie in the pre-registered range of the reference (the defect test;
   family-wise false alarm at most 3.5% over all 70 ranges of WU-0006).
@@ -62,8 +63,10 @@ def cache() -> wu.RunCache:
 @pytest.mark.parametrize("phi", wu.PHIS)
 @pytest.mark.parametrize("case", CASES)
 def test_exact_checks(pool, cache: wu.RunCache, case: str, phi: float) -> None:
-    """Identity with ``block_bootstrap_counted`` (bitwise, 10 replications) and A5 (0 failed
-    resamples in continuous data). Reference: the production function itself; zero tolerance."""
+    """Regression guard: identity with ``block_bootstrap_counted`` (bitwise, 10 replications) and A5
+    (0 failed resamples in continuous data). For C1 and C3 the harness's path is the body of that
+    function, so the identity is a self-comparison, not correctness evidence; the evidence is the
+    coverage against the analytic truth and the independent reference (the other two tests)."""
     evaluation = cache.coverage(pool, wu.CaseSpec(case), phi)
     assert not evaluation.exact, "; ".join(evaluation.exact)
 

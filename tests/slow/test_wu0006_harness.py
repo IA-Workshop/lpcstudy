@@ -17,9 +17,10 @@ truth checks): the checks of the harness itself that must hold before its number
   production function, A4, A5, the C7 zero column, L3, the bitwise refit) hold there.
 
 Tolerances. Each H1 and H3 check is a 3-standard-error z-test with the standard error stated at the
-assertion; on fixed seeds the outcome is deterministic, and the chance that a correct generator fails
-one of the checks is about 0.3% each (0.6% for the bivariate lag-1 check, whose estimator's bias is
-0.46 SE; about 3% over the dozen). A failure would be a finding about the
+assertion; on fixed seeds the outcome is deterministic. There are 31 such z-tests (AR(1) 6, bivariate 12,
+truths 5, log-rank 4, delta-R2 4). About 25 have a false-alarm probability of 0.27% for a correct
+generator and 6 (the phi = 0.3 bivariate lag-1 checks, whose estimator's bias is 0.46 SE) 0.58%, so the
+chance that at least one of the 31 fails for a correct generator is about 10%. A failure would be a finding about the
 generator, not a reason to move a seed or a bound.
 """
 
@@ -28,6 +29,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import warnings
 
 import numpy as np
 import pytest
@@ -490,9 +492,10 @@ def test_result_table_round_trips_numpy_and_non_finite_values(tmp_path) -> None:
     """The results JSON holds numpy values and non-finite numbers as plain JSON, row by row."""
     table = wu.ResultTable("selfcheck", tmp_path)
     table.add("a", {"n": np.int64(3), "x": np.float64(0.5), "v": np.array([1, 2]),
-                    "bad": float("inf"), "t": (1, 2)})
-    table.add("b", {"ok": True})
+                    "bad": float("inf"), "t": (1, 2)}, workers=3)
+    table.add("b", {"ok": True}, workers=3)
     loaded = json.loads(table.path.read_text())
+    assert loaded["_meta"]["workers"] == 3
     assert loaded["a"] == {"n": 3, "x": 0.5, "v": [1, 2], "bad": "inf", "t": [1, 2]}
     assert loaded["b"] == {"ok": True}
     assert loaded["_meta"]["bootstrap"] == [2000, 5]
@@ -546,18 +549,20 @@ def test_every_design_runs_end_to_end_and_passes_the_exact_checks(pool, tmp_path
         ev = wu.evaluate_coverage(run, strict=False)
         assert ev.exact == [], ev.exact
         assert ev.row["failed_resamples"] == 0
-        table.add(f"{spec.label}-{phi:g}", ev.row)
+        table.add(f"{spec.label}-{phi:g}", ev.row, workers=pool.wu_workers)
     for row in ("L1", "L2"):
         run = wu.run_logrank(pool, row, 0.3, R=20)
         ev = wu.evaluate_logrank(run, strict=False)
         assert ev.exact == [] and ev.row["uncomputed_pairs"] == 0
-        table.add(row, ev.row)
+        table.add(row, ev.row, workers=pool.wu_workers)
     delta = wu.run_delta(pool, 0.3, R=2, chunk=1)
     ev = wu.evaluate_delta(delta, strict=False)
     assert ev.exact == [] and delta.table.shape == (2, 18)
     assert all(ev.row["targets"][name]["failed_resamples"] == 0 for name in wu.DELTA_TARGETS)
-    table.add("delta", ev.row)
-    assert len(json.loads(table.path.read_text())) == len(specs) + 3 + 1
+    table.add("delta", ev.row, workers=pool.wu_workers)
+    saved = json.loads(table.path.read_text())
+    assert len(saved) == len(specs) + 3 + 1
+    assert saved["_meta"]["workers"] == pool._max_workers == wu.pool_size()
 
 
 def test_c7_zero_column_rule_allows_a_failing_interior_part() -> None:
@@ -575,3 +580,56 @@ def test_c7_zero_column_rule_allows_a_failing_interior_part() -> None:
         assert wu._zero_column_ok(extra, interior, 2000) is ok, (interior, combined)
     assert not wu._zero_column_ok({"zero_part": {**zero, "n_failed_resamples": 1999},
                                    "combined": "inconclusive"}, "pass", 2000)
+
+
+def test_result_files_are_stamped_and_never_overwritten(tmp_path) -> None:
+    """Two tables of the same name get different files, each keeps its own rows (R2)."""
+    first, second = wu.ResultTable("same", tmp_path), wu.ResultTable("same", tmp_path)
+    assert first.path != second.path
+    first.add("a", {"x": 1}, workers=4)
+    second.add("b", {"x": 2}, workers=4)
+    assert sorted(path.name[:10] for path in tmp_path.iterdir()) == ["wu0006_same"] * 2
+    assert "a" in json.loads(first.path.read_text()) and "b" not in json.loads(first.path.read_text())
+    assert first.path.name.startswith("wu0006_same_20") and first.path.name.endswith(".json")
+
+
+def test_run_cache_records_the_pool_size_at_creation(pool, tmp_path) -> None:
+    """R1: the results JSON written by ``RunCache`` says ``workers`` = the pool's size (4 here), not
+    1, although the parent environment has ``LPC_THREADS=1`` while the pool lives. Runs C1 at phi 0
+    (R = 1000, a few seconds), the cheapest study design, through the same code path as the study
+    files, and checks the file and the exact checks."""
+    assert os.environ["LPC_THREADS"] == "1"
+    cache = wu.RunCache("smoke-cache", tmp_path)
+    evaluation = cache.coverage(pool, wu.CaseSpec("C1"), 0.0)
+    assert evaluation.exact == [] and evaluation.row["R"] == wu.R_COVERAGE
+    meta = json.loads(cache.table.path.read_text())["_meta"]
+    assert meta["workers"] == pool._max_workers == pool.wu_workers
+
+
+def test_delta_roadmap_rows_are_keyed_not_matched_by_text() -> None:
+    """R6: the N-row tests select failures by row key (``delta_rows``), never by message text.
+
+    Every message of ``roadmap`` is in exactly one row list and names its row; an unknown row raises.
+    A reworded message that dropped its row label would fail here, and a row that selected nothing
+    would raise ``KeyError``."""
+    ev = wu.evaluate_delta(fake_delta(460, 23, 460))      # N1, N2 and N3 all fail, both targets
+    assert {row: len(msgs) for row, msgs in ev.roadmap_rows.items()} == {"n1": 2, "n2": 2, "n3": 2}
+    assert sorted(ev.roadmap) == sorted(wu.delta_rows(ev, "n1", "n2", "n3"))
+    for row in ("n1", "n2", "n3"):
+        assert all(f" {row.upper()} " in message for message in wu.delta_rows(ev, row))
+        assert not set(wu.delta_rows(ev, row)) & set(wu.delta_rows(
+            ev, *({"n1", "n2", "n3"} - {row})))
+    assert len(wu.delta_rows(ev, "n2", "n3")) == 4
+    with pytest.raises(KeyError):
+        wu.delta_rows(ev, "n4")
+    ok = wu.evaluate_delta(fake_delta(478, 22, 461))
+    assert wu.delta_rows(ok, "n1", "n2", "n3") == [] and ok.roadmap == []
+
+
+def test_option_c_failure_warns_instead_of_passing_silently() -> None:
+    """R6: under Option C a failed ROADMAP row gives a passing node plus a visible UserWarning."""
+    with pytest.warns(UserWarning, match="Option C"):
+        assert wu.enforce(["C4: A1 929 < 930"], asserting=False) == "fail"
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert wu.enforce([], asserting=False) == "pass"

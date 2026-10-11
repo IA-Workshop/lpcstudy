@@ -34,6 +34,7 @@ import json
 import math
 import os
 import time
+import warnings
 from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, replace
@@ -166,12 +167,14 @@ def worker_pool(workers: int | None = None) -> Iterator[ProcessPoolExecutor]:
     The thread variables are set in ``os.environ`` before the pool exists, because a spawned child
     reads them when numpy, OpenBLAS and jax are imported to unpickle its first task (an initializer
     would be too late). They stay set while the pool lives, since children are started on demand.
+    The pool's size is read before that and kept as ``pool.wu_workers`` for the results table.
     """
-    size = pool_size() if workers is None else workers
+    size = pool_size() if workers is None else workers  # read BEFORE LPC_THREADS is set to 1 below
     saved = {key: os.environ.get(key) for key in _POOL_ENV}
     os.environ.update(_POOL_ENV)
     try:
         with ProcessPoolExecutor(max_workers=size, mp_context=get_context("spawn")) as pool:
+            pool.wu_workers = size  # recorded in the results table (the env now says LPC_THREADS=1)
             yield pool
     finally:
         for key, value in saved.items():
@@ -540,6 +543,9 @@ class Evaluation:
     exact: list[str] = field(default_factory=list)
     consistency: list[str] = field(default_factory=list)
     roadmap: list[str] = field(default_factory=list)
+    roadmap_rows: dict[str, list[str]] = field(default_factory=dict)
+    """Delta-R2 only: the ROADMAP failures keyed by row, ``"n1"``, ``"n2"``, ``"n3"`` (structured, so
+    that no test selects a row by matching message text)."""
     consistency_rows: dict[str, str | None] = field(default_factory=dict)
     """Delta-R2 only: the consistency message (or None) of each row, keyed ``"n1|<target>"``."""
 
@@ -570,6 +576,10 @@ def enforce(failures: Sequence[str], *, asserting: bool | None = None) -> str:
     if failures and asserting:
         raise AssertionError("ROADMAP bound failed (a finding to record, not to tune): "
                              + "; ".join(failures))
+    if failures:
+        warnings.warn("Option C (ASSERT_ROADMAP_BOUNDS = False): ROADMAP bound failed but not "
+                      "asserted, recorded in the results table: " + "; ".join(failures),
+                      UserWarning, stacklevel=2)
     return "fail" if failures else "pass"
 
 
@@ -898,6 +908,7 @@ def evaluate_delta(run: DeltaRun, *, strict: bool = True) -> Evaluation:
     ev = Evaluation(row={"phi": run.phi, "R": run.R, "seconds": run.seconds,
                          "sizes": [FULL.n_construction + FULL.n_calibration, FULL.n_test],
                          "targets": {}})
+    ev.roadmap_rows = {"n1": [], "n2": [], "n3": []}
     for name in DELTA_TARGETS:
         est, lo, hi, truth, truth_se, refit, failed, r2_three, reduces = run.target(name).T
         label = f"{name} phi={run.phi:g}"
@@ -924,16 +935,19 @@ def evaluate_delta(run: DeltaRun, *, strict: bool = True) -> Evaluation:
             ev.exact.append(f"{label}: refitting qn_regressor reproduced delta_r2 bitwise in "
                             f"{int(refit.sum())}/{run.R} replications")
         if not ok["n1"]:
-            ev.roadmap.append(f"{label}: N1 interval contains 0 in {counts['n1']}/{run.R} < {N1_MIN} "
-                              "(predicted to fail: the interval targets the conditional gain, "
-                              f"mean {truth.mean():.4f}, not the population gain 0; "
-                              f"P(fail | correct code) {reference['n1'][2]:.2f})")
+            ev.roadmap_rows["n1"].append(
+                f"{label}: N1 interval contains 0 in {counts['n1']}/{run.R} < {N1_MIN} "
+                "(predicted to fail: the interval targets the conditional gain, "
+                f"mean {truth.mean():.4f}, not the population gain 0; "
+                f"P(fail | correct code) {reference['n1'][2]:.2f})")
         if not ok["n2"]:
-            ev.roadmap.append(f"{label}: N2 false 'distinct' {counts['n2']}/{run.R} > {N2_MAX} "
-                              f"(P(fail | correct code) {reference['n2'][2]:.3f})")
+            ev.roadmap_rows["n2"].append(
+                f"{label}: N2 false 'distinct' {counts['n2']}/{run.R} > {N2_MAX} "
+                f"(P(fail | correct code) {reference['n2'][2]:.3f})")
         if not ok["n3"]:
-            ev.roadmap.append(f"{label}: N3 coverage of the conditional gain {counts['n3']}/{run.R} "
-                              f"< {N3_MIN} (P(fail | correct code) {reference['n3'][2]:.3f})")
+            ev.roadmap_rows["n3"].append(
+                f"{label}: N3 coverage of the conditional gain {counts['n3']}/{run.R} "
+                f"< {N3_MIN} (P(fail | correct code) {reference['n3'][2]:.3f})")
         for key in ("n1", "n2", "n3"):
             rate, _, _, bounds = reference[key]
             message = None
@@ -943,10 +957,19 @@ def evaluate_delta(run: DeltaRun, *, strict: bool = True) -> Evaluation:
                 ev.consistency.append(message)
             ev.consistency_rows[f"{key}|{name}"] = message
             ev.row["targets"][name][f"{key}_range_ok"] = message is None
+    ev.roadmap = [m for row in ("n1", "n2", "n3") for m in ev.roadmap_rows[row]]
     ev.row["roadmap_outcome"] = "fail" if ev.roadmap else "pass"
     ev.row["consistency_outcome"] = "fail" if ev.consistency else "pass"
     ev.row["roadmap_failures"] = list(ev.roadmap)
     return ev
+
+
+def delta_rows(evaluation: Evaluation, *rows: str) -> list[str]:
+    """ROADMAP failures of the named delta-R2 rows (``"n1"``, ``"n2"``, ``"n3"``), selected by key.
+
+    An unknown row raises ``KeyError``, so a test cannot silently select nothing.
+    """
+    return [message for row in rows for message in evaluation.roadmap_rows[row]]
 
 
 # --------------------------------------------------------------------------------------- tables
@@ -966,17 +989,28 @@ def _plain(value: object) -> object:
 
 
 class ResultTable:
-    """The results table of one test file: a JSON under ``runs/tests/`` rewritten on every row."""
+    """The results table of one test file: a JSON under ``runs/tests/`` rewritten on every row.
+
+    The file name carries the UTC stamp of the session (``wu0006_<name>_<stamp>.json``, with the
+    process id added if that name exists), so no earlier table is ever overwritten.
+    """
 
     def __init__(self, name: str, directory: Path = RESULTS_DIR) -> None:
-        self.path = directory / f"wu0006_{name}.json"
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        self.path = directory / f"wu0006_{name}_{stamp}.json"
+        if self.path.exists():
+            self.path = directory / f"wu0006_{name}_{stamp}-{os.getpid()}.json"
         self.rows: dict[str, object] = {}
 
-    def add(self, key: str, row: dict) -> None:
-        """Store a row and rewrite the file (so a crashed run keeps what it finished)."""
+    def add(self, key: str, row: dict, *, workers: int) -> None:
+        """Store a row and rewrite the file (so a crashed run keeps what it finished).
+
+        ``workers`` is the pool size read when the pool was created (``pool.wu_workers``); the
+        environment of the parent says ``LPC_THREADS=1`` while the pool lives.
+        """
         self.rows[key] = _plain(row)
         meta = {"written_utc": datetime.now(UTC).isoformat(timespec="seconds"),
-                "assert_roadmap_bounds": ASSERT_ROADMAP_BOUNDS, "workers": pool_size(),
+                "assert_roadmap_bounds": ASSERT_ROADMAP_BOUNDS, "workers": workers,
                 "seed": WU0006_SEED, "bootstrap": [FULL.bootstrap_resamples, FULL.bootstrap_block]}
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"_meta": meta, **self.rows}, indent=1, sort_keys=True))
@@ -990,11 +1024,11 @@ class RunCache:
     group.
     """
 
-    def __init__(self, name: str) -> None:
-        self.table = ResultTable(name)
+    def __init__(self, name: str, directory: Path = RESULTS_DIR) -> None:
+        self.table = ResultTable(name, directory)
         self._done: dict[str, Evaluation | BaseException] = {}
 
-    def _get(self, key: str, make: Callable[[], Evaluation]) -> Evaluation:
+    def _get(self, key: str, make: Callable[[], Evaluation], workers: int) -> Evaluation:
         if key not in self._done:
             try:
                 evaluation = make()
@@ -1002,7 +1036,7 @@ class RunCache:
                 self._done[key] = error
                 raise
             self._done[key] = evaluation
-            self.table.add(key, evaluation.row)
+            self.table.add(key, evaluation.row, workers=workers)
         done = self._done[key]
         if isinstance(done, BaseException):
             raise done
@@ -1011,12 +1045,14 @@ class RunCache:
     def coverage(self, pool: ProcessPoolExecutor, spec: CaseSpec, phi: float) -> Evaluation:
         """Evaluation of ``R_COVERAGE`` replications of a coverage design."""
         return self._get(f"{spec.label}-phi{phi:g}",
-                         lambda: evaluate_coverage(run_coverage(pool, spec, phi)))
+                         lambda: evaluate_coverage(run_coverage(pool, spec, phi)), pool.wu_workers)
 
     def logrank(self, pool: ProcessPoolExecutor, row: str, phi: float) -> Evaluation:
         """Evaluation of ``R_LOGRANK`` log-rank families."""
-        return self._get(f"{row}-phi{phi:g}", lambda: evaluate_logrank(run_logrank(pool, row, phi)))
+        return self._get(f"{row}-phi{phi:g}", lambda: evaluate_logrank(run_logrank(pool, row, phi)),
+                         pool.wu_workers)
 
     def delta(self, pool: ProcessPoolExecutor, phi: float) -> Evaluation:
         """Evaluation of ``R_DELTA`` null delta-R2 replications."""
-        return self._get(f"DR2-phi{phi:g}", lambda: evaluate_delta(run_delta(pool, phi)))
+        return self._get(f"DR2-phi{phi:g}", lambda: evaluate_delta(run_delta(pool, phi)),
+                         pool.wu_workers)
