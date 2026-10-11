@@ -43,6 +43,9 @@ def test_smoke_preset_writes_outputs_and_gate_flag(tmp_path: Path) -> None:
     assert systems
     for name, result in systems.items():
         assert isinstance(result["validation"]["gate"]["gate_pass"], bool), name
+        # WU-0005.5 (P1): the P2(c) check runs on the core cell's own draws and finds no violation.
+        p2c = result["verification"]["P2c"]
+        assert p2c["n_violations"] == 0 and p2c["same_draws_identical"] is True, name
     assert_handling(json.loads((out_dir / "results.json").read_text()))
 
 

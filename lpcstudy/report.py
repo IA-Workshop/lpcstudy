@@ -481,6 +481,48 @@ def _lyapunov_lines(results: dict, systems: list[str]) -> list[str]:
     return lines
 
 
+def _p2c_lines(results: dict, systems: list[str]) -> list[str]:
+    """Markdown of the Theorem P2(c) verification subsection (WU-0005.5).
+
+    One row per system, read from ``systems.<s>.verification.P2c``; a system without the block
+    shows "n/a", not a skip. The check is report-only: it carries no verdict and is not part of
+    the validation gate or of any verdict. A violation is shown as a defect, never as a flag on
+    the results.
+    """
+    lines = ["| System | States | Violations | Chain violations (N≤A, A≤B, P2(a), triangle, "
+             "consistency) | Switching states | States with B = 0 | N/√B (median, p90, max) | "
+             "Same draws as N |", "|---|---|---|---|---|---|---|---|"]
+    for s in systems:
+        block = results["systems"][s].get("verification", {}).get("P2c")
+        if block is None:
+            lines.append(f"| {s} | n/a: no P2(c) result | | | | | | |")
+            continue
+        chain = block["n_chain_violations"]
+        spread = block["tightness"]["N_over_sqrt_B"]
+        tight = "n/a" if spread["median"] is None else \
+            f"{_fmt(spread['median'], 3)}, {_fmt(spread['p90'], 3)}, {_fmt(spread['max'], 3)}"
+        found = block["n_violations"]
+        lines.append(
+            f"| {s} | {block['n_states']} | "
+            + (f"{found}" if not found else f"**{found}: DEFECT**")
+            + f" | {chain['N_le_A']}, {chain['A_le_B']}, {chain['p2a']}, {chain['triangle']}, "
+            f"{chain['consistency']} | {block['n_switching_states']} | "
+            f"{block['n_zero_bound_states']} | {tight} | "
+            + ("not compared" if block["same_draws_identical"] is None
+               else ("yes" if block["same_draws_identical"] else "**NO: DEFECT**")) + " |")
+    lines += ["",
+              "Verification check (NVVUQ.14, v3 Theorem P2(c)); not a hypothesis test; no "
+              "verdict; not in the validation gate. At the core cell (k = 1) and on the same "
+              "oracle draws as N, every state must satisfy N² ≤ A ≤ B, where "
+              "A = mean ‖Y_r − X₁‖² / (ρ²D) is the spread of the retrieved analogs Y_r about "
+              "the clean-query analog X₁ and B = 4 mean (r₁ + ‖η_r‖)² 1{‖η_r‖ ≥ Δ/2} / (ρ²D) "
+              "is the bound, both over the M draws, in the units of N². This holds exactly, so a "
+              "violation is a code defect, not sampling noise; the slack is the round-off "
+              "bound of the check (κ = 1e-13, τ_N), not a tolerance fitted to results. "
+              "N/√B near 0 means the bound is loose for that state."]
+    return lines
+
+
 def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
     """Write the human-readable results report.
 
@@ -564,6 +606,8 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
     lines += _v7_rows(results, systems, config)
     lines += ["", "### Largest Lyapunov exponent against published values", "",
               *_lyapunov_lines(results, systems)]
+    lines += ["", "### Theorem P2(c) bound (verification check, not a hypothesis)", "",
+              *_p2c_lines(results, systems)]
 
     if "robustness" in results:
         lines += ["", "## Robustness (core cell)", ""]
