@@ -27,9 +27,9 @@ from .allocation import ErrorPredictor, ProfileProxies, RegimeMap, calibrate_reg
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, build_context, make_rng
 from .ensemble import CORRELATION_FIELDS, DRAW_COUNTERS, DRAW_COLUMN, ENTRY_COUNTERS, \
-    AnalogLibrary, EnsembleMoments, EvaluationDraws, ForecastSetup, ensemble_moments, \
-    evaluation_draws
-from .estimation import StateEstimator
+    LM_FIELDS, AnalogLibrary, EnsembleMoments, EvaluationDraws, ForecastSetup, \
+    ensemble_moments, evaluation_draws, stack_optional
+from .estimation import StateEstimator, lm_summary
 from .networks import train_estimator
 from .oracle import ORACLE_COUNTERS, StateOracles, curvature, excess_mse, oracle_weight, \
     realized_horizon, state_oracles
@@ -279,7 +279,7 @@ class Study:
         return out
 
     def system_handling(self, system: str, result_counts: dict[str, int]) -> dict:
-        """The ``handling`` block of one system (schema ``lpcstudy.handling/1``).
+        """The ``handling`` block of one system (schema ``lpcstudy.handling/2``).
 
         Parameters
         ----------
@@ -385,7 +385,8 @@ class Study:
             oracles[split] = full_oracles if core else full_oracles.subset(
                 np.arange(cfg.n_test_sweep))
         self.record_cell(system, label, cell_id(label, noise, library_size, core),
-                         cell_handling(splits, cfg.n_oracle_draws, cfg.reference_horizon))
+                         cell_handling(splits, cfg.n_oracle_draws, cfg.reference_horizon, noise,
+                                       ctx.embed_dim - ctx.spec.dim))
         LOG.info("cell %s rho=%.3f n_lib=%d core=%s label=%s done in %.1fs", system, noise,
                  library_size, core, label, time.time() - start)
         return Cell(system=system, noise=noise, library_size=library_size, label=label,
@@ -535,13 +536,16 @@ def fit_counters(regimes: dict[int, RegimeMap], chosen: int, a2_floor: int,
 
 
 # ------------------------------------------------------------ the handling block
-HANDLING_SCHEMA: str = "lpcstudy.handling/1"
+HANDLING_SCHEMA: str = "lpcstudy.handling/2"
+"""Schema id. ``/2`` (WU-0005.4) adds the ``lm`` block of each cell and the counters
+``lm_nonfinite_cost`` and ``lm_nonfinite_jacobian``; nothing of ``/1`` is removed or changed."""
 
 CELL_COUNTERS: tuple[str, ...] = (
     "invariant_mean_replacements", "nu_replacements", "error_clips", "error_clips_cp",
     "error_clips_plp", "error_clips_nonfinite", "error_clips_plp_href",
     "error_clips_nonfinite_href", "gain_replacements", "gain_floor", "zero_variance_corr",
-    "zero_variance_corr_cp", "zero_variance_corr_plp", "curvature_floor", "decisive_floor")
+    "zero_variance_corr_cp", "zero_variance_corr_plp", "curvature_floor", "decisive_floor",
+    "lm_nonfinite_cost", "lm_nonfinite_jacobian")
 """Counters of a cell record (per kind and in total); ``DRAW_COUNTERS`` and ``ENTRY_COUNTERS``
 (ensemble), their sum ``error_clips``, and ``moment_counters``."""
 
@@ -568,6 +572,7 @@ COUNTER_DENOMINATOR: dict[str, str | None] = {
     "gain_floor": "eval_draws", "zero_variance_corr": "moment_entries",
     "zero_variance_corr_cp": "moment_entries", "zero_variance_corr_plp": "moment_entries",
     "curvature_floor": "moment_entries", "decisive_floor": "states",
+    "lm_nonfinite_cost": "estimates", "lm_nonfinite_jacobian": "estimates",
     "local_dim_zero_distance": "states", "oracle_gain_floor": "states",
     "oracle_nonfinite": "states", "nu_cap_clips": "nu_cap_estimates",
     "closed_form_floor_a4": "test_eval_draws", "closed_form_floor_a4o": "test_states",
@@ -602,18 +607,74 @@ def _add_to_kind(kind: dict, handled: np.ndarray, clip_entries: dict[str, int],
         kind["denominators"][name] += int(value)
 
 
-def cell_record(kinds: dict[str, dict]) -> dict:
+LMParts = dict[str, list[tuple[np.ndarray, np.ndarray, np.ndarray]]]
+"""Per kind, the ``(residual, accepted, late_progress)`` arrays of each computation of the cell."""
+
+
+def _lm_arrays(parts: list[tuple[np.ndarray, np.ndarray, np.ndarray]]
+               ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Flatten and join the arrays of several computations (empty arrays if there are none)."""
+    if not parts:
+        return np.zeros(0), np.zeros(0, dtype=np.int32), np.zeros(0, dtype=np.int32)
+    return tuple(np.concatenate([part[i].ravel() for part in parts]) for i in range(3))
+
+
+def lm_block(parts: LMParts, noise: float, dof: int) -> dict:
+    """The ``lm`` block of a cell record: the Levenberg-Marquardt summary (NVVUQ.10, WU-0005.4).
+
+    Parameters
+    ----------
+    parts : dict
+        ``KINDS`` name to the list of ``(residual, accepted, late_progress)`` arrays of each
+        computation of that kind (a missing kind has none).
+    noise : float
+        Noise level ``rho`` of the cell.
+    dof : int
+        Degrees of freedom ``D - m`` of the cell's goodness-of-fit reference (stored as
+        ``gof_dof``): ``embed_dim - state dimension``, 4 for the main systems.
+
+    Returns
+    -------
+    dict
+        ``lm_summary`` of all estimates of the cell, plus ``by_kind``: the summary of each kind
+        of ``KINDS`` (``n_estimates`` 0 and ``None`` values for a kind without estimates). It is
+        not summed into ``totals`` (``sum_totals`` reads ``counts`` only). Report-only: no verdict
+        reads it. Needs owner review before freeze.
+    """
+    by_kind = {kind: lm_summary(*_lm_arrays(parts.get(kind, [])), noise, dof) for kind in KINDS}
+    pooled = [part for kind in KINDS for part in parts.get(kind, [])]
+    return {**lm_summary(*_lm_arrays(pooled), noise, dof), "by_kind": by_kind}
+
+
+def cell_record(kinds: dict[str, dict], lm: dict | None = None) -> dict:
     """Assemble a cell record from its kinds (missing kinds are zero): counts and denominators
-    are the sums over ``KINDS``; ``by_kind`` keeps the parts."""
+    are the sums over ``KINDS``; ``by_kind`` keeps the parts. ``lm`` is the ``lm_block`` (added
+    under the key ``lm`` when given)."""
     full = {kind: kinds.get(kind) or _new_kind() for kind in KINDS}
-    return {"counts": {name: sum(full[k]["counts"][name] for k in KINDS) for name in CELL_COUNTERS},
-            "by_kind": full,
-            "denominators": {name: sum(full[k]["denominators"][name] for k in KINDS)
-                             for name in CELL_DENOMINATORS}}
+    record = {"counts": {name: sum(full[k]["counts"][name] for k in KINDS)
+                         for name in CELL_COUNTERS},
+              "by_kind": full,
+              "denominators": {name: sum(full[k]["denominators"][name] for k in KINDS)
+                               for name in CELL_DENOMINATORS}}
+    if lm is not None:
+        record["lm"] = lm
+    return record
 
 
-def cell_handling(splits: dict[str, SplitData], n_oracle_draws: int, reference_horizon: int
-                  ) -> dict:
+def _lm_part(source: EnsembleMoments | EvaluationDraws, name: str, shape: tuple[int, int]
+             ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The Levenberg-Marquardt arrays of a computation, checked against its ``(n, M)`` shape."""
+    arrays = tuple(getattr(source, field_name) for field_name in LM_FIELDS)
+    if any(a is None for a in arrays):
+        raise ValueError(f"{name}: carries no Levenberg-Marquardt arrays (built by hand or a view)")
+    if any(a.shape != shape for a in arrays):
+        raise ValueError(f"{name}: Levenberg-Marquardt arrays have shapes "
+                         f"{[a.shape for a in arrays]}, expected {shape} each")
+    return arrays
+
+
+def cell_handling(splits: dict[str, SplitData], n_oracle_draws: int, reference_horizon: int,
+                  noise: float, dof: int) -> dict:
     """Handling record of one cell, from the counts its computations stored.
 
     Sums over the splits: the oracle kind from the moments (per-state ``handled``, the entry
@@ -628,24 +689,33 @@ def cell_handling(splits: dict[str, SplitData], n_oracle_draws: int, reference_h
         Oracle draws per state ``M`` (the moments do not store it).
     reference_horizon : int
         ``H_ref`` in steps.
+    noise : float
+        Noise level ``rho`` of the cell (scales the goodness-of-fit reading of the ``lm`` block).
+    dof : int
+        ``D - m`` of the cell (embedding dimension minus state dimension), the degrees of freedom
+        of the chi-square reference of ``c / rho^2``.
 
     Returns
     -------
     dict
-        ``{counts, by_kind, denominators}`` with every counter of ``CELL_COUNTERS`` and every
-        denominator of ``CELL_DENOMINATORS`` present.
+        ``{counts, by_kind, denominators, lm}`` with every counter of ``CELL_COUNTERS`` and every
+        denominator of ``CELL_DENOMINATORS`` present, and the ``lm_block`` of the cell.
 
     Raises
     ------
     ValueError
-        If a split's moments or draws carry no counts (built by hand, or after a subset).
+        If a split's moments or draws carry no counts or no Levenberg-Marquardt arrays (built by
+        hand, or after a subset), or the arrays do not have the shape of the draws.
     """
     oracle, evaluation = _new_kind(), _new_kind()
+    lm_parts: LMParts = {"oracle": [], "eval": []}
     for name, data in splits.items():
         moments, evals = data.moments, data.evals
         if moments.handled is None or moments.clip_entries is None:
             raise ValueError(f"split {name!r}: moments carry no counts (built by hand or a view)")
         n, n_hor = len(moments.handled), len(moments.horizons)
+        lm_parts["oracle"].append(_lm_part(moments, f"split {name!r} moments",
+                                           (n, n_oracle_draws)))
         _add_to_kind(oracle, moments.handled, moments.clip_entries,
                      moment_counters(moments, reference_horizon),
                      {"states": n, "estimates": n * n_oracle_draws,
@@ -655,14 +725,16 @@ def cell_handling(splits: dict[str, SplitData], n_oracle_draws: int, reference_h
             if evals.handled is None or evals.clip_entries is None:
                 raise ValueError(f"split {name!r}: evaluation draws carry no counts")
             draws, n_hor_ev = evals.cp_err.shape[1], evals.cp_err.shape[2]
+            lm_parts["eval"].append(_lm_part(evals, f"split {name!r} evaluation draws", (n, draws)))
             _add_to_kind(evaluation, evals.handled, evals.clip_entries, None,
                          {"estimates": n * draws, "error_entries": n * draws * n_hor_ev,
                           "href_draws": n * draws, "eval_draws": n * draws})
-    return cell_record({"oracle": oracle, "eval": evaluation})
+    return cell_record({"oracle": oracle, "eval": evaluation}, lm_block(lm_parts, noise, dof))
 
 
 def check_record(handled: dict[str, int], clip_entries: dict[str, int], n_states: int,
-                 n_draws: int, n_horizons: int) -> dict:
+                 n_draws: int, n_horizons: int, noise: float, dof: int,
+                 lm: tuple[np.ndarray, np.ndarray, np.ndarray]) -> dict:
     """Handling record of a validation check that draws its own forecasts (V3, V4).
 
     Parameters
@@ -673,19 +745,34 @@ def check_record(handled: dict[str, int], clip_entries: dict[str, int], n_states
         ``ENTRY_COUNTERS`` totals.
     n_states, n_draws, n_horizons : int
         Size of the check: states, draws per state, horizons.
+    noise : float
+        Noise level ``rho`` of the check.
+    dof : int
+        ``D - m`` of the check's system (see ``cell_handling``).
+    lm : tuple of np.ndarray
+        ``(residual, accepted, late_progress)`` of the check's estimates, ``n_states * n_draws``
+        values each. They are summarized here and not stored.
 
     Returns
     -------
     dict
-        A cell record with only the ``check`` kind filled.
+        A cell record with only the ``check`` kind filled (``lm`` block included).
+
+    Raises
+    ------
+    ValueError
+        If the arrays do not hold ``n_states * n_draws`` values.
     """
+    if any(np.size(a) != n_states * n_draws for a in lm):
+        raise ValueError(f"check_record: expected {n_states * n_draws} estimates per array, "
+                         f"got {[np.size(a) for a in lm]}")
     kind = _new_kind()
     matrix = np.array([[handled[name] for name in DRAW_COUNTERS]], dtype=np.int64)
     _add_to_kind(kind, matrix, clip_entries, None,
                  {"states": n_states, "estimates": n_states * n_draws,
                   "error_entries": n_states * n_draws * n_horizons,
                   "href_draws": n_states * n_draws})
-    return cell_record({"check": kind})
+    return cell_record({"check": kind}, lm_block({"check": [lm]}, noise, dof))
 
 
 def oracle_block(oracles: StateOracles) -> dict:
@@ -828,6 +915,7 @@ def _concat_moments(parts: list[EnsembleMoments]) -> EnsembleMoments:
         horizons=parts[0].horizons,
         kept={k: np.concatenate([p.kept[k] for p in parts]) for k in kept_keys},
         handled=_stack_handled(parts), clip_entries=_sum_entries(parts),
+        **{k: stack_optional([getattr(p, k) for p in parts]) for k in LM_FIELDS},
         **correlation, **{k: np.concatenate([getattr(p, k) for p in parts]) for k in keys})
 
 
@@ -836,9 +924,11 @@ def _concat_evals(parts: list[EvaluationDraws]) -> EvaluationDraws:
     if len(parts) == 1:
         return parts[0]
     stacked = {k: np.concatenate([getattr(p, k) for p in parts]) for k in parts[0].__dict__
-               if k not in ("horizons", "handled", "clip_entries")}
+               if k not in ("horizons", "handled", "clip_entries", *LM_FIELDS)}
     return EvaluationDraws(horizons=parts[0].horizons, handled=_stack_handled(parts),
-                           clip_entries=_sum_entries(parts), **stacked)
+                           clip_entries=_sum_entries(parts),
+                           **{k: stack_optional([getattr(p, k) for p in parts])
+                              for k in LM_FIELDS}, **stacked)
 
 
 def _stack_handled(parts: list) -> np.ndarray | None:

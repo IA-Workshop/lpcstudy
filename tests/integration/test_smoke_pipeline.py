@@ -46,7 +46,38 @@ def test_smoke_preset_writes_outputs_and_gate_flag(tmp_path: Path) -> None:
         # WU-0005.5 (P1): the P2(c) check runs on the core cell's own draws and finds no violation.
         p2c = result["verification"]["P2c"]
         assert p2c["n_violations"] == 0 and p2c["same_draws_identical"] is True, name
-    assert_handling(json.loads((out_dir / "results.json").read_text()))
+    results = json.loads((out_dir / "results.json").read_text())
+    assert_handling(results)
+    assert_lm_rows(results, (out_dir / "RESULTS.md").read_text().splitlines())
+
+
+LM_KEYS = ("median_residual", "p95_residual", "median_iterations", "fraction_no_decrease")
+"""The four keys the ROADMAP row of WU-0005.4 names."""
+
+
+def assert_lm_rows(results: dict, report_lines: list[str]) -> None:
+    """WU-0005.4 (V2 and V3): every handling cell has an ``lm`` block, and RESULTS.md shows it.
+
+    Every cell of every system has ``lm`` with the four ROADMAP keys, the counts of estimates per
+    kind equal the ``estimates`` denominators of the same kind, and the report has exactly one row
+    per (system, cell, kind) with at least one estimate. The core cell has the oracle and eval
+    kinds; the two checks (V3, V4) have the check kind only.
+    """
+    row = re.compile(r"^\| \w+ \| `.+` \| (oracle|eval|check) \| \d+ \|")  # ids hold escaped pipes
+    rows = [line for line in report_lines if row.match(line)]
+    expected = 0
+    for name, system in results["systems"].items():
+        for block_id, record in system["handling"]["cells"].items():
+            lm = record["lm"]
+            assert set(LM_KEYS) <= set(lm), (name, block_id)
+            assert set(lm["by_kind"]) == {"oracle", "eval", "check"}, (name, block_id)
+            for kind, part in lm["by_kind"].items():
+                assert set(LM_KEYS) <= set(part), (name, block_id, kind)
+                assert part["n_estimates"] == record["by_kind"][kind]["denominators"]["estimates"], \
+                    (name, block_id, kind)
+                expected += part["n_estimates"] > 0
+            assert lm["n_estimates"] == record["denominators"]["estimates"], (name, block_id)
+    assert len(rows) == expected > 0, (len(rows), expected)
 
 
 COUNT_KEY_PATTERN = re.compile(r"n_(failed|excluded|nonfinite|dropped|km_not_reached|degenerate|"
@@ -80,7 +111,7 @@ def assert_handling(results: dict) -> None:
     fit; the run totals are the sum over systems; and every key of the results that looks like a
     count (the pattern of A13) is in ``RESULT_COUNT_KEYS`` or is named here as not a handling count.
     """
-    assert results["handling"]["schema"] == "lpcstudy.handling/1"
+    assert results["handling"]["schema"] == "lpcstudy.handling/2"  # WU-0005.4 (O1)
     run_total = dict.fromkeys(ALL_COUNTERS, 0)
     for name, system in results["systems"].items():
         block = system["handling"]

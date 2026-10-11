@@ -562,6 +562,87 @@ def _p2c_lines(results: dict, systems: list[str]) -> list[str]:
     return lines
 
 
+LM_KINDS: tuple[str, ...] = ("oracle", "eval", "check")
+"""The kinds of a cell's ``lm`` block, in report order (the keys of ``pipeline.KINDS``)."""
+
+
+def _lm_number(value: float | None, digits: int = 3) -> str:
+    """A float to ``digits`` significant digits, or ``n/a`` for ``None`` (non-finite or absent)."""
+    return "n/a" if value is None else f"{value:.{digits}g}"
+
+
+def _lm_ratio(value: float | None, noise: float) -> float | None:
+    """``c / rho^2`` from a residual statistic (``None`` stays ``None``)."""
+    return None if value is None else value / noise**2
+
+
+def _lm_lines(results: dict, systems: list[str], config: StudyConfig) -> list[str]:
+    """Markdown of the Levenberg-Marquardt diagnostics subsection (WU-0005.4, NVVUQ.10).
+
+    One row per system, cell and kind with at least one estimate, read from
+    ``systems.<s>.handling.cells.<id>.lm``. ``c`` is the final cost ``||X_t - G'(u_hat)||^2`` in
+    normalized observation units, printed beside ``c / rho^2``. A report only: no verdict reads it,
+    it is not in the validation gate, and the fraction of estimates with ``c / rho^2`` above the
+    chi-square 0.999 quantile is a diagnostic with no role in any decision (DEC-0025, D3). Results
+    written before the block existed (handling schema ``/1``, or none) get one line, never an
+    exception. Needs owner review before freeze.
+    """
+    rows = []
+    for system in systems:
+        handling = results["systems"][system].get("handling")
+        for cell_id, record in ({} if handling is None else handling.get("cells", {})).items():
+            block = record.get("lm")
+            if block is None:
+                continue
+            for kind in LM_KINDS:
+                part = block["by_kind"][kind]
+                if not part["n_estimates"]:
+                    continue
+                rho = part["noise"]
+                rows.append(
+                    f"| {system} | `{_cell(cell_id)}` | {kind} | {part['n_estimates']} | "
+                    f"{part['gof_dof']} | {_lm_number(part['median_residual'])} | "
+                    f"{_lm_number(part['p95_residual'])} | "
+                    f"{_lm_number(_lm_ratio(part['median_residual'], rho))} | "
+                    f"{_lm_number(_lm_ratio(part['p95_residual'], rho))} | "
+                    f"{_lm_number(part['median_iterations'])} | "
+                    f"{_lm_number(part['fraction_no_decrease'])} | "
+                    f"{_lm_number(part['fraction_late_progress'])} | "
+                    f"{_lm_number(part['fraction_above_chi2'])} | {part['nonfinite_residuals']} |")
+    if not rows:
+        return ["No Levenberg-Marquardt estimates in these results (no cell has an `lm` block with "
+                "n > 0: written before WU-0005.4, or built by hand)."]
+    steps = config.estimator_refine_steps
+    return [
+        f"| System | Cell | Kind | n | dof (D − m) | median c | p95 c | median c/ρ² | p95 c/ρ² | "
+        f"median accepted steps (of {steps}) | fraction no decrease | fraction late progress | "
+        f"fraction c/ρ² > χ²(dof) 0.999 quantile | non-finite residuals |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|", *rows, "",
+        f"Verification of the estimator's iterative stage (NVVUQ.10); not a hypothesis test; no "
+        f"verdict; not in the validation gate. The stopping criterion is a fixed {steps} "
+        f"Levenberg–Marquardt iterations with no tolerance stop. c is the final cost "
+        f"‖X_t − G′(û)‖², the sum of D squared terms in the units of σ_x (the noise standard "
+        f"deviation is ρ). The first-order reference for an estimate that converged in the "
+        f"correct basin is c/ρ² ~ χ²(dof) with dof = D − m delay coordinates beyond the state "
+        f"(4 at D = 7: median 3.36, p95 9.49). 'Accepted steps' counts "
+        f"every iteration whose candidate cost was strictly lower, round-off accepts after "
+        f"convergence included, so it is an upper bound on the productive steps and not the "
+        f"number of iterations to convergence. A fraction with no decrease above 0 indicates a "
+        f"failure (non-finite cost, corrupted Jacobian, or a stationary start), not slow "
+        f"convergence. 'Late progress' is the fraction of estimates with an accepted step in the "
+        f"last 3 iterations that lowered the cost by more than 1e-6 relative (or left an infinite "
+        f"cost): a screen for an "
+        f"estimate still moving at the budget. The fraction with c/ρ² above the 0.999 quantile of "
+        f"χ²(dof) (18.47 for dof 4) is 0.001 under the reference (a converged estimate in the "
+        f"correct basin with an exact model); it also counts wrong-basin estimates, estimates "
+        f"still unconverged at the budget, and model error (a misspecified model gives a "
+        f"non-central χ²: in a probe at 5% misspecification 100% exceeded at ρ = 0.01 and 23% at "
+        f"ρ = 0.05). Infinite residuals count in this fraction and also in the non-finite "
+        f"residuals column, so the two overlap. It is printed as a diagnostic, with no gate or "
+        f"verdict role. Neither column estimates the iterative error of any reported quantity "
+        f"(NVVUQ.9)."]
+
+
 def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
     """Write the human-readable results report.
 
@@ -647,6 +728,8 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
               *_lyapunov_lines(results, systems)]
     lines += ["", "### Theorem P2(c) bound (verification check, not a hypothesis)", "",
               *_p2c_lines(results, systems)]
+    lines += ["", "### Levenberg–Marquardt diagnostics (verification, NVVUQ.10; not a hypothesis)",
+              "", *_lm_lines(results, systems, config)]
 
     if "robustness" in results:
         lines += ["", "## Robustness (core cell)", ""]
