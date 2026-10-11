@@ -141,3 +141,18 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Resolution:** pending a WU-0011.5 follow-up (implement the direct-import rule and a regression test with the fixture); until then, planners add `test_validation.py` by hand when `analysis` changes. Also, a change to any `lpcstudy/*.py` should select `test_tools_test_impact.py` (the hand-written graph fixture is checked there).
 - 2026-10-11: opened (claude-sonnet-5-5, main session, on the WU-0002.6 review R3).
 - 2026-10-11: resolved by owner ruling (DEC-0015): V7 is plumbing only; `gate_pass` false at smoke is by design; V7 to be confirmed at pilot size in WU-0002.12 and may be retired once superseded (claude-sonnet-5-5, main session).
+
+**DEF-0017: the system states do not depend on the seed: every DEV run and the confirmatory run use the same trajectories** (LPC.PC.21, Methods v2 change-list item 8; candidate defect, needs an owner ruling)
+
+- **Blocking:** to be ruled on by the owner before the freeze (it changes what the confirmatory run is independent of); not blocking development.
+- **Affects:** `lpcstudy/data.py` `build_context` (lines 268, 299 to 307): the statistics, main and separate trajectories start from `spec.initial_state` (the separate one from `initial_state + 1e-3`), none from `make_rng`. Only the observation noise and the networks/bootstraps depend on the seed.
+- **Description.** Found by the WU-0002.11 applied-mathematician (Log of `docs/agent/records/work/WU-0002.11-counters.md`, finding F-A); verified by the main session by reading `data.py` (the seed does not enter the trajectory start). Consequence: all DEV seeds and the confirmatory seed share identical latent states and oracle quantities; the confirmatory run is fresh in noise only, and the bootstrap over test states models a variability that is never redrawn at the seed level. This may or may not contradict the intent of the design documents (v3 section on Trajectories says "three trajectories, after a 100-LT burn-in", silent on seeding the start state).
+- **Resolution:** pending the owner's ruling. Mathematician's recommendation: seed-dependent start states (drawn with `make_rng(seed, "start", system)` near the attractor, burn-in unchanged), which needs the DEF-0015 diverging-orbit guard (WU-0002.11c) first and changes every number (re-baseline and re-run the DEV-0 regression). Not acted on.
+- 2026-10-11: opened (claude-sonnet-5-5, main session).
+
+**DEF-0018: the H3a log-rank can give extreme p-values for tiny regimes** (v3 H3a; candidate defect, owner view)
+
+- **Blocking:** no.
+- **Affects:** `statistics.logrank_test` / `analysis.h3a_logrank`. One event against 99 censored gives p = 2.5e-23 (mathematician's calculation, WU-0002.11 Log, F-B). DEC-0011 O1 waived the 50-state minimum for individual regimes on purpose; the minimum applies to the total (WU-0002.7/.8 review R3).
+- **Resolution:** pending; the owner may want a per-regime minimum or an event-count minimum, which would revisit DEC-0011 O1. Not acted on. Candidate for the WU-0002.9 follow-ups.
+- 2026-10-11: opened (claude-sonnet-5-5, main session).

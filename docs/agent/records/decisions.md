@@ -267,3 +267,20 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0002.9, the report's verdict rows, WU-0002.12's `compare_pilot` and WU-0008 (they read the verdict values, which become strings). Marked "needs owner review before freeze" (verdict code).
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0017: WU-0002.11: counting only, the split into lanes, and the answers to the planner's questions Q1 to Q7  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the planner's questions and the applied-mathematician's answers; for owner confirmation)
+
+**Decision.**
+- **Q1 (blocks .11c only).** A diverging Lyapunov orbit **refuses the run** (a flagged run would have a wrong time unit), with the WU-0007 bounds on |x| plus a finiteness check: Lorenz-63 40, Rössler 25, Chua 3, applied to the Benettin orbit and the three `build_context` trajectories; the cache is recomputed once and asserted bitwise equal. Lane .11c waits for the owner's ruling on DEF-0017 (seed-dependent start states change the same code).
+- **Q2.** DEF-0012 (`workers=LPC_THREADS`) is a separate small unit. **Q3.** The Levenberg–Marquardt internal sites go to WU-0005.4.
+- **Q4.** `regime_count_fallback` is renamed `empty_regime_fallback` (it now counts empty calibration regimes), and a count of the chosen K is added; the ROADMAP key wording is amended by the owner.
+- **Q5.** This unit only counts: it excludes nothing and changes no number. Exclusions, moving dropped resamples to the A3 tail and failing on bound hits are WU-0002.9 or a later ruling.
+- **Q6.** Rate counters are report-only. A nonzero counter that should be zero under the theorems, or a collapsed ν cap (more than about 1% of construction ν̂ replaced), marks results provisional; that rule is for the owner. A clip-sensitivity flag (3s against one tenth of the interval half-width) is reported next to each MSE- or weight-based verdict in .11b.
+- **Q7.** The fixed seeds of the V2 (`validation.py:107`) and V5 (`:147`) checks stay as verification fixtures; the rest of the DEF-0011 conversions follow WU-0002.12 and need the owner's ruling (they change numbers). The shared stream `default_rng(config.seed)` across four consumers and the shared bootstrap indices across systems are not an inference problem (intersection–union and Holm are valid under any dependence); hygiene only.
+- **Plan fixes D1 to D8** from the mathematician's review are part of the plan (the developer applies each before the commit that implements it).
+
+**Alternatives weighed.** Flag-and-count a diverging orbit: rejected (wrong time unit). Convert all `default_rng` sites now: rejected (changes the pilot comparison anchor, DEC-0008 B).
+
+**Affects:** WU-0002.11 (.11a to .11d), WU-0002.9 hand-off, WU-0005.4, DEF-0012. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
