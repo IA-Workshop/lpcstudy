@@ -87,3 +87,8 @@ The retrieval cap stays in force until that first entry exists: until then the r
 - ROADMAP.md WU-0002.8 acceptance (line 115): replace "`handling.zero_variance_corr`" with "the zero-variance count is `zero_variance_corr[rho][n_lib]` in the H2b result, a dict of counts (CP constant, PLP constant, both, non-finite, n_states)" (review R7/R8).
 - Result keys: every criterion result carries `verdict` ("pass", "fail", "inconclusive"), `reason` (when inconclusive), `n_failed_resamples` and `pass` (DEC-0012 governs; DEC-0011 O3's `inconclusive_reason` is superseded for names). H3a's verdict is only pass or inconclusive.
 - H3a needs at least 50 test states on the full sample (the per-regime minimum is waived, DEC-0011 O1); H2d keeps a pending marker until WU-0002.9 because its pass uses the point estimate (DEC-0011 O4).
+
+## 10. Ruling on V7 (DEC-0015), 2026-10-11
+
+- ROADMAP: the smoke acceptance wording ('smoke passes the gate') becomes 'smoke lists V1 to V7'; WU-0002.12 acceptance adds 'V7 passes at pilot size on DEV-0'.
+- Ledger: the owner's `ruling` entry for DEF-0014 (option 1); say what 'superseded' means for the retirement of V7.
