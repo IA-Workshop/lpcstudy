@@ -8,11 +8,13 @@ import json
 import zlib
 
 import numpy as np
+import pytest
 
 from lpcstudy.config import SMOKE
-from lpcstudy.data import build_context, make_rng
+from lpcstudy.data import build_context, lyapunov_cached, make_rng
 from lpcstudy.pipeline import Study
 from lpcstudy.seeds import REGISTRY_PATH, with_seed
+from lpcstudy.systems import SYSTEMS, make_flow_step, simulate_trajectory
 
 
 def test_make_rng_with_a_registry_seed_equals_numpy_directly() -> None:
@@ -268,3 +270,84 @@ def test_every_random_state_keyword_is_a_sklearn_seed_call() -> None:
     sites, problems = _scan_random_state(sources)
     assert sites >= 4, sites
     assert not problems, f"random_state= not routed through sklearn_seed: {problems}"
+
+
+# ------------------------------------------- lambda_max against published values (WU-0007.2)
+
+# These three constants mirror the settings of ``lyapunov_cached`` (``lpcstudy/data.py``: the
+# tangent step ``20 * spec.max_dt``, ``n_steps=100_000``, ``burn_in=5_000``). They are
+# repeated here so that the orbit guard runs the same map for the same number of steps.
+LYAPUNOV_STEP_FACTOR = 20
+LYAPUNOV_AVERAGING_STEPS = 100_000
+LYAPUNOV_BURN_IN_STEPS = 5_000
+
+# (system, [(published value per natural time unit, relative tolerance), ...], bound on |x|).
+# Chua has no reference: no confirmed published value exists at the study's parameters.
+LYAPUNOV_CASES = [
+    pytest.param("lorenz63", [(0.90563, 0.01)], 40.0, id="lorenz63"),
+    pytest.param("rossler", [(0.0714, 0.03), (0.07062, 0.03)], 25.0, id="rossler"),
+    pytest.param("chua", [], 3.0, id="chua"),
+]
+
+
+@pytest.mark.parametrize(("system", "references", "bound"), LYAPUNOV_CASES)
+def test_lyapunov_cached_matches_published_reference(system: str,
+                                                     references: list[tuple[float, float]],
+                                                     bound: float, tmp_path) -> None:
+    """``lyapunov_cached`` agrees with the published lambda_max on a bounded orbit (WU-0007.2).
+
+    Reference: LITERATURE values per natural time unit, independent of the code, and NOT the
+    code's own pilot output (which Methods v2 rounds to 0.905, 0.0719 and 0.431). The
+    comparison is in natural time units; the per-step lambda is 1/30 by construction and carries
+    no information.
+
+    - Lorenz-63 (sigma 10, rho 28, beta 8/3): 0.90563, Sprott, ``lespec.htm`` (confirmed;
+      integrator and step not stated). Cross-check 0.905 +- 0.003, Hartl, arXiv:physics/0303077.
+    - Rossler (a = b = 0.2, c = 5.7): 0.0714, Sprott as cited by Bogdanov and Bogdanova,
+      arXiv:1412.2242 (secondary: Sprott's own text not retrieved), and 0.07062 +- 0.00066,
+      Bogdanov and Bogdanova's own estimate (confirmed, primary). Both are asserted.
+    - Chua (alpha 15.6, beta 28, m0 -1.143, m1 -0.714): NO confirmed published value (WU-0007.1,
+      DEC-0010). There is NO lambda assertion: a known limitation, the exponent is not
+      validated (NVVUQ.13). The case still asserts that the exponent is finite and that the orbit
+      is bounded.
+
+    Tolerances, fixed before the result was seen (the applied-mathematician's DEVELOPMENT
+    standard errors at 10^5 Benettin steps, burn-in 5000; no observed gap was used):
+
+    - Lorenz 1%: code SE 0.0012 (0.13%); Sprott's own uncertainty is unstated, so Hartl's
+      +-0.003 (0.33%) stands in. 3 * sqrt(0.13^2 + 0.33^2) = 1.06%. The RK4 bias is below 1e-4
+      relative (h = 0.01 against 0.02 and 0.04 shows no trend).
+    - Rossler 3% against each reference: code SE 0.00055 (0.75%), B&B 0.93%, combined
+      sqrt(0.75^2 + 0.93^2) = 1.19%, so 3% is about 2.5 sigma (a family-wise false-alarm
+      probability of at most about 2%). It cannot be tightened on SE grounds. The two references
+      differ by 1.1%. The RK4 bias at h = 0.04 is about -0.1%.
+
+    Orbit guard (DEF-0015): ``estimate_lyapunov`` returns a finite, positive, plausible value for
+    a diverging orbit, so "finite and positive" detects nothing. Each case therefore simulates
+    its own orbit (the same map ``make_flow_step(spec, spec.params, 20 * max_dt)``, the same
+    start state, 5000 + 10^5 steps) and asserts every value is finite and the first coordinate
+    obeys max|x| <= B. B = 3 for Chua (attractor |x| <= 2.26). B = 40 for Lorenz: the ball
+    x^2 + y^2 + (z - sigma - rho)^2 <= (39.25)^2 is forward invariant for the ODE and the start
+    (1, 1, 1) is inside, so |x| <= 39.25, and the margin absorbs the RK4 error. B = 25 for
+    Rossler: no trapping region is known; an escaping orbit has x > c persistently and
+    z' = b + z (x - c) overflows within 10^5 steps, so any bound well above the attractor
+    separates the cases. The bound is not to be raised to pass.
+
+    Runtime: about 1 s per case including JIT, within the unit budget.
+    """
+    spec = SYSTEMS[system]
+    interval = LYAPUNOV_STEP_FACTOR * spec.max_dt
+    value = lyapunov_cached(spec, tmp_path / "lyapunov.json")
+    assert np.isfinite(value), f"{system}: lambda_max is not finite"
+    for reference, tolerance in references:
+        gap = value / reference - 1.0
+        assert abs(gap) <= tolerance, (
+            f"{system}: lambda_max {value:.6g} against published {reference} is {gap:+.2%} "
+            f"(tolerance {tolerance:.0%}); the step {interval} is the suspected cause "
+            "(LPC.NV.1); report, do not tune")
+    orbit = simulate_trajectory(make_flow_step(spec, spec.params, interval),
+                                np.asarray(spec.initial_state, dtype=np.float64),
+                                LYAPUNOV_BURN_IN_STEPS + LYAPUNOV_AVERAGING_STEPS)
+    assert np.isfinite(orbit).all(), f"{system}: the orbit left the finite range (diverged)"
+    largest = float(np.abs(orbit[:, spec.observed_index]).max())
+    assert largest <= bound, f"{system}: max|x| = {largest:.4g} exceeds the bound {bound}"

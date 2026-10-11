@@ -127,3 +127,21 @@ So the memo's set equals alpha = 9, beta = 100/7, m0 = -8/7, m1 = -5/7: the m va
 ### Status for WU-0007.1, Chua row
 
 `not found`: no confirmed published lambda_max at alpha = 15.6, beta = 28, m0 = -1.143, m1 = -0.714 (autonomous, per unit of the dimensionless time). Methods v2's 0.431 has no retrieved source and is not contradicted by one either. Options for the owner: (a) record Chua as a known limitation (NVVUQ.13); (b) have a request retrieve the IEEE 1985 paper, the Scholarpedia page (if the certificate is fixed), Guégan and Leroux, or Bilotta and Pantano by an approved route; (c) use the memo's alpha = 9, beta = 100/7 case as a primary check of the Chua field and the Benettin routine (expected about 0.33 per unit dimensionless time, derived, two digits).
+
+---
+
+## Addendum (2026-10-11, WU-0007.2, claude-sonnet-5-5 as developer): the code's measured values against the references
+
+Appended; nothing above edited. Measured by `lyapunov_cached` (`estimate_lyapunov` with tangent step `20*max_dt`, 10^5 averaging steps, burn-in 5000, fixed start `spec.initial_state`; deterministic, no seed), CPU, DEVELOPMENT. The test is `tests/unit/test_data.py::test_lyapunov_cached_matches_published_reference`. Units: per natural time unit. The standard errors (SE) are the applied-mathematician's development values (WU-0007 Log, 2026-10-11): Lorenz 0.0012, Rössler 0.00055.
+
+| System | Code lambda_max | Reference | Gap (relative; absolute) | In SE | Tolerance (WU-0007 plan amendment A2) |
+|---|---|---|---|---|---|
+| Lorenz-63 | 0.905494 | 0.90563 (Sprott, confirmed) | -0.015% (-0.000136) | 0.11 code SE | 1% (passes) |
+| Rössler | 0.0719398 | 0.0714 (Sprott via Bogdanov and Bogdanova, secondary) | +0.76% (+0.00054) | 0.98 code SE | 3% (passes) |
+| Rössler | 0.0719398 | 0.07062 +- 0.00066 (Bogdanov and Bogdanova, primary) | +1.87% (+0.00132) | 1.54 combined SE (sqrt(0.00055^2 + 0.00066^2)) | 3% (passes) |
+| Chua (alpha 15.6, beta 28, m0 -1.143, m1 -0.714) | 0.431133 | none (not found; known limitation, NVVUQ.13, DEC-0010) | n/a | n/a | no assertion: not validated |
+
+- The reference values are literature values, not the code's output. The tolerances were fixed in the plan amendment before these numbers were compared (VV.3 caveat: the pilot values had been seen earlier).
+- The test also asserts that each orbit is bounded (DEF-0015): max|x| over the first coordinate was Lorenz 19.27 (bound 40), Rössler 11.43 (bound 25), Chua 2.263 (bound 3).
+
+**Methods v2 §M2 values.** The values 0.905, 0.0719 and 0.431 in Methods v2 §M2 (and v3 §4) are the code's own output rounded, not literature values. `docs/study/pilot_results_v1.json` (`systems.<s>.context.lambda_max`) holds 0.9054940534657817, 0.07193978510879935 and 0.43113260161336364, which round to them at 3, 3 and 3 significant digits (0.905, 0.0719, 0.431), and the measurement above reproduces them exactly. So the agreement of 0.905 with Hartl's 0.905 and of 0.0719 with Bogdanov and Bogdanova is an agreement of the code with the literature, not of two copies of one source; and 0.431 has no external check (Chua).

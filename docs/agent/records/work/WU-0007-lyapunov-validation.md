@@ -284,6 +284,24 @@ Scope: M1 to M4 before any code is written. No library or test file was touched,
 
 Tightened: Lorenz 3% → 1%. Unchanged: Rössler 3% (both references) and memo 10%.
 
+### 2026-10-11 WU-0007.2 and .3 implementation (developer, claude-sonnet-5-5)
+
+**Base smoke (taken before any report change).** `tools/run_preset.sh smoke DEV-0 runs/dev/base-0007`, CPU, 48 s wall, exit 0. This is the comparison base for WU-0007.3.
+
+**Interpretation of "max|x|" in the orbit guard (A4).** Measured once (scratch script, not a test; CPU, 4 threads, 5000 + 10^5 steps of the study's map from the registry start): max over the orbit of each coordinate (x, y, z).
+- Lorenz: (19.27, 26.73, 47.45). Rössler: (11.43, 10.79, 22.85). Chua: (2.263, 0.389, 3.638).
+- "max|x|" in A4 can only mean the FIRST coordinate (the observed variable, `spec.observed_index` = 0): the plan's Chua attractor figure 2.26 is the x coordinate (z reaches 3.64 > B = 3), and the Lorenz ball of radius 39.25 is centred at z = sigma + rho = 38, so z = 47.45 is inside it and |z| ≤ 40 would be wrong. The test therefore asserts max|x| over the first state coordinate, as the plan's numbers require. Observed x: Lorenz 19.27 ≤ 40, Rössler 11.43 ≤ 25 (and ≤ 16.7, so no referral), Chua 2.263 ≤ 3.
+
+**§4.9 checklist before the WU-0007.2 invocation.**
+1. Change set: `git status --porcelain` shows only ` M tests/unit/test_data.py`; the branch's committed diff against develop is the unit file only.
+2. Radius: a test file changed and no `lpcstudy/` file: "test file: that file only" (`tools/test_impact.py --explain`, rule for `tests/unit/test_data.py`), so `tests/unit/test_data.py`, unit tier, smaller than the suite; no integration, no smoke (A6).
+3. Already run? No; the file is new in this form.
+4. Device: `tools/run_tests.sh` sets `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`.
+5. Threads: `LPC_THREADS` default 4 (budget 4); unit timeout 300 s.
+6. Contention: CPU only, no lock; no preset of mine running.
+7. Output: the wrapper's `-q --tb=short -rfE`; `--durations=10` added for the §4.6 evidence.
+8. Command: `tools/run_tests.sh unit --durations=10 tests/unit/test_data.py`.
+
 ## Review
 
 - **Reviewer:** <actor, not the author>
