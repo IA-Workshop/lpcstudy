@@ -217,6 +217,7 @@ def run_with_fakes(argv: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPa
     saves: list[dict] = []
     monkeypatch.setattr(cli, "Study", _FakeStudy)
     monkeypatch.setattr(cli, "run_system", lambda study, system: {"seed_seen": study.config.seed})
+    monkeypatch.setattr(cli, "run_handling", lambda study, results: {"schema": "fake"})
     monkeypatch.setattr(cli, "verdicts", lambda results, config: {})
     monkeypatch.setattr(cli, "save_json", lambda obj, path: saves.append(copy.deepcopy(obj))
                         or path.write_text(json.dumps(obj)))
@@ -240,6 +241,8 @@ def test_provenance_is_saved_incomplete_first_and_complete_last(
     assert last["seed_id"] == "DEV-0" and saves[-1]["config"]["seed_id"] == "DEV-0"
     assert saves[-1]["systems"]["lorenz63"]["seed_seen"] == 20261005 == saves[-1]["config"]["seed"]
     assert last["argv"][:2] == ["--preset", "smoke"]
+    assert saves[-1]["handling"] == {"schema": "fake"}  # the run-level handling is saved (DEF-0001)
+    assert "handling" not in saves[0]
 
 
 def test_confirmatory_run_writes_no_seed_value(

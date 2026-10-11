@@ -10,7 +10,12 @@ from scipy.spatial import cKDTree
 
 from .data import SystemContext
 from .dynamics import growth_exponent, make_amplification, make_observability
-from .ensemble import EnsembleMoments
+from .ensemble import EnsembleMoments, worker_count
+
+
+ORACLE_COUNTERS: tuple[str, ...] = ("local_dim_zero_distance", "oracle_gain_floor",
+                                    "oracle_nonfinite")
+"""Columns of ``StateOracles.handled``; each counts states of the split (DEF-0001)."""
 
 
 @dataclass
@@ -27,17 +32,55 @@ class StateOracles:
         Effective exponent ``Lambda_bar`` per step (slope of ``ln g_H``), ``(n,)``.
     local_dim : np.ndarray
         Levina-Bickel local dimension of the latent state, ``(n,)``.
+    handled : np.ndarray or None
+        Per-state 0/1 flags ``(n, 3)`` int64, columns ``ORACLE_COUNTERS``: a neighbour distance
+        below the ``1e-300`` floor of ``local_dimension``; a gain below that floor in the window;
+        a non-finite ``nu`` or gain (never replaced: it propagates). All three are sentinels
+        (a nonzero count means a hypothesis or the code failed). ``None`` for hand-built oracles.
     """
 
     nu: np.ndarray
     gains: np.ndarray
     growth: np.ndarray
     local_dim: np.ndarray
+    handled: np.ndarray | None = None
 
     def subset(self, rows: np.ndarray) -> "StateOracles":
         """Restrict to a subset of states."""
         return StateOracles(self.nu[rows], self.gains[rows], self.growth[rows],
-                            self.local_dim[rows])
+                            self.local_dim[rows],
+                            None if self.handled is None else self.handled[rows])
+
+
+def local_dimension_counted(reference: np.ndarray, queries: np.ndarray, n_neighbors: int = 20
+                            ) -> tuple[np.ndarray, np.ndarray]:
+    """Levina-Bickel local dimension and the states whose distance floor bound.
+
+    A neighbour at distance below ``1e-300`` (an exact duplicate of the query in the reference,
+    which the contract excludes) is floored to ``1e-300`` before the logarithm. The dimension
+    is that of :func:`local_dimension`; the flag marks the states (``local_dim_zero_distance``).
+
+    Parameters
+    ----------
+    reference : np.ndarray
+        Reference sample of whitened states ``(N, m)``.
+    queries : np.ndarray
+        Whitened query states ``(n, m)`` (not contained in ``reference``).
+    n_neighbors : int, optional
+        Number of neighbors ``k``.
+
+    Returns
+    -------
+    dims : np.ndarray
+        Local dimension estimates ``(n,)``.
+    floored : np.ndarray
+        Boolean ``(n,)``: at least one of the ``k`` neighbour distances was below ``1e-300``.
+    """
+    dist, _ = cKDTree(reference).query(queries, k=n_neighbors, workers=worker_count())
+    floored = (dist < 1e-300).any(axis=1)
+    dist = np.maximum(dist, 1e-300)
+    logs = np.log(dist[:, -1:] / dist[:, :-1])
+    return (n_neighbors - 2) / np.sum(logs, axis=1), floored
 
 
 def local_dimension(reference: np.ndarray, queries: np.ndarray, n_neighbors: int = 20
@@ -58,10 +101,7 @@ def local_dimension(reference: np.ndarray, queries: np.ndarray, n_neighbors: int
     np.ndarray
         Local dimension estimates ``(n,)``.
     """
-    dist, _ = cKDTree(reference).query(queries, k=n_neighbors, workers=-1)
-    dist = np.maximum(dist, 1e-300)
-    logs = np.log(dist[:, -1:] / dist[:, :-1])
-    return (n_neighbors - 2) / np.sum(logs, axis=1)
+    return local_dimension_counted(reference, queries, n_neighbors)[0]
 
 
 def inverse_dimension(local_dim: np.ndarray, n_neighbors: int = 20) -> np.ndarray:
@@ -133,13 +173,45 @@ def state_oracles(ctx: SystemContext, split: str, window: int,
         nu_parts.append(np.asarray(nu_fn(jnp.asarray(ctx.eval_states[t_chunk - ctx.history]))))
         gain_parts.append(np.asarray(amp_fn(jnp.asarray(ctx.eval_states[t_chunk]))))
     gains = np.concatenate(gain_parts)
+    nu = np.concatenate(nu_parts)
     rng = np.random.default_rng(0)
     pool = ctx.library_states[rng.choice(len(ctx.library_states),
                                          size=min(20_000, len(ctx.library_states)),
                                          replace=False)]
-    dims = local_dimension(ctx.whiten_states(pool), ctx.whiten_states(ctx.eval_states[times]))
-    return StateOracles(nu=np.concatenate(nu_parts), gains=gains,
-                        growth=growth_exponent(gains, window), local_dim=dims)
+    dims, zero_distance = local_dimension_counted(
+        ctx.whiten_states(pool), ctx.whiten_states(ctx.eval_states[times]))
+    return StateOracles(nu=nu, gains=gains, growth=growth_exponent(gains, window),
+                        local_dim=dims, handled=oracle_handling(nu, gains, window, zero_distance))
+
+
+def oracle_handling(nu: np.ndarray, gains: np.ndarray, window: int, zero_distance: np.ndarray
+                    ) -> np.ndarray:
+    """Per-state sentinel flags of the oracle quantities (``ORACLE_COUNTERS``). Nothing is replaced.
+
+    ``oracle_gain_floor`` marks a state with a gain below the ``1e-300`` floor of
+    ``growth_exponent`` in the first ``window`` columns (NaN does not count: ``NaN < x`` is
+    False). ``oracle_nonfinite`` marks a state with a non-finite ``nu`` or a non-finite gain
+    anywhere; such a value propagates to ``growth`` and the weights as NaN, visibly.
+
+    Parameters
+    ----------
+    nu : np.ndarray
+        Oracle ``nu``, ``(n,)``.
+    gains : np.ndarray
+        Oracle gains, ``(n, window)``.
+    window : int
+        Growth window (steps).
+    zero_distance : np.ndarray
+        Boolean ``(n,)`` from :func:`local_dimension_counted`.
+
+    Returns
+    -------
+    np.ndarray
+        ``(n, 3)`` int64 flags, columns ``ORACLE_COUNTERS``.
+    """
+    floor = (gains[:, :window] < 1e-300).any(axis=1)
+    nonfinite = ~np.isfinite(nu) | ~np.isfinite(gains).all(axis=1)
+    return np.column_stack([zero_distance, floor, nonfinite]).astype(np.int64)
 
 
 def oracle_weight(moments: EnsembleMoments, clip: bool = True) -> np.ndarray:
@@ -211,8 +283,8 @@ def excess_mse(moments: EnsembleMoments, weight: np.ndarray) -> np.ndarray:
 
     Hypothesis: ``c > 0`` (P1(a): ``c >= rho^2 / k``). A non-positive or non-finite
     curvature is not filtered here (it makes ``u`` infinite or NaN through the
-    ``1e-300`` floor of ``oracle_weight``); counting it belongs to the floor audit of
-    DEF-0001.
+    ``1e-300`` floor of ``oracle_weight``); the entries with ``c < 1e-300`` are counted as
+    ``curvature_floor`` in the cell blocks of ``handling`` (``pipeline.moment_counters``).
 
     Parameters
     ----------

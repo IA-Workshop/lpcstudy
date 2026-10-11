@@ -220,3 +220,108 @@ def test_regime_weight_rejects_empty_members() -> None:
     moments = moments_from_triples(np.ones((3, 1)), np.ones((3, 1)), np.zeros((3, 1)))
     with pytest.raises(ValueError, match="at least one member"):
         regime_weight(moments, np.array([], dtype=int))
+
+
+# ---------------------------------------------------------------- WU-0002.11a: counters (DEF-0001)
+def test_floor_counters_a5_count_and_leave_outputs_unchanged() -> None:
+    """A5: ``closed_form_floor_count`` and ``pooled_floor_count`` count the bound floors; outputs kept.
+
+    Reference: hand-built inputs, expected counts read off the construction. (a) Squared seeds
+    ``eps^2 = [0.16, 0, 0.5, nan]``, ``delta^2 = [0.81, 0, 0.0, 0.3]``: only the second pair has a
+    sum below 1e-300 (the NaN pair is not counted: ``NaN < x`` is False), count 1. (b) Moments of
+    4 states by 3 horizons with ``E_C = E_P = C = 1`` at (state 0, horizon 0) and 2 elsewhere
+    (``c = E_C + E_P - 2C``: 0 at the one entry, 2 elsewhere): the pool of all states has
+    ``sum c = 6`` at horizon 0, so no floor (count 0); the members [0] alone have ``sum c = 0``
+    at horizon 0, count 1; members [1, 2] count 0. The outputs of ``closed_form_weight``,
+    ``global_weight`` and ``regime_weight`` equal the pre-change expressions bitwise (this is a
+    regression guard: the functions are untouched).
+    """
+    from lpcstudy.allocation import closed_form_floor_count, global_weight, pooled_floor_count
+
+    eps_sq = np.array([0.16, 0.0, 0.5, np.nan])
+    delta_sq = np.array([0.81, 0.0, 0.0, 0.3])
+    assert closed_form_floor_count(eps_sq, delta_sq) == 1
+    old_cf = delta_sq / np.maximum(eps_sq + delta_sq, 1e-300)
+    assert closed_form_weight(eps_sq, delta_sq).tobytes() == old_cf.tobytes()
+
+    e_c = np.full((4, 3), 2.0)
+    e_p = np.full((4, 3), 2.0)
+    cross = np.full((4, 3), 1.0)  # c = 2 + 2 - 2 = 2
+    e_c[0, 0], e_p[0, 0], cross[0, 0] = 1.0, 1.0, 1.0  # c = 0
+    moments = moments_from_triples(e_c, e_p, cross)
+    assert float(curvature(moments)[0, 0]) == 0.0
+    assert pooled_floor_count(moments) == 0
+    assert pooled_floor_count(moments, np.array([0])) == 1
+    assert pooled_floor_count(moments, np.array([1, 2])) == 0
+    old_a2 = np.clip(np.sum(moments.sq_plp - moments.cross, axis=0)
+                     / np.maximum(np.sum(curvature(moments), axis=0), 1e-300), 0.0, 1.0)
+    assert global_weight(moments).tobytes() == old_a2.tobytes()
+    members = np.array([0, 3, 3])
+    old_rw = np.clip(np.sum((moments.sq_plp - moments.cross)[members], axis=0)
+                     / np.maximum(np.sum(curvature(moments)[members], axis=0), 1e-300), 0.0, 1.0)
+    assert regime_weight(moments, members).tobytes() == old_rw.tobytes()
+
+
+def test_nu_cap_and_constant_target_counters_a9() -> None:
+    """A9: ``nu_cap_clip_count`` counts only entries strictly above the cap; constants counted once each.
+
+    Reference: hand arrays. nu_hat = [1, 2, 10, 11, 12, 13, 5, 10] with cap 10: three values above
+    (11, 12, 13) and two equal to the cap (not clipped by ``np.minimum``, so not counted): 3. The
+    values changed by ``ProfileProxies.features`` are exactly those, checked on the same array.
+    Constant targets: w constant 0.5 and a varying log-horizon: 1; both constant: 2; neither: 0; a
+    target constant up to round-off (0.1 repeated, std of order 1e-17 < 1e-12): counted; a target
+    with spread 1e-6 (above the 1e-12 guard): not counted.
+    """
+    from lpcstudy.allocation import ProfileProxies, constant_target_count, nu_cap_clip_count
+
+    nu = np.array([1.0, 2.0, 10.0, 11.0, 12.0, 13.0, 5.0, 10.0])
+    assert nu_cap_clip_count(nu, 10.0) == 3
+    capped = ProfileProxies.features(np.ones(8), nu, 0.01, 10.0)["est_f"] / 0.01
+    assert int(np.sum(capped != nu)) == 3
+    varying = np.linspace(0.0, 1.0, 20)
+    assert constant_target_count(np.full(20, 0.5), varying) == 1
+    assert constant_target_count(np.full(20, 0.5), np.full(20, 2.0)) == 2
+    assert constant_target_count(varying, varying + 1.0) == 0
+    assert constant_target_count(np.full(20, 0.1), varying) == 1
+    assert constant_target_count(1e-6 * varying, varying) == 0
+
+
+def test_calibrate_regimes_counts_an_empty_regime_a6() -> None:
+    """A6: a tree leaf no calibration profile reaches is flagged, falls back bitwise, has NaN KM.
+
+    Reference: a hand construction. A 2-leaf tree is fitted on a 1-D profile with x = -1 (target
+    0) and x = +1 (target 1), so the leaves are the two half-lines. The calibration profiles are
+    all x = +1 (the leaf of x = -1 is unreached): exactly one regime is empty. 20 calibration
+    states x 2 draws, horizons 1..4 (contiguous, so KM runs for the reached regime), the CP and
+    PLP errors are 1.0 everywhere and the verification noise 0, so every realized error is 1.0 >
+    theta = 0.2 at horizon 1: the reached regime has KM median 1 (finite). ``fallback`` is a
+    non-dyadic vector [0.1, 0.3, 0.7, 0.9]; the empty row must equal it bitwise. Expected: ``empty``
+    has exactly one True (the x = -1 leaf), ``horizons_km`` is NaN there and finite elsewhere,
+    ``pooled_curvature_floor == 0`` (c = 2 > 0).
+    """
+    from lpcstudy.allocation import calibrate_regimes
+    from lpcstudy.ensemble import EvaluationDraws
+
+    x_fit = np.concatenate([-np.ones(10), np.ones(10)])
+    tree = DecisionTreeRegressor(max_leaf_nodes=2, random_state=0)
+    tree.fit(x_fit.reshape(-1, 1), (x_fit > 0).astype(float))
+    left_leaf = int(tree.apply(np.array([[-1.0]]))[0])
+    n_states, n_draws, n_hor = 20, 2, 4
+    profile = np.ones((n_states, n_draws, 1))
+    moments = moments_from_triples(np.full((n_states, n_hor), 2.0), np.full((n_states, n_hor), 2.0),
+                                   np.full((n_states, n_hor), 1.0))
+    ones = np.ones((n_states, n_draws, n_hor))
+    evals = EvaluationDraws(
+        horizons=np.arange(1, n_hor + 1), cp_err=ones, plp_err=ones,
+        verify_noise=np.zeros_like(ones), distance=np.zeros((n_states, n_draws)),
+        est_nu=np.zeros((n_states, n_draws)), growth_proxy=np.zeros((n_states, n_draws)),
+        gain_proxy=ones, inputs=np.zeros((n_states, n_draws, 1)),
+        noise_sens=np.zeros((n_states, n_draws)))
+    fallback = np.array([0.1, 0.3, 0.7, 0.9])
+    result = calibrate_regimes(tree, profile, moments, evals, 0.2, fallback)
+    left = int(np.nonzero(result.leaf_ids == left_leaf)[0][0])
+    assert int(result.empty.sum()) == 1 and bool(result.empty[left])
+    assert result.weights[left].tobytes() == fallback.tobytes()
+    assert np.isnan(result.horizons_km[left])
+    assert np.all(np.isfinite(result.horizons_km[~result.empty]))
+    assert result.pooled_curvature_floor == 0

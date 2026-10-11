@@ -21,16 +21,18 @@ from pathlib import Path
 import numpy as np
 
 from .allocation import ErrorPredictor, ProfileProxies, RegimeMap, calibrate_regimes, \
-    closed_form_weight, deployable_profile, fit_regime_tree, global_weight, regime_regret, \
+    closed_form_floor_count, closed_form_weight, constant_target_count, deployable_profile, \
+    fit_regime_tree, global_weight, nu_cap_clip_count, pooled_floor_count, regime_regret, \
     state_horizon_target
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, build_context, make_rng
-from .ensemble import CORRELATION_FIELDS, AnalogLibrary, EnsembleMoments, EvaluationDraws, \
-    ForecastSetup, ensemble_moments, evaluation_draws
+from .ensemble import CORRELATION_FIELDS, DRAW_COUNTERS, DRAW_COLUMN, ENTRY_COUNTERS, \
+    AnalogLibrary, EnsembleMoments, EvaluationDraws, ForecastSetup, ensemble_moments, \
+    evaluation_draws
 from .estimation import StateEstimator
 from .networks import train_estimator
-from .oracle import StateOracles, excess_mse, oracle_weight, realized_horizon, \
-    state_oracles
+from .oracle import ORACLE_COUNTERS, StateOracles, curvature, excess_mse, oracle_weight, \
+    realized_horizon, state_oracles
 from .statistics import kaplan_meier
 from .systems import make_flow_step
 
@@ -94,6 +96,7 @@ class FittedRules:
     predictor: ErrorPredictor
     regimes: dict[int, RegimeMap]
     chosen_regimes: int
+    handled: dict[str, object] = field(default_factory=dict)
 
 
 def allocator_grid(config: StudyConfig) -> np.ndarray:
@@ -124,6 +127,9 @@ class Study:
         self._setups: dict[tuple, ForecastSetup] = {}
         self._networks: dict[tuple, object] = {}
         self._oracles: dict[tuple, StateOracles] = {}
+        self._records: dict[tuple[str, str], dict[str, dict]] = {}
+        self._fit_records: dict[str, dict] = {}
+        self.failed_variants: dict[str, list[str]] = {}
         self.estimator_log: dict[str, dict] = {}
         self.core_cells: dict[str, Cell] = {}
         self.fitted: dict[str, FittedRules] = {}
@@ -204,6 +210,112 @@ class Study:
             self._oracles[key] = state_oracles(ctx, split, self.config.steps_per_lyapunov)
         return self._oracles[key]
 
+    # --------------------------------------------------------------------- handling
+    def record_cell(self, system: str, label: str, block_id: str, record: dict) -> None:
+        """Store the handling record of a cell or check block (once per id; a repeat replaces it).
+
+        Parameters
+        ----------
+        system : str
+            System name.
+        label : str
+            Variant label; ``"base"`` goes to the system's handling, any other label to its
+            robustness handling.
+        block_id : str
+            Cell id (:func:`cell_id`) or check id (``V3-cp-horizon``, ``V4-convergence``).
+        record : dict
+            Output of :func:`cell_handling` or :func:`check_record`.
+        """
+        scope = "main" if label == "base" else "robustness"
+        self._records.setdefault((system, scope), {})[block_id] = record
+
+    def record_rules(self, system: str, cell: Cell, rules: FittedRules) -> None:
+        """Store the evaluation sub-block and the fit counters of rules fitted on a core cell.
+
+        The proxy-dependent counters (D3, D6 of the mathematics review) exist only after
+        ``fit_rules``, so they are added to the cell's record here. The main system's fit goes to
+        its ``fitting`` block; a robustness variant's goes inside its cell record.
+
+        Parameters
+        ----------
+        system : str
+            System name.
+        cell : Cell
+            Core cell (already recorded by ``run_cell``).
+        rules : FittedRules
+            Rules fitted on that cell.
+
+        Raises
+        ------
+        ValueError
+            If the cell was not recorded by ``run_cell``, or the rules carry no counters.
+        """
+        if not rules.handled:
+            raise ValueError("record_rules needs rules from fit_rules (they carry the counters)")
+        scope = "main" if cell.label == "base" else "robustness"
+        block_id = cell_id(cell.label, cell.noise, cell.library_size, "construction" in cell.splits)
+        record = self._records.get((system, scope), {}).get(block_id)
+        if record is None:
+            raise ValueError(f"cell {block_id!r} of {system} has no handling record; "
+                             "it must come from Study.run_cell")
+        record["evaluation"] = evaluation_block(cell, rules)
+        fit = fit_block(rules, len(cell.horizons))
+        if scope == "main":
+            self._fit_records[system] = fit
+        else:
+            record["fitting"] = fit
+
+    def record_failed_variant(self, system: str, label: str) -> None:
+        """Count a robustness variant that raised (``failed_variants``; the result keeps its error)."""
+        self.failed_variants.setdefault(system, []).append(label)
+
+    def _oracle_blocks(self, system: str, main: bool) -> dict[str, dict]:
+        """Oracle counters of the cached state oracles of a system (once per cache key)."""
+        out = {}
+        for (name, embed_dim, _delay, split), oracles in self._oracles.items():
+            default = embed_dim == self.config.embedding_dim
+            if name == system and default == main:
+                out[split if main else f"{split}|D={embed_dim}"] = oracle_block(oracles)
+        return out
+
+    def system_handling(self, system: str, result_counts: dict[str, int]) -> dict:
+        """The ``handling`` block of one system (schema ``lpcstudy.handling/1``).
+
+        Parameters
+        ----------
+        system : str
+            System name.
+        result_counts : dict[str, int]
+            Copy of the counts the hypothesis results already carry (``collect_result_counts``).
+
+        Returns
+        -------
+        dict
+            ``schema``, ``cells``, ``oracles``, ``fitting``, ``result_counts`` and ``totals``
+            (every counter of ``ALL_COUNTERS`` as an int, the sum over cells, their evaluation
+            sub-blocks, the oracles and the fit).
+        """
+        cells = dict(self._records.get((system, "main"), {}))
+        oracles = self._oracle_blocks(system, main=True)
+        fitting = self._fit_records.get(system) or empty_fit_block()
+        totals = sum_totals([*cells.values(), *oracles.values(), fitting])
+        return {"schema": HANDLING_SCHEMA, "cells": cells, "oracles": oracles,
+                "fitting": fitting, "result_counts": dict(result_counts), "totals": totals}
+
+    def robustness_handling(self, system: str, result_counts: dict[str, int]) -> dict:
+        """Handling of the robustness variants of one system (not part of the system's totals).
+
+        Returns
+        -------
+        dict
+            ``cells`` (variant cells, each with its ``evaluation`` and ``fitting``), ``oracles``
+            (variant embedding dimensions), ``result_counts`` and ``totals``.
+        """
+        cells = dict(self._records.get((system, "robustness"), {}))
+        oracles = self._oracle_blocks(system, main=False)
+        return {"cells": cells, "oracles": oracles, "result_counts": dict(result_counts),
+                "totals": sum_totals([*cells.values(), *oracles.values()])}
+
     # ------------------------------------------------------------------ cells
     def run_cell(self, system: str, noise: float, library_size: int, core: bool,
                  with_evals: bool, label: str = "base", embed_dim: int | None = None,
@@ -252,7 +364,8 @@ class Study:
                                            ctx.embed_dim)[rows]
             keep = allocator_grid(cfg) if (core and split == "construction") else None
             moments = ensemble_moments(setup, library, split, oracle_noise, horizons,
-                                       keep_horizons=keep, keep_draws=cfg.allocator_draws)
+                                       keep_horizons=keep, keep_draws=cfg.allocator_draws,
+                                       reference_horizon=cfg.reference_horizon)
             evals = None
             if with_evals:
                 eval_noise = self.unit_noise(ctx, split, "eval", cfg.n_eval_draws,
@@ -265,15 +378,63 @@ class Study:
                 synth = synth.reshape(synth.shape[0], cfg.n_eval_draws,
                                       cfg.noise_sensitivity_draws, ctx.embed_dim)
                 evals = evaluation_draws(setup, library, split, eval_noise, verify,
-                                         horizons, cfg.steps_per_lyapunov, synth)
+                                         horizons, cfg.steps_per_lyapunov, synth,
+                                         reference_horizon=cfg.reference_horizon)
             splits[split] = SplitData(moments=moments, evals=evals)
             full_oracles = self.state_oracles(ctx, split)
             oracles[split] = full_oracles if core else full_oracles.subset(
                 np.arange(cfg.n_test_sweep))
+        self.record_cell(system, label, cell_id(label, noise, library_size, core),
+                         cell_handling(splits, cfg.n_oracle_draws, cfg.reference_horizon))
         LOG.info("cell %s rho=%.3f n_lib=%d core=%s label=%s done in %.1fs", system, noise,
                  library_size, core, label, time.time() - start)
         return Cell(system=system, noise=noise, library_size=library_size, label=label,
                     setup=setup, splits=splits, oracles=oracles, horizons=horizons)
+
+
+# --------------------------------------------------------------- handling counters
+def moment_counters(moments: EnsembleMoments, reference_horizon: int) -> dict[str, int]:
+    """Counters derived from the stored moment arrays (DEF-0001; no instrumentation needed).
+
+    * ``zero_variance_corr``: moment entries (state, horizon) whose CP **or** PLP error is
+      constant over the oracle draws, so the correlation was set to 0 (the union D4 of the
+      mathematics review); ``_cp`` and ``_plp`` are its parts, so
+      ``zero_variance_corr == _cp + _plp - both``. Over all horizons; the ``H_ref`` slice is the
+      one H2e reports.
+    * ``curvature_floor``: entries with ``c = E[(e_C - e_P)^2] < 1e-300`` (the expression of
+      ``oracle.curvature``, so negatives from cancellation count); under P1(a)
+      ``c >= rho^2 / k``, so this is a sentinel.
+    * ``decisive_floor``: states with ``E[e_P^2] < 1e-300`` at ``H_ref`` (the floor of the
+      decisive ratio in ``score_rules``); a sentinel.
+
+    Parameters
+    ----------
+    moments : EnsembleMoments
+        Oracle moments of a cell split, built by ``ensemble_moments`` (they carry the masks).
+    reference_horizon : int
+        ``H_ref`` in steps.
+
+    Returns
+    -------
+    dict[str, int]
+        The five counters.
+
+    Raises
+    ------
+    ValueError
+        If the moments carry no ``cp_constant`` and ``plp_constant``, or ``H_ref`` is not among
+        the horizons.
+    """
+    if moments.cp_constant is None or moments.plp_constant is None:
+        raise ValueError("moment_counters needs moments from ensemble_moments (constancy masks)")
+    where = np.nonzero(moments.horizons == reference_horizon)[0]
+    if where.size == 0:
+        raise ValueError(f"reference horizon {reference_horizon} is not among the horizons")
+    cp, plp = moments.cp_constant, moments.plp_constant
+    return {"zero_variance_corr": int((cp | plp).sum()), "zero_variance_corr_cp": int(cp.sum()),
+            "zero_variance_corr_plp": int(plp.sum()),
+            "curvature_floor": int((curvature(moments) < 1e-300).sum()),
+            "decisive_floor": int((moments.sq_plp[:, where[0]] < 1e-300).sum())}
 
 
 # ---------------------------------------------------------------------- fitting
@@ -326,7 +487,273 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
                                            config.primary_threshold, a2)
     chosen = _choose_regimes(regimes, cal_profile, cal_moments, config)
     return FittedRules(proxies=proxies, global_weights=a2, predictor=predictor,
-                       regimes=regimes, chosen_regimes=chosen)
+                       regimes=regimes, chosen_regimes=chosen,
+                       handled=fit_counters(regimes, chosen, pooled_floor_count(con_moments),
+                                            constant_target_count(w_target, t_target)))
+
+
+FIT_COUNTERS: tuple[str, ...] = (
+    "empty_regime_fallback", "empty_regime_fallback_chosen", "pooled_curvature_floor",
+    "regime_target_constant")
+"""Scalar counters of one ``fit_rules`` call; ``empty_regime_fallback_by_K`` (a dict keyed by the
+string of ``K``) comes with them in ``FittedRules.handled``."""
+
+
+def fit_counters(regimes: dict[int, RegimeMap], chosen: int, a2_floor: int,
+                 target_constant: int) -> dict[str, object]:
+    """Counters of one rule fit (DEF-0001; Q4 of DEC-0017 renames the ROADMAP key).
+
+    * ``empty_regime_fallback``: (K, regime) pairs with no calibration (state, draw), summed over
+      all fitted ``K``, with ``empty_regime_fallback_by_K`` and the count at the chosen ``K``
+      (``empty_regime_fallback_chosen``: only the chosen ``K`` reaches A5 and H3).
+    * ``pooled_curvature_floor``: the A2 pool plus every regime pool of every ``K`` whose summed
+      curvature was below ``1e-300`` at some horizon (summed over horizons).
+    * ``regime_target_constant``: constant tree targets, once per fit (D7).
+
+    Parameters
+    ----------
+    regimes : dict[int, RegimeMap]
+        Calibrated maps by ``K`` (built by ``calibrate_regimes``).
+    chosen : int
+        The chosen ``K``.
+    a2_floor : int
+        :func:`pooled_floor_count` of the A2 pool.
+    target_constant : int
+        :func:`constant_target_count` of the tree targets.
+
+    Returns
+    -------
+    dict[str, object]
+        The counters of ``FIT_COUNTERS`` and ``empty_regime_fallback_by_K``.
+    """
+    by_k = {str(k): int(regimes[k].empty.sum()) for k in sorted(regimes)}
+    return {"empty_regime_fallback": sum(by_k.values()), "empty_regime_fallback_by_K": by_k,
+            "empty_regime_fallback_chosen": by_k[str(chosen)],
+            "pooled_curvature_floor": int(a2_floor + sum(r.pooled_curvature_floor
+                                                         for r in regimes.values())),
+            "regime_target_constant": int(target_constant)}
+
+
+# ------------------------------------------------------------ the handling block
+HANDLING_SCHEMA: str = "lpcstudy.handling/1"
+
+CELL_COUNTERS: tuple[str, ...] = (
+    "invariant_mean_replacements", "nu_replacements", "error_clips", "error_clips_cp",
+    "error_clips_plp", "error_clips_nonfinite", "error_clips_plp_href",
+    "error_clips_nonfinite_href", "gain_replacements", "gain_floor", "zero_variance_corr",
+    "zero_variance_corr_cp", "zero_variance_corr_plp", "curvature_floor", "decisive_floor")
+"""Counters of a cell record (per kind and in total); ``DRAW_COUNTERS`` and ``ENTRY_COUNTERS``
+(ensemble), their sum ``error_clips``, and ``moment_counters``."""
+
+EVALUATION_COUNTERS: tuple[str, ...] = ("nu_cap_clips", "closed_form_floor_a4",
+                                         "closed_form_floor_a4o")
+"""Proxy-dependent counters of the ``evaluation`` sub-block of a core cell (D3, D6)."""
+
+ALL_COUNTERS: tuple[str, ...] = (*CELL_COUNTERS, *ORACLE_COUNTERS, *EVALUATION_COUNTERS,
+                                 *FIT_COUNTERS)
+"""Every counter name; the ``totals`` of a block carry exactly these keys."""
+
+KINDS: tuple[str, ...] = ("oracle", "eval", "check")
+"""Where a cell record's counts come from: oracle draws, evaluation draws, or a validation check
+(V3, V4) that draws its own forecasts."""
+
+CELL_DENOMINATORS: tuple[str, ...] = ("estimates", "error_entries", "href_draws", "eval_draws",
+                                      "moment_entries", "states")
+
+COUNTER_DENOMINATOR: dict[str, str | None] = {
+    "invariant_mean_replacements": "estimates", "nu_replacements": "estimates",
+    "error_clips": None, "error_clips_cp": "error_entries", "error_clips_plp": "error_entries",
+    "error_clips_nonfinite": "error_entries", "error_clips_plp_href": "href_draws",
+    "error_clips_nonfinite_href": "href_draws", "gain_replacements": "eval_draws",
+    "gain_floor": "eval_draws", "zero_variance_corr": "moment_entries",
+    "zero_variance_corr_cp": "moment_entries", "zero_variance_corr_plp": "moment_entries",
+    "curvature_floor": "moment_entries", "decisive_floor": "states",
+    "local_dim_zero_distance": "states", "oracle_gain_floor": "states",
+    "oracle_nonfinite": "states", "nu_cap_clips": "nu_cap_estimates",
+    "closed_form_floor_a4": "test_eval_draws", "closed_form_floor_a4o": "test_states",
+    "empty_regime_fallback": "regimes", "empty_regime_fallback_chosen": "chosen_regimes",
+    "pooled_curvature_floor": "pools", "regime_target_constant": "targets"}
+"""The denominator (a key of the block's ``denominators``) of each counter; ``None``: a total that
+mixes CP and PLP entries, with no denominator."""
+
+
+def cell_id(label: str, noise: float, library_size: int, core: bool) -> str:
+    """Id of a cell in ``handling.cells``: ``<label>|rho=<g>|n_lib=<n>|core`` (or ``sweep``)."""
+    return f"{label}|rho={noise:g}|n_lib={library_size}|{'core' if core else 'sweep'}"
+
+
+def _new_kind() -> dict:
+    return {"counts": dict.fromkeys(CELL_COUNTERS, 0),
+            "denominators": dict.fromkeys(CELL_DENOMINATORS, 0)}
+
+
+def _add_to_kind(kind: dict, handled: np.ndarray, clip_entries: dict[str, int],
+                 moment: dict[str, int] | None, denominators: dict[str, int]) -> None:
+    """Add one computation's per-state columns, entry totals and moment counters to a kind."""
+    counts = kind["counts"]
+    for name in DRAW_COUNTERS:
+        counts[name] += int(handled[:, DRAW_COLUMN[name]].sum())
+    for name in ENTRY_COUNTERS:
+        counts[name] += int(clip_entries[name])
+        counts["error_clips"] += int(clip_entries[name])
+    for name, value in (moment or {}).items():
+        counts[name] += int(value)
+    for name, value in denominators.items():
+        kind["denominators"][name] += int(value)
+
+
+def cell_record(kinds: dict[str, dict]) -> dict:
+    """Assemble a cell record from its kinds (missing kinds are zero): counts and denominators
+    are the sums over ``KINDS``; ``by_kind`` keeps the parts."""
+    full = {kind: kinds.get(kind) or _new_kind() for kind in KINDS}
+    return {"counts": {name: sum(full[k]["counts"][name] for k in KINDS) for name in CELL_COUNTERS},
+            "by_kind": full,
+            "denominators": {name: sum(full[k]["denominators"][name] for k in KINDS)
+                             for name in CELL_DENOMINATORS}}
+
+
+def cell_handling(splits: dict[str, SplitData], n_oracle_draws: int, reference_horizon: int
+                  ) -> dict:
+    """Handling record of one cell, from the counts its computations stored.
+
+    Sums over the splits: the oracle kind from the moments (per-state ``handled``, the entry
+    totals, and the moment-derived counters), the eval kind from the evaluation draws. Nothing is
+    recomputed and nothing is drawn.
+
+    Parameters
+    ----------
+    splits : dict[str, SplitData]
+        The cell's splits as made by ``Study.run_cell``.
+    n_oracle_draws : int
+        Oracle draws per state ``M`` (the moments do not store it).
+    reference_horizon : int
+        ``H_ref`` in steps.
+
+    Returns
+    -------
+    dict
+        ``{counts, by_kind, denominators}`` with every counter of ``CELL_COUNTERS`` and every
+        denominator of ``CELL_DENOMINATORS`` present.
+
+    Raises
+    ------
+    ValueError
+        If a split's moments or draws carry no counts (built by hand, or after a subset).
+    """
+    oracle, evaluation = _new_kind(), _new_kind()
+    for name, data in splits.items():
+        moments, evals = data.moments, data.evals
+        if moments.handled is None or moments.clip_entries is None:
+            raise ValueError(f"split {name!r}: moments carry no counts (built by hand or a view)")
+        n, n_hor = len(moments.handled), len(moments.horizons)
+        _add_to_kind(oracle, moments.handled, moments.clip_entries,
+                     moment_counters(moments, reference_horizon),
+                     {"states": n, "estimates": n * n_oracle_draws,
+                      "error_entries": n * n_oracle_draws * n_hor,
+                      "href_draws": n * n_oracle_draws, "moment_entries": n * n_hor})
+        if evals is not None:
+            if evals.handled is None or evals.clip_entries is None:
+                raise ValueError(f"split {name!r}: evaluation draws carry no counts")
+            draws, n_hor_ev = evals.cp_err.shape[1], evals.cp_err.shape[2]
+            _add_to_kind(evaluation, evals.handled, evals.clip_entries, None,
+                         {"estimates": n * draws, "error_entries": n * draws * n_hor_ev,
+                          "href_draws": n * draws, "eval_draws": n * draws})
+    return cell_record({"oracle": oracle, "eval": evaluation})
+
+
+def check_record(handled: dict[str, int], clip_entries: dict[str, int], n_states: int,
+                 n_draws: int, n_horizons: int) -> dict:
+    """Handling record of a validation check that draws its own forecasts (V3, V4).
+
+    Parameters
+    ----------
+    handled : dict[str, int]
+        Column sums of ``DrawBatch.handled`` by ``DRAW_COUNTERS`` name.
+    clip_entries : dict[str, int]
+        ``ENTRY_COUNTERS`` totals.
+    n_states, n_draws, n_horizons : int
+        Size of the check: states, draws per state, horizons.
+
+    Returns
+    -------
+    dict
+        A cell record with only the ``check`` kind filled.
+    """
+    kind = _new_kind()
+    matrix = np.array([[handled[name] for name in DRAW_COUNTERS]], dtype=np.int64)
+    _add_to_kind(kind, matrix, clip_entries, None,
+                 {"states": n_states, "estimates": n_states * n_draws,
+                  "error_entries": n_states * n_draws * n_horizons,
+                  "href_draws": n_states * n_draws})
+    return cell_record({"check": kind})
+
+
+def oracle_block(oracles: StateOracles) -> dict:
+    """Counts of one split's state oracles: ``{counts: ORACLE_COUNTERS, denominators: {states}}``."""
+    if oracles.handled is None:
+        raise ValueError("the state oracles carry no counts (built by hand or a view)")
+    return {"counts": {name: int(oracles.handled[:, i].sum())
+                       for i, name in enumerate(ORACLE_COUNTERS)},
+            "denominators": {"states": int(len(oracles.handled))}}
+
+
+def evaluation_block(cell: Cell, rules: FittedRules) -> dict:
+    """Proxy-dependent counters of a core cell, after ``fit_rules`` (D3, D6).
+
+    * ``nu_cap_clips``: estimates ``nu_hat > nu_cap`` of the fitted proxies, per split and in
+      total. On construction about 1% by construction of the 99th-percentile cap; on the other
+      splits a diagnostic.
+    * ``closed_form_floor_a4``: test-split evaluation draws on which the floor of the A4 weight
+      binds (``eps_hat^2 + delta_hat^2 < 1e-300``); ``closed_form_floor_a4o``: test states with
+      oracle seeds on which it binds (A4o). Both are sentinels.
+
+    Counted from arrays; nothing inside ``ProfileProxies.features`` (it runs many times).
+    """
+    cap = rules.proxies.nu_cap
+    by_split = {name: nu_cap_clip_count(data.evals.est_nu, cap)
+                for name, data in cell.splits.items() if data.evals is not None}
+    test = cell.splits["test"]
+    eps_hat, delta_hat = rules.proxies.seeds(test.evals, cell.noise)
+    moments = test.moments
+    return {"counts": {"nu_cap_clips": sum(by_split.values()),
+                       "closed_form_floor_a4": closed_form_floor_count(eps_hat**2, delta_hat**2),
+                       "closed_form_floor_a4o": closed_form_floor_count(
+                           moments.analog_seed**2, moments.est_seed**2)},
+            "by_split": {"nu_cap_clips": by_split},
+            "denominators": {"nu_cap_estimates": int(sum(
+                data.evals.est_nu.size for data in cell.splits.values() if data.evals is not None)),
+                "test_eval_draws": int(test.evals.est_nu.size),
+                "test_states": int(len(moments.analog_seed))}}
+
+
+def fit_block(rules: FittedRules, n_horizons: int) -> dict:
+    """The ``fitting`` block of rules fitted on a core cell with ``n_horizons`` horizons."""
+    counts = {name: int(rules.handled[name]) for name in FIT_COUNTERS}
+    n_regimes = sum(rules.regimes)
+    return {"counts": counts,
+            "empty_regime_fallback_by_K": dict(rules.handled["empty_regime_fallback_by_K"]),
+            "denominators": {"regimes": int(n_regimes), "chosen_regimes": int(rules.chosen_regimes),
+                             "pools": int(n_horizons * (1 + n_regimes)), "targets": 2}}
+
+
+def empty_fit_block() -> dict:
+    """A ``fitting`` block of zeros, for a system whose rules were never fitted."""
+    return {"counts": dict.fromkeys(FIT_COUNTERS, 0), "empty_regime_fallback_by_K": {},
+            "denominators": {"regimes": 0, "chosen_regimes": 0, "pools": 0, "targets": 0}}
+
+
+def sum_totals(blocks: list[dict]) -> dict[str, int]:
+    """Sum every counter of ``ALL_COUNTERS`` over blocks.
+
+    Each block contributes its ``counts``, and, if present, those of its ``evaluation`` and
+    ``fitting`` sub-blocks. A counter no block carries is 0, so every key is present.
+    """
+    totals = dict.fromkeys(ALL_COUNTERS, 0)
+    for block in blocks:
+        for part in (block, block.get("evaluation"), block.get("fitting")):
+            for name, value in (part or {}).get("counts", {}).items():
+                totals[name] += int(value)
+    return totals
 
 
 def choose_regime_count(excess_by_count: Mapping[int, float], margin: float = 0.05) -> int:
@@ -400,6 +827,7 @@ def _concat_moments(parts: list[EnsembleMoments]) -> EnsembleMoments:
     return EnsembleMoments(
         horizons=parts[0].horizons,
         kept={k: np.concatenate([p.kept[k] for p in parts]) for k in kept_keys},
+        handled=_stack_handled(parts), clip_entries=_sum_entries(parts),
         **correlation, **{k: np.concatenate([getattr(p, k) for p in parts]) for k in keys})
 
 
@@ -407,9 +835,25 @@ def _concat_evals(parts: list[EvaluationDraws]) -> EvaluationDraws:
     """Stack evaluation draws of several cells (same horizons)."""
     if len(parts) == 1:
         return parts[0]
-    return EvaluationDraws(**{k: (parts[0].horizons if k == "horizons" else
-                                  np.concatenate([getattr(p, k) for p in parts]))
-                              for k in parts[0].__dict__})
+    stacked = {k: np.concatenate([getattr(p, k) for p in parts]) for k in parts[0].__dict__
+               if k not in ("horizons", "handled", "clip_entries")}
+    return EvaluationDraws(horizons=parts[0].horizons, handled=_stack_handled(parts),
+                           clip_entries=_sum_entries(parts), **stacked)
+
+
+def _stack_handled(parts: list) -> np.ndarray | None:
+    """Stack the per-state ``handled`` arrays of several cells; ``None`` if none carries one."""
+    present = [p.handled is not None for p in parts]
+    if any(present) and not all(present):
+        raise ValueError("cannot stack: only some parts carry 'handled'")
+    return np.concatenate([p.handled for p in parts]) if all(present) else None
+
+
+def _sum_entries(parts: list) -> dict[str, int] | None:
+    """Add the ``clip_entries`` totals of several cells; ``None`` if any part lacks them."""
+    if any(p.clip_entries is None for p in parts):
+        return None
+    return {k: sum(p.clip_entries[k] for p in parts) for k in parts[0].clip_entries}
 
 
 # ------------------------------------------------------------------- evaluation
@@ -471,7 +915,7 @@ class RuleScores:
         Mean exact excess error ``V(w) - V(w*)`` per horizon ``(nH,)`` (Theorem P1(a)).
     agreement : float
         Fraction of decisive states at ``H_ref`` where the rule weights the
-        better forecaster more.
+        better forecaster more (NaN when no state is decisive: visible, not replaced; DEF-0001, J).
     km_median, rmst : float
         Kaplan-Meier median and restricted mean of realized horizons
         (Lyapunov times; ``nan`` if horizons are not contiguous).

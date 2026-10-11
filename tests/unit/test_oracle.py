@@ -472,3 +472,193 @@ def test_inverse_dimension_rejects_too_few_neighbors_and_keeps_nonfinite() -> No
     out = inverse_dimension(np.array([np.nan, np.inf, 2.0]))
     assert np.isnan(out[0]) and out[1] == 0.0
     assert out[2] == pytest.approx(18.0 / (19.0 * 2.0), rel=1e-15, abs=0.0)
+
+
+# ---------------------------------------------------------------- WU-0002.11a: counters (DEF-0001)
+def _old_local_dimension(reference: np.ndarray, queries: np.ndarray, k: int = 20) -> np.ndarray:
+    """``local_dimension`` before WU-0002.11a, verbatim (bitwise reference)."""
+    from scipy.spatial import cKDTree
+
+    dist, _ = cKDTree(reference).query(queries, k=k, workers=-1)
+    dist = np.maximum(dist, 1e-300)
+    logs = np.log(dist[:, -1:] / dist[:, :-1])
+    return (k - 2) / np.sum(logs, axis=1)
+
+
+def test_local_dimension_counts_zero_distance_a7() -> None:
+    """A7: a query that duplicates a reference point is counted once; the dimensions are unchanged.
+
+    Reference: a hand construction. 300 standard-normal reference points in R^3 from
+    ``np.random.default_rng(1107)``; queries: 5 fresh normal points (no duplicate: the nearest
+    distance of a continuous draw is positive) and query 5 equal to reference point 17 (distance 0,
+    below the 1e-300 floor). Expected ``local_dim_zero_distance`` flags: only query 5 (sum 1).
+    The dimensions equal the pre-change function (copied above) bitwise, for both entry points:
+    the floor of 1e-300 is applied identically.
+    """
+    from lpcstudy.oracle import local_dimension, local_dimension_counted
+
+    rng = np.random.default_rng(1107)
+    reference = rng.standard_normal((300, 3))
+    queries = np.vstack([rng.standard_normal((5, 3)), reference[17:18]])
+    dims, floored = local_dimension_counted(reference, queries)
+    assert floored.tolist() == [False] * 5 + [True] and int(floored.sum()) == 1
+    ref = _old_local_dimension(reference, queries)
+    assert dims.tobytes() == ref.tobytes()
+    assert local_dimension(reference, queries).tobytes() == ref.tobytes()
+    assert np.isfinite(dims[5]) and dims[5] < dims[:5].min()  # the floored state: tiny dimension
+
+
+def test_oracle_handling_a8_oracle_path_replaces_nothing() -> None:
+    """A8 (oracle path): NaN, +inf and 0.0 in the window are counted per state and never replaced.
+
+    Reference: hand arrays, window 4, 6 states. State 0: a NaN gain. State 1: a +inf gain. State
+    2: a 0.0 gain in the window (a floor). State 3: all finite. First three rows alone:
+    ``oracle_nonfinite == 2`` and ``oracle_gain_floor == 1`` (the plan's A8). State 4 (D5): NaN and
+    +inf in one row counts once, making ``oracle_nonfinite == 3``. State 5: ``nu`` = NaN with
+    finite gains (counts in ``oracle_nonfinite``). ``growth_exponent`` (unchanged code) keeps the
+    NaN: the oracle gains are not replaced, so ``growth`` equals the old expression bitwise.
+    The zero-distance flags are passed through to column 0. Exact.
+    """
+    from lpcstudy.dynamics import growth_exponent
+    from lpcstudy.oracle import ORACLE_COUNTERS, oracle_handling
+
+    assert ORACLE_COUNTERS == ("local_dim_zero_distance", "oracle_gain_floor",
+                               "oracle_nonfinite")
+    gains = np.full((6, 4), 3.0)
+    gains[0, 1] = np.nan
+    gains[1, 2] = np.inf
+    gains[2, 0] = 0.0
+    gains[4, 0], gains[4, 3] = np.nan, np.inf
+    nu = np.ones(6)
+    nu[5] = np.nan
+    zero_distance = np.array([False, False, False, True, False, False])
+    first = oracle_handling(nu[:3], gains[:3], 4, zero_distance[:3])
+    assert first[:, 2].sum() == 2 and first[:, 1].sum() == 1 and first[:, 0].sum() == 0
+    flags = oracle_handling(nu, gains, 4, zero_distance)
+    assert flags.dtype == np.int64 and flags.shape == (6, 3)
+    assert flags[:, 0].tolist() == [0, 0, 0, 1, 0, 0]
+    assert flags[:, 1].tolist() == [0, 0, 1, 0, 0, 0]
+    assert flags[:, 2].tolist() == [1, 1, 0, 0, 1, 1] and flags[:, 2].sum() == 4
+    with np.errstate(invalid="ignore"):  # the inf - inf of the unreplaced row is the point
+        old = growth_exponent(gains, 4)
+    assert np.isnan(old[0]) and np.isnan(old[4])  # nothing replaced: NaN propagates
+
+
+def test_state_oracles_attaches_handled_and_keeps_values(monkeypatch) -> None:
+    """``state_oracles`` returns ``handled`` per state and the same ``nu``, ``gains``, ``growth``.
+
+    Reference: hand-planned stubs. The flow map, observability and amplification functions are
+    replaced by stubs returning planned arrays (``nu`` with one NaN, gains with one 0.0 in the
+    window); the library of 50 random states contains state 7 exactly, and the evaluation state at
+    time 12 is that state (a zero neighbour distance). Expected flags (columns local_dim_zero_
+    distance, oracle_gain_floor, oracle_nonfinite) for the 3 states at times (10, 12, 14): zero
+    distance only for time 12, gain floor for the state at time 14, non-finite for the state at
+    time 10. ``growth`` equals ``growth_exponent`` of the planned gains bitwise, and ``subset``
+    carries the rows. Exact.
+    """
+    from types import SimpleNamespace
+
+    from lpcstudy import oracle, systems
+    from lpcstudy.dynamics import growth_exponent
+
+    rng = np.random.default_rng(1108)
+    library = rng.standard_normal((50, 2))
+    eval_states = rng.standard_normal((30, 2))
+    eval_states[12] = library[7]
+    gains = np.full((3, 4), 2.0)
+    gains[2, 1] = 0.0
+    nu = np.array([np.nan, 1.0, 2.0])
+    ctx = SimpleNamespace(spec=SimpleNamespace(params={}, observed_index=0), interval=0.1,
+                          obs_scale=1.0, whiten=np.eye(2), unwhiten=np.eye(2), delay=1,
+                          embed_dim=3, history=2, library_states=library, eval_states=eval_states,
+                          split_indices={"test": np.array([10, 12, 14])},
+                          whiten_states=lambda x: x)
+    monkeypatch.setattr(systems, "make_flow_step", lambda *a, **k: None)
+    monkeypatch.setattr(oracle, "make_observability", lambda *a, **k: (lambda s: nu))
+    monkeypatch.setattr(oracle, "make_amplification", lambda *a, **k: (lambda s: gains))
+    out = oracle.state_oracles(ctx, "test", 4)
+    np.testing.assert_array_equal(out.handled, [[0, 0, 1], [1, 0, 0], [0, 1, 0]])
+    assert out.growth.tobytes() == growth_exponent(gains, 4).tobytes()
+    assert out.gains.tobytes() == gains.tobytes() and out.nu.tobytes() == nu.tobytes()
+    np.testing.assert_array_equal(out.subset(np.array([2, 0])).handled, [[0, 1, 0], [0, 0, 1]])
+
+
+class _SpyTree:
+    """A real ``cKDTree`` behind a recorder of the keyword arguments of ``query``."""
+
+    def __init__(self, tree, calls: list) -> None:
+        self.tree = tree
+        self.calls = calls
+
+    def query(self, *args, **kwargs):
+        self.calls.append(dict(kwargs))
+        return self.tree.query(*args, **kwargs)
+
+
+def _spy_factory(calls: list):
+    from scipy.spatial import cKDTree
+
+    return lambda reference: _SpyTree(cKDTree(reference), calls)
+
+
+def _reference_and_queries() -> tuple[np.ndarray, np.ndarray]:
+    """A fixed Gaussian reference (2000, 4) and 50 queries, test seed 50121."""
+    rng = np.random.default_rng(50121)
+    return rng.standard_normal((2000, 4)), rng.standard_normal((50, 4))
+
+
+@pytest.mark.parametrize("value, expected", [(None, 4), ("2", 2), ("8", 8)])
+def test_local_dimension_passes_lpc_threads_as_workers(monkeypatch, value, expected: int
+                                                       ) -> None:
+    """``local_dimension_counted`` queries the tree with ``workers == LPC_THREADS`` (DEF-0012).
+
+    Reference: the expected integer is the environment value set by the test (4 when unset).
+    The spy forwards to a real ``cKDTree``. Exact comparison.
+    """
+    from lpcstudy import oracle
+
+    calls: list = []
+    monkeypatch.setattr(oracle, "cKDTree", _spy_factory(calls))
+    if value is None:
+        monkeypatch.delenv("LPC_THREADS", raising=False)
+    else:
+        monkeypatch.setenv("LPC_THREADS", value)
+    reference, queries = _reference_and_queries()
+    oracle.local_dimension_counted(reference, queries)
+    assert len(calls) == 1 and calls[0]["workers"] == expected
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc"])
+def test_local_dimension_rejects_invalid_lpc_threads(monkeypatch, value: str) -> None:
+    """An invalid ``LPC_THREADS`` raises ``ValueError`` and no query is made (PRIME.4)."""
+    from lpcstudy import oracle
+
+    calls: list = []
+    monkeypatch.setattr(oracle, "cKDTree", _spy_factory(calls))
+    monkeypatch.setenv("LPC_THREADS", value)
+    reference, queries = _reference_and_queries()
+    with pytest.raises(ValueError, match="LPC_THREADS"):
+        oracle.local_dimension_counted(reference, queries)
+    assert calls == []
+
+
+@pytest.mark.parametrize("threads", ["1", "4"])
+def test_local_dimension_is_bitwise_independent_of_workers(monkeypatch, threads: str) -> None:
+    """The estimates and flags are bitwise those computed from a ``workers=1`` query.
+
+    Reference: the Levina-Bickel formula written out here from ``cKDTree.query(workers=1)``
+    (the formula with ``k = 20`` neighbours, floor ``1e-300``), not the code under test.
+    The exact comparison is justified as in ``test_analog_query_is_bitwise_independent_of_workers``
+    (the worker count splits the query points and changes no arithmetic).
+    """
+    from scipy.spatial import cKDTree
+    from lpcstudy.oracle import local_dimension_counted
+
+    monkeypatch.setenv("LPC_THREADS", threads)
+    reference, queries = _reference_and_queries()
+    dims, floored = local_dimension_counted(reference, queries)
+    dist = cKDTree(reference).query(queries, k=20, workers=1)[0]
+    ref_dims = 18 / np.sum(np.log(np.maximum(dist, 1e-300)[:, -1:]
+                                  / np.maximum(dist, 1e-300)[:, :-1]), axis=1)
+    assert dims.tobytes() == ref_dims.tobytes()
+    assert not floored.any()

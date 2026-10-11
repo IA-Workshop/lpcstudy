@@ -46,6 +46,15 @@ class StateEstimator:
         Flow map of the model used for refinement and for ``nu``.
     refine_steps : int
         Levenberg-Marquardt iterations (0 disables refinement).
+
+    Notes
+    -----
+    Handling (DEF-0001, WU-0002.11). Inside the refinement, the ``1e-12`` added to the damping
+    scale and the accept-or-reject step are part of the algorithm, not data handling. A
+    non-finite candidate cost (mapped to ``inf``, so the step is rejected) and a non-finite
+    Jacobian entry (set to 0) are algorithm-internal too; counting them needs the scan carry and
+    belongs to WU-0005.4. After the compiled function, a non-finite ``nu`` and a non-finite state
+    coordinate are replaced and counted by :meth:`estimate_counted`.
     """
 
     ctx: SystemContext
@@ -121,8 +130,45 @@ class StateEstimator:
 
         return run
 
+    def estimate_counted(self, inputs: np.ndarray
+                         ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Estimate states and ``nu`` with the replacements applied and flagged (DEF-0001).
+
+        The values are those of the original ``estimate``: a non-finite ``nu`` becomes ``1e6`` and
+        a non-finite coordinate becomes the invariant mean of that coordinate (a replacement,
+        not a wrong-basin estimate: no finite state came back). The flags are taken on the host
+        after the compiled function, so the compiled function and the values do not change.
+
+        Parameters
+        ----------
+        inputs : np.ndarray
+            Noisy normalized delay vectors ``(n, D)``.
+
+        Returns
+        -------
+        states : np.ndarray
+            Physical state estimates ``s_hat_t`` ``(n, m)`` after replacement.
+        nu : np.ndarray
+            ``nu(s_hat)`` ``(n,)`` after replacement.
+        state_replaced : np.ndarray
+            Boolean ``(n,)``: the estimate had at least one non-finite coordinate replaced
+            (``invariant_mean_replacements`` counts these estimates, not coordinates).
+        nu_replaced : np.ndarray
+            Boolean ``(n,)``: ``nu`` was not finite and was replaced (``nu_replacements``).
+        """
+        if self._fn is None:
+            self._fn = self._build()
+        states, nu = self._fn(inputs)
+        finite_nu = np.isfinite(nu)
+        finite_state = np.isfinite(states)
+        nu = np.where(finite_nu, nu, 1e6)
+        states = np.where(finite_state, states, self.ctx.state_mean)
+        return states, nu, ~finite_state.all(axis=1), ~finite_nu
+
     def estimate(self, inputs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Estimate physical states and the observability factor at the estimate.
+
+        Delegates to :meth:`estimate_counted` and drops the flags.
 
         Parameters
         ----------
@@ -135,9 +181,5 @@ class StateEstimator:
             Physical state estimates ``s_hat_t`` ``(n, m)`` and ``nu(s_hat)``
             ``(n,)`` (non-finite values are replaced by a large number).
         """
-        if self._fn is None:
-            self._fn = self._build()
-        states, nu = self._fn(inputs)
-        nu = np.where(np.isfinite(nu), nu, 1e6)
-        states = np.where(np.isfinite(states), states, self.ctx.state_mean)
+        states, nu, _, _ = self.estimate_counted(inputs)
         return states, nu

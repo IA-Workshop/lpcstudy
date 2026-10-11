@@ -13,7 +13,7 @@ from pathlib import Path
 
 from . import provenance
 from .config import PRESETS
-from .experiments import run_robustness, run_system
+from .experiments import run_handling, run_robustness, run_system
 from .pipeline import Study
 from .report import make_figures, save_json, verdicts, write_markdown
 from .seeds import (LEDGER_PATH, REGISTRY_PATH, SeedRefusal, confirmatory_seed, load_registry,
@@ -140,6 +140,7 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
         results["robustness"] = {s: run_robustness(study, s)
                                  for s in config.robustness_systems
                                  if s in study.core_cells}
+    results["handling"] = run_handling(study, results)  # DEF-0001: counts, never silent
     results["verdicts"] = verdicts(results, config)
     results["estimators"] = study.estimator_log
     results["seconds"] = time.time() - start
