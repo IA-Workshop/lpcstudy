@@ -344,3 +344,13 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 - **O6.** For the endpoint-error change (.2a): the unit tiers of `statistics` and its dependants, the integration tier, and the slow `test_exact_checks` nodes for C4, C7 and C8 at both phi, once.
 
 **Affects:** WU-0008. Marked "needs owner review before freeze". **Status:** proposed.
+
+## DEC-0022: WU-0002.12: the local v1 re-reference becomes the new baseline; N1 kept as written; the platform record is added  (2026-10-11, owner instructions relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner instructed, in the session on 2026-10-11, in these words: "Redo the v1 baseline and make that the new baseline. The old platform is not available. N1 I agree with the recommendation. Explain N3. Do 4, since this is our reference platform." Recorded as:
+1. **New baseline.** The v1 code (tag `v1-baseline`, commit f01360d) is re-run at the pilot preset on DEV-0 on this host (CPU, `LPC_THREADS=8`, same wrapper settings as the v3 pilot run) and its results become the regression baseline of this platform (the 'Pilot v1' row of the results manifest gets a dated line, the original pilot file is kept unmodified as the historical record). The v3 run (commit a5cd75b) is compared against it with branches B and N of DEC-0019, which also settles N1 and N3. The old platform is unavailable, so the original v1 pilot is no longer a bitwise target.
+2. **N1** is kept as written (the mathematician's recommendation); any cross-host tolerance is fixed before the results it applies to exist (WU-0003.4, WU-0016.3); the 69 differing leaves are DEF-0024.
+3. **N3** is explained to the owner (the licensing scope, the weakness found by the mathematician); a decision on its scope is pending the owner's reading of the explanation.
+4. **Item 4 (the platform record)**: add a digest of the whitening matrices W and U to `context` and record the CPU model and the BLAS kernel in the provenance block, as a unit (WU-0001.6) with planner, mathematician, developer and independent review; marked "needs owner review before freeze" (provenance code).
+
+**Affects:** WU-0002.12, WU-0004.3, WU-0001.6 (new), WU-0003.4, WU-0016.3. **Status:** owner instruction; recorded pending the owner's ledger entry.
