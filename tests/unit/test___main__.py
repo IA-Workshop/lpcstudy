@@ -326,23 +326,52 @@ def test_report_only_refuses_the_v1_baseline_smoke_copy(
     _assert_stale_refused(path, tmp_path, capsys)
 
 
+def test_report_only_refuses_a_results_file_with_pass_flags_and_no_verdict(
+        tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A file from before WU-0002.9 (boolean ``pass``, no ``verdict``) is refused, nothing written.
+
+    Reference (plan R3): the CLI's refusal contract (exit 64, one stderr line, no file created or
+    changed) and v3 section 7 (a boolean cannot say inconclusive, so it is not relabelled). The
+    file has v3 keys (so it passes the identifier check) with only ``pass``. Exact bytes.
+    """
+    path = tmp_path / "out" / "smoke" / "results.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"config": {}, "systems": {"lorenz63": {
+        "H1a": {"pass": True}, "H2a": {"pass": False}}}}))
+    before = path.read_bytes()
+    assert main(["--preset", "smoke", "--out", str(tmp_path / "out"), "--report-only"]) == 64
+    captured = capsys.readouterr()
+    lines = captured.err.splitlines()
+    assert captured.out == "" and len(lines) == 1
+    assert lines[0].startswith("lpcstudy: refused (stale results schema): ")
+    assert "no verdict" in lines[0] and "WU-0002.9" in lines[0]
+    assert path.read_bytes() == before
+    assert sorted(p.name for p in path.parent.iterdir()) == ["results.json"]
+
+
 def test_report_only_accepts_a_current_results_file(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A results file with v3 keys gets its verdicts rewritten and the report built (exit 0).
+    """A results file with v3 keys and verdicts gets its verdicts rewritten and the report built.
 
-    Reference: the identifier table (H1a, H2a are v3 keys). The report writers are replaced by
-    recorders, so only the check and the verdict step are exercised. Exact.
+    Reference: the identifier table (H1a, H2a are v3 keys) and v3 section 7. The report writers
+    are replaced by recorders, so only the check and the verdict step are exercised. The file
+    carries ``verdict`` keys (a plan-listed edit of this test, which carried ``pass`` only). The
+    smoke config runs one system, so a pass reads "inconclusive" with the other two v3 systems
+    missing, and a fail reads "not supported". Exact.
     """
     import lpcstudy.__main__ as cli
     path = tmp_path / "out" / "smoke" / "results.json"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps({"config": {}, "systems": {"lorenz63": {
-        "H1a": {"pass": True}, "H2a": {"pass": False}}}}))
+        "H1a": {"verdict": "pass", "pass": True}, "H2a": {"verdict": "fail", "pass": False}}}}))
     built: list[str] = []
     monkeypatch.setattr(cli, "write_markdown", lambda *a: built.append("md"))
     monkeypatch.setattr(cli, "make_figures", lambda *a: built.append("fig"))
     assert main(["--preset", "smoke", "--out", str(tmp_path / "out"), "--report-only"]) == 0
     saved = json.loads(path.read_text())
-    assert saved["verdicts"]["H1a"]["verdict"] == "supported"
-    assert saved["verdicts"]["H2a"]["by_system"] == {"lorenz63": False}
+    assert saved["verdicts"]["H1a"] == {"by_system": {"lorenz63": "pass"},
+                                        "verdict": "inconclusive",
+                                        "missing_systems": ["rossler", "chua"]}
+    assert saved["verdicts"]["H2a"]["by_system"] == {"lorenz63": "fail"}
+    assert saved["verdicts"]["H2a"]["verdict"] == "not supported"
     assert built == ["md", "fig"]
