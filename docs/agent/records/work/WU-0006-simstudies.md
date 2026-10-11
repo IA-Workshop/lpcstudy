@@ -240,6 +240,21 @@ Where the ROADMAP gives a formula and a rounded value, the stricter of the two i
 
   Every item is a tightening or a correction; no bound is loosened.
 
+**2026-10-11, claude-sonnet-5-5 (main session): Plan amendment (main session).** This amends the plan above before any code, on the applied-mathematician's review (9d1152e) and DEC-0018 (proposed). It supersedes the plan wherever they differ.
+
+- **Accepted as tightenings or corrections (mathematician amendments 1 to 6).**
+  1. N2 bound 0.045946 (count rule ≤ 22 of 500). The H1 lag-1 standard error is √((1 − φ²)/N) (Bartlett).
+  2. The generator specifications of the note, M3 (a) and (g), replace the plan's descriptions. The predictions apply only to them.
+  3. C7 and C6 column and verdict choices: A5, A3 and A4 use `part_ii["interior"]` for C7 and the per-row verdict of `h1d_correlations` for C6. The C7 zero column is asserted "not computable" with 2000 failed resamples.
+  4. A4 (verdict equality) is asserted per replication.
+  5. Every bound is an integer count: A1 ≥ 930/1000, A2 ≥ 972/1000, A3 ≤ 39/1000 (95%) or ≤ 16/1000 (98.3%), L ≤ 33/2000, N1 and N3 ≥ 461/500, N2 ≤ 22/500.
+  6. A pre-registered consistency range for each observed count from the reference (the 70 ranges: 36 coverage, 28 A3, 6 log-rank) is the defect test and is always asserted. The characterization rows C2h and C4h (σ = 1.5 and 2, c = 0.8, φ = 0) are added, and C1s keeps its role. Neither is asserted.
+- **Option K until the owner rules (DEC-0018).** The ROADMAP-bound assertions (A1, A2, A3, L1, L2, N1) are asserted behind one module-level constant `ASSERT_ROADMAP_BOUNDS = True` in the harness. Their outcomes are always computed and written to a results table (JSON under `runs/tests/`, plus a summary pasted into this Log). Flipping the constant to `False` (Option C) turns those rows into recorded characterization rows with the consistency ranges as the defect test. Both modes are implemented and the switch itself is tested. N2 and N3 of the delta-R2 study are always asserted; N1 is under the constant. A failed asserted row is a FINDING to record, never something to tune. No R, B = 2000, block = 5, level or bound changes.
+- **O1.** The spawned worker pool is approved. Workers are single-thread: OMP, MKL and OPENBLAS_NUM_THREADS = 1, LPC_THREADS = 1 and PJRT_NPROC = NPROC = 1 are set in the parent environment before the pool is created, the start method is spawn, the pool size is min(LPC_THREADS, 4) of the invoking environment, and there is no new dependency.
+- **O2 (file names).** `tests/slow/test_statistics_coverage.py` (C1, C3, C1s), `tests/slow/test_analysis_coverage.py` (C2, C4 to C9, C2h, C4h), `tests/slow/test_analysis_logrank_size.py` and `tests/slow/test_analysis_null_delta_r2.py`, with a shared harness module `tests/slow/wu0006_harness.py` and a fast harness smoke `tests/slow/test_wu0006_harness.py`. No `lpcstudy/` change and no import-graph change.
+- **O3.** The delta-R2 study uses 3000 training and 1000 test states. Seeds are `make_rng(6006, "wu0006", case, ...)`, never a DEV or confirmatory seed.
+- **Process.** The §4.9 checklist is logged before each test invocation. The slow tier runs once for the whole set through `tools/run_tests.sh slow --background`. If it needs more than the 3600 s tier timeout, stop and report; R is never reduced.
+
 ## Review
 
 ## Audit
