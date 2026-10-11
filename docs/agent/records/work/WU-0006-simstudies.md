@@ -295,6 +295,62 @@ Where the ROADMAP gives a formula and a rounded value, the stricter of the two i
 4. Device: `JAX_PLATFORMS=cpu`. 5. Threads and time: `LPC_THREADS=4`, 4 workers; about 2 minutes. 6. Contention: nothing running (`pgrep` as before). 7. Output: `-q --tb=short -rfE`.
 8. Command: `tools/run_tests.sh slow --background tests/slow/test_wu0006_harness.py "tests/slow/test_analysis_coverage.py::test_exact_checks[C7-0.0]" "tests/slow/test_analysis_coverage.py::test_exact_checks[C7-0.3]"`.
 
+**Test run 3 result.** `32 passed in 99.89s` (`runs/tests/slow-20261011T171519Z.log`, exit 0): the 30 smoke tests (29 plus the new C7 zero-column rule test) and `test_exact_checks[C7-0.0]`, `[C7-0.3]`.
+
+**Results of WU-0006.2 and .3 (run 2; R = 1000 for coverage, 2000 for log-rank, 500 for delta R2; counts out of R; "range" is the pre-registered consistency range; ROADMAP bounds: A1 >= 930, A2 >= 972, A3 <= 39 (95%) or <= 16 (98.3%), L <= 33, N1 and N3 >= 461, N2 <= 22).**
+
+| case, phi | cover 95% (range) | cover 98.3% (range) | edge pass / fail (range) | ROADMAP rows failed | consistency |
+| --- | --- | --- | --- | --- | --- |
+| C1, 0 | 945 (918-969) | 983 (963-994) | - | none | ok |
+| C1, 0.3 | **926** (895-953) | **969** (949-987) | - | A1, A2 | ok |
+| C3, 0 | 953 (917-969) | 984 (963-994) | - | none | ok |
+| C3, 0.3 | 937 (899-956) | 973 (953-989) | - | none | ok |
+| C2, 0 | 932 (911-964) | 974 (959-992) | 29 / 39 (14-52 / 13-50) at 95% | none | ok |
+| C2, 0.3 | **918** (898-955) | **969** (950-987) | 39 / **43** (17-58) | A1, A2, A3 fail | ok |
+| C4, 0 | 940 (912-965) | **971** (959-992) | 13 / 16 (2-25) at 98.3% | A2 (one below 972) | ok |
+| C4, 0.3 | **912** (896-954) | **961** (951-988) | **19 / 20** (3-30 / 3-29) | A1, A2, A3 pass, A3 fail | ok |
+| C5, 0 | 933 (910-963) | **971** (958-991) | 34 / 33 (14-53 / 13-50) at 95% | A2 (one below 972) | ok |
+| C5, 0.3 | **919** (897-955) | **966** (948-986) | **43** / 38 (17-59) | A1, A2, A3 pass | ok |
+| C6, 0 | 959 (919-971) | 985 (961-993) | 19 / 22 (10-47) at 95% | none | ok |
+| C6, 0.3 | 944 (915-968) | 977 (962-994) | 25 / 31 (11-48 / 12-50) | none | ok |
+| C7, 0 | 946 (917-968) | 972 (962-993) | 1 / 15 (1-23 / 1-24) at 98.3% | none | ok |
+| C7, 0.3 | 930 (910-964) | 977 (957-991) | **0** / 9 (2-27 / 2-25) | none | **A3 pass 0 below 2 (see F3)** |
+| C8, 0 | 953 (917-968) | 987 (963-994) | 6 / 7 (1-23 / 1-22) at 98.3% | none | ok |
+| C8, 0.3 | 933 (892-951) | 972 (947-986) | 10 / **18** (4-31 / 4-32) | A3 fail | ok |
+| C9, 0 | 949 (915-967) | 982 (960-993) | 28 / 23 (13-51 / 11-48) at 95% | none | ok |
+| C9, 0.3 | 934 (901-958) | 977 (954-990) | 23 / **43** (15-56 / 17-58) | A3 fail | ok |
+
+Failed resamples (A5): 0 in every coverage case, in every log-rank family (L3: 0 uncomputed pairs in 8000 families) and every delta-R2 replication. Identity with the production call site (bitwise) and A4 (verdict equals the independent rule in every replication) hold for all 18 asserted cells and the 7 characterization cells. The C7 zero column read "not computable" with 2000 failed resamples in every checked replication (after the fix of F4).
+
+| row | FWER count | P(pass) count | censored | mean chi-square of the null pair(s) (reference) | ROADMAP (<= 33) | consistency |
+| --- | --- | --- | --- | --- | --- | --- |
+| L1, 0 | 19 (7-39) | 3 (0-9) | 0.0490 | 1.018 (1.009) | ok | ok |
+| L1, 0.3 | 26 (11-47) | 2 (0-10) | 0.0489 | 1.075 (1.079) | ok | ok |
+| L2, 0 | - | 27 (8-42) | 0.0333 | 1.025 (1.012) | ok | ok |
+| L2, 0.3 | - | 27 (9-44) | 0.0335 | 1.035 (1.046) | ok | ok |
+
+| delta R2 (3000 / 1000), phi, target | N1 (>= 461) | N2 (<= 22) | N3 (>= 461) | mean conditional gain | P(gain > 0) | mean half-width | P("reduces") |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0, logit | 467 | 8 | 475 | -0.0025 | 0.14 | 0.0155 | 0.984 |
+| 0, indicator | **460** | 10 | 475 | -0.0033 | 0.18 | 0.0249 | 0.972 |
+| 0.3, logit | **457** | 8 | 478 | -0.0027 | 0.14 | 0.0156 | 0.984 |
+| 0.3, indicator | 467 | 8 | 476 | -0.0031 | 0.23 | 0.0252 | 0.982 |
+
+Refit bitwise equal in 500 of 500 replications in each row; the truth's Monte Carlo SE is at most 0.071 of the half-width (below a tenth). Reference (phi = 0, R = 200): gain -0.0023 and -0.0035, half-width 0.0155 and 0.0253, N1 0.925 and 0.890 (observed 0.934, 0.920), N2 0.020 and 0.035 (observed 0.016, 0.020), N3 0.960 and 0.925 (observed 0.950, 0.950).
+
+Characterization rows (coverage 95% / 98.3% out of 1000; z against the reference with both Monte Carlo errors): C1s phi 0.1: 947 / 982 (z 0.9, 0.6); phi 0.2: 935 / 980 (0.3, 1.2). C2h sigma 1.5: 949 / 980 (2.3, 1.3); sigma 2: 925 / 964 (0.4, -1.0). C4h sigma 1.5: 927 / 965 (-0.8, -1.8); sigma 2: 939 / 984 (1.9, 3.0). The largest deviation (C4h sigma 2 at 98.3%, z 3.0) is a reported row, not an assertion; with eight z-values the chance of one near 3 is about 2%. None of these shows the lower coverage the reference predicts for sigma 2 more clearly than the reference's own R = 20 000 does; the rows are consistent with the reference at this R and are not evidence for a different effective level.
+
+**Findings (failed asserted rows are findings, nothing was tuned; DEF numbers are for the main session to assign).**
+- **F1 (class "method", predicted).** 16 ROADMAP-bound coverage and edge rows failed: 2 at phi = 0 (C4 and C5 at 98.3%, each 971 against 972, P(fail | correct code) 0.12 and 0.15) and 14 at phi = 0.3 (C1: A1, A2; C2: A1, A2, A3 fail; C4: A1, A2, A3 pass, A3 fail; C5: A1, A2, A3 pass; C8: A3 fail; C9: A3 fail). The reference expected 1.7 and 11.4 for correct code. Every one of these counts lies inside its pre-registered consistency range, and the code agrees bitwise with the independent computation, so they are properties of the block-5 percentile interval (undercoverage, most for the log-normal cases and lag-1 0.3), not defects. Tests: `test_roadmap_coverage_bounds[C1-0.3]`, `test_roadmap_coverage_and_verdict_bounds[C2-0.3, C4-0.0, C4-0.3, C5-0.0, C5-0.3, C8-0.3, C9-0.3]`. Passing at phi = 0.3: C3, C6, C7, and C8 and C9 coverage. This is the content of DEC-0018.
+- **F2 (N1, predicted estimand mismatch).** N1 failed in 2 of 4 rows (460 and 457 of 500, bound 461): the interval targets the conditional gain (mean -0.0025 to -0.0033), not the population gain 0. N2 (8 to 10 of 500) and N3 (475 to 478) pass in all four rows. Tests: `test_roadmap_interval_contains_zero[0.0]` and `[0.3]`.
+- **F3 (defect of the pre-registered reference, not of the code; the only consistency-range failure).** `test_counts_are_consistent_with_the_reference[C7-0.3]` failed: the edge "pass" count is 0, below the range (2, 27); at phi = 0 it is 1, at the bottom of (1, 23). The reference took P(pass) at the edge to be the one-sided miss (truth above the upper bound, 10 to 13 per 1000). The verdict "pass" for the open two-sided band (-0.1, 0.1) also needs the lower bound above -0.1, and the 98.3% interval is 0.209 to 0.224 wide (mean half-width 0.086 to 0.112), wider than the band (0.2): once the upper bound is below 0.1 the lower bound is below -0.1. Evidence: in an ad hoc check of 200 replications (phi = 0) the truth was above the upper bound in 2 and the lower bound was at or below -0.1 in both, so there were no passes; the per-replication A4 equality and the identity with production hold. The review's M6 ("the far edge is never touched") holds for the fail side only. The range was not edited (PRIME.2, fixed before the result); the applied-mathematician should correct the reference (the expected P(pass) at the edge for C7 is about 0) and the owner should note a design consequence for WU-0008: with a block-bootstrap interval of this width at n = 500 and a 98.3% level, H2a(ii-b) can hardly reach "pass" at all (it needs a half-width below 0.1 around an estimate within about 0.1 of 0), whatever the truth is near the edge.
+- **F4 (defect of the harness, fixed in the commit after run 2).** `test_exact_checks[C7-0.3]` failed in run 2 because my check of the C7 zero column required the combined (ii) verdict "inconclusive", while `combine_verdicts` correctly returns "fail" when the interior part fails (one replication of the ten checked had an interior "fail"). The expectation was wrong, not the production code; fixed (combined = "fail" if the interior fails, else "inconclusive"), a unit-style test added, and the C7 nodes rerun in run 3 (pass). No bound or tolerance moved.
+- **F5 (reported).** The characterization rows are consistent with their references (above). The C7 and C6 truths, the log-normal truths and the generators passed H1 and H3 in the smoke.
+
+**Runtime and budget.** Run 2: 18 min 39 s with 4 workers (timeout 3600 s; the plan's T <= 20 min is met). By part: delta R2 about 375 s per phi (about 12.5 min; the review had estimated 8), C6 about 100 s per phi, C7 38 s, every other coverage case 3 to 7 s, log-rank 2 to 3 s per row. Run 1: 20 s; run 3: 100 s. No R, B, level, bound or seed changed. The owner's authorization of 8 workers and the GPU was not needed.
+
+**Deviations from the plan and the amendment.** (1) Added `test_wu0006_harness.py` (30 self-checks) and `wu0006_reference.py`. (2) `evaluate_*` keep a `strict` switch used only by the smoke. (3) The ROADMAP-bound tests of a (case, phi) are one test each (all of A1, A2, A3 together), with every violated row listed in the message. (4) The C7 pass range failure (F3) stays a recorded failure; nothing was relaxed. (5) The unit tier radius is empty (no `lpcstudy/`, `tools/` or `tests/unit` change), so no unit test was run. (6) Not done: the independent review, WU-0006.4 (the applied-mathematician's section) and the status, which are the main session's.
+
 ## Review
 
 ## Audit
