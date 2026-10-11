@@ -20,13 +20,17 @@ learner pays for an irrelevant feature): reference -0.0023 (logit) and -0.0035 (
 
 * N1 (ROADMAP as written): the 95% interval contains 0, for ``logit_w_interior`` and
   ``w_zero_indicator``, >= 461 of 500 (0.921, SE 0.00975). Reference P(contains 0) 0.925 (logit) and
-  0.890 (indicator): predicted P(fail) about 0.5 and 1.0. This is an estimand mismatch, not a defect.
+  0.890 (indicator): predicted P(fail) 0.42 and 0.88. This is an estimand mismatch, not a defect.
   Asserted while ``ASSERT_ROADMAP_BOUNDS`` is True (Option K).
 * N2 (always asserted): false "distinct", P(lower bound > 0) <= 22 of 500 (0.045946, SE 0.00698).
   Reference 0.020 and 0.035; predicted P(fail) < 0.01.
+  TO BE REPLACED by the 3000/1000 reference: this P(fail) holds only at 900/1000 states (applied-
+  mathematician's addendum A7, item 1); a 3000/1000 reference is being produced.
 * N3 (always asserted): coverage of Delta_cond, truth computed from the returned fitted pair on 10^5
   fresh i.i.d. stationary states (Monte Carlo error 0.05 of the half-width on average), >= 461 of 500.
   Reference 0.960 and 0.925 (R_ref 200, indicative); predicted P(fail) about 0.03.
+  TO BE REPLACED by the 3000/1000 reference: this P(fail) holds only at 900/1000 states (addendum A7,
+  item 2); R_ref 200 is too small to pre-register N2 and N3 at these sizes.
 * Exact: refitting ``qn_regressor(seed)`` on the same data reproduces the returned ``delta_r2``
   bitwise in every replication.
 

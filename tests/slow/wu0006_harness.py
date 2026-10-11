@@ -281,7 +281,9 @@ class CaseSpec:
 
 
 def expected_verdict(case: str, lower: float, upper: float) -> str:
-    """The verdict the band rule implies for an interval, written from the one-sided misses.
+    """The verdict the band rule implies for an interval, written from the criterion's wording.
+
+    One-sided misses for the one-sided bands, both edges for the two-sided band of C7.
 
     Pass iff the interval is wholly on the predicted side of the edge, fail iff it is wholly on the
     other side, otherwise inconclusive; the edge belongs to the band as the criterion says (the

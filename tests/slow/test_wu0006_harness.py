@@ -18,7 +18,8 @@ truth checks): the checks of the harness itself that must hold before its number
 
 Tolerances. Each H1 and H3 check is a 3-standard-error z-test with the standard error stated at the
 assertion; on fixed seeds the outcome is deterministic, and the chance that a correct generator fails
-one of the checks is about 0.3% each (about 3% over the dozen). A failure would be a finding about the
+one of the checks is about 0.3% each (0.6% for the bivariate lag-1 check, whose estimator's bias is
+0.46 SE; about 3% over the dozen). A failure would be a finding about the
 generator, not a reason to move a seed or a bound.
 """
 
@@ -132,8 +133,9 @@ def test_bivariate_ar1_has_the_stated_correlations(phi: float, cross: float) -> 
     """H1: lag-0 cross-correlation ``cross`` and lag-1 autocorrelation ``phi`` in both columns.
 
     200 independent paths of 5000 states; the mean of the per-path estimates is compared with the
-    target at 3 standard errors, the standard error being the sample SD / sqrt(200). The estimators'
-    O(1/N) bias (about 4e-4 for the lag-1) is below 3 SE (about 3e-3).
+    target at 3 standard errors, the standard error being the sample SD / sqrt(200) (about 9.5e-4 for the
+    lag-1). The lag-1 estimator's O(1/N) bias (about 4e-4) is 0.46 SE, which shifts the z-test and
+    roughly doubles its false-alarm rate to 0.0058 (from 0.0027); 3 SE is kept.
     """
     paths = 200
     rng = rng_for("ar1-bivariate", f"{phi:g}", f"{cross:g}")
@@ -165,7 +167,7 @@ def test_truths_of_the_log_normal_cases() -> None:
 
     Reference: analytic (a = exp(mu + sigma u), b = exp(sigma v) with u, v standard normal, so
     E[a]/E[b] = exp(mu)). 100 chunks of 10^5 draws; the standard error is the SD of the chunk values
-    / sqrt(100); the ratio estimator's O(1/n) bias is about 1e-5 against a standard error near 1e-3.
+    / sqrt(100); the ratio estimator's O(1/n) bias is about 1e-5 against a standard error of 3.3e-4 to 5.2e-4.
     """
     assert _within_three_se(
         _chunks(wu.CaseSpec("C2"), "C2", 100, 10**5, lambda d: np.mean(d["a"] - d["b"])), 0.0)
@@ -193,8 +195,8 @@ def test_truth_of_the_partial_correlation_case() -> None:
     """H3: the partial correlation of C7's target and growth given [1, Q] is 0.1, over 10^7 draws.
 
     Reference: both conditional means lie in span[1, Q(s)], so the population partial correlation
-    is corr(e1, e2) = 0.1 exactly (review M3 (d)). 100 chunks of 10^5 states; standard error from the
-    chunk SD / sqrt(100) (about 3e-3).
+    is corr(e1, e2) = 0.1 exactly (review M3 (d)). 100 chunks of 10^5 states; standard error of the mean
+    from the chunk SD / sqrt(100): the per-chunk SD is about 3.1e-3, the standard error 3.1e-4.
     """
     def partial(d: dict) -> float:
         logit = np.log(d["weight"] / (1.0 - d["weight"]))
@@ -226,13 +228,14 @@ def test_delta_r2_design_marginals() -> None:
     target noise that carries no information on x4 beyond x1 to x3 (corr of x4's innovation xi with
     the latent's residual is 0 by construction; here the correlation of x4 - 0.6 x1 with L - its
     x1..x3 part is checked to be 0). 10^6 i.i.d. draws; standard errors binomial 3.6e-4 for the zero
-    fraction and 1e-3 for the correlations."""
+    fraction and 6.4e-4 for corr(x4, x1) ((1 - 0.36)/sqrt(n)), whose tolerance is 3 SE = 1.9e-3 (it was
+    3e-3, 4.7 SE; tightened to the 3-SE rule of the other checks, a tightening of a self-check)."""
     n = 10**6
     profile, weight, _ = wu.delta_states(rng_for("delta"), n, 0.0, iid=True)
     se_zero = math.sqrt(0.15 * 0.85 / n)
     assert abs(float(np.mean(weight == 0.0)) - 0.15) < 3 * se_zero
     assert abs(float(profile[:, 3].var()) - 1.0) < 3 * math.sqrt(2 / n)
-    assert abs(float(np.corrcoef(profile[:, 3], profile[:, 0])[0, 1]) - 0.6) < 3e-3
+    assert abs(float(np.corrcoef(profile[:, 3], profile[:, 0])[0, 1]) - 0.6) < 1.9e-3
     interior = (weight > 0) & (weight < 1)
     latent = np.log(weight[interior] / (1 - weight[interior]))
     residual = latent - (profile[interior, 0] - 0.5 * profile[interior, 1] ** 2
@@ -247,7 +250,7 @@ CASE_EDGES = {"C2": 0.0, "C4": 1.05, "C5": 0.10, "C6": 0.7, "C7": 0.1, "C8": 0.0
 
 @pytest.mark.parametrize("case", sorted(CASE_EDGES))
 def test_independent_rule_agrees_with_criterion_verdict_at_the_edges(case: str) -> None:
-    """The one-sided-miss rule of ``expected_verdict`` equals ``criterion_verdict`` at every tie.
+    """The band rule of ``expected_verdict`` equals ``criterion_verdict`` at every tie.
 
     A continuous simulation never has a bound equal to the edge, so A4 cannot tell an open from a
     closed edge; this deterministic table does (edge, just inside, just outside, straddle). The

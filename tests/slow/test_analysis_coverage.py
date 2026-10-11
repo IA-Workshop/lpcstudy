@@ -24,8 +24,8 @@ All series are stationary AR(1) in the latent with lag-1 autocorrelation phi in 
 specifications are those of the applied-mathematician's review (M3 (a)). The C7 zero column has a
 constant indicator (all w* interior) and must read "not computable" with all 2000 resamples failed.
 
-**Reference and prediction** (independent simulation, scratch seed 20261011, R_ref 20 000 to 40 000,
-fixed before any result): coverage at 95% / 98.3% (SE of the reference in the note), and P(ROADMAP bound
+**Reference and prediction** (independent simulation, scratch seed 20261011, R_ref 10 000 to 40 000
+(C6 10 000), fixed before any result; the C7 verdict counts R_ref 60 000, see below): coverage at 95% / 98.3% (SE of the reference in the note), and P(ROADMAP bound
 fails | correct code).
 
 | case | phi 0: 95% / 98.3% | P(A1), P(A2) | phi 0.3: 95% / 98.3% | P(A1), P(A2) |
@@ -38,14 +38,33 @@ fails | correct code).
 | C8 | 0.9444 / 0.9806 | 0.02, 0.03 | 0.9230 / 0.9682 | 0.78, 0.72 |
 | C9 | 0.9427 / 0.9782 | 0.04, 0.08 | 0.9311 / 0.9736 | 0.42, 0.33 |
 
+**Edge rates** (P(verdict pass) / P(verdict fail) when the truth is on the band edge, at the criterion's
+own level; the same reference, fixed before any result except the C7 pass entries, which the
+applied-mathematician corrected after run 2: DEF-0022, R_ref 60 000, ranges (0, 6) and (0, 3) in place of
+(1, 23) and (2, 27), because H2a(ii-b) passes only if the interval lies inside the band, and the 98.3%
+interval is wider than the band). The ROADMAP bound is <= 39 of 1000 at 95% and <= 16 at 98.3%.
+
+| case (level) | phi 0: pass / fail | phi 0.3: pass / fail |
+| --- | --- | --- |
+| C2 (95%) | 0.0308 / 0.0296 | 0.0360 / 0.0358 |
+| C4 (98.3%) | 0.0116 / 0.0111 | 0.0145 / 0.0140 |
+| C5 (95%) | 0.0320 / 0.0297 | 0.0362 / 0.0363 |
+| C6 (95%) | 0.0268 / 0.0262 | 0.0274 / 0.0287 |
+| C7 (98.3%) | 0.00103 / 0.0106 | 0.00025 / 0.0112 |
+| C8 (98.3%) | 0.0100 / 0.0095 | 0.0158 / 0.0160 |
+| C9 (95%) | 0.0299 / 0.0274 | 0.0335 / 0.0355 |
+
+The C7 pass row cannot fail its ROADMAP bound (P about 1e-13): "pass" is almost unreachable at this
+width (v3 section 7 pre-registers that H2a's second part can be refuted but essentially cannot pass).
+
 Correct code is expected to fail about 1 to 2 of the 32 phi = 0 and about 11 of the 32 phi = 0.3
 assertions of A1 to A3 (the block-5 percentile interval undercovers, most for heavy tails and lag-1
 0.3): a ROADMAP-bound failure inside the consistency range is a finding of class "method", not a defect.
 
 **Assertion groups** (each (case, phi) is a separate test):
 
-* exact: identity with production; A4 (the verdict equals the independent one-sided-miss rule in every
-  replication); A5 (no failed resamples in the asserted column); the C7 zero column. Zero tolerance.
+* exact: identity with production; A4 (the verdict equals the independent band rule in every
+  replication: one-sided for C2, C4 to C6, C8 and C9, two-sided for C7); A5 (no failed resamples in the asserted column); the C7 zero column. Zero tolerance.
 * consistency: coverage at both levels, and the wrong-pass and wrong-fail counts at the edge, lie in
   the 64 pre-registered ranges (C2, C4 to C9 are 56 of them; the defect test, always asserted).
 * roadmap: A1 >= 930 of 1000, A2 >= 972, and A3 (P(pass) and P(fail) at the criterion's own level each
@@ -86,7 +105,7 @@ def cache() -> wu.RunCache:
 def test_exact_checks(pool, cache: wu.RunCache, case: str, phi: float) -> None:
     """Identity with the production call site, A4 per replication, A5, the C7 zero column.
 
-    Reference: the production function (identity), the one-sided-miss rule written in the harness (A4)
+    Reference: the production function (identity), the band rule written in the harness from the criterion's wording (A4; two-sided for C7)
     and the guard of DEC-0008 A3 (a constant indicator is not computable). Zero tolerance: all are
     deterministic comparisons of floats and strings."""
     evaluation = cache.coverage(pool, wu.CaseSpec(case), phi)
