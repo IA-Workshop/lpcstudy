@@ -195,6 +195,113 @@ Result of run 4: `10 passed in 67.52s (0:01:07)`.
 - **Reviewer:** <actor, not the author>
 - **Findings and resolution:**
 
+### 2026-10-11, reviewer claude-opus-5-5 (fresh context): WU-0008.3 and .4, round 1
+
+Scope: only .3 (labels, captions) and .4 (QoI table), at f1129a7 (commits dff3692, 8decf2a, b6b406f, f1129a7; plan ad2eee1; merge 7dc4f45). .1 and .2 are not implemented and not reviewed. Inputs: the diff 7dc4f45..f1129a7; `lpcstudy/analysis.py` at every bootstrap site; `experiments.py` (V4); `report.py` (`make_figures`, `write_markdown`, `_key_number`); `__main__.py`; v3 §2, §5, §7, §8; Methods v2 §M12; DEC-0008 A1, A3, A4; DEC-0021. No tests were run. The Log's results stand (148 passed; 243 passed plus 1 unrelated failure; 36 passed; 10 passed). `test_no_stale_identifier_in_the_package` is not counted against this branch: the failure comes from the `kaplan_meier` docstring, which is fixed on develop.
+
+**Checked and correct (no finding).**
+- **Purity.** `budget.py` imports only `config`, `identifiers` and `textwrap`. It has no randomness and no assignment into `results`, and it computes no statistic.
+- **`results.json` cannot change.** In both `__main__` paths (lines 114–116 and 148–150), `save_json` runs before `write_markdown` and `make_figures`. The new `identifiers` names (`QOI_DECLARATIONS`, `QOI_FIELDS`) are referenced only by `budget`; a grep of `analysis`, `experiments`, `pipeline` and `__main__` finds no use. The report-only comparison (4393 leaves, 0 different) agrees with this.
+- **Interval levels and procedures by row, against the code.**
+  - H1a: per ρ, joint ratio bootstrap over test-sweep states, 95%.
+  - H1b: PLP slope, `block_bootstrap_counted`, 95%.
+  - H1c: PLP median, 95%.
+  - H1d: three tested Spearman pairs, 95%; N̂ reported only.
+  - Q-N: estimate, 95%, no multiplicity.
+  - H2b: (i) and (ii) both at 1 − 0.05/3.
+  - H2c and H2d: 95%.
+  - H2e: 95% median of paired changes.
+  - H3a: Holm over consecutive pairs, p-values, no interval.
+  - H3b: 95% blocks of construction states, trees refitted.
+  - H3c: 1 − 0.05/3 ratio bootstrap.
+  - Gain bound: no interval.
+  - All of these match the labels except H2a (R1) and H3b (R6).
+  - B and the block length are read from `config`. The test on block 7 and B = 123 shows it.
+- **V4 label.** It is accurate against `experiments.py:108–120`: iid resampling of the M draws, 200 resamples, half-width (P97.5 − P2.5)/2, median over states, value at `n_oracle_draws`, bar 0.05. The literal 200 is pinned by a test that reads the source.
+- **L2.** A mismatch raises `ValueError`. Old-schema results fall back to the level of the row's role; this is documented and is the plan's old-schema case.
+- **Figures.**
+  - `separation_weight_vs_horizon.png`: the band is `q25` to `q75` across test states (`analysis.py:2135–2139`), and the caption calls it an inter-quartile range, not a confidence interval. Correct.
+  - `kaplan_meier_by_rule.png`: the plotted rules are A0–A5 and A\*.
+  - `regret_vs_regimes.png`: the dotted line is at 5%.
+  - `knob_response_library.png`: it plots medians; the stored 95% intervals are not drawn. Correct.
+  - No figure draws an interval. Each caption is written into its PNG by `caption_figure`. The test strips the line breaks and compares the PNG text exactly with the caption.
+- **QoI rows checked against v3 and M12, no finding:** H1a, H1b, H1c, H1d, Q-N, H2c, H2d, H2e and the gain bound.
+  - The M12 numbers quoted are correct: ±0.13; 0.04 for Q-N and H2a(i); 0.10 for H2a(ii); 0.05 and 0.03 for H2b.
+  - The 10 σ_x clip is `ensemble.ERROR_CLIP`.
+  - H2b reads correctly; its open bound is carried by the verbatim criterion "> 0".
+  - The criterion column is `row.criterion` verbatim. There are 14 rows, and the test checks the row ids against v3 §2 parsed from the file (an independent reference).
+- **Graph fixture.** `budget -> [config, identifiers]` and `report -> [allocation, budget, config, identifiers, statistics]` agree with the import lines. There are 22 `lpcstudy/*.py` files. The change from 21 to 22 is a count, not a tolerance. The fixture and test changes are in the same commit as the import edit (dff3692, DoD 4).
+- **Report hunks.** Every hunk is wrapped in begin/end markers (R1 import, R2, R3, R4, R6, R7). The diff of `report.py` adds lines only and deletes none.
+- **Commits.** Every commit names the unit and ends with `Agent: claude-sonnet-5-5`.
+- **No other interval table is unlabelled.** The V7, Lyapunov, P2(c), allocation and robustness tables print no `[lo, hi]` interval.
+
+**Findings.**
+
+- **R1. The H2a label misstates the resampling unit** (`lpcstudy/budget.py:129–132`).
+  - The label reads "blocks of 5 consecutive eligible (small-error) test states in time order", and the dependence clause repeats it.
+  - The code resamples blocks of **all** test states in time order:
+    - (i) re-evaluates eligibility inside each resample (`analysis.py:1067`, `:1118–1121`; DEC-0008 A4(b));
+    - (ii) is not restricted to small-error states at all: (ii-a) and (ii-c) run over all states, and (ii-b) applies the interior filter inside each resample (`analysis.py:1158–1159`, `:1211–1219`).
+  - Why it matters: the label is the dependence statement of a primary interval (NVVUQ.16), and it is factually wrong for both parts.
+  - Fix: name blocks of consecutive test states (all states) in time order, with eligibility (i) and the interior domain (ii-b) re-evaluated inside each resample. Add an assertion on the H2a label that cites DEC-0008 A4(b) as its reference.
+
+- **R2. The QoI declaration of H2a misstates the statistic and the decision-relevant error** (`lpcstudy/identifiers.py`, `QOI_DECLARATIONS["H2a"]`).
+  - (a) It says "partial correlation of logit w\* … on the interior and the w\* = 0 parts". The w\* = 0 part is the partial correlation of the **indicator 1{w\* = 0}** over all test states, not of logit w\* (which is undefined at 0). There is also a third part, 1{w\* = 1}, added when w\* = 1 holds in more than 5% of states (DEC-0008 A4(a); `analysis.py:1152–1156`).
+  - (b) "Given the analog and estimation seeds" leaves out the quadratic controls x, x², x₁x₂ with x = (ln ε_s/ρ, ln δ/ρ) (A4(a2)).
+  - (c) Part (i) is taken over **initial segments**: the first L ≥ 2 of 1, 2, 4 LT that are small-error (A4(b)), not over 1, 2 and 4 LT.
+  - (d) For (i), the decision-relevant error "a half-width near 0.1" is wrong. The edge of (i) is the bound 0.1, so what matters is a half-width comparable to the distance of the median range from 0.1 (M12: pilot 0.12–0.28, projected 0.04). The (ii) clause is correct: a half-width near the band half-width 0.1 means it cannot pass.
+  - (e) "Below 0.5 σ_x" should be "at most 0.5 σ_x" (`analysis.py:1268`, `<=`).
+  - Fix: reword the definition and decision_error of the row from v3 §2 plus DEC-0008 A4(a), (a2) and (b).
+
+- **R3. The QoI declaration of H3b names the stability index as decision-relevant** (`QOI_DECLARATIONS["H3b"]["decision_error"]`).
+  - The horizon-tree part is decided by the lower bound of the 95% interval of D = imp_t(Λ̃) − max of the other coordinates' imp_t (> 0, strict). The stability index is reported only (DEC-0008 A3; `analysis.py:1915–1919`, `:1983`, `:1992`).
+  - Fix: "a weight-tree Λ̃ upper bound within one half-width of 0.2, or a D lower bound within one half-width of 0; the stability index is reported, not decided". The definition may name D.
+
+- **R4. The QoI rows of H3a and H3c misstate what moves the verdict.**
+  - (a) H3a: since no equivalence margin is set, H3a **cannot fail** (DEC-0008 A3; `analysis.py:1788`). An error near 0.01 moves it only between pass and inconclusive, and no outcome refutes it. The decision_error and decision cells should say this; a reader would otherwise read "inconclusive" as a near-refutation.
+  - (b) H3c: "excess error flat in K is read as the P3 floor, not as a failure" is not v3's wording. v3 §7 reads a flat excess error as the P3 floor **when H3c holds**. The words "not as a failure" suggest a reading that could override the verdict rule.
+  - Fix: state the H3a limit, and quote v3 §7 for H3c.
+
+- **R5. L2 is only partly met: two stored decision levels are not cross-checked** (`lpcstudy/budget.py:35–37`, `STORED_LEVEL_PATHS`).
+  - H2e stores `level` per ρ under `by_noise[rho]` (`analysis.py:1581` via `_paired_change`, `:1386`).
+  - H3b stores `D.level` (`:1997`); only `weight_lambda.level` is checked.
+  - A wrong level at those sites would be labelled silently with the role level. The plan's L2 says "each result carrying `level`".
+  - Fix: allow several paths per key, including each `by_noise` entry. Add H2e (every ρ) and H3b D, and extend `test_label_level_equals_the_stored_level_and_a_mismatch_raises` to cover them.
+
+- **R6. The H3b label does not say "coverage not measured"** (`lpcstudy/budget.py:124–127`).
+  - The plan (Scope, Out) requires the H3b row of the verdict-table label to say "coverage not measured" (WU-0006 gap).
+  - The analysis docstring (`analysis.py:1909–1911`) also states that these intervals condition on the fitted proxies and are not guaranteed to cover.
+  - Fix: append that statement to the H3b label, and assert it in `test_budget.py`.
+
+- **R7. Governance: two smoke presets ran during another run** (Log, test run 4, item 6).
+  - `test_preset_wrapper.py` started two smoke presets while the `v1-baseline` pilot was running, against `.claude/rules/test-discipline.md`. The developer recorded it.
+  - No result is affected: the presets ran on CPU with fixed threads and are compared bitwise within the test.
+  - No code fix. The main session decides whether a deviation note is needed. Before any future integration run, check `pgrep -fa "lpcstudy --preset"`.
+
+**Smoke comparison base vs final (A1).**
+- **Not required before merging .3 and .4.** `results.json` is written before any `budget` or report code runs, and the `identifiers` additions are append-only constants unreferenced by the producers. The report-only evidence (0 of 4393 leaves differ) is consistent with this, but it is weak: it would hold for any report-side code.
+- **Required before the branch merges,** because .2a changes `analysis.py`, and A1 is .2a's criterion. One smoke at the .2a head, run when no preset is running, covers .3 and .4 too.
+- **Proposed rule:** a full-preset A1 comparison is required before merge iff the change set touches a module that runs before `save_json` (the import closure of `experiments`, `pipeline`, `analysis` and `statistics`) in more than append-only constants that no producer references. A change confined to code that runs after `save_json` (`write_markdown`, `make_figures`, `budget`) is covered by a `--report-only` leaf compare on stored results plus that grep, recorded in `## Log`.
+
+**The developer's deviations, as recorded in the Log.**
+- (1) `test_data.py` and `test_validation.py` were added to the radius at the main session's request: acceptable, recorded.
+- (2) The unrelated stale-id failure was not fixed in this lane: correct, since the fix is on develop.
+- (3) The run-3 failure was caught by a test written first, then fixed; `--lf`, then the radius once: compliant.
+- (4) The integration run during the pilot: R7.
+- (5) A1 deferred: see above.
+- (6) The old-schema check called `verdicts`, `write_markdown` and `make_figures` directly on the DEV-0 pilot results, because the hook blocks any pilot-preset command line. Acceptable for DoD 1, recorded.
+- The 14-row table follows DEC-0021 O1, which is still **proposed**, not owner-confirmed.
+
+**PRIME.4.** Nothing is dropped silently.
+- A row with no result is listed in the table with "no result" and gets no label line.
+- A missing declaration or caption raises `KeyError`.
+- A level mismatch raises, except at the sites of R5.
+- The old-schema fallback to the role level is documented.
+
+**Owner checkpoint.** The change touches no statistics, seed, provenance or dependency code. It does add report statements that govern how verdicts are read (interval labels and the QoI declarations), and it rests on DEC-0021 (proposed). **Needs owner review before freeze**, as the plan's Class row already says.
+
+**Verdict: approve with fixes** (R1 to R6 are text and test fixes in `budget.py`, `identifiers.py` and `test_budget.py`; R7 needs no code change). 7 findings.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
