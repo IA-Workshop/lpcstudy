@@ -16,6 +16,8 @@ accumulated chunk by chunk.
 
 from __future__ import annotations
 
+import os
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -29,6 +31,35 @@ from .embedding import delay_vectors
 from .estimation import StateEstimator
 
 ERROR_CLIP: float = 10.0
+
+THREADS_DEFAULT: int = 4
+"""Worker threads of a k-d tree query when ``LPC_THREADS`` is unset (as ``tools/run_tests.sh``)."""
+
+
+def worker_count() -> int:
+    """Return the number of worker threads for k-d tree queries from ``LPC_THREADS``.
+
+    The cap is the one the wrappers ``tools/run_tests.sh`` and ``tools/run_preset.sh``
+    export (DEF-0012, RSRC.11): an integer from 1 to 99, read at each call; unset or empty
+    means 4, as the shell expression ``${LPC_THREADS:-4}`` does there. The worker count
+    changes the speed of a query and no value it returns.
+
+    Returns
+    -------
+    int
+        The worker count.
+
+    Raises
+    ------
+    ValueError
+        If ``LPC_THREADS`` is set and is not an integer from 1 to 99 (no fallback, PRIME.4).
+    """
+    text = os.environ.get("LPC_THREADS", "")
+    if text == "":
+        return THREADS_DEFAULT
+    if re.fullmatch(r"[1-9][0-9]?", text) is None:
+        raise ValueError(f"LPC_THREADS must be an integer from 1 to 99, got {text!r}")
+    return int(text)
 
 DRAW_COUNTERS: tuple[str, ...] = (
     "invariant_mean_replacements", "nu_replacements", "gain_replacements", "gain_floor",
@@ -186,7 +217,7 @@ class AnalogLibrary:
         tuple[np.ndarray, np.ndarray]
             Time indices ``(n, k)`` and distances ``(n, k)``.
         """
-        dist, pos = self.tree.query(vectors, k=n_analogs, workers=-1)
+        dist, pos = self.tree.query(vectors, k=n_analogs, workers=worker_count())
         dist = dist.reshape(len(vectors), n_analogs)
         pos = pos.reshape(len(vectors), n_analogs)
         return self.indices[pos], dist

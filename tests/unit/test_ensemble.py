@@ -540,3 +540,108 @@ def test_evaluation_draws_accumulates_handled_and_gain_columns(monkeypatch,
     sub = out.subset(np.array([4, 0]))
     np.testing.assert_array_equal(sub.handled, expected[[4, 0]])
     assert sub.clip_entries is None
+
+
+class _SpyTree:
+    """A real ``cKDTree`` behind a recorder of the keyword arguments of ``query``."""
+
+    def __init__(self, tree) -> None:
+        self.tree = tree
+        self.calls: list[dict] = []
+
+    def query(self, *args, **kwargs):
+        self.calls.append(dict(kwargs))
+        return self.tree.query(*args, **kwargs)
+
+
+def _synthetic_library():
+    """A fixed 3000-vector library in R^5 (test seed 50120) and 40 query vectors."""
+    from lpcstudy.ensemble import AnalogLibrary
+    from scipy.spatial import cKDTree
+
+    rng = np.random.default_rng(50120)
+    vectors = rng.standard_normal((3000, 5))
+    queries = rng.standard_normal((40, 5))
+    tree = cKDTree(vectors)
+    library = AnalogLibrary(indices=np.arange(3000) + 7, noisy_series=np.zeros(3007), tree=tree)
+    return library, tree, queries
+
+
+@pytest.mark.parametrize("value, expected", [(None, 4), ("", 4), ("1", 1), ("2", 2), ("8", 8),
+                                             ("99", 99)])
+def test_worker_count_reads_lpc_threads(monkeypatch, value, expected: int) -> None:
+    """``worker_count`` is ``LPC_THREADS`` as an integer, 4 when unset or empty (DEF-0012).
+
+    Reference: the rule of ``tools/run_tests.sh`` (``${LPC_THREADS:-4}``, integer 1 to 99),
+    stated here as the table of expected values. Exact integer comparison: no tolerance.
+    """
+    from lpcstudy.ensemble import worker_count
+
+    if value is None:
+        monkeypatch.delenv("LPC_THREADS", raising=False)
+    else:
+        monkeypatch.setenv("LPC_THREADS", value)
+    assert worker_count() == expected
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc", "100", "07", "2.5", " 4"])
+def test_worker_count_rejects_invalid_values(monkeypatch, value: str) -> None:
+    """Values outside the integers 1 to 99 raise ``ValueError`` naming ``LPC_THREADS`` (PRIME.4).
+
+    Reference: the validation of ``tools/run_tests.sh`` (``^[1-9][0-9]?$``). There is no
+    silent fallback to 4.
+    """
+    from lpcstudy.ensemble import worker_count
+
+    monkeypatch.setenv("LPC_THREADS", value)
+    with pytest.raises(ValueError, match="LPC_THREADS"):
+        worker_count()
+
+
+@pytest.mark.parametrize("value, expected", [(None, 4), ("2", 2), ("8", 8)])
+def test_analog_query_passes_lpc_threads_as_workers(monkeypatch, value, expected: int) -> None:
+    """``AnalogLibrary.query`` calls the tree with ``workers == LPC_THREADS`` (DEF-0012).
+
+    Reference: the expected integer is the environment value set by the test (4 when unset).
+    The spy forwards to a real ``cKDTree``, so the call is also valid. Exact comparison.
+    """
+    library, tree, queries = _synthetic_library()
+    spy = _SpyTree(tree)
+    library.tree = spy
+    if value is None:
+        monkeypatch.delenv("LPC_THREADS", raising=False)
+    else:
+        monkeypatch.setenv("LPC_THREADS", value)
+    library.query(queries, 3)
+    assert len(spy.calls) == 1 and spy.calls[0]["workers"] == expected
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc"])
+def test_analog_query_rejects_invalid_lpc_threads(monkeypatch, value: str) -> None:
+    """``AnalogLibrary.query`` raises ``ValueError`` for an invalid ``LPC_THREADS`` and does
+    not query the tree (no silent fallback, PRIME.4)."""
+    library, tree, queries = _synthetic_library()
+    spy = _SpyTree(tree)
+    library.tree = spy
+    monkeypatch.setenv("LPC_THREADS", value)
+    with pytest.raises(ValueError, match="LPC_THREADS"):
+        library.query(queries, 3)
+    assert spy.calls == []
+
+
+@pytest.mark.parametrize("threads", ["1", "4"])
+def test_analog_query_is_bitwise_independent_of_workers(monkeypatch, threads: str) -> None:
+    """Indices and distances are bitwise those of the same query with ``workers=1``.
+
+    Reference: ``cKDTree.query(..., workers=1)`` on the same tree, with the library's
+    position-to-time map applied by hand. Justification of the exact comparison: a k-d
+    tree query is a deterministic search per query point; the worker count only splits
+    the query points among threads and does not change any arithmetic, so the bytes are
+    identical (a failure would mean a data race or a different code path, not round-off).
+    """
+    library, tree, queries = _synthetic_library()
+    monkeypatch.setenv("LPC_THREADS", threads)
+    indices, distances = library.query(queries, 5)
+    ref_dist, ref_pos = tree.query(queries, k=5, workers=1)
+    assert distances.tobytes() == ref_dist.tobytes()
+    assert indices.tobytes() == (np.arange(3000) + 7)[ref_pos].tobytes()
