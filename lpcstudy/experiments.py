@@ -19,12 +19,12 @@ import numpy as np
 from . import analysis as an
 from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
+from .data import make_rng
 from .dynamics import make_finite_growth
 from .ensemble import AnalogLibrary, forecast_draws
 from .identifiers import check_keys
 from .oracle import oracle_weight
 from .pipeline import Cell, FittedRules, Study, fit_rules, rule_weights, score_rules
-from .statistics import block_bootstrap, partial_correlation
 from .validation import check_cp_horizon, check_cramer_rao, check_integrator, \
     check_jacobians, check_kaplan_meier, gate_status
 
@@ -224,7 +224,9 @@ def _variant_summary(cell: Cell, rules: FittedRules, config: StudyConfig) -> dic
                            cell.splits["test"].moments, config.reference_horizon - 1)[1]
     ref = config.reference_horizon - 1
     out = {"H1b": an.h1b_seed_amplifier(cell, config),
-           "H2a_median_range": h2a["median_range"], "H2a_partial_corr": h2a["partial_corr"],
+           "H2a_median_range": h2a["median_range"],
+           "H2a_partial_corr_zero": h2a["part_ii"]["zero"]["partial_corr"],
+           "H2a_partial_corr_interior": h2a["part_ii"]["interior"]["partial_corr"],
            "A4_vs_A2_relative": h2c["A4_minus_A2"]["relative"],
            "A4_over_A3": float(scores["A4"].mse[ref] / scores["A3"].mse[ref]),
            "A5_regret_ratio": regret, "chosen_K": rules.chosen_regimes,
@@ -247,15 +249,18 @@ def _perturbation_scale_variant(study: Study, cell: Cell, rules: FittedRules,
     oracle_growth = np.concatenate([np.asarray(fin(jnp.asarray(true_states[i:i + 200]), eps))
                                     for i in range(0, len(true_states), 200)])
     m = test.moments
-    w_ref = np.clip(oracle_weight(m)[:, m.at(cfg.reference_horizon)], 0.01, 0.99)
-    controls = np.column_stack([np.log(m.analog_seed / cell.noise),
-                                np.log(m.est_seed / cell.noise)])
-    stat = lambda idx: partial_correlation(np.log(w_ref / (1 - w_ref))[idx],
-                                           oracle_growth[idx] * window, controls[idx])
-    est, lo, hi = block_bootstrap(stat, len(w_ref), cfg.bootstrap_resamples,
-                                  cfg.bootstrap_block, cfg.seed)
+    w_ref = oracle_weight(m)[:, m.at(cfg.reference_horizon)]
+    seeds = np.column_stack([np.log(m.analog_seed / cell.noise),
+                             np.log(m.est_seed / cell.noise)])
+    # The same two-part statistic and index sets as H2a(ii), with Lambda_fin for Lambda_tilde.
+    two = an.h2a_part_ii(w_ref, oracle_growth * window, seeds,
+                         n_resamples=cfg.bootstrap_resamples, block=cfg.bootstrap_block,
+                         seed=make_rng(cfg.seed, "h2a-two-part"), level=an.PRIMARY_LEVEL)
     agreement = float(np.corrcoef(oracle_growth, cell.oracles["test"].growth)[0, 1])
-    return {"scale_times_rho": scale, "H2a_partial_corr_fin": est, "ci": [lo, hi],
+    return {"scale_times_rho": scale,
+            "H2a_partial_corr_zero_fin": two["part_ii"]["zero"]["partial_corr"],
+            "H2a_partial_corr_interior_fin": two["part_ii"]["interior"]["partial_corr"],
+            "ci_zero": two["part_ii"]["zero"]["ci"], "ci_interior": two["part_ii"]["interior"]["ci"],
             "corr_fin_vs_linear": agreement}
 
 
