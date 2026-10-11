@@ -129,6 +129,10 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     if missing:
         log.warning("%d package(s) not installed, recorded as null: %s", len(missing),
                     ", ".join(missing))
+    probe_issues = provenance.probe_errors(block)
+    if probe_issues:
+        log.warning("%d platform probe failure(s) or fallback(s), recorded in the provenance "
+                    "block: %s", len(probe_issues), "; ".join(probe_issues))
     start = time.time()
     study = Study(config, out_dir)
     results: dict = {"config": provenance.config_record(config), "systems": {},
