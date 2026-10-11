@@ -562,7 +562,7 @@ def test_every_design_runs_end_to_end_and_passes_the_exact_checks(pool, tmp_path
     table.add("delta", ev.row, workers=pool.wu_workers)
     saved = json.loads(table.path.read_text())
     assert len(saved) == len(specs) + 3 + 1
-    assert saved["_meta"]["workers"] == pool._max_workers == wu.pool_size()
+    assert saved["_meta"]["workers"] == pool._max_workers == pool.wu_workers
 
 
 def test_c7_zero_column_rule_allows_a_failing_interior_part() -> None:
@@ -588,7 +588,7 @@ def test_result_files_are_stamped_and_never_overwritten(tmp_path) -> None:
     assert first.path != second.path
     first.add("a", {"x": 1}, workers=4)
     second.add("b", {"x": 2}, workers=4)
-    assert sorted(path.name[:10] for path in tmp_path.iterdir()) == ["wu0006_same"] * 2
+    assert sorted(path.name[:11] for path in tmp_path.iterdir()) == ["wu0006_same"] * 2
     assert "a" in json.loads(first.path.read_text()) and "b" not in json.loads(first.path.read_text())
     assert first.path.name.startswith("wu0006_same_20") and first.path.name.endswith(".json")
 

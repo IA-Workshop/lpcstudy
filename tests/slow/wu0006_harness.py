@@ -992,14 +992,24 @@ class ResultTable:
     """The results table of one test file: a JSON under ``runs/tests/`` rewritten on every row.
 
     The file name carries the UTC stamp of the session (``wu0006_<name>_<stamp>.json``, with the
-    process id added if that name exists), so no earlier table is ever overwritten.
+    process id and a counter added if that name exists). The name is reserved (created exclusively)
+    at construction, so no earlier or concurrent table is ever overwritten.
     """
 
     def __init__(self, name: str, directory: Path = RESULTS_DIR) -> None:
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        self.path = directory / f"wu0006_{name}_{stamp}.json"
-        if self.path.exists():
-            self.path = directory / f"wu0006_{name}_{stamp}-{os.getpid()}.json"
+        directory.mkdir(parents=True, exist_ok=True)
+        for suffix in ("", f"-{os.getpid()}", *(f"-{os.getpid()}-{k}" for k in range(1, 1000))):
+            candidate = directory / f"wu0006_{name}_{stamp}{suffix}.json"
+            try:
+                with candidate.open("x") as handle:  # reserve the name: never overwrite a table
+                    handle.write("{}")
+            except FileExistsError:
+                continue
+            self.path = candidate
+            break
+        else:
+            raise FileExistsError(f"no free result file name for {name} at {stamp}")
         self.rows: dict[str, object] = {}
 
     def add(self, key: str, row: dict, *, workers: int) -> None:
