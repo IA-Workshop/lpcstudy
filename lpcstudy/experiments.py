@@ -201,8 +201,9 @@ def run_system(study: Study, system: str) -> dict:
     res["Q-N"] = an.qn_noise_redundancy(core, rules, cfg)
     res["H2a"] = an.h2a_separation(core, cfg)
     res["H2b"] = an.h2b_knob_response(noise_cells, library_cells, cfg)
-    res["H2c"] = an.h2c_state_dependence(scores, cfg)
+    res["H2c"] = an.h2c_state_dependence(scores, core.splits["calibration"], cfg)
     res["H2d"] = an.h2d_empirical_comparison(scores, cfg)
+    res["H2e"] = an.h2e_noise_matching(library_cells, cfg)
     res["gain_bound"] = an.gain_horizon_bound(core, cfg)
     res.update(an.h3_regimes(core, rules, scores, cfg))
     res["oracle_recovery"] = an.oracle_recovery(scores, cfg)
@@ -218,7 +219,7 @@ def _variant_summary(cell: Cell, rules: FittedRules, config: StudyConfig) -> dic
     """Key statistics of a robustness variant."""
     _, scores = _evaluate(cell, rules, config)
     h2a = an.h2a_separation(cell, config)
-    h2c = an.h2c_state_dependence(scores, config)
+    h2c = an.h2c_state_dependence(scores, cell.splits["calibration"], config)
     profile = deployable_profile(cell.splits["test"].evals, rules.proxies, cell.noise,
                                  config.steps_per_lyapunov)
     regret = regime_regret(rules.regimes[rules.chosen_regimes], profile,
