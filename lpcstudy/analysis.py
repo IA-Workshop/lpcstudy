@@ -79,8 +79,9 @@ def _boot(config: StudyConfig, stat, n_items: int, level: float = 0.95, salt: in
     """Block bootstrap at the integer seed ``config.seed + salt``: the estimate, the interval and
     the number of NaN resamples that ``np.nanquantile`` dropped (DEF-0001, row T3).
 
-    The estimate and bounds are those of ``statistics.block_bootstrap``. The three callers (V7,
-    H1b CP, H2b(i)) report the count as ``n_dropped_resamples``; none converts it to the A3 tail.
+    The estimate and bounds are those of ``statistics.block_bootstrap``. The two callers (V7,
+    H1b CP) report the count as ``n_dropped_resamples``; neither converts it to the A3 tail
+    (H2b(i) did until WU-0002.9b, DEF-0019).
     """
     return block_bootstrap_dropped(stat, n_items, config.bootstrap_resamples,
                                    config.bootstrap_block, config.seed + salt, level)
@@ -1409,8 +1410,13 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
       conservative for "> 0": it shrinks the mean toward 0; at pilot size 20-40% of the states
       have ``w* = 0`` at every level; the count would also include a non-finite row, which cannot
       occur since the weights are finite), and
-      ``n_dropped_resamples``, the NaN resamples that this still-``_boot`` interval drops (a mean
-      of finite correlations cannot be NaN, so 0 is expected; the A3 tail is WU-0002.9's).
+      ``n_failed_resamples``, the non-finite resamples, which ``block_bootstrap_counted`` places
+      at the unfavourable tail (DEC-0008 A3; DEF-0019, WU-0002.9b): at the threshold
+      ``floor((B - 1) a) + 1`` both bounds are infinite and the verdict is inconclusive (a mean of
+      finite correlations cannot fail, so 0 is expected). The interval is the one of the earlier
+      ``_boot`` call bitwise when no resample fails (same integer seed ``config.seed + 3``, level
+      and block). ``n_dropped_resamples`` is kept as an alias with the same value (a published key
+      since WU-0002.11b; nothing is dropped any more).
     * (ii) ``library_change``: the mean over states of ``w*_i(H_ref, 10^4) - w*_i(H_ref, 10^3)``
       at ``rho = config.core_noise`` (1%), one block-bootstrap index array for both sizes, level
       ``1 - 0.05/3``, pass iff the lower bound is above 0 (strict; DEC-0008 A1). A missing cell
@@ -1446,13 +1452,16 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     rho_levels = np.array(sorted(noise_cells))
     w_rho = np.column_stack([_split_weights(noise_cells[r], config) for r in rho_levels])
     rho_corr, n_constant = _per_state_spearman_counted(rho_levels, w_rho)
-    est, lo, hi, n_dropped = _boot(config, lambda idx: float(np.mean(rho_corr[idx])),
-                                   len(rho_corr), PRIMARY_LEVEL, salt=3)
+    boot = block_bootstrap_counted(lambda idx: float(np.mean(rho_corr[idx])), len(rho_corr),
+                                   config.bootstrap_resamples, config.bootstrap_block,
+                                   config.seed + 3, PRIMARY_LEVEL)  # integer seed as _boot (salt 3)
+    est, lo, hi = boot.estimate, boot.lower, boot.upper
     medians = np.median(w_rho, axis=0)
     res["noise"] = {"median_w_by_noise": dict(zip(map(str, rho_levels), medians.tolist())),
                     "mean_state_spearman": est, "ci": [lo, hi],
                     "monotone_medians": bool(np.all(np.diff(medians) > 0)),
-                    "n_constant_states": n_constant, "n_dropped_resamples": int(n_dropped)}
+                    "n_constant_states": n_constant, "n_failed_resamples": int(boot.n_failed),
+                    "n_dropped_resamples": int(boot.n_failed)}
     noise_verdict, noise_reason = criterion_verdict(est, lo, hi, (0.0, np.inf), (False, True),
                                                     n_states=len(rho_corr))
     res["noise"].update(_decision(noise_verdict, noise_reason))

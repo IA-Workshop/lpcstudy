@@ -2929,6 +2929,7 @@ def test_per_state_spearman_counted_reports_the_constant_states_and_h2b_carries_
     noise_cells = {float(r): _stub_cell(table[:, j]) for j, r in enumerate(levels)}
     out = h2b_knob_response(noise_cells, _library_cells(TABLE), CONFIG)["noise"]
     assert out["n_constant_states"] == 3 and out["n_dropped_resamples"] == 0
+    assert out["n_failed_resamples"] == 0  # WU-0002.9b: the A3 count, the alias above equals it
     assert out["mean_state_spearman"] == pytest.approx(np.mean(reference), abs=1e-12, rel=0)
 
 
@@ -2963,3 +2964,136 @@ def test_h3a_counts_empty_regimes_and_degenerate_pairs() -> None:
     clean = h3a_logrank(regime3, durations3, np.ones(len(durations3), dtype=bool),
                         np.array([14.0, 2.0, 5.0]), target3, 30, 3)
     assert clean["n_empty_regimes"] == 0 and clean["n_degenerate_pairs"] == 0
+
+
+def _old_boot(config: StudyConfig, stat, n_items: int, level: float = 0.95, salt: int = 0):
+    """Verbatim body of ``analysis._boot`` before WU-0002.9b (the independent reference)."""
+    from lpcstudy.statistics import block_bootstrap_dropped
+    return block_bootstrap_dropped(stat, n_items, config.bootstrap_resamples,
+                                   config.bootstrap_block, config.seed + salt, level)
+
+
+def _inject_first_call(monkeypatch: pytest.MonkeyPatch, failing: set[int], value: float) -> None:
+    """Make the statistic of the FIRST ``analysis.block_bootstrap_counted`` call return ``value``
+    on the calls numbered ``failing`` (0-based; calls 0..B-1 are the resamples, call B is the
+    point estimate, in the order of ``bootstrap_values``). Later calls (part ii) are untouched."""
+    from lpcstudy import analysis
+    real = analysis.block_bootstrap_counted
+    seen = {"calls": 0}
+
+    def wrapper(statistic, *args, **kwargs):
+        seen["calls"] += 1
+        if seen["calls"] > 1:
+            return real(statistic, *args, **kwargs)
+        count = {"n": 0}
+
+        def faulty(idx):
+            k = count["n"]
+            count["n"] += 1
+            return value if k in failing else statistic(idx)
+        return real(faulty, *args, **kwargs)
+
+    monkeypatch.setattr(analysis, "block_bootstrap_counted", wrapper)
+
+
+def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails() -> None:
+    """WU-0002.9b (1): with all-finite resamples the new H2b(i) interval equals the old one bitwise.
+
+    Reference: a verbatim copy of the old ``_boot`` body (``block_bootstrap_dropped`` at seed
+    ``config.seed + 3``, ``PRIMARY_LEVEL``), and a hand loop (``block_resample_indices`` then
+    ``np.nanquantile``). Both use the per-state correlations of the unchanged
+    ``_per_state_spearman_counted`` (the changed part is only the bootstrap path). Tolerance: none,
+    exact; with no failed resample the percentile computation is the same ``np.quantile``
+    (``block_bootstrap_counted`` is documented bitwise equal to ``block_bootstrap``). The failure
+    count and its alias ``n_dropped_resamples`` are 0.
+    """
+    from lpcstudy.analysis import PRIMARY_LEVEL, _per_state_spearman_counted, h2b_knob_response
+    from lpcstudy.statistics import block_resample_indices
+
+    levels = np.array([0.01, 0.02, 0.04])
+    weights = np.random.default_rng(90201).uniform(0.0, 1.0, (60, 3))
+    weights[:, 1] += 0.15 * np.random.default_rng(90202).uniform(size=60)  # a clear but noisy rise
+    corr, _ = _per_state_spearman_counted(levels, weights)
+    stat = lambda idx: float(np.mean(corr[idx]))
+    est, lo, hi, n_dropped = _old_boot(CONFIG, stat, len(corr), PRIMARY_LEVEL, salt=3)
+    assert n_dropped == 0 and lo < est < hi  # premise: a non-degenerate interval
+
+    values = np.array([stat(idx) for idx in block_resample_indices(
+        len(corr), CONFIG.bootstrap_resamples, CONFIG.bootstrap_block, CONFIG.seed + 3)])
+    alpha = (1.0 - PRIMARY_LEVEL) / 2.0
+    assert (lo, hi) == (float(np.nanquantile(values, alpha)),
+                        float(np.nanquantile(values, 1.0 - alpha)))  # reference is self-consistent
+
+    cells = {float(r): _stub_cell(weights[:, j]) for j, r in enumerate(levels)}
+    out = h2b_knob_response(cells, _library_cells(TABLE), CONFIG)["noise"]
+    assert out["mean_state_spearman"] == est and out["ci"] == [lo, hi]
+    assert out["n_failed_resamples"] == 0 and out["n_dropped_resamples"] == 0
+    assert type(out["n_failed_resamples"]) is int
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_inconclusive(
+        monkeypatch: pytest.MonkeyPatch, bad: float) -> None:
+    """WU-0002.9b (2): a non-finite resample is counted, widens the interval, and at the tail
+    threshold turns the verdict inconclusive (DEC-0008 A3, DEC-0012).
+
+    Reference: the threshold ``floor((B - 1) a) + 1`` with ``a = (1 - level)/2`` is formed in the
+    test (B = 200, level ``1 - 0.05/3``: a = 0.008333, threshold 2). Part A, ``F = threshold - 1``
+    failures injected into random-looking data: the bounds equal ``np.quantile`` of the hand-built
+    resample values with the failed ones set to -inf (lower) and +inf (upper), the definition of
+    the unfavourable tail (no quantile index reaches the failure, so both stay finite and exact);
+    ``n_failed_resamples == F``; the alias ``n_dropped_resamples`` carries the same value. Part B,
+    states that all rise (Spearman +1, every resample mean exactly 1, interval [1, 1]): with
+    ``F = threshold - 1`` the verdict is still a pass, with ``F = threshold`` both bounds are
+    infinite and the verdict is inconclusive with the reason of ``criterion_verdict`` (the old code
+    dropped the failures and passed). Exact comparisons: the injected values are in the
+    resamples, not in a computation.
+    """
+    from lpcstudy.analysis import PRIMARY_LEVEL, _per_state_spearman_counted, h2b_knob_response
+    from lpcstudy.statistics import block_resample_indices
+
+    n_res = CONFIG.bootstrap_resamples
+    alpha = (1.0 - PRIMARY_LEVEL) / 2.0
+    threshold = int(np.floor((n_res - 1) * alpha)) + 1
+    assert threshold == 2  # premise of the cases below
+
+    # Part A: F = threshold - 1 = 1 failure, in a resample that is not the point estimate.
+    levels = np.array([0.01, 0.02, 0.04])
+    weights = np.random.default_rng(90203).uniform(0.0, 1.0, (60, 3))
+    corr, _ = _per_state_spearman_counted(levels, weights)
+    values = np.array([float(np.mean(corr[idx])) for idx in block_resample_indices(
+        len(corr), n_res, CONFIG.bootstrap_block, CONFIG.seed + 3)])
+    failing = {7}
+    mask = np.zeros(n_res, dtype=bool)
+    mask[list(failing)] = True
+    expected_lo = float(np.quantile(np.where(mask, -np.inf, values), alpha))
+    expected_hi = float(np.quantile(np.where(mask, np.inf, values), 1.0 - alpha))
+    assert np.isfinite(expected_lo) and np.isfinite(expected_hi)
+    _inject_first_call(monkeypatch, failing, bad)
+    cells = {float(r): _stub_cell(weights[:, j]) for j, r in enumerate(levels)}
+    out = h2b_knob_response(cells, _library_cells(TABLE), CONFIG)["noise"]
+    assert out["n_failed_resamples"] == len(failing) == threshold - 1
+    assert out["n_dropped_resamples"] == out["n_failed_resamples"]
+    assert out["ci"] == [expected_lo, expected_hi]
+    assert out["mean_state_spearman"] == float(np.mean(corr))  # the point call was not injected
+    monkeypatch.undo()
+
+    # Part B: all states rise, so every healthy resample mean is exactly 1.
+    n = 60
+    base = np.full(n, 0.5)
+    rising = {0.01: _stub_cell(base), 0.02: _stub_cell(base + 0.125)}
+    for count, verdict in ((threshold - 1, "pass"), (threshold, "inconclusive")):
+        _inject_first_call(monkeypatch, set(range(count)), bad)
+        result = h2b_knob_response(rising, _library_cells(np.tile(TABLE, (10, 1))), CONFIG)
+        monkeypatch.undo()
+        noise = result["noise"]
+        assert noise["n_failed_resamples"] == count and noise["n_dropped_resamples"] == count
+        assert noise["verdict"] == verdict
+        if count < threshold:
+            assert noise["ci"] == [1.0, 1.0] and noise["reason"] is None and noise["pass"]
+            assert result["verdict"] == "pass"
+        else:
+            assert noise["ci"] == [-np.inf, np.inf]
+            assert noise["reason"] == "failed resamples >= threshold" and not noise["pass"]
+            assert result["verdict"] == "inconclusive" and result["pass"] is False
+            assert result["reason"].startswith("noise: ")
