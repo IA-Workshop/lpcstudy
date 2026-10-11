@@ -853,6 +853,115 @@ Scope: a8bdf0b (.2a) and df40a3b (.1/.2b, R8), against the plan, the design M1 t
 - **R16:** fixed in the same commit (`LM_NOT_READ`; F1's k from the configuration).
 - The first-round filename elision and `test_identifiers.py` are left as instructed.
 
+### 2026-10-11, reviewer claude-opus-5-5 (fresh context): WU-0008.2a and .1/.2b, re-review (fix round 1)
+
+**Scope.** Findings R9 to R16 only, at fix commit 309926c (parent 4c5e337), checked against the code and the source documents, not against the developer's answers.
+- **Sources read.** The WU-0006 math note and `m2_coverage.log` / `m2_coverage.py`, the WU-0006 Log (line 341), `tests/slow/wu0006_harness.py`, DEF-0020 and DEC-0024 in `decisions.md` / `defects.md`, and the writers in `analysis.py` and `experiments.py`.
+- **No test was run.** The tree is clean, and HEAD = 309926c is the code of run 11 (`365 passed`), so a rerun would break the once-rule. The only pytest call was collection of one file (`--collect-only -q -m slow tests/slow/test_analysis_coverage.py`: 46 collected, no test executed).
+- **Neutrality holds.** `git diff a8bdf0b HEAD -- lpcstudy/statistics.py lpcstudy/analysis.py` is empty. 309926c changes only `budget.py` (report text), tests and this file, so no `results.json` leaf can move and the .2a bitwise neutrality verified in round 1 stands.
+- **No test was loosened.** Every removed assertion line in 309926c (6 in `test_budget.py`, 2 docstring lines in `test_analysis.py`) is replaced by a stricter or re-specified one:
+  - `LM_ABSENT` becomes `LM_NOT_READ`, per R16;
+  - "V4 absent" becomes the exact "V4 present but used_M missing";
+  - the C4h literals are now parsed;
+  - the seed text follows R9;
+  - the A2 docstring is narrowed and an H2e assertion is added.
+- **Commit.** 309926c names the unit and ends with `Agent: claude-sonnet-5-5`.
+
+**Status of R9 to R16.**
+- **R9: resolved.**
+  - `r_ref` equals the `R=` of `m2_coverage.log` for all 12 entries: C1, C4, C8 R=40000; C3, C7 R=20000; `C4_sigma1.5c0.8` and `C4_sigma2.0c0.8` R=20000.
+  - `m2_coverage.py:78` uses seed 20261011, and `m7b.log` only transcribes it.
+  - The run-2 seed string matches `wu0006_harness.py` (`WU0006_SEED = 6006`, `make_rng(6006, "wu0006", ...)`).
+  - R_ref is printed per case. The test's evidence is a hand transcription (R21).
+- **R10: resolved in the code.**
+  - The five Included cells are per QoI, H3c reads "no: …", and the row-1 How text no longer says the variance propagates.
+  - A grep of `lpcstudy/` for "every primary", "inside every" and "propagat…" in the budget finds nothing.
+  - `H2A_ONE_NOTE` is true: `add_one = 20 * n_one > n_states` is computed once outside `stat` (`analysis.py:1206`).
+  - Open: the wording has no record (R17), and the replacement How text points to the wrong column (R18).
+- **R11: resolved.**
+  - `interval_label` appends `ITERATIVE_LABEL` exactly for `PRIMARY_KEYS` (`budget.py:169`).
+  - The label test asserts the ending for every `role == "primary"` row and its absence on every other row, so a primary key missing from `PRIMARY_KEYS` would fail it.
+  - The verdict-table lines (`interval_label_lines`) use the same function. The hard-coded "15" is R19.
+- **R12: resolved.** Each reason was checked against the writer paths.
+  - (a) `_unavailable` writes `"ci": None` (`analysis.py:1405`), and `_bootstrap_cell` now tests that first. `json.dumps(..., allow_nan=True)` (`report.py:791`) round-trips ±inf, so no writer stores `None` inside a `ci` list.
+  - (b) and (c) `experiments.py:113–119` always writes `used_M` and numeric entries. At smoke, `convergence_draws = (10, 30)` and M = 30, so "no larger M than the one used (M = 30)" is the true reason there. The F2 branch order gives a distinct, true reason for each cause.
+  - (d) The rho-cell count `len(config.noise_levels)` equals the number of H2b(i) cells whenever `core_noise ∈ noise_levels` (`experiments.py:444–447`). That holds in every preset. It would be off by one only for a configuration without the core level. Observation, not a finding.
+  - (e) `oracle_recovery` returns NaN only when A2 − oracle ≤ 0 (`analysis.py:2127`), so "not computable (A2 ≤ A*)" is true. "not available" applies only to an absent key.
+  - The F1 k uses the same rule as `analysis.py:1267` (h ≥ 1 LT).
+- **R13: resolved.**
+  - `DEF0020_TEXT` agrees with the DEF-0020 Resolution (`defects.md:177`).
+  - Its claim "K in force by default via ASSERT_ROADMAP_BOUNDS = True" is true (`tests/slow/wu0006_harness.py:92`).
+  - `WIDENING_SENTENCE` cites only the uq-budget rule (`SKILL.md:24`: "say so and widen the interval or refine").
+- **R14: resolved.**
+  - (a) The C4h counts are parsed from the single source sentence (WU-0006 Log line 341: "C4h sigma 1.5: 927 / 965 …; sigma 2: 939 / 984").
+  - (b) H2e is asserted, and the docstring now says H2c is not exercised.
+  - (c) The E3 docstring states what F = 12 checks.
+- **R15: resolved, with a defect in the correction (R20).**
+  - The two corrections are appended. The diff of this file is 34 insertions and 0 deletions, so no earlier text was rewritten.
+  - The C1 claim is dropped from the `QOI_COVERAGE` docstring.
+- **R16: resolved.**
+  - `LM_NOT_READ` is returned before any lookup while the path is None. The test covers a summary present with the path unset.
+  - F1's k comes from `eval_horizons_lyapunov`, and k ∉ {2, 3} gives "F1 not computable: …". The test reference is `scipy.stats.norm.ppf`, compared at 3 significant digits on a `.3g` print.
+  - Residual: the parenthetical "until WU-0005.4 merges" still assumes the one-line re-point lands with that merge. Recommendation: the main session puts the re-point on WU-0005.4's merge checklist.
+
+**New findings.**
+
+- **R17 (required before merge; records and evidence). The applied-mathematician's fix-round-1 wording is recorded nowhere.**
+  - The wording covers: the five `ORACLE_INCLUDED` cells (`budget.py:497–507`), `DEF0020_TEXT`, `WIDENING_SENTENCE`, and R_ref per case.
+  - A grep of `docs/` (worktree and main checkout) finds none of it. This Log has no applied-mathematician entry after M1 to M9.
+  - M1 decision (a) at line 204 still reads "inside every primary interval", with no appended amendment. DEC-0024 accepted M1 as written.
+  - Why it matters:
+    - The amendment to an accepted design is untraceable (PRIME.5, VV.3).
+    - The developer's "verbatim" cannot be audited.
+    - The R10 test's stated reference is "the wording supplied in fix round 1, written out here" (`tests/unit/test_budget.py:789`). Without a recorded source, that test only compares the code with a copy of itself (LPC.PC.21).
+  - Fix (records only, no code):
+    - The applied-mathematician, or the main session quoting them with attribution, appends a Log entry "M1 (a) and M7 amendment, fix round 1". It gives the exact texts and R_ref per case, with the `m2_coverage.log` lines as source.
+    - The main session appends a dated line under DEC-0024 saying M1 (a) is amended: the variance is inside the H2a and H2b intervals, not inside H3c's.
+    - The R10 test docstring cites that entry.
+
+- **R18 (minor; statement truth, introduced by the R10 fix). The How text of row 1 points to the wrong column** (`budget.py:870–872`).
+  - It says "whether the M-draw variance is inside the interval is in the next column".
+  - The column after "How estimated" is "Size: <system>". The Included column follows all the Size columns (`budget.py:908–909`).
+  - Fix: "… is in the column 'Included in the reported interval?'". Assert that substring.
+
+- **R19 (minor). `ITERATIVE_LABEL` hard-codes "15-iteration"** (`budget.py:104–105`).
+  - The count is `config.estimator_refine_steps` (`config.py:141`, used at `pipeline.py:175`). Every other element of `interval_label` is read from `config`, and `test_every_label_has_the_four_elements_and_reads_its_config` exists for exactly that.
+  - The label is true for every preset today, since none overrides it. It becomes false under the 15 → 30 refinement study that DEC-0024 point 1 proposes. This is the same pattern as round 1's F1 k.
+  - Fix: build the clause from `config.estimator_refine_steps`, and assert it with a replaced config.
+
+- **R20 (minor; records). R15 correction (3) corrects a statement that does not exist** (Log line 536).
+  - It says "The `.2a` entry's 'no `used_M`' has the same origin as (1)."
+  - The .2a entry (lines 492–512) does not mention `used_M`. The only such statement is the run-9 paragraph (line 532), which correction (1) already covers.
+  - Fix: append one line saying correction (3) is void (append-only; do not edit it).
+
+- **R21 (minor; evidence). The r_ref test is a hand transcription, but its source is machine-readable** (`tests/unit/test_budget.py:749–754`).
+  - The docstring says the note gives only a generic range, "so this is a transcription, not a parse".
+  - The per-case R is in `docs/agent/notes/2026-10-11-math-wu0006-scripts/m2_coverage.log` (e.g. "C4 phi=0 R=40000", "C4_sigma2.0c0.8 phi=0 R=20000"). That is the run that produced the rates.
+  - I checked all 12 values against it by hand: they are correct.
+  - Fix: parse `R=` per (case, phi) from that log in B4, mapping C4h1.5/C4h2 to `C4_sigma{1.5,2.0}c0.8`. Alternatively, keep the transcription and correct the docstring to name the log.
+
+**Evidence still required before merge** (unchanged from round 1; run each once, when `pgrep -fa "lpcstudy --preset"` is empty):
+1. **A1 smoke at the head.**
+   - Commands: `LPC_THREADS=4 tools/run_preset.sh smoke DEV-0 runs/new`, then `leafcmp` against `runs/base/smoke`.
+   - Expected: 0 pre-existing leaves different (`provenance`, `seconds` and `handling` excluded), and 0 base-only leaves.
+   - The new-only leaves must be exactly the `ci_mc_se/{0,1}` of the five primary sites, per system, all `null` at smoke (B = 50, rule 3).
+   - Also record the report-only rendering, with "B = 50 too small for the binomial window".
+2. **The integration pair:** `LPC_THREADS=4 tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`.
+3. **The slow exact checks (DEC-0021 O6):** `tools/run_tests.sh slow --background` on the six node IDs below.
+   - IDs: `tests/slow/test_analysis_coverage.py::test_exact_checks[C4-0.0]`, `[C4-0.3]`, `[C7-0.0]`, `[C7-0.3]`, `[C8-0.0]`, `[C8-0.3]`.
+   - All six exist: collection lists them among 46 items.
+   - `run_tests.sh` accepts `slow … --background` (usage line 4).
+4. **The unit radius once** after the R17 to R21 fixes, if any code or test changes.
+
+**Owner checkpoint.** Unchanged from round 1. `endpoint_mc_error`, the three primary call paths and the budget statements (coverage flags, F1 on Chua H2a(i), and now the H3c "no" in the Included column) need **owner review before freeze**. 309926c touches no statistics, seed, provenance or dependency code.
+
+**Verdict: approve with fixes.**
+- R9 to R16 are resolved.
+- R17 is required before merge (records only).
+- R18 to R21 are minor.
+- The merge waits for the evidence above.
+- 5 new findings (R17 to R21).
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
