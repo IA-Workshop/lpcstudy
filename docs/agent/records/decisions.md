@@ -354,3 +354,9 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 4. **Item 4 (the platform record)**: add a digest of the whitening matrices W and U to `context` and record the CPU model and the BLAS kernel in the provenance block, as a unit (WU-0001.6) with planner, mathematician, developer and independent review; marked "needs owner review before freeze" (provenance code).
 
 **Affects:** WU-0002.12, WU-0004.3, WU-0001.6 (new), WU-0003.4, WU-0016.3. **Status:** owner instruction; recorded pending the owner's ledger entry.
+
+## DEC-0023: WU-0001.6 (platform record): defaults for the planner's questions O1 to O3  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision (defaults).** **O1:** the provenance schema is bumped to `lpcstudy.provenance/2` (the top-level key set changes; only `test_provenance.py` pins the string; a `/2` block distinguishes a never-recorded platform, as in the a5cd75b pilot, from a failed probe). **O2:** the unit keeps the name WU-0001.6 given in DEC-0022; ROADMAP section 2 already uses WU-0001.6 for the WU-0001 review sub-task (done), so the owner appends a ROADMAP line naming this unit WU-0001.6b or renumbers (amendments note). **O3:** the local v1 re-run has no provenance block (v1 code), so the main session appends this host's probe output (CPU model, BLAS kernels, package versions) to the manifest's dated line for the new baseline. **F1** (once both sides of a comparison carry digests, DEC-0019's literal 'any context difference means branch D' would send a digest difference to D) needs an owner ruling before such a comparison exists (WU-0003.4, a cross-host regeneration).
+
+**Affects:** WU-0001.6a/b. Marked "needs owner review before freeze" (provenance code). **Status:** proposed.
