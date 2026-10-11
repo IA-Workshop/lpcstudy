@@ -284,3 +284,5 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0002.11 (.11a to .11d), WU-0002.9 hand-off, WU-0005.4, DEF-0012. Marked "needs owner review before freeze".
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+- 2026-10-11 (claude-sonnet-5-5, main session; DEC-0017 still **proposed**): status of the clip-sensitivity flag of DEC-0017 Q6, from the WU-0002.11b review R5. The flag (3s against one tenth of the interval half-width, s the clipped share of the pooled second moment) is **deferred out of WU-0002.11b**: the share s and the scale per verdict (H2c, H2d, H3c, A2, A5) are undefined and it would add result leaves. Follow-up unit WU-0002.11e: the applied-mathematician defines s and the scale per verdict; the owner then rules whether nonzero should-be-zero counters and a collapsed nu cap mark results provisional. Listed as an open owner question (Q6).
