@@ -130,8 +130,8 @@ def test_header_has_the_platform_line_under_the_label_a8() -> None:
     Reference: the exact string fixed by the plan, for a hand-built block (not the live probe):
     ``Platform: CPU <model> · BLAS <library> <corename>, ...``. The per-key table is unchanged:
     it still has a row for every key (including ``cpu`` and ``blas``) except ``config``. A
-    library whose probe failed (corename ``None``) prints ``unknown``; no libraries print
-    ``BLAS none recorded``. Exact.
+    library whose probe failed prints ``unknown (<error>)`` (R1); a failed BLAS probe prints
+    ``BLAS probe failed (<error>)`` and a working probe with no library ``BLAS none mapped``. Exact.
     """
     results, _ = fake_results("DEV-0")
     block = dict(results["provenance"])
@@ -143,7 +143,7 @@ def test_header_has_the_platform_line_under_the_label_a8() -> None:
         "error": None}
     lines = header_lines(block)
     assert lines[2] == ("Platform: CPU Test CPU @ 1GHz · BLAS numpy.libs/libx.so Haswell, "
-                        "scipy.libs/liby.so unknown")
+                        "scipy.libs/liby.so unknown (E: x)")
     assert lines[1] == "" and lines[3] == "" and lines[4] == "| Provenance | Value |"
     rows = [ln for ln in lines if ln.startswith("| ") and not ln.startswith("| Provenance")]
     assert [ln.split(" | ")[0][2:] for ln in rows] == [k for k in block if k != "config"]
