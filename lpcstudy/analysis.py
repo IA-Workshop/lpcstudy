@@ -19,12 +19,13 @@ from sklearn.tree import DecisionTreeRegressor
 
 from .allocation import deployable_profile
 from .config import StudyConfig
-from .data import sklearn_seed
+from .data import make_rng, sklearn_seed
 from .identifiers import check_keys
 from .oracle import characteristic_horizon, curvature, hybrid_mse, oracle_weight
 from .pipeline import Cell, FittedRules, RuleScores
-from .statistics import block_bootstrap, holm_adjust, kaplan_meier, logrank_test, \
-    ols_slope, partial_correlation, spearman
+from .statistics import block_bootstrap, bootstrap_values, combine_verdicts, criterion_verdict, \
+    holm_adjust, kaplan_meier, logrank_test, ols_slope, partial_correlation, percentile_interval, \
+    spearman
 
 PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
 PROFILE_NAMES = ("log_eps_tilde", "log_nu_tilde", "lambda_tilde", "log_noise_sens")
@@ -411,8 +412,247 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> 
 
 
 # ------------------------------------------------------------------------ RQ2
+H2A_RANGE_BAND = (-np.inf, 0.1)
+"""H2a(i): the interval of the median range must lie below 0.1 (upper edge open, A1)."""
+H2A_PARTIAL_BAND = (-0.1, 0.1)
+"""H2a(ii): each interval must lie inside the open band (DEC-0008 A1)."""
+
+
+def quadratic_controls(seeds: np.ndarray) -> np.ndarray:
+    """Quadratic controls ``[x1, x2, x1^2, x2^2, x1 x2]`` of the log seed ratios (DEC-0008 A4(a2)).
+
+    ``x = (ln(eps_s / rho), ln(delta / rho))`` is centred on the mean of the rows given. Centring
+    leaves the span of ``[1, Q]`` unchanged (polynomials of degree 2 are closed under
+    translation), so a partial correlation does not depend on the centring; it only conditions
+    the least-squares design. The intercept is added by ``partial_correlation``.
+
+    Parameters
+    ----------
+    seeds : np.ndarray
+        ``(n, 2)`` array of ``ln(eps_s / rho)`` and ``ln(delta / rho)``.
+
+    Returns
+    -------
+    np.ndarray
+        ``(n, 5)`` array of controls.
+
+    Raises
+    ------
+    ValueError
+        If ``seeds`` is not ``(n, 2)`` with finite entries.
+    """
+    x = np.asarray(seeds, dtype=float)
+    if x.ndim != 2 or x.shape[1] != 2 or not np.all(np.isfinite(x)):
+        raise ValueError(f"seeds must be a finite (n, 2) array; got shape {x.shape}")
+    x = x - x.mean(axis=0)
+    return np.column_stack([x[:, 0], x[:, 1], x[:, 0] ** 2, x[:, 1] ** 2, x[:, 0] * x[:, 1]])
+
+
+def _partial_corr(target: np.ndarray, variable: np.ndarray, controls: np.ndarray) -> float:
+    """Partial correlation, NaN when it is not defined (counted as a failed resample).
+
+    A target or variable that is constant on the rows given (an indicator with one class in a
+    resample), or too few rows for the least-squares fit, give NaN. The caller's bootstrap
+    counts a non-finite value as failed (DEC-0008 A3); nothing is replaced here.
+    """
+    if target.size <= controls.shape[1] + 2 or np.ptp(target) == 0.0 or np.ptp(variable) == 0.0:
+        return float("nan")
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return partial_correlation(target, variable, controls)
+
+
+def _interval_block(values: np.ndarray, level: float) -> tuple[list[float], int]:
+    """``[lower, upper]`` and the failed count of one column of bootstrap values."""
+    lo, hi, n_failed = percentile_interval(values, level)
+    return [lo, hi], n_failed
+
+
+def h2a_initial_segments(w_cols: np.ndarray, small: np.ndarray, horizon_labels: list[str], *,
+                         n_resamples: int, block: int, seed: int | np.random.Generator,
+                         level: float = PRIMARY_LEVEL) -> dict:
+    """H2a(i): median range of ``w*`` over initial segments of the horizons (DEC-0008 A4(b)).
+
+    ``L`` is the number of leading horizons at which both r.m.s. errors are small. A state is
+    eligible iff ``L >= 2``; its range (max minus min of ``w*``) is taken over the first ``L``
+    horizons. The statistic is the median of the ranges of the eligible states. The block
+    bootstrap runs over all states in time order and re-evaluates eligibility in each resample,
+    at level ``level``. The complete-case version (``L`` equal to all horizons) is reported as a
+    sensitivity, with its interval from the same resamples and no verdict. Non-finite resamples
+    (an empty eligible set) are failed and counted (A3). The verdict is
+    ``criterion_verdict`` for the band ``(-inf, 0.1)`` (upper edge open): pass iff the upper
+    bound is below 0.1, fail iff the lower bound is at least 0.1, and inconclusive with fewer
+    than 50 eligible states.
+
+    Parameters
+    ----------
+    w_cols : np.ndarray
+        ``(n, k)`` weights ``w*`` at the ``k`` horizons of at least 1 LT, in time order.
+    small : np.ndarray
+        ``(n, k)`` bool, both r.m.s. errors at most ``linear_regime_rms``.
+    horizon_labels : list[str]
+        Labels of the ``k`` horizons (LT) for the span keys, for example ``["1", "2", "4"]``.
+    n_resamples, block : int
+        Bootstrap resamples and block length.
+    seed : int or np.random.Generator
+        Randomness of the resample indices.
+    level : float, optional
+        Confidence level (``1 - 0.05/3``).
+
+    Returns
+    -------
+    dict
+        ``median_range``, ``range_ci``, ``range_n_failed_resamples``, ``n_eligible_states``,
+        ``n_excluded_states``, ``n_noncontiguous_states`` (states the earlier rule "at least two
+        small horizons" admitted whose small horizons are not an initial segment),
+        ``range_by_span`` (median and count of the states with ``L`` equal to each span),
+        ``complete_case`` and ``part_i_verdict`` with ``part_i_reason``.
+    """
+    w_arr = np.asarray(w_cols, dtype=float)
+    ok = np.asarray(small, dtype=bool)
+    n_states, n_cols = w_arr.shape
+    if ok.shape != w_arr.shape or len(horizon_labels) != n_cols or n_cols < 2:
+        raise ValueError("w_cols and small must share a shape (n, k) with k >= 2 "
+                         "and one label per horizon")
+    if not np.all(np.isfinite(w_arr)):
+        raise ValueError("w_cols holds non-finite weights")
+    leading = np.cumprod(ok, axis=1).astype(bool)
+    length = leading.sum(axis=1)
+    eligible = length >= 2
+    complete = length == n_cols
+    high = np.where(leading, w_arr, -np.inf).max(axis=1)
+    low = np.where(leading, w_arr, np.inf).min(axis=1)
+    spread = np.where(eligible, high - low, np.nan)
+
+    def median_of(rows: np.ndarray) -> float:
+        return float(np.median(spread[rows])) if rows.size else float("nan")
+
+    def stat(idx: np.ndarray) -> np.ndarray:
+        return np.array([median_of(idx[eligible[idx]]), median_of(idx[complete[idx]])])
+
+    point, values = bootstrap_values(stat, n_states, n_resamples, block, seed)
+    interval, n_failed = _interval_block(values[:, 0], level)
+    interval_cc, n_failed_cc = _interval_block(values[:, 1], level)
+    n_eligible = int(eligible.sum())
+    verdict, reason = criterion_verdict(float(point[0]), interval[0], interval[1],
+                                        H2A_RANGE_BAND, (True, False), n_states=n_eligible)
+    by_span = {}
+    for span in range(2, n_cols + 1):
+        rows = np.flatnonzero(length == span)
+        by_span["-".join(horizon_labels[:span])] = {"median": median_of(rows),
+                                                    "n_states": int(rows.size)}
+    admitted_before = ok.sum(axis=1) >= 2
+    return {"median_range": float(point[0]), "range_ci": interval,
+            "range_n_failed_resamples": n_failed, "n_eligible_states": n_eligible,
+            "n_excluded_states": int(n_states - n_eligible),
+            "n_noncontiguous_states": int((admitted_before & (ok.sum(axis=1) != length)).sum()),
+            "range_by_span": by_span,
+            "complete_case": {"median_range": float(point[1]), "range_ci": interval_cc,
+                              "n_failed_resamples": n_failed_cc,
+                              "n_states": int(complete.sum())},
+            "part_i_verdict": verdict, "part_i_reason": reason}
+
+
+def h2a_part_ii(w_ref: np.ndarray, growth_scaled: np.ndarray, seeds: np.ndarray, *,
+                n_resamples: int, block: int, seed: int | np.random.Generator,
+                level: float = PRIMARY_LEVEL) -> dict:
+    """H2a(ii), two parts with quadratic seed controls (DEC-0008 A4(a), A4(a2), A1, A3).
+
+    ``w*`` is the oracle weight at ``H_ref`` in ``[0, 1]`` (no clip constant). With
+    ``Q(x) = [x1, x2, x1^2, x2^2, x1 x2]`` and ``x = (ln(eps_s/rho), ln(delta/rho))``:
+
+    * (ii-a) the partial correlation of ``1{w* = 0}`` with ``Lambda_tilde`` given ``Q``, over all
+      states;
+    * (ii-b) the same for ``logit w*`` over the states with ``0 < w* < 1``;
+    * (ii-c) the same for ``1{w* = 1}`` over all states, added only if ``w* = 1`` holds in
+      strictly more than 5% of the states (decided once, on the full sample).
+
+    All parts use level ``level`` and the same resample index sets; the domain filter is applied
+    inside each resample over all states in time order, and the least-squares fit is redone in
+    each resample. A non-finite value in a resample (a constant indicator, too few rows) is a
+    failed resample and is counted (A3). Each part gets ``criterion_verdict`` against the open
+    band ``(-0.1, 0.1)``: inconclusive if its full-sample domain has fewer than 50 states or its
+    estimate is not computable. (ii) passes iff every part passes and fails iff any part fails.
+    The false-fail probability under the null at the band edge is at most ``k * alpha / 2`` with
+    ``alpha = 0.05/3`` and ``k`` the number of parts (the near edge only; union bound).
+
+    Parameters
+    ----------
+    w_ref : np.ndarray
+        Oracle weights ``w*(H_ref)``, ``(n,)``, in ``[0, 1]``, in time order.
+    growth_scaled : np.ndarray
+        ``Lambda_tilde`` per state (growth rate per Lyapunov time), ``(n,)``.
+    seeds : np.ndarray
+        ``(n, 2)`` array of ``ln(eps_s / rho)`` and ``ln(delta / rho)``.
+    n_resamples, block : int
+        Bootstrap resamples and block length.
+    seed : int or np.random.Generator
+        Randomness of the shared resample indices.
+    level : float, optional
+        Confidence level (``1 - 0.05/3``).
+
+    Returns
+    -------
+    dict
+        ``part_ii`` (parts ``zero``, ``interior`` and, if triggered, ``one``, each with
+        ``partial_corr``, ``ci``, ``n_states``, ``n_failed_resamples``, ``verdict``,
+        ``reason``), ``n_w_zero``, ``n_w_one``, ``controls`` and ``part_ii_verdict``.
+
+    Raises
+    ------
+    ValueError
+        If the arrays disagree in length or ``w_ref`` leaves ``[0, 1]`` or is not finite.
+    """
+    weight = np.asarray(w_ref, dtype=float)
+    lam = np.asarray(growth_scaled, dtype=float)
+    n_states = len(weight)
+    if len(lam) != n_states or len(seeds) != n_states:
+        raise ValueError("w_ref, growth_scaled and seeds must have the same length")
+    if not np.all(np.isfinite(weight)) or weight.min() < 0.0 or weight.max() > 1.0:
+        raise ValueError("w_ref must be finite and inside [0, 1]")
+    controls = quadratic_controls(seeds)
+    is_zero, is_one = weight == 0.0, weight == 1.0
+    interior = ~is_zero & ~is_one
+    n_zero, n_one, n_interior = int(is_zero.sum()), int(is_one.sum()), int(interior.sum())
+    add_one = 20 * n_one > n_states  # strictly more than 5% of the states, in integers
+    logit = np.log(np.where(interior, weight, 0.5) / (1.0 - np.where(interior, weight, 0.5)))
+    indicators = {"zero": is_zero.astype(float), "one": is_one.astype(float)}
+    names = ["zero", "interior"] + (["one"] if add_one else [])
+    domain_size = {"zero": n_states, "interior": n_interior, "one": n_states}
+
+    def stat(idx: np.ndarray) -> np.ndarray:
+        out = []
+        for name in names:
+            rows = idx[interior[idx]] if name == "interior" else idx
+            target = logit[rows] if name == "interior" else indicators[name][rows]
+            out.append(_partial_corr(target, lam[rows], controls[rows]))
+        return np.array(out)
+
+    point, values = bootstrap_values(stat, n_states, n_resamples, block, seed)
+    parts, verdicts = {}, []
+    for col, name in enumerate(names):
+        interval, n_failed = _interval_block(values[:, col], level)
+        verdict, reason = criterion_verdict(float(point[col]), interval[0], interval[1],
+                                            H2A_PARTIAL_BAND, (False, False),
+                                            n_states=domain_size[name])
+        parts[name] = {"partial_corr": float(point[col]), "ci": interval,
+                       "n_states": domain_size[name], "n_failed_resamples": n_failed,
+                       "verdict": verdict, "reason": reason}
+        verdicts.append(verdict)
+    return {"part_ii": parts, "n_w_zero": n_zero, "n_w_one": n_one,
+            "controls": "x1, x2, x1^2, x2^2, x1*x2 with x = (ln(eps_s/rho), ln(delta/rho)) "
+                        "centred on the full-sample mean",
+            "part_ii_verdict": combine_verdicts(verdicts)}
+
+
 def h2a_separation(cell: Cell, config: StudyConfig) -> dict:
     """H2a (primary): beyond 1 LT the weight depends on the seed ratio, not on instability.
+
+    Two parts (DEC-0008 A4): (i) the median range of ``w*`` over initial segments of the
+    horizons 1, 2, 4 LT in the small-error regime (``h2a_initial_segments``); (ii) the two-part
+    partial correlation of ``w*(H_ref)`` with ``Lambda_tilde`` given quadratic seed controls
+    (``h2a_part_ii``). Both bootstraps are new: randomness comes from ``make_rng(config.seed,
+    label)`` (DEC-0012), both at level ``1 - 0.05/3``. H2a passes iff both parts pass and fails
+    iff either fails; ``pass`` is ``verdict == "pass"``.
 
     Parameters
     ----------
@@ -424,46 +664,40 @@ def h2a_separation(cell: Cell, config: StudyConfig) -> dict:
     Returns
     -------
     dict
-        Median range of ``w*`` over ``H in {1, 2, 4}`` LT and partial correlation of
-        ``logit w*(H_ref)`` with ``Lambda_tilde`` given the log seed ratios.
+        The keys of ``h2a_initial_segments`` and ``h2a_part_ii``, plus ``verdict``, ``pass``,
+        ``median_range_unrestricted``, ``short_horizon_range_median`` and
+        ``unconditional_spearman_w_lambda`` (on the unclipped ``w*`` in ``[0, 1]``).
     """
     m = cell.splits["test"].moments
     o = cell.oracles["test"]
     lt = config.steps_per_lyapunov
     w_star = oracle_weight(m)
-    cols = [m.at(int(h * lt)) for h in config.eval_horizons_lyapunov if h >= 1.0]
-    # Small-error regime (FW assumption A6): both forecasters' r.m.s. errors below
-    # config.linear_regime_rms; a state needs >= 2 such horizons to have a range.
+    long_horizons = [h for h in config.eval_horizons_lyapunov if h >= 1.0]
+    cols = [m.at(int(h * lt)) for h in long_horizons]
+    # Small-error regime (FW assumption A6): both forecasters' r.m.s. errors at most
+    # config.linear_regime_rms, at the leading horizons.
     small = (np.sqrt(m.sq_cp[:, cols]) <= config.linear_regime_rms) & \
         (np.sqrt(m.sq_plp[:, cols]) <= config.linear_regime_rms)
-    eligible = small.sum(axis=1) >= 2
-    masked = np.where(small, w_star[:, cols], np.nan)
-    ranges = (np.nanmax(masked, axis=1) - np.nanmin(masked, axis=1))[eligible]
-    if ranges.size == 0:
-        ranges = np.array([np.nan])
-    est_r, lo_r, hi_r = _boot(config, lambda idx: float(np.median(ranges[idx])),
-                              len(ranges), PRIMARY_LEVEL, salt=1)
-    unrestricted = np.ptp(w_star[:, cols], axis=1)
-    w_ref = np.clip(w_star[:, m.at(config.reference_horizon)], 0.01, 0.99)
-    logit = np.log(w_ref / (1 - w_ref))
-    controls = np.column_stack([np.log(m.analog_seed / cell.noise),
-                                np.log(m.est_seed / cell.noise)])
+    out = h2a_initial_segments(
+        w_star[:, cols], small, [f"{h:g}" for h in long_horizons],
+        n_resamples=config.bootstrap_resamples, block=config.bootstrap_block,
+        seed=make_rng(config.seed, "h2a-initial-segments"), level=PRIMARY_LEVEL)
+    out["median_range_unrestricted"] = float(np.median(np.ptp(w_star[:, cols], axis=1)))
+    w_ref = w_star[:, m.at(config.reference_horizon)]
+    seeds = np.column_stack([np.log(m.analog_seed / cell.noise),
+                             np.log(m.est_seed / cell.noise)])
     lam = o.growth * lt
-    stat = lambda idx: partial_correlation(logit[idx], lam[idx], controls[idx])
-    est_p, lo_p, hi_p = _boot(config, stat, len(logit), PRIMARY_LEVEL, salt=2)
-    raw = spearman(w_ref, lam)
-    passed = hi_r < 0.1 and max(abs(lo_p), abs(hi_p)) < 0.1
-    return {"median_range": est_r, "range_ci": [lo_r, hi_r],
-            "n_eligible_states": int(eligible.sum()),
-            "median_range_unrestricted": float(np.median(unrestricted)),
-            "partial_corr": est_p, "partial_ci": [lo_p, hi_p],
-            "unconditional_spearman_w_lambda": raw,
-            "short_horizon_range_median": float(np.median(np.ptp(
-                w_star[:, [m.at(int(h * lt)) for h in config.eval_horizons_lyapunov]],
-                axis=1))),
-            "threshold": "upper CI of median range (small-error regime) < 0.1 and "
-                         "|partial r| CI within 0.1",
-            "pass": bool(passed)}
+    out.update(h2a_part_ii(w_ref, lam, seeds, n_resamples=config.bootstrap_resamples,
+                           block=config.bootstrap_block,
+                           seed=make_rng(config.seed, "h2a-two-part"), level=PRIMARY_LEVEL))
+    out["unconditional_spearman_w_lambda"] = spearman(w_ref, lam)
+    out["short_horizon_range_median"] = float(np.median(np.ptp(
+        w_star[:, [m.at(int(h * lt)) for h in config.eval_horizons_lyapunov]], axis=1)))
+    out["verdict"] = combine_verdicts([out["part_i_verdict"], out["part_ii_verdict"]])
+    out["threshold"] = ("(i) upper bound of the median range over initial segments (small-error "
+                        "regime) < 0.1; (ii) each part's interval inside (-0.1, 0.1)")
+    out["pass"] = bool(out["verdict"] == "pass")
+    return out
 
 
 def _per_state_spearman(levels: np.ndarray, values: np.ndarray) -> np.ndarray:

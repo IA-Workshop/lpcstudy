@@ -125,8 +125,15 @@ def _key_number(key: str, res: dict) -> str:
                    f"[{_fmt(d['log_horizon']['ci'][0], 2)}, {_fmt(d['log_horizon']['ci'][1], 2)}]; " \
                    f"oracle: {r['oracle']['verdict']}"
         case "H2a":
-            return f"range {_fmt(r['median_range'])} (CI hi {_fmt(r['range_ci'][1])}); " \
-                   f"partial r {_fmt(r['partial_corr'], 2)}"
+            two = r["part_ii"]
+            return f"(i) {r['part_i_verdict']}: range {_fmt(r['median_range'])} " \
+                   f"(CI hi {_fmt(r['range_ci'][1])}, n={r['n_eligible_states']}); " \
+                   f"(ii) {r['part_ii_verdict']}: partial r zero " \
+                   f"{_fmt(two['zero']['partial_corr'], 2)} " \
+                   f"[{_fmt(two['zero']['ci'][0], 2)}, {_fmt(two['zero']['ci'][1], 2)}], " \
+                   f"interior {_fmt(two['interior']['partial_corr'], 2)} " \
+                   f"[{_fmt(two['interior']['ci'][0], 2)}, {_fmt(two['interior']['ci'][1], 2)}] " \
+                   f"(w*=0: {r['n_w_zero']}, w*=1: {r['n_w_one']})"
         case "H2b":
             lib = "; ".join(f"n_lib@{k}: w*(n_lib max)={_fmt(v['median_at_largest_n_lib'], 2)}"
                             for k, v in r["library"].items())
@@ -284,18 +291,21 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
     if "robustness" in results:
         lines += ["", "## Robustness (core cell)", ""]
         for s, variants in results["robustness"].items():
-            lines += [f"### {s}", "", "| Variant | H2a range | H2a partial r | A4 vs A2 | "
-                      "A4/A3 | A5 regret | H1b CP | H1b PLP |", "|---|---|---|---|---|---|---|---|"]
+            lines += [f"### {s}", "", "| Variant | H2a range | H2a partial r (w*=0) | "
+                      "H2a partial r (interior) | A4 vs A2 | A4/A3 | A5 regret | H1b CP | "
+                      "H1b PLP |", "|---|---|---|---|---|---|---|---|---|"]
             for label, v in variants.items():
                 if "error" in v:
-                    lines.append(f"| {label} | error: {v['error']} | | | | | | |")
-                elif "H2a_partial_corr_fin" in v:
-                    lines.append(f"| {label} | | {_fmt(v['H2a_partial_corr_fin'], 2)} | | | | | "
+                    lines.append(f"| {label} | error: {v['error']} | | | | | | | |")
+                elif "H2a_partial_corr_zero_fin" in v:
+                    lines.append(f"| {label} | | {_fmt(v['H2a_partial_corr_zero_fin'], 2)} | "
+                                 f"{_fmt(v['H2a_partial_corr_interior_fin'], 2)} | | | | | "
                                  f"corr(fin, lin) {_fmt(v['corr_fin_vs_linear'], 2)} |")
                 else:
                     lines.append(
                         f"| {label} | {_fmt(v['H2a_median_range'], 3)} | "
-                        f"{_fmt(v['H2a_partial_corr'], 2)} | "
+                        f"{_fmt(v['H2a_partial_corr_zero'], 2)} | "
+                        f"{_fmt(v['H2a_partial_corr_interior'], 2)} | "
                         f"{_fmt(100 * v['A4_vs_A2_relative'], 3)}% | {_fmt(v['A4_over_A3'], 3)} | "
                         f"{_fmt(100 * v['A5_regret_ratio'], 3)}% | "
                         f"{_fmt(v['H1b']['CP']['slope'], 3)} | {_fmt(v['H1b']['PLP']['slope'], 3)} |")
