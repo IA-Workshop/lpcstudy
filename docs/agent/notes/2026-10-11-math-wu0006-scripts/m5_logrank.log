@@ -1,0 +1,4 @@
+L1 phi=0 R=40000 t=56s FWER=0.0105(se 0.0005) P(pass)=0.0010 mean chi2 of null pair(s)=1.0086(se 0.0051) P(null p<0.01)=0.0109 P(null p<0.005)=0.0056 censored=0.0488 not_computed=0
+L1 phi=0.3 R=40000 t=58s FWER=0.0134(se 0.0006) P(pass)=0.0013 mean chi2 of null pair(s)=1.0792(se 0.0054) P(null p<0.01)=0.0133 P(null p<0.005)=0.0069 censored=0.0489 not_computed=0
+L2 phi=0 R=40000 t=55s FWER=1.0000(se 0.0000) P(pass)=0.0115 mean chi2 of null pair(s)=1.0117(se 0.0073) P(null p<0.01)=0.0115 P(null p<0.005)=0.0061 censored=0.0334 not_computed=0
+L2 phi=0.3 R=40000 t=55s FWER=1.0000(se 0.0000) P(pass)=0.0122 mean chi2 of null pair(s)=1.0462(se 0.0074) P(null p<0.01)=0.0122 P(null p<0.005)=0.0063 censored=0.0334 not_computed=0
