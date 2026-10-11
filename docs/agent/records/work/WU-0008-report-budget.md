@@ -173,6 +173,22 @@ Commit 8decf2a (.4). Report-only checks before run 3 (no run of a pilot-size pre
 
 Result of run 3: the first invocation gave `1 failed, 35 passed in 1.78s`: the new assert failed because the one-line fix to `budget.py` had not been written (the command that held it was blocked by the hook, see above; the test was written first and caught it). Fixed; `--lf` on the failing test: `1 passed`; radius once more: `36 passed in 1.71s`.
 
+Commit b6b406f (the fix).
+
+**Test run 4 (integration pair, once, at the end).** Checklist:
+1. Change set: as above (`budget.py`, `identifiers.py`, `report.py`, tests, fixture).
+2. Radius: integration tier, `test_cli_seeds.py` and `test_preset_wrapper.py` (the `report` change selects `tests/integration`; the smoke pipeline test is replaced by the DEV-0 smoke by hand, as the plan says).
+3. Already run? No: first integration run on this branch.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads and time: `LPC_THREADS=4`; integration timeout 900 s.
+6. Contention: the `v1-baseline` pilot of another worktree was running. **Correction (written after the run):** I had assumed both files only refuse before any study runs; `test_preset_wrapper.py` in fact runs two smoke presets (wrapper and direct, CPU, `LPC_THREADS=4`, bitwise comparison). They ran next to the pilot, against the instruction not to start a smoke while a run shows. No result is affected (CPU, fixed threads, the pilot is another process on another worktree), but the instruction was not followed and the reason is this wrong assumption.
+7. Output: wrapper's `-q --tb=short -rfE`.
+8. Command: `LPC_THREADS=4 tools/run_tests.sh integration tests/integration/test_cli_seeds.py tests/integration/test_preset_wrapper.py`.
+
+Result of run 4: `10 passed in 67.52s (0:01:07)`.
+
+**DEV-0 smoke comparison (A1-style): deferred.** `pgrep -fa 'lpcstudy --preset'` shows the `v1-baseline` pilot (started 20:05 UTC, on its second system at 20:15) after the work above, so the new smoke at the branch head was not started. The base smoke (branch base 7dc4f45, clean tree, DEV-0, `LPC_THREADS=4`) is in `runs/base/smoke` of this worktree. To finish: `LPC_THREADS=4 tools/run_preset.sh smoke DEV-0 runs/new` when no run shows, then `.venv/bin/python <scratchpad>/leafcmp.py runs/base/smoke/results.json runs/new/smoke/results.json` (the script packs every float as IEEE bytes, type-checks ints, strings, bools, None, and prints the counts with and without `provenance` and `seconds`). Evidence so far: the report-only run on the base results at the branch head gives 4393 leaves, 0 different, none only on one side (same script), and `RESULTS.md` differs by additions only.
+
 
 ## Review
 
