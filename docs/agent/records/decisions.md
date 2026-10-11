@@ -196,3 +196,17 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Affects:** WU-0002.7 and .8 only; DEF-0013. Marked "needs owner review before freeze".
 
 **Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0012: Shared bootstrap and verdict helpers: one contract for all WU-0002 lanes; seeding convention for new bootstraps  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the applied-mathematician's contract; for owner confirmation)
+
+**Decision.**
+
+- **One implementation of the DEC-0008 A1/A3 rules.** Three lanes planned overlapping helpers (WU-0002.4/.5, .6, .7/.8). The applied-mathematician's contract (Job 2, last entries of the Log in `docs/agent/records/work/WU-0002.4-5-h1.md`) governs: all helpers live in `lpcstudy/statistics.py`: `block_resample_indices`, `bootstrap_values` (vector statistics allowed), `percentile_interval(values, level) -> (lo, hi, n_failed)`, `BootstrapInterval` / `block_bootstrap_counted`, `interval_verdict(lo, hi, band, closed)`, `combine_verdicts`, `criterion_verdict` (the A3 guard order) and `MIN_STATES = 50`. Failed (non-finite) resamples are placed at -inf for the lower bound and +inf for the upper bound; a bound is infinite iff the number of failures is at least floor((B-1)·a)+1 with a = (1 - level)/2; there is no one-sided `unfavourable` argument (it would be anti-conservative for the opposite verdict). `block_bootstrap` is refactored onto `block_resample_indices` and stays **bitwise unchanged**. Result keys use `reason` and `n_failed_resamples`.
+- **Implementing lane: WU-0002.4/.5**, as one commit group merged to `develop` first; the other lanes (.6, .7/.8) merge `develop` and reuse it, and do not write their own.
+- **Seeding convention.** The existing bootstraps keep their `config.seed + salt` integer seeds unchanged (changing them would change numbers). New bootstraps introduced by WU-0002.4 to .8 take their randomness from `make_rng(config.seed, <label>)` (the project rule "randomness only via `make_rng`"); the helpers accept an integer or a `Generator`; when several parts of one criterion must share resample indices, pass the same integer or a fresh generator built with the same labels per part (a shared `Generator` would advance between calls). Whether to convert the existing integer-salt bootstraps is for the audit under DEF-0011.
+
+**Alternatives weighed.** Each lane with its own helpers: rejected (divergent semantics, three names for one function). Converting all existing salts now: rejected (changes the regression numbers, and the pilot comparison is the anchor).
+
+**Affects:** WU-0002.4 to .8, .9, .11; the shared helper semantics for the verdict logic. Marked "needs owner review before freeze" (statistics and verdict code).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
