@@ -698,6 +698,127 @@ Scope: R1 to R6 and the answer to R7 only, at e066aff (code and tests), 2656b62 
 
 **Verdict: approve.** R1 to R6 are resolved and R7 is accepted. R8 is one minor new finding that does not block the merge of .3 and .4 into the branch line. The branch merge still waits for the A1 smoke at the .2a head, as round 1 required. 1 new finding.
 
+### 2026-10-11, reviewer claude-opus-5-5 (fresh context): WU-0008.2a and .1/.2b (and R8), round 1
+
+Scope: a8bdf0b (.2a) and df40a3b (.1/.2b, R8), against the plan, the design M1 to M9 (28dfbd1) and DEC-0024; DEC-0008, DEC-0012, DEC-0018, DEC-0021 and DEF-0020 read on `develop`; the WU-0006 Log table, the WU-0006 math note, `m7b.log`, and `tests/slow/wu0006_reference.py` on `wu/0006-simstudies` (read-only). **No test was run:** nothing in `lpcstudy/` or `tests/` changed after run 9 (`372 passed`), so a rerun would break the once-rule. Read-only evaluations, single thread: (1) E1's deviations on the grid: −0.334% (95%) and −0.909% (1 − 0.05/3), as M2 says; a helper without the /2 is off by +99%. (2) At B = 2000 and 1 − 0.05/3, F = 12 gives finite values (0.347, 0.347) and F = 13 gives (None, None) with both bounds finite. The thresholds (rule 1 / rule 2) are 50/43 (95%) and 17/13 (98.3%) at B = 2000, and 13/9 and 5/3 at B = 500; rule 3 fires at B = 50 for 98.3% only. (3) `budget_lines` rendered on the stored DEV-0 pilot `results.json` with `PILOT`: F1 = 0.032, 0.0337, 0.0266 and F2 = 0.00856, 0.00472, … agree with M3. (4) Every `COVERAGE_WU0006` value checked by hand against its source: rates and SEs against the note's table and `wu0006_reference.py` (98.3% column), C4h against the note's characterization table (c = 0.8) and `m7b.log`, run-2 counts against the WU-0006 Log table (98.3% column) and the characterization paragraph (C4h 965 and 984), and n against the case table (C8 300, others 500). All equal.
+
+**Checked and correct (no finding).**
+- **`endpoint_mc_error` matches M2.**
+  - d = √(a(1 − a)/B) is the same at both ends, and SE = (Q(q + d) − Q(q − d))/2 uses linear `np.quantile`.
+  - The quantiles are taken on the A3-replaced arrays of `percentile_interval`: finite min for the lower endpoint, finite max for the upper.
+  - Rule 1 uses the same float threshold as `percentile_interval`. Rule 2 is floor((B − 1)(a − d)) + 1. The upper tail gives the same count by symmetry, since failures sit in both tails. Rule 3 is a − d ≤ 0.
+  - With all resamples failed, rule 1 returns before `finite.min()`, so there is no empty-array error (this is the C7 zero column).
+  - It draws no randomness and edits none of `percentile_interval`, `block_bootstrap_counted` or `BootstrapInterval`.
+- **Tests E1 to E3 are real.**
+  - E1's reference is the Bahadur formula through `statistics.NormalDist`.
+  - E2's reference is the SD of the endpoints from `percentile_interval` over 100 bootstraps. It is independent of the helper and uses the DEC-0024 factor 1.4 on the median.
+  - E3 pins both rule-2 boundaries (12 and 13 at 98.3%, 42 and 43 at 95%), rule 1 and rule 3. An off-by-one in either direction, or a missing rule 2, fails it.
+- **Bitwise neutrality, by reading.** `_paired_change`, H2b(i) and `h3c_ratio` now call `bootstrap_values(...)` and then `percentile_interval(values, level)`, which is the body of `block_bootstrap_counted` (statistics.py:386–392):
+  - same statistic closure, n, B, block and seed object (`make_rng(config.seed, *labels)`, `config.seed + 3`, `make_rng(config.seed, "h3c-ratio")`), so the index draws and their order are identical;
+  - `float(point)` in place of `boot.estimate`, and `n_failed` is the same int;
+  - the dropped `ndim` check cannot fire for these scalar statistics, and a vector statistic would still raise, now in `percentile_interval`;
+  - every site has its own generator or integer seed, so no other site's stream moves;
+  - `ci_mc_se` is the only added key: H2b(ii) through `mc_error=True`, while H2e and `library_change_reported` keep the default `False`.
+  - Independent unit references already pin the three sites exactly and passed in run 9: `h3c_ratio` against `block_bootstrap` (test_analysis.py:2054), H2b(ii) and the 0.02 change against `block_bootstrap` (:1541, :1641), and H2b(i) against `_old_boot` (:3001).
+- **`_inject_first_call` is equivalent, not weakened.**
+  - The first `analysis.bootstrap_values` call in `h2b_knob_response` is H2b(i) (analysis.py:1467). Later calls pass through: `_paired_change` and `library_curves` (:1500).
+  - The resample order is unchanged: 0..B−1, then the point.
+  - The diff touches only the helper. Every expected value, threshold and assertion is unchanged. The H3c key-set update adds the specified key and is not a loosening.
+- **The budget against M1 to M9.**
+  - Nine rows in the skill's order, plus row 9. Flags as M9: row 1 is "not estimated" always, rows 2, 7 and 8 are "—", row 4 is "yes", row 5 is "not estimated", and rows 3, 6 and 9 use strict `<` on (hi − lo)/2.
+  - Round-off is 1e-4·max(|lo|, |hi|). The LM row reads `LM_ABSENT` with `LM_SUMMARY_PATH = None`.
+  - The M7 mapping (H2b(i) → C8) and f = z_nom/z_obs − 1 with the delta-method SE are implemented. The flag outcomes yes, yes, no, no follow the largest f.
+  - The two M1 sentences are under every table, and the H3c sentence is under H3c only. The report hunk R5 adds lines only.
+- **Graph fixture.** `budget` imports only stdlib modules (`math`, `textwrap`, `dataclasses`, `statistics.NormalDist`) plus `.config` and `.identifiers`. That matches `"budget": ["config", "identifiers"]`. `analysis -> statistics` already existed.
+- **Commits.** Both commits name the unit and end with `Agent: claude-sonnet-5-5`. a8bdf0b carries the owner-review sentence. Randomness: none in the library. E2 uses `make_rng(8008, …)` (literal, not registered). Everything is float64.
+
+**Findings (ranked).**
+
+- **R9. The interval-procedure row names the wrong seed for its size** (`lpcstudy/budget.py:378`, used at `:735` and `:856`).
+  - The table line and the How cell say "synthetic, seed 6006, not a registered seed".
+  - The size comes from the *reference* rates. Those were simulated with the scratch seed 20261011 (math note line 5 and line 286; R_ref 10⁴ to 4·10⁴, 2·10⁴ for C4h). Only the run-2 counts beside them come from `make_rng(6006, …)`.
+  - Why it matters: it is a provenance statement under every primary table, and it is false for the number it labels (PRIME.4, REPRO).
+  - M7 amendment 4 also asked for R_ref with each constant, and `CoverageCase` has no such field.
+  - Fix: name both sources ("reference rates: scratch seed 20261011, R_ref …; run-2 counts: seed 6006; neither registered"). Add `r_ref` to `CoverageCase`, checked in B4 where the note gives it. Assert the new wording in `test_text_under_every_table`.
+
+- **R10. The H3c table says the oracle-draw variance is inside the interval, and its own cell says it is not** (`budget.py:468`, `INCLUDED[0]`, printed for all five QoIs at `:853`).
+  - For H3c, M3 says M-draw noise reaches the QoI only through the fitted A4 coefficients and A5 leaf weights, and that "the interval conditions on them". The row-1 cell repeats this. The Included column still prints "variance: yes (propagated)".
+  - The inconsistency comes from M1's per-row Included column and decision (a) ("inside every primary interval"), both of which the developer followed.
+  - Why it matters: this column states what the H3c verdict interval covers (NVVUQ.15). Read as written, it overstates it.
+  - Fix: make the Included cell per QoI for row 1, with H3c reading "no (conditional on the fitted A4 and A5)". The applied-mathematician confirms the wording, because it amends M1 and decision (a). Add a test.
+
+- **R11. DEC-0024's "each primary's label states its iterative error is unverified" is met only under the budget tables** (`budget.py:384`, `:860`).
+  - The verdict-table label lines (`interval_label` / `interval_label_lines`) for H2a, H2b and H3c do not carry the statement. A reader of the verdict table does not see it.
+  - Fix, either of:
+    - append the statement to `interval_label` for the three primary rows, and assert it;
+    - the main session records that placement under the budget tables satisfies DEC-0024.
+  - The statement is a plan amendment (7), so it is not optional.
+
+- **R12. Some "not estimated" reasons are false in reachable cases** (PRIME.4).
+  - (a) `_bootstrap_cell` (`:654–656`): when H2b(ii) is unavailable in current results, `_unavailable` writes `ci: None` and no `ci_mc_se`. The cell then reads "no ci_mc_se in these results (written before WU-0008.2a)", which is untrue. Check `part.ci is None` first and use "no interval in these results".
+  - (b) `_oracle_cell` H2b(ii) (`:639–644`): the `elif` prints "V4 has no larger M than the one used" also when the real cause is `n_states` missing or zero, or a non-finite `mean_abs_dev_from_max`. Give each cause its own reason.
+  - (c) `_v4` (`:606–617`) returns None, which prints "V4 absent from these results", also when V4 is present but `used_M` or its entry is missing. Say which of these is missing.
+  - (d) `:633`: "the four ρ cells" is hard-coded. Smoke has two noise levels (`config.py:210`). Derive the count from `config.noise_levels`, or say "across the ρ cells".
+  - (e) `_proxy_cell` (`:696`): `A5_vs_Astar` reads "not computable" with no reason. M8's form for it is "not computable (A2 ≤ A*)".
+  - Add a test for (a) at least, on a current-schema system with a missing library cell.
+
+- **R13. The How text of row 9 misstates DEF-0020's options** (`budget.py:736`).
+  - "DEF-0020: widening or another procedure (Option C or K) is the owner's decision, pending" is inaccurate.
+  - Option C or K (DEC-0018) decides whether the WU-0006 ROADMAP-bound rows stay asserted. DEF-0020's Resolution treats another interval (longer block, studentized, BCa) as a *separate* design question for the owner.
+  - Fix: "DEF-0020: Option C or K for the WU-0006 assertions (DEC-0018) pending; widening or another interval procedure is a separate owner design question".
+
+- **R14. Test evidence gaps** (no tolerance was loosened anywhere).
+  - (a) B4 (`tests/unit/test_budget.py:531`): the C4h run-2 counts {965, 984} are typed in the test, not parsed, and the comment cites "F5 row". The values sit in the WU-0006 Log "Characterization rows" paragraph (line 341). I verified them there and they are right. Parse that sentence, or label the two values as a hand transcription.
+  - (b) A2 (`tests/unit/test_analysis.py:3117`): the docstring says H2e and H2c carry no `ci_mc_se`, but only `library_change_reported` is asserted (`:3147`). Assert H2e `by_noise[*]` and H2c, or narrow the docstring.
+  - (c) E3's F = 12 "expected" (`tests/unit/test_statistics.py:1007`) re-evaluates the helper's own formula. Its value as a check is the boundary and the replacement semantics, not independence. Say so in the docstring.
+
+- **R15. Two Log statements need an append-only correction.**
+  - The run-9 paragraph says the DEV-0 pilot results have "no used_M". They do: `convergence.used_M = 200` in all three systems. The pilot report therefore prints F1 and F2, which I checked against M3.
+  - Also, the `QOI_COVERAGE` docstring (`budget.py:454–456`) says C1 is "cited beside" H2b(i), but `coverage_how` never prints C1, and the `C1` constants are unused. Either cite C1 in the H2b(i) cell, which M7 permits, or drop the claim.
+
+- **R16 (minor; merge-order hazard). `LM_SUMMARY_PATH = None` plus "WU-0005.4 summary absent from results" becomes false if WU-0005.4 merges before the one-line re-point** (`budget.py:373–377`).
+  - Fix: word it as true whatever the merge order ("not read: LM_SUMMARY_PATH not set until WU-0005.4 merges"). Alternatively, the main session puts the re-point on WU-0005.4's merge checklist.
+
+**The developer's deviations.**
+1. **`COVERAGE_PROVENANCE` elides the "T" in the log name: acceptable as recorded.** It is honest and the stamp is recoverable. It is the second false positive of the unanchored stale-id regex `H1e|H1f|H2f|H3d|T1|h1e_|h1f_` (`tests/unit/test_identifiers.py:139`); the first was the `kaplan_meier` docstring.
+   - Recommendation, not an edit: the planner and mathematician change the regex to token-bounded ids, e.g. `(?<![A-Za-z0-9])(?:H1e|H1f|H2f|H3d|T1)(?![0-9A-Za-z])|h1e_|h1f_`. Add cases asserting that "20261011T165447Z" is not flagged and that " T1 " and "T1," are.
+   - That corrects a false positive and does not loosen what the test is for (ids as tokens). Record it as a test amendment. Then restore the exact filename.
+2. **Cell texts of the developer's own: acceptable,** because B1 parses them (amendment 8). Examples are "0 (coverage ≥ nominal)" for M7's "none (…)" and "0 (tie at the endpoint)". R12 and R13 are the exceptions.
+3. **F1 with k = 3: acceptable.**
+   - Every preset has the long horizons (1, 2, 4) LT (`config.py:124`; no preset overrides them).
+   - States with L = 2 make k = 3 the worst case, so F1 stays an upper indication.
+   - Recommendation: derive k from the long horizons so the text "across 3 horizons" stays true if they change.
+4. **"Needs owner review before freeze" mark in the docstring: correct and required.**
+5. **Injection point moved to `bootstrap_values`, and the H3c key set: equivalent, not weakened** (see above).
+
+**Evidence still required before the branch merges.**
+- **A1 at the head (after the fixes), when `pgrep -fa "lpcstudy --preset"` is empty.**
+  - Command: `LPC_THREADS=4 tools/run_preset.sh smoke DEV-0 runs/new` from a clean tree. Then `leafcmp` against `runs/base/smoke`. The base at 7dc4f45 is valid: since then `lpcstudy/` changed only in this unit's files plus a docstring.
+  - Record in the Log:
+    - the number of pre-existing leaves, with 0 different (`provenance`, `seconds` and `handling` excluded, as A1 states);
+    - 0 leaves only in the base;
+    - the new-only leaves listed by path. They must be exactly `ci_mc_se/{0,1}` under H2a, H2a `part_ii/{zero,interior[,one]}`, H2b `noise`, H2b `library_change` and H3c, per system.
+  - At smoke (B = 50, 98.3%) every one of these is `null` by rule 3. The Log should say so. The numeric path at study size is therefore covered by A2, E1 to E3 and the slow nodes, not by A1.
+  - Also record that the report-only run on the new results renders the five tables with "B = 50 too small for the binomial window".
+- **A unit-level equality test cannot stand in for A1 without a recorded amendment.**
+  - The unit references above already prove function-level identity at the three sites.
+  - What A1 adds is the whole-pipeline claim that no other leaf moved.
+  - A1 is a criterion fixed in advance. Replacing it is the planner's and owner's change, not the developer's, and it costs about one minute of CPU.
+- **The integration pair once** (`test_cli_seeds.py`, `test_preset_wrapper.py`). Run 4 predates .2a and .1, and `report` and `statistics` changed since.
+- **The slow exact-check nodes, once (DEC-0021 O6; they must pass before merge):** `tests/slow/test_analysis_coverage.py::test_exact_checks` for C4, C7 and C8 at φ 0 and 0.3.
+  - They call the changed bodies (`h3c_ratio`, `h2a_part_ii`, `_paired_change`) at B = 2000 and compare estimate, bounds, failure count and verdict with the harness's own computation. The added key does not affect that comparison.
+  - C7's zero column exercises the all-failed path of the helper.
+  - `cache.coverage` runs the full R = 1000 per case, so these are CPU-heavy. Run them in the slow tier, not during the pilot.
+- **The unit radius once after the R9 to R16 fixes.**
+
+**Owner checkpoint.** This change adds statistics code (`endpoint_mc_error`) and changes the call path of three primary interval sites (bitwise-neutral by design, still to be shown by A1 and the slow nodes). It also adds report statements that set how much weight a primary verdict carries: the budget, the coverage shortfall flags "no" for H2b and H3c, and the F1 statement on Chua H2a(i). It rests on DEC-0012, DEC-0021 and DEC-0024, all still **proposed**. **Needs owner review before freeze.** No seed, provenance or dependency code is touched.
+
+**Verdict: approve with fixes.**
+- R9 to R13 are required before merge: provenance and statement truth, and DEC-0024 conformance. R10 needs the applied-mathematician's wording.
+- R14 to R16 are minor.
+- The merge also waits for A1, the integration pair and the slow exact checks above.
+- 8 findings (R9 to R16).
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
