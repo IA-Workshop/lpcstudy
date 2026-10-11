@@ -384,14 +384,13 @@ the QoI-type statistics, at most 6.0e-5 relative (DEV-0 against the v1 pilot, M5
 FLAG_FRACTION = 0.1
 """A numerical row is small against the sampling half-width iff its size is strictly below this
 fraction of it (M9; the skill's "at least 10 times smaller" differs only at equality)."""
-LM_SUMMARY_PATH: tuple[str, ...] | None = None
-"""Key path, below a system's results, of the WU-0005.4 iteration summary (``median_residual``,
-``fraction_no_decrease``). Set when WU-0005.4 names it. While it is ``None`` the row says the path
-is not set and reads nothing (true whether or not WU-0005.4 has merged); once set, the row reads
-the summary and says "absent from results" only when it is not there."""
-LM_NOT_READ = ("not estimated: LM_SUMMARY_PATH not set (the location of the WU-0005.4 summary is "
-               "not read until WU-0005.4 merges)")
-LM_ABSENT = "not estimated: WU-0005.4 summary absent from results"
+LM_ABSENT = ("not estimated: no Levenberg–Marquardt summary (handling.cells[*].lm with "
+             "estimates) in these results")
+LM_PRESENT = ("not estimated: the residual bounds the error in the observation metric only "
+              "(cond(JᵀJ) ≈ 1e7), so it does not convert to the QoI scale; needs a "
+              "{steps} → {doubled} iteration refinement of the QoI; the residual diagnostics are "
+              "in the report's 'Levenberg–Marquardt diagnostics' subsection (a diagnostic, not "
+              "an estimate of this error)")
 COVERAGE_SEEDS_TEXT = ("reference rates from scratch seed 20261011 (m2_coverage.py), run-2 counts "
                        "from seed 6006 (make_rng(6006, \"wu0006\", ...)); neither is a "
                        "registered seed")
@@ -748,25 +747,33 @@ def _bootstrap_cell(part: _Part, half_width: float | None, config: StudyConfig, 
     return text, below_tenth(size, half_width)
 
 
+def lm_summary_present(system: dict) -> bool:
+    """Whether a system's results carry a WU-0005.4 Levenberg–Marquardt summary with estimates.
+
+    The summary is ``handling.cells[<cell id>].lm`` (cell ids depend on the configuration), whose
+    ``by_kind`` parts have an ``n_estimates``; present iff some cell has an ``lm`` block with at
+    least one part with ``n_estimates > 0`` (the rows the report's subsection prints).
+    """
+    handling = system.get("handling")
+    cells = handling.get("cells") if isinstance(handling, dict) else None
+    if not isinstance(cells, dict):
+        return False
+    for record in cells.values():
+        block = record.get("lm") if isinstance(record, dict) else None
+        parts = block.get("by_kind") if isinstance(block, dict) else None
+        if isinstance(parts, dict) and any(isinstance(p, dict) and p.get("n_estimates")
+                                           for p in parts.values()):
+            return True
+    return False
+
+
 def _lm_cell(system: dict, config: StudyConfig) -> tuple[str, str]:
-    """Row 5: not estimated, with the WU-0005.4 diagnostic when its keys are present (M4)."""
-    if LM_SUMMARY_PATH is None:
-        return LM_NOT_READ, "not estimated"
-    block: object = system
-    for key in LM_SUMMARY_PATH:
-        block = block.get(key) if isinstance(block, dict) else None
-    if not isinstance(block, dict):
+    """Row 5: always "not estimated" (M4); the text says why, and points to the report's
+    subsection when the summary is present. No number of the summary is printed as an estimate."""
+    if not lm_summary_present(system):
         return LM_ABSENT, "not estimated"
-    floor = 3.36 * config.core_noise**2
-    ratio = block.get("median_residual")
-    ratio_text = "n/a" if ratio is None else _num(float(ratio) / floor)
-    decrease = block.get("fraction_no_decrease")
-    return (NOT_ESTIMATED + "residual and iteration summary do not convert to the QoI scale "
-            "(excess residual bounds the error in the observation metric only; cond(JᵀJ) ≈ 1e7); "
-            f"needs a {config.estimator_refine_steps} → {2 * config.estimator_refine_steps} "
-            "iteration refinement of the QoI; diagnostic (core cell): median "
-            f"residual/(3.36ρ²) = {ratio_text}, fraction no decrease = "
-            f"{'n/a' if decrease is None else _num(float(decrease))}", "not estimated")
+    steps = config.estimator_refine_steps
+    return LM_PRESENT.format(steps=steps, doubled=2 * steps), "not estimated"
 
 
 def _proxy_cell(qoi: str, system: dict) -> tuple[str, str]:

@@ -588,6 +588,24 @@ Result of run 14: `10 passed in 136.96s (0:02:16)`.
 
 Result of run 15: `6 passed in 92.47s (0:01:32)`, exit 0 (`runs/tests/slow-20261011T221010Z.log`): `test_exact_checks` for C4, C7, C8 at phi 0 and 0.3. With runs 12 to 14 this completes the evidence the re-review listed (unit radius `422 passed`, A1 smoke 0 different and only the 18 new leaves, integration pair `10 passed`, slow exact checks `6 passed`).
 
+### 2026-10-11, developer claude-sonnet-5-5: merge of develop b0c939c (WU-0001.6, WU-0005.4), LM row
+
+Merged develop (own command): one conflict, `lpcstudy/report.py`, both sides inserting after the P2(c) subsection; resolved as the union with the **LM subsection first, then the `## Uncertainty budget` section** (so the LM `###` stays under the validation gate); no marker left (grep). The graph fixture merged without conflict; I re-derived the import edges of all 22 modules (`ensemble`, `estimation`, `experiments`, `pipeline`, `report`, `validation` changed on develop) and they equal the fixture rows. Merge commit 9377a83.
+
+LM row (DEC-0024 M4, reconciled with WU-0005.4): `LM_SUMMARY_PATH` and `LM_NOT_READ` are gone (the location is now known). `lm_summary_present(system)` looks for `handling.cells[<any cell id>].lm` with a `by_kind` part with `n_estimates > 0` (the rows the report's subsection prints). Present: "not estimated: the residual bounds the error in the observation metric only (cond(JᵀJ) ≈ 1e7), so it does not convert to the QoI scale; needs a 15 → 30 iteration refinement of the QoI; the residual diagnostics are in the report's 'Levenberg–Marquardt diagnostics' subsection (a diagnostic, not an estimate of this error)", no number from the summary printed. Absent: `LM_ABSENT` = "not estimated: no Levenberg–Marquardt summary (handling.cells[*].lm with estimates) in these results". **Deviation from the request:** I did not keep the `LM_NOT_READ` wording for the absent case: it said "LM_SUMMARY_PATH not set until WU-0005.4 merges", which is false now that the path is resolved by a resolver; the absent wording is the true statement. Tests: `test_lm_row_is_not_estimated_with_and_without_the_summary` (hand-written results, two cell ids, four absent cases), `test_report_order_p2c_then_lm_then_budget`; the R16 LM tests were replaced. No `results.json` leaf is touched (budget is report-side).
+
+**Test run 16 (merge and LM row; unit radius once).** Checklist:
+1. Change set: the merge (develop's `ensemble`, `estimation`, `experiments`, `pipeline`, `report`, `validation`, tests), `lpcstudy/budget.py`, `tests/unit/test_budget.py`, this file.
+2. Radius: `tools/test_impact.py --base develop --explain` (unit `test___main__`, `test_allocation`, `test_analysis`, `test_budget`, `test_experiments`, `test_identifiers`, `test_pipeline`, `test_report`, `test_statistics`, `test_tools_test_impact`, `test_validation`) plus by hand, as asked, `test_data`, `test_ensemble`, `test_estimation`, `test_provenance` and the other `test_tools_*` files.
+3. Already run? No: the merged tree and the new LM code.
+4. `JAX_PLATFORMS=cpu`.
+5. `LPC_THREADS=4`; unit timeout 300 s.
+6. Unit tier; `pgrep -fa 'lpcstudy --preset'` empty.
+7. `-q --tb=short -rfE`.
+8. Command: `LPC_THREADS=4 tools/run_tests.sh unit tests/unit/test___main__.py tests/unit/test_allocation.py tests/unit/test_analysis.py tests/unit/test_budget.py tests/unit/test_data.py tests/unit/test_ensemble.py tests/unit/test_estimation.py tests/unit/test_experiments.py tests/unit/test_identifiers.py tests/unit/test_pipeline.py tests/unit/test_provenance.py tests/unit/test_report.py tests/unit/test_statistics.py tests/unit/test_tools_compare_pilot.py tests/unit/test_tools_gpu_hours.py tests/unit/test_tools_run_preset.py tests/unit/test_tools_run_tests.py tests/unit/test_tools_test_impact.py tests/unit/test_validation.py`.
+
+Result of run 16: `781 passed in 78.32s (0:01:18)` (the first attempt to start it failed in the shell before pytest ran, an env-assignment slip; nothing was executed, so this is the only run).
+
 ## Review
 
 - **Reviewer:** <actor, not the author>

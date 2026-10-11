@@ -486,7 +486,7 @@ def test_old_schema_and_a_missing_result_give_the_same_rows_and_not_estimated_ce
     bootstrap = tables[budget.QOI_TITLES["H2b(ii)"]][2]
     assert bootstrap[3].startswith("not estimated: no ci_mc_se in these results")
     assert bootstrap[4] == "0.002 (lower 0.001, upper 0.002)"  # the second system has the keys
-    assert tables[budget.QOI_TITLES["H2a(i)"]][4][3] == budget.LM_NOT_READ
+    assert tables[budget.QOI_TITLES["H2a(i)"]][4][3] == budget.LM_ABSENT
     # the old fake V4 has convergence entries but no used_M: R12(c), a distinct reason
     assert tables[budget.QOI_TITLES["H2a(i)"]][0][3].endswith(
         "F1 not computable: V4 present but used_M missing")
@@ -696,24 +696,46 @@ def test_h2a_ii_cells_are_labelled_by_part_and_the_zero_part_has_no_coverage_cas
     assert part_values(rows[8][5]) == ["not estimated", "yes", "not estimated"]
 
 
-def test_lm_row_reads_the_summary_when_a_path_is_set(monkeypatch: pytest.MonkeyPatch) -> None:
-    """With ``LM_SUMMARY_PATH`` set and the keys present the row is "not estimated" plus the diagnostic.
+LM_BLOCK = {"by_kind": {"estimate": {"n_estimates": 5, "median_residual": 6.72e-4,
+                                      "fraction_no_decrease": 0.25},
+                        "refit": {"n_estimates": 0}}}
+"""A hand-written WU-0005.4 summary: ``handling.cells[<id>].lm`` with one populated kind."""
 
-    Reference: M4's text: median residual/(3.36 rho^2) with rho = 0.01 (smoke core noise):
-    a median residual of 6.72e-4 gives 2 (6.72e-4 / (3.36 * 1e-4) = 2, by hand), the fraction
-    of no decrease 0.25. The flag stays "not estimated" (the residual does not convert to the QoI
-    scale). Absent keys give ``LM_ABSENT``. Exact.
+
+def test_lm_row_is_not_estimated_with_and_without_the_summary() -> None:
+    """The LM row (DEC-0024 M4) stays "not estimated" whether or not WU-0005.4's summary is there.
+
+    Reference: hand-written results dicts. Present: ``handling.cells.<any id>.lm`` with a kind
+    whose ``n_estimates`` > 0 (cell ids depend on the configuration: two ids are used); the
+    cell says "not estimated: the residual bounds the error in the observation metric only",
+    points to the report's "Levenberg–Marquardt diagnostics" subsection, prints the iteration
+    refinement "15 → 30" from the configuration, and prints no number of the summary (no 6.72e-4,
+    no 0.25, no 2). Absent (no handling, no cells, a cell without ``lm``, an ``lm`` whose parts
+    all have n = 0): the absent text. The flag is "not estimated" in every case. Exact.
     """
-    monkeypatch.setattr(budget, "LM_SUMMARY_PATH", ("estimators", "summary"))
-    system = full_system()
-    system["estimators"] = {"summary": {"median_residual": 6.72e-4, "fraction_no_decrease": 0.25}}
-    results, systems = budget_results(system, full_system(), names=("lorenz63", "rossler"))
-    row = tables_of(budget.budget_lines(results, systems, SMOKE))[
-        budget.QOI_TITLES["H3c"]][4]
-    assert row[3].startswith("not estimated: residual and iteration summary do not convert")
-    assert "median residual/(3.36ρ²) = 2, fraction no decrease = 0.25" in row[3]
-    assert row[4] == budget.LM_ABSENT and row[6] == "not estimated"
-    assert budget.LM_ABSENT == "not estimated: WU-0005.4 summary absent from results"
+    present = full_system()
+    present["handling"] = {"cells": {"lorenz63/rho=0.01/n=1000": {"counts": {}},
+                                     "lorenz63/rho=0.01/n=10000": {"lm": LM_BLOCK}}}
+    absent_cases = [full_system(),
+                    {**full_system(), "handling": {"cells": {}}},
+                    {**full_system(), "handling": {"cells": {"c": {"counts": {}}}}},
+                    {**full_system(), "handling": {"cells": {"c": {"lm": {"by_kind": {
+                        "estimate": {"n_estimates": 0}}}}}}}]
+    results, systems = budget_results(present, *absent_cases,
+                                      names=("a", "b", "c", "d", "e"))
+    row = tables_of(budget.budget_lines(results, systems, SMOKE))[budget.QOI_TITLES["H3c"]][4]
+    assert row[3] == ("not estimated: the residual bounds the error in the observation metric "
+                      "only (cond(JᵀJ) ≈ 1e7), so it does not convert to the QoI scale; needs a "
+                      "15 → 30 iteration refinement of the QoI; the residual diagnostics are in "
+                      "the report's 'Levenberg–Marquardt diagnostics' subsection (a diagnostic, "
+                      "not an estimate of this error)")
+    assert all(v not in row[3] for v in ("6.72e-4", "0.25", "= 2"))
+    assert row[4:8] == [budget.LM_ABSENT] * 4
+    assert budget.LM_ABSENT == ("not estimated: no Levenberg–Marquardt summary "
+                                "(handling.cells[*].lm with estimates) in these results")
+    assert row[9] == "not estimated"
+    assert budget.lm_summary_present(present) and not any(
+        budget.lm_summary_present(s) for s in absent_cases)
 
 
 def test_text_under_every_table() -> None:
@@ -938,31 +960,7 @@ def test_f1_uses_the_number_of_long_horizons_of_the_configuration() -> None:
                                "configuration has 4")
 
 
-def test_lm_row_text_is_true_whatever_the_merge_order(monkeypatch: pytest.MonkeyPatch) -> None:
-    """R16: with ``LM_SUMMARY_PATH`` None the row says the path is not set, and reads nothing.
-
-    Reference: the review: "not read: LM_SUMMARY_PATH not set until WU-0005.4 merges" must hold
-    even if a summary is present in the results (a WU-0005.4 that merged first). Once the path is
-    set and the summary missing the row says "absent from results"; with it present it reads it.
-    """
-    system = full_system()
-    system["handling"] = {"lm": {"median_residual": 1.0, "fraction_no_decrease": 0.0}}
-    results, systems = budget_results(system, names=("lorenz63",))
-
-    def cell() -> str:
-        return tables_of(budget.budget_lines(results, systems, SMOKE))[
-            budget.QOI_TITLES["H3c"]][4][3]
-
-    assert cell() == ("not estimated: LM_SUMMARY_PATH not set (the location of the WU-0005.4 "
-                      "summary is not read until WU-0005.4 merges)")
-    monkeypatch.setattr(budget, "LM_SUMMARY_PATH", ("handling", "missing"))
-    assert cell() == "not estimated: WU-0005.4 summary absent from results"
-    monkeypatch.setattr(budget, "LM_SUMMARY_PATH", ("handling", "lm"))
-    assert "median residual/(3.36ρ²) = " in cell()
-
-
-def test_iterative_label_reads_the_configured_iteration_budget(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+def test_iterative_label_reads_the_configured_iteration_budget() -> None:
     """R19: the label's iteration count is ``config.estimator_refine_steps``, not a literal.
 
     Reference: the config field (15 in every preset, 30 in a changed configuration, set in the
@@ -979,9 +977,25 @@ def test_iterative_label_reads_the_configured_iteration_budget(
     rows = tables_of(budget.budget_lines(results, systems, config))[budget.QOI_TITLES["H3c"]]
     assert "'Included in the reported interval?' column" in rows[0][2]
     assert "is in the next column" not in rows[0][2]
-    monkeypatch.setattr(budget, "LM_SUMMARY_PATH", ("handling", "lm"))
     system = full_system()
-    system["handling"] = {"lm": {"median_residual": 1.0, "fraction_no_decrease": 0.0}}
+    system["handling"] = {"cells": {"c": {"lm": LM_BLOCK}}}
     results, systems = budget_results(system, names=("lorenz63",))
     lm = tables_of(budget.budget_lines(results, systems, config))[budget.QOI_TITLES["H3c"]][4][3]
     assert "needs a 30 → 60 iteration refinement of the QoI" in lm
+
+
+def test_report_order_p2c_then_lm_then_budget(tmp_path: Path) -> None:
+    """The LM subsection (WU-0005.4) sits after P2(c) and before the budget section.
+
+    Reference: hand-written heading texts in the order of the merge rule (the LM subsection is a
+    "###" under "## Validation gate", so it must precede the next "##" heading, the budget): the
+    positions of the three headings in RESULTS.md satisfy P2(c) < LM < budget, and the budget is
+    the next "##" heading after the validation gate. Exact.
+    """
+    lines = markdown(tmp_path)
+    p2c = lines.index("### Theorem P2(c) bound (verification check, not a hypothesis)")
+    lm = lines.index("### Levenberg–Marquardt diagnostics (verification, NVVUQ.10; not a hypothesis)")
+    budget_at = lines.index("## Uncertainty budget (NVVUQ.15)")
+    assert p2c < lm < budget_at
+    gate = lines.index("## Validation gate")
+    assert next(i for i in range(gate + 1, len(lines)) if lines[i].startswith("## ")) == budget_at
