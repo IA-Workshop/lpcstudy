@@ -104,3 +104,12 @@ The retrieval cap stays in force until that first entry exists: until then the r
 - ROADMAP section 2: WU-0001.6 is already the WU-0001 review sub-task; name the platform-record unit WU-0001.6b (or renumber) and list its dependency on WU-0002.12 (the regression found DEF-0024).
 - ROADMAP WU-0002.12 acceptance: the baseline of the regression is the local re-run of tag `v1-baseline` on the reference platform (DEC-0022); the original pilot file is the historical record.
 - DEC-0019 F1: once both runs carry W and U digests, state how a digest difference is treated in branch selection.
+
+## 13. Additions from WU-0005.4, WU-0008 and the baseline run, 2026-10-11 (DEC-0024 addendum A1, DEC-0025)
+
+- ROADMAP WU-0005.4 acceptance: the L2 tolerance 'relative 1e-12 on |c_k - J(u_k)|' is replaced by |c_k - J(u_k)| <= eta(2 sqrt(J) + eta), eta = 1e-12 max(1, ||X||_inf) (the relative form is not a valid round-off bound as J falls toward 1e-31); the p95 uses the inverted-CDF quantile; the report prints c beside c/rho^2 with the chi-square(D - m) reference (m = 3); add the key list of the `lm` summary (including `noise`, `gof_dof`, `fraction_late_progress`, `fraction_above_chi2`) and the handling schema `lpcstudy.handling/2`.
+- v3 section 4 (LM): it covers about 2% wrong-basin estimates but not estimates still unconverged at the 15-iteration budget (2 to 13% in test configurations, production rate unknown): say whether the study measures and reports both (DEC-0025 D3) and whether 'PLP is the fixed 15-iteration LM' is a convention like LPC.NV.1 (DEC-0024 point 1).
+- ROADMAP WU-0008 acceptance: H3c's budget 'Included' cell is 'no' (the test-state M draws do not enter H3c); the row-9 text says that Option C/K (DEC-0018) decides only whether the WU-0006 coverage rows stay asserted, and that widening the intervals is a separate owner decision (DEC-0024 addendum A1).
+- Test amendment for the owner: `tests/unit/test_identifiers.py::test_no_stale_identifier_in_the_package` matches 'T1' inside a log filename (`slow-20261011T165447Z.log`) and inside the `kaplan_meier` docstring; it should match whole tokens only (with cases: '20261011T165447Z' is not flagged, a standalone 'T1' is). Recorded in DEF-0016; the WU-0008 text elides the letter in the filename meanwhile.
+- DEF-0025 (robustness filter `d >= spec.dim` admits dof 0): choose `d > spec.dim` or None at dof 0.
+- Ledger: the owner's `ruling` entries for the baseline instruction (DEC-0022) and for the pilot regression result (branch B, 0 failures: `docs/study/dev_regression_dev0_vs_local_v1.md`).
