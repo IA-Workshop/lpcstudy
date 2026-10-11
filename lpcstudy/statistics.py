@@ -47,6 +47,24 @@ def kaplan_meier(durations: np.ndarray, events: np.ndarray, horizon_max: int
                  ) -> SurvivalCurve:
     """Kaplan-Meier estimator for discrete first-passage times.
 
+    The hazard is 0 where nobody is at risk (the ``np.where`` below; DEF-0001, inventory row T1).
+    That branch never changes a value of the formula, and its two cases are these.
+
+    * Since ``deaths(t) <= at_risk(t)``, ``at_risk = 0`` implies ``deaths = 0``, so
+      ``deaths / max(at_risk, 1)`` is already 0: the ``np.where`` states the convention
+      "hazard 0 when nobody is at risk, so S is carried forward" and is not a replacement.
+    * With ``n >= 1`` and censoring only at ``H_max`` (every caller using ``realized_horizon``
+      or ``characteristic_horizon``), ``at_risk = 0`` before ``H_max`` means that everyone had
+      an event. At the last event time ``t_L`` the risk set is exactly the ``d(t_L)`` subjects
+      that fail, so the hazard is ``d / d = 1`` in IEEE arithmetic and ``S(t_L) = 0`` exactly;
+      S stays 0 afterwards. So the convention fires only where S is already 0.
+
+    Two hypotheses. (i) ``check_kaplan_meier`` (V5) censors at random times, so there the branch
+    is the standard carry-forward convention and not "S is already 0"; it does not fire at its
+    n = 20000. (ii) ``n = 0`` (an empty set; no caller passes one) gives ``S = 1`` at every
+    horizon, a NaN median and a restricted mean of ``H_max``; ``durations`` must then have an
+    integer dtype (``np.bincount`` rejects floats).
+
     Parameters
     ----------
     durations : np.ndarray
@@ -125,6 +143,13 @@ def logrank_test(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
     float
         Two-sided p-value (chi-square, 1 degree of freedom); 1.0 if the variance is 0
         (see ``logrank_parts``).
+
+    Notes
+    -----
+    ``p = 1.0`` at ``V <= 0`` is a convention, not a measurement (DEF-0001, row T2). ``V`` is a
+    sum of non-negative terms, so ``V < 0`` is impossible and ``V = 0`` is exact. The only caller
+    (``analysis.h3a_logrank``) reads ``logrank_parts`` first, does not call this function for such
+    a pair, records the reason, and counts the pair in ``H3a.n_degenerate_pairs``.
     """
     observed_minus_expected, variance = logrank_parts(dur_a, ev_a, dur_b, ev_b)
     if variance <= 0:
@@ -528,6 +553,49 @@ def criterion_verdict(estimate: float, lower: float, upper: float,
     return verdict, "interval meets band edge"
 
 
+def block_bootstrap_dropped(statistic: Callable[[np.ndarray], float], n_items: int,
+                            n_resamples: int, block: int, seed: int | np.random.Generator,
+                            level: float = 0.95) -> tuple[float, float, float, int]:
+    """Moving-block bootstrap of a statistic of item indices, counting the dropped resamples.
+
+    Items are states in temporal order; blocks of consecutive states are
+    resampled with replacement to respect residual serial dependence. NaN
+    resamples are dropped here (``np.nanquantile``), as ``block_bootstrap`` always did, and
+    **counted** (DEF-0001, row T3). Use ``block_bootstrap_counted`` for the DEC-0008 A3 rule,
+    which places failed resamples at the unfavourable tail instead. A resample of +-inf is not
+    dropped by ``np.nanquantile``: it stays in the quantiles and is not counted here. If every
+    resample is NaN (``n_dropped == n_resamples``) both bounds are NaN and NumPy warns
+    ``All-NaN slice``.
+
+    Parameters
+    ----------
+    statistic : Callable[[np.ndarray], float]
+        Function of an index array returning a scalar.
+    n_items : int
+        Number of items.
+    n_resamples : int
+        Number of bootstrap resamples.
+    block : int
+        Block length.
+    seed : int or np.random.Generator
+        Seed, or a generator that is consumed.
+    level : float, optional
+        Confidence level.
+
+    Returns
+    -------
+    tuple[float, float, float, int]
+        Point estimate on all items, lower and upper percentile bounds, and the number of NaN
+        resamples that were dropped.
+    """
+    values = np.empty(n_resamples)
+    for r, idx in enumerate(block_resample_indices(n_items, n_resamples, block, seed)):
+        values[r] = statistic(idx)
+    alpha = (1.0 - level) / 2.0
+    return (float(statistic(np.arange(n_items))), float(np.nanquantile(values, alpha)),
+            float(np.nanquantile(values, 1.0 - alpha)), int(np.isnan(values).sum()))
+
+
 def block_bootstrap(statistic: Callable[[np.ndarray], float], n_items: int,
                     n_resamples: int, block: int, seed: int | np.random.Generator,
                     level: float = 0.95) -> tuple[float, float, float]:
@@ -536,7 +604,8 @@ def block_bootstrap(statistic: Callable[[np.ndarray], float], n_items: int,
     Items are states in temporal order; blocks of consecutive states are
     resampled with replacement to respect residual serial dependence. Non-finite
     resamples are dropped silently here (``np.nanquantile``); use
-    ``block_bootstrap_counted`` for the DEC-0008 A3 rule.
+    ``block_bootstrap_dropped`` to count them and ``block_bootstrap_counted`` for the
+    DEC-0008 A3 rule. This is the first three items of ``block_bootstrap_dropped``.
 
     Parameters
     ----------
@@ -558,12 +627,7 @@ def block_bootstrap(statistic: Callable[[np.ndarray], float], n_items: int,
     tuple[float, float, float]
         Point estimate on all items, lower and upper percentile bounds.
     """
-    values = np.empty(n_resamples)
-    for r, idx in enumerate(block_resample_indices(n_items, n_resamples, block, seed)):
-        values[r] = statistic(idx)
-    alpha = (1.0 - level) / 2.0
-    return (float(statistic(np.arange(n_items))), float(np.nanquantile(values, alpha)),
-            float(np.nanquantile(values, 1.0 - alpha)))
+    return block_bootstrap_dropped(statistic, n_items, n_resamples, block, seed, level)[:3]
 
 
 def ols_slope(x_values: np.ndarray, y_values: np.ndarray) -> float:

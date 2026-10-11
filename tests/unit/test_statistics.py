@@ -7,13 +7,14 @@ import itertools
 import math
 import warnings
 from collections.abc import Callable
+from fractions import Fraction
 
 import numpy as np
 import pytest
 from scipy import stats as sps
 
 from lpcstudy.statistics import MIN_STATES, V3_SYSTEMS, BootstrapInterval, block_bootstrap, \
-    block_bootstrap_counted, block_resample_indices, bootstrap_values, \
+    block_bootstrap_counted, block_bootstrap_dropped, block_resample_indices, bootstrap_values, \
     combine_verdicts, criterion_verdict, holm_adjust, interval_verdict, kaplan_meier, \
     logrank_parts, logrank_test, overall_verdict, partial_correlation, percentile_interval
 
@@ -782,3 +783,118 @@ def test_criterion_verdict_guard_order_and_reasons() -> None:
         ("pass", None)
     assert criterion_verdict(0.9, 0.8, math.inf, (0.7, math.inf), (True, False), n_states=50) == \
         ("pass", None)
+
+
+# ---------------------------------------------------------------------------------------
+# WU-0002.11b: the dropped resamples of block_bootstrap are counted; the Kaplan-Meier
+# hazard-0 branch (inventory row T1) is justified.
+# ---------------------------------------------------------------------------------------
+
+
+def _nan_on_calls(x_values: np.ndarray, nan_calls: set[int]) -> Callable[[np.ndarray], float]:
+    """Statistic: the mean of the selected items, NaN on the listed call numbers (0-based).
+
+    ``block_bootstrap`` and ``block_bootstrap_dropped`` call the statistic once per resample in
+    order (calls 0..B-1) and then once on all items (call B), so a fresh closure injects the
+    same failures into any function that follows that order.
+    """
+    calls = itertools.count()
+    return lambda idx: float("nan") if next(calls) in nan_calls else float(np.mean(x_values[idx]))
+
+
+def test_block_bootstrap_dropped_counts_nan_resamples_and_keeps_the_numbers() -> None:
+    """B1: ``n_dropped`` is the number of NaN resamples; (est, lo, hi) are the old values bitwise.
+
+    Reference: NaN is injected into exactly 3 of B = 40 resamples (calls 4, 11, 25), so the
+    count is known by construction. The interval is compared with ``block_bootstrap`` and with
+    the verbatim pre-refactor copy of this file, both run with their own fresh closure that
+    injects the same calls. Tolerance: none, ``==`` on the tuples (same draws, same
+    expressions). Also: all resamples NaN gives ``n_dropped == B`` and NaN bounds (the
+    All-NaN slice, whose RuntimeWarning is expected and checked); a +inf resample is not
+    dropped by ``np.nanquantile`` (it can turn a bound into inf or NaN) and so not counted; no
+    failure counts 0.
+    """
+    x_values = np.random.default_rng(5).standard_normal(60)
+    inject = {4, 11, 25}
+    est, lo, hi, n_dropped = block_bootstrap_dropped(_nan_on_calls(x_values, inject), 60, 40, 5, 3)
+    assert n_dropped == 3
+    assert (est, lo, hi) == block_bootstrap(_nan_on_calls(x_values, inject), 60, 40, 5, 3)
+    assert (est, lo, hi) == _pre_refactor_block_bootstrap(_nan_on_calls(x_values, inject), 60,
+                                                          40, 5, 3)
+    assert math.isfinite(est) and math.isfinite(lo) and math.isfinite(hi)
+
+    *_, none_dropped = block_bootstrap_dropped(_mean_of(x_values), 60, 40, 5, 3)
+    assert none_dropped == 0
+
+    with pytest.warns(RuntimeWarning, match="All-NaN"):
+        est_all, lo_all, hi_all, n_all = block_bootstrap_dropped(
+            lambda idx: float("nan"), 60, 40, 5, 3)
+    assert n_all == 40 and math.isnan(lo_all) and math.isnan(hi_all) and math.isnan(est_all)
+
+    def with_inf() -> Callable[[np.ndarray], float]:
+        calls = itertools.count()
+        return lambda idx: float("inf") if next(calls) in (2, 9) \
+            else float(np.mean(x_values[idx]))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)  # inf - inf inside np.quantile's lerp
+        *rest, inf_dropped = block_bootstrap_dropped(with_inf(), 60, 40, 5, 3)
+        old_inf = block_bootstrap(with_inf(), 60, 40, 5, 3)
+    assert inf_dropped == 0  # an infinite resample is not NaN: nanquantile keeps it, not counted
+    assert np.array_equal(rest, old_inf, equal_nan=True)
+
+
+def _exact_km(durations: list[int], events: list[bool], horizon_max: int) -> list[Fraction]:
+    """Product-limit survival in exact rational arithmetic (the textbook definition)."""
+    survival, out = Fraction(1), []
+    for t in range(1, horizon_max + 1):
+        at_risk = sum(d >= t for d in durations)
+        deaths = sum(d == t and e for d, e in zip(durations, events))
+        if at_risk > 0:
+            survival *= 1 - Fraction(deaths, at_risk)
+        out.append(survival)
+    return out
+
+
+def test_kaplan_meier_all_events_before_h_max_gives_exact_zero_after_the_last_event() -> None:
+    """B4 (a), T1: with every subject having an event before H_max, S = 0 exactly from the last
+    event on, and the curve equals the exact product-limit before it.
+
+    Reference: the product-limit estimator in exact rational arithmetic (``_exact_km``,
+    ``fractions.Fraction``), independent of the NumPy implementation. At the last event time
+    ``t_L`` everyone still at risk has an event, so ``deaths / at_risk = d / d = 1`` in IEEE
+    and ``1 - 1 = 0`` exactly: S(t_L) is exactly 0 and the cumulative product stays 0. Before
+    that, tolerance ``rel = 1e-15``: at most 5 floating-point products of O(1) numbers (error
+    below 5 * 1.1e-16). Hand values for the first case: S = (1, 3/4, 1/4, 1/4, 0, 0, 0, 0),
+    median 3, restricted mean 1 + 2.25 = 3.25.
+    """
+    cases = [([2, 3, 3, 5], [True] * 4, 8),
+             ([1, 1, 4, 4, 4, 6], [True] * 6, 10),
+             ([7], [True], 9)]
+    for durations, events, horizon_max in cases:
+        curve = kaplan_meier(np.array(durations), np.array(events), horizon_max)
+        last = max(durations)
+        assert np.array_equal(curve.survival[last - 1:], np.zeros(horizon_max - last + 1))
+        expected = _exact_km(durations, events, horizon_max)
+        assert curve.survival == pytest.approx([float(v) for v in expected], rel=1e-15, abs=0)
+    first = kaplan_meier(np.array([2, 3, 3, 5]), np.ones(4, dtype=bool), 8)
+    assert first.survival == pytest.approx([1, 0.75, 0.25, 0.25, 0, 0, 0, 0], rel=1e-15, abs=0)
+    assert first.median() == 3.0
+    assert first.restricted_mean() == pytest.approx(3.25, rel=1e-15)
+
+
+def test_kaplan_meier_empty_input_is_all_ones_with_nan_median() -> None:
+    """B4 (b), T1 hypothesis (ii): n = 0 gives S = 1 at every horizon, a NaN median and a
+    restricted mean of H_max.
+
+    Reference: the product-limit definition with an empty risk set at every time (the hazard is
+    0 by convention, so the product is empty and equals 1); the restricted mean is
+    ``1 + sum_{H < H_max} 1 = H_max``. Exact equalities. The integer dtype of the empty
+    ``durations`` is required (``np.bincount`` rejects floats), as the docstring says.
+    """
+    empty = np.array([], dtype=int)
+    curve = kaplan_meier(empty, empty.astype(bool), 6)
+    assert np.array_equal(curve.survival, np.ones(6))
+    assert np.array_equal(curve.times, np.arange(1, 7))
+    assert math.isnan(curve.median())
+    assert curve.restricted_mean() == 6.0
