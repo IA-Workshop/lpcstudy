@@ -154,7 +154,8 @@ def interval_label_lines(results: dict, systems: list[str], config: StudyConfig)
         if row.key not in results["verdicts"]:
             continue
         label = interval_label(row, row_level(row, results, systems), config)
-        lines.append(f"- {row.v3_id} ({row.role}) — {label}")
+        role = "" if row.v3_id == f"({row.role})" else f" ({row.role})"  # gain bound: "(reported)"
+        lines.append(f"- {row.v3_id}{role} — {label}")
     return lines
 
 

@@ -121,6 +121,7 @@ def test_markdown_labels_every_interval_table_before_the_next_heading(tmp_path: 
     assert labelled == 3
     verdict_lines = [ln for ln in lines if ln.startswith("- ") and "— procedure:" in ln]
     assert [ln.split(" ")[1] for ln in verdict_lines] == [r.v3_id for r in HYPOTHESIS_TABLE]
+    assert any(ln.startswith("- (reported) — procedure: none, a fraction") for ln in lines)
     v4 = [ln for ln in lines if ln.startswith("V4 half-width — procedure:")]
     assert len(v4) == 1 and "ordinary percentile bootstrap" in v4[0] and "200 resamples" in v4[0]
     assert all(tag in v4[0] for tag in TAGS)

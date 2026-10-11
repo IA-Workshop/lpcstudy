@@ -159,6 +159,20 @@ Commit dff3692 (.3).
 Result of run 2: `1 failed, 243 passed in 20.60s`. The one failure, `tests/unit/test_identifiers.py::test_no_stale_identifier_in_the_package`, is not caused by this change and is **not fixed here** (out of scope: `statistics.py` is the mathematician's lane, and the test is not to be loosened): it reports `('statistics.py', 'stale', 'Kaplan-Meier estimator for discrete first-passage times...')`, i.e. the docstring of `kaplan_meier` (introduced in a486b7d, WU-0002.11b, present on `develop`) contains "inventory row T1", and the test's regex `T1` (a stale v1 id) matches it. Nothing in `budget.py` or `QOI_DECLARATIONS` is flagged. For the main session: reword that docstring on develop (e.g. "inventory row 1 of T-series") or the test must learn that "inventory row T1" is not an id; the owner or the planner decides. Not rerun (no code change).
 Self-check of the .4 diff: no `clip|nan_to_num|isfinite|where(|try:|except` and no `default_rng|random.|PRNGKey` in non-test code; no tolerance in an assert or approx touched; the QoI texts are drawn from v3 sections 2, 5, 7, 8 and Methods v2 M12.
 
+Commit 8decf2a (.4). Report-only checks before run 3 (no run of a pilot-size preset: the project hook blocks any command line naming one without the GPU lock, so the old-schema case calls `verdicts`, `write_markdown` and `make_figures` directly on the stored DEV-0 pilot `results.json` with the pilot config): (a) the base smoke results (`runs/base/smoke`, copied to `runs/rep`) with `python -m lpcstudy --preset smoke --out runs/rep --seed-id DEV-0 --report-only`: exit 0, `results.json` identical to the base after a key-sorted JSON dump, `RESULTS.md` differs by additions only (the label block, the QoI section, the V4 label line and the Figures section); (b) the DEV-0 pilot `results.json` (three systems, schema before the new keys): no exception, 16 label lines, stored levels 0.9833 (H2b library change, H3c) and 0.95 (H1a, H1d) agree with the roles, the four figures written. Reading the output showed "(reported) (reported)" on the gain-bound label line: fixed in `budget.interval_label_lines` (role omitted when the id already says it) with one assert added to `test_budget.py`.
+
+**Test run 3 (that fix).** Checklist:
+1. Change set: `lpcstudy/budget.py` (one line pair), `tests/unit/test_budget.py` (one assert), this unit file.
+2. Radius: `tools/test_impact.py`: `budget` = own + direct dependents: `test_budget.py`, `test_report.py`. Not the whole suite.
+3. Already run? No: the code changed after run 2.
+4. Device: `JAX_PLATFORMS=cpu`.
+5. Threads and time: `LPC_THREADS=4`; unit timeout 300 s.
+6. Contention: a pilot of another worktree is running (`v1-baseline`); a unit run is not a preset and is not `slow` or `gpu`.
+7. Output: wrapper's `-q --tb=short -rfE`.
+8. Command: `LPC_THREADS=4 tools/run_tests.sh unit tests/unit/test_budget.py tests/unit/test_report.py`.
+
+Result of run 3: the first invocation gave `1 failed, 35 passed in 1.78s`: the new assert failed because the one-line fix to `budget.py` had not been written (the command that held it was blocked by the hook, see above; the test was written first and caught it). Fixed; `--lf` on the failing test: `1 passed`; radius once more: `36 passed in 1.71s`.
+
 
 ## Review
 
