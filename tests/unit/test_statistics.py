@@ -448,6 +448,26 @@ def test_percentile_interval_failure_edge_matches_exact_index_rule(
         (-math.inf, math.inf, n_resamples)
 
 
+def test_percentile_interval_float_threshold_is_conservative_at_b21() -> None:
+    """Pin the documented float convention of the failure threshold (review R2).
+
+    Reference: exact arithmetic gives (B - 1) a = 20 * 0.1 = 2 for B = 21 and level 0.8,
+    so F* = 3 and F = 2 would leave a finite lower bound (the third order statistic);
+    the float a = 0.09999999999999998 gives 1.9999999999999996, so the code's F* is 2 and
+    F = 2 returns (-inf, inf). This is the documented conservative result (more
+    inconclusive, one step), recorded here so that a later change to exact arithmetic is
+    a visible decision. F = 1 stays finite; the same threshold applies to the upper bound.
+    Tolerance: exact.
+    """
+    values = np.random.default_rng(0).standard_normal(21)
+    for n_failed, infinite in ((1, False), (2, True), (3, True)):
+        failing = values.copy()
+        failing[:n_failed] = np.nan
+        lo, hi, got = percentile_interval(failing, 0.8)
+        assert got == n_failed
+        assert (lo == -math.inf and hi == math.inf) == infinite
+
+
 def test_percentile_interval_rejects_bad_input() -> None:
     """Empty, 2-D values and a level outside (0, 1) raise (PRIME.4).
 
@@ -538,6 +558,12 @@ VERDICT_CASES = [
     ((0.75, 1.25), (True, True), -math.inf, math.inf, "inconclusive"),
     ((0.75, 1.25), (True, True), math.nan, 1.0, "inconclusive"),
     ((0.75, 1.25), (True, True), 1.0, math.nan, "inconclusive"),
+    # A bound that cannot be computed never reads as a fail (A3), even when the other bound
+    # is disjoint from the band on its own side.
+    ((0.75, 1.25), (True, True), math.nan, 0.5, "inconclusive"),
+    ((0.75, 1.25), (True, True), 1.3, math.nan, "inconclusive"),
+    ((0.75, 1.25), (True, True), math.nan, math.nan, "inconclusive"),
+    ((0.0, math.inf), (False, True), math.nan, -1.0, "inconclusive"),
     # H2a(ii) open band (-0.1, 0.1)
     ((-0.1, 0.1), (False, False), -0.05, 0.05, "pass"),
     ((-0.1, 0.1), (False, False), -0.1, 0.05, "inconclusive"),
@@ -664,6 +690,12 @@ def test_criterion_verdict_guard_order_and_reasons() -> None:
     assert criterion_verdict(1.0, 1.25, 1.4, band, n_states=50) == \
         ("inconclusive", "interval meets band edge")
     assert criterion_verdict(1.4, 1.3, 1.5, band, n_states=50) == ("fail", None)
+    # One infinite bound is enough for the failed-resample reason (not both required).
+    reason = "failed resamples >= threshold"
+    assert criterion_verdict(1.0, -math.inf, 1.1, band, n_states=50) == ("inconclusive", reason)
+    assert criterion_verdict(1.0, 0.9, math.inf, band, n_states=50) == ("inconclusive", reason)
+    assert criterion_verdict(1.0, -math.inf, math.inf, band, n_states=50) == \
+        ("inconclusive", reason)
     assert criterion_verdict(0.9, 0.8, 0.95, (0.7, math.inf), (True, False), n_states=50) == \
         ("pass", None)
     assert criterion_verdict(0.9, 0.8, math.inf, (0.7, math.inf), (True, False), n_states=50) == \

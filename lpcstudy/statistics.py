@@ -227,6 +227,18 @@ def percentile_interval(values: np.ndarray, level: float) -> tuple[float, float,
     bound) or largest (upper bound) finite value, which leaves the quantile unchanged
     and avoids infinite arithmetic. With ``F = 0`` the result is ``np.quantile``.
 
+    Float convention: the threshold is evaluated in float64 with ``a = (1 - level)/2``
+    as computed. When ``(B - 1) a`` is an exact integer but the float ``a`` rounds
+    below it, the float floor is one lower than exact arithmetic, so the threshold is
+    one failure lower: for ``B = 21`` at level 0.8, ``(B - 1) a = 1.9999999999999996``
+    gives ``F* = 2``, and ``F = 2`` returns ``(-inf, inf)`` where exact arithmetic gives
+    a finite lower bound (the third order statistic). This is conservative (more
+    inconclusive, never fewer), and it matches ``np.quantile`` only for the lower
+    bound, whose float index puts weight 4e-16 on a failure; making both bounds
+    infinite together is a convention. It occurs only for some B at levels 0.8 and 0.9
+    (748 pairs with B <= 5000, none at 0.95 or ``1 - 0.05/3`` or at B in {50, 500, 2000}),
+    so no study verdict changes. The tests pin the ``B = 21`` case.
+
     Parameters
     ----------
     values : np.ndarray
