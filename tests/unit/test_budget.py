@@ -808,28 +808,46 @@ def addendum_a1() -> str:
     return text[start:end if end != -1 else len(text)]
 
 
-def test_interval_procedure_cell_names_both_seed_sources_and_def0020_correctly() -> None:
-    """R9 and R13: reference seed 20261011 with R_ref and run-2 seed 6006; DEF-0020 stated truly.
+def addendum_a2() -> str:
+    """The text of DEC-0024 addendum A2 in the decisions file (row 9 under Option C)."""
+    text = DECISIONS.read_text(encoding="utf-8")
+    start = text.index("## DEC-0024 addendum A2")
+    end = text.find("\n## ", start + 5)
+    return text[start:end if end != -1 else len(text)]
 
-    Reference: DEC-0024 addendum A1, parsed from the decisions file (row 9 text between backticks;
-    the reference rates come from the scratch seed 20261011, the run-2 counts from
-    make_rng(6006, ...)); DEF-0020's Resolution (Option C or K only decides whether the WU-0006
-    ROADMAP-bound rows stay asserted; widening or another procedure is a separate design
-    question). The widening sentence cites the uq-budget rule, not DEF-0020 or DEC-0018. Exact
-    substring checks.
+
+def test_interval_procedure_cell_names_both_seed_sources_and_def0020_correctly() -> None:
+    """R9, R13 and WU-0006.5: reference seed 20261011 with R_ref and run-2 seed 6006; DEF-0020 true.
+
+    Reference: DEC-0024 addendum A1 (seeds, R_ref) and addendum A2 (row 9 under Option C, which
+    replaces the A1 sentence after the owner's ratification of Option C, DEC-0026 item 2), both
+    parsed from the decisions file (row 9 text between backticks; the reference rates come from the
+    scratch seed 20261011, the run-2 counts from make_rng(6006, ...)). Row 9 says Option C is in
+    force (owner-ratified 2026-10-12, DEC-0026), that the ROADMAP-bound rows are recorded and not
+    asserted with the consistency ranges as the defect test, and that widening or another procedure
+    is a separate, undecided design question. A1 is left intact (append-only) and A2 says it
+    amends A1's row 9. The widening sentence cites the uq-budget rule, not DEF-0020 or DEC-0018.
+    Exact substring checks.
     """
     results, systems = budget_results(full_system(), names=("lorenz63",))
     tables = tables_of(budget.budget_lines(results, systems, SMOKE))
     h2b = tables[budget.QOI_TITLES["H2b(ii)"]][8][2]
     assert "R_ref 40000" in h2b and "scratch seed 20261011" in h2b and "seed 6006" in h2b
     assert "R_ref 20000" in tables[budget.QOI_TITLES["H3c"]][8][2]
-    assert "decides only whether the WU-0006 ROADMAP-bound coverage rows stay asserted (K) or " \
-        "become recorded characterization rows" in h2b
+    assert "Option C in force (owner-ratified 2026-10-12, DEC-0026; ASSERT_ROADMAP_BOUNDS = " \
+        "False)" in h2b
+    assert "recorded characterization rows (outcome reported, not asserted) and the " \
+        "consistency ranges are the defect test" in h2b
     assert "separate, undecided design question for the owner and the applied-mathematician" in h2b
-    assert "widening or another procedure (Option C or K)" not in h2b
+    assert "pending" not in budget.DEF0020_TEXT and "K in force" not in h2b
+    assert "Option C or K" not in h2b and "widening or another procedure (Option C or K)" not in h2b
     assert "registered seed" in h2b and "synthetic, seed 6006" not in h2b
-    row9 = re.search(r"\*\*Row 9 \(DEF-0020\)\.\*\* `([^`]+)`", addendum_a1()).group(1)
+    row9 = re.search(r"\*\*Row 9 \(DEF-0020\), replacing the A1 text\.\*\* `([^`]+)`",
+                     addendum_a2()).group(1)
     assert row9.rstrip(".") == budget.DEF0020_TEXT and row9.rstrip(".") in h2b
+    assert "amends the row-9 text of addendum a1" in addendum_a2().lower()
+    a1_row9 = re.search(r"\*\*Row 9 \(DEF-0020\)\.\*\* `([^`]+)`", addendum_a1()).group(1)
+    assert a1_row9 != row9 and a1_row9.rstrip(".") != budget.DEF0020_TEXT   # A1 is history
     assert "scratch seed 20261011" in addendum_a1() and "make_rng(6006" in addendum_a1()
     assert "DEF-0020" not in budget.WIDENING_SENTENCE and "DEC-0018" not in budget.WIDENING_SENTENCE
     assert "uq-budget skill is to widen the interval or refine" in budget.WIDENING_SENTENCE
