@@ -20,7 +20,10 @@ labels and durations at phi = 0.3 inflate its variance by about 1.08, a property
 **Assertion groups**: exact (L3: no pair left uncomputed, counted, 0), consistency (the pre-registered
 ranges of counts of 2000: L1 FWER 7 to 39 at phi 0 and 11 to 47 at 0.3; L1 pass 0 to 9 and 0 to 10; L2
 pass 8 to 42 and 9 to 44), and roadmap (each error count <= 33 of 2000: nominal 0.01 + 3 SE, SE 0.00222,
-bound 0.016675), asserted while ``ASSERT_ROADMAP_BOUNDS`` is True. Results are written to
+bound 0.016675). Under Option C (``ASSERT_ROADMAP_BOUNDS = False``, in force since 2026-10-12,
+DEC-0026 item 2) this bound is a recorded characterization row (computed, written to the results table,
+shown as a pytest warning, not asserted); the exact and consistency groups are asserted in both
+positions, and the bound is asserted only under Option K (True). Results are written to
 ``runs/tests/wu0006_logrank.json`` with the censoring fraction and the variance inflation.
 """
 
@@ -72,8 +75,9 @@ def test_roadmap_size_bound(pool, cache: wu.RunCache, row: str, phi: float) -> N
 
     Under L1 a "pass" is a false positive; under L2 it needs the null pair to reject. Predicted
     P(fail): see the module table (0.105 for L1 at phi = 0.3). A failure is a finding of class
-    "method" (dependent labels), recorded in the unit Log, never tuned away. Under Option C the
-    outcome is only recorded."""
+    "method" (dependent labels), recorded in the unit Log, never tuned away. Under Option C
+    (``ASSERT_ROADMAP_BOUNDS = False``, as shipped) the outcome is only recorded and warned about,
+    never asserted; under Option K (True) a failed bound raises."""
     evaluation = cache.logrank(pool, row, phi)
     assert wu.enforce(evaluation.roadmap) in ("pass", "fail")
 

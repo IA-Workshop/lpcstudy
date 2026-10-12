@@ -57,9 +57,9 @@ interval is wider than the band). The ROADMAP bound is <= 39 of 1000 at 95% and 
 The C7 pass row cannot fail its ROADMAP bound (P about 1e-13): "pass" is almost unreachable at this
 width (v3 section 7 pre-registers that H2a's second part can be refuted but essentially cannot pass).
 
-Correct code is expected to fail about 1 to 2 of the 32 phi = 0 and about 11 of the 32 phi = 0.3
-assertions of A1 to A3 (the block-5 percentile interval undercovers, most for heavy tails and lag-1
-0.3): a ROADMAP-bound failure inside the consistency range is a finding of class "method", not a defect.
+Correct code is expected to fall short of about 1 to 2 of the 32 phi = 0 and about 11 of the 32 phi = 0.3
+ROADMAP bounds of A1 to A3 (recorded, not asserted, under Option C; the block-5 percentile interval
+undercovers, most for heavy tails and lag-1 0.3): a ROADMAP-bound failure inside the consistency range is a finding of class "method", not a defect.
 
 **Assertion groups** (each (case, phi) is a separate test):
 
@@ -68,8 +68,10 @@ assertions of A1 to A3 (the block-5 percentile interval undercovers, most for he
 * consistency: coverage at both levels, and the wrong-pass and wrong-fail counts at the edge, lie in
   the 64 pre-registered ranges (C2, C4 to C9 are 56 of them; the defect test, always asserted).
 * roadmap: A1 >= 930 of 1000, A2 >= 972, and A3 (P(pass) and P(fail) at the criterion's own level each
-  <= 39 of 1000 at 95%, <= 16 at 1 - 0.05/3; nominal alpha/2 + 3 SE), asserted while
-  ``ASSERT_ROADMAP_BOUNDS`` is True. Open and closed edges are not told apart by A4 (no ties occur);
+  <= 39 of 1000 at 95%, <= 16 at 1 - 0.05/3; nominal alpha/2 + 3 SE). Under Option C
+  (``ASSERT_ROADMAP_BOUNDS = False``, in force since 2026-10-12, DEC-0026 item 2) these are recorded
+  characterization rows (computed, written to the results table, shown as a pytest warning, not
+  asserted); they are asserted only under Option K (True). Open and closed edges are not told apart by A4 (no ties occur);
   deterministic tie tests do that (``test_wu0006_harness.py`` and ``tests/unit/test_analysis.py``).
 
 Characterization rows C2h and C4h (sigma 1.5 and 2, c 0.8, phi 0) are reported against the reference
@@ -131,7 +133,8 @@ def test_roadmap_coverage_and_verdict_bounds(pool, cache: wu.RunCache, case: str
     at the edge <= 39 (95%) or <= 16 (98.3%). Bounds are nominal -/+ 3 SE (SE 0.00689, 0.00405,
     0.00494, 0.00287); truth on the band edge, analytic. Predicted P(fail) per the module table; a
     failure is a finding recorded in the unit Log, never tuned away (PRIME.2). Under Option C
-    (``ASSERT_ROADMAP_BOUNDS = False``) the outcome is only recorded."""
+    (``ASSERT_ROADMAP_BOUNDS = False``, as shipped) the outcome is only recorded and warned about,
+    never asserted; under Option K (True) a failed bound raises."""
     evaluation = cache.coverage(pool, wu.CaseSpec(case), phi)
     assert wu.enforce(evaluation.roadmap) in ("pass", "fail")
 
