@@ -22,6 +22,14 @@ DECISION_LOG = ROOT / "docs" / "study" / "decision_log_lpc.md"
 PROPOSAL = ROOT / "docs" / "study" / "proposal_and_methods_v3.md"
 PACKAGE = ROOT / "lpcstudy"
 
+# The v1/v2 ids that left the code, matched as whole tokens (WU-0011.5, DEC-0026 item 7): an id
+# inside a longer alphanumeric token (a timestamp such as 20261011T165447Z) is not an id. The two
+# lowercase prefixes keep their substring matching. Underscore is a separator, so ``H3d_median``
+# and ``kaplan_meier_T1`` are flagged.
+STALE_ID = re.compile(r"(?<![A-Za-z0-9])(?:H1e|H1f|H2f|H3d|T1)(?![A-Za-z0-9])|h1e_|h1f_")
+# The unanchored regex the test used before WU-0011.5, kept to show that nothing real is lost.
+OLD_STALE_ID = re.compile(r"H1e|H1f|H2f|H3d|T1|h1e_|h1f_")
+
 
 def unescape(text: str) -> str:
     """Remove Markdown escapes and bold markers from a table cell."""
@@ -133,10 +141,11 @@ def test_no_stale_identifier_in_the_package() -> None:
     Reference: the ROADMAP grep of WU-0002.2 (``H1e|H1f|H2f|H3d|T1``, ``h1e_|h1f_``), done on the
     syntax tree (names, attributes, function and argument names, string constants including
     docstrings). Every string constant that is exactly an identifier (``H1a`` ... ``Q-N``, ``T1``)
-    must be a ``key`` of the table.
+    must be a ``key`` of the table. Stale ids match as whole tokens (``STALE_ID``; the cases
+    below pin what it flags), so a timestamp such as ``20261011T165447Z`` is not a stale ``T1``.
     """
     keys = {h.key for h in HYPOTHESIS_TABLE}
-    stale = re.compile(r"H1e|H1f|H2f|H3d|T1|h1e_|h1f_")
+    stale = STALE_ID
     exact = re.compile(r"^(H\d[a-f]|Q-N|T1)$")
     found = []
     for path in sorted(PACKAGE.glob("*.py")):
@@ -186,3 +195,85 @@ def test_declarations_cover_the_table_keys_with_nonempty_fields() -> None:
     for key, declared in QOI_DECLARATIONS.items():
         assert set(declared) == set(QOI_FIELDS), key
         assert all(text.strip() for text in declared.values()), key
+
+
+# (text, is_flagged). Hand-written: a standalone token IS flagged; the same letters inside a
+# longer alphanumeric token (a timestamp, a longer word) are not.
+STALE_CASES = [
+    ("T1", True), (" T1 ", True), ("T1,", True), ("(T1)", True), ("inventory row T1", True),
+    ("kaplan_meier T1", True), ("kaplan_meier_T1", True), ("H1e", True), ("H1f", True),
+    ("H2f", True), ("H3d", True), ("H3d_median", True), ("use H2f.", True), ("h1e_x", True),
+    ("h1f_y", True), ("key=H1e;", True),
+    ("20261011T165447Z", False), ("slow-20261011T165447Z.log", False), ("xT1", False),
+    ("T10", False), ("kaplan_meierT1", False), ("H1ex", False), ("ABH3d", False),
+    ("H2a", False), ("H1a", False), ("kaplan_meier", False), ("", False),
+]
+
+
+def token_reference(text: str) -> bool:
+    """Independent whole-token rule: some alphanumeric token is a stale id, or a prefix is found."""
+    stale_ids = {"H1e", "H1f", "H2f", "H3d", "T1"}
+    return (any(token in stale_ids for token in re.findall(r"[A-Za-z0-9]+", text))
+            or "h1e_" in text or "h1f_" in text)
+
+
+def test_stale_id_regex_matches_whole_tokens_only() -> None:
+    """S1: ``STALE_ID`` flags a standalone stale id and not the same letters inside a longer token.
+
+    Reference: the hand-written ``STALE_CASES`` (a timestamp ``20261011T165447Z`` is not ``T1``;
+    a standalone ``T1`` is, including ``kaplan_meier T1``), and ``token_reference``, a token split
+    on non-alphanumerics that shares no code with the regex. Exact booleans, no tolerance. This
+    corrects a false positive (DEC-0026 item 7); it does not loosen what the test is for.
+    """
+    for text, flagged in STALE_CASES:
+        assert bool(STALE_ID.search(text)) is flagged, text
+        assert token_reference(text) is flagged, text
+
+
+def test_stale_id_regex_loses_nothing_real() -> None:
+    """S2: every stale id the old regex flagged in a real context is still flagged.
+
+    Reference: the v1/v2 ids of the decision-log correction (H1e, H1f, H2f, H3d, T1) and the two
+    lowercase prefixes, each in the contexts the package can hold (a bare string, a docstring
+    phrase, a dict key, a function-name stem, a trailing punctuation mark). The two regexes may
+    differ only on a string whose old match lay inside a longer alphanumeric token: on the case
+    table the difference is exactly the strings below. Exact sets.
+    """
+    real = []
+    for ident in ("H1e", "H1f", "H2f", "H3d", "T1"):
+        real += [ident, f" {ident} ", f"{ident}.", f"({ident})", f"row {ident}, per v1",
+                 f"{ident}_median", f"'{ident}'", f"{ident}\n"]
+    real += ["h1e_ratio", "h1f_slope", "def h1e_check", "x.h1f_"]
+    for text in real:
+        assert OLD_STALE_ID.search(text) and STALE_ID.search(text), text
+    texts = [text for text, _ in STALE_CASES] + real
+    differing = {t for t in texts if bool(OLD_STALE_ID.search(t)) != bool(STALE_ID.search(t))}
+    assert differing == {"20261011T165447Z", "slow-20261011T165447Z.log", "xT1", "T10",
+                         "kaplan_meierT1", "H1ex", "ABH3d"}
+    assert all(not STALE_ID.search(t) and OLD_STALE_ID.search(t) for t in differing)
+
+
+def test_stale_id_regex_mutants_are_caught() -> None:
+    """S3: a weakened or over-tightened ``STALE_ID`` gives a wrong verdict on the case table.
+
+    Reference: ``STALE_CASES``. Each mutant is built from ``STALE_ID.pattern`` by one edit (drop
+    the lookbehind, drop the lookahead, drop the ``T1`` or the ``H3d`` alternative, drop the
+    ``h1f_`` prefix, require whitespace boundaries). Expected: the mutant text differs from the
+    pattern (the edit applied) and at least one case gets a verdict other than the hand-written
+    one, so the table fails if the regex is changed in any of these ways. Exact.
+    """
+    pattern = STALE_ID.pattern
+    mutants = {
+        "no lookbehind": pattern.replace("(?<![A-Za-z0-9])", ""),
+        "no lookahead": pattern.replace("(?![A-Za-z0-9])", ""),
+        "no T1": pattern.replace("|T1", ""),
+        "no H3d": pattern.replace("|H3d", ""),
+        "no h1f_ prefix": pattern.replace("|h1f_", ""),
+        "whitespace boundaries": pattern.replace("(?<![A-Za-z0-9])", r"(?<!\S)")
+                                        .replace("(?![A-Za-z0-9])", r"(?!\S)"),
+    }
+    for name, text in mutants.items():
+        assert text != pattern, name
+        regex = re.compile(text)
+        wrong = [case for case, flagged in STALE_CASES if bool(regex.search(case)) is not flagged]
+        assert wrong, f"mutant '{name}' passes the case table"

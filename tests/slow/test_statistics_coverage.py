@@ -34,7 +34,11 @@ finding of class "method", not a defect.
 * consistency: the observed counts lie in the pre-registered range of the reference (the defect test;
   family-wise false alarm at most 3.5% over all 70 ranges of WU-0006).
 * roadmap: A1 (count of covering intervals at 95% >= 930 of 1000, i.e. nominal - 3 SE = 0.929324,
-  SE 0.00689) and A2 (>= 972, 0.971188, SE 0.00405), asserted while ``ASSERT_ROADMAP_BOUNDS`` is True.
+  SE 0.00689) and A2 (>= 972, 0.971188, SE 0.00405). Under Option C (``ASSERT_ROADMAP_BOUNDS = False``,
+  in force since 2026-10-12, DEC-0026 item 2) these are recorded characterization rows: the outcome is
+  computed, written to the results table and shown as a pytest warning, never asserted (asserted only
+  under Option K, ``ASSERT_ROADMAP_BOUNDS = True``). The exact and consistency groups are asserted in
+  both positions.
 
 The outcomes of all groups are written to ``runs/tests/wu0006_coverage_statistics.json``.
 """
@@ -89,7 +93,8 @@ def test_roadmap_coverage_bounds(pool, cache: wu.RunCache, case: str, phi: float
 
     Truth 0 (analytic). Predicted P(fail) per the module table; a failure at phi = 0.3 is a finding
     of class "method" recorded in the unit Log, never tuned away (PRIME.2). Under Option C
-    (``ASSERT_ROADMAP_BOUNDS = False``) the outcome is only recorded."""
+    (``ASSERT_ROADMAP_BOUNDS = False``, as shipped) the outcome is only recorded and warned about,
+    never asserted; under Option K (True) a failed bound raises."""
     evaluation = cache.coverage(pool, wu.CaseSpec(case), phi)
     outcome = wu.enforce(evaluation.roadmap)
     assert outcome in ("pass", "fail")

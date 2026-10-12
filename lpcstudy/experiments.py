@@ -384,6 +384,10 @@ def run_handling(study: Study, results: dict) -> dict:
     if failed:
         LOG.warning("handling run: failed_variants = %d of %d variants (%s)", failed, n_variants,
                     "; ".join(f"{s}: {', '.join(v)}" for s, v in study.failed_variants.items()))
+    skipped = sum(len(labels) for labels in study.skipped_variants.values())
+    if skipped:  # not in the results block: no schema change (DEF-0025); the log carries it
+        LOG.warning("handling run: skipped_variants = %d (%s)", skipped,
+                    "; ".join(f"{s}: {', '.join(v)}" for s, v in study.skipped_variants.items()))
     return {"schema": HANDLING_SCHEMA, "totals": totals, "by_system": by_system,
             "robustness": robustness, "failed_variants": failed}
 
@@ -575,6 +579,29 @@ def _perturbation_scale_variant(study: Study, cell: Cell, rules: FittedRules,
             "corr_fin_vs_linear": agreement}
 
 
+def robustness_dimensions(cfg: StudyConfig, state_dim: int) -> tuple[list[int], list[int]]:
+    """Split the configured robustness dimensions into those run and those skipped (DEF-0025).
+
+    A variant needs ``d - state_dim`` positive chi-square degrees of freedom (the goodness-of-fit
+    threshold has none at ``d == state_dim``), so the kept dimensions are ``d > state_dim``. The
+    base dimension ``cfg.embedding_dim`` is the base cell, neither a variant nor a skip.
+
+    Parameters
+    ----------
+    cfg : StudyConfig
+        Configuration (``robustness_dims`` and ``embedding_dim``).
+    state_dim : int
+        Dimension of the system (``spec.dim``).
+
+    Returns
+    -------
+    tuple of list of int
+        ``(kept, skipped)``, each in configured order; ``skipped`` holds ``d <= state_dim``.
+    """
+    candidates = [d for d in cfg.robustness_dims if d != cfg.embedding_dim]
+    return [d for d in candidates if d > state_dim], [d for d in candidates if d <= state_dim]
+
+
 def run_robustness(study: Study, system: str) -> dict:
     """Stage (v): robustness variants at the core cell of one system.
 
@@ -593,8 +620,14 @@ def run_robustness(study: Study, system: str) -> dict:
     cfg = study.config
     out: dict = {"base": _variant_summary(study.core_cells[system], study.fitted[system], cfg)}
     variants: list[tuple[str, dict]] = []
-    variants += [(f"D={d}", {"embed_dim": d}) for d in cfg.robustness_dims
-                 if d != cfg.embedding_dim and d >= study.context(system).spec.dim]
+    kept, skipped = robustness_dimensions(cfg, study.context(system).spec.dim)
+    variants += [(f"D={d}", {"embed_dim": d}) for d in kept]
+    for d in skipped:  # counted and reported, never dropped silently (DEF-0025, PRIME.4)
+        study.record_skipped_variant(system, f"D={d}")
+    if skipped:
+        LOG.warning("robustness %s: skipped_variants = %d (%s): dimension not above the state "
+                    "dimension, zero chi-square degrees of freedom", system, len(skipped),
+                    ", ".join(f"D={d}" for d in skipped))
     variants += [(f"k={k}", {"n_analogs": k}) for k in cfg.analog_counts if k != 1]
     variants += [(f"misspec={p:g}", {"misspec": p}) for p in cfg.misspec_levels]
     for label, kwargs in variants:
