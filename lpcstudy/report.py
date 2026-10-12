@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 from .allocation import RULE_LABELS  # noqa: E402
+from .clip_sensitivity import INVARIANCE_NOT_GUARANTEED, part_state  # noqa: E402
 from .config import StudyConfig  # noqa: E402
 from .identifiers import HYPOTHESIS_TABLE, Hypothesis, check_keys  # noqa: E402
 from .statistics import overall_verdict  # noqa: E402
@@ -653,6 +654,117 @@ def _lm_lines(results: dict, systems: list[str], config: StudyConfig) -> list[st
         f"(NVVUQ.9)."]
 
 
+# --- WU-0002.11e begin ---
+CLIP_NONE = "—"
+"""The ``clip`` cell of a criterion whose inputs hold no clipped entry at H_ref."""
+CLIP_MARK = "CLIP-SENSITIVE"
+
+
+def _parts_text(entry: dict) -> str:
+    """The ``clip`` text of one criterion from its parts (``clip_sensitivity.part_state``).
+
+    Fired parts are listed with their ratio and the verdict at 20 sigma_x; otherwise ``—`` when no
+    computed part has a clipped input, ``ok (|Δ|/hw = x)`` with the largest ratio, and the parts that
+    could not be computed with their reason (never read as ok).
+    """
+    parts = entry["parts"]
+    fired, other, ratios, not_done = [], [], [], []
+    for name, part in parts.items():
+        state = part_state(part)
+        ratio = part["ratio"]
+        label = "|Δ|max/hw" if "delta_bound" in part else "|Δ|/hw"
+        if state == "fired":
+            what = part["verdict_2L"] if part.get("verdict_2L") else (
+                part["reason"] or "bound")
+            fired.append(f"{name} ({label} = {_fmt(ratio, 2)}; at 20 σ_x: {what})")
+        elif state == "not_computed":
+            not_done.append(f"{name}: {part['reason']}")
+        else:
+            other.append(state)
+            if ratio is not None:
+                ratios.append(ratio)
+    text = []
+    if fired:
+        text.append(f"**{CLIP_MARK}** " + "; ".join(fired))
+    elif entry["flag"]:  # a criterion-level event: the parts of H2a(ii) change at 20 sigma_x
+        text.append(f"**{CLIP_MARK}** (the parts change at 20 σ_x: {entry.get('parts_2L')})")
+    if not fired and other:
+        text.append(CLIP_NONE if all(s == "none" for s in other)
+                    else f"ok (|Δ|/hw = {_fmt(max(ratios), 2) if ratios else 'n/a'})")
+    if not_done:
+        text.append("not computed (" + "; ".join(not_done) + ")")
+    return "; ".join(text) if text else CLIP_NONE
+
+
+def _clip_text(block: dict | None, key: str) -> str:
+    """The ``clip`` text of table row ``key`` for one system (``block`` is its ``clip_sensitivity``)."""
+    if block is None:
+        return "n/a"
+    if block["status"] != "computed":
+        return f"not computed ({block['reason']})"
+    if key == "Q-N" or key == "H3b":
+        n = block["affected_states"][key]
+        return CLIP_NONE if n == 0 else f"{n} states with a clipped H_ref draw (count only)"
+    if key == "H1c":
+        return "invariant" if block["invariance"]["H1c"] == "exact" else block["invariance"]["H1c"]
+    if key == "H3a":
+        inv = block["invariance"]["H3a"]
+        return "invariant" if inv == "exact" else \
+            f"{inv} ({block['test_eval_clipped_entries']} clipped test evaluation entries)"
+    entry = block["by_hypothesis"].get(key)
+    if entry is None:
+        return "n/a"
+    text = _parts_text(entry)
+    if key == "H2a":
+        inv = block["invariance"]["H2a_i"]
+        return f"(i) {'invariant' if inv == 'exact' else inv}; (ii) {text}"
+    return text
+
+
+def clip_cells(results: dict, systems: list[str], key: str) -> str:
+    """The ``clip`` cell of table row ``key``: each system's text, pipes escaped for the table."""
+    text = "; ".join(f"{s}: {_clip_text(results['systems'][s].get('clip_sensitivity'), key)}"
+                     for s in systems)
+    return text.replace("|", "\\|")
+
+
+def clip_lines(results: dict, systems: list[str]) -> list[str]:
+    """The note under the verdict table about the ``clip`` column (WU-0002.11e), or ``[]`` if no
+    system has a ``clip_sensitivity`` block (results written before it existed).
+
+    One line says what the column is and that it is report-only (OD6: a fired flag marks nothing
+    provisional); then one line per system for a block that was not computed, for the clipped inputs
+    that are held fixed (the regime tree, A3 and Kaplan-Meier inputs are not recomputed) and for an H3a
+    invariance that is not guaranteed.
+    """
+    blocks = {s: results["systems"][s].get("clip_sensitivity") for s in systems}
+    if not any(blocks.values()):
+        return []
+    lines = ["", "Clip sensitivity (the `clip` column; WU-0002.11e, DEC-0017 Q6): each verdict is "
+             "recomputed with every clipped PLP error at H_ref moved from 10 σ_x to 20 σ_x (the "
+             "same states, draws, proxies, A3 network, regime tree and bootstrap resamples). "
+             f"`{CLIP_MARK}` means 10 |Δ| exceeds the half-width of the verdict's own interval, or "
+             "the verdict at 20 σ_x differs (Δ is the change of the estimate); `—` means no clipped "
+             "H_ref entry feeds the verdict; a quantity that cannot be computed says so. It is "
+             "reported next to the verdicts and changes none of them; it marks no result "
+             "provisional (the clip is part of the estimand, v3 §4)."]
+    for s, block in blocks.items():
+        if block is None:
+            lines += ["", f"{s}: no `clip_sensitivity` block (results written before WU-0002.11e)."]
+            continue
+        if block["status"] != "computed":
+            lines += ["", f"{s}: clip sensitivity not computed: {block['reason']}."]
+            continue
+        if block["held_fixed_entries"]:
+            lines += ["", f"{s}: tree, A3 and KM inputs contain {block['held_fixed_entries']} "
+                      "clipped entries; not recomputed."]
+        if block["invariance"]["H3a"] == INVARIANCE_NOT_GUARANTEED:
+            lines += ["", f"{s}: H3a invariance not guaranteed: {block['test_eval_clipped_entries']}"
+                      " clipped test evaluation entries."]
+    return lines
+# --- WU-0002.11e end ---
+
+
 def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
     """Write the human-readable results report.
 
@@ -666,12 +778,15 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
         Output file.
     """
     systems = [s for s in config.core_systems if s in results["systems"]]
+    # WU-0002.11e: the clip column appears only if some system carries a clip_sensitivity block
+    with_clip = any("clip_sensitivity" in results["systems"][s] for s in systems)
     lines = [f"# Results — preset `{config.name}`", "",
              *header_lines(results.get("provenance")), "",
              INTRO, "",
              "## Hypothesis verdicts", "",
-             "| ID | Hypothesis | " + " | ".join(systems) + " | Verdict |",
-             "|---|---|" + "---|" * len(systems) + "---|"]
+             "| ID | Hypothesis | " + " | ".join(systems) + " | Verdict |"
+             + (" clip |" if with_clip else ""),
+             "|---|---|" + "---|" * len(systems) + "---|" + ("---|" if with_clip else "")]
     gate = {s: results["systems"][s]["validation"].get("gate", {}).get("gate_pass")
             for s in systems}
     gate_lines = ["", "Validation gate: " + ", ".join(
@@ -686,7 +801,7 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
         if row.key not in ver:  # a table row without a result is listed, not dropped
             cells = ["n/a: no result" for _ in systems]
             lines.append(f"| {row.v3_id} | {_hypothesis_text(row, computed=False)} | "
-                         + " | ".join(cells) + " | no result |")
+                         + " | ".join(cells) + " | no result |" + (" n/a |" if with_clip else ""))
             continue
         cells = []
         for s in systems:
@@ -702,7 +817,9 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
         missing = ver[row.key].get("missing_systems")
         overall = ver[row.key]["verdict"] + (f" (missing: {', '.join(missing)})" if missing else "")
         lines.append(f"| {row.v3_id} | {HYPOTHESES[row.key]} | " + " | ".join(cells)
-                     + f" | {overall} |")
+                     + f" | {overall} |"
+                     + (f" {clip_cells(results, systems, row.key)} |" if with_clip else ""))
+    lines += clip_lines(results, systems)  # WU-0002.11e
     # --- WU-0008.3 begin ---
     lines += interval_label_lines(results, systems, config)
     # --- WU-0008.3 end ---
