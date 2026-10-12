@@ -238,8 +238,17 @@ def scan_tests(root: Path, warnings: list[str]) -> tuple[dict[str, set[str]], li
     Direct imports are the absolute ``lpcstudy`` edges of ``_edge_targets`` found by walking the
     syntax tree of the test file, at any nesting level (``import lpcstudy.m``, ``from lpcstudy.m
     import x``, ``from lpcstudy import m``). Strings, comments and ``importlib`` calls are not
-    imports (a limit of the rule). A test file that does not parse is named in a warning and gets
-    no imports (never skipped silently); relative imports in a test file do not name the package.
+    imports. A test file that does not parse is named in a warning and gets no imports (never
+    skipped silently); relative imports in a test file do not name the package.
+
+    Known gaps (the two rules are text and import based, ratified as such): a test that reads
+    the source of one package file by path without importing it, a real case in the tree:
+    ``tests/unit/test_budget.py`` reads ``lpcstudy/experiments.py`` with ``read_text`` and asserts
+    ``(200, m_draws)`` is in it, so a change to ``experiments.py`` alone selects it under neither
+    rule; and a test that loads a module with ``importlib.import_module`` or reads its text with
+    ``inspect.getsource``. For these, planners add the test by hand: ``test_budget.py`` when
+    ``experiments.py`` changes (DEF-0016 status line 2026-10-12). No third marker is added here
+    (it would widen the rules beyond what the owner ratified).
 
     Returns
     -------
