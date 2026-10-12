@@ -98,8 +98,10 @@ False: the ROADMAP-bound rows (A1, A2, A3, L1, L2 and N1, N2, N3) are computed, 
 table and reported as labelled characterization rows (a UserWarning in the pytest output names each
 failed bound); they are never asserted. The pytest outcome is the consistency ranges (the defect
 test) and the exact checks, which are asserted whatever this constant says. True is Option K: the
-same rows are asserted and a failed bound raises (about 13 predicted failures at every gate,
-DEF-0020 and DEF-0021). N2 and N3 of the delta-R2 study joined the switch after addendum A9 (their
+same rows are asserted and a failed bound raises. DEC-0018 predicts that 16 to 17 of the 82
+probabilistic assertions at the nominal bounds fail for correct code (about 13 of them in the coverage rows
+alone; DEF-0020 and DEF-0021), across the L, A1 to A3, C and N1 to N3 families; under Option C none of
+those fails a node. N2 and N3 of the delta-R2 study joined the switch after addendum A9 (their
 nominal bounds, like A1 and A2, are method-validity bounds that correct code fails with probability
 about 0.15 per run); the 12 delta-R2 ranges are always asserted. No bound, level, R or B depends on
 the constant."""
