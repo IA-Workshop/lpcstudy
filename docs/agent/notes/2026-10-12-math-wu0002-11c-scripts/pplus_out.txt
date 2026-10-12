@@ -1,0 +1,6 @@
+P+ = [  5.6929738  -28.46486898  28.46486898] eigenvalues [-4.59607104e-06+5.42802593j -4.59607104e-06-5.42802593j
+  1.92982987e-01+0.j        ]
+eps=1e-02: refused 104/200 (diverged 104), refusal step max 192 median 158.0; not refused: max|x| 11.432608946178172
+eps=1e-06: refused 98/200 (diverged 98), refusal step max 297 median 262.0; not refused: max|x| 11.431780083386585
+eps=1e-10: refused 98/200 (diverged 98), refusal step max 396 median 364.0; not refused: max|x| 11.433167987234983
+eps=1e-14: refused 0/200 (diverged 0), refusal step max None median None; not refused: max|x| 5.69297379516591

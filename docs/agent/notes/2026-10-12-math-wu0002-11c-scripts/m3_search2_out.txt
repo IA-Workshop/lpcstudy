@@ -1,0 +1,11 @@
+735 starts, 170 diverge, 94 with k>=20
+start (np.float64(0.6), np.float64(-0.3), np.float64(1.0)) k=81 margin below 0.1339 above 0.1270; 1e-3 ball diverge all True, k 81-81
+start (np.float64(1.3), np.float64(-0.5), np.float64(-0.5)) k=57 margin below 0.1333 above 0.1252; 1e-3 ball diverge all True, k 57-57
+start (np.float64(0.6), np.float64(-0.5), np.float64(1.0)) k=49 margin below 0.1250 above 0.1197; 1e-3 ball diverge all True, k 49-49
+start (np.float64(1.4), np.float64(-0.5), np.float64(-0.5)) k=49 margin below 0.1150 above 0.1221; 1e-3 ball diverge all True, k 49-49
+start (np.float64(0.8), np.float64(-0.3), np.float64(1.0)) k=39 margin below 0.1244 above 0.1115; 1e-3 ball diverge all True, k 39-39
+start (np.float64(0.9), np.float64(0.5), np.float64(0.5)) k=44 margin below 0.1356 above 0.1115; 1e-3 ball diverge all True, k 44-44
+start (np.float64(1.4), np.float64(0.5), np.float64(0.0)) k=44 margin below 0.1046 above 0.1370; 1e-3 ball diverge all True, k 44-44
+start (np.float64(0.7), np.float64(0.5), np.float64(1.0)) k=28 margin below 0.0982 above 0.1484; 1e-3 ball diverge all True, k 28-28
+start (np.float64(1.3), np.float64(-0.5), np.float64(0.0)) k=32 margin below 0.0970 above 0.1538; 1e-3 ball diverge all True, k 32-32
+start (np.float64(1.0), np.float64(0.5), np.float64(0.5)) k=36 margin below 0.1362 above 0.0932; 1e-3 ball diverge all True, k 36-36

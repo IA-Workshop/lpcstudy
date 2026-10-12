@@ -1,0 +1,3 @@
+lorenz63 numpy max|x| over states 0..104999: np.float64(18.942631074757067) rel diff to production -0.01687229203773695
+rossler numpy max|x| over states 0..104999: np.float64(11.432999923289387) rel diff to production 6.233553640925414e-05
+chua numpy max|x| over states 0..104999: np.float64(2.2630735303811234) rel diff to production 8.791638022714941e-06
