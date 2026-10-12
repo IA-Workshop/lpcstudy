@@ -53,6 +53,9 @@ that cross-host differences in the cp, oracle and fixture chains are expected. N
 exit code depends on it. The four ``context`` digests of the new run (``state_mean_digest``,
 ``cov_digest``, ``whiten_digest``, ``unwhiten_digest``) are ``new`` leaves; the branch rule does not
 read them (a v3-against-v3 comparison needs an owner ruling first, follow-up F1 of WU-0001.6).
+The four orbit-guard leaves of each system (``context/lyapunov_orbit_max_abs`` and
+``context/trajectory_max_abs/{statistics,main,estimator}``, WU-0002.11c, DEF-0015) are ``new`` leaves
+too, and the branch rule does not read them.
 
 Outputs. ``--report`` (default ``docs/study/dev_regression_dev0.md``), whose first line is
 ``DEVELOPMENT (DEV-0): not a hypothesis test``, and a per-leaf JSON file (default
@@ -467,6 +470,10 @@ def _build_rules() -> list[Rule]:
                item="R2, switch rule", reason="dynamics and embedding code unchanged"))
     add(_rules("new", f"{S}/context/{{state_mean_digest,cov_digest,whiten_digest,unwhiten_digest}}",
                "WU-0001.6", "DEF-0024", "platform record: SHA-256 of the whitening chain"))
+    add(_rules("new", f"{S}/context/lyapunov_orbit_max_abs "
+               f"{S}/context/trajectory_max_abs/{{statistics,main,estimator}}",
+               "WU-0002.11c", "DEF-0015", "orbit guard: max |x| of the Benettin orbit and of the "
+               "three trajectories (diagnostics)", chain="dynamics"))
     add(_rules("unchanged", f"{S}/validation/{{delay_jacobian_rel_err,gain_rel_err,"
                "integrator_max_dev_sigma,km_max_abs_dev}", chain="fixture", item="R2 (V1, V2, V5, V6)",
                reason="fixed-seed or deterministic fixtures"))

@@ -3,18 +3,23 @@
 from __future__ import annotations
 
 import ast
+import dataclasses
 import inspect
 import json
+import math
+import re
+import struct
 import zlib
 
 import numpy as np
 import pytest
 
+from lpcstudy import data as data_module
 from lpcstudy.config import SMOKE
-from lpcstudy.data import build_context, lyapunov_cached, make_rng
+from lpcstudy.data import build_context, lyapunov_cached, lyapunov_record, make_rng
 from lpcstudy.pipeline import Study
 from lpcstudy.seeds import REGISTRY_PATH, with_seed
-from lpcstudy.systems import (SYSTEMS, SystemSpec, chua_field, make_flow_step,
+from lpcstudy.systems import (SYSTEMS, OrbitDivergence, SystemSpec, chua_field, make_flow_step,
                               simulate_trajectory)
 
 
@@ -289,7 +294,7 @@ LYAPUNOV_BURN_IN_STEPS = 5_000
 CHUA_MEMO = SystemSpec(
     name="chua_memo", field_fn=chua_field,
     params={"alpha": 9.0, "beta": 100.0 / 7.0, "m0": -8.0 / 7.0, "m1": -5.0 / 7.0},
-    dim=3, observed_index=0, initial_state=(0.7, 0.0, 0.0), max_dt=0.005)
+    dim=3, observed_index=0, initial_state=(0.7, 0.0, 0.0), max_dt=0.005, orbit_bound=3.0)
 
 # (spec, [(published value per natural time unit, relative tolerance), ...], bound on |x|).
 # The registry Chua has no reference: no confirmed published value exists at the study's
@@ -370,6 +375,10 @@ def test_lyapunov_cached_matches_published_reference(spec: SystemSpec,
     interval = LYAPUNOV_STEP_FACTOR * spec.max_dt
     value = lyapunov_cached(spec, tmp_path / "lyapunov.json")
     assert np.isfinite(value), f"{system}: lambda_max is not finite"
+    # WU-0002.11c: the cache now holds the exponent and the orbit maximum under the guard.
+    stored = json.loads((tmp_path / "lyapunov.json").read_text())[system]
+    assert set(stored) == {"lambda_max", "orbit_max_abs"} and stored["lambda_max"] == value
+    assert 0.0 < stored["orbit_max_abs"] <= bound
     for reference, tolerance in references:
         gap = value / reference - 1.0
         assert abs(gap) <= tolerance, (
@@ -382,3 +391,172 @@ def test_lyapunov_cached_matches_published_reference(spec: SystemSpec,
     assert np.isfinite(orbit).all(), f"{system}: the orbit left the finite range (diverged)"
     largest = float(np.abs(orbit[:, spec.observed_index]).max())
     assert largest <= bound, f"{system}: max|x| = {largest:.4g} exceeds the bound {bound}"
+
+
+# ------------------------------------------------ orbit guard in the data layer (WU-0002.11c)
+#
+# Needs owner review before freeze (the guard sets the study's time unit). References are hand
+# JSON, hand arrays and the literal key lists of the plan (G6 to G8); none is read from the code.
+
+LORENZ_CACHE = {"lambda_max": 0.9054940534657817, "orbit_max_abs": 19.267721702218743}
+"""This host's values of the Lorenz-63 Benettin run (applied-mathematician, M4 and M2; the
+pilot baseline lambda is the same double). Used only as inputs to the cache and to the
+fake-trajectory tests, never as expected results of a computation."""
+
+
+def _write_cache(path, **entries) -> None:
+    path.write_text(json.dumps(entries))
+
+
+def test_build_context_refuses_a_failing_trajectory(monkeypatch, tmp_path) -> None:
+    """G6: each of the three trajectories is guarded, burn-in included, and refuses the build.
+
+    Reference: hand-corrupted copies of the real array: x = 40 + 1e-6 at row 7 (statistics),
+    a NaN in z only at row 11 (main) and +inf in y only at row 3 (estimator). Tolerance: none;
+    the message must name that orbit and the first failing row, and no context is returned. The
+    exponent is read from a pre-written new-form cache entry so that only the trajectory
+    simulation runs (a unit test of the guard wiring, not of the dynamics).
+    """
+    _write_cache(tmp_path / "lyapunov.json", lorenz63=LORENZ_CACHE)
+    real = simulate_trajectory
+    cases = [("statistics", 0, 7, (7, 0, 40.0 + 1e-6),
+              re.escape(f"max|x| {40.0 + 1e-6:.17g}")),
+             ("main", 1, 11, (11, 2, math.nan), r"max\|x\| non-finite"),
+             ("estimator", 2, 3, (3, 1, math.inf), r"max\|x\| non-finite")]
+    for orbit, target, row, (r, c, value), size in cases:
+        calls = []
+
+        def fake(step_fn, initial, n_steps, target=target, r=r, c=c, value=value):
+            states = np.array(real(step_fn, initial, n_steps))
+            calls.append(n_steps)
+            if len(calls) == target + 1:
+                states[r, c] = value
+            return states
+
+        monkeypatch.setattr(data_module, "simulate_trajectory", fake)
+        with pytest.raises(OrbitDivergence, match=rf"orbit '{orbit}' of 'lorenz63'.*"
+                           rf"first failing step {row}, {size}"):
+            build_context("lorenz63", SMOKE, tmp_path)
+        assert len(calls) == target + 1
+
+
+def test_build_context_meta_has_the_four_new_leaves() -> None:
+    """G8: ``ctx.meta`` gains exactly ``lyapunov_orbit_max_abs`` and ``trajectory_max_abs``.
+
+    Reference: the literal key lists of the plan (4 leaves per system: the exponent orbit and
+    the three trajectories). Tolerance: none for the key sets and types. Values are Python
+    floats, at most B = 40 and at least the start (|x_0| = 1), and the Lorenz-63 attractor
+    gives max|x| in the band [18, 20] (block maxima of 3.2e6 states, M4) for each trajectory
+    of 2e5 or more states (the estimator orbit of the smoke preset is shorter, so only
+    the bound is asserted for it). A cache is written in the new form.
+    """
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as folder:
+        ctx = build_context("lorenz63", SMOKE, Path(folder))
+        stored = json.loads((Path(folder) / "lyapunov.json").read_text())["lorenz63"]
+    meta = ctx.meta
+    assert set(meta) == {"lambda_max", "interval", "delay", "ami_delay", "embed_dim", "acf_time",
+                         "spacing", "obs_scale", "trajectory_len", "library_len", "theiler",
+                         "lyapunov_orbit_max_abs", "trajectory_max_abs"}
+    assert set(meta["trajectory_max_abs"]) == {"statistics", "main", "estimator"}
+    leaves = [meta["lyapunov_orbit_max_abs"], *meta["trajectory_max_abs"].values()]
+    assert all(type(v) is float and 1.0 <= v <= 40.0 for v in leaves), leaves
+    assert 18.0 <= meta["lyapunov_orbit_max_abs"] <= 20.0
+    assert 18.0 <= meta["trajectory_max_abs"]["statistics"] <= 20.0
+    assert stored == {"lambda_max": meta["lambda_max"],
+                      "orbit_max_abs": meta["lyapunov_orbit_max_abs"]}
+
+
+def _stub_guarded(monkeypatch, result=(0.5, 1.25)) -> list:
+    """Replace ``data.lyapunov_guarded`` by a stub returning ``result``; return its call log."""
+    calls: list = []
+
+    def stub(spec, interval, n_steps, burn_in):
+        calls.append((spec.name, interval, n_steps, burn_in))
+        return result
+
+    monkeypatch.setattr(data_module, "lyapunov_guarded", stub)
+    return calls
+
+
+def test_cache_migrates_a_legacy_entry_with_a_bitwise_check(monkeypatch, tmp_path) -> None:
+    """G7 (a), (b): a legacy flat float is recomputed once and rewritten; one ulp more raises.
+
+    Reference: hand JSON with a stubbed guarded recomputation returning (0.5, 1.25) (the real
+    equality of the bits is the regression test of ``test_systems`` and the V4 log check).
+    Tolerance: none, IEEE bytes. (a) A legacy 0.5 is accepted, the file becomes
+    ``{"lambda_max": 0.5, "orbit_max_abs": 1.25}`` with the other system's entry untouched, the
+    recomputation uses the production settings (interval 20 max_dt, 10^5 steps, burn-in 5000)
+    and runs once. (b) ``nextafter(0.5, 1)`` raises ``RuntimeError`` and the file is unchanged.
+    """
+    calls = _stub_guarded(monkeypatch)
+    cache = tmp_path / "lyapunov.json"
+    spec = SYSTEMS["rossler"]
+    _write_cache(cache, rossler=0.5, chua=0.25)
+    assert lyapunov_record(spec, cache) == (0.5, 1.25)
+    assert json.loads(cache.read_text()) == {
+        "rossler": {"lambda_max": 0.5, "orbit_max_abs": 1.25}, "chua": 0.25}
+    assert calls == [("rossler", 20 * spec.max_dt, 100_000, 5_000)]
+    assert lyapunov_record(spec, cache) == (0.5, 1.25) and len(calls) == 1
+
+    bumped = math.nextafter(0.5, 1.0)
+    assert struct.pack("<d", bumped) != struct.pack("<d", 0.5)
+    _write_cache(cache, rossler=bumped)
+    before = cache.read_text()
+    with pytest.raises(RuntimeError, match="differs from the recomputation"):
+        lyapunov_record(spec, cache)
+    assert cache.read_text() == before
+
+
+def test_cache_new_form_entry_does_not_recompute(monkeypatch, tmp_path) -> None:
+    """G7 (c): a new-form entry is returned as stored, and ``lyapunov_cached`` returns lambda.
+
+    Reference: hand JSON. ``lyapunov_guarded`` is stubbed to raise if called. Tolerance: none.
+    A missing entry is computed once and written in the new form.
+    """
+    def boom(*args, **kwargs):
+        raise AssertionError("recomputed a cached entry")
+
+    monkeypatch.setattr(data_module, "lyapunov_guarded", boom)
+    cache = tmp_path / "sub" / "lyapunov.json"
+    cache.parent.mkdir()
+    _write_cache(cache, lorenz63=LORENZ_CACHE)
+    assert lyapunov_record(SYSTEMS["lorenz63"], cache) == (0.9054940534657817, 19.267721702218743)
+    assert lyapunov_cached(SYSTEMS["lorenz63"], cache) == 0.9054940534657817
+    calls = _stub_guarded(monkeypatch, result=(0.25, 2.0))
+    assert lyapunov_record(SYSTEMS["chua"], cache) == (0.25, 2.0) and len(calls) == 1
+    assert json.loads(cache.read_text()) == {
+        "lorenz63": LORENZ_CACHE, "chua": {"lambda_max": 0.25, "orbit_max_abs": 2.0}}
+
+
+def test_cache_refuses_a_spec_without_a_bound_and_bad_entries(monkeypatch, tmp_path) -> None:
+    """G7 (d) and malformed entries raise; nothing is recomputed or rewritten silently.
+
+    Reference: hand JSON. Tolerance: none. A spec with ``orbit_bound=None`` raises ``ValueError``
+    even when the cache holds an entry for it; an entry with a missing key, a string, a bool or an
+    ``orbit_max_abs`` above B or NaN is refused (``ValueError`` or ``OrbitDivergence``).
+    """
+    calls = _stub_guarded(monkeypatch)
+    cache = tmp_path / "lyapunov.json"
+    unbounded = dataclasses.replace(SYSTEMS["lorenz63"], orbit_bound=None)
+    _write_cache(cache, lorenz63=LORENZ_CACHE)
+    with pytest.raises(ValueError, match="orbit_bound"):
+        lyapunov_record(unbounded, cache)
+    with pytest.raises(ValueError, match="orbit_bound"):
+        lyapunov_record(unbounded, tmp_path / "absent.json")
+    spec = SYSTEMS["lorenz63"]
+    for entry in ({"lambda_max": 0.9}, {"lambda_max": 0.9, "orbit_max_abs": 1.0, "x": 1.0},
+                  {"lambda_max": 0.9, "orbit_max_abs": 1}, "0.9", True, [0.9]):
+        _write_cache(cache, lorenz63=entry)
+        with pytest.raises(ValueError, match="malformed"):
+            lyapunov_record(spec, cache)
+    for largest in (math.nextafter(40.0, math.inf), 1e300):
+        _write_cache(cache, lorenz63={"lambda_max": 0.9, "orbit_max_abs": largest})
+        with pytest.raises(OrbitDivergence, match="exceeds the bound 40"):
+            lyapunov_record(spec, cache)
+    cache.write_text('{"lorenz63": {"lambda_max": 0.9, "orbit_max_abs": NaN}}')
+    with pytest.raises(OrbitDivergence, match="exceeds the bound 40"):
+        lyapunov_record(spec, cache)
+    assert calls == []
