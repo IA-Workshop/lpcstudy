@@ -276,7 +276,8 @@ def _full_preset_labels() -> list[str]:
     for system in systems:
         labels |= {_label(system, tail) for tail in (
             "library-noise", "misspec", "h2a-initial-segments", "h2a-two-part", "h3b-bootstrap",
-            "h3c-ratio", "V4-convergence", "finite-growth", "oracle-pool", "start")}
+            "h3c-ratio", "V4-convergence", "finite-growth", "oracle-pool")}
+        labels.add(_label("start", system))  # the label order of draw_starts
         labels |= {_label(system, "bootstrap", name) for name in (
             "H1b", "H1c", "H2b-noise", "H2c", "H2d", "Q-N")}
         labels |= {_label(system, "bootstrap", "H1a", f"{rho:g}") for rho in rhos}
@@ -319,3 +320,13 @@ def test_crc32_of_every_full_preset_label_is_distinct() -> None:
     mine = make_rng(seed, "lorenz63", 7, 5, "estimator", "0.01", 64).random(4)
     ref = np.random.default_rng([seed, zlib.crc32(b"lorenz63|7|5|estimator|0.01|64")]).random(4)
     assert np.array_equal(mine, ref)
+
+
+def test_the_start_label_belongs_to_draw_starts_alone() -> None:
+    """The label ``"start"`` is used by ``draw_starts`` only, so no other stream shares it.
+
+    Reference: the ``make_rng`` call sites found by the scanner (tested above on hand sources).
+    Tolerance: none (exact list).
+    """
+    sites = [(m, f) for m, f, _, literal in scan_labels(_package_sources()) if "start" in literal]
+    assert sites == [("data.py", "draw_starts")]
