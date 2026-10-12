@@ -75,22 +75,23 @@ its iterates strictly inside the bounds: an exponent constrained at 0.01 returne
 (a distance of 2.5e-11), so 1e-6 separates a constrained fit from a free one by four orders."""
 
 
-def _boot(config: StudyConfig, stat, n_items: int, level: float = 0.95, salt: int = 0
-          ) -> tuple[float, float, float, int]:
-    """Block bootstrap at the integer seed ``config.seed + salt``: the estimate, the interval and
-    the number of NaN resamples that ``np.nanquantile`` dropped (DEF-0001, row T3).
+def _boot(config: StudyConfig, stat, n_items: int, rng: np.random.Generator,
+          level: float = 0.95) -> tuple[float, float, float, int]:
+    """Block bootstrap drawing from ``rng``: the estimate, the interval and the number of NaN
+    resamples that ``np.nanquantile`` dropped (DEF-0001, row T3).
 
     The estimate and bounds are those of ``statistics.block_bootstrap``. The two callers (V7,
     H1b CP) report the count as ``n_dropped_resamples``; neither converts it to the A3 tail
-    (H2b(i) did until WU-0002.9b, DEF-0019).
+    (H2b(i) did until WU-0002.9b, DEF-0019). The generator is consumed: each call needs its own
+    ``make_rng(config.seed, system, "bootstrap", ...)`` (WU-0002.14).
     """
     return block_bootstrap_dropped(stat, n_items, config.bootstrap_resamples,
-                                   config.bootstrap_block, config.seed + salt, level)
+                                   config.bootstrap_block, rng, level)
 
 
 # ------------------------------------------------------------------------ RQ1
 def v7_efficiency(levels: np.ndarray, deltas: np.ndarray, nu: np.ndarray,
-                  config: StudyConfig) -> dict:
+                  config: StudyConfig, system: str) -> dict:
     """V7: the estimator attains the Cramer-Rao scaling ``delta = rho nu`` at every ``rho``.
 
     Two checks, both on point medians over the sweep states (E0 verification check, decided like
@@ -115,6 +116,10 @@ def v7_efficiency(levels: np.ndarray, deltas: np.ndarray, nu: np.ndarray,
         Per-state oracle ``nu_i`` (noise-free, the same states at every level), ``(n_states,)``.
     config : StudyConfig
         Study configuration (bootstrap settings).
+    system : str
+        System name; the bootstrap generators are
+        ``make_rng(config.seed, system, "bootstrap", "V7", "slope")`` and
+        ``(..., "V7", f"efficiency-{rho:g}")`` (WU-0002.14). Needs owner review before freeze.
 
     Returns
     -------
@@ -155,8 +160,9 @@ def v7_efficiency(levels: np.ndarray, deltas: np.ndarray, nu: np.ndarray,
     if n_bad:
         est, lo, hi = float(np.median(slopes)), *nan_ci
     else:
-        est, lo, hi, dropped_slope = _boot(config, lambda idx: float(np.median(slopes[idx])),
-                                           len(slopes))
+        est, lo, hi, dropped_slope = _boot(
+            config, lambda idx: float(np.median(slopes[idx])), len(slopes),
+            make_rng(config.seed, system, "bootstrap", "V7", "slope"))
     out_eff, out_ci, out_pass, out_dropped = {}, {}, {}, {}
     for i, rho in enumerate(levels):
         key = f"{rho:g}"
@@ -167,7 +173,7 @@ def v7_efficiency(levels: np.ndarray, deltas: np.ndarray, nu: np.ndarray,
         else:
             _, boot_lo, boot_hi, dropped = _boot(
                 config, lambda idx: float(np.median(efficiency[idx, i])), len(efficiency),
-                salt=7000 + i)
+                make_rng(config.seed, system, "bootstrap", "V7", f"efficiency-{rho:g}"))
             out_ci[key], out_dropped[key] = [boot_lo, boot_hi], int(dropped)
         out_pass[key] = bool(low <= out_eff[key] <= high)
     slope_pass = bool(low <= est <= high)
@@ -197,7 +203,7 @@ def v7_noise_scaling(noise_cells: dict[float, Cell], config: StudyConfig) -> dic
     levels = sorted(noise_cells)
     deltas = np.column_stack([noise_cells[r].splits["test"].moments.est_seed for r in levels])
     nu = noise_cells[levels[0]].oracles["test"].nu
-    return v7_efficiency(np.array(levels), deltas, nu, config)
+    return v7_efficiency(np.array(levels), deltas, nu, config, noise_cells[levels[0]].system)
 
 
 def _floor_power_law(log_n: np.ndarray, log_c2: float, exponent: float,
@@ -426,8 +432,9 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     binds (``E e^2 - floor < 1e-12``, so ``y`` is pinned at ``0.5 ln 1e-12 = -13.8``, a
     high-leverage vertical outlier) is kept and counted in ``n_floored`` (DEF-0001, row N4; for the
     PLP regression, whose floor is 0, it is a sentinel that should read 0).
-    The bootstrap seed is the integer ``config.seed`` as before, so slopes and intervals are
-    those of the earlier code when no resample fails; failed resamples of the PLP slope are
+    Both regressions bootstrap from a fresh ``make_rng(config.seed, system, "bootstrap", "H1b")``
+    (the pairing of the CP and PLP resamples is kept, WU-0002.14; with different numbers of kept
+    states the index arrays differ anyway). Failed resamples of the PLP slope are
     counted (``PLP.n_failed_resamples``) and placed at the unfavourable tail. The CP interval
     still drops non-finite resamples (``block_bootstrap_dropped``); it is reported only, and the
     drops are counted (``CP.n_dropped_resamples``).
@@ -467,11 +474,13 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
             est = lo = hi = float("nan")
             n_failed = 0
         elif name == "CP":
-            est, lo, hi, n_dropped = _boot(config, stat, len(x))
+            est, lo, hi, n_dropped = _boot(config, stat, len(x),
+                                           make_rng(config.seed, cell.system, "bootstrap", "H1b"))
             n_failed = 0
         else:
-            interval = block_bootstrap_counted(stat, len(x), config.bootstrap_resamples,
-                                               config.bootstrap_block, config.seed, H1_LEVEL)
+            interval = block_bootstrap_counted(
+                stat, len(x), config.bootstrap_resamples, config.bootstrap_block,
+                make_rng(config.seed, cell.system, "bootstrap", "H1b"), H1_LEVEL)
             est, lo, hi, n_failed = interval.estimate, interval.lower, interval.upper, \
                 interval.n_failed
         res[name] = {"slope": est, "ci": [lo, hi], "n_excluded_nonfinite": n_excluded,
@@ -489,15 +498,15 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     return res
 
 
-def h1c_ratio_block(ratios: np.ndarray, config: StudyConfig, *, with_verdict: bool = True
-                    ) -> dict:
+def h1c_ratio_block(ratios: np.ndarray, config: StudyConfig, system: str, *,
+                    with_verdict: bool = True) -> dict:
     """Median of the per-state ratios with its 95% block-bootstrap interval (H1c; WU-0002.9).
 
     Non-finite ratios are excluded and counted (``n_excluded_nonfinite``; DEC-0008 A3).
     ``n_states`` is the number of finite ratios. With at least ``H1C_MIN_INTERVAL`` (10) of them
-    the interval is computed by ``block_bootstrap_counted`` at the integer seed ``config.seed``
-    (the seed the median had before this helper; bitwise-equal output when no resample fails),
-    with failed resamples counted (``n_failed_resamples``). With fewer, ``median_ratio`` and
+    the interval is computed by ``block_bootstrap_counted`` from a fresh
+    ``make_rng(config.seed, system, "bootstrap", "H1c")`` (the PLP and the CP share the label,
+    WU-0002.14), with failed resamples counted (``n_failed_resamples``). With fewer, ``median_ratio`` and
     ``ci`` are None (a number that was not computed is not shown). The 50-state minimum of
     DEC-0008 A3 replaces the earlier "fewer than 10 states" branch: it is applied by
     ``criterion_verdict`` (inconclusive, ``n_states < 50``) and can only turn a verdict into
@@ -509,6 +518,8 @@ def h1c_ratio_block(ratios: np.ndarray, config: StudyConfig, *, with_verdict: bo
         ``Lambda_bar x slope`` of each eligible state.
     config : StudyConfig
         Study configuration (resamples, block, seed).
+    system : str
+        System name (a label of the bootstrap generator).
     with_verdict : bool, optional
         Add ``verdict``, ``reason`` and ``pass``. False for the CP, which is reported with no
         verdict (v3 H1c names the PLP; DEC-0016 O3).
@@ -528,7 +539,7 @@ def h1c_ratio_block(ratios: np.ndarray, config: StudyConfig, *, with_verdict: bo
     if kept.size >= H1C_MIN_INTERVAL:
         interval = block_bootstrap_counted(
             lambda idx: float(np.median(kept[idx])), int(kept.size), config.bootstrap_resamples,
-            config.bootstrap_block, config.seed, H1_LEVEL)
+            config.bootstrap_block, make_rng(config.seed, system, "bootstrap", "H1c"), H1_LEVEL)
         estimate, lower, upper = interval.estimate, interval.lower, interval.upper
         out.update(median_ratio=estimate, ci=[lower, upper],
                    n_failed_resamples=int(interval.n_failed))
@@ -548,8 +559,8 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
     interval are reported with no verdict. A state is eligible when it has at least three
     events at the admissible thresholds, horizons above one step, positive growth and varying
     horizons; the others are counted (``n_ineligible_states``), as are the non-finite ratios
-    (``n_excluded_nonfinite``). The statistic and the bootstrap seed are those of the earlier
-    code, so the median and interval are unchanged when no resample fails.
+    (``n_excluded_nonfinite``). The bootstrap of both medians is ``h1c_ratio_block`` (generator
+    labels ``(seed, system, "bootstrap", "H1c")``, WU-0002.14).
 
     Parameters
     ----------
@@ -581,7 +592,8 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
             if ok.sum() >= 3 and growth[i] > 0 and np.ptp(horizons[i][ok]) > 0:
                 ratios.append(growth[i] * ols_slope(np.log(thetas[ok]),
                                                     horizons[i][ok].astype(float)))
-        res[name] = h1c_ratio_block(np.asarray(ratios), config, with_verdict=name == "PLP")
+        res[name] = h1c_ratio_block(np.asarray(ratios), config, cell.system,
+                                    with_verdict=name == "PLP")
         res[name]["n_ineligible_states"] = int(len(horizons) - len(ratios))
     res["threshold"] = list(H1C_BAND)
     res.update({key: res["PLP"][key]
@@ -944,9 +956,9 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> 
     the oracle profile (primary) and the deployable profile (secondary): see
     ``qn_profile_block`` for the three targets (interior logit of ``w*``, the indicator
     ``1{w* = 0}``, the log horizon), the intervals and the readings. The resamples are shared
-    across targets and across the two profiles (one integer seed, ``config.seed + 11``: the
-    salt of the earlier bootstrap, kept so that the log-horizon interval is unchanged,
-    DEC-0012). The counts of ``w* = 0`` and ``w* = 1`` over the test states are reported.
+    across targets and across the two profiles (a fresh ``make_rng(config.seed, system,
+    "bootstrap", "Q-N")`` for each profile, WU-0002.14: a shared generator would advance).
+    The counts of ``w* = 0`` and ``w* = 1`` over the test states are reported.
 
     Parameters
     ----------
@@ -992,7 +1004,8 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> 
         out[kind] = qn_profile_block(
             x_train, profiles(kind, "test"), w_train, w_test, log_t_train, log_t_test,
             seed=config.seed, n_resamples=config.bootstrap_resamples,
-            block=config.bootstrap_block, boot_seed=config.seed + 11)
+            block=config.bootstrap_block,
+            boot_seed=make_rng(config.seed, cell.system, "bootstrap", "Q-N"))
     out["threshold"] = ("estimate, no pass/fail: reading of the oracle Delta R^2 interval for "
                         "the interior logit and for 1{w*=0} by the table of v3 section 7 "
                         "(upper bound < 0.05 and lower bound <= 0: reduces; lower bound > 0 "
@@ -1243,7 +1256,7 @@ def h2a_separation(cell: Cell, config: StudyConfig) -> dict:
     horizons 1, 2, 4 LT in the small-error regime (``h2a_initial_segments``); (ii) the two-part
     partial correlation of ``w*(H_ref)`` with ``Lambda_tilde`` given quadratic seed controls
     (``h2a_part_ii``). Both bootstraps are new: randomness comes from ``make_rng(config.seed,
-    label)`` (DEC-0012), both at level ``1 - 0.05/3``. H2a passes iff both parts pass and fails
+    system, label)`` (DEC-0012, WU-0002.14), both at level ``1 - 0.05/3``. H2a passes iff both parts pass and fails
     iff either fails; ``pass`` is ``verdict == "pass"``.
 
     Parameters
@@ -1273,7 +1286,7 @@ def h2a_separation(cell: Cell, config: StudyConfig) -> dict:
     out = h2a_initial_segments(
         w_star[:, cols], small, [f"{h:g}" for h in long_horizons],
         n_resamples=config.bootstrap_resamples, block=config.bootstrap_block,
-        seed=make_rng(config.seed, "h2a-initial-segments"), level=PRIMARY_LEVEL)
+        seed=make_rng(config.seed, cell.system, "h2a-initial-segments"), level=PRIMARY_LEVEL)
     out["median_range_unrestricted"] = float(np.median(np.ptp(w_star[:, cols], axis=1)))
     w_ref = w_star[:, m.at(config.reference_horizon)]
     seeds = np.column_stack([np.log(m.analog_seed / cell.noise),
@@ -1281,7 +1294,8 @@ def h2a_separation(cell: Cell, config: StudyConfig) -> dict:
     lam = o.growth * lt
     out.update(h2a_part_ii(w_ref, lam, seeds, n_resamples=config.bootstrap_resamples,
                            block=config.bootstrap_block,
-                           seed=make_rng(config.seed, "h2a-two-part"), level=PRIMARY_LEVEL))
+                           seed=make_rng(config.seed, cell.system, "h2a-two-part"),
+                           level=PRIMARY_LEVEL))
     out["unconditional_spearman_w_lambda"] = spearman(w_ref, lam)
     out["short_horizon_range_median"] = float(np.median(np.ptp(
         w_star[:, [m.at(int(h * lt)) for h in config.eval_horizons_lyapunov]], axis=1)))
@@ -1367,7 +1381,8 @@ def _paired_change(low: np.ndarray, high: np.ndarray, config: StudyConfig, level
     """Bootstrap interval of the mean or median of per-state paired differences ``high - low``.
 
     One index array (the moving-block resample of states) serves both cells, and the
-    generator is ``make_rng(config.seed, *labels)`` (DEC-0012). Failed (non-finite)
+    generator is ``make_rng(config.seed, *labels)`` (DEC-0012; the callers' labels start with the
+    system, WU-0002.14). Failed (non-finite)
     resamples are counted at the unfavourable tail (DEC-0008 A3). With ``mc_error`` the result
     also carries ``ci_mc_se`` (``statistics.endpoint_mc_error`` on the same resample values;
     WU-0008.2a: set only for the primary H2b(ii)); estimate and interval are those of
@@ -1413,7 +1428,7 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     """H2b (primary): ``w*`` rises with the noise level and with the library size.
 
     * (i) ``noise``: the mean over states of the per-state Spearman correlation of ``w*(H_ref)``
-      with ``rho``; the interval is at level ``1 - 0.05/3`` (salt 3, unchanged), pass iff its lower
+      with ``rho``; the interval is at level ``1 - 0.05/3`` (WU-0002.14: new generator), pass iff its lower
       bound is above 0 (strict), fail iff the whole interval is at or below 0, else inconclusive
       (``criterion_verdict``, including the 50-state guard). Two counts sit beside it (DEF-0001;
       report only, no treatment changes): ``n_constant_states``, the states scored 0 because their
@@ -1424,9 +1439,8 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
       ``n_failed_resamples``, the non-finite resamples, which ``block_bootstrap_counted`` places
       at the unfavourable tail (DEC-0008 A3; DEF-0019, WU-0002.9b): at the threshold
       ``floor((B - 1) a) + 1`` both bounds are infinite and the verdict is inconclusive (a mean of
-      finite correlations cannot fail, so 0 is expected). The interval is the one of the earlier
-      ``_boot`` call bitwise when no resample fails (same integer seed ``config.seed + 3``, level
-      and block). ``n_dropped_resamples`` is kept as an alias with the same value (a published key
+      finite correlations cannot fail, so 0 is expected). The generator is
+      ``make_rng(config.seed, system, "bootstrap", "H2b-noise")`` (WU-0002.14). ``n_dropped_resamples`` is kept as an alias with the same value (a published key
       since WU-0002.11b; nothing is dropped any more).
     * (ii) ``library_change``: the mean over states of ``w*_i(H_ref, 10^4) - w*_i(H_ref, 10^3)``
       at ``rho = config.core_noise`` (1%), one block-bootstrap index array for both sizes, level
@@ -1460,13 +1474,14 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
         ``threshold``, ``verdict``, ``reason`` and ``pass``.
     """
     res: dict = {}
+    system = noise_cells[min(noise_cells)].system
     rho_levels = np.array(sorted(noise_cells))
     w_rho = np.column_stack([_split_weights(noise_cells[r], config) for r in rho_levels])
     rho_corr, n_constant = _per_state_spearman_counted(rho_levels, w_rho)
-    # integer seed as _boot (salt 3); the body of block_bootstrap_counted, to keep the values
+    # the body of block_bootstrap_counted, to keep the resample values for ci_mc_se
     point, noise_values = bootstrap_values(
         lambda idx: float(np.mean(rho_corr[idx])), len(rho_corr), config.bootstrap_resamples,
-        config.bootstrap_block, config.seed + 3)
+        config.bootstrap_block, make_rng(config.seed, system, "bootstrap", "H2b-noise"))
     lo, hi, noise_failed = percentile_interval(noise_values, PRIMARY_LEVEL)
     est = float(point)
     medians = np.median(w_rho, axis=0)
@@ -1485,7 +1500,7 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
     missing = _missing_cells(library_cells, wanted)
     fields, verdict, reason = _unavailable(PRIMARY_LEVEL, missing, "mean_change") if missing \
         else _paired_change(*(_split_weights(library_cells[key], config) for key in wanted),
-                            config, PRIMARY_LEVEL, ("h2b-library-change", f"{rho:g}"),
+                            config, PRIMARY_LEVEL, (system, "h2b-library-change", f"{rho:g}"),
                             "mean_change", mc_error=True)
     res["library_change"] = {**fields, "rho": rho, "n_lib": list(H2B_LIBRARY_SIZES),
                              **_decision(verdict, reason)}
@@ -1501,7 +1516,7 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
             lambda idx: np.concatenate([weights[idx].mean(axis=0),
                                         np.median(weights[idx], axis=0)]),
             len(weights), config.bootstrap_resamples, config.bootstrap_block,
-            make_rng(config.seed, "h2b-curves", f"{other:g}"))
+            make_rng(config.seed, system, "h2b-curves", f"{other:g}"))
         curve = {}
         for j, n in enumerate(sizes):
             mean_lo, mean_hi, mean_failed = percentile_interval(values[:, j], 0.95)
@@ -1517,7 +1532,7 @@ def h2b_knob_response(noise_cells: dict[float, Cell],
             gone = _missing_cells(library_cells, pair)
             fields, _, _ = _unavailable(0.95, gone, "mean_change") if gone else _paired_change(
                 *(_split_weights(library_cells[key], config) for key in pair), config, 0.95,
-                ("h2b-library-change", f"{other:g}"), "mean_change")
+                (system, "h2b-library-change", f"{other:g}"), "mean_change")
             res["library_change_reported"][f"{other:g}"] = {
                 **fields, "role": "reported", "unavailable_reason": (
                     "missing cell(s): " + ", ".join(gone)) if gone else None}
@@ -1543,7 +1558,8 @@ def h2e_noise_matching(library_cells: dict[tuple[float, int], Cell], config: Stu
     Methods v2 section M11); the counts of such states per cell (``zero_variance_corr``, split into
     CP-constant, PLP-constant and both) and of states whose change is exactly 0
     (``n_zero_difference``) are reported. A median with an atom at 0 can put the lower bound at
-    exactly 0, which is inconclusive; that is intended. Any cell missing for a ``rho``
+    exactly 0, which is inconclusive; that is intended. The bootstrap generator is
+    ``make_rng(config.seed, system, "h2e", f"{rho:g}")`` (WU-0002.14). Any cell missing for a ``rho``
     (the smoke preset has neither 10^5 nor 2%) gives ``median_change = None`` and a reason
     naming it; no NaN is invented. Non-finite correlations are not dropped: they make the
     estimate or a resample non-finite, so they are counted and widen the interval.
@@ -1593,7 +1609,8 @@ def h2e_noise_matching(library_cells: dict[tuple[float, int], Cell], config: Stu
         missing = _missing_cells(library_cells, wanted)
         fields, verdict, reason = _unavailable(0.95, missing, "median_change") if missing \
             else _paired_change(corr[wanted[0]], corr[wanted[1]], config, 0.95,
-                                ("h2e", f"{rho:g}"), "median_change", "median")
+                                (library_cells[wanted[0]].system, "h2e", f"{rho:g}"),
+                                "median_change", "median")
         by_noise[f"{rho:g}"] = {**fields, **_decision(verdict, reason)}
         parts[f"rho={rho:g}"] = (verdict, reason)
     out["by_noise"] = by_noise
@@ -1604,7 +1621,7 @@ def h2e_noise_matching(library_cells: dict[tuple[float, int], Cell], config: Stu
 
 
 def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
-                         config: StudyConfig) -> dict:
+                         config: StudyConfig, system: str) -> dict:
     """H2c: A4 has lower MSE at ``H_ref`` than A2 and than the better single forecaster.
 
     The better single forecaster is chosen on the calibration split, not on the test data that
@@ -1613,14 +1630,14 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
     noise-free truth, the same definition as on test; a tie goes to A0. The two values are
     reported as ``calibration_mse``. The entry ``A4o_minus_A2`` (A4 with the oracle seeds against
     A2; reported only, no pass; D-20) is the paired mean difference of the per-state squared
-    errors at ``H_ref``, 95%, on the same states and the same resamples (integer seed
-    ``config.seed + 5``) as the other differences; it is a new bootstrap, so it goes through
+    errors at ``H_ref``, 95%, on the same states and the same resamples as the other differences
+    (each part draws from its own fresh ``make_rng(config.seed, system, "bootstrap", "H2c")``,
+    so the index arrays are identical; a shared generator would advance); it is a new bootstrap, so it goes through
     ``block_bootstrap_counted`` and reports ``n_failed_resamples`` (DEC-0012; bitwise equal to
     ``block_bootstrap`` when no resample fails).
 
-    Each decided part goes through ``block_bootstrap_counted`` at the same integer seed as
-    before (bitwise-equal means and intervals when no resample fails; failed resamples are
-    counted and widen the interval). Its verdict is ``criterion_verdict`` against the band
+    Each decided part goes through ``block_bootstrap_counted`` with that generator (failed
+    resamples are counted and widen the interval). Its verdict is ``criterion_verdict`` against the band
     ``(-inf, 0)`` with the upper edge open (DEC-0008 A1: a difference whose upper bound is 0
     is not below 0, so it fails), at 95% and with the 50-state minimum. The criterion is
     ``combine_verdicts`` of the two parts (v3 section 7). The top-level ``n_failed_resamples``
@@ -1635,6 +1652,8 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
         ``evals.plp_err`` at ``H_ref`` are read).
     config : StudyConfig
         Study configuration.
+    system : str
+        System name (a label of the bootstrap generator).
 
     Returns
     -------
@@ -1665,7 +1684,8 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
         diff = a4 - scores[other].state_mse_ref
         boot = block_bootstrap_counted(lambda idx: float(np.mean(diff[idx])), len(diff),
                                        config.bootstrap_resamples, config.bootstrap_block,
-                                       config.seed + 5, H1_LEVEL)
+                                       make_rng(config.seed, system, "bootstrap", "H2c"),
+                                       H1_LEVEL)
         verdict, reason = criterion_verdict(boot.estimate, boot.lower, boot.upper, H2C_BAND,
                                             H2C_CLOSED, n_states=len(diff))
         out[f"A4_minus_{other}"] = {
@@ -1679,7 +1699,7 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
     diff_o = scores["A4o"].state_mse_ref - scores["A2"].state_mse_ref
     boot = block_bootstrap_counted(lambda idx: float(np.mean(diff_o[idx])), len(diff_o),
                                    config.bootstrap_resamples, config.bootstrap_block,
-                                   config.seed + 5, 0.95)
+                                   make_rng(config.seed, system, "bootstrap", "H2c"), 0.95)
     out["A4o_minus_A2"] = {"mean": boot.estimate, "ci": [boot.lower, boot.upper], "level": 0.95,
                            "n_failed_resamples": boot.n_failed,
                            "relative": boot.estimate / float(scores["A2"].state_mse_ref.mean()),
@@ -1687,15 +1707,16 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
     return out
 
 
-def h2d_empirical_comparison(scores: dict[str, RuleScores], config: StudyConfig) -> dict:
+def h2d_empirical_comparison(scores: dict[str, RuleScores], config: StudyConfig,
+                             system: str) -> dict:
     """H2d: A4 within 10% of A3 in-distribution (part (ii) is removed in v3).
 
     The statistic is ``mean(A4) / mean(A3) - 1`` over states. The verdict is the 95%
-    block-bootstrap interval (integer seed ``config.seed + 6``, as before) against the band
+    block-bootstrap interval (``make_rng(config.seed, system, "bootstrap", "H2d")``) against the band
     ``(-inf, 0.10]``, closed at 0.10 (v3 H2d: "upper bound <= 0.10"; DEC-0008 A1; DEC-0011 O4 is
     lifted by WU-0002.9): pass if the upper bound is at most 0.10, fail if the lower bound is
     above it, else inconclusive, with the 50-state minimum. Failed resamples are counted and
-    widen the interval (bitwise-equal output when none fails). No single resample value can
+    widen the interval. No single resample value can
     equal 0.10 (for a result near 0.1 the subtraction is exact on a multiple of ``2**-52``,
     which 0.1 is not), but the interpolated percentile bound can, so the edge is a live case.
 
@@ -1705,6 +1726,8 @@ def h2d_empirical_comparison(scores: dict[str, RuleScores], config: StudyConfig)
         Core test scores.
     config : StudyConfig
         Study configuration.
+    system : str
+        System name (a label of the bootstrap generator).
 
     Returns
     -------
@@ -1715,7 +1738,7 @@ def h2d_empirical_comparison(scores: dict[str, RuleScores], config: StudyConfig)
     a3, a4 = scores["A3"].state_mse_ref, scores["A4"].state_mse_ref
     boot = block_bootstrap_counted(lambda idx: float(a4[idx].mean() / a3[idx].mean() - 1.0),
                                    len(a3), config.bootstrap_resamples, config.bootstrap_block,
-                                   config.seed + 6, H1_LEVEL)
+                                   make_rng(config.seed, system, "bootstrap", "H2d"), H1_LEVEL)
     verdict, reason = criterion_verdict(boot.estimate, boot.lower, boot.upper, H2D_BAND,
                                         (True, True), n_states=len(a3))
     return {"in_distribution_excess": boot.estimate, "ci": [boot.lower, boot.upper],
@@ -1904,7 +1927,7 @@ def _state_rows(idx: np.ndarray, n_draws: int) -> np.ndarray:
 
 
 def h3b_importances(con_profile: np.ndarray, w_target: np.ndarray, curvature_ref: np.ndarray,
-                    t_target: np.ndarray, config: StudyConfig) -> dict:
+                    t_target: np.ndarray, config: StudyConfig, system: str) -> dict:
     """H3b: impurity importances of ``Lambda_tilde`` in a weight tree and a horizon tree.
 
     Two regression trees with ``max_leaf_nodes = 8`` (DEC-0008 A3, A4(e); fixed so that the
@@ -1916,7 +1939,7 @@ def h3b_importances(con_profile: np.ndarray, w_target: np.ndarray, curvature_ref
 
     The interval is a moving-block bootstrap (blocks of ``config.bootstrap_block`` consecutive
     construction states, ``config.bootstrap_resamples`` resamples, 95%,
-    ``make_rng(config.seed, "h3b-bootstrap")``) in which all draws of a state stay together and
+    ``make_rng(config.seed, system, "h3b-bootstrap")``) in which all draws of a state stay together and
     **both trees are refitted in every resample**; the weight curvature is that of the resampled
     rows. Intervals are percentile intervals (importances lie in [0, 1] and the weight importance
     sits on the boundary 0 under the hypothesis, where a basic interval is anti-conservative).
@@ -1949,6 +1972,8 @@ def h3b_importances(con_profile: np.ndarray, w_target: np.ndarray, curvature_ref
         ``ln T`` per state (log characteristic horizon), ``(n,)``.
     config : StudyConfig
         Study configuration (seed, bootstrap settings).
+    system : str
+        System name (a label of the bootstrap generator).
 
     Returns
     -------
@@ -1985,7 +2010,8 @@ def h3b_importances(con_profile: np.ndarray, w_target: np.ndarray, curvature_ref
             tree_t.feature_importances_ if tree_t.tree_.n_leaves > 1 else failed])
 
     point, values = bootstrap_values(importances, n_states, config.bootstrap_resamples,
-                                     config.bootstrap_block, make_rng(config.seed, "h3b-bootstrap"))
+                                     config.bootstrap_block,
+                                     make_rng(config.seed, system, "h3b-bootstrap"))
     imp_w, imp_t = point[:n_coords], point[n_coords:]
     d_values = values[:, n_coords + lam] - values[:, n_coords + others].max(axis=1)
     d_point = imp_t[lam] - imp_t[others].max()
@@ -2025,11 +2051,12 @@ def h3b_importances(con_profile: np.ndarray, w_target: np.ndarray, curvature_ref
     return out
 
 
-def h3c_ratio(a5_state_mse: np.ndarray, a4_state_mse: np.ndarray, config: StudyConfig) -> dict:
+def h3c_ratio(a5_state_mse: np.ndarray, a4_state_mse: np.ndarray, config: StudyConfig,
+              system: str) -> dict:
     """H3c (primary): the regimes' MSE over the closed form's, ``mean(A5) / mean(A4)`` at ``H_ref``.
 
     A ratio of means with the same block-bootstrap index array in the numerator and the
-    denominator (paired on states), level ``1 - 0.05/3``, ``make_rng(config.seed, "h3c-ratio")``.
+    denominator (paired on states), level ``1 - 0.05/3``, ``make_rng(config.seed, system, "h3c-ratio")``.
     Pass iff the upper bound is at most 1.05 (closed; DEC-0008 A1). Failed resamples are
     counted (DEC-0008 A3). The interval conditions on the fitted A4 and A5.
 
@@ -2039,6 +2066,8 @@ def h3c_ratio(a5_state_mse: np.ndarray, a4_state_mse: np.ndarray, config: StudyC
         Per-state realized squared error at ``H_ref`` of A5 and A4, ``(n,)``.
     config : StudyConfig
         Study configuration.
+    system : str
+        System name (a label of the bootstrap generator).
 
     Returns
     -------
@@ -2052,7 +2081,7 @@ def h3c_ratio(a5_state_mse: np.ndarray, a4_state_mse: np.ndarray, config: StudyC
     point, values = bootstrap_values(
         lambda idx: float(a5_state_mse[idx].mean() / a4_state_mse[idx].mean()),
         len(a5_state_mse), config.bootstrap_resamples, config.bootstrap_block,
-        make_rng(config.seed, "h3c-ratio"))
+        make_rng(config.seed, system, "h3c-ratio"))
     lower, upper, n_failed = percentile_interval(values, PRIMARY_LEVEL)
     verdict, reason = criterion_verdict(float(point), lower, upper,
                                         (-np.inf, H3C_BOUND), (True, True),
@@ -2111,9 +2140,10 @@ def h3_regimes(cell: Cell, rules: FittedRules, scores: dict[str, RuleScores],
     con_profile = deployable_profile(con.evals, rules.proxies, cell.noise, lt)
     h3b = h3b_importances(
         con_profile, oracle_weight(con.moments)[:, col], curvature(con.moments)[:, col],
-        np.log(state_horizon_target(con.moments, cell.noise, config.primary_threshold)), config)
+        np.log(state_horizon_target(con.moments, cell.noise, config.primary_threshold)), config,
+        cell.system)
 
-    h3c = h3c_ratio(scores["A5"].state_mse_ref, scores["A4"].state_mse_ref, config)
+    h3c = h3c_ratio(scores["A5"].state_mse_ref, scores["A4"].state_mse_ref, config, cell.system)
     out = {"H3a": h3a, "H3b": h3b, "H3c": h3c, "regime_curve": regime_curve}
     check_keys(out)
     return out

@@ -160,7 +160,8 @@ class Study:
             network, losses = train_estimator(
                 ctx.estimator_inputs, ctx.estimator_targets, noise,
                 self.config.estimator_widths, self.config.estimator_epochs,
-                self.config.seed + int(1e4 * noise))
+                lambda width: make_rng(self.config.seed, ctx.spec.name, ctx.embed_dim, ctx.delay,
+                                       "estimator", f"{noise:g}", width))
             self._networks[base_key] = network
             self.estimator_log[str(base_key)] = {
                 "val_loss_by_width": losses, "chosen_width": network.width,
@@ -208,7 +209,8 @@ class Study:
         """Oracle state quantities (cached; independent of noise and library)."""
         key = (ctx.spec.name, ctx.embed_dim, ctx.delay, split)
         if key not in self._oracles:
-            self._oracles[key] = state_oracles(ctx, split, self.config.steps_per_lyapunov)
+            self._oracles[key] = state_oracles(
+                ctx, split, self.config.steps_per_lyapunov, self.config.seed)
         return self._oracles[key]
 
     # --------------------------------------------------------------------- handling
@@ -475,7 +477,7 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
     predictor = ErrorPredictor.fit(
         con_moments.kept["inputs"], con_moments.kept["cp_err"], con_moments.kept["plp_err"],
         allocator_grid(config), noise, width=64, epochs=config.allocator_epochs,
-        seed=config.seed)
+        rng=make_rng(config.seed, cells[0].system, cells[0].ctx.embed_dim, "allocator"))
 
     con_profile = np.concatenate([deployable_profile(s.evals, proxies, noise,
                                                      config.steps_per_lyapunov)

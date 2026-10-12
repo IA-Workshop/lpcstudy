@@ -111,7 +111,7 @@ def convergence_check(study: Study, cell: Cell) -> dict:
         den = np.mean((c - p) ** 2, axis=-1)
         return np.clip(num / np.maximum(den, 1e-300), 0, 1)
 
-    rng = np.random.default_rng(cfg.seed)
+    rng = make_rng(cfg.seed, cell.system, "V4-convergence")  # one stream over the M loop
     reference = weight(cp, plp)
     out = {}
     for m_draws in cfg.convergence_draws:
@@ -512,8 +512,8 @@ def run_system(study: Study, system: str) -> dict:
     res["Q-N"] = an.qn_noise_redundancy(core, rules, cfg)
     res["H2a"] = an.h2a_separation(core, cfg)
     res["H2b"] = an.h2b_knob_response(noise_cells, library_cells, cfg)
-    res["H2c"] = an.h2c_state_dependence(scores, core.splits["calibration"], cfg)
-    res["H2d"] = an.h2d_empirical_comparison(scores, cfg)
+    res["H2c"] = an.h2c_state_dependence(scores, core.splits["calibration"], cfg, system)
+    res["H2d"] = an.h2d_empirical_comparison(scores, cfg, system)
     res["H2e"] = an.h2e_noise_matching(library_cells, cfg)
     res["gain_bound"] = an.gain_horizon_bound(core, cfg)
     res.update(an.h3_regimes(core, rules, scores, cfg))
@@ -532,7 +532,7 @@ def _variant_summary(cell: Cell, rules: FittedRules, config: StudyConfig) -> dic
     """Key statistics of a robustness variant."""
     _, scores = _evaluate(cell, rules, config)
     h2a = an.h2a_separation(cell, config)
-    h2c = an.h2c_state_dependence(scores, cell.splits["calibration"], config)
+    h2c = an.h2c_state_dependence(scores, cell.splits["calibration"], config, cell.system)
     profile = deployable_profile(cell.splits["test"].evals, rules.proxies, cell.noise,
                                  config.steps_per_lyapunov)
     regret = regime_regret(rules.regimes[rules.chosen_regimes], profile,
@@ -557,8 +557,11 @@ def _perturbation_scale_variant(study: Study, cell: Cell, rules: FittedRules,
     ctx = cell.ctx
     window = cfg.steps_per_lyapunov
     eps = scale * cell.noise
+    # a fresh generator per call, no scale in the label: the same directions at every scale
+    # (common random numbers across scales; WU-0002.14, M4)
     fin = make_finite_growth(cell.setup.model_step, ctx.spec.observed_index, ctx.obs_scale,
-                             ctx.unwhiten, window, cfg.perturbation_dirs, cfg.seed)
+                             ctx.unwhiten, window, cfg.perturbation_dirs,
+                             make_rng(cfg.seed, cell.system, "finite-growth"))
     test = cell.splits["test"]
     true_states = ctx.eval_states[ctx.split_indices["test"]]
     oracle_growth = np.concatenate([np.asarray(fin(jnp.asarray(true_states[i:i + 200]), eps))
@@ -567,10 +570,12 @@ def _perturbation_scale_variant(study: Study, cell: Cell, rules: FittedRules,
     w_ref = oracle_weight(m)[:, m.at(cfg.reference_horizon)]
     seeds = np.column_stack([np.log(m.analog_seed / cell.noise),
                              np.log(m.est_seed / cell.noise)])
-    # The same two-part statistic and index sets as H2a(ii), with Lambda_fin for Lambda_tilde.
+    # The same two-part statistic and index sets as H2a(ii), with Lambda_fin for Lambda_tilde:
+    # the generator labels are those of analysis.h2a_separation, so the resamples are shared.
     two = an.h2a_part_ii(w_ref, oracle_growth * window, seeds,
                          n_resamples=cfg.bootstrap_resamples, block=cfg.bootstrap_block,
-                         seed=make_rng(cfg.seed, "h2a-two-part"), level=an.PRIMARY_LEVEL)
+                         seed=make_rng(cfg.seed, cell.system, "h2a-two-part"),
+                         level=an.PRIMARY_LEVEL)
     agreement = float(np.corrcoef(oracle_growth, cell.oracles["test"].growth)[0, 1])
     return {"scale_times_rho": scale,
             "H2a_partial_corr_zero_fin": two["part_ii"]["zero"]["partial_corr"],

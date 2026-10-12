@@ -8,6 +8,7 @@ from sklearn.tree import DecisionTreeRegressor
 
 from lpcstudy.allocation import RegimeMap
 from lpcstudy.config import StudyConfig
+from lpcstudy.data import make_rng
 from lpcstudy.ensemble import EvaluationDraws
 from lpcstudy.oracle import curvature, oracle_weight
 from lpcstudy.pipeline import SplitData, _choose_regimes, choose_regime_count, score_rules
@@ -366,12 +367,18 @@ def test_fit_rules_records_fit_counters(monkeypatch) -> None:
         return SplitData(moments=moments, evals=evals)
 
     x_con = np.concatenate([-np.ones(20), np.ones(20)])
-    cell = SimpleNamespace(noise=0.01, splits={"construction": split(40, x_con, True),
-                                               "calibration": split(40, np.ones(40), True)})
+    cell = SimpleNamespace(system="lorenz63", ctx=SimpleNamespace(embed_dim=7), noise=0.01,
+                           splits={"construction": split(40, x_con, True),
+                                   "calibration": split(40, np.ones(40), True)})
     monkeypatch.setattr(pipeline, "ProfileProxies", SimpleNamespace(fit=lambda *a, **k: "proxies"))
-    monkeypatch.setattr(pipeline, "ErrorPredictor", SimpleNamespace(fit=lambda *a, **k: "predictor"))
+    allocator_rngs: list = []
+    monkeypatch.setattr(pipeline, "ErrorPredictor", SimpleNamespace(
+        fit=lambda *a, **k: (allocator_rngs.append(k["rng"]), "predictor")[1]))
     monkeypatch.setattr(pipeline, "deployable_profile", lambda ev, *a, **k: ev.growth_proxy[..., None])
     rules = pipeline.fit_rules([cell], config)
+    # WU-0002.14: the allocator network draws from make_rng(seed, system, embed_dim, "allocator")
+    assert len(allocator_rngs) == 1 and allocator_rngs[0].bit_generator.state == make_rng(
+        config.seed, "lorenz63", 7, "allocator").bit_generator.state
     assert rules.chosen_regimes == 2
     assert rules.handled == {"empty_regime_fallback": 2,
                              "empty_regime_fallback_by_K": {"2": 1, "3": 1},
@@ -657,3 +664,41 @@ def test_concat_stacks_lm_arrays_and_refuses_partial() -> None:
     assert _concat_evals([evals(3, 0, 3, False), evals(2, 3, 5, False)]).lm_residual is None
     with pytest.raises(ValueError, match="only some parts"):
         _concat_evals([evals(3, 0, 3), evals(2, 3, 5, False)])
+
+
+def test_estimator_streams_are_labelled_by_system_dimension_delay_noise_and_width(
+        monkeypatch, tmp_path) -> None:
+    """WU-0002.14 (b): ``Study.setup`` trains psi from ``make_rng(seed, system, D, delay,
+    "estimator", f"{rho:g}", width)`` per width.
+
+    Reference: the label written out by hand and a fresh ``make_rng`` for each width (the stream
+    factory is called inside the stubbed ``train_estimator``, which replaces the training). The
+    factory must return a generator in its initial state, different between widths, and the same
+    label for the second call of the same setup (the network is cached by system, D, delay and
+    noise, so the stub runs once). Tolerance: none (bit-generator state equality).
+    """
+    from types import SimpleNamespace
+
+    from lpcstudy import pipeline
+    from lpcstudy.config import SMOKE
+    from lpcstudy.systems import SYSTEMS
+
+    streams: list = []
+
+    def stub(inputs, targets, noise, widths, epochs, stream):
+        streams.append((noise, widths, stream))
+        return SimpleNamespace(width=widths[0]), {widths[0]: 1.0}
+
+    monkeypatch.setattr(pipeline, "train_estimator", stub)
+    study = pipeline.Study(SMOKE, tmp_path)
+    ctx = SimpleNamespace(spec=SYSTEMS["lorenz63"], embed_dim=7, delay=5, interval=0.03,
+                          estimator_inputs=np.zeros((4, 7)), estimator_targets=np.zeros((4, 3)))
+    study.setup(ctx, 0.01)
+    study.setup(ctx, 0.01, n_analogs=5)
+    assert len(streams) == 1
+    noise, widths, stream = streams[0]
+    assert noise == 0.01
+    for width in (32, 64):
+        expected = make_rng(SMOKE.seed, "lorenz63", 7, 5, "estimator", "0.01", width)
+        assert stream(width).bit_generator.state == expected.bit_generator.state
+    assert stream(32).bit_generator.state != stream(64).bit_generator.state

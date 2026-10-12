@@ -611,3 +611,119 @@ def test_run_handling_warns_of_skipped_variants_and_keeps_its_keys_def_0025(
     warned = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warned) == 1 and "skipped_variants = 1" in warned[0] and "D=3" in warned[0]
     assert list(run) == ["schema", "totals", "by_system", "robustness", "failed_variants"]
+
+
+def test_convergence_check_resamples_come_from_the_v4_generator(monkeypatch, tmp_path) -> None:
+    """WU-0002.14 (b): V4 draws its bootstrap from ``make_rng(seed, system, "V4-convergence")``.
+
+    Reference: a hand re-computation from ``np.random.default_rng([seed, crc32(b"lorenz63|V4-
+    convergence")])`` (NumPy directly): for each M in order, ``integers(0, M, (200, M))`` from
+    ONE generator that advances over the loop, the weight formula written again from the
+    definition (``w = clip(mean(p (p - c)) / mean((c - p)^2), 0, 1)``), the half-width as
+    ``0.5 (P97.5 - P2.5)`` over the 200 rows, and its median. Exact (``==``): the same operations
+    in the same order on the same arrays. The largest-M deviation from the reference is exactly 0.0
+    (the reference is the largest-M weight itself; plan R-f) and ``used_M`` is ``n_oracle_draws``.
+    """
+    import zlib
+
+    from lpcstudy import experiments
+    from lpcstudy.ensemble import DRAW_COUNTERS, DrawBatch
+    from lpcstudy.pipeline import Study
+
+    config = SMOKE
+    n_states, n_draws = config.convergence_states, max(config.convergence_draws)
+    study = Study(config, tmp_path)
+    study.unit_noise = lambda *args, **kwargs: np.zeros((n_states + 5, n_draws, 7))
+    monkeypatch.setattr(experiments.AnalogLibrary, "build", classmethod(lambda cls, *a, **k: None))
+    errors = np.random.default_rng(1411).standard_normal((n_states, n_draws, 1))
+
+    def fake(setup, library, split, rows, unit_noise, horizons, reference_horizon=None):
+        ones = np.ones((len(rows), n_draws))
+        return DrawBatch(
+            cp_err=errors[rows], plp_err=errors[rows] + 0.1, analog_seed_sq=None, est_seed_sq=None,
+            distance=None, inputs=None, est_states=None, est_nu=None, analog_vecs=None,
+            handled=np.ones((len(rows), len(DRAW_COUNTERS)), dtype=np.int64),
+            clip_entries={"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 0},
+            lm_residual=ones, lm_accepted=ones.astype(int), lm_late=ones.astype(int))
+
+    monkeypatch.setattr(experiments, "forecast_draws", fake)
+    cell = SimpleNamespace(system="lorenz63", label="base", noise=0.01, library_size=10_000,
+                           ctx=SimpleNamespace(embed_dim=10, spec=SimpleNamespace(dim=3)), setup=None)
+    out = experiments.convergence_check(study, cell)
+
+    cp, plp = errors[:, :, 0], errors[:, :, 0] + 0.1
+
+    def weight(c, p):
+        return np.clip(np.mean(p * (p - c), axis=-1) / np.maximum(np.mean((c - p) ** 2, axis=-1),
+                                                                   1e-300), 0, 1)
+
+    hand = np.random.default_rng([config.seed, zlib.crc32(b"lorenz63|V4-convergence")])
+    for m_draws in config.convergence_draws:
+        boots = np.stack([weight(cp[:, idx], plp[:, idx])
+                          for idx in hand.integers(0, m_draws, (200, m_draws))])
+        half = 0.5 * (np.percentile(boots, 97.5, axis=0) - np.percentile(boots, 2.5, axis=0))
+        assert out[str(m_draws)]["median_half_width"] == float(np.median(half))
+    assert out[str(max(config.convergence_draws))]["mean_abs_dev_from_max"] == 0.0
+    assert out["used_M"] == config.n_oracle_draws
+
+
+def _variant_cell(rng: np.random.Generator, n: int = 80):
+    """A stub cell for the Lambda_fin variant and H2a: weights with zeros, interior and ones."""
+    from unit_helpers import moments_from_triples, realizable_triples
+
+    tri = realizable_triples(rng, n_below=n // 4, n_inside=n // 2, n_above=n - n // 4 - n // 2)
+    shuffle = rng.permutation(n)
+    scale = 1e-3  # r.m.s. errors below 0.5 (the small-error regime), w* unchanged
+    cols = lambda a: np.tile((scale * a[shuffle])[:, None], (1, 2))
+    moments = moments_from_triples(cols(tri["E_C"]), cols(tri["E_P"]), cols(tri["C"]))
+    moments.horizons = np.array([30, 60])
+    moments.analog_seed = np.exp(rng.normal(0.0, 0.3, n)) * 0.01
+    moments.est_seed = np.exp(rng.normal(0.0, 0.3, n)) * 0.01
+    growth = np.exp(rng.normal(-3.0, 0.3, n))
+    ctx = SimpleNamespace(spec=SimpleNamespace(name="lorenz63", observed_index=0), obs_scale=1.0,
+                          unwhiten=np.eye(3), split_indices={"test": np.arange(n)},
+                          eval_states=np.zeros((n, 3)))
+    return SimpleNamespace(system="lorenz63", noise=0.01, ctx=ctx,
+                           setup=SimpleNamespace(model_step=None),
+                           splits={"test": SimpleNamespace(moments=moments)},
+                           oracles={"test": SimpleNamespace(growth=growth)}), growth
+
+
+def test_lambda_fin_variant_shares_the_h2a_two_part_generator_and_the_directions_across_scales(
+        monkeypatch) -> None:
+    """P9: the Lambda_fin variant is H2a(ii) bitwise when Lambda_fin := Lambda_tilde, at any scale.
+
+    Reference (M4 of the mathematics check). (a) With the finite-growth function stubbed to return
+    the cell's own ``Lambda_tilde`` per window step, the variant's statistic is the same two-part
+    statistic on the same index sets, so its partial correlations and both intervals equal the
+    ones ``analysis.h2a_separation`` reports, bitwise (``==``; no tolerance: identical operations
+    on identical arrays from identical generators). (b) The generator handed to
+    ``make_finite_growth`` has the state of a fresh ``make_rng(seed, system, "finite-growth")``
+    at both scales 1 and 3 (a fresh one per call, no scale in the label, so the same directions at
+    every scale), which differs from a generator on another system's label.
+    """
+    from lpcstudy import analysis as an
+    from lpcstudy import experiments
+    from lpcstudy.data import make_rng
+
+    config = dataclasses.replace(SMOKE, bootstrap_resamples=60, eval_horizons_lyapunov=(1.0, 2.0),
+                                 perturbation_scales=(1.0, 3.0))
+    cell, growth = _variant_cell(np.random.default_rng(14009))
+    received: list[dict] = []
+
+    def stub(step_fn, observed_index, obs_scale, unwhiten, n_steps, n_dirs, rng):
+        received.append(rng.bit_generator.state)
+        return lambda states, eps: np.asarray(growth)[: len(states)]
+
+    monkeypatch.setattr(experiments, "make_finite_growth", stub)
+    study = SimpleNamespace(config=config)
+    h2a = an.h2a_separation(cell, config)["part_ii"]
+    assert not np.isnan(h2a["zero"]["partial_corr"]) and not np.isnan(h2a["interior"]["partial_corr"])
+    for scale in (1.0, 3.0):
+        out = experiments._perturbation_scale_variant(study, cell, None, scale)
+        assert out["H2a_partial_corr_zero_fin"] == h2a["zero"]["partial_corr"]
+        assert out["H2a_partial_corr_interior_fin"] == h2a["interior"]["partial_corr"]
+        assert out["ci_zero"] == h2a["zero"]["ci"] and out["ci_interior"] == h2a["interior"]["ci"]
+    fresh = make_rng(config.seed, "lorenz63", "finite-growth").bit_generator.state
+    assert received == [fresh, fresh]
+    assert make_rng(config.seed, "rossler", "finite-growth").bit_generator.state != fresh

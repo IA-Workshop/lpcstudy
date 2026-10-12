@@ -361,14 +361,16 @@ def _bootstrap_plan(spec: CaseSpec, data: dict[str, np.ndarray], cfg
                 lambda: make_rng(cfg.seed, "wu0006", "C3"))
     if base == "C2":
         diff = data["a"] - data["b"]
-        return (lambda idx: float(np.mean(diff[idx])), lambda: cfg.seed + 5)
+        return (lambda idx: float(np.mean(diff[idx])),
+                lambda: make_rng(cfg.seed, SYSTEM_LABEL, "bootstrap", "H2c"))
     if base == "C4":
         a, b = data["a"], data["b"]
         return (lambda idx: float(a[idx].mean() / b[idx].mean()),
-                lambda: make_rng(cfg.seed, "h3c-ratio"))
+                lambda: make_rng(cfg.seed, SYSTEM_LABEL, "h3c-ratio"))
     if base == "C5":
         a, b = data["a"], data["b"]
-        return (lambda idx: float(a[idx].mean() / b[idx].mean() - 1.0), lambda: cfg.seed + 6)
+        return (lambda idx: float(a[idx].mean() / b[idx].mean() - 1.0),
+                lambda: make_rng(cfg.seed, SYSTEM_LABEL, "bootstrap", "H2d"))
     if base == "C6":
         x, y = data["x"], data["y"]
         return (lambda idx: spearman(x[idx], y[idx]),
@@ -406,15 +408,17 @@ def _production(spec: CaseSpec, data: dict[str, np.ndarray], cfg, seed_factory
                   "A1": _state(data["b"]), "A4o": _state(data["b"])}
         evals = SimpleNamespace(horizons=np.array([cfg.reference_horizon]),
                                 cp_err=np.ones((1, 1, 1)), plp_err=np.ones((1, 1, 1)))
-        out = h2c_state_dependence(scores, SimpleNamespace(evals=evals), cfg)["A4_minus_A2"]
+        out = h2c_state_dependence(scores, SimpleNamespace(evals=evals), cfg,
+                                   SYSTEM_LABEL)["A4_minus_A2"]
         return ({"estimate": out["mean"], "lower": out["ci"][0], "upper": out["ci"][1],
                  "n_failed": out["n_failed_resamples"], "verdict": out["verdict"]}, None)
     if base == "C4":
-        out = h3c_ratio(data["a"], data["b"], cfg)
+        out = h3c_ratio(data["a"], data["b"], cfg, SYSTEM_LABEL)
         return ({"estimate": out["A5_over_A4_mse"], "lower": out["ci"][0], "upper": out["ci"][1],
                  "n_failed": out["n_failed_resamples"], "verdict": out["verdict"]}, None)
     if base == "C5":
-        out = h2d_empirical_comparison({"A3": _state(data["b"]), "A4": _state(data["a"])}, cfg)
+        out = h2d_empirical_comparison({"A3": _state(data["b"]), "A4": _state(data["a"])}, cfg,
+                                      SYSTEM_LABEL)
         return ({"estimate": out["in_distribution_excess"], "lower": out["ci"][0],
                  "upper": out["ci"][1], "n_failed": out["n_failed_resamples"],
                  "verdict": out["verdict"]}, None)

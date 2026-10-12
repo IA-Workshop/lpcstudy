@@ -116,8 +116,8 @@ def growth_exponent(gains: np.ndarray, window: int) -> np.ndarray:
 
 
 def make_finite_growth(step_fn: StepFn, observed_index: int, obs_scale: float,
-                       unwhiten: np.ndarray, n_steps: int, n_dirs: int, seed: int
-                       ) -> Callable[[jnp.ndarray, float], jnp.ndarray]:
+                       unwhiten: np.ndarray, n_steps: int, n_dirs: int,
+                       rng: np.random.Generator) -> Callable[[jnp.ndarray, float], jnp.ndarray]:
     """Finite-amplitude growth ``Lambda_fin`` from random whitened perturbations.
 
     Parameters
@@ -134,8 +134,11 @@ def make_finite_growth(step_fn: StepFn, observed_index: int, obs_scale: float,
         Window length.
     n_dirs : int
         Number of random unit directions.
-    seed : int
-        Seed for the directions.
+    rng : np.random.Generator
+        Source of the directions, consumed once (``n_dirs * dim`` normal draws). The caller
+        builds a *fresh* ``make_rng(seed, system, "finite-growth")`` per call, so that the
+        directions are the same at every perturbation scale (common random numbers across
+        scales, WU-0002.14) and different for every seed and system.
 
     Returns
     -------
@@ -144,7 +147,7 @@ def make_finite_growth(step_fn: StepFn, observed_index: int, obs_scale: float,
         to slopes per step ``(n,)`` of ``0.5 ln mean |dh|^2 / eps^2``.
     """
     dim = unwhiten.shape[0]
-    dirs = np.random.default_rng(seed).standard_normal((n_dirs, dim))
+    dirs = rng.standard_normal((n_dirs, dim))
     dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
     offsets = jnp.asarray(dirs @ unwhiten.T)
 

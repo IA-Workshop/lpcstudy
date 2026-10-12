@@ -645,3 +645,96 @@ def test_lm_summary_threshold_follows_the_degrees_of_freedom() -> None:
     got = {dof: _hand(values, noise=1.0, dof=dof) for dof in (2, 4, 7)}
     assert [got[d]["fraction_above_chi2"] for d in (2, 4, 7)] == [0.8, 0.6, 0.2]
     assert [got[d]["gof_dof"] for d in (2, 4, 7)] == [2, 4, 7]
+
+
+# ------------------------------------------------ randomness of the networks (WU-0002.14, P7)
+def _tiny_training_set() -> tuple[np.ndarray, np.ndarray]:
+    rng = np.random.default_rng(14007)
+    inputs = rng.standard_normal((40, 2))
+    targets = np.sin(inputs[:, :1]) + 0.5 * inputs[:, 1:]
+    return inputs, targets
+
+
+def test_train_mlp_draws_its_randomness_from_the_generator_in_the_documented_order(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """P7: equal generator states give identical networks; other labels give other ones; M7 order.
+
+    Reference: a hand re-draw from ``np.random.default_rng([seed, crc32(label)])`` (NumPy used
+    directly, independent of ``make_rng``): two 32-bit integers (the JAX keys: initialization,
+    then the epoch stream), then ``permutation(n)`` for the validation split, then the validation
+    input noise. The keys that ``train_mlp`` hands to ``jax.random.PRNGKey`` are recorded and
+    must be those two integers; the reported ``val_loss`` is recomputed from the returned network
+    on the hand-chosen validation rows and noise. Tolerance: none for the recorded keys, the
+    parameters and the val_loss of two equal calls (the same deterministic XLA program on the same
+    inputs, same process: bitwise); ``val_loss`` against the recomputation ``rel 1e-12`` (the
+    same ``predict`` on the same inputs, a sum of 1 residual component per row: round-off only).
+    A different label gives different parameters (checked as inequality of the first weight).
+    """
+    import zlib
+
+    from lpcstudy import networks
+    from lpcstudy.data import make_rng
+
+    inputs, targets = _tiny_training_set()
+    seed, label = 20261005, "lorenz63|7|5|estimator|0.01|32"
+
+    def hand() -> np.random.Generator:
+        return np.random.default_rng([seed, zlib.crc32(label.encode())])
+
+    recorded: list[int] = []
+    real_key = networks.jax.random.PRNGKey
+    monkeypatch.setattr(networks.jax.random, "PRNGKey",
+                        lambda value: (recorded.append(int(value)), real_key(value))[1])
+    kwargs = dict(width=4, epochs=2, input_noise=0.1, batch_size=8)
+    first = networks.train_mlp(inputs, targets, rng=make_rng(seed, "lorenz63", 7, 5, "estimator",
+                                                             "0.01", 32), **kwargs)
+    ref = hand()
+    keys = [int(ref.integers(0, 2**32)) for _ in range(2)]
+    assert recorded == keys
+
+    n_val = max(1, int(0.1 * len(inputs)))
+    order = ref.permutation(len(inputs))
+    val = order[:n_val]
+    noisy = inputs[val] + 0.1 * ref.standard_normal(inputs[val].shape)
+    residual = np.asarray(first.predict(noisy)) - targets[val]
+    assert first.val_loss == pytest.approx(float(np.mean(np.sum(residual**2, axis=1))),
+                                           rel=1e-12, abs=0)
+
+    second = networks.train_mlp(inputs, targets, rng=hand(), **kwargs)
+    assert second.val_loss == first.val_loss
+    for (w1, b1), (w2, b2) in zip(first.params, second.params):
+        assert np.array_equal(np.asarray(w1), np.asarray(w2))
+        assert np.array_equal(np.asarray(b1), np.asarray(b2))
+
+    other = networks.train_mlp(inputs, targets, rng=make_rng(seed, "lorenz63", 7, 5, "estimator",
+                                                             "0.01", 64), **kwargs)
+    assert not np.array_equal(np.asarray(other.params[0][0]), np.asarray(first.params[0][0]))
+
+
+def test_train_estimator_gives_each_width_its_own_fresh_stream(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """P7: ``train_estimator`` calls ``stream(width)`` once per width and trains from that stream.
+
+    Reference: hand-built stubs. ``train_mlp`` is replaced by a recorder returning a stub network
+    whose ``val_loss`` is 1.0 for both widths; the generators it receives must be in their initial
+    state, equal to fresh generators for their own width and different between widths. The capacity
+    rule (smallest width within 5% of the best) then keeps width 32 (equal losses, the smaller
+    wins). Tolerance: none.
+    """
+    from lpcstudy import networks
+    from lpcstudy.data import make_rng
+
+    seen: dict[int, np.random.Generator] = {}
+
+    def stub(inputs, targets, width, epochs, rng, input_noise=0.0, **kwargs):
+        seen[width] = rng
+        return SimpleNamespace(val_loss=1.0, width=width)
+
+    monkeypatch.setattr(networks, "train_mlp", stub)
+    stream = lambda width: make_rng(20261005, "rossler", 7, 8, "estimator", "0.02", width)
+    net, losses = networks.train_estimator(np.zeros((4, 2)), np.zeros((4, 1)), 0.02, (32, 64), 1,
+                                           stream)
+    assert set(seen) == {32, 64} and net.width == 32 and losses == {32: 1.0, 64: 1.0}
+    for width, rng in seen.items():
+        assert rng.bit_generator.state == stream(width).bit_generator.state
+    assert seen[32].bit_generator.state != seen[64].bit_generator.state
