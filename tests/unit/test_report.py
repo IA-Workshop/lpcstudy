@@ -1051,7 +1051,9 @@ def _clip_block() -> dict:
             "H2e": parts(**{"0.01": _clip_missing("missing cell(s)", True),
                             "0.02": _clip_part(0, 0.0, None, False)}),
             "H3c": parts(A5_over_A4=_clip_part(3, 0.001, 0.04, False))},
-        "invariance": {"H1c": "exact", "H2a_i": "exact", "H3a": "not guaranteed"},
+        "invariance": {"H1c": "exact", "H2a_i": "exact",
+                       "H3a": "not guaranteed: calibration oracle: 3 clipped entries (2 at H_ref; "
+                              "A5 weights, A5_max shift 0.252)"},
         "affected_states": {"Q-N": 4, "H3b": 0}}
 
 
@@ -1079,7 +1081,7 @@ def test_clip_column_texts_per_criterion(tmp_path: Path) -> None:
     invariant, (ii) one fired part with ratio 2 and verdict 'fail'; H2c: the part whose best single
     changes says so; H2d: fired 0.35 'fail'; H2e: both parts of the tier-B quantity not computed or
     without clipped inputs (the mixed text keeps the reason); H3c: 'ok' with the ratio 0.04; Q-N and
-    H3b: the counts only; H1c and H3a: the tier-D statement; rows with no analysis: 'n/a'. Exact strings.
+    H3b: the counts only; H1c and H3a: the tier-D statement (H3a with its cause, Amendment 1); rows with no analysis: 'n/a'. Exact strings.
     """
     rows, lines = _clip_rows(tmp_path, _clip_block())
     header = next(line for line in lines if line.startswith("| ID | Hypothesis |"))
@@ -1097,12 +1099,14 @@ def test_clip_column_texts_per_criterion(tmp_path: Path) -> None:
     assert cell("Q-N") == "lorenz63: 4 states with a clipped H_ref draw (count only)"
     assert cell("H3b") == "lorenz63: —"
     assert cell("H1c") == "lorenz63: invariant"
-    assert cell("H3a") == "lorenz63: not guaranteed (3 clipped test evaluation entries)"
+    assert cell("H3a") == ("lorenz63: not guaranteed: calibration oracle: 3 clipped entries (2 at "
+                           "H_ref; A5 weights, A5_max shift 0.252)")
     assert cell("H1a") == "lorenz63: n/a" and cell("H1d") == "lorenz63: n/a"
     assert cell("(reported)") == "lorenz63: n/a"  # the gain bound has no verdict
     text = "\n".join(lines)
     assert "lorenz63: tree, A3 and KM inputs contain 7 clipped entries; not recomputed." in text
-    assert "lorenz63: H3a invariance not guaranteed: 3 clipped test evaluation entries." in text
+    assert ("lorenz63: H3a invariance not guaranteed: calibration oracle: 3 clipped entries (2 at "
+            "H_ref; A5 weights, A5_max shift 0.252).") in text
     assert "it marks no result provisional" in text  # OD6, stated next to the column
     # the verdict cells are untouched by the column (a fired flag changes no verdict)
     plain, _ = _clip_rows(tmp_path, None)

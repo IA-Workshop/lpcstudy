@@ -547,11 +547,37 @@ def clip_sensitivity_block(cell, rules, weights: dict[str, np.ndarray], scores: 
     -------
     dict
         ``clip_level``, ``perturbed_level``, ``status`` ("computed" or "not_computed", with ``reason``),
-        ``href_clipped_draws``, ``held_fixed_entries``, ``test_eval_clipped_entries``, ``share_test``,
-        ``weight_shift``, ``by_hypothesis`` (per criterion ``parts`` and ``flag``), ``invariance`` and
-        ``affected_states``. Nothing here changes a verdict or marks a result provisional (OD6); the
-        recomputation consumes no randomness.
+        ``href_clipped_draws``, ``held_fixed_entries``, ``test_eval_clipped_entries``, ``share_test``
+        (per rule, the share of the pooled squared error on the test draws whose PLP error is clipped:
+        a descriptor of where the error sits, for A0 the CP squared-error share; only its change under
+        P2 is 0, Amendment 1 A1.4), ``weight_shift``, ``by_hypothesis`` (per criterion ``parts`` and
+        ``flag``), ``invariance`` and ``affected_states``. Nothing here changes a verdict or marks a
+        result provisional (OD6); the recomputation consumes no randomness. This is a report-only
+        block: **any** exception inside it is caught and recorded (``status = "not_computed"``,
+        ``reason = "error: <repr>"``, ``LOG.exception``), so that a defect here can never end a run and
+        lose the verdicts (the pattern of ``run_robustness``).
     """
+    try:
+        return _block(cell, rules, weights, scores, noise_cells, library_cells, results, config)
+    except Exception as exc:  # noqa: BLE001 - report-only block: recorded and logged, never fatal
+        LOG.exception("clip sensitivity: block not computed: %r", exc)
+        return _failed(results, f"error: {exc!r}")
+
+
+def _failed(results: dict, reason: str) -> dict:
+    """A block that was not computed: every part ``not_computed`` with ``reason`` (never False)."""
+    try:
+        by_hypothesis = _all_not_computed(results, reason)
+    except Exception:  # noqa: BLE001 - malformed results: no parts to list, the reason stays
+        by_hypothesis = {}
+    return {"clip_level": ERROR_CLIP, "perturbed_level": PERTURBED_LEVEL,
+            "status": "not_computed", "reason": reason, "by_hypothesis": by_hypothesis,
+            "invariance": dict.fromkeys(("H1c", "H2a_i", "H3a"), INVARIANCE_NOT_COMPUTED),
+            "affected_states": {"Q-N": None, "H3b": None}}
+
+
+def _block(cell, rules, weights, scores, noise_cells, library_cells, results, config) -> dict:
+    """The body of ``clip_sensitivity_block`` (which catches whatever it raises)."""
     out: dict = {"clip_level": ERROR_CLIP, "perturbed_level": PERTURBED_LEVEL,
                  "status": "computed", "reason": None}
     con, cal, test = (cell.splits[s] for s in ("construction", "calibration", "test"))
@@ -569,18 +595,12 @@ def clip_sensitivity_block(cell, rules, weights: dict[str, np.ndarray], scores: 
         if n_cp:
             reason = f"CP clip sentinel nonzero ({n_cp} entries)"
     if reason is not None:
-        out.update(status="not_computed", reason=reason, by_hypothesis=_all_not_computed(results, reason),
-                   invariance=dict.fromkeys(("H1c", "H2a_i", "H3a"), INVARIANCE_NOT_COMPUTED),
-                   affected_states={"Q-N": None, "H3b": None})
-        return out
+        return _failed(results, reason)
     try:
         out.update(_compute(cell, rules, weights, scores, noise_cells, library_cells, results, config,
                             sweeps))
     except _BaselineMismatch as exc:
-        out.update(status="not_computed", reason=str(exc),
-                   by_hypothesis=_all_not_computed(results, str(exc)),
-                   invariance=dict.fromkeys(("H1c", "H2a_i", "H3a"), INVARIANCE_NOT_COMPUTED),
-                   affected_states={"Q-N": None, "H3b": None})
+        return _failed(results, str(exc))
     return out
 
 
@@ -622,6 +642,11 @@ def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, 
     rmap = rules.regimes[rules.chosen_regimes]
     profile = lambda split: deployable_profile(split.evals, rules.proxies, cell.noise, lt)
     regime_cal, regime_test = rmap.assign(profile(cal)), rmap.assign(profile(test))
+    # a regime with no calibration member takes the fallback A2' (the construction oracle)
+    empty = np.array([not (regime_cal == k).any() for k in range(rmap.n_regimes)])
+    if rmap.empty is not None and not np.array_equal(rmap.empty, empty):
+        raise _BaselineMismatch("the empty regimes of the map disagree with the calibration assignment")
+    empty_used = bool(empty[regime_test].any())  # some test draw is scored with the fallback
 
     def regime_weights(fallback: np.ndarray, moments: EnsembleMoments) -> np.ndarray:
         # The weights of calibrate_regimes: an empty regime keeps the fallback, others regime_weight.
@@ -665,7 +690,8 @@ def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, 
     if "H3c" in names:
         by_hypothesis["H3c"] = _guarded(names["H3c"], lambda: _hypothesis({"A5_over_A4": h3c_part(
             results["H3c"], mse_2["A5"], mse_2["A4"], config,
-            n_test_eval + href["calibration_oracle"])}))
+            n_test_eval + href["calibration_oracle"]
+            + empty_used * href["construction_oracle"])}))
     if "H2d" in names:
         by_hypothesis["H2d"] = _guarded(names["H2d"], lambda: _hypothesis({"A4_over_A3": h2d_part(
             results["H2d"], mse_2["A3"], mse_2["A4"], config, n_test_eval)}))
@@ -708,40 +734,75 @@ def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, 
         "Q-N": int((q["construction_oracle"] > 0).sum() + (q["calibration_oracle"] > 0).sum()
                    + (q["test_oracle"] > 0).sum()),
         "H3b": int((q["construction_oracle"] > 0).sum())}
-    out["invariance"] = invariance(config, out["test_eval_clipped_entries"])
+    counts = {"test_eval": (out["test_eval_clipped_entries"], href["test_eval"]),
+              "calibration_eval": (int(entries(cal.evals)), href["calibration_eval"]),
+              "calibration_oracle": (int(entries(cal.moments)), href["calibration_oracle"]),
+              "construction_oracle": (int(entries(con.moments)), href["construction_oracle"])}
+    out["invariance"] = invariance(config, counts, out["weight_shift"]["A5_max"], empty_used)
+    if out["invariance"]["H3a"] == INVARIANCE_EXACT:
+        # P-c of Amendment 1: with no clipped entry feeding A5 or the Kaplan-Meier order, the A5 weights
+        # at H_ref that H3a reads must be bitwise unchanged (the rows of an empty regime only matter
+        # if a test draw falls in one). A failure is a defect, not a finding.
+        rows = ~empty | empty_used
+        if not np.array_equal(a5_2[rows, col], a5_0[rows, col]):
+            raise _BaselineMismatch("P-c failed: the A5 weights at H_ref changed although no clipped "
+                                    "entry feeds H3a (defect)")
     return out
 
 
-def invariance(config: StudyConfig, test_eval_entries: int) -> dict[str, str]:
-    """The tier-D statements, with the hypotheses checked at run time (NVVUQ.14).
+def invariance(config: StudyConfig, counts: dict[str, tuple[int, int]], a5_shift: float = 0.0,
+               empty_regime_used: bool = False) -> dict[str, str]:
+    """The tier-D statements, with the hypotheses checked at run time (NVVUQ.14; Amendment 1).
 
-    H1c, H2a(i) and the regime targets use first exceedances and small-error regimes: a horizon at
-    which P2 changes anything carries a clipped draw, so its mean square is at least ``L^2 / M``; if
-    ``L^2 / M > max(theta_max, r_lin)^2`` (H-M1, H-M2) the exceedance already happened at ``L`` and the
-    statistic is unchanged. This is asserted here; if it fails the statement is "outside the
-    invariance hypothesis". H3a (realized horizons of the A5 rule) is unchanged if the test evaluation
-    draws hold no clipped entry at any horizon (H-W cannot be checked cheaply otherwise), else "not
-    guaranteed".
+    H1c and H2a(i) read the test oracle only (never a fitted weight). A horizon at which P2 changes
+    anything carries a clipped draw, so its mean square is at least ``L^2 / M``; if
+    ``L^2 / M > max(theta_max, r_lin)^2`` (H-M1, H-M2) it exceeded, or was non-small, at ``L`` already,
+    and the statistic is unchanged. This is asserted here; if it fails the statement is "outside the
+    invariance hypothesis".
+
+    H3a reads the A5 weights and the Kaplan-Meier regime order, which come from the calibration oracle
+    (and, for a regime with no calibration member, from the construction oracle), and the test and
+    calibration evaluation errors. It is "exact" only if none of those inputs holds a clipped entry at
+    any horizon: no test evaluation entry, no calibration evaluation entry, no calibration oracle entry,
+    and no construction oracle entry if some test draw falls in an empty regime. Otherwise it is
+    ``"not guaranteed: " + "; ".join(causes)``, each cause naming the source, its total, its count at
+    ``H_ref`` and what it feeds. "Not guaranteed" does not mean "changed".
 
     Parameters
     ----------
     config : StudyConfig
         Configuration (``thresholds``, ``linear_regime_rms``, ``n_oracle_draws``).
-    test_eval_entries : int
-        Clipped PLP entries (finite beyond the clip, or non-finite) of the test evaluation draws, all
-        horizons.
+    counts : dict[str, tuple[int, int]]
+        For ``test_eval``, ``calibration_eval``, ``calibration_oracle`` and ``construction_oracle``:
+        the clipped PLP entries (finite beyond the clip, or non-finite) at all horizons, and the
+        clipped draws at ``H_ref``.
+    a5_shift : float, optional
+        ``max_k |A5'_k - A5_k|`` at ``H_ref`` (named in the calibration-oracle cause).
+    empty_regime_used : bool, optional
+        Some test draw falls in a regime with no calibration member.
 
     Returns
     -------
     dict[str, str]
-        ``H1c``, ``H2a_i`` and ``H3a``: "exact", "outside the invariance hypothesis" or
-        "not guaranteed".
+        ``H1c``, ``H2a_i`` (``"exact"`` or "outside the invariance hypothesis") and ``H3a``
+        (``"exact"`` or ``"not guaranteed: <causes>"``).
     """
     holds = ERROR_CLIP**2 / config.n_oracle_draws > max(max(config.thresholds)**2,
                                                        config.linear_regime_rms**2)
+    note = {"test_eval": ("test evaluation", ""),
+            "calibration_eval": ("calibration evaluation", "; Kaplan-Meier regime order"),
+            "calibration_oracle": ("calibration oracle",
+                                   f"; A5 weights, A5_max shift {a5_shift:.3g}"),
+            "construction_oracle": ("construction oracle", "; A2 fallback of an empty regime")}
+    causes = []
+    for key, (label, what) in note.items():
+        total, at_ref = counts[key]
+        if total and (key != "construction_oracle" or empty_regime_used):
+            causes.append(f"{label}: {total} clipped entries ({at_ref} at H_ref{what})")
     return {"H1c": INVARIANCE_EXACT if holds else INVARIANCE_OUTSIDE,
             "H2a_i": INVARIANCE_EXACT if holds else INVARIANCE_OUTSIDE,
-            "H3a": INVARIANCE_EXACT if test_eval_entries == 0 else INVARIANCE_NOT_GUARANTEED}
+            "H3a": INVARIANCE_EXACT if not causes
+            else INVARIANCE_NOT_GUARANTEED + ": " + "; ".join(causes)}
 
 
 def _weights_at_ref(cell, config: StudyConfig, m_draws: int) -> tuple[np.ndarray, np.ndarray, int]:
@@ -841,9 +902,8 @@ def log_flags(system: str, block: dict) -> int:
             LOG.warning("clip sensitivity %s H2a: CLIP-SENSITIVE (the parts of (ii) change at 20 "
                         "sigma_x: %s)", system, entry["parts_2L"])
             lines += 1
-    if block["invariance"]["H3a"] == INVARIANCE_NOT_GUARANTEED:
-        LOG.warning("clip sensitivity %s H3a: invariance NOT GUARANTEED (%d clipped test evaluation "
-                    "entries)", system, block["test_eval_clipped_entries"])
+    if block["invariance"]["H3a"].startswith(INVARIANCE_NOT_GUARANTEED):
+        LOG.warning("clip sensitivity %s H3a: invariance %s", system, block["invariance"]["H3a"])
         lines += 1
     for name in ("H1c", "H2a_i"):
         if block["invariance"][name] == INVARIANCE_OUTSIDE:

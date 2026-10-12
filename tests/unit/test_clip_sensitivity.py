@@ -591,10 +591,10 @@ def _raw(rng, n_draws: int, inject: int, extra: int = 0, cp_inject: int = 0):
     return cp, plp
 
 
-def _clip_arrays(masks, plp_err):
+def _clip_arrays(masks, plp_err, ref: int = REF_STEP - 1):
     """``handled`` (the two H_ref columns), the signs and the entry totals of a world at L (the
     fixture builder; the production derivation is tested in T1 and T11)."""
-    n, ref = len(plp_err), REF_STEP - 1
+    n = len(plp_err)
     handled = np.zeros((n, len(DRAW_COUNTERS)), dtype=np.int64)
     handled[:, DRAW_COLUMN["error_clips_plp_href"]] = masks.plp[:, :, ref].sum(axis=1)
     handled[:, DRAW_COLUMN["error_clips_nonfinite_href"]] = masks.nonfinite[:, :, ref].sum(axis=1)
@@ -604,38 +604,40 @@ def _clip_arrays(masks, plp_err):
     return handled, sign, {k: counts[k] for k in ENTRY_COUNTERS}
 
 
-def _moments_from(cp_err, plp_err, masks, seeds):
-    """Moments of errors ``(n, M, H)`` as ``ensemble_moments`` forms them (with the clip arrays if
+def _moments_from(cp_err, plp_err, masks, seeds, ref: int = REF_STEP - 1):
+    """Moments of errors ``(n, M, nH)`` as ``ensemble_moments`` forms them (with the clip arrays if
     ``masks`` is given)."""
     corr, cp_const, plp_const = draw_correlation(cp_err, plp_err)
     handled = np.zeros((len(cp_err), len(DRAW_COUNTERS)), dtype=np.int64)
     chi = entries = None
     if masks is not None:
-        handled, sign, entries = _clip_arrays(masks, plp_err)
-        chi = (sign * cp_err[:, :, REF_STEP - 1]).mean(axis=1)
+        handled, sign, entries = _clip_arrays(masks, plp_err, ref)
+        chi = (sign * cp_err[:, :, ref]).mean(axis=1)
     return EnsembleMoments(
-        horizons=np.arange(1, H + 1), mean_cp=cp_err.mean(axis=1), mean_plp=plp_err.mean(axis=1),
+        horizons=np.arange(1, cp_err.shape[2] + 1), mean_cp=cp_err.mean(axis=1), mean_plp=plp_err.mean(axis=1),
         sq_cp=(cp_err**2).mean(axis=1), sq_plp=(plp_err**2).mean(axis=1),
         cross=(cp_err * plp_err).mean(axis=1), analog_seed=seeds[0], est_seed=seeds[1],
         noise_sens=seeds[2], err_corr=corr, cp_constant=cp_const, plp_constant=plp_const,
         handled=handled, clip_entries=entries, clip_cross_ref=chi)
 
 
-def _evals_from(feats, cp_err, plp_err, masks):
-    """Evaluation draws ``(n, E, H)`` with the features ``deployable_profile`` reads."""
+def _evals_from(feats, cp_err, plp_err, masks, ref: int = REF_STEP - 1):
+    """Evaluation draws ``(n, E, nH)`` with the features ``deployable_profile`` reads."""
     distance, est_nu, growth, noise_sens, verify = feats
-    handled = np.zeros((len(cp_err), len(DRAW_COUNTERS)), dtype=np.int64)
+    n, n_draws, n_hor = cp_err.shape
+    handled = np.zeros((n, len(DRAW_COUNTERS)), dtype=np.int64)
     sign = entries = None
     if masks is not None:
-        handled, sign, entries = _clip_arrays(masks, plp_err)
+        handled, sign, entries = _clip_arrays(masks, plp_err, ref)
     return EvaluationDraws(
-        horizons=np.arange(1, H + 1), cp_err=cp_err, plp_err=plp_err, verify_noise=verify,
-        distance=distance, est_nu=est_nu, growth_proxy=growth, gain_proxy=np.ones((len(cp_err), E, H)),
-        inputs=np.zeros((len(cp_err), E, 2)), noise_sens=noise_sens, handled=handled,
+        horizons=np.arange(1, n_hor + 1), cp_err=cp_err, plp_err=plp_err, verify_noise=verify,
+        distance=distance, est_nu=est_nu, growth_proxy=growth, gain_proxy=np.ones((n, n_draws, n_hor)),
+        inputs=np.zeros((n, n_draws, 2)), noise_sens=noise_sens, handled=handled,
         clip_entries=entries, clip_sign_ref=sign)
 
 
-def _world(seed: int, inject: bool = True, cp_inject: int = 0, with_reference: bool = True):
+def _world(seed: int, inject: bool = True, cp_inject: int = 0, with_reference: bool = True,
+           oracle_only: bool = False):
     """A miniature core cell with the production fitting steps, and the 20 sigma_x reference world.
 
     Three splits of 60 states (oracle draws M = 20, evaluation draws E = 2, horizons 1..16, H_ref = 4
@@ -650,13 +652,16 @@ def _world(seed: int, inject: bool = True, cp_inject: int = 0, with_reference: b
     config = _world_config()
     n_inject = 6 if inject else 0
     splits = ("construction", "calibration", "test")
-    raw = {s: _raw(rng, M, n_inject, 3 if inject else 0, cp_inject if s == "test" else 0)
+    # oracle_only: clips in the construction and calibration oracles and nowhere else (T15)
+    raw = {s: _raw(rng, M, 0 if oracle_only and s == "test" else n_inject,
+                   0 if oracle_only else (3 if inject else 0), cp_inject if s == "test" else 0)
            for s in splits}
-    eval_raw = {s: _raw(rng, E, 5 if inject else 0) for s in splits}
+    eval_raw = {s: _raw(rng, E, 0 if oracle_only else (5 if inject else 0)) for s in splits}
     seeds = {s: (0.2 + rng.random(N), 0.1 + rng.random(N), rng.random(N)) for s in splits}
     feats = {s: (0.5 + rng.random((N, E)), 0.5 + rng.random((N, E)), rng.random((N, E)),
                  rng.random((N, E)), 0.05 * rng.standard_normal((N, E, H))) for s in splits}
-    sweep_raw = {key: _raw(rng, M, 4 if inject else 0) for key in [*SWEEP_KEYS, NOISE_KEYS[0.05]]}
+    sweep_raw = {key: _raw(rng, M, 0 if oracle_only else (4 if inject else 0))
+                 for key in [*SWEEP_KEYS, NOISE_KEYS[0.05]]}
     gains = np.exp(0.3 * rng.standard_normal((N, H)))
     growth = 0.5 * rng.standard_normal(N)
     a3_fixed = rng.uniform(0.1, 0.9, (N, E, H))
@@ -707,6 +712,7 @@ def _world(seed: int, inject: bool = True, cp_inject: int = 0, with_reference: b
             oracles={"test": SimpleNamespace(gains=gains, growth=growth)}, horizons=horizons)
         results = {
             "H1b": an.h1b_seed_amplifier(cell, config),
+            "H1c": an.h1c_horizon_law(cell, config),
             "H2a": an.h2a_separation(cell, config),
             "H2b": an.h2b_knob_response(noise_cells, library_cells, config),
             "H2c": an.h2c_state_dependence(scores, cell.splits["calibration"], config),
@@ -864,7 +870,25 @@ def test_world_counts_shares_and_invariance_are_read_off_the_stored_arrays() -> 
     cp_clipped = sum(cp_squares[i, r] for i in range(N) for r in range(E)
                      if ev.clip_sign_ref[i, r] != 0)
     assert block["share_test"]["A0"] == pytest.approx(cp_clipped / cp_squares.sum(), rel=1e-12)
-    assert block["invariance"] == {"H1c": "exact", "H2a_i": "exact", "H3a": "not guaranteed"}
+    # H3a (Amendment 1 A1.1): the cause names every source that holds a clipped entry, in the order
+    # test evaluation, calibration evaluation, calibration oracle (with the A5_max shift), then the
+    # construction oracle only if some test draw lies in a regime with no calibration member
+    totals = {k: (c.clip_entries["error_clips_plp"] + c.clip_entries["error_clips_nonfinite"])
+              for k, c in (("test", cell.splits["test"].evals), ("cal_eval", cell.splits["calibration"].evals),
+                           ("cal_oracle", cell.splits["calibration"].moments),
+                           ("con_oracle", cell.splits["construction"].moments))}
+    h = block["href_clipped_draws"]
+    expected = ("not guaranteed: "
+                f"test evaluation: {totals['test']} clipped entries ({h['test_eval']} at H_ref); "
+                f"calibration evaluation: {totals['cal_eval']} clipped entries "
+                f"({h['calibration_eval']} at H_ref; Kaplan-Meier regime order); "
+                f"calibration oracle: {totals['cal_oracle']} clipped entries "
+                f"({h['calibration_oracle']} at H_ref; A5 weights, A5_max shift "
+                f"{block['weight_shift']['A5_max']:.3g})")
+    construction = (f"; construction oracle: {totals['con_oracle']} clipped entries "
+                    f"({h['construction_oracle']} at H_ref; A2 fallback of an empty regime)")
+    assert block["invariance"]["H1c"] == block["invariance"]["H2a_i"] == "exact"
+    assert block["invariance"]["H3a"] in (expected, expected + construction)
 
 
 def test_world_without_a_clipped_entry_is_bitwise_unchanged() -> None:
@@ -965,7 +989,7 @@ def test_world_log_flags_writes_one_warning_per_fired_flag(caplog) -> None:
     with caplog.at_level(logging.WARNING, logger="lpcstudy"):
         assert cs.log_flags("mini", block) == expected
     assert caplog.text.count("CLIP-SENSITIVE") >= fired > 0
-    assert "H3a: invariance NOT GUARANTEED" in caplog.text
+    assert "H3a: invariance not guaranteed: test evaluation: " in caplog.text
     assert "not recomputed" in caplog.text
 
 
@@ -975,10 +999,273 @@ def test_invariance_outside_the_hypothesis_when_l_squared_over_m_is_small() -> N
     Reference: the plan (section 5): ``L**2 / M > max(max(thresholds)**2, linear_regime_rms**2)``, with
     thresholds (0.1, 0.2, 0.3, 0.5) and r_lin = 0.5, so the bound is 0.25: M = 399 gives 100 / 399 =
     0.2506 (holds) and M = 400 gives exactly 0.25 (does not hold, the inequality is strict: 100 / 400
-    is exact). Exact.
+    is exact). H3a: "exact" with no clipped entry, else "not guaranteed: " plus the cause (Amendment 1
+    A1.1; a construction-oracle entry counts only if a test draw lies in an empty regime). Exact.
     """
-    assert cs.invariance(dataclasses.replace(SMOKE, n_oracle_draws=399), 0) == {
+    zero = {k: (0, 0) for k in ("test_eval", "calibration_eval", "calibration_oracle",
+                                "construction_oracle")}
+    assert cs.invariance(dataclasses.replace(SMOKE, n_oracle_draws=399), zero) == {
         "H1c": "exact", "H2a_i": "exact", "H3a": "exact"}
-    out = cs.invariance(dataclasses.replace(SMOKE, n_oracle_draws=400), 3)
+    held = {**zero, "test_eval": (3, 2)}
+    out = cs.invariance(dataclasses.replace(SMOKE, n_oracle_draws=400), held)
     assert out == {"H1c": "outside the invariance hypothesis",
-                   "H2a_i": "outside the invariance hypothesis", "H3a": "not guaranteed"}
+                   "H2a_i": "outside the invariance hypothesis",
+                   "H3a": "not guaranteed: test evaluation: 3 clipped entries (2 at H_ref)"}
+
+
+# ------------------------------------------------- Amendment 1: H3a (T13, T15), H3c (T14), R3
+def _tiny_world(config, raws, growth, level, masked, tree=None):
+    """A hand-sized core cell (horizons 1..3, H_ref = 2) with the production fitting steps.
+
+    ``raws[split] = (cp_oracle, plp_oracle_raw, cp_eval, plp_eval_raw)`` with oracle arrays
+    ``(n, M, 3)`` and evaluation arrays ``(n, E, 3)``; ``growth[split]`` is the ``(n, E)`` growth proxy
+    (the only profile coordinate that varies, so a two-leaf tree splits on it). The errors are
+    clipped at ``level`` by ``clip_errors``; ``tree`` is fitted on the construction states of the
+    first world and passed to the reference world (held fixed). The A3 weights are fixed at 1/2.
+    """
+    from sklearn.tree import DecisionTreeRegressor
+
+    splits = ("construction", "calibration", "test")
+    ref = 1
+    moments, evals = {}, {}
+    for s in splits:
+        cp_o, plp_o, cp_e, plp_e = raws[s]
+        cp_err, plp_err, masks = clip_errors(cp_o, plp_o, np.zeros((len(cp_o), 1, 3)), clip=level)
+        ones = np.ones(len(cp_o))
+        moments[s] = _moments_from(cp_err, plp_err, masks if masked else None,
+                                   (ones, ones, np.zeros(len(cp_o))), ref)
+        e_cp, e_plp, e_masks = clip_errors(cp_e, plp_e, np.zeros((len(cp_e), 1, 3)), clip=level)
+        shape = growth[s].shape
+        feats = (np.ones(shape), np.ones(shape), growth[s], np.zeros(shape), np.zeros(cp_e.shape))
+        evals[s] = _evals_from(feats, e_cp, e_plp, e_masks if masked else None, ref)
+    proxies = ProfileProxies(SeedProxy(0.5, 0.5), SeedProxy(0.5, 0.5), nu_cap=5.0)
+    lt = config.steps_per_lyapunov
+    profile = {s: deployable_profile(evals[s], proxies, 0.01, lt) for s in splits}
+    if tree is None:
+        tree = DecisionTreeRegressor(max_leaf_nodes=2, random_state=0).fit(
+            profile["construction"].reshape(-1, 4), growth["construction"].reshape(-1))
+    a2 = global_weight(moments["construction"])
+    rmap = calibrate_regimes(tree, profile["calibration"], moments["calibration"],
+                             evals["calibration"], config.primary_threshold, a2)
+    k = rmap.n_regimes
+    n_test = len(raws["test"][0])
+    rules = FittedRules(
+        proxies=proxies, global_weights=a2,
+        predictor=SimpleNamespace(weights=lambda inputs, horizons: np.full(
+            (n_test, raws["test"][2].shape[1], 3), 0.5)),
+        regimes={k: rmap}, chosen_regimes=k)
+    test = SplitData(moments["test"], evals["test"])
+    horizons = np.arange(1, 4)
+    weights = rule_weights(rules, test, 0.01, config, horizons)
+    scores = score_rules(weights, test, horizons, config, config.primary_threshold)
+    cell = SimpleNamespace(noise=0.01, splits={s: SplitData(moments[s], evals[s]) for s in splits})
+    return SimpleNamespace(cell=cell, rules=rules, weights=weights, scores=scores, tree=tree,
+                           config=config)
+
+
+def _tiny_config():
+    return dataclasses.replace(SMOKE, steps_per_lyapunov=2, horizon_max_lyapunov=1.5,
+                               primary_threshold=0.5, n_oracle_draws=4, n_eval_draws=1,
+                               bootstrap_resamples=40, bootstrap_block=5)
+
+
+def _tiny_block(world, results=None):
+    return cs.clip_sensitivity_block(world.cell, world.rules, world.weights, world.scores, {}, {},
+                                     results or {}, world.config)
+
+
+def _t13_raws(fourth_error: float):
+    """The calibration oracle of the plan's T13: states A (e_C = 0, raw e_P = (0, 0, 0, x) at H_ref)
+    and B (e_C = 4, e_P = 0), M = 4; one test state with e_C = (0, 1, 0), e_P = (0, -1, 0)."""
+    zeros = lambda n, m: np.zeros((n, m, 3))
+    cal_cp, cal_plp = zeros(2, 4), zeros(2, 4)
+    cal_cp[1] = 4.0
+    cal_plp[0, 3, 1] = fourth_error
+    con_cp, con_plp = np.ones((1, 4, 3)), np.full((1, 4, 3), 0.5)
+    test_cp, test_plp = np.full((1, 4, 3), 0.1), np.full((1, 4, 3), 0.05)
+    test_e_cp, test_e_plp = np.array([[[0.0, 1.0, 0.0]]]), np.array([[[0.0, -1.0, 0.0]]])
+    return {"construction": (con_cp, con_plp, np.ones((1, 1, 3)), np.full((1, 1, 3), 0.5)),
+            "calibration": (cal_cp, cal_plp, zeros(2, 1), zeros(2, 1)),
+            "test": (test_cp, test_plp, test_e_cp, test_e_plp)}
+
+
+T13_GROWTH = {"construction": np.zeros((1, 1)), "calibration": np.zeros((2, 1)),
+              "test": np.zeros((1, 1))}
+
+
+def test_t13_a_calibration_oracle_clip_moves_a5_and_h3a_is_not_guaranteed() -> None:
+    """T13 (R1): clips only in the calibration oracle move A5's weight and a test draw's first passage.
+
+    Reference: the mathematician's hand world (Amendment 1, A1.5), M = 4, horizons 1..3, H_ref = 2,
+    theta = 0.5, one regime. Calibration state A has e_C = 0 and raw e_P = (0, 0, 0, +inf) at H_ref,
+    state B e_C = 4, e_P = 0: b_A = c_A = 25, b_B = 0, c_B = 16, so w5 = 25/41; at 20, b_A = c_A =
+    100, so w5' = 25/29 and the A5_max shift is 300/1189 = 0.252313. The test state has e_C = (0, 1, 0)
+    and e_P = (0, -1, 0), no clipped entry in any evaluation draw: the hybrid at H_ref is 2 w5 - 1 =
+    9/41 = 0.2195 <= theta at L and 21/29 = 0.7241 > theta at 20, so (duration, event) (3, False) ->
+    (2, True). The label is 'not guaranteed' with the cause string of A1.1. The independent
+    reference is the 20 sigma_x world (``clip_errors(clip=20)``, production ``calibrate_regimes``,
+    ``rule_weights`` and ``score_rules`` rerun, tree held fixed). Tolerances: weights against
+    ``Fraction`` <= 2 ulp (exact dyadic sums, one rounded division); the shift and the squared hybrid
+    errors <= 4 ulp of 25/29 (differences of rounded values); durations, events, labels, counts and
+    the cause string exact. The margins |h| - theta = -0.28 and +0.22 exceed rounding by about 1e15.
+    """
+    config, raws = _tiny_config(), _t13_raws(np.inf)
+    world = _tiny_world(config, raws, T13_GROWTH, LEVEL, True)
+    reference = _tiny_world(config, raws, T13_GROWTH, 2 * LEVEL, False, tree=world.tree)
+    ulp = lambda x, k: k * np.spacing(x)
+    w_0 = world.rules.regimes[1].weights[0, 1]
+    w_2 = reference.rules.regimes[1].weights[0, 1]
+    assert abs(w_0 - float(Fraction(25, 41))) <= ulp(w_0, 2)
+    assert abs(w_2 - float(Fraction(25, 29))) <= ulp(w_2, 2)
+    assert (int(world.scores["A5"].durations[0, 0]), bool(world.scores["A5"].events[0, 0])) == (3, False)
+    assert (int(reference.scores["A5"].durations[0, 0]),
+            bool(reference.scores["A5"].events[0, 0])) == (2, True)
+    for rules_scores, hybrid in ((world.scores, Fraction(9, 41)), (reference.scores, Fraction(21, 29))):
+        value = rules_scores["A5"].state_mse_ref[0]
+        assert abs(value - float(hybrid**2)) <= ulp(25 / 29, 4)
+    block = _tiny_block(world)
+    assert block["status"] == "computed"
+    assert abs(block["weight_shift"]["A5_max"] - 300 / 1189) <= ulp(25 / 29, 4)
+    assert block["invariance"]["H3a"] == ("not guaranteed: calibration oracle: 1 clipped entries "
+                                          "(1 at H_ref; A5 weights, A5_max shift 0.252)")
+    assert block["invariance"]["H1c"] == block["invariance"]["H2a_i"] == "exact"
+
+
+def test_t13b_control_without_a_clip_h3a_is_exact_and_the_durations_do_not_move() -> None:
+    """T13b: the same world with state A's fourth raw e_P set to 0: no clipped entry anywhere.
+
+    Reference: the plan (A1.5): the A5 weights at H_ref are bitwise unchanged under P2, the 20 sigma_x
+    world gives the same durations and events, and the label is 'exact'. Bitwise / exact.
+    """
+    config, raws = _tiny_config(), _t13_raws(0.0)
+    world = _tiny_world(config, raws, T13_GROWTH, LEVEL, True)
+    reference = _tiny_world(config, raws, T13_GROWTH, 2 * LEVEL, False, tree=world.tree)
+    assert world.scores["A5"].durations.tolist() == reference.scores["A5"].durations.tolist()
+    assert world.scores["A5"].events.tolist() == reference.scores["A5"].events.tolist()
+    assert world.rules.regimes[1].weights.tobytes() == reference.rules.regimes[1].weights.tobytes()
+    block = _tiny_block(world)
+    assert block["status"] == "computed" and block["weight_shift"]["A5_max"] == 0.0
+    assert block["invariance"]["H3a"] == "exact"
+
+
+def _t14_world(test_growth: float):
+    """Two regimes, regime 1 (high growth) with no calibration member; one clipped H_ref draw in the
+    construction oracle only; the test state has growth ``test_growth`` (0: regime 0, 1: regime 1)."""
+    config = _tiny_config()
+    zeros = lambda n, m: np.zeros((n, m, 3))
+    con_plp = np.full((2, 4, 3), 0.5)
+    con_plp[1, 0, 1] = np.inf  # the clipped draw, in the state with growth 1
+    plain = lambda n, m, value: np.full((n, m, 3), value)
+    con_cp = plain(2, 4, 1.0)
+    con_cp[0] = 8.0  # a large CP error keeps the pooled A2 inside (0, 1): 0.24 at L, 0.62 at 20
+    raws = {"construction": (con_cp, con_plp, plain(2, 1, 1.0), plain(2, 1, 0.5)),
+            "calibration": (plain(2, 4, 1.0), plain(2, 4, 0.5), plain(2, 1, 1.0), plain(2, 1, 0.5)),
+            "test": (plain(1, 4, 1.0), plain(1, 4, 0.5), plain(1, 1, 1.0), plain(1, 1, 0.5))}
+    growth = {"construction": np.array([[0.0], [1.0]]), "calibration": np.zeros((2, 1)),
+              "test": np.full((1, 1), test_growth)}
+    world = _tiny_world(config, raws, growth, LEVEL, True)
+    reference = _tiny_world(config, raws, growth, 2 * LEVEL, False, tree=world.tree)
+    results = {"H3c": an.h3c_ratio(world.scores["A5"].state_mse_ref,
+                                   world.scores["A4"].state_mse_ref, config)}
+    return world, reference, results
+
+
+def test_t14_h3c_counts_the_construction_oracle_only_when_a_test_draw_is_in_an_empty_regime() -> None:
+    """T14 (R2): the fallback A2' of an empty regime reads the construction oracle.
+
+    Reference: the plan (Amendment 1, A1.3 and A1.5). Two regimes, regime 1 has no calibration member
+    (``rmap.empty`` agrees); the construction oracle holds one clipped H_ref draw, the calibration
+    oracle and every evaluation split none. (i) A test draw in regime 1: ``n_clipped_inputs`` of H3c
+    is 1 (= 0 test evaluation + 0 calibration oracle + 1 construction oracle), A5' of that draw is
+    A2' (the 20 sigma_x world's regime-1 weight equals its A2, and the block's A5_max equals the A2
+    shift), and H3a's condition (d) fails with the cause 'construction oracle: 1 clipped entries (1 at
+    H_ref; A2 fallback of an empty regime)'. (ii) A test draw in regime 0: ``n_clipped_inputs`` is 0,
+    (d) does not apply and H3a is 'exact' (the empty regime's A5 row differs and is not read).
+    Integers and strings exact; the shift against the reference world rtol 1e-12.
+    """
+    world, reference, results = _t14_world(1.0)
+    rmap = world.rules.regimes[2]
+    assert rmap.empty.tolist() == [False, True]
+    block = _tiny_block(world, results)
+    part = block["by_hypothesis"]["H3c"]["parts"]["A5_over_A4"]
+    assert part["n_clipped_inputs"] == 1
+    ref_map = reference.rules.regimes[2]
+    assert ref_map.weights[1].tobytes() == reference.rules.global_weights.tobytes()
+    assert block["weight_shift"]["A5_max"] == pytest.approx(
+        abs(reference.rules.global_weights[1] - world.rules.global_weights[1]), rel=1e-12)
+    assert block["weight_shift"]["A5_max"] > 0.0
+    assert block["invariance"]["H3a"] == ("not guaranteed: construction oracle: 1 clipped entries "
+                                          "(1 at H_ref; A2 fallback of an empty regime)")
+    world, _, results = _t14_world(0.0)
+    block = _tiny_block(world, results)
+    assert block["status"] == "computed"
+    assert block["by_hypothesis"]["H3c"]["parts"]["A5_over_A4"]["n_clipped_inputs"] == 0
+    assert block["invariance"]["H3a"] == "exact"
+
+
+def test_t15_h1c_and_h2a_part_i_are_bitwise_unchanged_at_twenty_sigma() -> None:
+    """T15 (recommended; A1.2): H1c and H2a(i) do not read a fitted weight and are invariant.
+
+    Reference: the 20 sigma_x mini-world (production ``h1c_horizon_law`` and ``h2a_separation`` on
+    errors clipped at 20), compared with the original results bitwise (JSON text, so a NaN equals a
+    NaN) for H1c (whole result) and the part (i) keys of H2a. Two worlds: clips only in the
+    construction and calibration oracles (the plan's T15; the labels are 'exact' and H3a is 'not
+    guaranteed' by the calibration oracle), and the world with clips everywhere, including the test
+    oracle at H_ref and at a later horizon (the theorem H-M1, H-M2 at work: L^2 / M = 5 > 0.25).
+    """
+    import json
+
+    part_i = ("median_range", "range_ci", "part_i_verdict", "part_i_reason", "n_eligible_states",
+              "n_excluded_states", "n_noncontiguous_states", "range_by_span", "complete_case",
+              "range_n_failed_resamples")
+    dump = lambda d: json.dumps(d, sort_keys=True)
+    for kwargs in ({"oracle_only": True}, {}):
+        world = _world(1101, **kwargs)
+        block = _run(world)
+        assert block["status"] == "computed"
+        assert dump(world.results["H1c"]) == dump(world.reference.results["H1c"])
+        assert dump({k: world.results["H2a"][k] for k in part_i}) == dump(
+            {k: world.reference.results["H2a"][k] for k in part_i})
+        assert block["invariance"]["H1c"] == block["invariance"]["H2a_i"] == "exact"
+        assert block["invariance"]["H3a"].startswith("not guaranteed: ")
+        if kwargs:
+            assert block["href_clipped_draws"]["test_oracle"] == 0
+            assert block["href_clipped_draws"]["test_eval"] == 0
+            assert "test evaluation" not in block["invariance"]["H3a"]
+            assert "calibration oracle" in block["invariance"]["H3a"]
+
+
+def test_an_exception_inside_the_block_is_recorded_not_raised(monkeypatch, caplog) -> None:
+    """R3: any exception in the report-only block gives ``not_computed`` with the error, never a raise.
+
+    Reference: the plan's OD6 reading (the flag is report-only) and ``run_robustness`` (a failed
+    variant is reported, not fatal). Three injections: ``_compute`` raising ``RuntimeError``, a cell
+    without splits (a ``KeyError`` before ``_compute``), and malformed results (``_part_names``
+    raising inside the fallback itself). Each returns a block with status 'not_computed', the reason
+    'error: <repr>', no flag, the invariance 'not_computed', one ERROR traceback in the log, and
+    ``log_flags`` writes one WARNING. Exact strings.
+    """
+    world = _world(1101, with_reference=False)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("injected")
+
+    monkeypatch.setattr(cs, "_compute", boom)
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        block = _run(world)
+        assert cs.log_flags("mini", block) == 1
+    assert block["status"] == "not_computed" and block["reason"] == "error: RuntimeError('injected')"
+    assert set(block["by_hypothesis"]) == {"H1b", "H2a", "H2b", "H2c", "H2d", "H2e", "H3c"}
+    for entry in block["by_hypothesis"].values():
+        assert entry["flag"] is None
+        assert all(p["status"] == "not_computed" and p["flag"] is None for p in entry["parts"].values())
+    assert block["invariance"] == dict.fromkeys(("H1c", "H2a_i", "H3a"), "not_computed")
+    assert "Traceback" in caplog.text and "injected" in caplog.text
+    assert "NOT COMPUTED: error: RuntimeError('injected')" in caplog.text
+    monkeypatch.undo()
+    broken = cs.clip_sensitivity_block(SimpleNamespace(splits={}), world.rules, world.weights,
+                                       world.scores, {}, {}, world.results, world.config)
+    assert broken["status"] == "not_computed" and broken["reason"].startswith("error: KeyError")
+    worse = cs.clip_sensitivity_block(SimpleNamespace(splits={}), None, None, None, {}, {},
+                                      {"H2c": {}}, world.config)
+    assert worse["status"] == "not_computed" and worse["by_hypothesis"] == {}

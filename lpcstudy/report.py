@@ -709,8 +709,7 @@ def _clip_text(block: dict | None, key: str) -> str:
         return "invariant" if block["invariance"]["H1c"] == "exact" else block["invariance"]["H1c"]
     if key == "H3a":
         inv = block["invariance"]["H3a"]
-        return "invariant" if inv == "exact" else \
-            f"{inv} ({block['test_eval_clipped_entries']} clipped test evaluation entries)"
+        return "invariant" if inv == "exact" else inv  # the cause string: source, total, H_ref count
     entry = block["by_hypothesis"].get(key)
     if entry is None:
         return "n/a"
@@ -758,9 +757,8 @@ def clip_lines(results: dict, systems: list[str]) -> list[str]:
         if block["held_fixed_entries"]:
             lines += ["", f"{s}: tree, A3 and KM inputs contain {block['held_fixed_entries']} "
                       "clipped entries; not recomputed."]
-        if block["invariance"]["H3a"] == INVARIANCE_NOT_GUARANTEED:
-            lines += ["", f"{s}: H3a invariance not guaranteed: {block['test_eval_clipped_entries']}"
-                      " clipped test evaluation entries."]
+        if block["invariance"]["H3a"].startswith(INVARIANCE_NOT_GUARANTEED):
+            lines += ["", f"{s}: H3a invariance {block['invariance']['H3a']}."]
     return lines
 # --- WU-0002.11e end ---
 
