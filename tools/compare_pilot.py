@@ -67,7 +67,10 @@ the comparison with an old run is a regression screen only. The mode needs ``--n
 apply) and **forces branch D** with the reason "state sample redrawn by design (WU-0002.14)". It
 applies D2, N4 and D3 as implemented, and in addition **I1**: every ``context`` leaf of the old
 run is present in the new run and bitwise equal (the units, sigma_x, C and the digests are system
-constants that do not depend on the states). The D3 standard errors of the two runs are taken
+constants that do not depend on the states), and **R-f**, the exact invariants that hold by
+construction for any state sample (``rf_rows``: A* regret 0.0 and agreement 1.0; the V4 deviation of
+the largest M 0.0 and ``used_M`` = ``n_oracle_draws``; V5 ``km_max_abs_dev`` the fixed fixture value;
+V7 ``n_states`` = ``n_test_sweep``). The D3 standard errors of the two runs are taken
 from the arms given by ``--d3-arms`` (default ``REDRAWN_D3_ARMS``): ``away`` (both arms facing
 away from the other estimate, symmetric under swapping the runs; the mathematician's
 recommendation, a WORKING DEFAULT pending the owner's ruling O4), ``half-width`` (``(hi - lo) /
@@ -1411,6 +1414,7 @@ class DReport:
     findings: list[str]
     i1: list[tuple] | None = None
     arms: str = "delta-side"
+    rf: list[tuple] | None = None
 
     @property
     def passed(self) -> bool:
@@ -1490,6 +1494,57 @@ def i1_rows(old: dict[Path_, object], new: dict[Path_, object]) -> list[tuple]:
     return rows
 
 
+V5_FIXTURE_DEVIATION = 0.005830472656782881
+"""``validation/km_max_abs_dev`` of every system: V5 is ``check_kaplan_meier()`` with its fixed seed
+and no context input, so the value is the same in every run (WU-0002.14, M5(c) item 3)."""
+
+
+def rf_rows(new: dict[Path_, object]) -> list[tuple]:
+    """R-f (``--redrawn-states``): the exact invariants that hold by construction for any state sample
+    (WU-0002.14, M5(c)); a row is ``(check, path, value, expected, ok)``, floats compared by IEEE bytes.
+
+    1. ``scores/A*/regret/<h>`` is ``0.0`` and ``scores/A*/agreement_href`` is ``1.0`` (A* is the oracle
+       rule itself).
+    2. ``validation/convergence/<largest M>/mean_abs_dev_from_max`` is ``0.0`` (the reference is the
+       largest-M weight itself) and ``validation/convergence/used_M`` equals ``config/n_oracle_draws``.
+    3. ``validation/km_max_abs_dev`` is ``V5_FIXTURE_DEVIATION`` (a fixture with a fixed seed).
+    4. ``V7/n_states`` equals ``config/n_test_sweep``.
+
+    A leaf that is absent gives a row with value ``MISSING`` and ``ok`` false.
+    """
+    def same(value: object, expected: object) -> bool:
+        if value is MISSING or expected is MISSING:
+            return False
+        if isinstance(expected, float):
+            return isinstance(value, float) and struct.pack("<d", value) == struct.pack("<d", expected)
+        return type(value) is type(expected) and value == expected
+
+    rows: list[tuple] = []
+
+    def check(name: str, path: Path_, expected: object) -> None:
+        value = new.get(path, MISSING)
+        rows.append((name, show(path), value, expected, same(value, expected)))
+
+    for system in sorted({p[1] for p in new if p[0] == "systems" and len(p) > 1}):
+        base = ("systems", system)
+        regret = (*base, "scores", "A*", "regret")
+        horizons = sorted(p[5] for p in new if len(p) == 6 and p[:5] == regret)
+        for horizon in horizons:
+            check("A* regret", (*regret, horizon), 0.0)
+        if not horizons:
+            check("A* regret", (*regret, "*"), 0.0)
+        check("A* agreement", (*base, "scores", "A*", "agreement_href"), 1.0)
+        conv = (*base, "validation", "convergence")
+        largest = max((int(p[4]) for p in new if len(p) == 6 and p[:4] == conv and p[4].isdigit()
+                       and p[5] == "mean_abs_dev_from_max"), default=None)
+        check("V4 largest-M deviation",
+              (*conv, "<M>" if largest is None else str(largest), "mean_abs_dev_from_max"), 0.0)
+        check("V4 used_M", (*conv, "used_M"), new.get(("config", "n_oracle_draws"), MISSING))
+        check("V5 km_max_abs_dev", (*base, "validation", "km_max_abs_dev"), V5_FIXTURE_DEVIATION)
+        check("V7 n_states", (*base, "V7", "n_states"), new.get(("config", "n_test_sweep"), MISSING))
+    return rows
+
+
 def evaluate_d(results: list[LeafResult], old: dict[Path_, object], new: dict[Path_, object],
                table: Table, constants: dict, gates: list[tuple], reference: Comparison | None,
                no_reference: bool, arms: str = "delta-side", redrawn: bool = False) -> DReport:
@@ -1526,10 +1581,13 @@ def evaluate_d(results: list[LeafResult], old: dict[Path_, object], new: dict[Pa
         findings += [f"D3: {p} moves {d!r}, more than {b!r}" for p, _, _, d, _, _, b, ok in rows
                      if not ok]
         i1 = i1_rows(old, new) if redrawn else None
+        rf = rf_rows(new) if redrawn else None
         if i1 is not None:
             findings += [f"I1: {p}: {a!r} -> {b!r}" for p, a, b, ok in i1 if not ok]
+        if rf is not None:
+            findings += [f"R-f: {c}: {p} = {v!r}, expected {e!r}" for c, p, v, e, ok in rf if not ok]
         return DReport("D3", "new run", d2, context_ints_differ(old, new), None, rows, reported,
-                       z_b, findings, i1, arms)
+                       z_b, findings, i1, arms, rf)
     return DReport("missing", "", [], context_ints_differ(old, new), None, [], [], None,
                    [("branch D needs the local v1 reference run (--reference, D1) or --no-reference "
                     "(D3)")])
@@ -1882,6 +1940,12 @@ def _d_lines(rep: DReport, branch_note: str) -> list[str]:
                  "the states):"), ""]
         out += table_lines(("path", "pilot", "new", "ok"),
                            [(a, fmt(b), fmt(c), "yes" if ok else "NO") for a, b, c, ok in rep.i1])
+    if rep.mode == "D3" and rep.rf is not None:
+        failed = [x for x in rep.rf if not x[4]]
+        out += [(f"R-f (--redrawn-states): {len(rep.rf)} exact invariants, "
+                 f"{len(rep.rf) - len(failed)} hold, {len(failed)} do not:"), ""]
+        out += table_lines(("check", "path", "value", "expected", "ok"),
+                           [(a, b, fmt(c), fmt(d), "yes" if ok else "NO") for a, b, c, d, ok in rep.rf])
     if rep.mode == "D3":
         arm_note = {"away": "both arms facing away from the other estimate",
                     "half-width": "half-width (hi - lo) / (2 z) for both",

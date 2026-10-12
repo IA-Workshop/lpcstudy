@@ -23,6 +23,7 @@ used). Each test runs in well under 5 s; T9 classifies 11 540 leaves in about 0.
 from __future__ import annotations
 
 import ast
+import copy
 import hashlib
 import importlib.util
 import json
@@ -1589,17 +1590,34 @@ START_LEAVES = {"start_index": {"main": 165362, "estimator": 199474},
                 "start_state": {"main": [-13.1, -14.4, 31.9], "estimator": [-13.5, -13.1, 34.0]}}
 
 
+RF_COMMON = {"config": {"n_oracle_draws": 200, "n_test_sweep": 300},
+             "scores_star": {"agreement_href": 1.0},
+             "validation": {"convergence": {"50": {"mean_abs_dev_from_max": 0.01},
+                                            "200": {"mean_abs_dev_from_max": 0.0},
+                                            "used_M": 200, "pass": True},
+                            "km_max_abs_dev": 0.005830472656782881}}
+"""The leaves that both runs carry for the R-f checks (the same values on both sides, so the
+'unchanged' rules hold); ``V7/n_states`` (a new leaf) is added to the new side."""
+
+
 def redrawn_trees(**changes):
-    """The pilot tree and a new tree with the same context, the start leaves, and given changes."""
-    new = new_tree()
+    """The pilot tree and a new tree with the same context, the start leaves, the R-f leaves
+    (all invariants hold) and given changes (``a__b__c=value`` sets ``new[a][b][c]``)."""
+    old, new = old_tree(), new_tree()
+    for tree in (old, new):
+        tree["config"].update(RF_COMMON["config"])
+        system = tree["systems"]["lorenz63"]
+        system["scores"]["A*"].update(RF_COMMON["scores_star"])
+        system["validation"].update(copy.deepcopy(RF_COMMON["validation"]))
     new["systems"]["lorenz63"]["context"].update(START_LEAVES)
+    new["systems"]["lorenz63"]["V7"]["n_states"] = 300
     for dotted, value in changes.items():
         node = new["systems"]["lorenz63"]
         *head, last = dotted.split("__")
         for part in head:
             node = node[part]
         node[last] = value
-    return old_tree(), new
+    return old, new
 
 
 def test_the_eight_start_leaves_are_new_leaves_of_the_dynamics_chain() -> None:
@@ -1761,3 +1779,79 @@ def test_d3_without_the_redrawn_mode_keeps_the_delta_side_arms(tmp_path) -> None
     done, report = run_cli_with(tmp_path, old, new, "--no-reference")
     assert done.returncode == 0, done.stdout + done.stderr
     assert "D3 standard-error arms: delta-side" in report.read_text()
+
+
+# --------------------------------------------- WU-0002.14: R-f exact invariants (redrawn mode)
+def rf_tree() -> dict:
+    """A new-run tree on which every R-f invariant holds (hand-built from the plan, M5(c))."""
+    return {"config": {"n_oracle_draws": 200, "n_test_sweep": 300},
+            "systems": {"lorenz63": {
+                "scores": {"A*": {"regret": {"1LT": 0.0, "2LT": 0.0}, "agreement_href": 1.0}},
+                "validation": {"convergence": {"50": {"mean_abs_dev_from_max": 0.01},
+                                               "200": {"mean_abs_dev_from_max": 0.0},
+                                               "used_M": 200, "pass": True},
+                               "km_max_abs_dev": 0.005830472656782881},
+                "V7": {"n_states": 300}}}}
+
+
+def test_rf_rows_hold_on_a_hand_built_tree_and_name_each_invariant() -> None:
+    """R-f: 2 A* regrets, the agreement, the V4 deviation and used_M, V5 and V7 n_states: 7 rows.
+
+    Reference: the four invariants of the mathematics check (M5(c)), typed by hand: A* regret 0.0
+    and agreement 1.0 (A* is the oracle rule), the largest-M weight is its own reference (deviation
+    0.0; the smaller M is not asserted), ``used_M`` = ``n_oracle_draws``, V5 the fixed fixture
+    0.005830472656782881, V7 ``n_states`` = ``n_test_sweep``. Exact (IEEE bytes for floats).
+    """
+    rows = cp.rf_rows(cp.flatten(rf_tree()))
+    assert [r[0] for r in rows] == ["A* regret", "A* regret", "A* agreement",
+                                    "V4 largest-M deviation", "V4 used_M", "V5 km_max_abs_dev",
+                                    "V7 n_states"]
+    assert all(r[4] for r in rows)
+    assert rows[3][1] == "systems/lorenz63/validation/convergence/200/mean_abs_dev_from_max"
+
+
+@pytest.mark.parametrize(("edit", "name"), [
+    (lambda t: t["systems"]["lorenz63"]["scores"]["A*"]["regret"].update({"2LT": 1e-300}), "A* regret"),
+    (lambda t: t["systems"]["lorenz63"]["scores"]["A*"]["regret"].update({"1LT": -0.0}), "A* regret"),
+    (lambda t: t["systems"]["lorenz63"]["scores"]["A*"].update(agreement_href=0.999), "A* agreement"),
+    (lambda t: t["systems"]["lorenz63"]["validation"]["convergence"]["200"].update(
+        mean_abs_dev_from_max=1e-17), "V4 largest-M deviation"),
+    (lambda t: t["systems"]["lorenz63"]["validation"]["convergence"].update(used_M=100), "V4 used_M"),
+    (lambda t: t["systems"]["lorenz63"]["validation"].update(
+        km_max_abs_dev=math.nextafter(0.005830472656782881, 1.0)), "V5 km_max_abs_dev"),
+    (lambda t: t["systems"]["lorenz63"]["V7"].update(n_states=299), "V7 n_states"),
+    (lambda t: t["systems"]["lorenz63"].pop("V7"), "V7 n_states"),
+    (lambda t: t["systems"]["lorenz63"]["scores"]["A*"].pop("regret"), "A* regret"),
+    (lambda t: t["config"].pop("n_oracle_draws"), "V4 used_M"),
+])
+def test_rf_rows_flag_each_violation_exactly(edit, name) -> None:
+    """Each invariant fails on a one-ulp, a sign (-0.0) or an absence change, and only it does.
+
+    Reference: hand edits of the passing tree. A regret of 1e-300 or -0.0, an agreement of 0.999,
+    a deviation of 1e-17, a changed ``used_M``, the V5 fixture one ulp away, V7 ``n_states`` 299 or
+    absent, a missing regret block, a missing ``n_oracle_draws``: each makes exactly the named row
+    fail. Exact.
+    """
+    tree = rf_tree()
+    edit(tree)
+    failed = [r[0] for r in cp.rf_rows(cp.flatten(tree)) if not r[4]]
+    assert failed == [name], failed
+
+
+def test_cli_redrawn_states_applies_rf(tmp_path) -> None:
+    """The redrawn mode fails (exit 1) when an R-f invariant is violated, and names it.
+
+    Reference: the standard redrawn trees, in which the 7 invariants hold (A* regret 0.0 at one
+    horizon, agreement 1.0, the V4 deviation of M = 200 is 0.0, used_M = 200, V5 the fixture, V7
+    ``n_states`` = 300); a non-zero A* regret in the new run is a finding in this mode (the same
+    leaf is not judged in plain D3). Exact.
+    """
+    old, new = redrawn_trees()
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "R-f (--redrawn-states): 6 exact invariants, 6 hold, 0 do not" in report.read_text()
+    old, new = redrawn_trees()
+    new["systems"]["lorenz63"]["scores"]["A*"]["regret"]["1LT"] = 1e-9
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 1
+    assert "R-f: A* regret: systems/lorenz63/scores/A*/regret/1LT" in report.read_text()
