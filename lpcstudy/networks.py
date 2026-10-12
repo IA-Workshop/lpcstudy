@@ -230,7 +230,8 @@ def train_estimator(inputs: np.ndarray, targets: np.ndarray, noise: float,
     stream : Callable[[int], np.random.Generator]
         Maps a width to a *fresh* generator for that width's network (the caller builds it from
         ``make_rng`` labels that include the width), so the widths are trained from
-        independent streams that do not depend on which other widths are trained.
+        independent streams that do not depend on which other widths are trained. Needs owner
+        review before freeze.
 
     Returns
     -------

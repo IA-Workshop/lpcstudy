@@ -327,7 +327,7 @@ class ErrorPredictor:
             Epochs.
         rng : np.random.Generator
             Randomness of the network (see ``networks.train_mlp``); the caller builds it from
-            ``make_rng(seed, system, embed_dim, "allocator")``.
+            ``make_rng(seed, system, embed_dim, "allocator")``. Needs owner review before freeze.
 
         Returns
         -------

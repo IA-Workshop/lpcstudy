@@ -111,7 +111,8 @@ def convergence_check(study: Study, cell: Cell) -> dict:
         den = np.mean((c - p) ** 2, axis=-1)
         return np.clip(num / np.maximum(den, 1e-300), 0, 1)
 
-    rng = make_rng(cfg.seed, cell.system, "V4-convergence")  # one stream over the M loop
+    # one stream over the M loop (WU-0002.14; seed code: needs owner review before freeze)
+    rng = make_rng(cfg.seed, cell.system, "V4-convergence")
     reference = weight(cp, plp)
     out = {}
     for m_draws in cfg.convergence_draws:

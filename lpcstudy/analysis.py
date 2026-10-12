@@ -83,7 +83,8 @@ def _boot(config: StudyConfig, stat, n_items: int, rng: np.random.Generator,
     The estimate and bounds are those of ``statistics.block_bootstrap``. The two callers (V7,
     H1b CP) report the count as ``n_dropped_resamples``; neither converts it to the A3 tail
     (H2b(i) did until WU-0002.9b, DEF-0019). The generator is consumed: each call needs its own
-    ``make_rng(config.seed, system, "bootstrap", ...)`` (WU-0002.14).
+    ``make_rng(config.seed, system, "bootstrap", ...)`` (WU-0002.14; needs owner review before
+    freeze).
     """
     return block_bootstrap_dropped(stat, n_items, config.bootstrap_resamples,
                                    config.bootstrap_block, rng, level)
@@ -519,7 +520,8 @@ def h1c_ratio_block(ratios: np.ndarray, config: StudyConfig, system: str, *,
     config : StudyConfig
         Study configuration (resamples, block, seed).
     system : str
-        System name (a label of the bootstrap generator).
+        System name (a label of the bootstrap generator, WU-0002.14; the bootstrap seed of a
+        verdict statistic: needs owner review before freeze).
     with_verdict : bool, optional
         Add ``verdict``, ``reason`` and ``pass``. False for the CP, which is reported with no
         verdict (v3 H1c names the PLP; DEC-0016 O3).
@@ -1653,7 +1655,8 @@ def h2c_state_dependence(scores: dict[str, RuleScores], calibration: SplitData,
     config : StudyConfig
         Study configuration.
     system : str
-        System name (a label of the bootstrap generator).
+        System name (a label of the bootstrap generator, WU-0002.14; the bootstrap seed of a
+        verdict statistic: needs owner review before freeze).
 
     Returns
     -------
@@ -1727,7 +1730,8 @@ def h2d_empirical_comparison(scores: dict[str, RuleScores], config: StudyConfig,
     config : StudyConfig
         Study configuration.
     system : str
-        System name (a label of the bootstrap generator).
+        System name (a label of the bootstrap generator, WU-0002.14; the bootstrap seed of a
+        verdict statistic: needs owner review before freeze).
 
     Returns
     -------
@@ -1973,7 +1977,8 @@ def h3b_importances(con_profile: np.ndarray, w_target: np.ndarray, curvature_ref
     config : StudyConfig
         Study configuration (seed, bootstrap settings).
     system : str
-        System name (a label of the bootstrap generator).
+        System name (a label of the bootstrap generator, WU-0002.14; the bootstrap seed of a
+        verdict statistic: needs owner review before freeze).
 
     Returns
     -------
@@ -2067,7 +2072,8 @@ def h3c_ratio(a5_state_mse: np.ndarray, a4_state_mse: np.ndarray, config: StudyC
     config : StudyConfig
         Study configuration.
     system : str
-        System name (a label of the bootstrap generator).
+        System name (a label of the bootstrap generator, WU-0002.14; the bootstrap seed of a
+        verdict statistic: needs owner review before freeze).
 
     Returns
     -------

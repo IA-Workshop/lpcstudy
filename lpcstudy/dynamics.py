@@ -138,7 +138,8 @@ def make_finite_growth(step_fn: StepFn, observed_index: int, obs_scale: float,
         Source of the directions, consumed once (``n_dirs * dim`` normal draws). The caller
         builds a *fresh* ``make_rng(seed, system, "finite-growth")`` per call, so that the
         directions are the same at every perturbation scale (common random numbers across
-        scales, WU-0002.14) and different for every seed and system.
+        scales, WU-0002.14) and different for every seed and system. Needs owner review before
+        freeze.
 
     Returns
     -------

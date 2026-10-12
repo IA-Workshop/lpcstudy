@@ -157,6 +157,7 @@ class Study:
         network = self._networks.get(base_key)
         if network is None:
             start = time.time()
+            # one fresh stream per width (WU-0002.14; seed code: needs owner review before freeze)
             network, losses = train_estimator(
                 ctx.estimator_inputs, ctx.estimator_targets, noise,
                 self.config.estimator_widths, self.config.estimator_epochs,
