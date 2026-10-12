@@ -1,0 +1,3 @@
+lorenz63: Delta=0.03681 sub=4: burn-in 3000 from registry start max|s_i| = [19.19382348 27.0774046  47.17803831]; attractor 1.28e6 states max|s_i| = [19.4690055  27.20618118 47.73389971], min s_i = [-19.4690055  -27.20618118   0.92881748], B/max|x| = 2.055 (2s)
+rossler: Delta=0.46335 sub=12: burn-in 3000 from registry start max|s_i| = [11.36135932 10.75846391 22.15796383]; attractor 1.28e6 states max|s_i| = [11.43311665 10.79069034 22.85100736], min s_i = [ -9.10564768 -10.79069034   0.01352748], B/max|x| = 2.187 (4s)
+chua: Delta=0.07732 sub=16: burn-in 3000 from registry start max|s_i| = [2.26200213 0.38765734 3.62770611]; attractor 1.28e6 states max|s_i| = [2.26307379 0.38861149 3.63758709], min s_i = [-2.26307379 -0.38861149 -3.63756874], B/max|x| = 1.326 (10s)

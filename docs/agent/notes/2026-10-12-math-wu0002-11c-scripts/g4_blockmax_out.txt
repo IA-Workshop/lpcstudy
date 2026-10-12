@@ -1,0 +1,3 @@
+lorenz63 32 block maxima of |x| over 1e5 states (interval 20*max_dt): min 18.8665 q10 18.9167 median 19.0905 max 19.6118
+rossler 32 block maxima of |x| over 1e5 states (interval 20*max_dt): min 11.4314 q10 11.4320 median 11.4328 max 11.4332
+chua 32 block maxima of |x| over 1e5 states (interval 20*max_dt): min 2.2628 q10 2.2630 median 2.2630 max 2.2631

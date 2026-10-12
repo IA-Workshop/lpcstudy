@@ -1301,6 +1301,57 @@ def digest_context(**changes) -> dict:
     return {**CONTEXT, **digests, **changes}
 
 
+GUARD_LEAVES = ("lyapunov_orbit_max_abs", "trajectory_max_abs/statistics",
+                "trajectory_max_abs/main", "trajectory_max_abs/estimator")
+
+
+def guard_context(**changes) -> dict:
+    """The fixture context plus the four orbit-guard leaves of ``build_context`` (hand-typed)."""
+    return {**CONTEXT, "lyapunov_orbit_max_abs": 19.27,
+            "trajectory_max_abs": {"statistics": 19.5, "main": 19.4, "estimator": 18.9}, **changes}
+
+
+def test_v3_the_four_orbit_guard_leaves_are_new_and_everything_classifies() -> None:
+    """V3 (WU-0002.11c): the four orbit-guard context leaves classify as ``new``, chain dynamics.
+
+    Reference: the plan (rule ``new``, chain ``dynamics``, sub-task WU-0002.11c, item DEF-0015),
+    decided by hand: the old side never has the leaves, so each is ``new`` with that rule, no
+    leaf is unclassified, and the other leaves' statuses equal those of the trees without them.
+    Exact.
+    """
+    new = new_tree()
+    new["systems"]["lorenz63"]["context"] = guard_context()
+    _, _, results = sides(old_tree(), new)
+    found = by_path(results)
+    for leaf in GUARD_LEAVES:
+        row = found[f"systems/lorenz63/context/{leaf}"]
+        assert row.status == "new" and row.rule.cls == "new" and row.rule.chain == "dynamics"
+        assert row.rule.sub == "WU-0002.11c" and row.rule.item == "DEF-0015"
+    plain = by_path(sides(old_tree(), new_tree())[2])
+    assert {k: v.status for k, v in found.items() if "max_abs" not in k} == \
+        {k: v.status for k, v in plain.items()}
+
+
+@pytest.mark.parametrize("changes, branch", [
+    ({}, "B"),                                                     # identical context
+    ({"obs_scale": 2.0 * (1.0 + 5e-13)}, "N"),                    # within 1e-12 relative
+    ({"lambda_max": math.nextafter(0.9056, 1.0)}, "D"),           # one ulp
+])
+def test_v3_branch_selection_is_unchanged_by_the_guard_leaves(changes, branch) -> None:
+    """V3: ``select_branch`` returns the same result with and without the orbit-guard leaves.
+
+    Reference: the T6 fixtures for B, N and D (decided by hand in T6). The old side never has the
+    leaves and the rule reads the old side's context paths only. Exact.
+    """
+    old = {"systems": {"lorenz63": {"context": dict(CONTEXT)}}}
+    results = []
+    for context in ({**CONTEXT, **changes}, guard_context(**changes)):
+        new = {"systems": {"lorenz63": {"context": context}}}
+        old_l, new_l, res = sides(old, new)
+        results.append(cp.select_branch(res, old_l, new_l))
+    assert results[0] == results[1] and results[0][0] == branch
+
+
 def platform_block(model: str = "Test CPU", cores: tuple[str | None, ...] = ("Haswell", "Haswell"),
                    coretype: str | None = None) -> dict:
     """A hand-built provenance block with the keys of ``provenance.collect`` that the tool reads."""

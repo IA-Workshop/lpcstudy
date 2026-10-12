@@ -1,0 +1,16 @@
+chua pair 0: |a-b|=2.2e-16 after 9 halvings; refused end first fail step 732 (56.6 t.u.), diverged=True; bounded end max|x|=2.5303, refused=False
+chua pair 1: |a-b|=1.9e-16 after 9 halvings; refused end first fail step 767 (59.3 t.u.), diverged=True; bounded end max|x|=2.4882, refused=False
+chua pair 2: |a-b|=4.4e-16 after 9 halvings; refused end first fail step 760 (58.8 t.u.), diverged=True; bounded end max|x|=2.7860, refused=False
+chua pair 3: |a-b|=4.4e-16 after 9 halvings; refused end first fail step 750 (58.0 t.u.), diverged=True; bounded end max|x|=2.5288, refused=False
+chua pair 4: |a-b|=2.2e-16 after 9 halvings; refused end first fail step 760 (58.8 t.u.), diverged=True; bounded end max|x|=2.6833, refused=False
+chua pair 5: |a-b|=1.1e-16 after 9 halvings; refused end first fail step 748 (57.8 t.u.), diverged=True; bounded end max|x|=2.4914, refused=False
+chua: worst first-fail step at float resolution 767 of 3000
+rossler pair 0: |a-b|=1.8e-15 after 9 halvings; refused end first fail step 9 (4.2 t.u.), diverged=False; bounded end max|x|=25.0000, refused=False
+rossler pair 1: |a-b|=1.8e-15 after 9 halvings; refused end first fail step 6 (2.8 t.u.), diverged=False; bounded end max|x|=25.0000, refused=False
+rossler pair 2: |a-b|=2.2e-15 after 9 halvings; refused end first fail step 11 (5.1 t.u.), diverged=False; bounded end max|x|=25.0000, refused=False
+rossler pair 3: |a-b|=8.9e-16 after 9 halvings; refused end first fail step 7 (3.2 t.u.), diverged=False; bounded end max|x|=25.0000, refused=False
+rossler pair 4: |a-b|=1.5e-15 after 9 halvings; refused end first fail step 5 (2.3 t.u.), diverged=False; bounded end max|x|=25.0000, refused=False
+rossler pair 5: |a-b|=3.6e-15 after 9 halvings; refused end first fail step 4 (1.9 t.u.), diverged=False; bounded end max|x|=25.0000, refused=False
+rossler: worst first-fail step at float resolution 11 of 3000
+rossler refused-not-diverged: n=70, first fail steps [1 1 1 1 1 1 1 1 1 1]... max 5; start |x0| range 0.06-24.91; max|x| over 3000 steps 25.0-26.1
+  after 3000 steps, max|x| over next 3000 steps: 11.330-11.433 (attractor 11.433)

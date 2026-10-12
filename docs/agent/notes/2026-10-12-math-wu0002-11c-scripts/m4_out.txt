@@ -1,0 +1,8 @@
+substeps 4 dt 0.025
+G2: first failing state index n = 22; x_(n-1) = 2.857651117459, x_n = 3.004166023281; relative margins below 4.745e-02, above 1.389e-03
+  production simulate_trajectory: first |x|>3 at row 22; rel error of x_n vs exact 0.00e+00
+  scratch guarded Benettin burn=50: first_fail (burn-in carried) 22; (plan placement) 50
+  scratch guarded Benettin burn=10: first_fail (burn-in carried) 22; (plan placement) 22
+G3: lambda_ref (log1p) = -0.09999999999996738; high-precision = -0.09999999999996738; rel diff 0.0e+00
+  burn=10: estimate_lyapunov -0.09999999999996696, rel err 4.16e-15; guarded bitwise equal True; orbit max (burn-in carried) 1.0; (plan placement) 0.9048374180359892; plan formula R^(burn*sub) = 0.904837418035989
+  burn=0: estimate_lyapunov -0.09999999999996696, rel err 4.16e-15; guarded bitwise equal True; orbit max (burn-in carried) 1.0; (plan placement) 1.0; plan formula R^(burn*sub) = 1.0

@@ -1,0 +1,8 @@
+chua: 4000 starts in box |s_i|<=(3.0, 1.0, 6.0); Delta=0.07732; 28000 steps (30s)
+  refused (|x|>B or non-finite at some state): 3015; reached |x|>1e6: 3015; refused but never >1e6: 0; >1e6 but never refused: 0
+  bounded starts: max|x| over orbit max 2.9986; after-start max distribution q50/q99/max of mx: [2.31015651 2.97018519 2.99855407]
+  first failing step among refused: q50 5, q99 81, max 123 (= 9.5 time units)
+rossler: 4000 starts in box |s_i|<=(25.0, 25.0, 25.0); Delta=0.46335; 28000 steps (25s)
+  refused (|x|>B or non-finite at some state): 1566; reached |x|>1e6: 1496; refused but never >1e6: 70; >1e6 but never refused: 0
+  bounded starts: max|x| over orbit max 24.9968; after-start max distribution q50/q99/max of mx: [16.66101042 24.82188142 24.99682399]
+  first failing step among refused: q50 1, q99 71, max 105 (= 48.7 time units)

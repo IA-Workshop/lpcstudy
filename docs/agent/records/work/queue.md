@@ -94,3 +94,16 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
 - 2026-10-11, claude-sonnet-5-5 (developer): WU-0001.6 (platform record) **in progress** on branch `wu/0001-6-platform-record`: .6a and .6b implemented, independent review rounds 1 and 2 answered (R1 to R3, R5, R6 fixed), unit radius green. **Needs owner review before freeze** (provenance code, LPC.PC.11). Pending before merge: R4 (A3 base-against-final smoke, the integration pair), then A9 (forced Sandybridge) before closure; they wait for the v1-baseline pilot run to end.
 
 - 2026-10-11, claude-opus-5-5 (planner): WU-0005.4 **plan written** on branch `wu/0005-4-lm-diagnostics` (`WU-0005.4-lm-diagnostics.md`): residual, accepted-step count and the S3/S4 counters returned from the same compiled LM loop (no separate pass), summarized per cell under `handling.cells[<id>].lm`, with a RESULTS.md row. Criteria L1-L7 and V1-V3 (V1: every pre-existing smoke leaf bitwise equal, `handling` included). The applied-mathematician answers M1-M7 before execution; owner questions O1-O4 (schema id, placement, wrong-basin rate, other solvers) block nothing before M1-M7.
+
+## Added 2026-10-12: DEC-0026 items 3 and 4 (claude-opus-5-5, planner)
+
+| Unit | Title | Depends on | Owner checkpoint | Status |
+| --- | --- | --- | --- | --- |
+| WU-0002.11c | DEF-0015 guard: a diverging Lyapunov or `build_context` orbit refuses the run (bounds on \|x\| 40, 25, 3, plus finiteness); orbit maxima as `context` leaves; cache recomputed once and asserted bitwise | WU-0002.11 (lanes .11a, .11b merged) | owner ruling given (DEC-0026 item 3); needs owner review before freeze | planned |
+| WU-0002.14 | Seed-dependent start states (`make_rng(seed, "start", system)`) plus the remaining `default_rng` conversions (DEF-0011, R1 table), as one numbers-changing step; DEV-0 pilot regenerated and adopted as the new reference | WU-0002.11c merged | seed and statistics code: needs owner review before freeze; O1 to O8 (O4 before the P1 run) | planned |
+
+- 2026-10-12, claude-opus-5-5 (planner): WU-0002.11c and WU-0002.14 **plans written** on branch `wu/0002-11c-start-states` (`WU-0002.11c-orbit-guard.md`, `WU-0002.14-seeded-states.md`).
+  - **.11c.** Criteria G1 to G8 (analytic RK4 references; λ bitwise against a verbatim copy of the pre-change Benettin loop) and V1 to V4 (smoke neutrality: exactly 4 new `context` leaves at smoke). The applied-mathematician checks M1 to M5. Owner questions Q1 and Q2.
+  - **.14.** It starts after .11c merges, on a fresh branch. Split .14a (conversions), .14b (start states), .14c (`compare_pilot --redrawn-states`), .14d (runs).
+  - **.14 verification.** Property tests P1 to P7 and slow distributional checks S-D1 and S-D2. Staged smokes S1 and S2 with predicted divergence loci. A P0 pilot at the base (branch B against the local baseline), then P1 under D3 plus exact invariants I1 and R-c to R-h. P1 becomes the new reference.
+  - **.14 questions.** The applied-mathematician checks M1 to M7. Owner questions O1 to O8; O4 (the regression reading and the DEC-0020 SE_new arm) is needed before P1.
