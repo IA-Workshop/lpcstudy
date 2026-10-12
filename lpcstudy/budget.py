@@ -406,15 +406,17 @@ WIDENING_SENTENCE = ("A numerical row at or above 10% of the sampling half-width
                      "widened: the rule of the uq-budget skill is to widen the interval or "
                      "refine, and which of the two is the owner's choice; this report does not "
                      "widen.")
-# The texts of ORACLE_INCLUDED, DEF0020_TEXT, WIDENING_SENTENCE and the R_ref of COVERAGE_WU0006
-# are those of DEC-0024 addendum A1 (docs/agent/records/decisions.md), which amends M1 (a) and M7.
-DEF0020_TEXT = ("DEF-0020: Option C or K (DEC-0018; owner, pending; K in force by default via "
-                "ASSERT_ROADMAP_BOUNDS = True) decides only whether the WU-0006 ROADMAP-bound "
-                "coverage rows stay asserted (K) or become recorded characterization rows with "
-                "the consistency ranges as the defect test (C); neither changes a bound, level "
-                "or R. Whether the study widens its intervals or uses another procedure (longer "
-                "block, studentized, BCa) is a separate, undecided design question for the owner "
-                "and the applied-mathematician")
+# The texts of ORACLE_INCLUDED, WIDENING_SENTENCE and the R_ref of COVERAGE_WU0006 are those of
+# DEC-0024 addendum A1 (docs/agent/records/decisions.md), which amends M1 (a) and M7. DEF0020_TEXT is
+# the row-9 text of addendum A2 of the same file, which replaces the A1 sentence after the owner
+# ratified Option C (DEC-0026 item 2, 2026-10-12).
+DEF0020_TEXT = ("DEF-0020: Option C in force (owner-ratified 2026-10-12, DEC-0026; "
+                "ASSERT_ROADMAP_BOUNDS = False): the WU-0006 ROADMAP-bound coverage rows are "
+                "recorded characterization rows (outcome reported, not asserted) and the "
+                "consistency ranges are the defect test; no bound, level or R is changed. Whether "
+                "the study widens its intervals or uses another procedure (longer block, "
+                "studentized, BCa) is a separate, undecided design question for the owner and the "
+                "applied-mathematician")
 
 
 @dataclass(frozen=True)
