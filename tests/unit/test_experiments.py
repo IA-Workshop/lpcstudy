@@ -477,3 +477,137 @@ def test_cp_horizon_check_records_the_lm_block_of_v3(monkeypatch, tmp_path) -> N
     assert (lm["n_estimates"], lm["median_residual"], lm["p95_residual"]) == (3, 4.0, 6.0)
     assert (lm["median_iterations"], lm["fraction_no_decrease"]) == (3.0, 1 / 3)
     assert (lm["fraction_late_progress"], lm["fraction_above_chi2"]) == (2 / 3, 0.0)
+
+
+# ------------------------------------------------ DEF-0025: the robustness dimension filter
+
+def _robustness_study(monkeypatch, tmp_path, **changes):
+    """A real ``Study`` with stubs: dimension 3, summaries constant, ``run_cell`` recorded."""
+    from lpcstudy import experiments
+    from lpcstudy.pipeline import Study
+
+    config = dataclasses.replace(SMOKE, misspec_levels=(), analog_counts=(1,),
+                                 perturbation_scales=(), **changes)
+    study = Study(config, tmp_path)
+    study.core_cells["lorenz63"], study.fitted["lorenz63"] = object(), object()
+    calls: list[str] = []
+    monkeypatch.setattr(study, "context",
+                        lambda system: SimpleNamespace(spec=SimpleNamespace(dim=3)))
+    monkeypatch.setattr(experiments, "_variant_summary", lambda cell, rules, cfg: {"ok": True})
+    monkeypatch.setattr(experiments, "fit_rules", lambda cells, cfg: object())
+    monkeypatch.setattr(study, "record_rules", lambda system, cell, rules: None)
+
+    def run_cell(system, noise, library, core, with_evals, label, **kwargs):
+        calls.append(label)
+        return object()
+
+    monkeypatch.setattr(study, "run_cell", run_cell)
+    return study, calls
+
+
+def test_robustness_skips_and_reports_a_dimension_equal_to_the_state_dimension_def_0025(
+        monkeypatch, tmp_path, caplog) -> None:
+    """D1: ``D=3`` (equal to ``spec.dim``, zero chi-square degrees of freedom) is skipped, counted, reported.
+
+    Reference: a hand-written config, ``robustness_dims = (3, 5, 7)`` with the smoke base
+    ``embedding_dim = 7`` and a system of dimension 3. Expected by the DEF-0025 rule ``d >
+    spec.dim`` and ``d != embedding_dim``: 7 is the base cell (not a variant, not a skip), 5 is
+    run, 3 is skipped. Variants run: ``["D=5"]``; ``skipped_variants == {"lorenz63": ["D=3"]}``;
+    exactly one WARNING from the ``lpcstudy`` logger naming the system and ``D=3``; the result
+    has the keys ``base`` and ``D=5`` only. Exact.
+    """
+    import logging
+
+    from lpcstudy import experiments
+
+    study, calls = _robustness_study(monkeypatch, tmp_path, robustness_dims=(3, 5, 7))
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        out = experiments.run_robustness(study, "lorenz63")
+    assert calls == ["D=5"]
+    assert list(out) == ["base", "D=5"]
+    assert study.skipped_variants == {"lorenz63": ["D=3"]}
+    warned = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warned) == 1 and "lorenz63" in warned[0] and "D=3" in warned[0]
+
+
+def test_robustness_counts_every_dimension_at_or_below_the_state_dimension_def_0025(
+        monkeypatch, tmp_path, caplog) -> None:
+    """D2: ``(2, 3, 5)`` skips ``D=2`` and ``D=3``; ``(5,)`` skips nothing and warns of nothing.
+
+    Reference: the same hand rule as D1. Expected: skipped ``["D=2", "D=3"]`` in configured
+    order, run ``["D=5"]`` in both configs, no skip record and no WARNING for ``(5,)``. Exact.
+    """
+    import logging
+
+    from lpcstudy import experiments
+
+    study, calls = _robustness_study(monkeypatch, tmp_path, robustness_dims=(2, 3, 5))
+    experiments.run_robustness(study, "lorenz63")
+    assert calls == ["D=5"] and study.skipped_variants == {"lorenz63": ["D=2", "D=3"]}
+    caplog.clear()  # the first config's own warning is not part of the second check
+    clean, calls = _robustness_study(monkeypatch, tmp_path, robustness_dims=(5,))
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        experiments.run_robustness(clean, "lorenz63")
+    assert calls == ["D=5"] and clean.skipped_variants == {}
+    assert [r for r in caplog.records if r.levelno >= logging.WARNING] == []
+
+
+def test_no_configured_preset_changes_its_robustness_dimensions_def_0025() -> None:
+    """D3: for smoke, pilot and full and every registry system the kept list is the hand list.
+
+    Reference: ``config.py`` read by hand (``embedding_dim = 7`` in every preset;
+    ``robustness_dims = (5, 7, 10)`` in the full config, inherited unchanged by the pilot; smoke
+    ``(7,)``) and ``systems.py`` (the dimension of Lorenz-63, Rossler and Chua is 3). The base
+    dimension 7 is the base cell, so the variants are smoke ``[]`` and pilot, full ``[5, 10]``;
+    nothing is skipped. These are the lists of the old filter ``d >= spec.dim`` as well, so no
+    preset's robustness list changes. Exact.
+    """
+    from lpcstudy.config import PILOT, FULL
+    from lpcstudy.experiments import robustness_dimensions
+    from lpcstudy.systems import SYSTEMS
+
+    expected = {"smoke": [], "pilot": [5, 10], "full": [5, 10]}
+    assert set(SYSTEMS) == {"lorenz63", "rossler", "chua"}
+    for config in (SMOKE, PILOT, FULL):
+        assert config.embedding_dim == 7
+        for name, spec in SYSTEMS.items():
+            assert spec.dim == 3
+            kept, skipped = robustness_dimensions(config, spec.dim)
+            assert (kept, skipped) == (expected[config.name], []), (config.name, name)
+
+
+def test_robustness_dimensions_boundaries_def_0025() -> None:
+    """D3b: the filter on a hand-written grid: ``d > dim`` kept, ``d <= dim`` skipped, base ignored.
+
+    Reference: DEF-0025 (chi-square degrees of freedom ``d - dim`` must be positive). With
+    ``dim = 3`` and base 7: ``(1, 2, 3, 4, 5, 7, 10)`` keeps ``[4, 5, 10]`` and skips ``[1, 2, 3]``;
+    the base 7 is neither. Exact.
+    """
+    from lpcstudy.experiments import robustness_dimensions
+
+    config = dataclasses.replace(SMOKE, robustness_dims=(1, 2, 3, 4, 5, 7, 10))
+    assert robustness_dimensions(config, 3) == ([4, 5, 10], [1, 2, 3])
+    assert robustness_dimensions(config, 5) == ([10], [1, 2, 3, 4, 5])
+
+
+def test_run_handling_warns_of_skipped_variants_and_keeps_its_keys_def_0025(
+        tmp_path, caplog) -> None:
+    """D4: one aggregate WARNING when variants were skipped; the handling block keeps its keys.
+
+    Reference: the ``failed_variants`` precedent in ``run_handling`` (one WARNING, count in the
+    block). Here only the log line is new: expected exactly one WARNING naming the count and the
+    label, and the returned keys exactly ``schema, totals, by_system, robustness,
+    failed_variants`` (no schema change). Exact.
+    """
+    import logging
+
+    from lpcstudy.experiments import run_handling
+    from lpcstudy.pipeline import Study
+
+    study = Study(SMOKE, tmp_path)
+    study.skipped_variants = {"lorenz63": ["D=3"]}
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        run = run_handling(study, {"systems": {}})
+    warned = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warned) == 1 and "skipped_variants = 1" in warned[0] and "D=3" in warned[0]
+    assert list(run) == ["schema", "totals", "by_system", "robustness", "failed_variants"]

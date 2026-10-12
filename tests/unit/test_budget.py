@@ -853,6 +853,23 @@ def test_interval_procedure_cell_names_both_seed_sources_and_def0020_correctly()
     assert "uq-budget skill is to widen the interval or refine" in budget.WIDENING_SENTENCE
 
 
+def test_coverage_provenance_names_the_exact_log_file() -> None:
+    """The WU-0006 run-2 log is cited by its exact file name, in the constant and in the cell text.
+
+    Reference: the file written by the slow run, ``runs/tests/slow-20261011T165447Z.log`` (the
+    WU-0008 plan; a UTC stamp, ``T`` between date and time), typed here by hand. The elided form
+    ``slow-20261011...165447Z`` and its explanatory sentence (a workaround for the unanchored
+    stale-identifier grep, fixed by whole-token matching in WU-0011.5) must be gone. Exact string
+    checks, no tolerance.
+    """
+    log_name = "runs/tests/slow-20261011T165447Z.log"
+    assert log_name in budget.COVERAGE_PROVENANCE
+    assert "elided" not in budget.COVERAGE_PROVENANCE and "\u2026" not in budget.COVERAGE_PROVENANCE
+    results, systems = budget_results(full_system(), names=("lorenz63",))
+    tables = tables_of(budget.budget_lines(results, systems, SMOKE))
+    assert log_name in tables[budget.QOI_TITLES["H2b(ii)"]][8][2]
+
+
 def test_included_cell_of_the_oracle_row_is_per_qoi() -> None:
     """R10: the Included cell of row 1 is the wording of DEC-0024 addendum A1 for each QoI.
 

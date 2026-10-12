@@ -451,9 +451,7 @@ class CoverageCase:
     design: str
 
 
-COVERAGE_PROVENANCE = ("WU-0006 run 2, log `runs/tests/slow-20261011…165447Z.log` (the letter "
-                       "between date and time elided: it would match the stale-identifier grep "
-                       "of test_identifiers), Log table at "
+COVERAGE_PROVENANCE = ("WU-0006 run 2, log `runs/tests/slow-20261011T165447Z.log`, Log table at "
                        "b73bbed; reference rates (scratch seed 20261011, m2_coverage.py) from "
                        "docs/agent/notes/2026-10-11-math-wu0006.md and, for C4h, "
                        "docs/agent/notes/2026-10-11-math-wu0008-scripts/m7b.log, which only "
