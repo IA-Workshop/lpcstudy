@@ -1469,6 +1469,12 @@ def cache_status(info: dict) -> tuple[str, bool]:
     tuple[str, bool]
         The sentence for the report and whether it is a finding (the run must then be repeated with
         an empty cache). A file last written before the run started cannot have been made by it.
+
+    Since WU-0002.11c, ``lyapunov_record`` rewrites ``lyapunov.json`` during a run when it migrates
+    a legacy entry. The mtime test then no longer distinguishes a pre-existing cache: a mixed file
+    (a new-form entry read without recomputation next to a migrated legacy one) has an mtime inside
+    the run and reports "cannot tell". The ``--cache-preexisted`` launch-record flag is then the
+    only authority for the DEC-0019 condition.
     """
     if info.get("flag") == "yes":
         return "launch record: lyapunov.json pre-existed in the cache directory", True
