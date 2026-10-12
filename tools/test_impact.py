@@ -40,6 +40,10 @@ NO_TEST_DIRS = ("docs/", ".claude/")
 WHOLE_SUITE = frozenset({"", ".", "./", "tests", "tests/"})
 PYTEST_FLAGS = ("-q", "--tb=short", "-rfE")
 SEEDS_TESTS = ("tests/unit/test_seeds.py", "tests/integration/test_cli_seeds.py")
+# A test whose text holds one of these reads the package source or its hand-written import graph
+# (``PACKAGE.glob("*.py")``, ``lpcstudy_graph.json``): any change to a ``lpcstudy/*.py`` file can
+# change what it sees (DEF-0016, scan-the-source rule).
+SCAN_MARKERS = ('glob("*.py")', "glob('*.py')", "lpcstudy_graph.json")
 
 
 class ToolError(Exception):
@@ -220,6 +224,54 @@ def _convention(root: Path, tier: str, module: str) -> list[str]:
     return [f"tests/{tier}/{name}" for name in sorted(names)]
 
 
+def _test_files(root: Path) -> list[str]:
+    """Return every ``tests/<tier>/**/test_*.py`` file (POSIX, relative to ``root``), sorted."""
+    found = []
+    for tier in ALL_TIERS:
+        found += [p.relative_to(root).as_posix() for p in (root / "tests" / tier).rglob("test_*.py")]
+    return sorted(found)
+
+
+def scan_tests(root: Path, warnings: list[str]) -> tuple[dict[str, set[str]], list[str]]:
+    """Read every test file once for the direct-import and scan-the-source rules (DEF-0016).
+
+    Direct imports are the absolute ``lpcstudy`` edges of ``_edge_targets`` found by walking the
+    syntax tree of the test file, at any nesting level (``import lpcstudy.m``, ``from lpcstudy.m
+    import x``, ``from lpcstudy import m``). Strings, comments and ``importlib`` calls are not
+    imports (a limit of the rule). A test file that does not parse is named in a warning and gets
+    no imports (never skipped silently); relative imports in a test file do not name the package.
+
+    Returns
+    -------
+    tuple
+        ``(imports, scanners)``: the set of package modules each test file imports directly, and
+        the test files whose text holds a ``SCAN_MARKERS`` entry.
+    """
+    package = root / PACKAGE
+    imports: dict[str, set[str]] = {}
+    scanners: list[str] = []
+    for path in _test_files(root):
+        text = (root / path).read_text(errors="replace")
+        if any(marker in text for marker in SCAN_MARKERS):
+            scanners.append(path)
+        if PACKAGE not in text:
+            continue
+        try:
+            tree = ast.parse(text, filename=path)
+        except SyntaxError as error:
+            warnings.append(f"syntax error in {path}: its imports of {PACKAGE} cannot be read "
+                            f"({error.msg}, line {error.lineno})")
+            continue
+        found: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) or (isinstance(node, ast.ImportFrom)
+                                                and node.level == 0):
+                found.update(_edge_targets(node, package))
+        if found:
+            imports[path] = found
+    return imports, scanners
+
+
 def _tier_of(path: str) -> str | None:
     """Return the tier of a ``tests/<tier>/...`` path (first directory, as ``tier_of``)."""
     parts = Path(path).parts
@@ -308,6 +360,11 @@ def select(changed: Iterable[str], graph: Mapping[str, list[str]], root: str | P
            core: frozenset[str], include_slow: bool, include_gpu: bool) -> Selection:
     """Select the tests a change set can affect (DEVELOPMENT_WORKFLOW.md 4.2).
 
+    For a changed ``lpcstudy/<m>.py`` two rules add to the table of 4.2 (WU-0011.5, DEF-0016): a
+    test file that imports ``<m>`` directly is selected whatever its name (``scan_tests``), and
+    a test that scans the package source or the graph fixture (``SCAN_MARKERS``) is selected for
+    any change to a ``lpcstudy/*.py`` file. Slow and gpu files they reach follow the flags.
+
     Parameters
     ----------
     changed : iterable of str
@@ -334,18 +391,34 @@ def select(changed: Iterable[str], graph: Mapping[str, list[str]], root: str | P
     warnings: list[str] = []
     reasons: dict[str, list[str]] = {}
     wanted: set[str] = set()
-    for path in sorted(set(changed)):
+    changed = sorted(set(changed))
+    is_module = [len(Path(p).parts) == 2 and p.startswith(f"{PACKAGE}/") and p.endswith(".py")
+                 for p in changed]
+    imports, scanners = scan_tests(root, warnings) if any(is_module) else ({}, [])
+
+    def visible(paths: Iterable[str]) -> str:
+        """The paths the flags let through, as the reason text prints them."""
+        kept = [p for p in paths if _tier_of(p) not in ("slow", "gpu")
+                or (_tier_of(p) == "slow" and include_slow)
+                or (_tier_of(p) == "gpu" and include_gpu)]
+        return " ".join(sorted(set(kept))) or "nothing"
+
+    for path, module_file in zip(changed, is_module):
         rule, paths = _map_file(path, graph, reverse, root, core, warnings)
         if not (root / path).exists():
             warnings.append(f"{path} is deleted; mapped by name")
-        if len(Path(path).parts) == 2 and path.startswith(f"{PACKAGE}/") and path.endswith(".py"):
+        extra: list[tuple[str, list[str]]] = []
+        if module_file:
             module = Path(path).stem
             paths = [*paths, *_convention(root, "slow", module), *_convention(root, "gpu", module)]
+            extra = [("direct import: tests importing the module",
+                      [t for t, found in imports.items() if module in found]),
+                     ("scan the source: tests reading the package text", list(scanners))]
         wanted.update(paths)
-        selected = [p for p in paths if _tier_of(p) not in ("slow", "gpu")
-                    or (_tier_of(p) == "slow" and include_slow)
-                    or (_tier_of(p) == "gpu" and include_gpu)]
-        reasons.setdefault(path, []).append(f"{rule} -> {' '.join(sorted(set(selected))) or 'nothing'}")
+        reasons.setdefault(path, []).append(f"{rule} -> {visible(paths)}")
+        for text, more in extra:
+            wanted.update(more)
+            reasons[path].append(f"{text} -> {visible(more)}")
     tiers: dict[str, list[str]] = {tier: [] for tier in ALL_TIERS}
     excluded: list[tuple[str, str]] = []
     for path in sorted(wanted):
