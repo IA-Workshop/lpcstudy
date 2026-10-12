@@ -130,6 +130,7 @@ class Study:
         self._records: dict[tuple[str, str], dict[str, dict]] = {}
         self._fit_records: dict[str, dict] = {}
         self.failed_variants: dict[str, list[str]] = {}
+        self.skipped_variants: dict[str, list[str]] = {}
         self.estimator_log: dict[str, dict] = {}
         self.core_cells: dict[str, Cell] = {}
         self.fitted: dict[str, FittedRules] = {}
@@ -264,6 +265,10 @@ class Study:
             self._fit_records[system] = fit
         else:
             record["fitting"] = fit
+
+    def record_skipped_variant(self, system: str, label: str) -> None:
+        """Count a robustness variant that was not run (``skipped_variants``; DEF-0025)."""
+        self.skipped_variants.setdefault(system, []).append(label)
 
     def record_failed_variant(self, system: str, label: str) -> None:
         """Count a robustness variant that raised (``failed_variants``; the result keeps its error)."""
