@@ -514,3 +514,68 @@ def test_tally_failure_other_than_64_65_fails_closed(fake: FakeRoot, tally_exit:
     assert cli_calls(fake) == []
     assert not list(fake.root.rglob("run.meta.json*"))
     assert lock_is_free(fake)
+
+
+# ------------------------------------------------ WU-0005.6a: --estimator-refine-steps (K2)
+# Reference: the plan (the wrapper passes the flag to the CLI unchanged and refuses a bad value
+# before the lock, the tally and any child) and the argv contract of ``test_pass_through_*``.
+# Tolerance: none; argv lists, exit codes and counts are compared for equality.
+@pytest.mark.parametrize("args", [
+    pytest.param(["--estimator-refine-steps", "0"], id="zero"),
+    pytest.param(["--estimator-refine-steps", "-1"], id="negative"),
+    pytest.param(["--estimator-refine-steps", "1.5"], id="fraction"),
+    pytest.param(["--estimator-refine-steps", "x"], id="letter"),
+    pytest.param(["--estimator-refine-steps", ""], id="empty"),
+    pytest.param(["--estimator-refine-steps", "015"], id="leading-zero"),
+    pytest.param(["--estimator-refine-steps", "+3"], id="plus"),
+    pytest.param(["--estimator-refine-steps", "3\nx"], id="newline"),
+    pytest.param(["--estimator-refine-steps"], id="no-value"),
+    pytest.param(["--estimator-refine-steps", "15", "--estimator-refine-steps", "30"], id="twice"),
+])
+def test_k2_bad_refine_value_is_refused_before_the_lock(fake: FakeRoot, args: list[str]) -> None:
+    """K2: a bad value, no value or a repeat gives 64 with one line, even with the lock held.
+
+    A pilot would exit 75 with the lock held if the check came after the lock; 64 shows it comes
+    first. No fake is called, no meta file or runs directory is created.
+    """
+    with open(fake.lock, "w") as holder:
+        fcntl.flock(holder, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        done = fake.run("run_preset.sh", "pilot", "DEV-1", "runs/dev/DEV-1", *args)
+    assert done.returncode == 64, (done.stdout, done.stderr)
+    assert len(done.stderr.strip().splitlines()) == 1 and "--estimator-refine-steps" in done.stderr
+    assert fake.calls() == [] and fake.timeout_calls() == [] and fake.tally_calls() == []
+    assert not list(fake.root.rglob("run.meta.json*")) and not (fake.root / "runs").exists()
+
+
+def test_k2_flag_reaches_the_cli_and_the_meta(fake: FakeRoot) -> None:
+    """K2: the flag and its value reach the CLI argv in order, and the meta ``command`` shows it.
+
+    ``--systems`` keeps its place before the other pass-through arguments, which keep their
+    given order (``wrapper`` builds ``--systems S...`` then the pass-through list).
+    """
+    done = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/DEV-2", "--estimator-refine-steps",
+                    "30", "--systems", "lorenz63", "--skip-robustness")
+    assert done.returncode == 0, done.stderr
+    (call,) = cli_calls(fake)
+    tail = call["argv"][call["argv"].index("--systems"):]
+    assert tail == ["--systems", "lorenz63", "--estimator-refine-steps", "30", "--skip-robustness"]
+    assert "--seed-id" in call["argv"] and call["argv"][call["argv"].index("--seed-id") + 1] == "DEV-2"
+    meta = json.loads(meta_path(fake, "smoke", "DEV-2").read_text())
+    assert "--estimator-refine-steps 30" in meta["command"]
+
+
+def test_k2_absent_flag_leaves_the_argv_as_before(fake: FakeRoot) -> None:
+    """K2: without the flag the CLI argv has no mention of it (the production path is unchanged)."""
+    done = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/DEV-2")
+    assert done.returncode == 0, done.stderr
+    (call,) = cli_calls(fake)
+    assert "--estimator-refine-steps" not in call["argv"]
+
+
+def test_k2_background_pilot_carries_the_flag_and_the_tally(fake: FakeRoot) -> None:
+    """K2: a CPU pilot with the flag passes it to the child, after the lock and the tally."""
+    _, pid = start_pilot(fake, "--device", "cpu", "--estimator-refine-steps", "60")
+    assert wait_until(lambda: not alive(pid))
+    (call,) = cli_calls(fake)
+    assert call["argv"][-2:] == ["--estimator-refine-steps", "60"]
+    assert fake.tally_calls() == [["check", "--hours", "0"]]

@@ -398,3 +398,153 @@ def test_report_only_accepts_a_current_results_file(
     assert saved["verdicts"]["H2a"]["by_system"] == {"lorenz63": "fail"}
     assert saved["verdicts"]["H2a"]["verdict"] == "not supported"
     assert built == ["md", "fig"]
+
+
+# ------------------------------------------------ WU-0005.6a: --estimator-refine-steps (K1)
+# Reference for every test below: the contract of the plan and its Mathematics check, written
+# before the code: the flag is an integer of at least 1 (canonical decimal), absent means the
+# preset's value (15, the design), the sealed flag refuses it before the sealed seed is read, and
+# --report-only refuses a value that differs from the stored one. Exact: exit codes, strings,
+# dict equality. The study is faked (``run_with_fakes``) and never run.
+STEPS_FLAG = "--estimator-refine-steps"
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "1.5", "x", "", " 15", "15 ", "015", "+15", "1e1",
+                                   "٣"])
+def test_k1_bad_refine_value_is_refused_without_echo(value: str, tmp_path: Path,
+                                                      capsys: pytest.CaptureFixture[str]) -> None:
+    """K1: 0, -1, 1.5, x, "" and the other non-canonical forms give 64, one line, nothing created.
+
+    The value is not echoed (a refusal line names the flag, never the value). Both the separate
+    and the ``=`` form are covered.
+    """
+    for argv in ([STEPS_FLAG, value], [f"{STEPS_FLAG}={value}"]):
+        out = tmp_path / "out"
+        code = main([*argv, "--preset", "smoke", "--out", str(out)])
+        captured = capsys.readouterr()
+        lines = captured.err.splitlines()
+        assert code == 64 and captured.out == ""
+        assert len(lines) == 1 and lines[0].startswith(PREFIX) and STEPS_FLAG in lines[0]
+        if value.strip():
+            assert value not in lines[0].replace(STEPS_FLAG, "")
+        assert not out.exists()
+
+
+@pytest.mark.parametrize("order", ["flag-first", "flag-last"])
+def test_k1_refine_with_the_sealed_flag_is_refused_before_the_sealed_seed(
+        order: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str]) -> None:
+    """K1: the sealed flag with the knob gives 64 in either order, and the ledger is never read.
+
+    Reference: the plan ("refused together with the sealed flag"). The ledger path does not
+    exist and valid-looking variables are set: if the sealed seed were read, the refusal would be
+    about the ledger and not about the knob (the line must name the knob), and the seed and the
+    salt must not appear in the line.
+    """
+    monkeypatch.setenv("LPC_CONF_SEED", str(SEED))
+    monkeypatch.setenv("LPC_CONF_SALT", SALT)
+    argv = [FLAG, STEPS_FLAG, "30"] if order == "flag-first" else [STEPS_FLAG, "30", FLAG]
+    out = tmp_path / "out"
+    code = main([*argv, "--out", str(out)], ledger_path=tmp_path / "missing_ledger.jsonl")
+    err = capsys.readouterr().err
+    assert code == 64 and len(err.splitlines()) == 1 and err.startswith(PREFIX)
+    assert STEPS_FLAG in err and "confirmatory flag" in err
+    assert str(SEED) not in err and SALT not in err and not out.exists()
+
+
+def test_k1_choose_refine_steps_values() -> None:
+    """``choose_refine_steps``: absent gives None; 15, 30 and 60 give the integers; 1 is allowed."""
+    from lpcstudy.__main__ import choose_refine_steps
+    parse = lambda argv: choose_refine_steps(build_parser().parse_args(argv))
+    assert parse([]) is None
+    assert [parse([STEPS_FLAG, text]) for text in ("1", "15", "30", "60", "120")] == [
+        1, 15, 30, 60, 120]
+    assert parse([f"{STEPS_FLAG}=30"]) == 30
+
+
+def _fake_config(argv: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
+    """The ``config`` record of the last save of a faked run."""
+    return run_with_fakes(argv, tmp_path, monkeypatch)[-1]["config"]
+
+
+def test_k1_flag_sets_only_the_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """K1: absent is the preset's 15; ``15`` changes nothing; ``30`` changes that one key only.
+
+    Reference: the preset (``PRESETS["smoke"]``, 15 by the design of v3 section 4) and the
+    ``dataclasses.asdict`` of the config; dict equality is exact, and the provenance argv carries the
+    flag so the run is self-describing.
+    """
+    from lpcstudy.config import PRESETS
+    absent = _fake_config(["--preset", "smoke"], tmp_path / "a", monkeypatch)
+    assert absent["estimator_refine_steps"] == PRESETS["smoke"].estimator_refine_steps == 15
+    same = _fake_config(["--preset", "smoke", STEPS_FLAG, "15"], tmp_path / "b", monkeypatch)
+    assert same == absent
+    thirty = _fake_config(["--preset", "smoke", STEPS_FLAG, "30"], tmp_path / "c", monkeypatch)
+    assert thirty["estimator_refine_steps"] == 30
+    assert {k: v for k, v in thirty.items() if k != "estimator_refine_steps"} == {
+        k: v for k, v in absent.items() if k != "estimator_refine_steps"}
+    saves = run_with_fakes(["--preset", "smoke", STEPS_FLAG, "60"], tmp_path / "d", monkeypatch)
+    assert saves[-1]["provenance"]["argv"][:4] == ["--preset", "smoke", STEPS_FLAG, "60"]
+
+
+def test_k1_flag_reaches_the_study_and_keeps_the_systems_option(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The ``Study`` receives the replaced config, whatever the order of ``--systems``."""
+    import lpcstudy.__main__ as cli
+    seen: list = []
+
+    class Recorder(_FakeStudy):
+        def __init__(self, config: object, out_dir: Path) -> None:
+            super().__init__(config, out_dir)
+            seen.append(config)
+
+    run_with_fakes(["--preset", "smoke", "--systems", "lorenz63", STEPS_FLAG, "30"],
+                   tmp_path, monkeypatch)
+    monkeypatch.setattr(cli, "Study", Recorder)
+    assert main(["--preset", "smoke", STEPS_FLAG, "30", "--systems", "lorenz63", "--out",
+                 str(tmp_path / "e"), "--skip-robustness"]) == 0
+    assert seen[-1].estimator_refine_steps == 30 and seen[-1].core_systems == ("lorenz63",)
+
+
+def _stored_results(tmp_path: Path, steps: int | None) -> Path:
+    """A current-schema results file whose config stores ``steps`` (no key if ``None``)."""
+    path = tmp_path / "out" / "smoke" / "results.json"
+    path.parent.mkdir(parents=True)
+    config = {} if steps is None else {"estimator_refine_steps": steps}
+    path.write_text(json.dumps({"config": config, "systems": {"lorenz63": {
+        "H1a": {"verdict": "pass", "pass": True}}}}))
+    return path
+
+
+@pytest.mark.parametrize(("stored", "argv_steps", "accepted"), [
+    (30, "30", True), (15, "15", True), (15, None, True), (None, None, True),
+    (30, "15", False), (15, "30", False), (None, "30", False), (30, None, False)])
+def test_k1_report_only_needs_the_stored_budget(
+        stored: int | None, argv_steps: str | None, accepted: bool, tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """K1: ``--report-only`` accepts the stored budget and refuses a different one (exit 64).
+
+    Reference: the plan ("must equal results[config][estimator_refine_steps], a mismatch is
+    refused") and, for the rows with the flag absent and a stored 30, the report's label: it prints
+    the budget from the config (``iterative_label``), so a stored 30 under the preset's 15 would be
+    mislabelled, and is refused too. A file with no stored budget (older) and no flag passes as
+    before. Refusals: one line, the file's bytes unchanged, no other file written.
+    """
+    import lpcstudy.__main__ as cli
+    path = _stored_results(tmp_path, stored)
+    built: list[str] = []
+    monkeypatch.setattr(cli, "write_markdown", lambda *a: built.append("md"))
+    monkeypatch.setattr(cli, "make_figures", lambda *a: built.append("fig"))
+    before = path.read_bytes()
+    argv = ["--preset", "smoke", "--out", str(tmp_path / "out"), "--report-only"]
+    if argv_steps is not None:
+        argv += [STEPS_FLAG, argv_steps]
+    code = main(argv)
+    captured = capsys.readouterr()
+    if accepted:
+        assert code == 0 and built == ["md", "fig"]
+    else:
+        lines = captured.err.splitlines()
+        assert code == 64 and built == [] and len(lines) == 1 and lines[0].startswith(PREFIX)
+        assert path.read_bytes() == before
+        assert sorted(p.name for p in path.parent.iterdir()) == ["results.json"]
