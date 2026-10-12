@@ -1582,3 +1582,182 @@ def test_r5_a_failed_probe_is_not_a_value_in_the_platform_row() -> None:
     block["cpu"].update(error=None)
     rows, _ = cp.platform_rows({"new": cp.platform_record({"provenance": block})})
     assert rows == [("new run", "unknown (source none)", "none mapped", "unset")]
+
+
+# ------------------------------------------------------------- WU-0002.14: --redrawn-states
+START_LEAVES = {"start_index": {"main": 165362, "estimator": 199474},
+                "start_state": {"main": [-13.1, -14.4, 31.9], "estimator": [-13.5, -13.1, 34.0]}}
+
+
+def redrawn_trees(**changes):
+    """The pilot tree and a new tree with the same context, the start leaves, and given changes."""
+    new = new_tree()
+    new["systems"]["lorenz63"]["context"].update(START_LEAVES)
+    for dotted, value in changes.items():
+        node = new["systems"]["lorenz63"]
+        *head, last = dotted.split("__")
+        for part in head:
+            node = node[part]
+        node[last] = value
+    return old_tree(), new
+
+
+def test_the_eight_start_leaves_are_new_leaves_of_the_dynamics_chain() -> None:
+    """WU-0002.14: ``context/start_index/*`` and ``context/start_state/*/[i]`` match exactly one rule.
+
+    Reference: hand-written paths (the 2 + 6 leaves per system of the plan) and the class ``new``
+    with chain ``dynamics``; a run without the start leaves needs no rule for them (no leaf, no
+    finding). Exact.
+    """
+    old, new = old_tree(), redrawn_trees()[1]
+    _, _, results = sides(old, new)
+    found = {cp.show(r.path): r for r in results if "start_" in "/".join(r.path)}
+    expected = {f"systems/lorenz63/context/start_index/{k}" for k in ("main", "estimator")} | {
+        f"systems/lorenz63/context/start_state/{k}/[{i}]" for k in ("main", "estimator")
+        for i in range(3)}
+    assert set(found) == expected and len(found) == 8
+    assert all(r.rule.cls == "new" and r.status == "new" and r.rule.chain == "dynamics"
+               for r in found.values())
+    _, _, plain = sides(old_tree(), new_tree())
+    assert not [r for r in plain if "start_" in "/".join(r.path)]
+
+
+@pytest.mark.parametrize(("arms", "expected"), [
+    ("away", (0.1, 0.15)), ("delta-side", (0.25, 0.15)), ("half-width", (0.175, 0.1))])
+def test_se_pair_arms_by_hand(arms, expected) -> None:
+    """The D3 standard errors for old = (1.0; [0.8, 1.5]) and new = (1.4; [1.3, 1.7]) at z = 2.
+
+    Reference: hand arithmetic. delta = +0.4 (new above old). ``away``: the old lower arm
+    (1.0 - 0.8) / 2 = 0.1 and the new upper arm (1.7 - 1.4) / 2 = 0.15. ``delta-side`` (DEC-0019):
+    both on the side of delta: (1.5 - 1.0) / 2 = 0.25 and 0.15. ``half-width``: (1.5 - 0.8) / 4 =
+    0.175 and (1.7 - 1.3) / 4 = 0.1. Tolerance ``abs 1e-15`` (a few operations on numbers of
+    order 1).
+    """
+    got = cp.se_pair((1.0, 0.8, 1.5, 2.0), (1.4, 1.3, 1.7, 2.0), 1.4 - 1.0, arms)
+    assert got == pytest.approx(expected, abs=1e-15, rel=0)
+
+
+def test_se_pair_away_is_symmetric_under_swapping_the_runs() -> None:
+    """Both arms facing away: swapping old and new (and the sign of delta) swaps the two values.
+
+    Reference: hand arithmetic on the numbers of the previous test, and the same for a negative
+    delta. ``delta-side`` is not symmetric (the test asserts that it changes), which is why the
+    redrawn mode does not use it. Tolerance ``abs 1e-15``.
+    """
+    a, b = (1.0, 0.8, 1.5, 2.0), (1.4, 1.3, 1.7, 2.0)
+    forward = cp.se_pair(a, b, 0.4, "away")
+    backward = cp.se_pair(b, a, -0.4, "away")
+    assert backward == pytest.approx(forward[::-1], abs=1e-15, rel=0)
+    assert backward == pytest.approx((0.15, 0.1), abs=1e-15, rel=0)
+    assert cp.se_pair(b, a, -0.4, "delta-side") != pytest.approx(
+        cp.se_pair(a, b, 0.4, "delta-side")[::-1], abs=1e-15, rel=0)
+    with pytest.raises(cp.ToolError, match="unknown D3 arms"):
+        cp.se_pair(a, b, 0.4, "toward")
+
+
+def test_cli_redrawn_states_with_equal_context_forces_branch_d_and_passes(tmp_path) -> None:
+    """The context equals the pilot's, the statistics are inside the D3 bound: branch D, exit 0.
+
+    Reference: the plan (c): the mode forces branch D with the reason "state sample redrawn by
+    design (WU-0002.14)", applies D2, N4, D3 and I1. Hand data: the CP slope of H1b is 1.0 with
+    the interval [0.5, 1.5] in both runs (delta 0), so D3 passes with m = 1 statistic; I1 lists
+    the 4 context leaves of the pilot, all bitwise equal; the start leaves are new. The report
+    names the arms and says that they are a working default.
+    """
+    old, new = redrawn_trees()
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 0, done.stdout + done.stderr
+    text = report.read_text()
+    assert "- branch: D (forced by --redrawn-states" in text
+    assert "- state sample redrawn by design (WU-0002.14)" in text
+    assert "mode: D3" in text and "I1 (--redrawn-states): 4 context leaves of the pilot, 4 bitwise equal" in text
+    assert "D3 standard-error arms: away" in text and "WORKING DEFAULT pending the owner's ruling O4" in text
+    assert "m = 1 statistics with intervals in both runs" in text
+
+
+def test_cli_redrawn_states_flags_a_changed_context_leaf_as_i1(tmp_path) -> None:
+    """A pilot ``context`` leaf that moves by one ulp (or is missing) fails I1: exit 1.
+
+    Reference: hand data. ``obs_scale`` 2.0 -> nextafter(2.0, 3.0) is not bitwise equal; the
+    mode forces branch D, but I1 still applies (the units are system constants).
+    """
+    old, new = redrawn_trees(context__obs_scale=math.nextafter(2.0, 3.0))
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 1
+    assert "I1: systems/lorenz63/context/obs_scale" in report.read_text()
+    old, new = redrawn_trees()
+    del new["systems"]["lorenz63"]["context"]["delay"]
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 1 and "I1: systems/lorenz63/context/delay" in report.read_text()
+
+
+def test_cli_redrawn_states_applies_d3_with_the_away_arms(tmp_path) -> None:
+    """D3 in the redrawn mode uses the arms facing away, and an excess is a finding.
+
+    Reference: hand arithmetic for one statistic (H1b CP slope; m = 1, so z_B = Phi^-1(1 - 0.025)
+    = 1.959964, and z = 1.960 at 95%). Old: 1.0 with [0.5, 1.5]. New: 2.0 with [1.9, 2.1]. delta =
+    +1.0. Away arms: old lower arm (1.0 - 0.5)/1.960 = 0.2551, new upper arm (2.1 - 2.0)/1.960 =
+    0.0510, bound = z_B hypot = 1.959964 * 0.2601 = 0.5098 < 1.0: an excess, exit 1. With the new
+    interval [1.0, 3.0] (arms 0.510) the bound is 1.959964 * 0.5702 = 1.1176 > 1.0 and D3 passes.
+    The reported SEs in the leaves JSON are not asserted; the verdict is. Tolerance: none (the
+    outcomes are far from the bound).
+    """
+    old, new = redrawn_trees(H1b__CP__slope=2.0, H1b__CP__ci=[1.9, 2.1])
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 1
+    assert "D3: systems/lorenz63/H1b/CP/slope moves 1.0, more than" in report.read_text()
+    old, new = redrawn_trees(H1b__CP__slope=2.0, H1b__CP__ci=[1.0, 3.0])
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_cli_redrawn_states_arms_option_changes_the_bound(tmp_path) -> None:
+    """``--d3-arms delta-side`` gives the old DEC-0019 bound; the choice is recorded in the report.
+
+    Reference: hand arithmetic, same data as the previous test with new [1.9, 2.1]: delta-side arms
+    are the old upper arm (1.5 - 1.0)/1.960 = 0.2551 and the new upper arm 0.0510, the same two
+    numbers as ``away`` here (the old interval is symmetric), so the outcome (an excess) is the
+    same and only the recorded arms differ; with the asymmetric old interval [0.9, 2.0] the
+    delta-side old arm (2.0 - 1.0)/1.96 = 0.510 gives the bound 1.959964 * 0.5127 = 1.0049 > 1.0
+    (pass) while the away arm (1.0 - 0.9)/1.96 = 0.0510 gives 1.959964 * 0.0722 = 0.1415 (excess).
+    """
+    old, new = redrawn_trees(H1b__CP__slope=2.0, H1b__CP__ci=[1.9, 2.1])
+    old["systems"]["lorenz63"]["H1c"]["CP"]["ci"] = [0.9, 2.0]
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference",
+                                "--d3-arms", "delta-side")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "D3 standard-error arms: delta-side" in report.read_text()
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference",
+                                "--d3-arms", "away")
+    assert done.returncode == 1 and "D3: systems/lorenz63/H1b/CP/slope" in report.read_text()
+
+
+def test_cli_redrawn_states_usage_errors_exit_two(tmp_path) -> None:
+    """Exit 2 (usage): ``--redrawn-states`` with ``--reference`` (the v1 code cannot draw the new
+    states, so D1 cannot apply), without ``--no-reference``, and ``--d3-arms`` without the mode."""
+    old, new = redrawn_trees()
+    done, _ = run_cli_with(tmp_path, old, new, "--redrawn-states", reference=old_tree())
+    assert done.returncode == 2 and "--no-reference" in done.stderr
+    done, _ = run_cli_with(tmp_path, old, new, "--redrawn-states")
+    assert done.returncode == 2
+    done, _ = run_cli_with(tmp_path, old, new, "--no-reference", "--d3-arms", "away")
+    assert done.returncode == 2
+    with pytest.raises(cp.ToolError, match="redrawn-states requires"):
+        cp.compare_files(tmp_path / "new.json", tmp_path / "old.json", "r", "m",
+                         redrawn_states=True)
+
+
+def test_d3_without_the_redrawn_mode_keeps_the_delta_side_arms(tmp_path) -> None:
+    """Regression guard: plain D3 (--no-reference) still uses the arm on the side of delta.
+
+    Reference: hand arithmetic as above (old [0.9, 2.0], new [1.9, 2.1], delta = 1): delta-side
+    arms 0.510 and 0.0510, bound 1.0049 > 1.0, so the D3 row is ok; a context difference
+    (lambda inside the 5 SE band) puts the run in branch D by the old rule. This is a guard that
+    the new option did not change the existing D3.
+    """
+    old, new = branch_d_trees(lambda_max=0.9056 + 0.0030)
+    new["systems"]["lorenz63"]["H1b"]["CP"].update(slope=2.0, ci=[1.9, 2.1])
+    old["systems"]["lorenz63"]["H1c"]["CP"]["ci"] = [0.9, 2.0]
+    done, report = run_cli_with(tmp_path, old, new, "--no-reference")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "D3 standard-error arms: delta-side" in report.read_text()

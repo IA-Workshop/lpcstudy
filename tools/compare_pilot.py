@@ -8,6 +8,7 @@ Usage::
         [--leaves-json runs/dev/wu0002-12/compare_leaves.json]
         [--run-dir DIR] [--manifest-row TEXT]
         [--reference LOCAL_V1_RESULTS_JSON | --no-reference]
+        [--redrawn-states [--d3-arms away|half-width|delta-side]]
         [--cache-file PATH] [--cache-preexisted yes|no]
 
 What it does. It reads two ``results.json`` files and flattens each to leaves addressed by tuples
@@ -55,7 +56,25 @@ exit code depends on it. The four ``context`` digests of the new run (``state_me
 read them (a v3-against-v3 comparison needs an owner ruling first, follow-up F1 of WU-0001.6).
 The four orbit-guard leaves of each system (``context/lyapunov_orbit_max_abs`` and
 ``context/trajectory_max_abs/{statistics,main,estimator}``, WU-0002.11c, DEF-0015) are ``new`` leaves
-too, and the branch rule does not read them.
+too, and the branch rule does not read them. So are the eight start leaves of each system
+(``context/start_index/{main,estimator}`` and ``context/start_state/{main,estimator}/[0..2]``,
+WU-0002.14, DEF-0017; chain ``dynamics``).
+
+``--redrawn-states`` (WU-0002.14; needs owner review before freeze). The code under test draws the
+data trajectories from seed-dependent start states, so every statistic is a new realization and
+the comparison with an old run is a regression screen only. The mode needs ``--no-reference``
+(with ``--reference`` the tool exits 2: the v1 code cannot draw the new states, so D1 cannot
+apply) and **forces branch D** with the reason "state sample redrawn by design (WU-0002.14)". It
+applies D2, N4 and D3 as implemented, and in addition **I1**: every ``context`` leaf of the old
+run is present in the new run and bitwise equal (the units, sigma_x, C and the digests are system
+constants that do not depend on the states). The D3 standard errors of the two runs are taken
+from the arms given by ``--d3-arms`` (default ``REDRAWN_D3_ARMS``): ``away`` (both arms facing
+away from the other estimate, symmetric under swapping the runs; the mathematician's
+recommendation, a WORKING DEFAULT pending the owner's ruling O4), ``half-width`` (``(hi - lo) /
+(2 z)`` for both) or ``delta-side`` (the rule of DEC-0019 as implemented for D3 without this
+flag). A D3 excess is a statistic to triage, not an error of the code: with the state sample
+redrawn and the networks refitted, the true spread of a difference exceeds what the two bootstraps
+report (mathematics check M5).
 
 Outputs. ``--report`` (default ``docs/study/dev_regression_dev0.md``), whose first line is
 ``DEVELOPMENT (DEV-0): not a hypothesis test``, and a per-leaf JSON file (default
@@ -108,6 +127,14 @@ FALLBACK_CONSTANTS: dict = {
     "z": {CI_LEVEL: 1.960, PRIMARY_LEVEL: 2.394},
     "k": 5.0, "se": {"lorenz63": 0.0012, "rossler": 0.00055, "chua": 0.0048},
 }
+
+REDRAWN_REASON = "state sample redrawn by design (WU-0002.14)"
+D3_ARMS = ("delta-side", "away", "half-width")
+REDRAWN_D3_ARMS = "away"
+"""The D3 standard-error arms of ``--redrawn-states`` (WU-0002.14, M5(b)): both arms facing away from
+the other estimate. A WORKING DEFAULT pending the owner's ruling O4 (DEC-0020 open item); the
+alternatives are ``half-width`` and ``delta-side`` (the arm on the side of the difference, which
+faces the other run for the older of the two)."""
 
 Path_ = tuple[str, ...]
 
@@ -474,6 +501,11 @@ def _build_rules() -> list[Rule]:
                f"{S}/context/trajectory_max_abs/{{statistics,main,estimator}}",
                "WU-0002.11c", "DEF-0015", "orbit guard: max |x| of the Benettin orbit and of the "
                "three trajectories (diagnostics)", chain="dynamics"))
+    add(_rules("new", f"{S}/context/start_index/{{main,estimator}} "
+               f"{S}/context/start_state/{{main,estimator}}/[]",
+               "WU-0002.14", "DEF-0017", "seed-drawn start states of the main and estimator "
+               "trajectories (index into the statistics orbit; the raw start state)",
+               chain="dynamics"))
     add(_rules("unchanged", f"{S}/validation/{{delay_jacobian_rel_err,gain_rel_err,"
                "integrator_max_dev_sigma,km_max_abs_dev}", chain="fixture", item="R2 (V1, V2, V5, V6)",
                reason="fixed-seed or deterministic fixtures"))
@@ -1133,6 +1165,28 @@ def se_arm(est: float, lo: float, hi: float, delta: float, z: float) -> float:
     return ((hi - est) if delta > 0 else (est - lo)) / z
 
 
+def se_pair(old: tuple, new: tuple, delta: float, arms: str) -> tuple[float, float]:
+    """The standard errors of the older and the newer run in D3, from their intervals.
+
+    ``old`` and ``new`` are ``(estimate, lo, hi, z)``; ``delta`` is ``new - old``.
+
+    * ``delta-side`` (DEC-0019 as implemented): both runs use the arm on the side of ``delta``.
+    * ``away`` (WU-0002.14, M5(b)): each run uses its arm facing away from the other estimate: for
+      ``delta > 0`` the old lower arm and the new upper arm, for ``delta <= 0`` the old upper arm
+      and the new lower arm. Symmetric under swapping the two runs.
+    * ``half-width``: ``(hi - lo) / (2 z)`` for both.
+    """
+    if arms == "half-width":
+        return tuple((b[2] - b[1]) / (2.0 * b[3]) for b in (old, new))  # type: ignore[return-value]
+    if arms == "away":
+        return (se_arm(old[0], old[1], old[2], -delta, old[3]),
+                se_arm(new[0], new[1], new[2], delta, new[3]))
+    if arms == "delta-side":
+        return (se_arm(old[0], old[1], old[2], delta, old[3]),
+                se_arm(new[0], new[1], new[2], delta, new[3]))
+    raise ToolError(f"unknown D3 arms {arms!r}; choose from {D3_ARMS}")
+
+
 @dataclass
 class NReport:
     """Result of the checks N1 to N5 (branch N) of the approved criterion."""
@@ -1355,6 +1409,8 @@ class DReport:
     d3_reported: list[tuple]
     d3_z: float | None
     findings: list[str]
+    i1: list[tuple] | None = None
+    arms: str = "delta-side"
 
     @property
     def passed(self) -> bool:
@@ -1385,10 +1441,13 @@ def d2_rows(old: dict[Path_, object], subject: dict[Path_, object],
 
 
 def d3_rows(results: list[LeafResult], old: dict[Path_, object], new: dict[Path_, object],
-            table: Table, constants: dict) -> tuple[list[tuple], list[tuple], float | None]:
+            table: Table, constants: dict, arms: str = "delta-side"
+            ) -> tuple[list[tuple], list[tuple], float | None]:
     """D3: for each ``unchanged`` statistic with an interval in both runs,
     ``|delta| <= z_B sqrt(SE_old^2 + SE_new^2)`` with ``z_B = Phi^-1(1 - 0.05 / (2 m))`` over the
     ``m`` such statistics. Statistics without intervals, and discrete flips, are reported only.
+    ``arms`` selects the arms of the two standard errors (``se_pair``; ``delta-side`` is the rule
+    that D3 has always had).
 
     Returns
     -------
@@ -1407,8 +1466,8 @@ def d3_rows(results: list[LeafResult], old: dict[Path_, object], new: dict[Path_
     rows = []
     for r, a, b in pairs:
         delta = r.new - r.old  # type: ignore[operator]
-        se_old = se_arm(r.old, a[0], a[1], delta, z_of(constants, a[2]))  # type: ignore[arg-type]
-        se_new = se_arm(r.new, b[0], b[1], delta, z_of(constants, b[2]))  # type: ignore[arg-type]
+        se_old, se_new = se_pair((r.old, a[0], a[1], z_of(constants, a[2])),  # type: ignore[arg-type]
+                                 (r.new, b[0], b[1], z_of(constants, b[2])), delta, arms)
         bound = z_b * math.hypot(se_old, se_new)  # type: ignore[operator]
         rows.append((show(r.path), r.old, r.new, delta, se_old, se_new, bound,
                      bool(abs(delta) <= bound)))
@@ -1420,15 +1479,30 @@ def d3_rows(results: list[LeafResult], old: dict[Path_, object], new: dict[Path_
     return rows, reported, z_b
 
 
+def i1_rows(old: dict[Path_, object], new: dict[Path_, object]) -> list[tuple]:
+    """I1 (``--redrawn-states``): every ``context`` leaf of the old run is present in the new run and
+    bitwise equal (IEEE bytes for floats, ``==`` otherwise). A row is ``(path, old, new, ok)``."""
+    rows = []
+    for path in sorted(p for p in old if p[0] == "systems" and len(p) >= 4 and p[2] == "context"):
+        got = new.get(path, MISSING)
+        ok = got is not MISSING and values_equal(old[path], got) in ("equal", "equal_nan")
+        rows.append((show(path), old[path], got, bool(ok)))
+    return rows
+
+
 def evaluate_d(results: list[LeafResult], old: dict[Path_, object], new: dict[Path_, object],
                table: Table, constants: dict, gates: list[tuple], reference: Comparison | None,
-               no_reference: bool) -> DReport:
+               no_reference: bool, arms: str = "delta-side", redrawn: bool = False) -> DReport:
     """Evaluate branch D.
 
     * D1 (a ``reference`` run of the v1 code, same machine and threads): branches B then N must
       hold for (new run, reference), and D2 holds for the reference against the pilot.
     * D3 (``no_reference``): D2 holds for the new run, N4 (the gate) holds, and the interval band.
     * With neither, the mode is ``missing`` (the tool exits 3).
+
+    With ``redrawn`` (``--redrawn-states``, which requires ``no_reference``) the D3 arms are
+    ``arms`` and I1 is added: a ``context`` leaf of the old run that is missing or not bitwise equal
+    in the new run is a finding.
     """
     findings: list[str] = []
     if reference is not None:
@@ -1448,11 +1522,14 @@ def evaluate_d(results: list[LeafResult], old: dict[Path_, object], new: dict[Pa
                      for s, a, b, d, t, ok in d2 if not ok]
         findings += [f"N4: {path} = {value!r}" for check, path, value, ok in gates
                      if check == "R4" and not ok]
-        rows, reported, z_b = d3_rows(results, old, new, table, constants)
+        rows, reported, z_b = d3_rows(results, old, new, table, constants, arms)
         findings += [f"D3: {p} moves {d!r}, more than {b!r}" for p, _, _, d, _, _, b, ok in rows
                      if not ok]
+        i1 = i1_rows(old, new) if redrawn else None
+        if i1 is not None:
+            findings += [f"I1: {p}: {a!r} -> {b!r}" for p, a, b, ok in i1 if not ok]
         return DReport("D3", "new run", d2, context_ints_differ(old, new), None, rows, reported,
-                       z_b, findings)
+                       z_b, findings, i1, arms)
     return DReport("missing", "", [], context_ints_differ(old, new), None, [], [], None,
                    [("branch D needs the local v1 reference run (--reference, D1) or --no-reference "
                     "(D3)")])
@@ -1674,6 +1751,8 @@ class Comparison:
         The D1 to D3 evaluation (branch D only).
     cache : tuple[str, bool]
         The lyapunov.json statement and whether it is a finding.
+    redrawn : bool
+        ``--redrawn-states`` (WU-0002.14): branch D was forced, with D3 arms and I1.
     """
 
     results: list[LeafResult]
@@ -1688,6 +1767,7 @@ class Comparison:
     cache: tuple[str, bool]
     info: dict
     obs_scale_differs: bool = False
+    redrawn: bool = False
 
     def findings(self) -> list[LeafResult]:
         """Leaf findings that fail the run: structure findings in every branch, plus the value
@@ -1794,7 +1874,21 @@ def _d_lines(rep: DReport, branch_note: str) -> list[str]:
         if sub.nreport is not None:
             out += [""] + _n_lines(sub.nreport, "### D1: branch N checks against the local v1 run")
         out.append("")
+    if rep.mode == "D3" and rep.i1 is not None:
+        failed = [x for x in rep.i1 if not x[3]]
+        out += [(f"I1 (--redrawn-states): {len(rep.i1)} context leaves of the pilot, "
+                 f"{len(rep.i1) - len(failed)} bitwise equal in the new run, {len(failed)} not "
+                 "(the units, sigma_x, C and the digests are system constants, not functions of "
+                 "the states):"), ""]
+        out += table_lines(("path", "pilot", "new", "ok"),
+                           [(a, fmt(b), fmt(c), "yes" if ok else "NO") for a, b, c, ok in rep.i1])
     if rep.mode == "D3":
+        arm_note = {"away": "both arms facing away from the other estimate",
+                    "half-width": "half-width (hi - lo) / (2 z) for both",
+                    "delta-side": "the arm on the side of the difference (DEC-0019 as implemented)"}
+        out += [(f"D3 standard-error arms: {rep.arms} ({arm_note[rep.arms]})"
+                 + (" -- WORKING DEFAULT pending the owner's ruling O4 (DEC-0020 open item)"
+                    if rep.i1 is not None and rep.arms == REDRAWN_D3_ARMS else "")), ""]
         out += [(f"D3 (m = {len(rep.d3)} statistics with intervals in both runs; z_B = "
                 f"{rep.d3_z!r}):"), ""]
         out += table_lines(("path", "pilot", "new", "delta", "SE pilot", "SE new", "bound", "ok"),
@@ -1827,7 +1921,9 @@ def render_report(cmp: Comparison) -> str:
     out += ["", "## Branch", ""]
     meaning = {"B": "bitwise: every unchanged leaf equals the pilot's",
                "N": "network: the context equals the pilot's, some unchanged leaf differs",
-               "D": "dynamics: the context differs (a new realization of the whole study)"}
+               "D": ("forced by --redrawn-states: the state sample is redrawn by design"
+                     if cmp.redrawn else
+                     "dynamics: the context differs (a new realization of the whole study)")}
     out.append(f"- branch: {cmp.branch} ({meaning[cmp.branch]})")
     out += [f"- {cell(r)}" for r in cmp.reasons]
     if cmp.obs_scale_differs:
@@ -1872,7 +1968,10 @@ def render_report(cmp: Comparison) -> str:
         out += _n_lines(cmp.nreport, "## Branch N: N1 to N5")
         out += [""] + _locus_lines(cmp.nreport.locus)
     if cmp.dreport is not None:
-        out += _d_lines(cmp.dreport, "D1 re-reference (the local v1 run), D2 and D3 of DEC-0019.")
+        out += _d_lines(cmp.dreport, (
+            "--redrawn-states (WU-0002.14): D2, N4, D3 and I1; no reference run (the v1 code "
+            "cannot draw the new states)." if cmp.redrawn
+            else "D1 re-reference (the local v1 run), D2 and D3 of DEC-0019."))
     if cmp.nreport is None:
         out += _locus_lines(locus_table(cmp.results))
 
@@ -1988,7 +2087,8 @@ def cache_info(new_tree: object, cache_file: Path | None, flag: str | None) -> d
 def compare_files(new_path: Path, old_path: Path, run_dir: str, manifest_row: str,
                   constants: dict | None = None, table: Table = TABLE,
                   reference_path: Path | None = None, no_reference: bool = False,
-                  cache_file: Path | None = None, cache_flag: str | None = None) -> Comparison:
+                  cache_file: Path | None = None, cache_flag: str | None = None,
+                  redrawn_states: bool = False, d3_arms: str | None = None) -> Comparison:
     """Run the whole comparison for two files (and the reference run in branch D).
 
     Parameters
@@ -2000,13 +2100,29 @@ def compare_files(new_path: Path, old_path: Path, run_dir: str, manifest_row: st
         then N, and with the pilot by D2.
     no_reference : bool
         Branch D without a reference run: D3.
+    redrawn_states : bool
+        The new run draws its data from seed-dependent start states (WU-0002.14): branch D is forced
+        with the reason ``REDRAWN_REASON``; D2, N4, D3 (with ``d3_arms``) and I1 are applied.
+        Requires ``no_reference`` and no ``reference_path``.
+    d3_arms : str or None
+        The D3 arms of the redrawn mode (default ``REDRAWN_D3_ARMS``).
 
     Raises
     ------
     ToolError
-        On unreadable input; ``Unclassified`` (a ``ToolError``) on a leaf without exactly one rule.
+        On unreadable input, a bad combination of options; ``Unclassified`` (a ``ToolError``) on a
+        leaf without exactly one rule.
     """
     constants = FALLBACK_CONSTANTS if constants is None else constants
+    if redrawn_states and reference_path is not None:
+        raise ToolError("--redrawn-states cannot be combined with --reference: the v1 code cannot "
+                        "draw the new states, so D1 does not apply")
+    if redrawn_states and not no_reference:
+        raise ToolError("--redrawn-states requires --no-reference (branch D is judged by D2, N4, "
+                        "D3 and I1)")
+    arms = (d3_arms or REDRAWN_D3_ARMS) if redrawn_states else "delta-side"
+    if arms not in D3_ARMS:
+        raise ToolError(f"unknown D3 arms {arms!r}; choose from {D3_ARMS}")
     try:
         old_tree = json.loads(old_path.read_text())
         new_tree = json.loads(new_path.read_text())
@@ -2015,6 +2131,8 @@ def compare_files(new_path: Path, old_path: Path, run_dir: str, manifest_row: st
     old, new, n_prov = load_sides(old_tree, new_tree)
     results = compare_leaves(old, new, table)
     branch, reasons, obs_differs = select_branch(results, old, new)
+    if redrawn_states:
+        branch, reasons = "D", [REDRAWN_REASON, *reasons]
     gates = gate_rows(new)
     nrep = drep = None
     if branch == "N":
@@ -2024,7 +2142,8 @@ def compare_files(new_path: Path, old_path: Path, run_dir: str, manifest_row: st
         if reference_path is not None:
             reference = compare_files(new_path, reference_path, run_dir, manifest_row, constants,
                                       table, None, False, cache_file, cache_flag)
-        drep = evaluate_d(results, old, new, table, constants, gates, reference, no_reference)
+        drep = evaluate_d(results, old, new, table, constants, gates, reference, no_reference,
+                          arms, redrawn_states)
     cache = cache_status(cache_info(new_tree, cache_file, cache_flag))
     info = provenance_info(new_tree, old_path, new_path, run_dir, manifest_row)
     info["platform"] = {"new": platform_record(new_tree), "old": platform_record(old_tree)}
@@ -2034,7 +2153,7 @@ def compare_files(new_path: Path, old_path: Path, run_dir: str, manifest_row: st
         except (OSError, ValueError):   # branch D raised above; elsewhere the row says so
             info["platform"]["reference"] = {"recorded": False, "why": "reference unreadable"}
     return Comparison(results, old, new, n_prov, branch, reasons, gates, nrep, drep, cache, info,
-                      obs_differs)
+                      obs_differs, redrawn_states)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -2052,6 +2171,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="results.json of the v1-baseline code run locally (branch D1)")
     ap.add_argument("--no-reference", action="store_true",
                     help="branch D without a reference run (D3, only if the owner declines D1)")
+    ap.add_argument("--redrawn-states", action="store_true",
+                    help="the new run draws its data from seed-dependent start states "
+                         "(WU-0002.14): forces branch D; requires --no-reference; adds I1")
+    ap.add_argument("--d3-arms", choices=D3_ARMS, default=None,
+                    help=f"D3 standard-error arms of --redrawn-states (default {REDRAWN_D3_ARMS}: "
+                         "both arms facing away from the other estimate)")
     ap.add_argument("--cache-file", type=Path, default=None,
                     help="lyapunov.json of the new run (default: <dir of NEW>/cache/lyapunov.json)")
     ap.add_argument("--cache-preexisted", choices=("yes", "no"), default=None,
@@ -2061,12 +2186,21 @@ def main(argv: list[str] | None = None) -> int:
         print("compare_pilot: error: --reference and --no-reference exclude each other",
               file=sys.stderr)
         return EXIT_ERROR
+    if args.redrawn_states and (args.reference is not None or not args.no_reference):
+        print("compare_pilot: error: --redrawn-states requires --no-reference and excludes "
+              "--reference (the v1 code cannot draw the new states, so D1 cannot apply)",
+              file=sys.stderr)
+        return EXIT_ERROR
+    if args.d3_arms is not None and not args.redrawn_states:
+        print("compare_pilot: error: --d3-arms belongs to --redrawn-states", file=sys.stderr)
+        return EXIT_ERROR
     run_dir = args.run_dir or str(args.new.resolve().parent)
     cache_file = args.cache_file or args.new.resolve().parent / "cache" / "lyapunov.json"
     try:
         cmp = compare_files(args.new, args.old, run_dir, args.manifest_row, FALLBACK_CONSTANTS,
                             reference_path=args.reference, no_reference=args.no_reference,
-                            cache_file=cache_file, cache_flag=args.cache_preexisted)
+                            cache_file=cache_file, cache_flag=args.cache_preexisted,
+                            redrawn_states=args.redrawn_states, d3_arms=args.d3_arms)
     except ToolError as exc:
         print(f"compare_pilot: error: {exc}", file=sys.stderr)
         return EXIT_ERROR
