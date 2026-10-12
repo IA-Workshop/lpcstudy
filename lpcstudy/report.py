@@ -654,7 +654,7 @@ def _lm_lines(results: dict, systems: list[str], config: StudyConfig) -> list[st
         f"(NVVUQ.9)."]
 
 
-# --- WU-0002.11e begin ---
+# --- WU-0002.11e begin ---  (verdict reporting: needs owner review before freeze)
 CLIP_NONE = "—"
 """The ``clip`` cell of a criterion whose inputs hold no clipped entry at H_ref."""
 CLIP_MARK = "CLIP-SENSITIVE"
