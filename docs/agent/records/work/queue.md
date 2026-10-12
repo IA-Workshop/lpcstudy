@@ -94,3 +94,15 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
 - 2026-10-11, claude-sonnet-5-5 (developer): WU-0001.6 (platform record) **in progress** on branch `wu/0001-6-platform-record`: .6a and .6b implemented, independent review rounds 1 and 2 answered (R1 to R3, R5, R6 fixed), unit radius green. **Needs owner review before freeze** (provenance code, LPC.PC.11). Pending before merge: R4 (A3 base-against-final smoke, the integration pair), then A9 (forced Sandybridge) before closure; they wait for the v1-baseline pilot run to end.
 
 - 2026-10-11, claude-opus-5-5 (planner): WU-0005.4 **plan written** on branch `wu/0005-4-lm-diagnostics` (`WU-0005.4-lm-diagnostics.md`): residual, accepted-step count and the S3/S4 counters returned from the same compiled LM loop (no separate pass), summarized per cell under `handling.cells[<id>].lm`, with a RESULTS.md row. Criteria L1-L7 and V1-V3 (V1: every pre-existing smoke leaf bitwise equal, `handling` included). The applied-mathematician answers M1-M7 before execution; owner questions O1-O4 (schema id, placement, wrong-basin rate, other solvers) block nothing before M1-M7.
+
+- 2026-10-12, claude-opus-5-5 (planner): WU-0005.6 (LM iteration-doubling study, DEC-0026 item 9) **plan written** on branch `wu/0005-6-lm-doubling` (`WU-0005.6-lm-doubling.md`). The plan has three steps:
+  - .6a: a CLI flag `--estimator-refine-steps N` (refused with `--confirmatory`) with a `run_preset.sh` pass-through. The production default stays 15.
+  - .6b: `tools/lm_doubling.py`, with `compare` (QoI level) and `probe` (per estimate, core cell, 15/30/60).
+  - .6c: DEV-0 smoke runs at 15, 30 and 60, then pilots at 15 and 30 (60 only under rule D2), all on CPU, one at a time.
+
+  The decision rule (d1 = max relative change of point and endpoints over the half-width) is fixed in advance:
+  - negligible if d1 < 0.05 with a credible 30-iteration reference;
+  - not negligible if d1 ≥ 0.1 or a verdict changes;
+  - undetermined in between, which triggers the 60 arm.
+
+  The applied-mathematician answers M1 to M8 before execution. Owner questions O1 to O6; O3 is an identifier clash with the ROADMAP's WU-0005.6 review sub-task. Recommendation: run now, before the seed step. Needs owner review before freeze (the seed-guard parser and the wrapper).
