@@ -20,3 +20,12 @@ Gate: merge (DEVELOPMENT_WORKFLOW.md 4.3), run by the main session with `LPC_GAT
 ## Results
 
 (appended below after the runs)
+
+- `LPC_GATE=merge tools/run_tests.sh unit tests/unit`: `975 passed in 78.84s`.
+- `LPC_GATE=merge tools/run_tests.sh integration tests/integration`: `12 passed in 290.42s (0:04:50)` (a WU-0005.6 smoke from another lane ran during it; no effect on results).
+- No failure, no rerun. The tree was clean for both runs.
+- **Gate result: pass** for `develop` tip `1b20db9` (this log commit follows it).
+
+## Items the gate does not settle (owner checkpoints, needs owner review before freeze)
+
+As in `GATE-2026-10-11-develop-2.md`, plus: the orbit guard (WU-0002.11c; sets the time unit), the clip-sensitivity flag (WU-0002.11e; D1 layout awaiting the owner), Option C (WU-0006.5), the test-impact rules (WU-0011.5). The slow tier is not part of this gate. Not green for `main`: see DEC-0026's list of open items; no request for `main` is made.
