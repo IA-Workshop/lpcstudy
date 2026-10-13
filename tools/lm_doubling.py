@@ -1600,6 +1600,8 @@ def run_probe(args: argparse.Namespace) -> int:
             segment = capture_segment(study, setup, libraries[spec.rho], spec,
                                       estimators[spec.rho], horizons, cfg.reference_horizon)
             segments[segment.name] = segment
+            print(f"{system}: {segment.name} captured at {list(args.steps)} "
+                  f"({time.time() - t0:.0f}s into the system)", flush=True)
         groups = {}
         for group, members in groups_of(specs, cfg).items():
             parts = [segments[name].rows(rows) for name, rows in members]
@@ -1607,6 +1609,7 @@ def run_probe(args: argparse.Namespace) -> int:
                                          long_columns=long_columns, limit=cfg.linear_regime_rms)
         p0 = [p0_report(stored[arm].get("systems", {}).get(system) or {}, specs, segments, arm,
                         lm_summary) for arm in args.steps if arm in stored]
+        print(f"{system}: groups and P0 done ({time.time() - t0:.0f}s)", flush=True)
         report["systems"][system] = {"groups": groups, "p0": p0, "seconds": time.time() - t0,
                                      "segments": [s.name for s in specs]}
         for entry in p0:
