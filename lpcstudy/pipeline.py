@@ -920,6 +920,7 @@ def _concat_moments(parts: list[EnsembleMoments]) -> EnsembleMoments:
         horizons=parts[0].horizons,
         kept={k: np.concatenate([p.kept[k] for p in parts]) for k in kept_keys},
         handled=_stack_handled(parts), clip_entries=_sum_entries(parts),
+        clip_cross_ref=stack_optional([p.clip_cross_ref for p in parts]),
         **{k: stack_optional([getattr(p, k) for p in parts]) for k in LM_FIELDS},
         **correlation, **{k: np.concatenate([getattr(p, k) for p in parts]) for k in keys})
 
@@ -929,9 +930,10 @@ def _concat_evals(parts: list[EvaluationDraws]) -> EvaluationDraws:
     if len(parts) == 1:
         return parts[0]
     stacked = {k: np.concatenate([getattr(p, k) for p in parts]) for k in parts[0].__dict__
-               if k not in ("horizons", "handled", "clip_entries", *LM_FIELDS)}
+               if k not in ("horizons", "handled", "clip_entries", "clip_sign_ref", *LM_FIELDS)}
     return EvaluationDraws(horizons=parts[0].horizons, handled=_stack_handled(parts),
                            clip_entries=_sum_entries(parts),
+                           clip_sign_ref=stack_optional([p.clip_sign_ref for p in parts]),
                            **{k: stack_optional([getattr(p, k) for p in parts])
                               for k in LM_FIELDS}, **stacked)
 

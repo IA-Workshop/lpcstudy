@@ -1582,3 +1582,56 @@ def test_r5_a_failed_probe_is_not_a_value_in_the_platform_row() -> None:
     block["cpu"].update(error=None)
     rows, _ = cp.platform_rows({"new": cp.platform_record({"provenance": block})})
     assert rows == [("new run", "unknown (source none)", "none mapped", "unset")]
+
+
+# ------------------------------------------------------------------ WU-0002.11e: clip_sensitivity
+CLIP_PATHS = (
+    "systems/lorenz63/clip_sensitivity/status",
+    "systems/lorenz63/clip_sensitivity/clip_level",
+    "systems/rossler/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A0/delta",
+    "systems/rossler/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A1/verdict_2L",
+    "systems/chua/clip_sensitivity/by_hypothesis/H2e/parts/0.01/delta_bound",
+    "systems/chua/clip_sensitivity/by_hypothesis/H2a/parts_2L/[0]",
+    "systems/chua/clip_sensitivity/by_hypothesis/H2b/parts/library_change/flag",
+    "systems/chua/clip_sensitivity/invariance/H3a",
+    "systems/chua/clip_sensitivity/affected_states/Q-N",
+    "systems/lorenz63/clip_sensitivity/share_test/A4",
+    "systems/lorenz63/clip_sensitivity/href_clipped_draws/test_eval",
+)
+
+
+@pytest.mark.parametrize("path", CLIP_PATHS)
+def test_clip_sensitivity_leaves_match_exactly_one_new_rule(path: str) -> None:
+    """Every leaf of the per-system ``clip_sensitivity`` subtree matches exactly one rule, class ``new``.
+
+    Reference: the rule table's own contract (``Table.classify`` raises on no match and on two
+    matches, which is exit code 2 of the tool) and WU-0002.11e (sub-task, DEC-0017 Q6): the subtree is
+    one tail-wildcard rule and sits outside every existing ``**`` rule (``H2e/**``,
+    ``H2b/library_change/**``, ``H2a/part_ii/**``, ``H2c/A4_minus_<single>/**`` and
+    ``handling/**`` would match a leaf below them a second time). Exact.
+    """
+    found = cp.TABLE.matches(p(path))
+    assert len(found) == 1, [r.pattern for r in found]
+    assert found[0].cls == "new" and found[0].sub == "WU-0002.11e"
+
+
+def test_clip_sensitivity_block_is_new_and_changes_no_other_status() -> None:
+    """A new tree with a ``clip_sensitivity`` block: its leaves are ``new``, every other leaf has the
+    status it has without the block, and nothing is a finding.
+
+    Reference: the same trees without the block (``old_tree``/``new_tree``, decided by hand in the
+    tests above). Exact.
+    """
+    block = {"status": "computed", "reason": None, "clip_level": 10.0,
+             "by_hypothesis": {"H2d": {"parts": {"A4_over_A3": {"delta": 0.0, "flag": False}},
+                                       "flag": False}},
+             "invariance": {"H3a": "exact"}, "affected_states": {"Q-N": 0, "H3b": 0}}
+    with_block = new_tree()
+    with_block["systems"]["lorenz63"]["clip_sensitivity"] = block
+    _, _, results = sides(old_tree(), with_block)
+    found = by_path(results)
+    leaves = [path for path in found if "/clip_sensitivity/" in path]
+    assert leaves and all(found[path].status == "new" for path in leaves)
+    plain = by_path(sides(old_tree(), new_tree())[2])
+    assert {k: v.status for k, v in found.items() if "/clip_sensitivity/" not in k} == \
+        {k: v.status for k, v in plain.items()}

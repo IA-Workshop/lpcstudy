@@ -1016,3 +1016,121 @@ def test_write_markdown_places_the_lm_subsection_after_p2c_and_before_handling(
     write_markdown(plain, config, tmp_path / "NO_LM.md")
     text = (tmp_path / "NO_LM.md").read_text()
     assert heading in text and "No Levenberg-Marquardt estimates in these results" in text
+
+
+# ------------------------------------------------------------------ WU-0002.11e: the clip column
+def _clip_part(n_clipped: int, delta, ratio, flag, verdict_2l: str = "pass") -> dict:
+    """A computed entry of the ``clip_sensitivity`` block (the keys ``clip_sensitivity.part_entry`` writes)."""
+    return {"status": "computed", "reason": None, "delta": delta, "ratio": ratio, "flag": flag,
+            "verdict_2L": verdict_2l, "n_clipped_inputs": n_clipped}
+
+
+def _clip_missing(reason: str, bound: bool = False) -> dict:
+    return {"status": "not_computed", "reason": reason, "delta_bound" if bound else "delta": None,
+            "ratio": None, "flag": None, "n_clipped_inputs": 0}
+
+
+def _clip_block() -> dict:
+    """A hand-written computed block: every kind of cell text of the ``clip`` column occurs."""
+    parts = lambda **p: {"parts": p, "flag": any(v["flag"] for v in p.values() if v["flag"])}
+    return {
+        "clip_level": 10.0, "perturbed_level": 20.0, "status": "computed", "reason": None,
+        "href_clipped_draws": {"test_eval": 3}, "held_fixed_entries": 7,
+        "test_eval_clipped_entries": 3, "share_test": {}, "weight_shift": {},
+        "by_hypothesis": {
+            "H1b": parts(PLP=_clip_part(0, 0.0, 0.0, False)),
+            "H2a": {**parts(zero=_clip_part(2, 0.01, 0.1, False),
+                            interior=_clip_part(2, 0.2, 2.0, True, "fail")),
+                    "parts_2L": ["zero", "interior"]},
+            "H2c": {**parts(A4_minus_A2=_clip_part(5, -0.5, 0.5, False),
+                            A4_minus_A1={**_clip_part(4, None, None, True),
+                                         "reason": "best single changes at 2L",
+                                         "verdict_2L": None}),
+                    "best_single_2L": "A0"},
+            "H2d": parts(A4_over_A3=_clip_part(3, 0.07, 0.35, True, "fail")),
+            "H2e": parts(**{"0.01": _clip_missing("missing cell(s)", True),
+                            "0.02": _clip_part(0, 0.0, None, False)}),
+            "H3c": parts(A5_over_A4=_clip_part(3, 0.001, 0.04, False))},
+        "invariance": {"H1c": "exact", "H2a_i": "exact",
+                       "H3a": "not guaranteed: calibration oracle: 3 clipped entries (2 at H_ref; "
+                              "A5 weights, A5_max shift 0.252)"},
+        "affected_states": {"Q-N": 4, "H3b": 0}}
+
+
+def _clip_rows(tmp_path: Path, block: dict | None) -> tuple[dict, list[str]]:
+    """The verdict-table rows of ``RESULTS.md`` by id, and all lines, for one system and a block."""
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    if block is not None:
+        system["clip_sensitivity"] = block
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    start = lines.index("## Hypothesis verdicts")
+    table = [line for line in lines[start:] if line.startswith("| ") and "---" not in line][:15]
+    return {row.split(" | ")[0][2:]: row for row in table[1:]}, lines
+
+
+def test_clip_column_texts_per_criterion(tmp_path: Path) -> None:
+    """The ``clip`` column: one cell per verdict row with the text of each kind of entry.
+
+    Reference: the plan's section 4 ("shows '—' when n_aff = 0 ..., 'ok (|Δ|/hw = x)', or
+    'CLIP-SENSITIVE (|Δ|/hw = x; at 20 σ_x: verdict₂)'") and its tier table, applied to a hand-written
+    block (pipes of '|Δ|' escaped for the Markdown table). H1b: no clipped input, '—'; H2a: (i)
+    invariant, (ii) one fired part with ratio 2 and verdict 'fail'; H2c: the part whose best single
+    changes says so; H2d: fired 0.35 'fail'; H2e: both parts of the tier-B quantity not computed or
+    without clipped inputs (the mixed text keeps the reason); H3c: 'ok' with the ratio 0.04; Q-N and
+    H3b: the counts only; H1c and H3a: the tier-D statement (H3a with its cause, Amendment 1); rows with no analysis: 'n/a'. Exact strings.
+    """
+    rows, lines = _clip_rows(tmp_path, _clip_block())
+    header = next(line for line in lines if line.startswith("| ID | Hypothesis |"))
+    assert header == "| ID | Hypothesis | lorenz63 | Verdict | clip |"
+    esc = lambda text: text.replace("|", "\\|")
+    cell = lambda key: rows[key].rsplit(" | ", 1)[1].removesuffix(" |")
+    assert cell("H1b") == "lorenz63: —"
+    assert cell("H2a") == esc("lorenz63: (i) invariant; (ii) **CLIP-SENSITIVE** interior "
+                              "(|Δ|/hw = 2; at 20 σ_x: fail)")
+    assert cell("H2c") == esc("lorenz63: **CLIP-SENSITIVE** A4_minus_A1 (|Δ|/hw = n/a; at 20 σ_x: "
+                              "best single changes at 2L)")
+    assert cell("H2d") == esc("lorenz63: **CLIP-SENSITIVE** A4_over_A3 (|Δ|/hw = 0.35; at 20 σ_x: fail)")
+    assert cell("H2e") == "lorenz63: —; not computed (0.01: missing cell(s))"
+    assert cell("H3c") == esc("lorenz63: ok (|Δ|/hw = 0.04)")
+    assert cell("Q-N") == "lorenz63: 4 states with a clipped H_ref draw (count only)"
+    assert cell("H3b") == "lorenz63: —"
+    assert cell("H1c") == "lorenz63: invariant"
+    assert cell("H3a") == ("lorenz63: not guaranteed: calibration oracle: 3 clipped entries (2 at "
+                           "H_ref; A5 weights, A5_max shift 0.252)")
+    assert cell("H1a") == "lorenz63: n/a" and cell("H1d") == "lorenz63: n/a"
+    assert cell("(reported)") == "lorenz63: n/a"  # the gain bound has no verdict
+    text = "\n".join(lines)
+    assert "lorenz63: tree, A3 and KM inputs contain 7 clipped entries; not recomputed." in text
+    assert ("lorenz63: H3a invariance not guaranteed: calibration oracle: 3 clipped entries (2 at "
+            "H_ref; A5 weights, A5_max shift 0.252).") in text
+    assert "it marks no result provisional" in text  # OD6, stated next to the column
+    # the verdict cells are untouched by the column (a fired flag changes no verdict)
+    plain, _ = _clip_rows(tmp_path, None)
+    for key, row in rows.items():
+        assert row.rsplit(" | ", 1)[0] == plain[key].removesuffix(" |"), key
+
+
+def test_clip_column_says_not_computed_and_is_absent_without_a_block(tmp_path: Path) -> None:
+    """A block that was not computed shows its reason in every row (never '—' or 'ok'); results with
+    no block have no ``clip`` column and no note.
+
+    Reference: the plan's section 4 ('not_computed with a reason ... never False') and the
+    backward-compatibility rule that results written before WU-0002.11e render as before. Exact strings.
+    """
+    block = {"clip_level": 10.0, "perturbed_level": 20.0, "status": "not_computed",
+             "reason": "CP clip sentinel nonzero (2 entries)", "by_hypothesis": {},
+             "invariance": {}, "affected_states": {}}
+    rows, lines = _clip_rows(tmp_path, block)
+    for key, row in rows.items():
+        assert row.endswith("| lorenz63: not computed (CP clip sentinel nonzero (2 entries)) |"), key
+    assert "lorenz63: clip sensitivity not computed: CP clip sentinel nonzero (2 entries)." in \
+        "\n".join(lines)
+    rows, lines = _clip_rows(tmp_path, None)
+    header = next(line for line in lines if line.startswith("| ID | Hypothesis |"))
+    assert header == "| ID | Hypothesis | lorenz63 | Verdict |"
+    assert not any("clip" in row.rsplit(" | ", 1)[-1] for row in rows.values())
+    assert not any("Clip sensitivity (the `clip` column" in line for line in lines)

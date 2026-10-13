@@ -17,6 +17,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from . import analysis as an
+from . import clip_sensitivity
 from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, make_rng
@@ -463,7 +464,7 @@ def run_system(study: Study, system: str) -> dict:
 
     rules = fit_rules([core], cfg)
     study.record_rules(system, core, rules)
-    _, scores = _evaluate(core, rules, cfg)
+    weights, scores = _evaluate(core, rules, cfg)
     res["fitted"] = {"analog_proxy": vars(rules.proxies.analog),
                      "estimation_proxy": vars(rules.proxies.estimation),
                      "nu_cap": rules.proxies.nu_cap,
@@ -519,6 +520,11 @@ def run_system(study: Study, system: str) -> dict:
     res.update(an.h3_regimes(core, rules, scores, cfg))
     res["oracle_recovery"] = an.oracle_recovery(scores, cfg)
     check_keys(res)
+    # WU-0002.11e: how far each verdict would move if the clip level doubled; reported next to the
+    # verdicts, changes none of them, draws no random number (needs owner review before freeze).
+    res["clip_sensitivity"] = clip_sensitivity.clip_sensitivity_block(
+        core, rules, weights, scores, noise_cells, library_cells, res, cfg)
+    clip_sensitivity.log_flags(system, res["clip_sensitivity"])
     res["handling"] = study.system_handling(system, collect_result_counts(res))
     log_handling(system, res["handling"])
     res["seconds"] = time.time() - t0

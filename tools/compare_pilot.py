@@ -494,6 +494,11 @@ def _build_rules() -> list[Rule]:
     add(_rules("new", f"{S}/verification/**", "WU-0005.5", "P2(c)", "P2(c) verification check"))
     add(_rules("new", f"{S}/handling/** handling/**", "WU-0002.11", "D-18",
                "counted handling of clips, replacements and fallbacks"))
+    # WU-0002.11e: one subtree per system, outside every hypothesis key and outside ``handling``
+    # (the table's ``**`` is a tail wildcard, and the blanket rules of H2e, H2b/library_change,
+    # H2a/part_ii and H2c/A4_minus_<single> would otherwise match a leaf below them twice).
+    add(_rules("new", f"{S}/clip_sensitivity/**", "WU-0002.11e", "DEC-0017 Q6, DEC-0026",
+               "clip sensitivity of the verdicts (doubling to 20 sigma_x), reported only"))
     # ---- fitted ----------------------------------------------------------------------------
     add(_rules("unchanged", f"{S}/fitted/{{analog_proxy,estimation_proxy}}/{{floor,slope}}",
                chain="network", item="R2",
