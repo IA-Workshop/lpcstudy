@@ -75,7 +75,18 @@ from the arms given by ``--d3-arms`` (default ``REDRAWN_D3_ARMS``): ``away`` (bo
 away from the other estimate, symmetric under swapping the runs; the mathematician's
 recommendation, a WORKING DEFAULT pending the owner's ruling O4), ``half-width`` (``(hi - lo) /
 (2 z)`` for both) or ``delta-side`` (the rule of DEC-0019 as implemented for D3 without this
-flag). A D3 excess is a statistic to triage, not an error of the code: with the state sample
+flag). O4 rules on BOTH arms: ``away`` keeps SE_new as implemented (the arm facing away from the
+older run, which closes the open item of DEC-0020) and CHANGES SE_old, from the arm on the side of
+the difference (facing the new run) to the arm facing away.
+
+What the tool does NOT check (the report says so in a fixed section; use ``tools/leafdiff.py`` on
+the P1 and P0 ``results.json`` files): R-a against P0 (the leaf set equals P0's plus the start
+leaves, except the K-shaped ``H3a`` lists, whose lengths must match P1's ``H3a.chosen_K``, and
+``H2c`` ``A4_minus_<best_single>`` when ``best_single`` flips; any other added or removed leaf is a
+finding); the P0 half of R-b (the digests, ``lyapunov_orbit_max_abs`` and
+``trajectory_max_abs.statistics`` bitwise equal to P0's); R-c (``trajectory_max_abs.{main,estimator}``
+at most B); R-g (verdict flips against the baseline); R-h (sentinels nonzero in P1 and zero in P0).
+An exit code of 0 is therefore not "P1 passes". A D3 excess is a statistic to triage, not an error of the code: with the state sample
 redrawn and the networks refitted, the true spread of a difference exceeds what the two bootstraps
 report (mathematics check M5).
 
@@ -132,12 +143,24 @@ FALLBACK_CONSTANTS: dict = {
 }
 
 REDRAWN_REASON = "state sample redrawn by design (WU-0002.14)"
+REDRAWN_NOT_CHECKED = (
+    "R-a against P0: the leaf set equals P0's plus the start leaves, except the K-shaped H3a lists "
+    "(their length must match P1's H3a.chosen_K) and H2c A4_minus_<best_single> when best_single "
+    "flips; any other added or removed leaf is a finding",
+    "R-b, P0 half: the digests, lyapunov_orbit_max_abs and trajectory_max_abs.statistics bitwise "
+    "equal to P0's",
+    "R-c: trajectory_max_abs.main and .estimator at most B for every system",
+    "R-g: every pass, fail or inconclusive flip against the baseline, listed",
+    "R-h: each handling sentinel nonzero in P1 and zero in P0, listed and triaged")
+"""The P1 criteria that ``--redrawn-states`` does not evaluate (review R4/R6); the report prints
+them in a fixed section. ``tools/leafdiff.py`` compares two ``results.json`` files leaf by leaf."""
 D3_ARMS = ("delta-side", "away", "half-width")
 REDRAWN_D3_ARMS = "away"
 """The D3 standard-error arms of ``--redrawn-states`` (WU-0002.14, M5(b)): both arms facing away from
-the other estimate. A WORKING DEFAULT pending the owner's ruling O4 (DEC-0020 open item); the
-alternatives are ``half-width`` and ``delta-side`` (the arm on the side of the difference, which
-faces the other run for the older of the two)."""
+the other estimate. A WORKING DEFAULT pending the owner's ruling O4, which rules on BOTH arms: SE_new
+is as implemented (the arm facing away from the older run; this closes the open item of DEC-0020)
+and SE_old CHANGES, from the arm on the side of the difference (facing the new run, the reading of
+the DEC-0019 text) to the arm facing away. The alternatives are ``half-width`` and ``delta-side``."""
 
 Path_ = tuple[str, ...]
 
@@ -1945,6 +1968,10 @@ def _d_lines(rep: DReport, branch_note: str) -> list[str]:
                  "the states):"), ""]
         out += table_lines(("path", "pilot", "new", "ok"),
                            [(a, fmt(b), fmt(c), "yes" if ok else "NO") for a, b, c, ok in rep.i1])
+    if rep.mode == "D3" and rep.i1 is not None:
+        out += ["NOT checked by this tool (an exit code of 0 is not 'P1 passes'; compare the P1 and "
+                "P0 `results.json` with `tools/leafdiff.py` and read the report):", ""]
+        out += [f"- {x}" for x in REDRAWN_NOT_CHECKED] + [""]
     if rep.mode == "D3" and rep.rf is not None:
         failed = [x for x in rep.rf if not x[4]]
         out += [(f"R-f (--redrawn-states): {len(rep.rf)} exact invariants, "
@@ -1956,7 +1983,8 @@ def _d_lines(rep: DReport, branch_note: str) -> list[str]:
                     "half-width": "half-width (hi - lo) / (2 z) for both",
                     "delta-side": "the arm on the side of the difference (DEC-0019 as implemented)"}
         out += [(f"D3 standard-error arms: {rep.arms} ({arm_note[rep.arms]})"
-                 + (" -- WORKING DEFAULT pending the owner's ruling O4 (DEC-0020 open item)"
+                 + (" -- WORKING DEFAULT pending the owner's ruling O4 on both arms (SE_new as "
+                    "implemented, which closes the DEC-0020 item; SE_old changes)"
                     if rep.i1 is not None and rep.arms == REDRAWN_D3_ARMS else "")), ""]
         out += [(f"D3 (m = {len(rep.d3)} statistics with intervals in both runs; z_B = "
                 f"{rep.d3_z!r}):"), ""]

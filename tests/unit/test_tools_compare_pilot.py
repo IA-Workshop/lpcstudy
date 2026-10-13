@@ -1690,6 +1690,10 @@ def test_cli_redrawn_states_with_equal_context_forces_branch_d_and_passes(tmp_pa
     assert "- state sample redrawn by design (WU-0002.14)" in text
     assert "mode: D3" in text and "I1 (--redrawn-states): 4 context leaves of the pilot, 4 bitwise equal" in text
     assert "D3 standard-error arms: away" in text and "WORKING DEFAULT pending the owner's ruling O4" in text
+    assert "NOT checked by this tool" in text and "tools/leafdiff.py" in text
+    for line in cp.REDRAWN_NOT_CHECKED:
+        assert f"- {line}" in text
+    assert "on both arms" in text
     assert "m = 1 statistics with intervals in both runs" in text
 
 

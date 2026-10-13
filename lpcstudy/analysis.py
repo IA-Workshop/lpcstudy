@@ -461,9 +461,9 @@ def h1b_seed_amplifier(cell: Cell, config: StudyConfig) -> dict:
     dim = cell.ctx.spec.dim
     copied = cell.noise**2 / cell.setup.n_analogs
     res: dict = {}
-    for name, seed, sq, floor in (("CP", m.analog_seed, m.sq_cp[:, col], copied),
-                                  ("PLP", m.est_seed, m.sq_plp[:, col], 0.0)):
-        x_all = np.log(gain * seed / np.sqrt(dim))
+    for name, seed_err, sq, floor in (("CP", m.analog_seed, m.sq_cp[:, col], copied),
+                                      ("PLP", m.est_seed, m.sq_plp[:, col], 0.0)):
+        x_all = np.log(gain * seed_err / np.sqrt(dim))
         y_all = 0.5 * np.log(np.maximum(sq - floor, 1e-12))
         keep = np.isfinite(x_all) & np.isfinite(y_all)  # excluded and counted (DEC-0008 A3)
         x, y = x_all[keep], y_all[keep]

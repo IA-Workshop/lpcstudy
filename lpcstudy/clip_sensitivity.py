@@ -7,8 +7,9 @@ Errors are measured against the noise-free truth and clipped at ``ERROR_CLIP`` =
 reports how much each verdict would move if the level were doubled. It reads the arrays the
 forecast code already stores and recomputes the verdict statistics on copies. It never changes a
 verdict, never marks a result provisional (OD6) and consumes no randomness: every bootstrap is
-rebuilt from the same integer seed or the same ``make_rng`` labels as the verdict it re-reads, so the
-resample indices are the same and no shared generator advances (DEC-0012).
+rebuilt from a fresh ``make_rng`` generator with exactly the labels (system included) of the verdict
+it re-reads (WU-0002.14), so the resample indices are the same and no shared generator advances
+(DEC-0012); otherwise the flags would measure resampling noise.
 
 The perturbation P2
 -------------------
@@ -330,24 +331,25 @@ def _hypothesis(parts: dict[str, dict], **extra: object) -> dict:
 
 # ----------------------------------------------- recomputation of the tier-A verdict statistics
 def h3c_part(original: dict, a5_2: np.ndarray, a4_2: np.ndarray, config: StudyConfig,
-             n_clipped: int) -> dict:
+             system: str, n_clipped: int) -> dict:
     """H3c under P2: ``an.h3c_ratio`` on the perturbed per-state MSEs (same generator labels)."""
-    out = an.h3c_ratio(a5_2, a4_2, config)
+    out = an.h3c_ratio(a5_2, a4_2, config, system)
     return part_entry(original["A5_over_A4_mse"], original["ci"], original["verdict"],
                       out["A5_over_A4_mse"], out["ci"], out["verdict"], n_clipped)
 
 
 def h2d_part(original: dict, a3_2: np.ndarray, a4_2: np.ndarray, config: StudyConfig,
-             n_clipped: int) -> dict:
-    """H2d under P2: ``an.h2d_empirical_comparison`` on the perturbed per-state MSEs (same seed)."""
+             system: str, n_clipped: int) -> dict:
+    """H2d under P2: ``an.h2d_empirical_comparison`` on the perturbed per-state MSEs (same generator labels)."""
     out = an.h2d_empirical_comparison({"A3": SimpleNamespace(state_mse_ref=a3_2),
-                                       "A4": SimpleNamespace(state_mse_ref=a4_2)}, config)
+                                       "A4": SimpleNamespace(state_mse_ref=a4_2)}, config,
+                                      system)
     return part_entry(original["in_distribution_excess"], original["ci"], original["verdict"],
                       out["in_distribution_excess"], out["ci"], out["verdict"], n_clipped)
 
 
 def h2c_parts(original: dict, mse_2: dict[str, np.ndarray], calibration_2: SimpleNamespace,
-              config: StudyConfig, n_clipped: dict[str, int]) -> dict:
+              config: StudyConfig, system: str, n_clipped: dict[str, int]) -> dict:
     """H2c under P2: ``an.h2c_state_dependence`` on the perturbed per-state MSEs and calibration draws.
 
     If the better single forecaster of the calibration split changes (``best_single_2L``), the two
@@ -364,6 +366,8 @@ def h2c_parts(original: dict, mse_2: dict[str, np.ndarray], calibration_2: Simpl
         ``.evals`` with ``horizons``, ``cp_err`` and the perturbed ``plp_err`` of the calibration split.
     config : StudyConfig
         Configuration.
+    system : str
+        System name (a label of the bootstrap generator of the verdict this re-reads).
     n_clipped : dict[str, int]
         Clipped ``H_ref`` draws among the inputs of each part, by part name.
 
@@ -373,7 +377,7 @@ def h2c_parts(original: dict, mse_2: dict[str, np.ndarray], calibration_2: Simpl
         ``parts``, ``best_single_2L`` and ``flag``.
     """
     out = an.h2c_state_dependence({k: SimpleNamespace(state_mse_ref=v) for k, v in mse_2.items()},
-                                  calibration_2, config)
+                                  calibration_2, config, system)
     best, best_2 = original["best_single"], out["best_single"]
     parts = {}
     for name in ("A4_minus_A2", f"A4_minus_{best}"):
@@ -390,15 +394,17 @@ def h2c_parts(original: dict, mse_2: dict[str, np.ndarray], calibration_2: Simpl
 
 
 def h1b_part(original: dict, sq_plp: np.ndarray, sq_plp_2: np.ndarray, gain: np.ndarray,
-             seed: np.ndarray, dim: int, config: StudyConfig, n_clipped: int) -> dict:
+             seed_err: np.ndarray, dim: int, config: StudyConfig, system: str, n_clipped: int
+             ) -> dict:
     """H1b (PLP) under P2: the OLS slope of ``0.5 ln E e_P^2`` on ``ln(g delta / sqrt(m))``.
 
-    The statistic, the bootstrap seed (the integer ``config.seed``) and the verdict are those of
+    The statistic, the bootstrap generator (a fresh ``make_rng(config.seed, system, "bootstrap",
+    "H1b")``, the label of the PLP regression) and the verdict are those of
     ``analysis.h1b_seed_amplifier``'s PLP regression (floor 0): ``y = 0.5 ln max(E e_P^2, 1e-12)``.
     ``x`` does not depend on the errors. If the set of finite regression states changes, the part is
     not computed.
     """
-    x_all = np.log(gain * seed / np.sqrt(dim))
+    x_all = np.log(gain * seed_err / np.sqrt(dim))
     keep = np.isfinite(x_all) & np.isfinite(0.5 * np.log(np.maximum(sq_plp, 1e-12)))
     y_2 = 0.5 * np.log(np.maximum(sq_plp_2, 1e-12))
     if not np.array_equal(keep, np.isfinite(x_all) & np.isfinite(y_2)):
@@ -408,7 +414,7 @@ def h1b_part(original: dict, sq_plp: np.ndarray, sq_plp_2: np.ndarray, gain: np.
         return not_computed("no regression state", n_clipped)
     boot = block_bootstrap_counted(lambda idx: ols_slope(x[idx], y[idx]), len(x),
                                    config.bootstrap_resamples, config.bootstrap_block,
-                                   config.seed, an.H1_LEVEL)
+                                   make_rng(config.seed, system, "bootstrap", "H1b"), an.H1_LEVEL)
     verdict_2, _ = criterion_verdict(boot.estimate, boot.lower, boot.upper, an.H1B_BAND,
                                      n_states=len(x))
     plp = original["PLP"]
@@ -417,7 +423,7 @@ def h1b_part(original: dict, sq_plp: np.ndarray, sq_plp_2: np.ndarray, gain: np.
 
 
 def h2a_parts(original: dict, w_ref_2: np.ndarray, growth_scaled: np.ndarray, seeds: np.ndarray,
-              config: StudyConfig, n_clipped: int) -> dict:
+              config: StudyConfig, system: str, n_clipped: int) -> dict:
     """H2a(ii) under P2: ``an.h2a_part_ii`` on the perturbed ``w*(H_ref)`` (same generator labels).
 
     A part of the original that is absent under P2 (the ``w* = 1`` part is added only above 5% of
@@ -426,7 +432,8 @@ def h2a_parts(original: dict, w_ref_2: np.ndarray, growth_scaled: np.ndarray, se
     """
     out = an.h2a_part_ii(w_ref_2, growth_scaled, seeds, n_resamples=config.bootstrap_resamples,
                          block=config.bootstrap_block,
-                         seed=make_rng(config.seed, "h2a-two-part"), level=an.PRIMARY_LEVEL)
+                         seed=make_rng(config.seed, system, "h2a-two-part"),
+                         level=an.PRIMARY_LEVEL)
     parts = {}
     for name, old in original["part_ii"].items():
         new = out["part_ii"].get(name)
@@ -438,16 +445,16 @@ def h2a_parts(original: dict, w_ref_2: np.ndarray, growth_scaled: np.ndarray, se
 
 
 def h2b_noise_part(original: dict, w_by_noise_2: np.ndarray, levels: np.ndarray,
-                   config: StudyConfig, n_clipped: int) -> dict:
+                   config: StudyConfig, system: str, n_clipped: int) -> dict:
     """H2b(i) under P2: the mean per-state Spearman correlation of ``w*(H_ref)`` with ``rho``.
 
-    The statistic, the integer seed ``config.seed + 3``, the level ``1 - 0.05/3`` and the verdict rule
+    The statistic, the generator ``make_rng(config.seed, system, "bootstrap", "H2b-noise")``, the level ``1 - 0.05/3`` and the verdict rule
     are those of ``analysis.h2b_knob_response``.
     """
     rho_corr, _ = an._per_state_spearman_counted(levels, w_by_noise_2)
     point, values = bootstrap_values(lambda idx: float(np.mean(rho_corr[idx])), len(rho_corr),
                                      config.bootstrap_resamples, config.bootstrap_block,
-                                     config.seed + 3)
+                                     make_rng(config.seed, system, "bootstrap", "H2b-noise"))
     lower, upper, _ = percentile_interval(values, an.PRIMARY_LEVEL)
     verdict_2, _ = criterion_verdict(float(point), lower, upper, (0.0, np.inf), (False, True),
                                      n_states=len(rho_corr))
@@ -456,10 +463,11 @@ def h2b_noise_part(original: dict, w_by_noise_2: np.ndarray, levels: np.ndarray,
 
 
 def h2b_library_part(original: dict, low_2: np.ndarray, high_2: np.ndarray, rho: float,
-                     config: StudyConfig, n_clipped: int) -> dict:
+                     config: StudyConfig, system: str, n_clipped: int) -> dict:
     """H2b(ii) under P2: ``an._paired_change`` on the perturbed weights (same labels, level)."""
     fields, verdict_2, _ = an._paired_change(low_2, high_2, config, an.PRIMARY_LEVEL,
-                                             ("h2b-library-change", f"{rho:g}"), "mean_change",
+                                             (system, "h2b-library-change", f"{rho:g}"),
+                                             "mean_change",
                                              mc_error=True)
     return part_entry(original["mean_change"], original["ci"], original["verdict"],
                       fields["mean_change"], fields["ci"], verdict_2, n_clipped)
@@ -689,12 +697,12 @@ def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, 
     n_test_eval = href["test_eval"]
     if "H3c" in names:
         by_hypothesis["H3c"] = _guarded(names["H3c"], lambda: _hypothesis({"A5_over_A4": h3c_part(
-            results["H3c"], mse_2["A5"], mse_2["A4"], config,
+            results["H3c"], mse_2["A5"], mse_2["A4"], config, cell.system,
             n_test_eval + href["calibration_oracle"]
             + empty_used * href["construction_oracle"])}))
     if "H2d" in names:
         by_hypothesis["H2d"] = _guarded(names["H2d"], lambda: _hypothesis({"A4_over_A3": h2d_part(
-            results["H2d"], mse_2["A3"], mse_2["A4"], config, n_test_eval)}))
+            results["H2d"], mse_2["A3"], mse_2["A4"], config, cell.system, n_test_eval)}))
     if "H2c" in names:
         def build_h2c() -> dict:
             plp_cal = cal.evals.plp_err.copy()
@@ -705,7 +713,7 @@ def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, 
             shared = n_test_eval + href["calibration_eval"]
             counts = {"A4_minus_A2": shared + href["construction_oracle"],
                       names["H2c"][1]: shared}
-            return h2c_parts(results["H2c"], mse_2, calibration_2, config, counts)
+            return h2c_parts(results["H2c"], mse_2, calibration_2, config, cell.system, counts)
         by_hypothesis["H2c"] = _guarded(names["H2c"], build_h2c)
     m_test = test.moments
     wcol = m_test.at(ref)
@@ -713,13 +721,14 @@ def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, 
         by_hypothesis["H1b"] = _guarded(names["H1b"], lambda: _hypothesis({"PLP": h1b_part(
             results["H1b"], m_test.sq_plp[:, wcol], test_2.sq_plp[:, wcol],
             cell.oracles["test"].gains[:, ref - 1], m_test.est_seed, cell.ctx.spec.dim, config,
-            href["test_oracle"])}))
+            cell.system, href["test_oracle"])}))
     if "H2a" in names:
         def build_h2a() -> dict:
             seeds = np.column_stack([np.log(m_test.analog_seed / cell.noise),
                                      np.log(m_test.est_seed / cell.noise)])
             return h2a_parts(results["H2a"], oracle_weight(test_2)[:, wcol],
-                             cell.oracles["test"].growth * lt, seeds, config, href["test_oracle"])
+                             cell.oracles["test"].growth * lt, seeds, config, cell.system,
+                             href["test_oracle"])
         by_hypothesis["H2a"] = _guarded(names["H2a"], build_h2a)
     if "H2b" in names:
         by_hypothesis["H2b"] = _guarded(names["H2b"], lambda: _h2b(
@@ -818,8 +827,9 @@ def _h2b(original: dict, noise_cells: dict, library_cells: dict, config: StudyCo
     """H2b(i) and H2b(ii) under P2 (the sweep cells carry their own clip arrays)."""
     levels = np.array(sorted(noise_cells))
     pieces = [_weights_at_ref(noise_cells[r], config, m_draws) for r in levels]
+    system = noise_cells[min(noise_cells)].system
     noise = h2b_noise_part(original["noise"], np.column_stack([p[0] for p in pieces]), levels,
-                           config, int(sum(p[1].sum() for p in pieces)))
+                           config, system, int(sum(p[1].sum() for p in pieces)))
     rho = config.core_noise
     wanted = [(rho, n) for n in an.H2B_LIBRARY_SIZES]
     old = original["library_change"]
@@ -827,7 +837,7 @@ def _h2b(original: dict, noise_cells: dict, library_cells: dict, config: StudyCo
         library = not_computed(f"the verdict itself is not computed ({old['reason']})")
     else:
         low, high = (_weights_at_ref(library_cells[key], config, m_draws) for key in wanted)
-        library = h2b_library_part(old, low[0], high[0], rho, config,
+        library = h2b_library_part(old, low[0], high[0], rho, config, system,
                                    int(low[1].sum() + high[1].sum()))
     return _hypothesis({"noise": noise, "library_change": library})
 
