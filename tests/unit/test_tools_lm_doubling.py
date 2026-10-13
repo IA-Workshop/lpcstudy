@@ -1049,21 +1049,31 @@ def provenance_block(threads: str = "8", commit: str = "abc", xla: str | None = 
 
 
 def test_precondition_mismatches_name_each_difference() -> None:
-    """The probe's environment must equal the arm's: LPC_THREADS and its mirrors, XLA_FLAGS, jax."""
+    """The probe's run must equal the arm's: commit, LPC_THREADS and its mirrors, XLA_FLAGS, jax."""
     here = dict(provenance_block()["env"])
     versions = {"jax": "0.11.2", "jaxlib": "0.11.2"}
-    assert lm.precondition_mismatches(provenance_block(), here, versions) == []
-    other = lm.precondition_mismatches(provenance_block(threads="4"), here, versions)
+    check = lambda prov, env=here, ver=versions, commit="abc": lm.precondition_mismatches(
+        prov, env, ver, commit)
+    assert check(provenance_block()) == []
+    other = check(provenance_block(threads="4"))
     assert len(other) == 6 and other[0] == "LPC_THREADS: recorded '4', here '8'"
-    assert lm.precondition_mismatches(provenance_block(xla="--x"), here, versions) == [
-        "XLA_FLAGS: recorded '--x', here None"]
-    assert lm.precondition_mismatches(provenance_block(), here, {"jax": "0.11.3", "jaxlib": "0.11.2"}
-                                      ) == ["jax: recorded '0.11.2', here '0.11.3'"]
-    assert lm.precondition_mismatches({}, here, versions) == ["no env block in the recorded provenance"]
+    assert check(provenance_block(xla="--x")) == ["XLA_FLAGS: recorded '--x', here None"]
+    assert check(provenance_block(), ver={"jax": "0.11.3", "jaxlib": "0.11.2"}) == [
+        "jax: recorded '0.11.2', here '0.11.3'"]
+    assert check(provenance_block(), commit="def") == ["commit: recorded 'abc', here 'def'"]
+    assert check(provenance_block(), commit=None) == ["commit: recorded 'abc', here None"]
+    assert check({}) == ["no env block in the recorded provenance"]
     missing = provenance_block()
     del missing["env"]["NPROC"]
-    assert lm.precondition_mismatches(missing, here, versions) == [
-        "NPROC: recorded 'not recorded', here '8'"]
+    assert check(missing) == ["NPROC: recorded 'not recorded', here '8'"]
+
+
+def test_current_commit_is_the_head_of_this_repository() -> None:
+    """``current_commit`` returns a 40-hex SHA equal to ``git rev-parse HEAD`` (reference: git)."""
+    import subprocess
+    expected = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True,
+                              text=True, check=True).stdout.strip()
+    assert lm.current_commit() == expected and len(expected) == 40
 
 
 def test_pairing_notes_list_what_differs_between_arms() -> None:

@@ -1300,21 +1300,32 @@ PRECONDITION_ENV = ("LPC_THREADS", *THREAD_VARIABLES, "XLA_FLAGS", "JAX_PLATFORM
 PRECONDITION_PACKAGES = ("jax", "jaxlib")
 
 
+def current_commit() -> str | None:
+    """``git rev-parse HEAD`` of the repository of this tool, or ``None`` if git fails."""
+    done = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True,
+                          text=True, check=False)
+    return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
+
+
 def precondition_mismatches(provenance: Mapping, env: Mapping[str, str | None],
-                            versions: Mapping[str, str | None]) -> list[str]:
-    """Where an arm's recorded run environment differs from this process (M6: P0 needs the same).
+                            versions: Mapping[str, str | None], commit: str | None
+                            ) -> list[str]:
+    """Where an arm's recorded run differs from this process (M6: P0 needs the same).
 
     P0 is exact only for the same commit, host, ``LPC_THREADS``, ``XLA_FLAGS`` and jax and jaxlib
     (a different batch shape or thread pool changes the result by round-off, E1(a)), so the probe
-    refuses to spend hours on an arm it cannot reproduce. Compares ``provenance.env`` for the names
-    of ``PRECONDITION_ENV`` (a name that is not recorded is a mismatch) and the versions of
-    ``PRECONDITION_PACKAGES``.
+    refuses to spend hours on an arm it cannot reproduce. Compares ``provenance.commit`` with
+    ``commit``, ``provenance.env`` for the names of ``PRECONDITION_ENV`` (a name that is not
+    recorded is a mismatch) and the versions of ``PRECONDITION_PACKAGES``. The host is not
+    compared here (``compare`` lists the CPU model of every arm in ``pairing_notes``).
     """
     stored = provenance.get("env")
     if not isinstance(stored, Mapping):
         return ["no env block in the recorded provenance"]
-    out = [f"{name}: recorded {stored.get(name, 'not recorded')!r}, here {env.get(name)!r}"
-           for name in PRECONDITION_ENV if name not in stored or stored[name] != env.get(name)]
+    out = [] if provenance.get("commit") == commit else [
+        f"commit: recorded {provenance.get('commit')!r}, here {commit!r}"]
+    out += [f"{name}: recorded {stored.get(name, 'not recorded')!r}, here {env.get(name)!r}"
+            for name in PRECONDITION_ENV if name not in stored or stored[name] != env.get(name)]
     packages = provenance.get("packages") or {}
     out += [f"{name}: recorded {packages.get(name)!r}, here {versions.get(name)!r}"
             for name in PRECONDITION_PACKAGES if packages.get(name) != versions.get(name)]
@@ -1556,8 +1567,10 @@ def run_probe(args: argparse.Namespace) -> int:
               (item.split("=", 1) for item in args.results)}
     from importlib import metadata
     versions = {name: metadata.version(name) for name in PRECONDITION_PACKAGES}
+    commit = current_commit()
     for arm, results in stored.items():
-        wrong = precondition_mismatches(results.get("provenance") or {}, dict(os.environ), versions)
+        wrong = precondition_mismatches(results.get("provenance") or {}, dict(os.environ), versions,
+                                        commit)
         if wrong:
             print(f"lm_doubling.py: refused: the {arm} arm was run in another environment, so P0 "
                   "cannot hold: " + "; ".join(wrong), file=sys.stderr)
