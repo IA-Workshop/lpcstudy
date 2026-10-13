@@ -1427,13 +1427,43 @@ def pairing_problems(arms: Mapping[int, Mapping]) -> list[str]:
     return out
 
 
+def arm_identity(arm: Mapping) -> dict:
+    """The start and end time an arm's results recorded: which run of the arm a P0 was made against."""
+    prov = arm.get("provenance") or {}
+    return {"start_utc": prov.get("start_utc"), "end_utc": prov.get("end_utc")}
+
+
+def probe_provenance(commit: str | None, dirty: bool | None, argv: Sequence[str],
+                     versions: Mapping[str, str | None], environ: Mapping[str, str | None],
+                     cpu: str | None) -> dict:
+    """The provenance block of a probe file: what ``probe_problems`` checks against the arms."""
+    return {"commit": commit, "dirty": dirty, "argv": list(argv), "packages": dict(versions),
+            "cpu": cpu, "env": {name: environ.get(name) for name in PRECONDITION_ENV}}
+
+
+def cpu_model() -> str | None:
+    """The CPU model as ``provenance.cpu_record`` records it (``None`` if unavailable)."""
+    from lpcstudy.provenance import cpu_record
+    return cpu_record().get("model")
+
+
+def probe_header(preset: str, seed_id: str, steps: Sequence[int], horizons: Sequence[int],
+                 env: Mapping[str, str], provenance: Mapping) -> dict:
+    """The top of a probe file (schema, label, preset, seed id, levels, environment, provenance)."""
+    return {"schema": "lpcstudy.lm-probe/1", "label": make_label(seed_id), "preset": preset,
+            "seed_id": seed_id, "levels": list(steps), "horizons": list(horizons),
+            "environment": dict(env), "systems": {}, "halt": [], "provenance": dict(provenance)}
+
+
 def probe_problems(probe: Mapping, arms: Mapping[int, Mapping]) -> list[str]:
     """Why a Part A file cannot supply ``r_A`` for these arms (empty if it can).
 
-    It must come from the same preset, seed id, commit, clean tree, ``LPC_THREADS`` and jax and
-    jaxlib as the arms, must have probed the levels 30, 60 and 120, and must hold an exact P0 (an
+    It must come from the same preset, seed id, commit, clean tree, CPU model, ``LPC_THREADS``,
+    ``XLA_FLAGS`` and jax and jaxlib as the arms, must have probed the levels 30, 60 and 120, and must hold an exact P0 (an
     entry with no mismatch) for every arm and every system it covers: a probe run without
-    ``--results`` has none and is not accepted.
+    ``--results`` has none and is not accepted. The P0 entry of an arm records the start and end
+    time of the results file it was checked against (``arm_identity``) and these must be this arm's,
+    so a probe that is exact against other directories at the same commit is not accepted.
     """
     out: list[str] = []
     facts = {k: arm_facts(a) for k, a in arms.items()}
@@ -1441,12 +1471,14 @@ def probe_problems(probe: Mapping, arms: Mapping[int, Mapping]) -> list[str]:
     prov = probe.get("provenance") or {}
     mine = {"seed_id": probe.get("seed_id"), "preset": probe.get("preset"),
             "commit": prov.get("commit"), "dirty": prov.get("dirty"),
+            "cpu": prov.get("cpu"),
             "LPC_THREADS": (prov.get("env") or {}).get("LPC_THREADS"),
+            "XLA_FLAGS": (prov.get("env") or {}).get("XLA_FLAGS"),
             **{n: (prov.get("packages") or {}).get(n) for n in PRECONDITION_PACKAGES}}
     for name in ("seed_id", "preset"):
         if seen[name] != {mine[name]}:
             out.append(f"the probe's {name} is {mine[name]!r}, the arms' is {sorted(map(str, seen[name]))}")
-    for name in ("commit", "LPC_THREADS", *PRECONDITION_PACKAGES):
+    for name in ("commit", "cpu", "LPC_THREADS", "XLA_FLAGS", *PRECONDITION_PACKAGES):
         if {f[name] for f in facts.values()} != {mine[name]}:
             out.append(f"the probe's {name} is {mine[name]!r}, the arms' is "
                        f"{sorted({str(f[name]) for f in facts.values()})}")
@@ -1454,11 +1486,18 @@ def probe_problems(probe: Mapping, arms: Mapping[int, Mapping]) -> list[str]:
         out.append(f"the probe was run from a tree recorded as dirty = {mine['dirty']!r}")
     if not {30, 60, 120} <= set(probe.get("levels") or []):
         out.append("the probe did not cover the levels 30, 60 and 120")
+    identity = {k: arm_identity(a) for k, a in arms.items()}
     for system, body in (probe.get("systems") or {}).items():
-        exact = {e.get("arm") for e in body.get("p0") or [] if not e.get("mismatches")}
+        entries = {e.get("arm"): e for e in body.get("p0") or []}
+        exact = {k for k, e in entries.items() if not e.get("mismatches")}
         missing = sorted(set(arms) - exact)
         if missing:
             out.append(f"the probe has no exact P0 for {system} at the arm(s) {missing}")
+        for k in sorted(set(arms) & exact):
+            wanted, found = identity[k], entries[k].get("arm_identity")
+            if None in wanted.values() or found != wanted:
+                out.append(f"the P0 of {system} at the {k} arm was made against another run of "
+                           f"that arm (recorded {found!r}, this arm {wanted!r})")
     return out
 
 
@@ -1614,9 +1653,13 @@ def capture_segment(study, setup, library, spec: Spec, estimators: Mapping[int, 
 
 
 def p0_report(system: Mapping, specs: Sequence[Spec], segments: Mapping[str, Segment],
-              arm: int, lm_summary: Callable) -> dict:
-    """P0 at one arm: for each cell and kind, the probe's pooled summary against the stored one."""
-    out: dict = {"arm": arm, "mismatches": []}
+              arm: int, lm_summary: Callable, identity: Mapping | None = None) -> dict:
+    """P0 at one arm: for each cell and kind, the probe's pooled summary against the stored one.
+
+    ``identity`` (``arm_identity`` of the stored results) is recorded in the entry, so ``compare``
+    can tell which run of the arm it was made against.
+    """
+    out: dict = {"arm": arm, "mismatches": [], "arm_identity": dict(identity or {})}
     cells = (system.get("handling") or {}).get("cells") or {}
     done = set()
     for spec in specs:
@@ -1694,12 +1737,9 @@ def run_probe(args: argparse.Namespace) -> int:
     horizons = np.array([h for h in cfg.eval_horizons if h >= cfg.steps_per_lyapunov], dtype=int)
     ref_column = int(np.nonzero(horizons == cfg.reference_horizon)[0][0])
     long_columns = list(range(len(horizons)))
-    report: dict = {"schema": "lpcstudy.lm-probe/1", "label": make_label(args.seed_id), "preset": args.preset,
-                    "seed_id": args.seed_id, "levels": list(args.steps), "horizons": horizons.tolist(),
-                    "environment": env, "systems": {}, "halt": [],
-                    "provenance": {"commit": commit, "dirty": dirty, "argv": list(args.argv),
-                                   "packages": versions,
-                                   "env": {n: os.environ.get(n) for n in PRECONDITION_ENV}}}
+    report = probe_header(args.preset, args.seed_id, args.steps, horizons.tolist(), env,
+                          probe_provenance(commit, dirty, args.argv, versions, os.environ,
+                                           cpu_model()))
     arrays: dict[str, np.ndarray] = {}
     for system in systems:
         t0 = time.time()
@@ -1725,7 +1765,8 @@ def run_probe(args: argparse.Namespace) -> int:
             groups[group] = group_report(parts, args.steps, gof_threshold, ref_column=ref_column,
                                          long_columns=long_columns, limit=cfg.linear_regime_rms)
         p0 = [p0_report(stored[arm].get("systems", {}).get(system) or {}, specs, segments, arm,
-                        lm_summary) for arm in args.steps if arm in stored]
+                        lm_summary, arm_identity(stored[arm])) for arm in args.steps
+              if arm in stored]
         print(f"{system}: groups and P0 done ({time.time() - t0:.0f}s)", flush=True)
         report["systems"][system] = {"groups": groups, "p0": p0, "seconds": time.time() - t0,
                                      "segments": [s.name for s in specs]}

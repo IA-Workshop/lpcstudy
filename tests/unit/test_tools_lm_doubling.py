@@ -244,9 +244,12 @@ def probe_with_tail(tail: float | None, arms: tuple = (15, 30, 60)) -> dict:
     block = provenance_block()
     return {"preset": "pilot", "seed_id": "DEV-0", "levels": [15, 30, 60, 120],
             "provenance": {"commit": block["commit"], "dirty": False, "packages": block["packages"],
-                           "env": block["env"], "argv": ["probe"]},
+                           "env": block["env"], "argv": ["probe"], "cpu": block["cpu"]["model"]},
             "systems": {"lorenz63": {"groups": {"H3c": {"tail_ratio": tail}},
-                                     "p0": [{"arm": k, "mismatches": []} for k in arms]}}}
+                                     "p0": [{"arm": k, "mismatches": [],
+                                             "arm_identity": {"start_utc": block["start_utc"],
+                                                              "end_utc": block["end_utc"]}}
+                                            for k in arms]}}}
 
 
 def test_build_comparison_h3c_arithmetic_and_projection() -> None:
@@ -1054,12 +1057,14 @@ def test_compare_cli_prints_the_table_and_returns_the_halt_code(tmp_path: Path,
 # ------------------------------------------------------------------ environment preconditions
 def provenance_block(threads: str = "8", commit: str = "abc", xla: str | None = None,
                      jax: str = "0.11.2", cpu: str = "Intel i9", dirty: bool | None = False,
-                     seed_id: str = "DEV-0", preset: str = "pilot") -> dict:
+                     seed_id: str = "DEV-0", preset: str = "pilot",
+                     start: str = "2026-10-12T10:00:00Z") -> dict:
     """A recorded provenance block of the stored shape (``env``, ``packages``, ``cpu``, ...)."""
     env = {name: threads for name in lm.THREAD_VARIABLES}
     env.update(LPC_THREADS=threads, XLA_FLAGS=xla, JAX_PLATFORMS="cpu")
     return {"env": env, "commit": commit, "dirty": dirty, "cpu": {"model": cpu},
-            "seed_id": seed_id, "preset": preset, "packages": {"jax": jax, "jaxlib": jax}}
+            "seed_id": seed_id, "preset": preset, "packages": {"jax": jax, "jaxlib": jax},
+            "start_utc": start, "end_utc": "2026-10-12T11:00:00Z"}
 
 
 def test_precondition_mismatches_name_each_difference() -> None:
@@ -1076,6 +1081,9 @@ def test_precondition_mismatches_name_each_difference() -> None:
         "jax: recorded '0.11.2', here '0.11.3'"]
     assert check(provenance_block(), commit="def") == ["commit: recorded 'abc', here 'def'"]
     assert check(provenance_block(), commit=None) == ["commit: recorded 'abc', here None"]
+    for dirty in (True, None):   # a tree that was dirty, or not recorded, cannot be reproduced
+        got = check(provenance_block(dirty=dirty))
+        assert len(got) == 1 and got[0].startswith("dirty: the arm was run from a tree recorded as")
     assert check({}) == ["no env block in the recorded provenance"]
     missing = provenance_block()
     del missing["env"]["NPROC"]
@@ -1110,6 +1118,10 @@ def test_pairing_problems_list_what_differs_between_arms() -> None:
         "preset: None at 15, 'pilot' at 30", "commit: None at 15, 'abc' at 30",
         "cpu: None at 15, 'Intel i9' at 30", "LPC_THREADS: None at 15, '8' at 30",
         "jax: None at 15, '0.11.2' at 30", "jaxlib: None at 15, '0.11.2' at 30"]
+    assert lm.pairing_problems(arms_of(clean(), clean(xla="--xla_cpu_x"))) == [
+        "XLA_FLAGS: None at 15, '--xla_cpu_x' at 30"]
+    assert lm.pairing_problems(arms_of(clean(), clean(cpu="Other CPU"))) == [
+        "cpu: 'Intel i9' at 15, 'Other CPU' at 30"]
     assert lm.pairing_problems(arms_of(clean(seed_id="DEV-1"), clean(preset="smoke"))) == [
         "seed_id: 'DEV-1' at 15, 'DEV-0' at 30", "preset: 'pilot' at 15, 'smoke' at 30"]
 
@@ -1165,6 +1177,23 @@ def test_probe_problems_one_case_per_condition() -> None:
         "the probe's LPC_THREADS is '4', the arms' is ['8']"]
     jax = changed(**{"provenance.packages": {"jax": "0.11.3", "jaxlib": "0.11.2"}})
     assert lm.probe_problems(jax, arms) == ["the probe's jax is '0.11.3', the arms' is ['0.11.2']"]
+    xla = changed(**{"provenance.env": {**probe["provenance"]["env"], "XLA_FLAGS": "--x"}})
+    assert lm.probe_problems(xla, arms) == ["the probe's XLA_FLAGS is '--x', the arms' is ['None']"]
+    cpu = changed(**{"provenance.cpu": "Other CPU"})
+    assert lm.probe_problems(cpu, arms) == ["the probe's cpu is 'Other CPU', the arms' is ['Intel i9']"]
+    no_cpu = changed(**{"provenance.cpu": None})
+    assert len(lm.probe_problems(no_cpu, arms)) == 1
+    # a P0 made against other directories of the same commit: the arm identity must be this arm's
+    other_run = {k: {"provenance": provenance_block(start="2026-10-12T09:00:00Z")} for k in (15, 30, 60)}
+    wrong = lm.probe_problems(probe, other_run)
+    assert len(wrong) == 3 and all("was made against another run of that arm" in w for w in wrong)
+    swapped = {15: arms[15], 30: {"provenance": provenance_block(start="x")}, 60: arms[60]}
+    assert len(lm.probe_problems(probe, swapped)) == 1
+    unrecorded = {k: {"provenance": {**provenance_block(), "start_utc": None}} for k in (15, 30, 60)}
+    assert len(lm.probe_problems(probe, unrecorded)) == 3
+    unrecorded_p0 = changed(**{"systems": {"lorenz63": {"groups": {}, "p0": [
+        {"arm": k, "mismatches": []} for k in (15, 30, 60)]}}})
+    assert len(lm.probe_problems(unrecorded_p0, arms)) == 3
     # a probe run without --results has no P0; a P0 with a mismatch, or for fewer arms, is refused
     none = changed(**{"systems": {"lorenz63": {"groups": {}, "p0": []}}})
     assert lm.probe_problems(none, arms) == [
@@ -1263,3 +1292,69 @@ def test_render_probe_prints_every_group_and_the_p0_outcome(tmp_path: Path,
     probe_file.write_text(json.dumps(probe))
     assert lm.main(["compare", *arms, "--probe", str(probe_file)]) == 1
     assert "Part A (per estimate)" in capsys.readouterr().out
+
+
+def test_k6a_states_left_out_of_the_standard_errors_are_counted() -> None:
+    """A state with no valid draw and the remainder of the blocks of 5 are reported, not hidden.
+
+    Seven states of three draws: state 0 has all three draws replaced (no valid draw), so it is left
+    out of the SEs (its three draws are in ``n_excluded``); 7 states give one block of 5 and a remainder of 2.
+    """
+    flags = {60: np.zeros((7, 3), dtype=bool)}
+    flags[60][0, :] = True
+    stats = lm.doubling_stats([seg(np.full((7, 3), 0.5), replaced=flags)], 15, 30)
+    assert (stats["n"], stats["n_excluded"]) == (18, 3)
+    assert (stats["n_states_no_valid_draw"], stats["n_states_dropped_from_blocks"]) == (1, 2)
+
+
+@pytest.mark.parametrize("dirty", [True, None])
+def test_probe_refuses_a_dirty_tree_before_any_work(dirty: bool | None, tmp_path: Path,
+                                                    monkeypatch: pytest.MonkeyPatch,
+                                                    capsys: pytest.CaptureFixture[str]) -> None:
+    """The probe returns 64 when git says the tree is dirty (or git fails), before the study is built.
+
+    The environment already equals ``thread_environment`` (so no re-exec), no preset is active, the
+    lock is free, and ``Study`` is replaced by a function that fails the test if it is reached.
+    """
+    import lpcstudy.pipeline as pipeline
+
+    def unreachable(*args, **kwargs):
+        raise AssertionError("the study must not be built from a dirty tree")
+
+    monkeypatch.setattr(pipeline, "Study", unreachable)
+    for name, value in lm.thread_environment({"LPC_THREADS": "4"}).items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("XLA_FLAGS", raising=False)
+    monkeypatch.setenv("LPC_GPU_LOCK", str(tmp_path / "lock"))
+    monkeypatch.setattr(lm, "running_presets", lambda: [])
+    monkeypatch.setattr(lm, "git_dirty", lambda: dirty)
+    out = tmp_path / "out"
+    code = lm.main(["probe", "--preset", "smoke", "--seed-id", "DEV-0", "--out", str(out),
+                    "--steps", "15", "30"])
+    assert code == 64 and "working tree is not clean" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_probe_file_records_its_provenance() -> None:
+    """The head of a probe file holds the commit, tree state, argv, packages, CPU and environment.
+
+    Reference: the arguments typed here; ``probe_problems`` reads exactly these keys, so a probe
+    built by ``probe_header`` and ``probe_provenance`` is accepted against arms recorded by the same
+    run (``provenance_block``), and the label carries the seed id.
+    """
+    block = provenance_block()
+    environ = {**block["env"], "UNRELATED": "x"}
+    provenance = lm.probe_provenance("abc", False, ["probe", "--preset", "pilot"], block["packages"],
+                                     environ, "Intel i9")
+    assert provenance == {"commit": "abc", "dirty": False, "argv": ["probe", "--preset", "pilot"],
+                          "packages": block["packages"], "cpu": "Intel i9",
+                          "env": {n: environ.get(n) for n in lm.PRECONDITION_ENV}}
+    assert "UNRELATED" not in provenance["env"]
+    header = lm.probe_header("pilot", "DEV-0", [15, 30, 60, 120], [30, 60, 120], block["env"],
+                             provenance)
+    assert header["provenance"] == provenance and header["seed_id"] == "DEV-0"
+    assert header["label"].startswith("DEVELOPMENT (DEV-0):") and header["halt"] == []
+    header["systems"] = probe_with_tail(0.25)["systems"]
+    arms = {k: {"provenance": block} for k in (15, 30, 60)}
+    assert lm.probe_problems(header, arms) == []
+    assert lm.arm_identity(arms[15]) == {"start_utc": block["start_utc"], "end_utc": block["end_utc"]}
