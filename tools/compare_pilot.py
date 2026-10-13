@@ -73,11 +73,15 @@ the largest M 0.0 and ``used_M`` = ``n_oracle_draws``; V5 ``km_max_abs_dev`` the
 V7 ``n_states`` = ``n_test_sweep``). The D3 standard errors of the two runs are taken
 from the arms given by ``--d3-arms`` (default ``REDRAWN_D3_ARMS``): ``away`` (both arms facing
 away from the other estimate, symmetric under swapping the runs; the mathematician's
-recommendation, a WORKING DEFAULT pending the owner's ruling O4), ``half-width`` (``(hi - lo) /
+recommendation, adopted by the owner's ruling O4, DEC-0027), ``half-width`` (``(hi - lo) /
 (2 z)`` for both) or ``delta-side`` (the rule of DEC-0019 as implemented for D3 without this
-flag). O4 rules on BOTH arms: ``away`` keeps SE_new as implemented (the arm facing away from the
-older run, which closes the open item of DEC-0020) and CHANGES SE_old, from the arm on the side of
-the difference (facing the new run) to the arm facing away.
+flag). DEC-0027 (the owner's ruling O4) rules on BOTH arms: ``away`` keeps SE_new as implemented
+(the arm facing away from the older run, which closes the open item of DEC-0020) and CHANGES SE_old,
+from the arm on the side of the difference (facing the new run) to the arm facing away. Triage order
+of DEC-0027 (mathematics check M5(a)): a D3 excess with |delta| / sqrt(SE_old^2 + SE_new^2) above
+2 z_B is a defect candidate that needs a root cause before the reference is accepted; between z_B
+and 2 z_B it is listed as consistent with the variance that the bootstraps do not capture, unless
+several fall in one chain. A V4 failure at P1 is referred to the owner, never retuned.
 
 What the tool does NOT check (the report says so in a fixed section; use ``tools/leafdiff.py`` on
 the P1 and P0 ``results.json`` files): R-a against P0 (no exit 2 and no structure finding; the leaf
@@ -161,7 +165,7 @@ them in a fixed section. ``tools/leafdiff.py`` compares two ``results.json`` fil
 D3_ARMS = ("delta-side", "away", "half-width")
 REDRAWN_D3_ARMS = "away"
 """The D3 standard-error arms of ``--redrawn-states`` (WU-0002.14, M5(b)): both arms facing away from
-the other estimate. A WORKING DEFAULT pending the owner's ruling O4, which rules on BOTH arms: SE_new
+the other estimate. Adopted by the owner's ruling O4 (DEC-0027), which rules on BOTH arms: SE_new
 is as implemented (the arm facing away from the older run; this closes the open item of DEC-0020)
 and SE_old CHANGES, from the arm on the side of the difference (facing the new run, the reading of
 the DEC-0019 text) to the arm facing away. The alternatives are ``half-width`` and ``delta-side``."""
@@ -742,6 +746,7 @@ def _build_rules() -> list[Rule]:
                "n_w_one,n_w_zero,part_i_reason,part_i_verdict,part_ii/**,part_ii_verdict,"
                "range_by_span/**,range_n_failed_resamples,reason,verdict}", "WU-0002.6, .9, .11",
                "D-25(a), D-25(b)", "parts, counts and verdicts"))
+    add(_rules("new", f"{h2a}/ci_mc_se/[]", "WU-0008.2a", "WU-0008", "Monte Carlo error of the interval endpoints (reported only)"))
     # ---- H2b --------------------------------------------------------------------------------
     h2b = f"{S}/H2b"
     add(_rules("unchanged", f"{h2b}/noise/{{mean_state_spearman,pass,monotone_medians}}",
@@ -761,6 +766,7 @@ def _build_rules() -> list[Rule]:
                "reason,verdict} "
                f"{h2b}/noise/{{n_constant_states,n_dropped_resamples,n_failed_resamples,reason,"
                "verdict}", "WU-0002.7, .9, .9b, .11", "D-05, DEF-0019", "H2b(ii), counts, verdicts"))
+    add(_rules("new", f"{h2b}/noise/ci_mc_se/[]", "WU-0008.2a", "WU-0008", "Monte Carlo error of the interval endpoints (reported only)"))
     # ---- H2c --------------------------------------------------------------------------------
     h2c = f"{S}/H2c"
     add(_rules("unchanged", f"{h2c}/A4_minus_A2/{{mean,pass}}", chain="network",
@@ -845,6 +851,7 @@ def _build_rules() -> list[Rule]:
     add(_rules("unchanged", f"{h3c}/threshold", item=smoke, reason="bound 1.05"))
     add(_rules("new", f"{h3c}/{{ci/[],level,n_failed_resamples,n_states,reason,verdict}}",
                "WU-0002.8, .9, .11", "D-10", "interval, counts, verdict"))
+    add(_rules("new", f"{h3c}/ci_mc_se/[]", "WU-0008.2a", "WU-0008", "Monte Carlo error of the interval endpoints (reported only)"))
     # ---- regime curve (moved from v1 H3b) -------------------------------------------------
     add(_rules("unchanged", f"{S}/regime_curve/realized_K/*", chain="network", discrete=True,
                item="R2", reason="trees do not change (moved from v1 H3b)"))
@@ -1987,8 +1994,12 @@ def _d_lines(rep: DReport, branch_note: str) -> list[str]:
                     "half-width": "half-width (hi - lo) / (2 z) for both",
                     "delta-side": "the arm on the side of the difference (DEC-0019 as implemented)"}
         out += [(f"D3 standard-error arms: {rep.arms} ({arm_note[rep.arms]})"
-                 + (" -- WORKING DEFAULT pending the owner's ruling O4 on both arms (SE_new as "
-                    "implemented, which closes the DEC-0020 item; SE_old changes)"
+                 + (" -- owner ruling O4, DEC-0027: both arms facing away (SE_new as implemented, "
+                    "which closes the DEC-0020 item; SE_old changes). Triage order of M5(a): an "
+                    "excess above 2 z_B is a defect candidate needing a root cause; between z_B "
+                    "and 2 z_B it is listed as consistent with the variance the bootstraps do "
+                    "not capture, unless several fall in one chain; a V4 failure is referred to "
+                    "the owner, never retuned"
                     if rep.i1 is not None and rep.arms == REDRAWN_D3_ARMS else "")), ""]
         out += [(f"D3 (m = {len(rep.d3)} statistics with intervals in both runs; z_B = "
                 f"{rep.d3_z!r}):"), ""]

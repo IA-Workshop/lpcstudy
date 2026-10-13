@@ -1689,7 +1689,8 @@ def test_cli_redrawn_states_with_equal_context_forces_branch_d_and_passes(tmp_pa
     assert "- branch: D (forced by --redrawn-states" in text
     assert "- state sample redrawn by design (WU-0002.14)" in text
     assert "mode: D3" in text and "I1 (--redrawn-states): 4 context leaves of the pilot, 4 bitwise equal" in text
-    assert "D3 standard-error arms: away" in text and "WORKING DEFAULT pending the owner's ruling O4" in text
+    assert "D3 standard-error arms: away" in text and "WORKING DEFAULT" not in text
+    assert "owner ruling O4, DEC-0027" in text and "never retuned" in text
     assert "NOT checked by this tool" in text and "tools/leafdiff.py" in text
     for line in cp.REDRAWN_NOT_CHECKED:
         assert f"- {line}" in text
@@ -1701,7 +1702,7 @@ def test_cli_redrawn_states_with_equal_context_forces_branch_d_and_passes(tmp_pa
                    "every other added or removed leaf is a finding"):
         assert phrase in r_a, phrase
     assert "exactly the 24 start leaves" in cp.__doc__
-    assert "on both arms" in text
+    assert "SE_old changes" in text
     assert "m = 1 statistics with intervals in both runs" in text
 
 
@@ -1920,3 +1921,42 @@ def test_clip_sensitivity_block_is_new_and_changes_no_other_status() -> None:
     plain = by_path(sides(old_tree(), new_tree())[2])
     assert {k: v.status for k, v in found.items() if "/clip_sensitivity/" not in k} == \
         {k: v.status for k, v in plain.items()}
+
+
+# --------------------------------------- WU-0008.2a ci_mc_se leaves at pilot size (fix round 3)
+CI_MC_SE_PATHS = [f"systems/{system}/{where}/ci_mc_se/[{i}]"
+                  for system in ("chua", "lorenz63", "rossler")
+                  for where in ("H2a", "H2b/noise", "H3c") for i in (0, 1)]
+
+
+def test_the_eighteen_ci_mc_se_leaves_of_the_pilot_have_exactly_one_new_rule() -> None:
+    """The top-level ``ci_mc_se`` of H2a, H2b(i) and H3c (WU-0008.2a; the pilot P0 showed 18 leaves
+    with no rule, exit 2) match exactly one rule each, of class ``new``.
+
+    Reference: the 18 paths listed by hand from the P0 error message (3 systems x {H2a, H2b/noise, H3c}
+    x two endpoints). The ``part_ii`` and ``library_change`` ``ci_mc_se`` leaves keep their tail rules
+    (checked on hand paths), and a path under another key stays unclassified. Exact.
+    """
+    assert len(CI_MC_SE_PATHS) == 18
+    for path in CI_MC_SE_PATHS:
+        found = cp.TABLE.matches(p(path))
+        assert len(found) == 1 and found[0].cls == "new" and found[0].sub == "WU-0008.2a", path
+    for path in ("systems/chua/H2a/part_ii/zero/ci_mc_se/[0]",
+                 "systems/rossler/H2b/library_change/ci_mc_se/[1]",
+                 "systems/lorenz63/H2b/library_change_reported/0.02/ci_mc_se/[0]"):
+        found = cp.TABLE.matches(p(path))
+        assert len(found) == 1 and found[0].cls == "new", path
+    assert cp.TABLE.matches(p("systems/chua/H1b/ci_mc_se/[0]")) == []
+
+
+def test_a_tree_with_the_ci_mc_se_leaves_compares_without_an_unclassified_leaf() -> None:
+    """``compare_leaves`` on a new tree that carries the 18 leaves (and none in the old) raises no
+    ``Unclassified`` and gives status ``new`` for each. Reference: hand-built tree."""
+    new = new_tree()
+    system = new["systems"]["lorenz63"]
+    system["H2a"] = {"ci_mc_se": [0.01, 0.02]}
+    system["H2b"] = {"noise": {"ci_mc_se": [None, 0.03]}}
+    system["H3c"] = {"ci_mc_se": [0.1, 0.2]}
+    results = by_path(sides(old_tree(), new)[2])
+    for path in [x for x in CI_MC_SE_PATHS if "lorenz63" in x]:
+        assert results[path].status == "new", path
