@@ -80,10 +80,12 @@ older run, which closes the open item of DEC-0020) and CHANGES SE_old, from the 
 the difference (facing the new run) to the arm facing away.
 
 What the tool does NOT check (the report says so in a fixed section; use ``tools/leafdiff.py`` on
-the P1 and P0 ``results.json`` files): R-a against P0 (the leaf set equals P0's plus the start
-leaves, except the K-shaped ``H3a`` lists, whose lengths must match P1's ``H3a.chosen_K``, and
-``H2c`` ``A4_minus_<best_single>`` when ``best_single`` flips; any other added or removed leaf is a
-finding); the P0 half of R-b (the digests, ``lyapunov_orbit_max_abs`` and
+the P1 and P0 ``results.json`` files): R-a against P0 (no exit 2 and no structure finding; the leaf
+set equals P0's plus exactly the 24 start leaves, except (i) the K-shaped ``H3a`` lists, whose
+lengths must be those implied by P1's ``H3a.chosen_K``: K for ``iqr_lt`` and ``n_per_regime``, K-1
+for ``pairs``, ``logrank_p_raw`` and ``logrank_p_holm``, and (ii) ``H2c`` ``A4_minus_<best_single>``
+given P1's ``H2c.best_single``; every other added or removed leaf is a finding, and each exception is
+listed with its cause); the P0 half of R-b (the digests, ``lyapunov_orbit_max_abs`` and
 ``trajectory_max_abs.statistics`` bitwise equal to P0's); R-c (``trajectory_max_abs.{main,estimator}``
 at most B); R-g (verdict flips against the baseline); R-h (sentinels nonzero in P1 and zero in P0).
 An exit code of 0 is therefore not "P1 passes". A D3 excess is a statistic to triage, not an error of the code: with the state sample
@@ -144,9 +146,11 @@ FALLBACK_CONSTANTS: dict = {
 
 REDRAWN_REASON = "state sample redrawn by design (WU-0002.14)"
 REDRAWN_NOT_CHECKED = (
-    "R-a against P0: the leaf set equals P0's plus the start leaves, except the K-shaped H3a lists "
-    "(their length must match P1's H3a.chosen_K) and H2c A4_minus_<best_single> when best_single "
-    "flips; any other added or removed leaf is a finding",
+    "R-a against P0: no exit 2 and no structure finding; the leaf set equals P0's plus exactly the "
+    "24 start leaves, except (i) the K-shaped H3a lists (iqr_lt and n_per_regime have length K; "
+    "pairs, logrank_p_raw and logrank_p_holm have length K-1), whose lengths must be those implied "
+    "by P1's H3a.chosen_K, and (ii) H2c A4_minus_<best_single> given P1's H2c.best_single; every "
+    "other added or removed leaf is a finding, and each exception is listed with its cause",
     "R-b, P0 half: the digests, lyapunov_orbit_max_abs and trajectory_max_abs.statistics bitwise "
     "equal to P0's",
     "R-c: trajectory_max_abs.main and .estimator at most B for every system",

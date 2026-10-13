@@ -106,15 +106,64 @@ must pass a ``make_rng(...)`` call or a generator-valued name, never an integer 
 value: the integer path of ``block_resample_indices`` has no production caller (plan, P4)."""
 
 
-def _is_seed(node: ast.expr) -> bool:
-    """True for a seed-named variable or an attribute named ``seed`` (``config.seed``)."""
+def _is_seed(node: ast.AST) -> bool:
+    """True for a seed-named variable, an attribute named ``seed`` (``config.seed``), or
+    ``getattr(x, "seed")``."""
+    if isinstance(node, ast.Call) and _callee(node) == "getattr" and len(node.args) >= 2 \
+            and isinstance(node.args[1], ast.Constant) and node.args[1].value == "seed":
+        return True
     return (isinstance(node, ast.Name) and node.id in SEED_NAMES) or (
         isinstance(node, ast.Attribute) and node.attr == "seed")
 
 
-def _mentions_seed(node: ast.AST) -> bool:
-    """True if a seed-named variable occurs anywhere in the expression."""
-    return any(_is_seed(n) for n in ast.walk(node))
+def _mentions_seed(node: ast.AST, taint: frozenset = frozenset()) -> bool:
+    """True if a seed-named variable, or a name tainted by an assignment from a seed, occurs anywhere
+    in the expression."""
+    return any(_is_seed(n) or (isinstance(n, ast.Name) and n.id in taint) for n in ast.walk(node))
+
+
+def _seed_valued(node: ast.AST, taint: frozenset) -> bool:
+    """True if the expression IS a seed (not a generator built from one): a seed, a tainted name,
+    ``int(...)`` of one, a call of a tainted lambda, or a conditional with such a branch."""
+    if _is_seed(node) or (isinstance(node, ast.Name) and node.id in taint):
+        return True
+    if isinstance(node, ast.Call):
+        if _callee(node) == "int" and len(node.args) == 1:
+            return _seed_valued(node.args[0], taint)
+        return isinstance(node.func, ast.Name) and node.func.id in taint
+    if isinstance(node, ast.IfExp):
+        return _seed_valued(node.body, taint) or _seed_valued(node.orelse, taint)
+    return False
+
+
+def _taints(tree: ast.AST, owner: dict) -> dict[str, frozenset]:
+    """Per function: the names assigned (to a fixed point) from a seed-valued expression or from a
+    lambda whose body is seed-valued; tuple assignments are read pairwise."""
+    taint: dict[str, set] = {}
+    for _ in range(4):
+        changed = False
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr)):
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            value = node.value
+            if value is None:
+                continue
+            pairs = [(targets[0], value)] if len(targets) == 1 else [(t, value) for t in targets]
+            if len(targets) == 1 and isinstance(targets[0], ast.Tuple) and isinstance(value, ast.Tuple) \
+                    and len(targets[0].elts) == len(value.elts):
+                pairs = list(zip(targets[0].elts, value.elts))
+            scope = taint.setdefault(owner[node], set())
+            frozen = frozenset(scope)
+            for target, val in pairs:
+                body = val.body if isinstance(val, ast.Lambda) else val
+                if isinstance(target, ast.Name) and _seed_valued(body, frozen) \
+                        and target.id not in scope:
+                    scope.add(target.id)
+                    changed = True
+        if not changed:
+            break
+    return {k: frozenset(v) for k, v in taint.items()}
 
 
 def _is_generator_draw(node: ast.expr) -> bool:
@@ -131,24 +180,52 @@ def _callee(call: ast.Call) -> str | None:
     return func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
 
 
-def _is_random_attribute(node: ast.AST, roots: tuple[str, ...]) -> bool:
-    """True for ``<root>.random`` (``np.random``, ``jax.random``) as an attribute chain."""
-    return (isinstance(node, ast.Attribute) and node.attr == "random"
-            and isinstance(node.value, ast.Name) and node.value.id in roots)
+RANDOM_LEAVES = frozenset({"key", "wrap_key_data", "PRNGKey"})
+"""``jax.random`` functions that build a key from an integer (outside a Generator draw)."""
+
+
+def _aliases(tree: ast.AST) -> dict[str, str]:
+    """Names bound to ``numpy``, ``jax`` or their ``random`` modules by ``import ... as``. The plain
+    names ``np``, ``numpy`` and ``jax`` are always roots (a source may use them without importing)."""
+    roots = {"np": "numpy", "numpy": "numpy", "jax": "jax"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.split(".")[0] in ("numpy", "jax"):
+                    roots[alias.asname or alias.name.split(".")[0]] = \
+                        alias.name if alias.asname else alias.name.split(".")[0]
+    return roots
+
+
+def _resolve(node: ast.AST, roots: dict[str, str]) -> str | None:
+    """The dotted name of an attribute chain rooted at a numpy or jax alias, else ``None``."""
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name) and node.id in roots:
+        return ".".join([roots[node.id], *reversed(parts)])
+    return None
 
 
 def scan_bypass(sources: dict[str, str]) -> tuple[set[tuple[str, str]], list[str]]:
     """Find the ``default_rng`` sites and the other bypasses of ``make_rng`` in module sources.
 
     Findings (the second element): seed arithmetic of any shape and depth (``seed + 1``,
-    ``seed * 2 + 1``, ``config.seed - 1``); a seed-named value passed as an argument to a callee
-    outside ``SEED_CONSUMERS`` (a pass-through function of ``PASS_THROUGH`` excepted); an integer
-    constant or a seed-named value in the generator position of a bootstrap helper (the integer
-    path); ``np.random`` attributes other than ``Generator`` and ``default_rng``; ``getattr`` on
-    ``np.random``; ``import random``, ``from random import``, ``from numpy.random import``,
-    ``from numpy import random``, ``import numpy.random`` and ``from jax import random``;
-    ``jax.random.key`` and ``wrap_key_data``; ``PRNGKey`` arguments that are not Generator draws;
-    a ``random_state=`` that is not a ``sklearn_seed`` call. Modules named ``seeds.py`` (the seed
+    ``seed * 2 + 1``, ``config.seed - 1``); a seed passed as an argument to a callee outside
+    ``SEED_CONSUMERS`` (a pass-through function of ``PASS_THROUGH`` excepted), also when it reaches
+    the call through an intermediate name (``base = config.seed``), a lambda (``g = lambda:
+    config.seed``) or ``getattr(config, "seed")``; an integer constant or a seed in the generator
+    position of a bootstrap helper, or a helper without one (so the integer path of
+    ``block_resample_indices`` has no production caller); ``numpy.random`` attributes other than
+    ``Generator`` and ``default_rng`` under any alias of ``numpy`` (``import numpy as xp``);
+    a ``numpy.random`` or ``jax.random`` module, or ``jax.random.key``/``wrap_key_data``/
+    ``PRNGKey``, bound to a name (``r = np.random``, ``P = jax.random.PRNGKey``); ``getattr`` on
+    a numpy or jax name or with the attribute ``seed``/``random``/``default_rng``/``key``;
+    ``import random``, ``import numpy.random``, ``from numpy.random import``, ``from numpy import
+    random``, ``from jax import random``, ``from jax.random import``; ``jax.random.key`` (also
+    through ``import jax.random as jr``); ``PRNGKey`` arguments that are not Generator draws; a
+    ``random_state=`` that is not a ``sklearn_seed`` call. Modules named ``seeds.py`` (the seed
     registry) are exempt from the seed-argument and arithmetic rules.
 
     Returns
@@ -162,6 +239,12 @@ def scan_bypass(sources: dict[str, str]) -> tuple[set[tuple[str, str]], list[str
         tree = ast.parse(source)
         owner = _enclosing(tree)
         registry = module == "seeds.py"
+        roots = _aliases(tree)
+        taints = _taints(tree, owner)
+        parent: dict[ast.AST, ast.AST] = {}
+        for node in ast.walk(tree):
+            for child in ast.iter_child_nodes(node):
+                parent[child] = node
         draws: dict[tuple[str, str], bool] = {}  # (function, name) -> assigned only from draws
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign) and len(node.targets) == 1 \
@@ -170,17 +253,17 @@ def scan_bypass(sources: dict[str, str]) -> tuple[set[tuple[str, str]], list[str
                 draws[key] = draws.get(key, True) and _is_generator_draw(node.value)
         for node in ast.walk(tree):
             where = f"{module}:{getattr(node, 'lineno', '?')}"
+            taint = taints.get(owner.get(node, "<module>"), frozenset())
             if isinstance(node, ast.Call):
                 callee = _callee(node)
                 here = (module, owner[node])
                 if callee == "default_rng":
                     sites.add(here)
-                if callee in ("key", "wrap_key_data") and isinstance(node.func, ast.Attribute) \
-                        and _is_random_attribute(node.func.value, ("jax",)):
-                    problems.append(f"{where} jax.random.{callee}")
-                if callee == "getattr" and node.args and any(
-                        _is_random_attribute(n, ("np", "numpy", "jax")) for n in ast.walk(node.args[0])):
-                    problems.append(f"{where} getattr on a random module")
+                if callee == "getattr" and node.args and (
+                        any(isinstance(n, ast.Name) and n.id in roots for n in ast.walk(node.args[0]))
+                        or (len(node.args) > 1 and isinstance(node.args[1], ast.Constant)
+                            and node.args[1].value in ({"seed", "random", "default_rng"} | RANDOM_LEAVES))):
+                    problems.append(f"{where} getattr on a random module or on a seed")
                 if callee == "PRNGKey":
                     arg = node.args[0] if len(node.args) == 1 and not node.keywords else None
                     ok = arg is not None and (
@@ -195,7 +278,8 @@ def scan_bypass(sources: dict[str, str]) -> tuple[set[tuple[str, str]], list[str
                 if not registry:
                     direct = [a for a in node.args] + [k.value for k in node.keywords]
                     for arg in direct:
-                        if _is_seed(arg) and callee not in SEED_CONSUMERS and here not in PASS_THROUGH \
+                        if _seed_valued(arg, taint) and callee not in SEED_CONSUMERS \
+                                and here not in PASS_THROUGH \
                                 and not (callee == "default_rng" and here in DEFAULT_RNG_ALLOWLIST) \
                                 and module != "statistics.py":
                             problems.append(f"{where} seed passed to {callee}")
@@ -207,25 +291,39 @@ def scan_bypass(sources: dict[str, str]) -> tuple[set[tuple[str, str]], list[str
                         problems.append(f"{where} {callee} without a generator argument")
                     for arg in given:
                         integer = isinstance(arg, ast.Constant) and isinstance(arg.value, int)
-                        if integer or (_mentions_seed(arg) and not (
+                        if integer or (_mentions_seed(arg, taint) and not (
                                 isinstance(arg, ast.Call) and _callee(arg) == "make_rng")) and \
                                 module != "statistics.py" and here not in PASS_THROUGH:
                             problems.append(f"{where} integer or seed-named generator argument "
                                             f"of {callee}")
             elif (isinstance(node, ast.BinOp) or (isinstance(node, ast.UnaryOp) and isinstance(
                     node.op, (ast.USub, ast.UAdd, ast.Invert)))) and not registry \
-                    and _mentions_seed(node):
+                    and _mentions_seed(node, taint):
                 problems.append(f"{where} seed arithmetic")
-            elif isinstance(node, ast.Attribute) and node.attr not in ("Generator", "default_rng") \
-                    and _is_random_attribute(node.value, ("np", "numpy")):
-                problems.append(f"{where} np.random.{node.attr}")
+            elif isinstance(node, ast.Attribute):
+                dotted = _resolve(node, roots)
+                up = parent.get(node)
+                is_link = isinstance(up, ast.Attribute) and up.value is node
+                if dotted is None or is_link:
+                    pass
+                elif dotted.startswith("numpy.random.") and dotted.rsplit(".", 1)[1] not in (
+                        "Generator", "default_rng"):
+                    problems.append(f"{where} {dotted}")
+                elif dotted in ("numpy.random", "jax.random"):
+                    problems.append(f"{where} {dotted} used as a value (bound to a name)")
+                elif dotted.startswith("jax.random.") and dotted.rsplit(".", 1)[1] in RANDOM_LEAVES:
+                    called = isinstance(up, ast.Call) and up.func is node
+                    if dotted.endswith(("key", "wrap_key_data")):
+                        problems.append(f"{where} {dotted}")
+                    elif not called:
+                        problems.append(f"{where} {dotted} bound to a name")
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     if alias.name == "random" or alias.name.startswith(("random.", "numpy.random")):
                         problems.append(f"{where} import {alias.name}")
             elif isinstance(node, ast.ImportFrom):
                 if node.module and (node.module == "random" or node.module.startswith(
-                        ("numpy.random", "random."))):
+                        ("numpy.random", "random.", "jax.random"))):
                     problems.append(f"{where} from {node.module} import")
                 elif node.module in ("numpy", "jax") and any(a.name == "random" for a in node.names):
                     problems.append(f"{where} from {node.module} import random")
@@ -330,6 +428,30 @@ def test_bypass_scan_flags_every_bypass_and_passes_the_good_forms() -> None:
         "seed_negated": "x = -seed",
         "random_state_const": "M(random_state=0)",
         "random_state_seed": "M(random_state=config.seed)",
+        # re-review R9: indirect forms
+        "seed_via_name": ("def f(c):\n    base = c.seed\n"
+                          "    return block_bootstrap_counted(s, 5, 10, 5, base, .95)"),
+        "seed_via_name_other_callee": "def f(c):\n    base = c.seed\n    return helper(base)",
+        "seed_via_int_name": ("def f(c):\n    base = int(c.seed)\n"
+                              "    return bootstrap_values(s, 5, 10, 5, base)"),
+        "seed_via_two_names": "def f(c):\n    a = c.seed\n    b = a\n    return helper(b)",
+        "seed_via_lambda": "def f(c):\n    g = lambda: c.seed\n    return helper(g())",
+        "seed_via_tuple": "def f(c):\n    a, b = c.seed, 1\n    return helper(a)",
+        "seed_via_conditional": "def f(c, k):\n    a = c.seed if k else 0\n    return helper(a)",
+        "seed_arithmetic_via_name": "def f(c):\n    a = c.seed\n    return a * 2",
+        "getattr_seed": "def f(c):\n    return helper(getattr(c, 'seed'))",
+        "numpy_alias": "import numpy as xp\nxp.random.seed(0)",
+        "numpy_alias_rand": "import numpy as xp\nx = xp.random.rand(3)",
+        "random_bound": "import numpy as np\nr = np.random\nr.seed(0)",
+        "jax_random_bound": "import jax\nr = jax.random\nk = r.key(0)",
+        "jax_random_alias": "import jax.random as jr\nk = jr.key(0)",
+        "jax_random_alias_wrap": "import jax.random as jr\nk = jr.wrap_key_data(d)",
+        "from_jax_random_key": "from jax.random import key as K\nk = K(0)",
+        "from_jax_random_prng": "from jax.random import PRNGKey as K\nk = K(0)",
+        "prng_bound": "import jax\nP = jax.random.PRNGKey\nk = P(0)",
+        "nested_getattr": ("import numpy as np\n"
+                           "g = getattr(getattr(np, 'random'), 'default_rng')(0)"),
+        "getattr_random_name": "def f(m):\n    return getattr(m, 'default_rng')(0)",
     }
     for name, source in bad.items():
         assert scan_bypass({name: source})[1], f"{name} was not flagged"
@@ -346,7 +468,15 @@ def test_bypass_scan_flags_every_bypass_and_passes_the_good_forms() -> None:
             "    s = sklearn_seed(seed, 'a')\n"
             "    M(random_state=sklearn_seed(config.seed, 'b'))\n"
             "    return block_bootstrap_counted(f, 5, 10, 5, make_rng(config.seed, system, 'y'), .95)\n"
-            "def legal_name(rng):\n    return bootstrap_values(f, 5, 10, 5, rng)\n")
+            "def legal_name(rng):\n    return bootstrap_values(f, 5, 10, 5, rng)\n"
+            "def legal_indirect(config, system):\n"
+            "    base = make_rng(config.seed, system, 'z')\n"
+            "    n = int(config.n)\n"
+            "    return bootstrap_values(f, n, 10, 5, base)\n"
+            "def legal_alias(key):\n"
+            "    import jax.random as jr\n"
+            "    return jr.split(key)\n"
+            "def legal_xp():\n    import numpy as xp\n    return xp.random.Generator\n")
     sites, problems = scan_bypass({"good.py": good})
     assert problems == [] and sites == {("good.py", "make")}
 
@@ -476,6 +606,10 @@ def _domain_of(expr: ast.expr, domains: dict[str, list]) -> list:
                    "(a new purpose must not be left out of the crc32 check)")
 
 
+F_STRING_FIELDS = {"rho": "rho", "other": "rho", "noise": "rho"}
+"""The f-string fields of the label calls and the domain of each (all are noise levels, ``:g``)."""
+
+
 def _expand(parts: list[ast.expr], domains: dict[str, list]) -> list[str]:
     """All label strings of one call site: the product of the domains of its parts."""
     choices = []
@@ -485,9 +619,16 @@ def _expand(parts: list[ast.expr], domains: dict[str, list]) -> list[str]:
             for piece in part.values:
                 if isinstance(piece, ast.Constant):
                     variants = [v + piece.value for v in variants]
-                else:  # FormattedValue: a noise level formatted with :g
+                else:  # FormattedValue: only a noise level formatted with :g is known
                     assert isinstance(piece, ast.FormattedValue), ast.dump(piece)
-                    values = domains["rho"]
+                    field = ast.unparse(piece.value)
+                    spec = "".join(v.value if isinstance(v, ast.Constant) else "?"
+                                   for v in piece.format_spec.values) if piece.format_spec else ""
+                    if field not in F_STRING_FIELDS or spec != "g":
+                        raise KeyError(f"no domain for the f-string field {{{field}:{spec}}}: map it "
+                                       "in F_STRING_FIELDS (an unknown field must not be expanded "
+                                       "over the wrong domain)")
+                    values = domains[F_STRING_FIELDS[field]]
                     variants = [v + format(x, "g") for v in variants for x in values]
             choices.append(variants)
         else:
@@ -545,6 +686,11 @@ def test_label_expansion_flags_an_unknown_part_and_expands_f_strings() -> None:
         _expand(parts, domains)
     (_, _, _, parts), = label_templates(
         {"m.py": "def f(s, system):\n    return make_rng(s, system, f'efficiency-{rho:g}')\n"})
+    for bad_field in ("f'w-{width}'", "f'w-{rho}'", "f'w-{rho:.2f}'"):
+        (_, _, _, parts_bad), = label_templates(
+            {"m.py": f"def f(s, system):\n    return make_rng(s, system, {bad_field})\n"})
+        with pytest.raises(KeyError, match="f-string field"):
+            _expand(parts_bad, domains)
     assert sorted(_expand(parts, domains)) == sorted(
         f"{sys}|efficiency-{rho:g}" for sys in FULL.core_systems
         for rho in sorted({*FULL.noise_levels, *FULL.library_sweep_noises, FULL.core_noise}))

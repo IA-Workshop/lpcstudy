@@ -1693,6 +1693,14 @@ def test_cli_redrawn_states_with_equal_context_forces_branch_d_and_passes(tmp_pa
     assert "NOT checked by this tool" in text and "tools/leafdiff.py" in text
     for line in cp.REDRAWN_NOT_CHECKED:
         assert f"- {line}" in text
+    # the R-a wording of the Log (review R6/R11), pinned: exactly 24 start leaves, K versus K-1
+    r_a = cp.REDRAWN_NOT_CHECKED[0]
+    for phrase in ("exactly the 24 start leaves", "iqr_lt and n_per_regime have length K",
+                   "pairs, logrank_p_raw and logrank_p_holm have length K-1",
+                   "implied by P1's H3a.chosen_K", "H2c A4_minus_<best_single> given P1's H2c.best_single",
+                   "every other added or removed leaf is a finding"):
+        assert phrase in r_a, phrase
+    assert "exactly the 24 start leaves" in cp.__doc__
     assert "on both arms" in text
     assert "m = 1 statistics with intervals in both runs" in text
 
