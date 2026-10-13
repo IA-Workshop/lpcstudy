@@ -49,6 +49,36 @@ def test_smoke_preset_writes_outputs_and_gate_flag(tmp_path: Path) -> None:
     results = json.loads((out_dir / "results.json").read_text())
     assert_handling(results)
     assert_lm_rows(results, (out_dir / "RESULTS.md").read_text().splitlines())
+    assert_clip_sensitivity(results, (out_dir / "RESULTS.md").read_text().splitlines())
+
+
+def assert_clip_sensitivity(results: dict, report_lines: list[str]) -> None:
+    """WU-0002.11e (T6 on the smoke): the clip-sensitivity block is computed and, where no clipped
+    entry feeds a part, that part has delta exactly 0.0, no flag and the same verdict.
+
+    Reference: the definition of the perturbation (a part with no clipped H_ref input is the same
+    computation on the same arrays, so its change is 0.0 bitwise, and a flag that is False implies the
+    verdict at 20 sigma_x equals the verdict); a part that cannot be computed says why and has no flag
+    (never False). The block sits outside ``handling`` and every hypothesis key, and RESULTS.md has
+    the ``clip`` column. Exact.
+    """
+    for name, system in results["systems"].items():
+        block = system["clip_sensitivity"]
+        assert block["status"] == "computed", (name, block["reason"])
+        assert (block["clip_level"], block["perturbed_level"]) == (10.0, 20.0), name
+        assert "clip_sensitivity" not in system["handling"], name
+        parts = [(h, n, part) for h, entry in block["by_hypothesis"].items()
+                 for n, part in entry["parts"].items()]
+        assert parts, name
+        for hypothesis, part_name, part in parts:
+            where = (name, hypothesis, part_name)
+            if part["status"] != "computed":
+                assert part["reason"] and part["flag"] is None, where
+            elif part["n_clipped_inputs"] == 0:
+                assert part.get("delta", part.get("delta_bound")) == 0.0, where
+                assert part["flag"] is False, where
+    header = next(line for line in report_lines if line.startswith("| ID | Hypothesis |"))
+    assert header.endswith("| Verdict | clip |")
 
 
 LM_KEYS = ("median_residual", "p95_residual", "median_iterations", "fraction_no_decrease")
