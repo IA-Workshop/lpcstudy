@@ -410,7 +410,7 @@ STEPS_FLAG = "--estimator-refine-steps"
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "1.5", "x", "", " 15", "15 ", "015", "+15", "1e1",
-                                   "٣"])
+                                   "٣", "1000", "999999999", "9" * 5000])
 def test_k1_bad_refine_value_is_refused_without_echo(value: str, tmp_path: Path,
                                                       capsys: pytest.CaptureFixture[str]) -> None:
     """K1: 0, -1, 1.5, x, "" and the other non-canonical forms give 64, one line, nothing created.
@@ -457,8 +457,8 @@ def test_k1_choose_refine_steps_values() -> None:
     from lpcstudy.__main__ import choose_refine_steps
     parse = lambda argv: choose_refine_steps(build_parser().parse_args(argv))
     assert parse([]) is None
-    assert [parse([STEPS_FLAG, text]) for text in ("1", "15", "30", "60", "120")] == [
-        1, 15, 30, 60, 120]
+    assert [parse([STEPS_FLAG, text]) for text in ("1", "15", "30", "60", "120", "240", "999")] == [
+        1, 15, 30, 60, 120, 240, 999]
     assert parse([f"{STEPS_FLAG}=30"]) == 30
 
 

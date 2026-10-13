@@ -65,7 +65,14 @@ if str(ROOT) not in sys.path:
 from lpcstudy import budget  # noqa: E402  (after the path line; no jax import)
 from lpcstudy.config import PRESETS  # noqa: E402
 
-LABEL = "DEVELOPMENT (DEV-0): conditional on one realization; not a hypothesis test"
+def make_label(seed_id: str | None) -> str:
+    """The label of every output, with the seed id the runs recorded (never a fixed one)."""
+    kind = "DEVELOPMENT" if isinstance(seed_id, str) and seed_id.startswith("DEV-") else "UNVERIFIED"
+    return (f"{kind} ({seed_id or 'seed id not recorded'}): conditional on one realization; "
+            "not a hypothesis test")
+
+
+
 EXIT_REFUSED = 64
 EXIT_BUSY = 75
 ARMS = (15, 30, 60)
@@ -357,16 +364,20 @@ def classify(ests: Mapping[int, Est | None], tail: float | None, *,
 
 
 def tail_ratio(f_prev: float, f_next: float, t_prev: float, t_next: float) -> float:
-    """``r_A = max(F_next/F_prev, T_next/T_prev)`` for the doublings 30 to 60 (prev) and 60 to 120.
+    """``r_A`` of rule R for the doublings 30 to 60 (prev) and 60 to 120 (next).
 
-    A zero numerator gives 0; a zero denominator with a positive numerator gives infinity (the
-    tail grows from nothing), as fixed in rule R.
+    As written in the Mathematics check: ``r_A = max(F_next/F_prev, T_next/T_prev)``, with
+    ``r_A = 0`` if ``F_next = 0`` (whatever ``T``: the loop keeps accepting round-off steps after
+    convergence, so ``T`` does not vanish) and ``r_A = infinity`` if ``F_prev = 0 < F_next``. With
+    both ``F`` positive the max of the two ratios; ``T_prev = 0`` under a positive ``T_next``
+    (impossible when ``F_prev > 0``) reads as infinity.
     """
-    def one(prev: float, nxt: float) -> float:
-        if nxt == 0:
-            return 0.0
-        return math.inf if prev == 0 else nxt / prev
-    return max(one(f_prev, f_next), one(t_prev, t_next))
+    if f_next == 0:
+        return 0.0
+    if f_prev == 0:
+        return math.inf
+    t_ratio = (math.inf if t_next > 0 else 0.0) if t_prev == 0 else t_next / t_prev
+    return max(f_next / f_prev, t_ratio)
 
 
 # --------------------------------------------------------------------------------------------
@@ -727,7 +738,13 @@ def build_comparison(arms: Mapping[int, Mapping], probe: Mapping | None = None) 
     if 15 not in arms or 30 not in arms:
         raise ValueError("compare needs the 15 and 30 arms")
     ordered = sorted(arms)
-    report: dict = {"label": LABEL, "arms": ordered, "qoi": {}, "membership": {}, "lm": {}}
+    report: dict = {"label": make_label(arm_facts(arms[15])["seed_id"]), "arms": ordered,
+                    "qoi": {}, "membership": {}, "lm": {}}
+    report["pairing_problems"] = pairing_problems(arms)
+    report["probe_problems"] = [] if probe is None else probe_problems(probe, arms)
+    if report["probe_problems"]:
+        probe = None   # not a Part A of these arms: r_A stays unknown, so no class N
+    blockers = [f"arms not paired: {m}" for m in report["pairing_problems"]]
     config = arms[15].get("config") or {}
     resamples = config.get("bootstrap_resamples")
     systems = sorted({s for r in arms.values() for s in (r.get("systems") or {})})
@@ -748,7 +765,7 @@ def build_comparison(arms: Mapping[int, Mapping], probe: Mapping | None = None) 
                 if probe is not None:
                     group = _walk(probe, ("systems", system, "groups", QOI_GROUP[qoi]))
                     tail = _walk(group, ("tail_ratio",))
-                structural = _structural(system, qoi, label, arms, per_arm)
+                structural = [*blockers, *_structural(system, qoi, label, arms, per_arm)]
                 full = classify(ests, tail, structural=structural)
                 point_only = classify(ests, tail, components=("pt",), structural=structural)
                 limited = point_only.cls != full.cls
@@ -768,8 +785,9 @@ def build_comparison(arms: Mapping[int, Mapping], probe: Mapping | None = None) 
         report["lm"][k] = _lm_table(arms[k])
     report["verdicts"] = _verdict_table(arms)
     report["robustness"] = _robustness_table(arms)
-    report["pairing_notes"] = pairing_notes(arms)
     report["c0"], halt = _c0_report(arms)
+    halt += [f"pairing: {m}" for m in report["pairing_problems"]]
+    halt += [f"probe: {m}" for m in report["probe_problems"]]
     checked, bad = check_p1_partb(arms)
     report["p1"] = {"checked": checked, "violations": bad}
     report["halt"] = halt + [f"P1: {line}" for line in bad]
@@ -787,10 +805,35 @@ def _se_over_hw(est: Est | None, design: Est | None) -> float | None:
     return max(se) / width if se and math.isfinite(width) and width > 0 else None
 
 
+def c0_coverage(arm: Mapping) -> dict:
+    """How many leaves of one arm each C0 pattern matches, and the patterns that match none.
+
+    A pattern that matches no leaf while its root block is present in the arm (``systems``,
+    ``robustness``, ``handling.robustness``, ``config``, ``estimators``) is a gap: either the block
+    lacks that leaf or the pattern is mis-shaped, and C0 is narrower than its list (PRIME.4). The
+    gaps are reported, not hidden; they do not halt.
+
+    Returns
+    -------
+    dict
+        ``matched`` (leaf count per pattern, by index) and ``gaps`` (index and producer line of each
+        gap).
+    """
+    paths = list(flatten(arm))
+    matched = [sum(1 for p in paths if _match(p, pattern)) for pattern, _ in C0_PATTERNS]
+    gaps = []
+    for i, (pattern, why) in enumerate(C0_PATTERNS):
+        root = pattern[:2] if pattern[0] == "handling" else pattern[:1]
+        if matched[i] == 0 and any(p[:len(root)] == root for p in paths):
+            gaps.append({"pattern": i + 1, "root": "/".join(root), "why": why})
+    return {"matched": matched, "gaps": gaps}
+
+
 def _c0_report(arms: Mapping[int, Mapping]) -> tuple[dict, list[str]]:
     """C0 over every pair of arms: the differing leaves, the C0 violations, and the halt reasons."""
     pairs, violations, halt = {}, [], []
     ordered = sorted(arms)
+    coverage = c0_coverage(arms[ordered[0]])
     for i, lo in enumerate(ordered):
         for hi in ordered[i + 1:]:
             diffs = differing_leaves(arms[lo], arms[hi])
@@ -802,8 +845,8 @@ def _c0_report(arms: Mapping[int, Mapping]) -> tuple[dict, list[str]]:
             if not effect:
                 halt.append(f"no leaf differs between the {lo} and {hi} arms apart from the budget "
                             "itself: the knob has no effect (K4)")
-    return {"pairs": pairs, "violations_list": violations,
-            "n_patterns": len(C0_PATTERNS)}, halt
+    return {"pairs": pairs, "violations_list": violations, "n_patterns": len(C0_PATTERNS),
+            "coverage": coverage["matched"], "coverage_gaps": coverage["gaps"]}, halt
 
 
 # --------------------------------------------------------------------------------------------
@@ -857,10 +900,19 @@ def render(report: Mapping) -> list[str]:
         for name, stat in entry["single_statistics"].items():
             lines.append(f"    {name}: {stat['values']} d15_30={_fmt(stat['delta_15_30'], 6)} "
                          f"d30_60={_fmt(stat['delta_30_60'], 6)}")
-    lines += ["", "Pairing preconditions (commit, CPU, LPC_THREADS, XLA_FLAGS, jax, jaxlib): "
-              + ("the same in every arm" if not report["pairing_notes"]
-                 else "DIFFER: " + "; ".join(report["pairing_notes"])),
+    lines += ["", "Pairing (seed id, preset, commit, clean tree, CPU, LPC_THREADS, XLA_FLAGS, jax, "
+              "jaxlib): " + ("the same in every arm" if not report["pairing_problems"]
+                             else "NOT PAIRED: " + "; ".join(report["pairing_problems"])),
+              "Part A file: " + ("accepted (same run, exact P0 at every arm)"
+                                 if not report["probe_problems"] else
+                                 "NOT USED, r_A unknown: " + "; ".join(report["probe_problems"])),
               f"C0: {report['c0']['n_patterns']} patterns; pairs {report['c0']['pairs']}",
+              "C0 coverage (leaves matched per pattern on the 15 arm): "
+              + " ".join(f"p{i + 1}:{n}" for i, n in enumerate(report["c0"]["coverage"])),
+              "C0 coverage gaps (a pattern matching no leaf while its block is present): "
+              + ("none" if not report["c0"]["coverage_gaps"] else "; ".join(
+                  f"p{g['pattern']} under {g['root']} ({g['why']})"
+                  for g in report["c0"]["coverage_gaps"])),
               f"P1: {report['p1']['checked']} comparisons, {len(report['p1']['violations'])} "
               "violations", "Membership (M7):"]
     for system, by_arm in report["membership"].items():
@@ -886,7 +938,7 @@ def render_probe(probe: Mapping) -> list[str]:
     left out. Then the chi-square crossings, P1, the tail ratio ``r_A`` and the P0 outcome.
     """
     lines = [f"Part A (per estimate), levels {probe.get('levels')}, horizons {probe.get('horizons')} "
-             f"({probe.get('preset')}, {probe.get('seed_id')}); {probe.get('label', LABEL)}"]
+             f"({probe.get('preset')}, {probe.get('seed_id')}); {make_label(probe.get('seed_id'))}"]
     for system, body in (probe.get("systems") or {}).items():
         for group, row in (body.get("groups") or {}).items():
             lines.append(f"  {system} {group}: {row.get('n_states')} states, "
@@ -1307,6 +1359,14 @@ def current_commit() -> str | None:
     return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
 
 
+def git_dirty() -> bool | None:
+    """``bool(git status --porcelain)`` of this repository (untracked files count, ``runs/`` is
+    ignored by git), the definition of ``provenance.git_state``; ``None`` if git fails."""
+    done = subprocess.run(["git", "-C", str(ROOT), "status", "--porcelain"], capture_output=True,
+                          text=True, check=False)
+    return bool(done.stdout.strip()) if done.returncode == 0 else None
+
+
 def precondition_mismatches(provenance: Mapping, env: Mapping[str, str | None],
                             versions: Mapping[str, str | None], commit: str | None
                             ) -> list[str]:
@@ -1315,15 +1375,18 @@ def precondition_mismatches(provenance: Mapping, env: Mapping[str, str | None],
     P0 is exact only for the same commit, host, ``LPC_THREADS``, ``XLA_FLAGS`` and jax and jaxlib
     (a different batch shape or thread pool changes the result by round-off, E1(a)), so the probe
     refuses to spend hours on an arm it cannot reproduce. Compares ``provenance.commit`` with
-    ``commit``, ``provenance.env`` for the names of ``PRECONDITION_ENV`` (a name that is not
+    ``commit`` (and requires ``dirty`` to be false), ``provenance.env`` for the names of ``PRECONDITION_ENV`` (a name that is not
     recorded is a mismatch) and the versions of ``PRECONDITION_PACKAGES``. The host is not
-    compared here (``compare`` lists the CPU model of every arm in ``pairing_notes``).
+    compared here (``compare`` checks the CPU model of every arm in ``pairing_problems``).
     """
     stored = provenance.get("env")
     if not isinstance(stored, Mapping):
         return ["no env block in the recorded provenance"]
     out = [] if provenance.get("commit") == commit else [
         f"commit: recorded {provenance.get('commit')!r}, here {commit!r}"]
+    if provenance.get("dirty") is not False:
+        out.append(f"dirty: the arm was run from a tree recorded as {provenance.get('dirty')!r} "
+                   "(only a clean tree is reproducible from a commit)")
     out += [f"{name}: recorded {stored.get(name, 'not recorded')!r}, here {env.get(name)!r}"
             for name in PRECONDITION_ENV if name not in stored or stored[name] != env.get(name)]
     packages = provenance.get("packages") or {}
@@ -1332,24 +1395,71 @@ def precondition_mismatches(provenance: Mapping, env: Mapping[str, str | None],
     return out
 
 
-def pairing_notes(arms: Mapping[int, Mapping]) -> list[str]:
-    """Differences between the arms' recorded runs that can break the bitwise pairing C0 (notes).
+def arm_facts(arm: Mapping) -> dict:
+    """What an arm recorded about its run: seed, preset, commit, tree, CPU, threads, jax."""
+    prov = arm.get("provenance") or {}
+    env = prov.get("env") or {}
+    return {"seed_id": prov.get("seed_id"), "preset": prov.get("preset"),
+            "commit": prov.get("commit"), "dirty": prov.get("dirty"),
+            "cpu": (prov.get("cpu") or {}).get("model"), "LPC_THREADS": env.get("LPC_THREADS"),
+            "XLA_FLAGS": env.get("XLA_FLAGS"),
+            **{n: (prov.get("packages") or {}).get(n) for n in PRECONDITION_PACKAGES}}
 
-    The commit, the CPU model, ``LPC_THREADS``, ``XLA_FLAGS`` and the jax and jaxlib versions should
-    be the same in every arm (plan: same host, commit and ``LPC_THREADS``). Information only: a C0
-    failure on arms that differ here has a known candidate cause, but still halts the study.
+
+def pairing_problems(arms: Mapping[int, Mapping]) -> list[str]:
+    """Why the arms are not a paired set (F4, M6): a halt, and no class N, while any is listed.
+
+    The seed id, the preset, the commit, the CPU model, ``LPC_THREADS``, ``XLA_FLAGS`` and the jax and
+    jaxlib versions must be the same in every arm, every arm must have been run from a clean tree
+    (``dirty`` false), and every arm must have recorded its provenance. C0 only sees leaves that
+    cannot read PLP output, so a change of the PLP path between arms would pass it.
     """
-    def facts(arm: Mapping) -> dict:
-        prov = arm.get("provenance") or {}
-        env = prov.get("env") or {}
-        return {"commit": prov.get("commit"), "cpu": (prov.get("cpu") or {}).get("model"),
-                "LPC_THREADS": env.get("LPC_THREADS"), "XLA_FLAGS": env.get("XLA_FLAGS"),
-                **{n: (prov.get("packages") or {}).get(n) for n in PRECONDITION_PACKAGES}}
-    base = {k: facts(a) for k, a in arms.items()}
-    first = min(base)
-    return [f"{name}: {base[first][name]!r} at {first}, {base[k][name]!r} at {k}"
-            for k in sorted(base) if k != first for name in base[first]
-            if base[k][name] != base[first][name]]
+    facts = {k: arm_facts(a) for k, a in arms.items()}
+    out = [f"the {k} arm records no provenance" for k, f in facts.items()
+           if f["commit"] is None or f["dirty"] is None]
+    out += [f"the {k} arm was run from a dirty tree" for k, f in facts.items()
+            if f["dirty"] is True]
+    first = min(facts)
+    out += [f"{name}: {facts[first][name]!r} at {first}, {facts[k][name]!r} at {k}"
+            for k in sorted(facts) if k != first
+            for name in ("seed_id", "preset", "commit", "cpu", "LPC_THREADS", "XLA_FLAGS",
+                         *PRECONDITION_PACKAGES) if facts[k][name] != facts[first][name]]
+    return out
+
+
+def probe_problems(probe: Mapping, arms: Mapping[int, Mapping]) -> list[str]:
+    """Why a Part A file cannot supply ``r_A`` for these arms (empty if it can).
+
+    It must come from the same preset, seed id, commit, clean tree, ``LPC_THREADS`` and jax and
+    jaxlib as the arms, must have probed the levels 30, 60 and 120, and must hold an exact P0 (an
+    entry with no mismatch) for every arm and every system it covers: a probe run without
+    ``--results`` has none and is not accepted.
+    """
+    out: list[str] = []
+    facts = {k: arm_facts(a) for k, a in arms.items()}
+    seen = {name: {f[name] for f in facts.values()} for name in ("seed_id", "preset")}
+    prov = probe.get("provenance") or {}
+    mine = {"seed_id": probe.get("seed_id"), "preset": probe.get("preset"),
+            "commit": prov.get("commit"), "dirty": prov.get("dirty"),
+            "LPC_THREADS": (prov.get("env") or {}).get("LPC_THREADS"),
+            **{n: (prov.get("packages") or {}).get(n) for n in PRECONDITION_PACKAGES}}
+    for name in ("seed_id", "preset"):
+        if seen[name] != {mine[name]}:
+            out.append(f"the probe's {name} is {mine[name]!r}, the arms' is {sorted(map(str, seen[name]))}")
+    for name in ("commit", "LPC_THREADS", *PRECONDITION_PACKAGES):
+        if {f[name] for f in facts.values()} != {mine[name]}:
+            out.append(f"the probe's {name} is {mine[name]!r}, the arms' is "
+                       f"{sorted({str(f[name]) for f in facts.values()})}")
+    if mine["dirty"] is not False:
+        out.append(f"the probe was run from a tree recorded as dirty = {mine['dirty']!r}")
+    if not {30, 60, 120} <= set(probe.get("levels") or []):
+        out.append("the probe did not cover the levels 30, 60 and 120")
+    for system, body in (probe.get("systems") or {}).items():
+        exact = {e.get("arm") for e in body.get("p0") or [] if not e.get("mismatches")}
+        missing = sorted(set(arms) - exact)
+        if missing:
+            out.append(f"the probe has no exact P0 for {system} at the arm(s) {missing}")
+    return out
 
 
 def derive_estimator(estimator, steps: int):
@@ -1567,7 +1677,11 @@ def run_probe(args: argparse.Namespace) -> int:
               (item.split("=", 1) for item in args.results)}
     from importlib import metadata
     versions = {name: metadata.version(name) for name in PRECONDITION_PACKAGES}
-    commit = current_commit()
+    commit, dirty = current_commit(), git_dirty()
+    if dirty is not False:
+        print("lm_doubling.py: refused: the working tree is not clean (or git failed): run the "
+              "probe from a clean worktree at the commit of the arms", file=sys.stderr)
+        return EXIT_REFUSED
     for arm, results in stored.items():
         wrong = precondition_mismatches(results.get("provenance") or {}, dict(os.environ), versions,
                                         commit)
@@ -1580,9 +1694,12 @@ def run_probe(args: argparse.Namespace) -> int:
     horizons = np.array([h for h in cfg.eval_horizons if h >= cfg.steps_per_lyapunov], dtype=int)
     ref_column = int(np.nonzero(horizons == cfg.reference_horizon)[0][0])
     long_columns = list(range(len(horizons)))
-    report: dict = {"schema": "lpcstudy.lm-probe/1", "label": LABEL, "preset": args.preset,
+    report: dict = {"schema": "lpcstudy.lm-probe/1", "label": make_label(args.seed_id), "preset": args.preset,
                     "seed_id": args.seed_id, "levels": list(args.steps), "horizons": horizons.tolist(),
-                    "environment": env, "systems": {}, "halt": []}
+                    "environment": env, "systems": {}, "halt": [],
+                    "provenance": {"commit": commit, "dirty": dirty, "argv": list(args.argv),
+                                   "packages": versions,
+                                   "env": {n: os.environ.get(n) for n in PRECONDITION_ENV}}}
     arrays: dict[str, np.ndarray] = {}
     for system in systems:
         t0 = time.time()

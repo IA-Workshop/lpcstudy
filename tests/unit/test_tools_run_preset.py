@@ -529,6 +529,8 @@ def test_tally_failure_other_than_64_65_fails_closed(fake: FakeRoot, tally_exit:
     pytest.param(["--estimator-refine-steps", "015"], id="leading-zero"),
     pytest.param(["--estimator-refine-steps", "+3"], id="plus"),
     pytest.param(["--estimator-refine-steps", "3\nx"], id="newline"),
+    pytest.param(["--estimator-refine-steps", "1000"], id="above-the-cap"),
+    pytest.param(["--estimator-refine-steps", "9" * 5000], id="over-the-digit-limit"),
     pytest.param(["--estimator-refine-steps"], id="no-value"),
     pytest.param(["--estimator-refine-steps", "15", "--estimator-refine-steps", "30"], id="twice"),
 ])

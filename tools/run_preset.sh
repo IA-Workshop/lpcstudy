@@ -13,7 +13,7 @@
 # another schema), an unknown preset or argument, an out-dir outside runs/, an existing
 # <out-dir>/<preset>/run.meta.json (it would erase GPU hours), or a seed the CLI cannot take.
 # --estimator-refine-steps N (WU-0005.6, the iteration-doubling study) is passed to the CLI as it is:
-# N is a canonical decimal integer of at least 1 (no sign, no leading zero), given once, else the
+# N is a canonical decimal integer from 1 to 999 (no sign, no leading zero), given once, else the
 # wrapper refuses before the lock. The CLI itself refuses it with the confirmatory flag, which this
 # wrapper never accepts. The meta file records it in "command".
 #
@@ -166,7 +166,7 @@ while [ "$#" -gt 0 ]; do
             ;;
         --estimator-refine-steps)
             [ "$refine_given" = 0 ] || refuse "--estimator-refine-steps is given twice"
-            [ "$#" -ge 2 ] && [[ "$2" =~ ^[1-9][0-9]*$ ]] || refuse "--estimator-refine-steps needs an integer of at least 1"
+            [ "$#" -ge 2 ] && [[ "$2" =~ ^[1-9][0-9]{0,2}$ ]] || refuse "--estimator-refine-steps needs an integer from 1 to 999"
             refine_given=1
             passthrough+=("$1" "$2")
             shift 2

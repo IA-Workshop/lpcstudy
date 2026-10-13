@@ -214,10 +214,15 @@ def test_k5_endpoint_limited_label_and_point_only_class() -> None:
 @pytest.mark.parametrize(("f", "t", "expected"), [
     ((10, 4), (5.0, 2.0), 0.4), ((10, 5), (8.0, 2.0), 0.5), ((4, 0), (3.0, 0.0), 0.0),
     ((0, 3), (3.0, 1.0), math.inf), ((0, 0), (0.0, 0.0), 0.0), ((8, 2), (2.0, 3.0), 1.5),
-    ((6, 3), (0.0, 1.0), math.inf)])
+    ((6, 3), (0.0, 1.0), math.inf),
+    # rule R as written: r_A = 0 whenever F(60 to 120) = 0, whatever T (round-off steps after
+    # convergence keep T positive); infinity if F(30 to 60) = 0 < F(60 to 120)
+    ((4, 0), (3.0, 2.0), 0.0), ((0, 0), (1e-9, 2e-9), 0.0), ((7, 0), (0.0, 5.0), 0.0),
+    ((0, 5), (0.0, 0.0), math.inf), ((0, 5), (4.0, 1.0), math.inf), ((5, 5), (4.0, 8.0), 2.0),
+    ((5, 5), (8.0, 4.0), 1.0)])
 def test_tail_ratio_cases(f: tuple, t: tuple, expected: float) -> None:
-    """r_A = max(F ratio, T ratio); a zero numerator is 0, a zero denominator under a positive
-    numerator is infinity (hand cases of the rule)."""
+    """r_A of rule R, hand cases: 0 if F(60 to 120) = 0 (the converged case, T ignored), infinity
+    if F(30 to 60) = 0 < F(60 to 120), else the larger of the F ratio and the T ratio."""
     assert lm.tail_ratio(f[0], f[1], t[0], t[1]) == expected
 
 
@@ -229,12 +234,19 @@ def results_with_h3c(e: Est, *, bootstrap: int = 500, chosen_k: int = 4, n_test:
              "ci_mc_se": list(e.mc_se) if e.mc_se else None, "level": 0.98,
              "n_states": e.n, "n_failed_resamples": e.failed, "verdict": e.verdict}
     return {"config": {"bootstrap_resamples": bootstrap, "n_test": n_test, "n_test_sweep": n_sweep},
+            "provenance": provenance_block(),
             "systems": {"lorenz63": {"H3c": block, "fitted": {"chosen_K": chosen_k}}},
             "verdicts": {"H3c": {"by_system": {"lorenz63": e.verdict}, "verdict": e.verdict}}}
 
 
-def probe_with_tail(tail: float | None) -> dict:
-    return {"systems": {"lorenz63": {"groups": {"H3c": {"tail_ratio": tail}}}}}
+def probe_with_tail(tail: float | None, arms: tuple = (15, 30, 60)) -> dict:
+    """A Part A file of the stored shape from the same run as ``provenance_block`` (exact P0)."""
+    block = provenance_block()
+    return {"preset": "pilot", "seed_id": "DEV-0", "levels": [15, 30, 60, 120],
+            "provenance": {"commit": block["commit"], "dirty": False, "packages": block["packages"],
+                           "env": block["env"], "argv": ["probe"]},
+            "systems": {"lorenz63": {"groups": {"H3c": {"tail_ratio": tail}},
+                                     "p0": [{"arm": k, "mismatches": []} for k in arms]}}}
 
 
 def test_build_comparison_h3c_arithmetic_and_projection() -> None:
@@ -288,6 +300,7 @@ def results_with_h2a(zero_pt: float, with_one: bool, interior_n: int = 100) -> d
     if with_one:
         part_ii["one"] = part(0.0, 500)
     return {"config": {"bootstrap_resamples": 500, "n_test": 500, "n_test_sweep": 300},
+            "provenance": provenance_block(),
             "systems": {"lorenz63": {"H2a": {
                 "median_range": 0.0625, "range_ci": [0.0, 0.125], "ci_mc_se": [0.01, 0.02],
                 "range_n_failed_resamples": 1, "n_eligible_states": 321, "part_i_verdict": "pass",
@@ -1040,12 +1053,13 @@ def test_compare_cli_prints_the_table_and_returns_the_halt_code(tmp_path: Path,
 
 # ------------------------------------------------------------------ environment preconditions
 def provenance_block(threads: str = "8", commit: str = "abc", xla: str | None = None,
-                     jax: str = "0.11.2", cpu: str = "Intel i9") -> dict:
-    """A recorded provenance block of the stored shape (``env``, ``packages``, ``cpu``)."""
+                     jax: str = "0.11.2", cpu: str = "Intel i9", dirty: bool | None = False,
+                     seed_id: str = "DEV-0", preset: str = "pilot") -> dict:
+    """A recorded provenance block of the stored shape (``env``, ``packages``, ``cpu``, ...)."""
     env = {name: threads for name in lm.THREAD_VARIABLES}
     env.update(LPC_THREADS=threads, XLA_FLAGS=xla, JAX_PLATFORMS="cpu")
-    return {"env": env, "commit": commit, "cpu": {"model": cpu},
-            "packages": {"jax": jax, "jaxlib": jax}}
+    return {"env": env, "commit": commit, "dirty": dirty, "cpu": {"model": cpu},
+            "seed_id": seed_id, "preset": preset, "packages": {"jax": jax, "jaxlib": jax}}
 
 
 def test_precondition_mismatches_name_each_difference() -> None:
@@ -1076,27 +1090,147 @@ def test_current_commit_is_the_head_of_this_repository() -> None:
     assert lm.current_commit() == expected and len(expected) == 40
 
 
-def test_pairing_notes_list_what_differs_between_arms() -> None:
-    """Commit, CPU, threads, XLA_FLAGS and jax versions that differ between arms are listed."""
-    same = {15: {"provenance": provenance_block()}, 30: {"provenance": provenance_block()}}
-    assert lm.pairing_notes(same) == []
-    differ = {15: {"provenance": provenance_block()},
-              30: {"provenance": provenance_block(commit="def", threads="4")}}
-    assert lm.pairing_notes(differ) == ["commit: 'abc' at 15, 'def' at 30",
-                                        "LPC_THREADS: '8' at 15, '4' at 30"]
+def arms_of(*blocks: dict) -> dict:
+    return {k: {"provenance": b} for k, b in zip((15, 30, 60), blocks)}
 
 
-def test_k6a_states_left_out_of_the_standard_errors_are_counted() -> None:
-    """A state with no valid draw and the remainder of the blocks of 5 are reported, not hidden.
+def test_pairing_problems_list_what_differs_between_arms() -> None:
+    """Seed id, preset, commit, CPU, threads, XLA_FLAGS, jax, a dirty tree or a missing
+    provenance are each a problem (F4, M6); identical clean arms have none."""
+    clean = provenance_block
+    assert lm.pairing_problems(arms_of(clean(), clean(), clean())) == []
+    assert lm.pairing_problems(arms_of(clean(), clean(commit="def", threads="4"))) == [
+        "commit: 'abc' at 15, 'def' at 30", "LPC_THREADS: '8' at 15, '4' at 30"]
+    assert lm.pairing_problems(arms_of(clean(), clean(), clean(dirty=True))) == [
+        "the 60 arm was run from a dirty tree"]
+    assert lm.pairing_problems(arms_of(clean(), clean(dirty=None))) == [
+        "the 30 arm records no provenance"]
+    assert lm.pairing_problems({15: {}, 30: {"provenance": clean()}}) == [
+        "the 15 arm records no provenance", "seed_id: None at 15, 'DEV-0' at 30",
+        "preset: None at 15, 'pilot' at 30", "commit: None at 15, 'abc' at 30",
+        "cpu: None at 15, 'Intel i9' at 30", "LPC_THREADS: None at 15, '8' at 30",
+        "jax: None at 15, '0.11.2' at 30", "jaxlib: None at 15, '0.11.2' at 30"]
+    assert lm.pairing_problems(arms_of(clean(seed_id="DEV-1"), clean(preset="smoke"))) == [
+        "seed_id: 'DEV-1' at 15, 'DEV-0' at 30", "preset: 'pilot' at 15, 'smoke' at 30"]
 
-    Seven states of three draws: state 0 has all three draws replaced (no valid draw), so it is left
-    out of the SEs (its three draws are in ``n_excluded``); 7 states give one block of 5 and a remainder of 2.
+
+def test_unpaired_arms_halt_and_block_class_n() -> None:
+    """A commit that differs between arms, or a dirty arm, halts the comparison and the part is
+    not N even though the numbers say N (hand dyadic case of K5: S = 1/16, tail 0.25)."""
+    def arm(pt: float, **prov) -> dict:
+        tree = results_with_h3c(est(pt))
+        tree["provenance"] = provenance_block(**prov)
+        return tree
+    pts = (0.0, 0.03125, 0.046875)
+    good = lm.build_comparison({k: arm(pt) for k, pt in zip((15, 30, 60), pts)},
+                               probe=probe_with_tail(0.25))
+    row = good["qoi"]["lorenz63"]["H3c"]["all"]["classification"]
+    assert (row["cls"], good["halt"]) == ("N", [])
+    for bad_prov, why in (({"commit": "def"}, "commit: 'abc' at 15, 'def' at 60"),
+                          ({"dirty": True}, "the 60 arm was run from a dirty tree")):
+        arms = {15: arm(pts[0]), 30: arm(pts[1]), 60: arm(pts[2], **bad_prov)}
+        report = lm.build_comparison(arms, probe=probe_with_tail(0.25))
+        cls = report["qoi"]["lorenz63"]["H3c"]["all"]["classification"]
+        assert cls["cls"] == "U" and any("arms not paired" in r for r in cls["reasons"])
+        assert f"pairing: {why}" in report["halt"]
+
+
+def test_probe_problems_one_case_per_condition() -> None:
+    """A Part A file is used only if it has the arms' preset, seed id, commit, threads and jax, a
+    clean tree, the levels 30, 60 and 120, and an exact P0 at every arm of every system."""
+    arms = {k: {"provenance": provenance_block()} for k in (15, 30, 60)}
+    probe = probe_with_tail(0.25)
+    assert lm.probe_problems(probe, arms) == []
+
+    def changed(**edits) -> dict:
+        out = json.loads(json.dumps(probe))
+        for key, value in edits.items():
+            node = out
+            *path, last = key.split(".")
+            for part in path:
+                node = node[part]
+            node[last] = value
+        return out
+    cases = {
+        "preset": changed(preset="smoke"), "seed_id": changed(seed_id="DEV-1"),
+        "commit": changed(**{"provenance.commit": "other"}),
+        "dirty": changed(**{"provenance.dirty": True}),
+        "tree no record": changed(**{"provenance.dirty": None}),
+        "levels": changed(levels=[15, 30, 60]),
+    }
+    for name, bad in cases.items():
+        assert lm.probe_problems(bad, arms), name
+    threads = changed(**{"provenance.env": {**probe["provenance"]["env"], "LPC_THREADS": "4"}})
+    assert lm.probe_problems(threads, arms) == [
+        "the probe's LPC_THREADS is '4', the arms' is ['8']"]
+    jax = changed(**{"provenance.packages": {"jax": "0.11.3", "jaxlib": "0.11.2"}})
+    assert lm.probe_problems(jax, arms) == ["the probe's jax is '0.11.3', the arms' is ['0.11.2']"]
+    # a probe run without --results has no P0; a P0 with a mismatch, or for fewer arms, is refused
+    none = changed(**{"systems": {"lorenz63": {"groups": {}, "p0": []}}})
+    assert lm.probe_problems(none, arms) == [
+        "the probe has no exact P0 for lorenz63 at the arm(s) [15, 30, 60]"]
+    bad_p0 = probe_with_tail(0.25)
+    bad_p0["systems"]["lorenz63"]["p0"][1]["mismatches"] = ["x"]
+    assert lm.probe_problems(bad_p0, arms) == [
+        "the probe has no exact P0 for lorenz63 at the arm(s) [30]"]
+    assert lm.probe_problems(probe_with_tail(0.25, arms=(15, 30)), arms) == [
+        "the probe has no exact P0 for lorenz63 at the arm(s) [60]"]
+
+
+def test_a_probe_that_does_not_match_gives_no_r_a_and_halts() -> None:
+    """With a probe from another run the tail ratio is not used (the part is U, never N) and the
+    comparison halts with the reason; with the matching probe it is N."""
+    arms = {k: results_with_h3c(est(pt)) for k, pt in zip((15, 30, 60), (0.0, 0.03125, 0.046875))}
+    mismatched = probe_with_tail(0.25)
+    mismatched["provenance"]["commit"] = "other"
+    report = lm.build_comparison(arms, probe=mismatched)
+    row = report["qoi"]["lorenz63"]["H3c"]["all"]
+    assert row["tail_ratio"] is None and row["classification"]["cls"] == "U"
+    assert any(h.startswith("probe: the probe's commit") for h in report["halt"])
+    no_p0 = probe_with_tail(0.25, arms=())
+    assert lm.build_comparison(arms, probe=no_p0)["qoi"]["lorenz63"]["H3c"]["all"][
+        "classification"]["cls"] == "U"
+    assert lm.build_comparison(arms, probe=probe_with_tail(0.25))["qoi"]["lorenz63"]["H3c"][
+        "all"]["classification"]["cls"] == "N"
+
+
+def test_labels_use_the_recorded_seed_id() -> None:
+    """The label names the seed id of the runs, never a fixed one; an unrecorded id is flagged."""
+    assert lm.make_label("DEV-7").startswith("DEVELOPMENT (DEV-7):")
+    assert lm.make_label(None).startswith("UNVERIFIED (seed id not recorded):")
+    assert lm.make_label("CONF-1").startswith("UNVERIFIED (CONF-1):")
+    arms = {k: results_with_h3c(est(pt)) for k, pt in zip((15, 30), (0.0, 0.5))}
+    for arm in arms.values():
+        arm["provenance"]["seed_id"] = "DEV-7"
+    assert lm.build_comparison(arms)["label"].startswith("DEVELOPMENT (DEV-7):")
+    assert "DEV-7" in "\n".join(lm.render_probe({"seed_id": "DEV-7", "systems": {}}))
+
+
+def test_c0_coverage_counts_matches_and_reports_gaps() -> None:
+    """Leaves matched per pattern on the 15 arm; a pattern with no match while its block is present
+    is a gap, one whose block is absent is not (hand tree).
+
+    The tree has the config and the P2c block (patterns 1 and 13 match), a ``robustness`` block with
+    only an unrelated leaf (the two robustness patterns under ``robustness`` are gaps), and no
+    ``handling.robustness`` (no gap there).
     """
-    flags = {60: np.zeros((7, 3), dtype=bool)}
-    flags[60][0, :] = True
-    stats = lm.doubling_stats([seg(np.full((7, 3), 0.5), replaced=flags)], 15, 30)
-    assert (stats["n"], stats["n_excluded"]) == (18, 3)
-    assert (stats["n_states_no_valid_draw"], stats["n_states_dropped_from_blocks"]) == (1, 2)
+    tree = {"config": {"seed": 1, "estimator_refine_steps": 15},
+            "systems": {"lorenz63": {"verification": {"P2c": {"a": 1, "b": 2, "c": 3}}}},
+            "robustness": {"lorenz63": {"base": {"other": 1.0}}}}
+    out = lm.c0_coverage(tree)
+    matched = out["matched"]
+    assert len(matched) == len(lm.C0_PATTERNS)
+    assert matched[0] == 2 and matched[12] == 3 and sum(matched) == 5
+    gap_ids = [g["pattern"] for g in out["gaps"]]
+    by_hand = [i + 1 for i, (pattern, _) in enumerate(lm.C0_PATTERNS)
+               if matched[i] == 0 and pattern[0] in ("systems", "robustness")]
+    assert gap_ids == by_hand and {29, 30} <= set(gap_ids)   # the two robustness patterns
+    assert not {1, 13} & set(gap_ids)                          # matched
+    assert not {2, 3} & set(gap_ids)                           # top-level estimators: block absent
+    assert not set(range(31, 36)) & set(gap_ids)               # handling.robustness is absent
+    assert {g["root"] for g in out["gaps"]} == {"systems", "robustness"}
+    report = lm.build_comparison({15: tree, 30: {**tree, "config": {"seed": 1}}})
+    assert report["c0"]["coverage"] == matched and report["c0"]["coverage_gaps"] == out["gaps"]
 
 
 def test_render_probe_prints_every_group_and_the_p0_outcome(tmp_path: Path,

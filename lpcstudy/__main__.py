@@ -43,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Rebuild RESULTS.md and figures from an existing results.json.")
     parser.add_argument("--estimator-refine-steps", default=None, metavar="N",
                         help="Levenberg-Marquardt iterations of the PLP estimator, an integer of "
-                             "at least 1 (WU-0005.6: iteration-doubling study; default: the "
+                             "from 1 to 999 (WU-0005.6: iteration-doubling study; default: the "
                              "preset's value, 15). Not accepted with the confirmatory flag.")
     return parser
 
@@ -51,8 +51,9 @@ def build_parser() -> argparse.ArgumentParser:
 def choose_refine_steps(args: argparse.Namespace) -> int | None:
     """Return the requested Levenberg-Marquardt budget, or ``None`` if the flag is absent.
 
-    The value is a canonical decimal integer of at least 1 (no sign, no leading zero, no space);
-    anything else is refused, and so is any use of the flag together with the confirmatory flag
+    The value is a canonical decimal integer from 1 to 999 (no sign, no leading zero, no space; the
+    study needs at most 240, and a longer string would hit Python's digit limit). Anything else is
+    refused, and so is any use of the flag together with the confirmatory flag
     (the sealed run takes the preset's value, LPC.PC.7). The value is never echoed. This runs
     before the seed is chosen, so a refused request has not read the sealed seed. Needs owner
     review before freeze (LPC.PC.11): it sits beside the seed guard.
@@ -60,8 +61,8 @@ def choose_refine_steps(args: argparse.Namespace) -> int | None:
     Raises
     ------
     SeedRefusal
-        If the flag is given with the confirmatory flag, or its value is not an integer of at
-        least 1.
+        If the flag is given with the confirmatory flag, or its value is not an integer from 1
+        to 999.
     """
     text = args.estimator_refine_steps
     if text is None:
@@ -69,8 +70,8 @@ def choose_refine_steps(args: argparse.Namespace) -> int | None:
     if args.confirmatory:
         raise SeedRefusal("--estimator-refine-steps is not accepted with the confirmatory flag "
                           "(the sealed run uses the preset's value)")
-    if re.fullmatch(r"[1-9][0-9]*", text) is None:
-        raise SeedRefusal("--estimator-refine-steps needs an integer of at least 1")
+    if re.fullmatch(r"[1-9][0-9]{0,2}", text) is None:
+        raise SeedRefusal("--estimator-refine-steps needs an integer from 1 to 999")
     return int(text)
 
 
