@@ -22,6 +22,7 @@ from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, make_rng
 from .dynamics import make_finite_growth
+from .dump import StateDump, entry_names, v4_arrays
 from .embedding import delay_vectors
 from .ensemble import CORRELATION_FIELDS, DRAW_COLUMN, DRAW_COUNTERS, ENTRY_COUNTERS, \
     AnalogLibrary, forecast_draws
@@ -98,6 +99,13 @@ def convergence_check(study: Study, cell: Cell) -> dict:
         for name in ENTRY_COUNTERS:
             clipped[name] += batch.clip_entries[name]
     cp, plp = np.concatenate(cp), np.concatenate(plp)
+    extra = None if study.dump is None else _v4_extra_forecasts(
+        study, cell, library, noise, n, cp, plp, cfg)
+    if extra is not None and extra["clip_entries"].any():  # counted in the dump; never silent
+        LOG.warning("%s V4 dump forecasts (2 and 4 LT): clipped entries %s of %d; counted in "
+                    "states/%s.npz only, not in handling", cell.system,
+                    dict(zip(ENTRY_COUNTERS, extra["clip_entries"].tolist())), cp.size * 2,
+                    cell.system)
     study.record_cell(cell.system, cell.label, "V4-convergence",
                       check_record(handled, clipped, n, noise.shape[1], 1, cell.noise,
                                    ctx.embed_dim - ctx.spec.dim,
@@ -116,17 +124,100 @@ def convergence_check(study: Study, cell: Cell) -> dict:
     rng = make_rng(cfg.seed, cell.system, "V4-convergence")
     reference = weight(cp, plp)
     out = {}
+    v4: dict[str, list] = {"w_hat": [], "half_width": [], "signed_dev": []}
     for m_draws in cfg.convergence_draws:
         base = weight(cp[:, :m_draws], plp[:, :m_draws])
-        boots = np.stack([weight(cp[:, idx], plp[:, idx]) for idx in
-                          rng.integers(0, m_draws, (200, m_draws))])
+        resamples = rng.integers(0, m_draws, (200, m_draws))
+        boots = np.stack([weight(cp[:, idx], plp[:, idx]) for idx in resamples])
         half = 0.5 * (np.percentile(boots, 97.5, axis=0) - np.percentile(boots, 2.5, axis=0))
         out[str(m_draws)] = {"median_half_width": float(np.median(half)),
                              "mean_abs_dev_from_max": float(np.mean(np.abs(base - reference)))}
+        if study.dump is not None and extra is not None:
+            # the dump's copies, and the same quantities at 2 and 4 LT from the second forecast,
+            # with the production resample indices (no new draw)
+            later = []
+            for j in range(extra["cp"].shape[0]):
+                c, p = extra["cp"][j], extra["plp"][j]
+                later_base = weight(c[:, :m_draws], p[:, :m_draws])
+                later_boots = np.stack([weight(c[:, idx], p[:, idx]) for idx in resamples])
+                later_half = 0.5 * (np.percentile(later_boots, 97.5, axis=0)
+                                    - np.percentile(later_boots, 2.5, axis=0))
+                later.append((later_base, later_half, later_base - weight(c, p)))
+            v4["w_hat"].append(np.column_stack([base, *[t[0] for t in later]]))
+            v4["half_width"].append(np.column_stack([half, *[t[1] for t in later]]))
+            v4["signed_dev"].append(np.column_stack([base - reference, *[t[2] for t in later]]))
+    if study.dump is not None and extra is not None:
+        study.dump.record_v4(cell.system, {
+            "M": np.array(cfg.convergence_draws), "horizons": extra["horizons"],
+            **{k: np.stack(v) for k, v in v4.items()},
+            "w_ref": np.column_stack([reference, *[weight(extra["cp"][j], extra["plp"][j])
+                                                   for j in range(extra["cp"].shape[0])]]),
+            "extra_href_equal": extra["href_equal"], "extra_handled": extra["handled"],
+            "extra_clip_entries": extra["clip_entries"],
+            "extra_clip_entry_names": entry_names()})
     used = out.get(str(cfg.n_oracle_draws))
     out["used_M"] = cfg.n_oracle_draws
     out["pass"] = bool(used is not None and used["median_half_width"] <= 0.05)
     return out
+
+
+def _v4_extra_forecasts(study: Study, cell: Cell, library: AnalogLibrary, noise: np.ndarray,
+                        n: int, cp_ref: np.ndarray, plp_ref: np.ndarray, cfg: StudyConfig) -> dict:
+    """The V4 forecasts at ``H_ref``, 2 and 4 LT, for the state dump only (WU-0003.7b).
+
+    The same states, the same noise and the same estimator as ``convergence_check``, in one more
+    ``forecast_draws`` call per batch of five states. It draws no random number (the noise array is
+    given). Its ``H_ref`` column is compared bitwise with the production one (``href_equal``); the
+    production column, not this one, feeds the ``H_ref`` results. The clipped entries and the
+    handling counts of the call are summed and returned (the caller writes them to the dump and a
+    nonzero clip count to the run log, PRIME.4), though nothing of it enters ``handling``: the run
+    does not use these forecasts.
+
+    Parameters
+    ----------
+    study : Study
+        Unused except for its place in the call chain (kept for symmetry with the caller).
+    cell : Cell
+        The core cell.
+    library : AnalogLibrary
+        The core library.
+    noise : np.ndarray
+        The convergence noise ``(>= n, M, D)``.
+    n : int
+        Number of states.
+    cp_ref, plp_ref : np.ndarray
+        The production errors at ``H_ref``, ``(n, M)``.
+    cfg : StudyConfig
+        Configuration.
+
+    Returns
+    -------
+    dict
+        ``cp`` and ``plp`` (``(2, n, M)``: the errors at 2 and 4 LT), ``horizons`` (all three,
+        steps), ``href_equal`` (bool), ``handled`` (int64 ``(n, 8)``) and ``clip_entries`` (int64
+        ``(3,)``).
+    """
+    del study
+    horizons, _ = v4_arrays(cfg)
+    cp, plp, href_cp, href_plp = [], [], [], []
+    handled = np.zeros((n, len(DRAW_COUNTERS)), dtype=np.int64)
+    entries = dict.fromkeys(ENTRY_COUNTERS, 0)
+    for start in range(0, n, 5):
+        rows = np.arange(start, min(n, start + 5))
+        batch = forecast_draws(cell.setup, library, "test", rows, noise[rows], horizons,
+                               cfg.reference_horizon)
+        href_cp.append(batch.cp_err[:, :, 0])
+        href_plp.append(batch.plp_err[:, :, 0])
+        cp.append(np.moveaxis(batch.cp_err[:, :, 1:], -1, 0))
+        plp.append(np.moveaxis(batch.plp_err[:, :, 1:], -1, 0))
+        handled[rows] = batch.handled
+        for name in ENTRY_COUNTERS:
+            entries[name] += batch.clip_entries[name]
+    equal = bool(np.array_equal(np.concatenate(href_cp), cp_ref)
+                 and np.array_equal(np.concatenate(href_plp), plp_ref))
+    return {"cp": np.concatenate(cp, axis=1), "plp": np.concatenate(plp, axis=1),
+            "horizons": horizons, "href_equal": equal, "handled": handled,
+            "clip_entries": np.array([entries[k] for k in ENTRY_COUNTERS])}
 
 
 def _evaluate(cell: Cell, rules: FittedRules, config: StudyConfig, split: str = "test"):
@@ -544,7 +635,7 @@ def run_system(study: Study, system: str) -> dict:
     res["H1b"] = an.h1b_seed_amplifier(core, cfg)
     res["H1c"] = an.h1c_horizon_law(core, cfg)
     res["H1d"] = an.h1d_proxies(core, rules, cfg)
-    res["Q-N"] = an.qn_noise_redundancy(core, rules, cfg)
+    res["Q-N"] = an.qn_noise_redundancy(core, rules, cfg, dump=study.dump)
     res["H2a"] = an.h2a_separation(core, cfg)
     res["H2b"] = an.h2b_knob_response(noise_cells, library_cells, cfg)
     res["H2c"] = an.h2c_state_dependence(scores, core.splits["calibration"], cfg, system)
@@ -561,6 +652,12 @@ def run_system(study: Study, system: str) -> dict:
     clip_sensitivity.log_flags(system, res["clip_sensitivity"])
     res["handling"] = study.system_handling(system, collect_result_counts(res))
     log_handling(system, res["handling"])
+    if study.dump is not None:  # opt-in, read-only (WU-0003.7b); nothing below reads it
+        arrays = study.dump.collect(system, core, rules, weights, scores, noise_cells,
+                                    library_cells, cfg)
+        path = study.out_dir / "states" / f"{system}.npz"
+        size = StateDump.write(path, arrays)
+        LOG.info("%s state dump: %d arrays, %d bytes, %s", system, len(arrays), size, path)
     res["seconds"] = time.time() - t0
     study.core_cells[system] = core
     study.fitted[system] = rules

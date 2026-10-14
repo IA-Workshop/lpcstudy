@@ -26,6 +26,7 @@ from .allocation import ErrorPredictor, ProfileProxies, RegimeMap, calibrate_reg
     state_horizon_target
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, build_context, make_rng
+from .dump import StateDump
 from .ensemble import CORRELATION_FIELDS, DRAW_COUNTERS, DRAW_COLUMN, ENTRY_COUNTERS, \
     LM_FIELDS, AnalogLibrary, EnsembleMoments, EvaluationDraws, ForecastSetup, \
     ensemble_moments, evaluation_draws, stack_optional
@@ -134,6 +135,7 @@ class Study:
         self.estimator_log: dict[str, dict] = {}
         self.core_cells: dict[str, Cell] = {}
         self.fitted: dict[str, FittedRules] = {}
+        self.dump: StateDump | None = None  # the opt-in state dump (WU-0003.7b); read-only collector
 
     # ------------------------------------------------------------------ setup
     def context(self, system: str, embed_dim: int | None = None) -> SystemContext:
@@ -371,9 +373,13 @@ class Study:
             oracle_noise = self.unit_noise(ctx, split, "oracle", cfg.n_oracle_draws,
                                            ctx.embed_dim)[rows]
             keep = allocator_grid(cfg) if (core and split == "construction") else None
+            halves = {} if (self.dump is not None and split == "test" and label == "base") \
+                else None
             moments = ensemble_moments(setup, library, split, oracle_noise, horizons,
                                        keep_horizons=keep, keep_draws=cfg.allocator_draws,
-                                       reference_horizon=cfg.reference_horizon)
+                                       reference_horizon=cfg.reference_horizon, half_out=halves)
+            if halves is not None:  # a copy of sums of the same draws; changes nothing above
+                self.dump.record_halves(system, noise, library_size, core, horizons, halves)
             evals = None
             if with_evals:
                 eval_noise = self.unit_noise(ctx, split, "eval", cfg.n_eval_draws,

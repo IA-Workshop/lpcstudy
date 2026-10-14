@@ -607,8 +607,8 @@ class EnsembleMoments:
 def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
                      unit_noise: np.ndarray, horizons: np.ndarray,
                      keep_horizons: np.ndarray | None = None, keep_draws: int = 0,
-                     chunk_traj: int = 6000, reference_horizon: int | None = None
-                     ) -> EnsembleMoments:
+                     chunk_traj: int = 6000, reference_horizon: int | None = None,
+                     half_out: dict[str, np.ndarray] | None = None) -> EnsembleMoments:
     """Accumulate oracle moments over noise draws, chunk by chunk.
 
     Parameters
@@ -632,14 +632,32 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
         Maximum number of trajectories integrated at once.
     reference_horizon : int, optional
         ``H_ref`` in steps for the H_ref clip columns of ``handled`` (see ``forecast_draws``).
+    half_out : dict[str, np.ndarray], optional
+        If given (the opt-in state dump, WU-0003.7b), it is filled with the second moments of the
+        two halves of the oracle draws, from the same draws and the same chunks as the moments
+        (no new random number, and no change to the returned moments): the keys ``sq_cp_A``,
+        ``sq_plp_A``, ``cross_A`` and the same with ``_B``, each ``(n, nH)`` (draws
+        ``[0, M // 2)`` for ``A`` and ``[M // 2, M)`` for ``B``), and ``n_draws`` ``(2,)`` int64,
+        the sizes of the halves. For even ``M`` the mean of the two halves is the full moment.
 
     Returns
     -------
     EnsembleMoments
         Moments, seeds and the handling counts (``handled`` per state, ``clip_entries`` totals;
         independent of ``chunk_traj``).
+
+    Raises
+    ------
+    ValueError
+        If ``half_out`` is given and there are fewer than two draws.
     """
     n_states, n_draws, _ = unit_noise.shape
+    if half_out is not None and n_draws < 2:
+        raise ValueError(f"half_out needs at least two oracle draws, got {n_draws}")
+    half = n_draws // 2
+    halves = None if half_out is None else {
+        f"{name}_{tag}": np.zeros((n_states, len(horizons)))
+        for name in ("sq_cp", "sq_plp", "cross") for tag in ("A", "B")}
     per_chunk = max(1, chunk_traj // n_draws)
     out = {k: np.zeros((n_states, len(horizons))) for k in
            ("mean_cp", "mean_plp", "sq_cp", "sq_plp", "cross")}
@@ -673,6 +691,12 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
         out["sq_cp"][rows] = (batch.cp_err**2).mean(axis=1)
         out["sq_plp"][rows] = (batch.plp_err**2).mean(axis=1)
         out["cross"][rows] = (batch.cp_err * batch.plp_err).mean(axis=1)
+        if halves is not None:
+            for tag, part in (("A", slice(0, half)), ("B", slice(half, None))):
+                cp_half, plp_half = batch.cp_err[:, part], batch.plp_err[:, part]
+                halves[f"sq_cp_{tag}"][rows] = (cp_half**2).mean(axis=1)
+                halves[f"sq_plp_{tag}"][rows] = (plp_half**2).mean(axis=1)
+                halves[f"cross_{tag}"][rows] = (cp_half * plp_half).mean(axis=1)
         analog_seed[rows] = np.sqrt(batch.analog_seed_sq.mean(axis=1))
         est_seed[rows] = np.sqrt(batch.est_seed_sq.mean(axis=1))
         noise_sens[rows] = retrieval_spread(batch.analog_vecs, setup.noise)
@@ -683,6 +707,9 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
             kept["plp_err"].append(batch.plp_err[:, :keep_draws][:, :, keep_cols])
             kept["inputs"].append(batch.inputs[:, :keep_draws])
     kept_arrays = {k: np.concatenate(v) for k, v in kept.items() if v}
+    if halves is not None and half_out is not None:
+        half_out.update(halves)
+        half_out["n_draws"] = np.array([half, n_draws - half], dtype=np.int64)
     return EnsembleMoments(horizons=np.asarray(horizons), analog_seed=analog_seed,
                            est_seed=est_seed, noise_sens=noise_sens, kept=kept_arrays,
                            err_corr=err_corr, cp_constant=cp_constant,

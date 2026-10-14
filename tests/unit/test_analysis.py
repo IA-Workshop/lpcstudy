@@ -3303,3 +3303,59 @@ def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(monkeypa
     an.qn_noise_redundancy(cell, SimpleNamespace(proxies=None), CONFIG)
     fresh = make_rng(CONFIG.seed, SYSTEM, "bootstrap", "Q-N").bit_generator.state
     assert states == [fresh, fresh]
+
+
+def test_qn_profile_block_capture_holds_the_predictions_and_changes_nothing() -> None:
+    """``capture`` (the state dump's hook) gets both models' predictions, the targets and the domains.
+
+    Reference: independent fits in the test with the literal parameters of T2 (as in the test
+    above; not ``qn_regressor``) on the same data: ``pred3`` and ``pred4`` equal them exactly (the
+    same deterministic fit of the same library on the same arrays: no tolerance is claimed beyond
+    equality). (i) The returned block is the same with and without ``capture`` (JSON text). (ii) The
+    target ``y`` is the logit of ``w*`` inside the interior, the placeholder 0.0 outside it, the
+    indicator, and the log horizon; ``domain`` is the interior mask for the logit and all-True for
+    the others. (iii) ``analysis.delta_r2`` of the captured arrays on the domain rows reproduces
+    the ``delta_r2`` leaf bitwise (it is the same call on the same arrays; b3 of the plan).
+    """
+    import json
+
+    from sklearn.ensemble import HistGradientBoostingRegressor
+
+    from lpcstudy.analysis import delta_r2, qn_profile_block
+
+    d = _qn_synthetic(500, 200, 31)
+    args = (d["x_train"], d["x_test"], d["w_train"], d["w_test"], d["log_t_train"],
+            d["log_t_test"])
+    kwargs = dict(seed=5, n_resamples=100, block=5, boot_seed=11)
+    plain = qn_profile_block(*args, **kwargs)
+    capture: dict = {}
+    out = qn_profile_block(*args, capture=capture, **kwargs)
+    assert json.dumps(out, sort_keys=True) == json.dumps(plain, sort_keys=True)
+
+    def fit_predict(cols, rows, y):
+        model = HistGradientBoostingRegressor(
+            max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=20,
+            l2_regularization=1.0, early_stopping=False, random_state=5)
+        return model.fit(d["x_train"][rows][:, cols], y[rows]).predict(d["x_test"][:, cols])
+
+    int_tr = (d["w_train"] > 0) & (d["w_train"] < 1)
+    int_te = (d["w_test"] > 0) & (d["w_test"] < 1)
+    inner = lambda w, rows: np.where(rows, w, 0.5)
+    logit = lambda w, rows: np.log(inner(w, rows) / (1 - inner(w, rows)))
+    everyone = np.ones(500, bool)
+    cases = {"logit_w_interior": (int_tr, logit(d["w_train"], int_tr), int_te,
+                                  logit(d["w_test"], int_te)),
+             "w_zero_indicator": (everyone, (d["w_train"] == 0).astype(float), np.ones(200, bool),
+                                  (d["w_test"] == 0).astype(float)),
+             "log_horizon": (everyone, d["log_t_train"], np.ones(200, bool), d["log_t_test"])}
+    assert set(capture) == {f"{t}/{k}" for t in cases for k in ("pred3", "pred4", "y", "domain")}
+    assert int_te.sum() < 200  # the placeholder is exercised
+    for name, (rows_tr, y_tr, rows_te, y_te) in cases.items():
+        assert np.array_equal(capture[f"{name}/pred3"], fit_predict([0, 1, 2], rows_tr, y_tr))
+        assert np.array_equal(capture[f"{name}/pred4"], fit_predict([0, 1, 2, 3], rows_tr, y_tr))
+        assert np.array_equal(capture[f"{name}/y"], y_te)
+        assert np.array_equal(capture[f"{name}/domain"], rows_te)
+        rows = np.flatnonzero(rows_te)
+        assert delta_r2(capture[f"{name}/y"], capture[f"{name}/pred3"], capture[f"{name}/pred4"],
+                        rows) == out[name]["delta_r2"]
+    assert (capture["logit_w_interior/y"][~int_te] == 0.0).all()

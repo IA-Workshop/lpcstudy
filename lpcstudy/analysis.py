@@ -32,6 +32,7 @@ from sklearn.tree import DecisionTreeRegressor
 from .allocation import deployable_profile
 from .config import StudyConfig
 from .data import make_rng, sklearn_seed
+from .dump import StateDump
 from .identifiers import check_keys
 from .oracle import characteristic_horizon, curvature, hybrid_mse, inverse_dimension, \
     oracle_weight
@@ -837,7 +838,7 @@ def _qn_reading_reason(lower: float, upper: float, n_test: int) -> tuple[str, st
 def qn_profile_block(x_train: np.ndarray, x_test: np.ndarray, w_train: np.ndarray,
                      w_test: np.ndarray, log_t_train: np.ndarray, log_t_test: np.ndarray, *,
                      seed: int, n_resamples: int, block: int, boot_seed: int | np.random.Generator,
-                     level: float = 0.95) -> dict:
+                     level: float = 0.95, capture: dict | None = None) -> dict:
     """Q-N for one profile: ``Delta R^2`` of F4 against F3 for three targets (DEC-0008 A4(a)).
 
     F3 is the first three coordinates of the profile, F4 all four. Targets, each fitted by
@@ -873,6 +874,11 @@ def qn_profile_block(x_train: np.ndarray, x_test: np.ndarray, w_train: np.ndarra
         Randomness of the resample indices.
     level : float, optional
         Confidence level (95%: Q-N is an estimate, v3 section 7).
+    capture : dict, optional
+        If given (the opt-in state dump, WU-0003.7b), it is filled with copies of what the
+        function already computed: per target the two predictions on every test state (``pred3``
+        and ``pred4``), the target ``y`` (placeholder 0.0 outside its domain) and the ``domain``
+        mask, keyed ``<target>/<name>``. Nothing is computed for it and nothing flows back.
 
     Returns
     -------
@@ -927,6 +933,11 @@ def qn_profile_block(x_train: np.ndarray, x_test: np.ndarray, w_train: np.ndarra
         return np.array(out)
 
     point, values = bootstrap_values(stat, len(w_test), n_resamples, block, boot_seed)
+    if capture is not None:
+        for name in names:
+            _, _, rows_test, y_test = targets[name]
+            capture.update({f"{name}/pred3": pred3[name], f"{name}/pred4": pred4[name],
+                            f"{name}/y": y_test, f"{name}/domain": rows_test})
     out: dict = {}
     for col, name in enumerate(names):
         rows_train, _, rows_test, y_test = targets[name]
@@ -950,7 +961,8 @@ def qn_profile_block(x_train: np.ndarray, x_test: np.ndarray, w_train: np.ndarra
     return out
 
 
-def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
+def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig,
+                        dump: StateDump | None = None) -> dict:
     """Q-N: is the fourth LPC (noise sensitivity) reducible to the other three?
 
     An estimate, not a pass/fail criterion (v3 section 7; DEC-0008 A4(a)). Nested out-of-sample
@@ -970,6 +982,9 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> 
         Fitted rules (seed proxies for the deployable profile).
     config : StudyConfig
         Study configuration.
+    dump : StateDump, optional
+        The opt-in state dump (WU-0003.7b): receives copies of the test profile, the targets and
+        the predictions of both models, per profile kind. It changes nothing computed here.
 
     Returns
     -------
@@ -1003,11 +1018,16 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig) -> 
                  "n_test": int(len(w_test))}
     for kind in ("oracle", "deployable"):
         x_train = np.concatenate([profiles(kind, s) for s in train_splits])
+        x_test = profiles(kind, "test")
+        captured: dict | None = None if dump is None else {}
         out[kind] = qn_profile_block(
-            x_train, profiles(kind, "test"), w_train, w_test, log_t_train, log_t_test,
+            x_train, x_test, w_train, w_test, log_t_train, log_t_test,
             seed=config.seed, n_resamples=config.bootstrap_resamples,
             block=config.bootstrap_block,
-            boot_seed=make_rng(config.seed, cell.system, "bootstrap", "Q-N"))
+            boot_seed=make_rng(config.seed, cell.system, "bootstrap", "Q-N"), capture=captured)
+        if dump is not None and captured is not None:
+            dump.record_qn(cell.system, kind, {"x_test": x_test, "w_star": w_test,
+                                               "log_horizon": log_t_test, **captured})
     out["threshold"] = ("estimate, no pass/fail: reading of the oracle Delta R^2 interval for "
                         "the interior logit and for 1{w*=0} by the table of v3 section 7 "
                         "(upper bound < 0.05 and lower bound <= 0: reduces; lower bound > 0 "

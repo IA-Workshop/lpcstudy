@@ -746,3 +746,64 @@ def test_setup_logs_the_weights_digest_of_each_trained_estimator(monkeypatch, tm
         assert list(entry) == ["val_loss_by_width", "chosen_width", "seconds", "weights_digest"]
         assert entry["weights_digest"] == expected
         assert entry["val_loss_by_width"] == {2: 0.5, 4: 0.75} and entry["chosen_width"] == 2
+
+
+def test_run_cell_asks_for_half_draw_moments_only_with_the_dump_on_for_the_base_test_split(
+        monkeypatch, tmp_path) -> None:
+    """WU-0003.7b: ``run_cell`` passes ``half_out`` to the test split of a base cell, and only with the dump on.
+
+    Reference: a spy on ``ensemble_moments`` and a stub for everything else (hand-built cells,
+    no computation). Dump off: ``half_out`` is ``None`` in every call, for a core and a sweep
+    cell. Dump on: a core cell (three splits) gives a dict to the ``test`` call only, and the
+    arrays the spy put in it are recorded under ``(system, rho, n_lib, core)``; a sweep cell
+    records under ``core = False``; a variant (label other than ``base``) gets no dict. Exact.
+    """
+    from types import SimpleNamespace
+
+    from lpcstudy import pipeline
+    from lpcstudy.config import SMOKE
+    from lpcstudy.dump import StateDump
+
+    seen: list[tuple[str, bool]] = []
+
+    def spy(setup, library, split, noise, horizons, keep_horizons=None, keep_draws=0,
+            chunk_traj=6000, reference_horizon=None, half_out=None):
+        seen.append((split, half_out is not None))
+        if half_out is not None:
+            half_out.update({"sq_cp_A": np.zeros((2, 3)), "n_draws": np.array([1, 1])})
+        return SimpleNamespace(handled=None)
+
+    monkeypatch.setattr(pipeline, "ensemble_moments", spy)
+    monkeypatch.setattr(pipeline, "cell_handling", lambda *a, **k: {})
+    monkeypatch.setattr(pipeline.AnalogLibrary, "build", classmethod(lambda cls, *a, **k: None))
+    ctx = SimpleNamespace(spec=SimpleNamespace(dim=3), embed_dim=7)
+
+    def make(dump):
+        study = pipeline.Study(SMOKE, tmp_path)
+        study.dump = dump
+        monkeypatch.setattr(study, "context", lambda system, embed_dim=None: ctx)
+        monkeypatch.setattr(study, "setup", lambda *a, **k: object())
+        monkeypatch.setattr(study, "unit_noise", lambda *a, **k: np.zeros((100, 3, 7)))
+        monkeypatch.setattr(study, "state_oracles", lambda ctx, split: SimpleNamespace(
+            subset=lambda rows: "subset"))
+        monkeypatch.setattr(study, "record_cell", lambda *a, **k: None)
+        return study
+
+    off = make(None)
+    off.run_cell("lorenz63", 0.01, 10_000, True, False)
+    off.run_cell("lorenz63", 0.02, 10_000, False, False)
+    assert seen == [("construction", False), ("calibration", False), ("test", False),
+                    ("test", False)]
+    seen.clear()
+    dump = StateDump()
+    on = make(dump)
+    on.run_cell("lorenz63", 0.01, 10_000, True, False)
+    on.run_cell("lorenz63", 0.02, 10_000, False, False)
+    on.run_cell("lorenz63", 0.01, 10_000, True, False, label="misspec=0.05")
+    assert seen == [("construction", False), ("calibration", False), ("test", True),
+                    ("test", True),
+                    ("construction", False), ("calibration", False), ("test", False)]
+    assert set(dump._halves) == {("lorenz63", 0.01, 10_000, True),
+                                 ("lorenz63", 0.02, 10_000, False)}
+    for record in dump._halves.values():
+        assert record["n_draws"].tolist() == [1, 1] and record["sq_cp_A"].shape == (2, 3)

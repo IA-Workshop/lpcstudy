@@ -548,3 +548,80 @@ def test_k1_report_only_needs_the_stored_budget(
         assert code == 64 and built == [] and len(lines) == 1 and lines[0].startswith(PREFIX)
         assert path.read_bytes() == before
         assert sorted(p.name for p in path.parent.iterdir()) == ["results.json"]
+
+
+# ------------------------------------------------ WU-0003.7b: --states-dump
+# Reference: the contract of the plan (B2 row .7b, b6) and of the knob it copies
+# (``--estimator-refine-steps``): opt-in, refused with the sealed flag before the sealed seed is
+# read, refused with --report-only, one provenance leaf and nothing else when on. Exact (exit
+# codes, strings, dict equality); the study is faked.
+DUMP_FLAG = "--states-dump"
+
+
+@pytest.mark.parametrize("order", ["flag-first", "flag-last"])
+def test_states_dump_with_the_sealed_flag_is_refused_before_the_sealed_seed(
+        order: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str]) -> None:
+    """b6: the sealed flag with the dump gives 64 in either order, one line, nothing created.
+
+    The ledger path does not exist and valid-looking variables are set: if the sealed seed were
+    read first, the refusal would be about the ledger; the line must name the dump flag and say
+    why, and the seed and salt must not appear in it.
+    """
+    monkeypatch.setenv("LPC_CONF_SEED", str(SEED))
+    monkeypatch.setenv("LPC_CONF_SALT", SALT)
+    argv = [FLAG, DUMP_FLAG] if order == "flag-first" else [DUMP_FLAG, FLAG]
+    out = tmp_path / "out"
+    code = main([*argv, "--out", str(out)], ledger_path=tmp_path / "missing_ledger.jsonl")
+    err = capsys.readouterr().err
+    assert code == 64 and len(err.splitlines()) == 1 and err.startswith(PREFIX)
+    assert DUMP_FLAG in err and "confirmatory flag" in err
+    assert str(SEED) not in err and SALT not in err and not out.exists()
+
+
+def test_states_dump_with_report_only_is_refused(tmp_path: Path,
+                                                 capsys: pytest.CaptureFixture[str]) -> None:
+    """--report-only recomputes nothing, so the dump flag is refused (not silently ignored)."""
+    out = tmp_path / "out"
+    code = main([DUMP_FLAG, "--report-only", "--preset", "smoke", "--out", str(out)])
+    err = capsys.readouterr().err
+    assert code == 64 and len(err.splitlines()) == 1 and DUMP_FLAG in err and "--report-only" in err
+    assert not out.exists()
+
+
+def test_choose_states_dump_values() -> None:
+    """Absent gives False, present gives True; the flag takes no value."""
+    from lpcstudy.__main__ import choose_states_dump
+    parse = lambda argv: choose_states_dump(build_parser().parse_args(argv))
+    assert parse([]) is False and parse([DUMP_FLAG]) is True
+    with pytest.raises(SystemExit):
+        build_parser().parse_args([f"{DUMP_FLAG}=1"])
+
+
+def test_states_dump_on_adds_one_provenance_leaf_and_hands_the_study_a_dump(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Dump on: ``provenance.states_dump`` is True and ``study.dump`` is a ``StateDump``; off: neither.
+
+    The study is faked and its ``dump`` attribute is read after the run. The
+    saved results of the two runs are equal except that one provenance leaf (the dump off adds no
+    leaf at all, b1).
+    """
+    from lpcstudy.dump import StateDump
+
+    created: list[_FakeStudy] = []
+    original = _FakeStudy.__init__
+    monkeypatch.setattr(_FakeStudy, "dump", None, raising=False)
+    monkeypatch.setattr(_FakeStudy, "__init__", lambda self, config, out_dir: (
+        original(self, config, out_dir), created.append(self))[0])
+    off = run_with_fakes(["--preset", "smoke"], tmp_path / "off", monkeypatch)
+    on = run_with_fakes(["--preset", "smoke", DUMP_FLAG], tmp_path / "on", monkeypatch)
+    assert created[0].dump is None and isinstance(created[1].dump, StateDump)
+    assert "states_dump" not in off[-1]["provenance"] and on[-1]["provenance"]["states_dump"] is True
+    drop = lambda block: {k: v for k, v in block.items() if k not in ("states_dump", "argv",
+                                                                         "start_utc", "end_utc",
+                                                                         "wall_seconds",
+                                                                         "peak_rss_bytes")}
+    assert drop(on[-1]["provenance"]).keys() == drop(off[-1]["provenance"]).keys()
+    # wall-clock "seconds" differs between any two runs; everything else outside provenance is equal
+    assert {k: v for k, v in on[-1].items() if k not in ("provenance", "seconds")} == \
+        {k: v for k, v in off[-1].items() if k not in ("provenance", "seconds")}
