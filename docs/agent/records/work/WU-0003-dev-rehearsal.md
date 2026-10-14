@@ -306,6 +306,29 @@ Needs owner review before freeze (the tool decides tolerances and compares verdi
   - **d4 P0/P1:** met on the extracted fixture: sum z^2 12.65 and 11.99, max |z| 1.69 (abs 0.005 against the log), no part fails; the same numbers come out of the evidence run on the two real files.
   - **d5 accounting:** met: union and one-sided counts, every difference with class, rel, tolerance and outcome (`--all`; by default every failure and the first `--show` of a passing group), timing and provenance listed as excluded with counts.
 
+#### WU-0003.9 fix round 1 (developer claude-sonnet-5-5, 2026-10-14; review `WU-0003.9-review.md`, commit 7a46e2f; findings R1 to R4, R7 to R11, R13; R5, R6, R12 and Q1 are not in this round)
+
+Needs owner review before freeze. Tool and tests only; no `lpcstudy/` file, no preset, no RNG, no tolerance loosened. No number of A6 or B1 changed; the changes make the tool stricter or fix its handling of the real schema.
+
+Record of the d1 change (R10): B2 d1 fixes truth-table fixtures "built from the WU-0002.14 S3 smoke pair (164 KB each)". The first implementation used synthetic dicts on the instruction of the main session (task message of 2026-10-14, which also said not to copy large results into tests). That instruction is not a dated plan amendment; the planner or owner should record it as one, or require the 164 KB fixtures (open question Q6 in the hand-back). To close the schema gap that let R1, R3 and R9 escape, the synthetic tree now embeds a 10 KB extract of the real S3 results (`tests/unit/fixtures/real_schema_extract.json`): the `handling` subtree of lorenz63 with its LM kinds, the top-level `handling` block, the `clip_sensitivity` block.
+
+Changes by finding (details under each finding in the review file): R1 `licensing_kind` and `count_scope` rebuilt to A6's list and per-system causal scope; R2 `td_statistic` uses the union of systems and counts a missing system's parts as not computable; R3 `lm_rules` (T3: T2 rules for the `eval` kind, T1 rules otherwise); R4 `--tol-other` above 1e-4 is refused (exit 2); R7 per-leaf-group selecting check on both runs, top-level estimator digests required; R8 a `cov_digest` difference alone is undetermined; R9 `is_verdict_str` (`verdict*`, `*_verdict`, `reading`, `status`) and `best_single*` as discrete; R10 above; R11 the three cases made 0.5x and 2x; R13 the docstring now says the untagged-as-network choice is the looser one and an owner reading.
+
+**§4.9 checklist (before the first invocation of this round; code and tests are written, nothing has run on them).**
+1. Change set (`git diff --name-only 9039bf5...HEAD` plus `git status --porcelain`): `tools/compare_runs.py`, `tests/unit/test_tools_compare_runs.py`, `tests/unit/fixtures/td_p0p1_parts.json`, `tests/unit/fixtures/real_schema_extract.json` (new, 10 KB), this file and `WU-0003.9-review.md`. Untracked files of other agents (`docs/agent/notes/2026-10-14-math-wu0003-9-*`) are not touched.
+2. Radius, `python3 tools/test_impact.py --base 9039bf5 --explain`: rule "`tools/<t>.py` -> `tests/unit/test_tools_<t>.py`"; the fixtures are selected through the test that names them. Unit set: `tests/unit/test_tools_compare_runs.py` (one file). Smaller than the whole suite; no gate; the file is run once after this code change.
+3. Already run: not on this code (the round-0 run, `166 passed`, was on the previous code).
+4. Device: `JAX_PLATFORMS=cpu` (wrapper); no JAX import.
+5. Threads and time: `LPC_THREADS` 4; wrapper timeout 300 s; the file took 1 s before.
+6. Contention: a pilot arm of another lane is running (PID 1972909, `k30`); this unit tier starts no preset and no GPU job.
+7. Output: `-q --tb=short -rfE`.
+8. Command: `tools/run_tests.sh unit tests/unit/test_tools_compare_runs.py`.
+
+**Results of fix round 1.**
+- Radius, run once on the new code: `tools/run_tests.sh unit tests/unit/test_tools_compare_runs.py`: `2 failed, 211 passed in 1.82s`. Both failures were one test, `test_t2_rules_fraction_no_decrease_uses_the_two_proportion_bound[T2, T3]`, whose typed sanity values (0.0777, 0.4363) were my wrong estimates of the fixed points; the tool's solved moves 0.07843 and 0.41081 were checked by hand (pbar 0.13922, bound 0.15687 = 2 x 0.07843; pbar 0.30541, bound 0.20541 = 0.41081 / 2). The literals were corrected to those hand values (abs 1e-5; no tolerance of the tool or of the criterion changed). Then `tools/run_tests.sh unit --lf tests/unit/test_tools_compare_runs.py`: `2 passed, 211 deselected in 0.30s`.
+- Self-check of the diff. `clip|nan_to_num|isfinite|where(|try:|except` sites: unchanged in kind (see the round-0 line above); the new refusal of `--tol-other` raises `ToolError` (exit 2) and is counted nowhere because nothing is replaced. `default_rng|random.|PRNGKey`: none (the hygiene test scans the source). No tolerance in an `assert` or `approx` of the file grew; the only literal changed is the one above, to the hand value.
+- Evidence run again on the scratch copy of the S3 pair (T2, injected digests): declared tolerance still 1e-5 for (a) and 1e-4 for (b) to (g); the four H1a `cp` failures remain (Q1, not in this round). New: 2 integer leaves now FAIL, `gain_bound/n_screened_out/negative_covariance` 25 -> 23 and its `handling/result_counts` mirror, because `n_screened_out` is not on A6's list (`n_states` is, and `gain_bound/n_states` 52 -> 54 stays listed). This follows the strict reading the main session asked for; whether `n_screened_out` is a state count that should license 0.1 hw is an owner question (Q7).
+
 ## Review
 
 ## Audit

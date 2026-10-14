@@ -22,14 +22,17 @@ Per system, from the ``context`` leaves, with ``provenance`` for the device:
 
 * **TD** if any of ``state_mean_digest``, ``lambda_max``, ``interval``, ``start_state`` (main or
   estimator), ``main_digest``, ``estimator_digest`` differs.
-* else **T2** if a ``cov_digest``, ``whiten_digest`` or ``unwhiten_digest`` (the W and U chain)
-  differs; else **T3** if a weight digest differs (``estimators/*/weights_digest``,
+* else **T2** if a ``whiten_digest`` or ``unwhiten_digest`` (W or U) differs (a ``cov_digest``
+  difference alongside counts too); a ``cov_digest`` difference alone, with W and U equal, matches no tier
+  of A6 and is left undetermined (exit 2; owner reading, since T2's LM bands are looser than T1's); else **T3** if a weight digest differs (``estimators/*/weights_digest``,
   ``validation/estimators/*/weights_digest``, ``fitted/allocator_digest``).
 * else **T0** if the host (platform and CPU model), the device (backend, kind, count) and
   ``LPC_THREADS`` are all equal, else **T1** (the device differs).
 * The pair gets the highest tier of any system (TD over T2 over T3 over T1 over T0).
-* A selecting leaf that either run lacks, or whose leaf set differs, gives "tier undetermined": no
-  tolerance is applied, and the exit code is 2.
+* A selecting leaf that either run lacks (checked per leaf group on both runs: each of the six
+  triggers with both ``start_state`` parts, the three W/U digests, ``allocator_digest``, at least one
+  validation estimator digest, the top-level estimator digests), or whose leaf set differs, gives
+  "tier undetermined": no tolerance is applied, and the exit code is 2.
 
 Tolerances applied to a pair (A6 and B1 items 2 to 5)
 -----------------------------------------------------
@@ -42,17 +45,27 @@ Tolerances applied to a pair (A6 and B1 items 2 to 5)
   exact, ``median_iterations`` within 1, the other LM summaries within ``1e-8 |ref|``; the
   per-estimate LM check of B1 item 2 (``lm_estimate_check``); QoIs and interval endpoints
   (class a) ``|d| <= 1e-4 s`` with ``s = max(|lo|, |hi|)`` of the reference interval.
-* **T2, T3:** as T1, except the LM summaries: ``fraction_no_decrease`` within
+* **T2, T3:** as T1, except the LM summaries of the "T2 rules": ``fraction_no_decrease`` within
   ``3 sqrt(2 pbar (1 - pbar) / n) + 1/n`` (WU-0005.4 M7(ii)), ``median_iterations`` within 1, and
   the order-statistic bands for ``median_residual`` and ``p95_residual`` (``order_statistic_band``).
-* **In T1 to T3:** a leaf with an interval, in a result block where a discrete count differs (K,
-  best single, a state count, a clip, nu-cap or replacement count), is allowed ``|d| <= 0.1 hw``
-  instead of its tolerance (hw of the reference interval). The scope of a count is the block it
-  lives in; K reaches ``fitted``, ``H3a``, ``H3c`` and ``regime_curve``; a ``handling`` count
-  reaches its whole system. A difference of the new integers (``nfev``, ``status``,
-  ``a5_leaf_digest``) is printed beside the differences it may explain and licenses nothing (OF-1,
-  working default). A leaf only on one side is a failure, except where a discrete count of its
-  block differs (the length follows the count).
+  T2 applies the T2 rules to every LM summary. T3 ("network chain as T2; other chains as T1") applies
+  them to the ``eval`` kind only; the ``oracle`` and ``check`` kinds and the pooled summary keep the
+  T1 rules (strict default; the kind-to-chain map is a question for the mathematician).
+* **In T1 to T3:** a leaf with an interval, in a result block where a discrete count of A6's list
+  differs, is allowed ``|d| <= 0.1 hw`` instead of its tolerance (hw of the reference interval). The
+  list is exactly A6's, unchanged by B1 item 3 (``licensing_kind``): K (``chosen_K``, ``realized_K``),
+  ``best_single``, ``n_states`` and the state denominators, and clip, nu-cap and replacement counts
+  (``error_clips*``, ``nu_cap_clips``, ``*_replacements``). The scope is per system and causal: a
+  ``n_states`` or ``best_single`` reaches its own block; K reaches ``fitted``, ``H3a``, ``H3c`` and
+  ``regime_curve``; a clip, nu-cap or replacement count under ``systems/<s>/handling`` reaches system
+  ``s`` only. The top-level ``handling`` block (``totals``, ``by_system``, ``robustness``), a per-system
+  ``totals`` mirror and a state denominator open no scope (the per-system source of a sum carries
+  it). Any other differing integer is exact (a failure), including the other ``handling`` counters, LM
+  ``n_estimates``, non-finite, warning, fallback and failed-resample counts; only integers inside a
+  K-shaped block of a system whose K differs are listed as following K. A difference of the new
+  integers (``nfev``, ``status``, ``a5_leaf_digest``) is printed beside the differences it may explain
+  and licenses nothing (OF-1, working default). A leaf only on one side is a failure, except where a
+  K or a count of its own block differs (the length follows the count).
 * **Every verdict must be identical** (T0 to T3): a flag or verdict string that differs prints a
   ``DEF`` line. In TD the verdicts are reported only.
 * **TD:** no per-leaf tolerance. Per primary part (6 parts per system, 18 over three systems)
@@ -74,12 +87,16 @@ and provenance. The declared tolerance is ``10^ceil(log10(10 max rel))`` per cla
 (b) to (g); "bitwise on the same device type" if nothing differs. A declaration above 1e-4 is the
 O3 finding (exit 1) for a T0 pair, the R1 against R2 calibration; on a T1 to T3 pair the same number is
 printed as information (a pair that passes at half its tolerance would otherwise always fail). In T1 to T3 the class tolerance of (b) to (g) is ``--tol-other`` (default 1e-4, the O3
-ceiling) until R1 and R2 declare one; an exceedance is a listed finding.
+ceiling) until R1 and R2 declare one, never above 1e-4: a larger value is refused (exit 2), because A6
+makes it an O3 finding that is not adopted silently. An exceedance is a listed finding.
 
 Readings that the plan leaves open (strict reading applied; owner questions)
 ----------------------------------------------------------------------------
-* The leaf-to-chain map is ``compare_pilot``'s rule table; an untagged leaf is treated as
-  network chain (the class rules), and the count of leaves without a rule is printed.
+* The leaf-to-chain map is ``compare_pilot``'s rule table. **A leaf without a chain tag is treated as
+  network chain (class rules, 1e-4), which is the looser choice** (the strict choice, 1e-12, would fail
+  the many QoI leaves that the table leaves untagged: 111 differing leaves on the S3 pair). The count
+  is printed, nothing is silent; this is an owner reading.
+* A ``cov_digest`` difference alone is undetermined (see above); a ``None`` system never opens a scope.
 * ``fraction_above_chi2`` and ``fraction_late_progress`` have no T2/T3 tolerance in A6: class (c)
   applies (T1: ``1e-8 |ref|``); the two-proportion band is printed beside them.
 * The per-estimate LM check and the order-statistic bands need arrays of the per-state dump
@@ -140,9 +157,10 @@ BAND_Z = 2.58              # WU-0005.4 M7(ii): 99% order-statistic band
 FLOOR_WEIGHT = 0.01        # M2 (b), (f)
 FLOOR_PVALUE = 1e-3        # M2 (e)
 
-TD_TRIGGERS = ("state_mean_digest", "lambda_max", "interval", "start_state", "main_digest",
-               "estimator_digest")
+TD_TRIGGERS = ("state_mean_digest", "lambda_max", "interval", "start_state/main", "start_state/estimator",
+               "main_digest", "estimator_digest")
 WU_TRIGGERS = ("cov_digest", "whiten_digest", "unwhiten_digest")
+WEIGHT_GROUPS = ("allocator_digest", "validation_weights")
 RANK = {"T0": 0, "T1": 1, "T3": 2, "T2": 3, "TD": 4}
 FACTS = (("device", "backend"), ("device", "kind"), ("device", "count"), ("platform",),
          ("cpu", "model"), ("env", "LPC_THREADS"))
@@ -152,14 +170,8 @@ EVIDENCE_DIGESTS = frozenset({"state_mean_digest", "cov_digest", "whiten_digest"
                               "main_digest", "estimator_digest", "weights_digest",
                               "allocator_digest"})
 CHAIN_HEAD_INTEGERS = frozenset({"nfev", "status", "a5_leaf_digest"})
-VERDICT_STRINGS = frozenset({"verdict", "part_i_verdict", "part_ii_verdict", "reading"})
 K_BLOCKS = ("fitted", "H3a", "H3c", "regime_curve")
-COUNT_SEGMENTS = frozenset({
-    "n_states", "n_eligible_states", "n_excluded_states", "n_noncontiguous_states",
-    "n_total_states", "n_switching_states", "n_w_zero", "n_w_one", "n_constant_states",
-    "n_zero_difference", "n_ineligible_states", "n_per_regime", "n_screened_out",
-    "n_empty_regimes", "n_degenerate_pairs", "n_km_not_reached", "n_test", "n_train",
-    "n_pred_outside_unit"})
+CLIP_NAME = re.compile(r"error_clips.*|nu_cap_clips|.*_replacements")
 INTERVAL_KEYS = frozenset({"ci", "interval", "ratio_ci", "mean_ci", "median_ci", "range_ci",
                            "ci_inverse_dim"})
 KNOWN_POSITIVE = frozenset({
@@ -199,6 +211,12 @@ def is_float(value: object) -> bool:
 def is_number(value: object) -> bool:
     """True for an int or a float (not a bool)."""
     return type(value) in (int, float)
+
+
+def is_verdict_str(name: str) -> bool:
+    """A string leaf that carries a verdict or a status: ``verdict``, ``verdict_2L``, ``part_i_verdict``,
+    ``reading``, ``status`` (the clip-sensitivity strings)."""
+    return name.startswith("verdict") or name.endswith("_verdict") or name in ("reading", "status")
 
 
 def leaf_key(value: object) -> tuple:
@@ -278,7 +296,11 @@ class Tier:
 
 
 def group_leaves(flat: dict[Path_, object], system: str | None, group: str) -> dict[Path_, object]:
-    """The leaves of one selecting group of one system (``None``: the top-level estimators)."""
+    """The leaves of one selecting group of one system (``None``: the top-level estimators).
+
+    Groups: a ``context`` leaf name, ``start_state/main`` or ``start_state/estimator``,
+    ``allocator_digest``, ``validation_weights`` (the weight digests of ``validation/estimators``).
+    """
     out = {}
     for path, value in flat.items():
         if system is None:
@@ -287,11 +309,16 @@ def group_leaves(flat: dict[Path_, object], system: str | None, group: str) -> d
             continue
         if path[:2] != ("systems", system):
             continue
-        if group == "weights_digest":
-            if (len(path) > 3 and path[2] == "validation" and path[3] == "estimators"
-                    and path[-1] == "weights_digest") or path[2:] == ("fitted", "allocator_digest"):
-                out[path] = value
-        elif len(path) > 3 and path[2] == "context" and path[3] == group:
+        rest = path[2:]
+        if group == "validation_weights":
+            ok = len(rest) > 2 and rest[:2] == ("validation", "estimators") and rest[-1] == "weights_digest"
+        elif group == "allocator_digest":
+            ok = rest == ("fitted", "allocator_digest")
+        elif group.startswith("start_state/"):
+            ok = len(rest) > 3 and rest[:3] == ("context", "start_state", group.split("/")[1])
+        else:
+            ok = len(rest) > 1 and rest[:2] == ("context", group)
+        if ok:
             out[path] = value
     return out
 
@@ -331,9 +358,9 @@ def select_tier(ref_tree: dict, new_tree: dict) -> Tier:
     if not common:
         tier.missing.append("no system with a context block on both runs")
         return tier
-    td_hits, wu_hits, weight_hits, only_traj = [], [], [], []
+    td_hits, wu_hits, weight_hits = [], [], []
     for system in common:
-        for group in (*TD_TRIGGERS, *WU_TRIGGERS, "weights_digest"):
+        for group in (*TD_TRIGGERS, *WU_TRIGGERS, *WEIGHT_GROUPS):
             status = group_status(group_leaves(ref, system, group), group_leaves(new, system, group))
             tier.evidence.append((system, group, status))
             label = f"{system}/{group}"
@@ -342,14 +369,12 @@ def select_tier(ref_tree: dict, new_tree: dict) -> Tier:
             elif status == "differs":
                 (td_hits if group in TD_TRIGGERS else wu_hits if group in WU_TRIGGERS
                  else weight_hits).append(label)
-    top_ref, top_new = group_leaves(ref, None, "weights_digest"), group_leaves(new, None, "weights_digest")
-    if top_ref or top_new:
-        status = group_status(top_ref, top_new)
-        tier.evidence.append(("(top level)", "estimators/*/weights_digest", status))
-        if status == "differs":
-            weight_hits.append("estimators/*/weights_digest")
-        elif status == "missing":
-            tier.missing.append("estimators/*/weights_digest")
+    status = group_status(group_leaves(ref, None, "weights_digest"), group_leaves(new, None, "weights_digest"))
+    tier.evidence.append(("(top level)", "estimators/*/weights_digest", status))
+    if status == "differs":
+        weight_hits.append("estimators/*/weights_digest")
+    elif status == "missing":
+        tier.missing.append("estimators/*/weights_digest")
     facts_ref, facts_new = provenance_facts(ref_tree), provenance_facts(new_tree)
     tier.cpu_device = facts_new.get("device.backend") == "cpu" and facts_ref.get("device.backend") == "cpu"
     if tier.missing:
@@ -359,8 +384,14 @@ def select_tier(ref_tree: dict, new_tree: dict) -> Tier:
         tier.reasons = [f"{h} differs" for h in td_hits]
         tier.only_trajectory_digest = all(h.rsplit("/", 1)[1] in ("main_digest", "estimator_digest")
                                           for h in td_hits)
-    elif wu_hits:
+    elif any(not h.endswith("/cov_digest") for h in wu_hits):
         tier.name, tier.reasons = "T2", [f"{h} differs" for h in wu_hits]
+    elif wu_hits:
+        # R8: cov_digest alone (W and U equal) matches no tier of A6; T2 would apply the looser LM bands,
+        # so the pair is left undetermined (owner reading).
+        tier.missing += [f"{h}: differs with whiten_digest and unwhiten_digest equal (matches no A6 tier)"
+                         for h in wu_hits]
+        return tier
     elif weight_hits:
         tier.name, tier.reasons = "T3", [f"{h} differs" for h in weight_hits]
     else:
@@ -443,39 +474,76 @@ def scale_of(cls: str, ref: float, floor_or_s: float | None) -> float:
     return max(abs(ref), floor_or_s)
 
 
-def count_scope(path: Path_, kind: str) -> tuple[str | None, str] | None:
-    """The scope ``(system, block)`` of a discrete count leaf, or ``None`` if the leaf is not one.
+def licensing_kind(path: Path_, kind: str) -> str | None:
+    """Which entry of A6's exception list a differing leaf is, or ``None`` (then a differing integer is exact).
 
-    ``block`` is the block the count lives in; ``"*"`` is the whole system (a ``handling`` count),
-    ``"K"`` the blocks of ``K_BLOCKS``. ``kind`` is ``int`` or ``str`` (only ``best_single``).
+    A6 (unchanged by B1 item 3): K (``chosen_K``, ``realized_K``), ``best_single`` (also
+    ``best_single_2L``), ``n_states`` and the state denominators, and clip, nu-cap and replacement counts
+    (``error_clips*``, ``nu_cap_clips``, ``*_replacements``). Nothing else is a licensing count: not
+    the other ``handling`` counters, the LM ``n_estimates``, non-finite, warning, fallback or
+    failed-resample counts.
     """
-    system, block = loc(path)
-    if path[0] == "handling" or block == "handling":
-        if kind != "int":
-            return None
-        if path[0] == "systems" and len(path) > 4 and path[3] == "result_counts":
-            return system, path[4].split("%2F")[0]
-        return system, "*" if block == "handling" else block
+    name = path[-1]
     if kind == "str":
-        return (system, "H2c") if path[-1] == "best_single" else None
+        return "best_single" if name.startswith("best_single") else None
     if kind != "int":
         return None
-    if path[-1] in ("chosen_K", "realized_K") or "realized_K" in path or block in ("H3a", "regime_curve"):
-        return system, "K"
-    if COUNT_SEGMENTS & set(path):
-        return system, block
+    if name in ("chosen_K", "realized_K") or "realized_K" in path:
+        return "K"
+    if name == "n_states":
+        return "states"
+    if "denominators" in path and name == "states":
+        return "denominator"
+    if any(CLIP_NAME.fullmatch(seg) for seg in path):
+        return "clip"
     return None
 
 
-def in_scope(scopes: list[tuple[str | None, str]], path: Path_) -> bool:
-    """Whether a path is in the scope of a differing discrete count."""
+def count_scope(path: Path_, kind: str) -> tuple[str, str] | None:
+    """The scope ``(system, block)`` that a differing licensing count opens, or ``None``.
+
+    ``block`` is the block the count lives in; ``"*"`` is the whole system (a per-system clip, nu-cap or
+    replacement count under ``systems/<s>/handling``), ``"K"`` the blocks of ``K_BLOCKS``. A leaf of the
+    top-level ``handling`` block (``totals``, ``by_system``, ``robustness``), a per-system ``totals``
+    mirror, and a state denominator open no scope: the per-system source of a sum carries it, and a
+    ``None`` system never matches every system (OF-1, per-system scope only).
+    """
+    lk = licensing_kind(path, kind)
+    if lk is None or path[0] == "handling" or lk == "denominator":
+        return None
     system, block = loc(path)
+    if system is None:
+        return None
+    if block == "handling":
+        if len(path) > 3 and path[3] == "totals":
+            return None
+        return (system, "*") if lk == "clip" else None
+    if lk == "clip":
+        return None
+    return (system, "K") if lk == "K" else (system, block)
+
+
+def in_scope(scopes: list[tuple[str, str]], path: Path_, star: bool = True) -> bool:
+    """Whether a path is in the scope of a differing licensing count of its own system.
+
+    ``star=False`` leaves out the whole-system scope of clip counts (used for one-sided leaves: only the
+    shape that follows a count of its own block or K is excused).
+    """
+    system, block = loc(path)
+    if system is None:
+        return False
     for s_sys, s_block in scopes:
-        if s_sys is not None and s_sys != system:
+        if s_sys != system:
             continue
-        if s_block == "*" or s_block == block or (s_block == "K" and block in K_BLOCKS):
+        if (s_block == "*" and star) or s_block == block or (s_block == "K" and block in K_BLOCKS):
             return True
     return False
+
+
+def follows_k(scopes: list[tuple[str, str]], path: Path_) -> bool:
+    """Whether a path lies in a K-shaped block of a system whose K differs."""
+    system, block = loc(path)
+    return system is not None and block in K_BLOCKS and (system, "K") in scopes
 
 
 # ------------------------------------------------------------------------------------- LM functions
@@ -639,7 +707,7 @@ def decide_one_sided(row: Row, scopes: list, tier: Tier) -> None:
     row.cls, row.rule = "structure", "present on both runs"
     if tier.name == "TD":
         row.outcome, row.note = "reported", "TD: no per-leaf rule"
-    elif tier.name != "T0" and in_scope(scopes, row.path):
+    elif tier.name != "T0" and in_scope(scopes, row.path, star=False):
         row.outcome, row.note = "listed", "shape follows a differing discrete count of its block"
     else:
         row.outcome = "FAIL"
@@ -652,7 +720,7 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
     """
     path, a, b, kind = row.path, row.ref, row.new, row.kind
     name = path[-1]
-    verdictlike = kind == "bool" or (kind == "str" and name in VERDICT_STRINGS) or path[0] == "verdicts"
+    verdictlike = kind == "bool" or (kind == "str" and is_verdict_str(name)) or path[0] == "verdicts"
     if kind == "float":
         row.cls, floor, row.defaulted = classify_float(ref, path)
         scale = scale_of(row.cls, a, floor)
@@ -690,7 +758,7 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
         elif verdictlike:
             row.cls, row.rule = "verdict", "every verdict identical"
             row.outcome, row.note = "DEF", "a verdict or flag differs"
-        elif count_scope(path, kind) is not None:
+        elif licensing_kind(path, kind) is not None:
             row.cls, row.rule, row.outcome = "discrete", "A6 exception list", "listed"
         else:
             row.cls, row.rule, row.outcome = "categorical", "exact", "FAIL"
@@ -700,8 +768,12 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
         if name in CHAIN_HEAD_INTEGERS:
             row.cls, row.rule, row.outcome = "chain head", "listed beside H2c, H2d, H3c, oracle_recovery", "listed"
             row.note = "OF-1: no licence for 0.1 hw"
-        elif count_scope(path, "int") is not None:
+        elif licensing_kind(path, "int") is not None:
             row.cls, row.rule, row.outcome = "discrete", "A6 exception list", "listed"
+            if count_scope(path, "int") is None:
+                row.note = "opens no scope (mirror, denominator or top-level sum)"
+        elif follows_k(scopes, path):
+            row.cls, row.rule, row.outcome = "discrete", "follows a differing K", "listed"
         else:
             row.cls, row.rule, row.outcome = "integer", "exact", "FAIL"
         return 0
@@ -748,35 +820,52 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
     return untagged
 
 
+def lm_rules(tier: Tier, path: Path_) -> str:
+    """``T1`` or ``T2``: which LM rules apply to an LM summary leaf under the tier.
+
+    A6: T2 applies the LM bands (T2 rules) to every LM summary. T3 says "network chain as T2; other
+    chains as T1": the ``eval`` kind (the estimates of the evaluation draws, which run the trained
+    network) gets the T2 rules; the ``oracle`` and ``check`` kinds and the pooled summary keep the T1
+    rules (strict default until the mathematician gives the kind-to-chain map).
+    """
+    if tier.name == "T2":
+        return "T2"
+    if tier.name == "T3":
+        kind = path[path.index("by_kind") + 1] if "by_kind" in path[:-1] else "pooled"
+        return "T2" if kind == "eval" else "T1"
+    return "T1"
+
+
 def lmrow(row: Row, ref: dict, tier: Tier, tol_other: float) -> None:
-    """The rule of an LM summary leaf (T1: WU-0005.4 M7(i); T2, T3: M7(ii))."""
+    """The rule of an LM summary leaf (T1 rules: WU-0005.4 M7(i); T2 rules: M7(ii); see ``lm_rules``)."""
     a, b, path = row.ref, row.new, row.path
+    rules = lm_rules(tier, path)
     name = path[-1]
     n = ref.get((*path[:-1], "n_estimates"))
     n = n if type(n) is int and n > 0 else None
     row.metric = abs(a - b) / abs(a) if a else (0.0 if a == b else math.inf)
     if name == "fraction_no_decrease":
-        if tier.name == "T1":
+        if rules == "T1":
             row.rule, row.tol, row.outcome = "T1: exact", 0.0, "FAIL"
             row.metric = abs(a - b)
         elif n is not None:
-            row.rule, row.tol, row.metric = "T2/T3: 3 sqrt(2 pbar (1 - pbar) / n) + 1/n", two_proportion_bound(a, b, n), abs(a - b)
+            row.rule, row.tol, row.metric = "T2 rules: 3 sqrt(2 pbar (1 - pbar) / n) + 1/n", two_proportion_bound(a, b, n), abs(a - b)
             row.outcome = "pass" if row.metric <= row.tol else "FAIL"
         else:
             row.rule, row.outcome, row.note = "needs n_estimates", "NOT COMPUTED", "n_estimates absent"
         return
-    if tier.name == "T1":
+    if rules == "T1":
         row.rule, row.tol = "T1: LM summary relative 1e-8 (M7(i))", TOL_LM_SUMMARY
         row.outcome = "pass" if row.metric <= row.tol else "FAIL"
     elif name in ("median_residual", "p95_residual"):
-        row.rule, row.outcome, row.for_10x = "T2/T3: order-statistic band", "NOT COMPUTED", False
+        row.rule, row.outcome, row.for_10x = "T2 rules: order-statistic band", "NOT COMPUTED", False
         row.note = "needs the per-estimate dump (WU-0003.7b); relative difference shown"
     else:
         row.cls = "c"
         scale = max(abs(a), 1.0 / n) if n else abs(a)
         row.metric = abs(a - b) / scale if scale else (0.0 if a == b else math.inf)
         row.rel = row.metric
-        row.rule, row.tol = "class (c); no T2/T3 tolerance in A6", tol_other
+        row.rule, row.tol = "class (c); no T2 tolerance in A6", tol_other
         if n:
             row.note = f"two-proportion band {two_proportion_bound(a, b, n):.3g} (information)"
         row.outcome = "pass" if row.metric <= row.tol else "FINDING"
@@ -833,26 +922,35 @@ def lookup(tree: object, keys: tuple[str, ...]) -> object:
 
 
 def td_statistic(ref_tree: dict, new_tree: dict) -> dict:
-    """The TD table over the primary parts of every system common to both runs.
+    """The TD table over the primary parts of every system of either run (6 parts per system, 18 over three).
+
+    A system missing on one run gives 6 parts that cannot be computed (never dropped silently: B1 item 5
+    fixes the number of parts).
 
     Returns
     -------
     dict
-        ``parts`` (rows with ``system``, ``part`` and ``td_part``'s keys, or ``error``), ``sum_sym``,
-        ``sum_away``, ``max_z``, ``k`` (parts computed), ``n_error``, ``n_fail``.
+        ``parts`` (rows with ``system``, ``part`` and ``td_part``'s keys, or ``error``), ``expected``
+        (6 x systems), ``sum_sym``, ``sum_away``, ``max_z``, ``k`` (parts computed), ``n_error``,
+        ``n_fail``.
     """
-    systems = sorted(set(ref_tree.get("systems", {})) & set(new_tree.get("systems", {})))
+    ref_systems, new_systems = ref_tree.get("systems", {}), new_tree.get("systems", {})
+    systems = sorted(set(ref_systems) | set(new_systems))
     parts, errors = [], 0
     for system in systems:
-        r, n = ref_tree["systems"][system], new_tree["systems"][system]
+        r, n = ref_systems.get(system), new_systems.get(system)
         for name, point, interval in TD_PARTS:
-            res = td_part(lookup(r, point), lookup(r, interval), lookup(n, point), lookup(n, interval))
+            if r is None or n is None:
+                res = {"error": f"system missing on the {'reference' if r is None else 'new'} run"}
+            else:
+                res = td_part(lookup(r, point), lookup(r, interval), lookup(n, point), lookup(n, interval))
             res.update(system=system, part=name)
             errors += "error" in res
             res["fail"] = "error" not in res and max(res["z_sym"], res["z_away"]) > TD_BOUND
             parts.append(res)
     good = [p for p in parts if "error" not in p]
     return {"parts": parts, "k": len(good), "n_error": errors, "n_fail": sum(p["fail"] for p in good),
+            "expected": len(TD_PARTS) * len(systems),
             "sum_sym": sum(p["z_sym"] ** 2 for p in good), "sum_away": sum(p["z_away"] ** 2 for p in good),
             "max_z": max((max(p["z_sym"], p["z_away"]) for p in good), default=0.0),
             "max_sym": max((p["z_sym"] for p in good), default=0.0),
@@ -878,6 +976,9 @@ def declarations(rows: list[Row]) -> dict[str, dict]:
 def compare_trees(ref_tree: dict, new_tree: dict, tol_other: float = TOL_O3,
                   allow_not_computed: bool = False) -> Comparison:
     """Compare two parsed results trees: tier, leaf decisions, 10x declarations, TD, exit code."""
+    if not 0 < tol_other <= TOL_O3:
+        raise ToolError(f"--tol-other {tol_other:g} is outside (0, {TOL_O3:g}]: a class tolerance above the O3 "
+                        "ceiling is an O3 finding that A6 does not let the tool adopt (stricter reading)")
     tier = select_tier(ref_tree, new_tree)
     flat_ref, flat_new = flatten(ref_tree), flatten(new_tree)
     excluded = {"ref": excluded_counts(ref_tree), "new": excluded_counts(new_tree)}
@@ -890,9 +991,14 @@ def compare_trees(ref_tree: dict, new_tree: dict, tol_other: float = TOL_O3,
     td = td_statistic(ref_tree, new_tree) if tier.name == "TD" else None
     not_computed: list[str] = []
     if tier.name in ("T1", "T2", "T3") and any(lm_name(p) for p in flat_ref):
-        not_computed.append(("LM per-estimate check (B1 item 2)" if tier.name == "T1" else
-                             "LM order-statistic bands for median_residual and p95_residual (M7(ii))")
-                            + ": needs the per-estimate arrays of the WU-0003.7b dump")
+        if tier.name in ("T1", "T3"):
+            not_computed.append("LM per-estimate check (B1 item 2)"
+                                + (" for the oracle and check kinds and the pooled summary" if tier.name == "T3" else "")
+                                + ": needs the per-estimate arrays of the WU-0003.7b dump")
+        if tier.name in ("T2", "T3"):
+            not_computed.append("LM order-statistic bands for median_residual and p95_residual (M7(ii))"
+                                + (" of the eval kind" if tier.name == "T3" else "")
+                                + ": needs the per-estimate arrays of the WU-0003.7b dump")
     if any(r.outcome == "NOT COMPUTED" and r.note == "n_estimates absent" for r in rows):
         not_computed.append("fraction_no_decrease needs n_estimates, absent from a cell")
     declared = declarations(rows) if tier.name != "TD" else {}
@@ -1023,7 +1129,7 @@ def render_td(td: dict) -> list[str]:
         ratio = p["hw1"] / p["hw0"] if p["hw0"] else math.inf
         out.append(f"  {p['system']:9s} {p['part']:17s} {p['d']:9.4f} {p['z_sym']:7.2f} {p['z_away']:7.2f} "
                    f"{ratio:8.3f}  {'FAIL' if p['fail'] else 'ok'}")
-    out.append(f"  parts computed {td['k']} (cannot be computed: {td['n_error']}); sum z^2 symmetric "
+    out.append(f"  parts computed {td['k']} of {td['expected']} expected (cannot be computed: {td['n_error']}); sum z^2 symmetric "
                f"{td['sum_sym']:.2f}, away {td['sum_away']:.2f}; max |z| symmetric {td['max_sym']:.2f}, "
                f"away {td['max_away']:.2f}; failing parts {td['n_fail']}")
     return out
@@ -1057,6 +1163,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if not (args.tol_other > 0 and math.isfinite(args.tol_other)) or args.show < 0:
             raise ToolError("--tol-other must be positive and finite, --show not negative")
+        if args.tol_other > TOL_O3 and not args.td_only:
+            raise ToolError(f"--tol-other {args.tol_other:g} is above the O3 ceiling {TOL_O3:g}: refused "
+                            "(A6: such a tolerance is a finding, never adopted silently)")
         ref_tree, new_tree = load(args.ref), load(args.new)
         if args.td_only:
             lines, code = run_td_only(ref_tree, new_tree, str(args.ref), str(args.new))

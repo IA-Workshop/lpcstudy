@@ -19,6 +19,14 @@ References (none of them is the tool's own output):
   5 KB, extracted from their ``results.json``), against the values printed by the independent script
   ``m1_td_p0p1.py`` in ``m1_td_p0p1.log`` (sum z^2 12.65 and 11.99, max 1.69, two decimals), plus hand
   cases at the 3.4 bound.
+* **Real schema (review R10):** ``fixtures/real_schema_extract.json`` (10 KB) is an extract of the real
+  ``results.json`` of the WU-0002.14 S3 smoke: the ``handling`` subtree of lorenz63 (one cell, with its LM
+  kinds ``oracle``, ``eval``, ``check``, ``totals``, ``fitting``, ``result_counts``), the top-level
+  ``handling`` block (``totals``, ``by_system``, ``robustness``, ``failed_variants``) and the
+  ``clip_sensitivity`` block (``verdict_2L``, ``status``). The synthetic tree embeds it, so the scope,
+  the LM kinds, the sum-over-systems case and the verdict strings are tested on real leaf shapes.
+  (B2 d1 asked for fixtures built from the whole 164 KB pair; the main session instructed synthetic
+  trees, and the extract is the real-schema part that matters; recorded in the unit Log.)
 * **Accounting (d5), read-only, exit codes:** counts decided by construction; file contents hashed before
   and after.
 
@@ -45,6 +53,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / "tools" / "compare_runs.py"
 FIXTURE = ROOT / "tests" / "unit" / "fixtures" / "td_p0p1_parts.json"
+EXTRACT = json.loads((ROOT / "tests" / "unit" / "fixtures" / "real_schema_extract.json").read_text())
 _SPEC = importlib.util.spec_from_file_location("compare_runs", TOOL)
 assert _SPEC is not None and _SPEC.loader is not None
 cr = importlib.util.module_from_spec(_SPEC)
@@ -61,7 +70,18 @@ def dig(char: str) -> str:
 
 
 def system_block() -> dict:
-    """One system of a synthetic results tree (paths and leaf kinds of the real ``results.json``)."""
+    """One system of a synthetic results tree (paths and leaf kinds of the real ``results.json``; the
+    ``handling`` and ``clip_sensitivity`` subtrees are the real ones)."""
+    block = _system_block()
+    lm = block["handling"]["cells"]["V3-cp-horizon"]["lm"]
+    lm["n_estimates"] = 100                       # the formulas of the tests use n = 100
+    pooled = {k: v for k, v in lm.items() if k != "by_kind"}
+    for kind in ("oracle", "eval", "check"):      # every kind carries the same numbers (the real oracle and
+        lm["by_kind"][kind] = copy.deepcopy(pooled)   # eval kinds are empty in this cell)
+    return block
+
+
+def _system_block() -> dict:
     return {
         "context": {"state_mean_digest": dig("1"), "cov_digest": dig("2"), "whiten_digest": dig("3"),
                     "unwhiten_digest": dig("4"), "main_digest": dig("5"), "estimator_digest": dig("6"),
@@ -95,12 +115,8 @@ def system_block() -> dict:
         "weight_profile": {"median": [0.5, 0.6]},
         "km_curves": {"A1": [1.0, 0.9, 0.5]},
         "regime_curve": {"realized_K": {"2": 2}},
-        "handling": {
-            "cells": {"V3": {"lm": {"fraction_no_decrease": 0.04, "fraction_above_chi2": 0.02,
-                                    "median_iterations": 8.0, "median_residual": 0.5,
-                                    "p95_residual": 9.0, "n_estimates": 100},
-                             "counts": {"error_clips": 2, "nu_cap_clips": 3}}},
-            "result_counts": {"H3c": {"n_states": 80}}},
+        "handling": copy.deepcopy(EXTRACT["system_handling"]),
+        "clip_sensitivity": copy.deepcopy(EXTRACT["clip_sensitivity"]),
     }
 
 
@@ -116,6 +132,8 @@ def make(systems: tuple[str, ...] = ("lorenz63",)) -> dict:
             "seconds": 1.0}},
         "verdicts": {"H3c": {"verdict": "inconclusive", "by_system": {s: "inconclusive" for s in systems}}},
         "robustness": {"lorenz63": {"Lambda_fin(eps=1rho)": {"corr_fin_vs_linear": 0.7}}},
+        "handling": {**copy.deepcopy(EXTRACT["top_handling"]),
+                     "by_system": {s: copy.deepcopy(EXTRACT["by_system_lorenz63"]) for s in systems}},
         "systems": {s: system_block() for s in systems},
     }
 
@@ -125,9 +143,9 @@ def edit(tree: dict, path: str, value: object) -> dict:
     node = tree
     parts = path.split("/")
     for part in parts[:-1]:
-        node = node[int(part[1:-1])] if part.startswith("[") else node[part]
+        node = node[int(part[1:-1])] if part.startswith("[") else node[part.replace("%2F", "/")]
     last = parts[-1]
-    key = int(last[1:-1]) if last.startswith("[") else last
+    key = int(last[1:-1]) if last.startswith("[") else last.replace("%2F", "/")
     if value is DELETE:
         del node[key]
     else:
@@ -139,12 +157,13 @@ def get(tree: dict, path: str) -> object:
     """The value at a ``/``-joined path."""
     node = tree
     for part in path.split("/"):
-        node = node[int(part[1:-1])] if part.startswith("[") else node[part]
+        node = node[int(part[1:-1])] if part.startswith("[") else node[part.replace("%2F", "/")]
     return node
 
 
 S = "systems/lorenz63"
 PROV = "provenance/device"
+CELL = f"{S}/handling/cells/V3-cp-horizon"
 
 
 def tier_pair(tier: str, **edits: object) -> tuple[dict, dict]:
@@ -212,11 +231,23 @@ def test_each_td_trigger_alone_selects_td(name: str) -> None:
     assert any(name.split("_")[0] in reason for reason in tier.reasons)
 
 
-@pytest.mark.parametrize("name", ["cov_digest", "whiten_digest", "unwhiten_digest"])
+@pytest.mark.parametrize("name", ["whiten_digest", "unwhiten_digest"])
 def test_w_or_u_digest_alone_selects_t2(name: str) -> None:
     """A W or U digest alone (the context otherwise equal) gives T2 (A6)."""
     ref, new = make(), make()
     edit(new, f"{S}/context/{name}", dig("9"))
+    assert cr.select_tier(ref, new).name == "T2"
+
+
+def test_cov_digest_alone_matches_no_tier_and_is_undetermined() -> None:
+    """R8: ``cov_digest`` differing with W and U equal is in no A6 row. T2 would apply looser LM bands, so the
+    pair is undetermined (exit 2, owner reading). With W or U also differing, it is T2 as before."""
+    ref, new = make(), make()
+    edit(new, f"{S}/context/cov_digest", dig("9"))
+    tier = cr.select_tier(ref, new)
+    assert tier.name == "undetermined" and "matches no A6 tier" in tier.missing[0]
+    assert cr.compare_trees(ref, new).exit_code == 2
+    edit(new, f"{S}/context/whiten_digest", dig("9"))
     assert cr.select_tier(ref, new).name == "T2"
 
 
@@ -256,7 +287,7 @@ def test_precedence_td_over_t2_over_t3_over_t1() -> None:
     assert cr.select_tier(ref, new).name == "T1"
     edit(new, "systems/rossler/fitted/allocator_digest", dig("9"))
     assert cr.select_tier(ref, new).name == "T3"
-    edit(new, "systems/lorenz63/context/cov_digest", dig("9"))
+    edit(new, "systems/lorenz63/context/whiten_digest", dig("9"))
     assert cr.select_tier(ref, new).name == "T2"
     edit(new, "systems/rossler/context/main_digest", dig("9"))
     assert cr.select_tier(ref, new).name == "TD"
@@ -266,7 +297,7 @@ SELECTING_LEAVES = [f"{S}/context/{n}" for n in ("state_mean_digest", "lambda_ma
                                                   "estimator_digest", "cov_digest", "whiten_digest",
                                                   "unwhiten_digest")] + [
     f"{S}/context/start_state/main", f"{S}/context/start_state/estimator",
-    f"{S}/fitted/allocator_digest", f"{S}/validation/estimators"]
+    f"{S}/fitted/allocator_digest", f"{S}/validation/estimators", "estimators"]
 
 
 @pytest.mark.parametrize("path", SELECTING_LEAVES)
@@ -283,6 +314,18 @@ def test_a_missing_selecting_leaf_is_undetermined_and_exits_2(path: str, side: s
     assert res.tier.missing
 
 
+@pytest.mark.parametrize("path", SELECTING_LEAVES)
+def test_a_selecting_leaf_missing_from_both_runs_is_undetermined(path: str) -> None:
+    """R7: "either run lacks a selecting leaf" includes a leaf that both lack (for example ``start_state/estimator``
+    while ``start_state/main`` is present, ``allocator_digest`` while the validation digests are present, or the
+    top-level estimator digests). Reference: the plan text; each leaf group is removed from both runs."""
+    ref, new = make(), make()
+    edit(ref, path, DELETE)
+    edit(new, path, DELETE)
+    res = cr.compare_trees(ref, new)
+    assert res.tier.name == "undetermined" and res.exit_code == 2 and res.tier.missing
+
+
 def test_selecting_leaf_set_that_differs_is_undetermined() -> None:
     """A start-state vector of another length is a different leaf set: undetermined, not TD."""
     ref, new = make(), make()
@@ -296,7 +339,7 @@ def test_missing_provenance_fact_is_undetermined_only_when_it_decides_t0_against
     edit(new, "provenance/env/LPC_THREADS", DELETE)
     tier = cr.select_tier(ref, new)
     assert tier.name == "undetermined" and "provenance.env.LPC_THREADS" in tier.missing
-    edit(new, f"{S}/context/cov_digest", dig("9"))
+    edit(new, f"{S}/context/whiten_digest", dig("9"))
     assert cr.select_tier(ref, new).name == "T2"
 
 
@@ -418,7 +461,20 @@ def test_tol_other_replaces_the_class_tolerance_of_b_to_g_only() -> None:
     path, value, _ = SHARED_RULES["QoI point"]
     edit(new, f"{S}/scores/A1/mse/1LT", 0.2)
     edit(new, path, value + 2e-4 * 1.2)
-    assert run(ref, new, tol_other=1.0).exit_code == 1
+    assert run(ref, new, tol_other=1e-4).exit_code == 1          # the A6 QoI rule is not an option
+
+
+def test_tol_other_above_the_o3_ceiling_is_refused() -> None:
+    """R4: a class tolerance above 1e-4 is an O3 finding that A6 does not let the tool adopt: ``compare_trees``
+    raises, the command line exits 2 with a message, and nothing prints PASS. The ceiling itself is accepted."""
+    ref, new = tier_pair("T1", **{f"{S}__scores__A1__mse__1LT": 0.3})
+    for bad in (1.0, 1e-3, 1.0000001e-4):
+        with pytest.raises(cr.ToolError):
+            run(ref, new, tol_other=bad)
+    assert run(ref, new, tol_other=1e-4).exit_code == 1
+    for bad in (0.0, -1e-5, math.nan):
+        with pytest.raises(cr.ToolError):
+            run(ref, new, tol_other=bad)
 
 
 # ---- scale classes: the floor binds (M2)
@@ -483,48 +539,82 @@ def test_every_float_leaf_without_a_rule_is_counted_in_the_default_class() -> No
 
 
 # ---- LM rules
-def lm_at(tier: str, name: str, ref_value: float, new_value: float) -> "cr.Comparison":
-    """One LM summary moved from ``ref_value`` to ``new_value``."""
-    path = f"{S}/handling/cells/V3/lm/{name}"
+def lm_path(name: str, kind: str | None = None) -> str:
+    """The LM summary leaf of the V3 cell: the pooled block, or one of the kinds ``oracle``, ``eval``, ``check``."""
+    return f"{CELL}/lm/" + (f"by_kind/{kind}/" if kind else "") + name
+
+
+def lm_at(tier: str, name: str, ref_value: float, new_value: float, kind: str | None = None) -> "cr.Comparison":
+    """One LM summary (pooled or of a kind) moved from ``ref_value`` to ``new_value``."""
     ref, new = tier_pair(tier)
-    edit(ref, path, ref_value)
-    edit(new, path, new_value)
+    edit(ref, lm_path(name, kind), ref_value)
+    edit(new, lm_path(name, kind), new_value)
     return run(ref, new)
 
 
 def test_t1_lm_summaries_exact_fraction_iterations_within_one_other_relative_1e_8() -> None:
-    """T1 (A6 and WU-0005.4 M7(i)): ``fraction_no_decrease`` exact; ``median_iterations`` within 1;
-    ``median_residual`` within 1e-8 relative (0.5 x passes, 2 x fails)."""
-    p = f"{S}/handling/cells/V3/lm/"
-    assert row(lm_at("T1", "fraction_no_decrease", 0.04, 0.04 + 1e-15), p + "fraction_no_decrease").outcome == "FAIL"
-    assert row(lm_at("T1", "median_iterations", 8.0, 9.0), p + "median_iterations").outcome == "pass"
-    assert row(lm_at("T1", "median_iterations", 8.0, 10.0), p + "median_iterations").outcome == "FAIL"
-    assert row(lm_at("T1", "median_residual", 0.5, 0.5 * (1 + 0.5e-8)), p + "median_residual").outcome == "pass"
-    assert row(lm_at("T1", "median_residual", 0.5, 0.5 * (1 + 2e-8)), p + "median_residual").outcome == "FAIL"
+    """T1 (A6 and WU-0005.4 M7(i)): ``fraction_no_decrease`` exact; ``median_iterations`` within 1 (0.5 passes,
+    2 fails); ``median_residual`` within 1e-8 relative (0.5 x passes, 2 x fails). Real LM leaf shapes."""
+    p = lm_path
+    assert row(lm_at("T1", "fraction_no_decrease", 0.04, 0.04 + 1e-15), p("fraction_no_decrease")).outcome == "FAIL"
+    assert row(lm_at("T1", "median_iterations", 8.0, 8.5), p("median_iterations")).outcome == "pass"
+    assert row(lm_at("T1", "median_iterations", 8.0, 10.0), p("median_iterations")).outcome == "FAIL"
+    assert row(lm_at("T1", "median_residual", 0.5, 0.5 * (1 + 0.5e-8)), p("median_residual")).outcome == "pass"
+    assert row(lm_at("T1", "median_residual", 0.5, 0.5 * (1 + 2e-8)), p("median_residual")).outcome == "FAIL"
 
 
-@pytest.mark.parametrize("tier", ["T2", "T3"])
-def test_t2_t3_fraction_no_decrease_uses_the_two_proportion_bound(tier: str) -> None:
-    """M7(ii): ``|d| <= 3 sqrt(2 pbar (1 - pbar) / n) + 1/n``, n = n_estimates = 100.
-
-    Reference: the formula evaluated by hand for p_ref = 0.10: moving to 0.175 (pbar 0.1375, bound
-    0.1561, so the move is 0.48 x the bound) passes; moving to 0.55 (pbar 0.325, bound 0.2087, so
-    2 x = 0.417 < 0.45) fails.
-    """
-    p = f"{S}/handling/cells/V3/lm/fraction_no_decrease"
+def solve_move(p_ref: float, factor: float) -> float:
+    """The move m with m = factor x bound(p_ref + m/2), the bound ``3 sqrt(2 pbar (1 - pbar)/100) + 1/100`` at
+    pbar = p_ref + m/2 (the tool's pbar is the mean of the two fractions). Solved by fixed-point iteration;
+    the map is a contraction here (slope about 0.1 for factor 0.5 and 0.3 for factor 2)."""
     bound = lambda pbar: 3 * math.sqrt(2 * pbar * (1 - pbar) / 100) + 1 / 100
-    assert bound(0.1375) == pytest.approx(0.15611, abs=1e-5)
-    assert 0.075 <= 0.5 * bound(0.1375) and 0.45 >= 2 * bound(0.325)
-    res = lm_at(tier, "fraction_no_decrease", 0.10, 0.175)
-    assert row(res, p).outcome == "pass" and row(res, p).tol == pytest.approx(bound(0.1375), rel=1e-12)
-    assert row(lm_at(tier, "fraction_no_decrease", 0.10, 0.55), p).outcome == "FAIL"
+    m = 0.1
+    for _ in range(200):
+        m = factor * bound(p_ref + m / 2)
+    assert m == pytest.approx(factor * bound(p_ref + m / 2), rel=1e-14)
+    return m
 
 
 @pytest.mark.parametrize("tier", ["T2", "T3"])
-def test_t2_t3_other_lm_fractions_keep_class_c_and_print_the_band(tier: str) -> None:
-    """``fraction_above_chi2`` has no T2/T3 tolerance in A6: class (c) applies (strict), and the band is
+def test_t2_rules_fraction_no_decrease_uses_the_two_proportion_bound(tier: str) -> None:
+    """M7(ii): ``|d| <= 3 sqrt(2 pbar (1 - pbar) / n) + 1/n``, n = n_estimates = 100, for T2 on every kind and
+    for T3 on the ``eval`` kind.
+
+    Reference: the formula by hand; the moves are solved for exactly 0.5 x and 2 x the bound from p_ref = 0.10
+    (R11): m = 0.5 bound(0.10 + m/2) (m = 0.0784) and m = 2 bound(0.10 + m/2) (m = 0.4108). Tolerance: the tool's |b - a| carries one
+    ulp (1e-16) on a move of 0.08 to 0.45, so the ratios are 0.5 and 2 to 1e-9.
+    """
+    p = lm_path("fraction_no_decrease", "eval")
+    half, double = solve_move(0.10, 0.5), solve_move(0.10, 2.0)
+    # hand check of the fixed points: m = 0.07843, pbar = 0.13922, bound = 3 sqrt(2 x 0.13922 x 0.86078 / 100) + 0.01
+    # = 0.15687 = 2 m; and m = 0.41081, pbar = 0.30541, bound = 0.20541 = m / 2 (digits typed from that hand calculation)
+    assert half == pytest.approx(0.07843, abs=1e-5) and double == pytest.approx(0.41081, abs=1e-5)
+    res = lm_at(tier, "fraction_no_decrease", 0.10, 0.10 + half, "eval")
+    assert row(res, p).outcome == "pass" and row(res, p).metric / row(res, p).tol == pytest.approx(0.5, rel=1e-9)
+    res = lm_at(tier, "fraction_no_decrease", 0.10, 0.10 + double, "eval")
+    assert row(res, p).outcome == "FAIL" and row(res, p).metric / row(res, p).tol == pytest.approx(2.0, rel=1e-9)
+
+
+def test_t3_keeps_the_t1_lm_rules_for_the_oracle_and_check_kinds_and_the_pooled_summary() -> None:
+    """R3: A6 T3 is "network chain as T2; other chains as T1". With only the weights differing, a one-ulp move of
+    ``fraction_no_decrease`` fails (T1: exact) in the pooled block and the ``oracle`` and ``check`` kinds, passes in
+    the ``eval`` kind (T2 band) and in every kind under T2. Likewise a 2e-8 relative move of ``median_residual``
+    fails under the T1 rules and is NOT COMPUTED (order-statistic band) under the T2 rules."""
+    for kind, t3_outcome in ((None, "FAIL"), ("oracle", "FAIL"), ("check", "FAIL"), ("eval", "pass")):
+        path = lm_path("fraction_no_decrease", kind)
+        assert row(lm_at("T3", "fraction_no_decrease", 0.04, 0.04 + 1e-15, kind), path).outcome == t3_outcome, kind
+        assert row(lm_at("T2", "fraction_no_decrease", 0.04, 0.04 + 1e-15, kind), path).outcome == "pass", kind
+    mr = lambda kind: lm_path("median_residual", kind)
+    assert row(lm_at("T3", "median_residual", 0.5, 0.5 * (1 + 2e-8), "oracle"), mr("oracle")).outcome == "FAIL"
+    assert row(lm_at("T3", "median_residual", 0.5, 0.5 * (1 + 2e-8), "eval"), mr("eval")).outcome == "NOT COMPUTED"
+    assert row(lm_at("T2", "median_residual", 0.5, 0.5 * (1 + 2e-8), "oracle"), mr("oracle")).outcome == "NOT COMPUTED"
+
+
+@pytest.mark.parametrize("tier", ["T2", "T3"])
+def test_t2_rules_other_lm_fractions_keep_class_c_and_print_the_band(tier: str) -> None:
+    """``fraction_above_chi2`` (eval kind) has no T2 tolerance in A6: class (c) applies (strict), and the band is
     printed as information."""
-    r = row(lm_at(tier, "fraction_above_chi2", 0.02, 0.03), f"{S}/handling/cells/V3/lm/fraction_above_chi2")
+    r = row(lm_at(tier, "fraction_above_chi2", 0.02, 0.03, "eval"), lm_path("fraction_above_chi2", "eval"))
     assert r.cls == "c" and r.outcome == "FINDING" and "two-proportion band" in r.note
 
 
@@ -562,9 +652,9 @@ def scope_case(count_edits: dict, leaf: str = f"{S}/H3c/A5_over_A4_mse", ref_val
 @pytest.mark.parametrize("counts", [
     {f"{S}__H3c__n_states": 79},                                   # a state count of the block
     {f"{S}__fitted__chosen_K": 4},                                 # K reaches H3c
-    {f"{S}__handling__cells__V3__counts__error_clips": 3},         # a clip count reaches the whole system
-    {f"{S}__handling__cells__V3__counts__nu_cap_clips": 4},
-    {f"{S}__handling__result_counts__H3c__n_states": 79},          # a result-count mirror of the block
+    {f"{CELL}__counts__error_clips": 3},                           # a clip count reaches the whole system
+    {f"{CELL}__by_kind__oracle__counts__error_clips_cp": 2},       # clip counters of any name starting error_clips
+    {f"{CELL}__counts__invariant_mean_replacements": 1},           # a replacement count
 ])
 def test_a_discrete_count_of_the_scope_licenses_0_1_hw_and_not_more(counts: dict) -> None:
     """A6: in a block where a discrete count differs, ``|d| <= 0.1 hw`` replaces the tolerance.
@@ -580,20 +670,89 @@ def test_a_discrete_count_of_the_scope_licenses_0_1_hw_and_not_more(counts: dict
 
 def test_scope_is_causal_not_global() -> None:
     """A state count of H3c does not license H2c; K licenses H3c but not H2c; ``best_single`` licenses H2c
-    only; a handling count licenses one system only (rossler's count leaves lorenz63 strict)."""
+    only (also not H3c)."""
     h2c = f"{S}/H2c/A4_minus_A2/mean"          # hw = 0.3
     assert row(scope_case({f"{S}__H3c__n_states": 79}, h2c, 0.5), h2c).outcome == "FAIL"
     assert row(scope_case({f"{S}__fitted__chosen_K": 4}, h2c, 0.5), h2c).outcome == "FAIL"
     assert row(scope_case({f"{S}__H2c__best_single": "A2"}, h2c, 0.5), h2c).outcome == "pass"
     assert row(scope_case({f"{S}__H2c__best_single": "A2"}), f"{S}/H3c/A5_over_A4_mse").outcome == "FAIL"
+
+
+def two_system_pair(**edits: object) -> "cr.Comparison":
+    """Two systems, device differs (T1); both systems' H3c estimate moves by 0.5 x 0.1 hw (= 0.015) and the given
+    leaves (paths with ``__`` for ``/``) are edited on the new run."""
     ref, new = make(("lorenz63", "rossler")), make(("lorenz63", "rossler"))
     edit(new, f"{PROV}/backend", "gpu")
-    edit(new, "systems/rossler/handling/cells/V3/counts/error_clips", 5)
     for system in ("lorenz63", "rossler"):
         edit(new, f"systems/{system}/H3c/A5_over_A4_mse", 0.915)
+    for path, value in edits.items():
+        edit(new, path.replace("__", "/"), value)
+    return run(ref, new)
+
+
+def test_a_clip_count_licenses_its_own_system_only_and_a_total_licenses_nothing() -> None:
+    """R1, the sum-over-systems probe (real ``handling`` shapes). ``handling/totals`` and ``by_system`` are sums
+    or mirrors of the per-system counts: if rossler's clip count rises by 1, its cell, its per-system totals, the
+    top-level ``by_system/rossler`` and the top-level ``totals`` all differ.
+
+    * rossler's H3c move (0.015 = 0.5 x 0.1 hw) passes (its own cell count licenses it); lorenz63's, whose
+      counts did not move, fails (a ``None`` system must not match every system);
+    * the mirrors are listed and open no scope: with only the mirrors moved, neither system is licensed.
+    """
+    h3c = lambda s: f"systems/{s}/H3c/A5_over_A4_mse"
+    cell = "systems/rossler/handling/cells/V3-cp-horizon/counts/error_clips"
+    full = two_system_pair(**{cell: 1, "systems__rossler__handling__totals__error_clips": 1,
+                              "handling__by_system__rossler__error_clips": 1, "handling__totals__error_clips": 1})
+    assert row(full, h3c("rossler")).outcome == "pass" and row(full, h3c("lorenz63")).outcome == "FAIL"
+    for mirror in ("handling/totals/error_clips", "handling/by_system/rossler/error_clips",
+                   "systems/rossler/handling/totals/error_clips"):
+        assert row(full, mirror).outcome == "listed" and "opens no scope" in row(full, mirror).note
+    assert row(full, cell).outcome == "listed" and "opens no scope" not in row(full, cell).note
+    only = two_system_pair(**{"handling__totals__error_clips": 1, "handling__by_system__rossler__error_clips": 1,
+                              "systems__rossler__handling__totals__error_clips": 1})
+    assert row(only, h3c("rossler")).outcome == "FAIL" and row(only, h3c("lorenz63")).outcome == "FAIL"
+
+
+@pytest.mark.parametrize("path", [
+    f"{CELL}/counts/zero_variance_corr", f"{CELL}/counts/lm_nonfinite_cost", f"{CELL}/counts/gain_floor",
+    f"{CELL}/denominators/estimates", f"{CELL}/lm/n_estimates", f"{CELL}/lm/nonfinite_residuals",
+    f"{CELL}/lm/gof_dof", f"{S}/handling/fitting/counts/empty_regime_fallback",
+    f"{S}/handling/fitting/denominators/pools", f"{S}/handling/result_counts/H3c%2Fn_failed_resamples",
+    f"{S}/handling/result_counts/gain_bound%2Fn_screened_out%2Fnegative_covariance",
+    f"{S}/handling/result_counts/H1a%2Fn_excluded_nonfinite", "handling/failed_variants"])
+def test_other_integers_are_not_licensing_counts_and_fail(path: str) -> None:
+    """R1: a differing integer that is not on A6's list (other ``handling`` counters, denominators other than the
+    states, LM ``n_estimates``, non-finite, fallback, warning and failed-resample counts) is exact: FAIL, and it
+    licenses nothing (H3c at 0.5 x 0.1 hw still fails). Reference: A6's list as quoted in the plan."""
+    ref, new = tier_pair("T1")
+    edit(new, path, get(ref, path) + 1)
+    edit(new, f"{S}/H3c/A5_over_A4_mse", 0.915)
     res = run(ref, new)
-    assert row(res, "systems/rossler/H3c/A5_over_A4_mse").outcome == "pass"
-    assert row(res, "systems/lorenz63/H3c/A5_over_A4_mse").outcome == "FAIL"
+    assert row(res, path).outcome == "FAIL" and row(res, f"{S}/H3c/A5_over_A4_mse").outcome == "FAIL"
+
+
+def test_state_denominator_and_top_level_counts_are_listed_without_a_scope() -> None:
+    """The state denominator is on A6's list (``n_states``) but, like the top-level ``handling`` sums, opens no
+    scope; it is listed, not failed."""
+    for path in (f"{CELL}/denominators/states", "handling/totals/nu_cap_clips"):
+        ref, new = tier_pair("T1")
+        edit(new, path, get(ref, path) + 1)
+        edit(new, f"{S}/H3c/A5_over_A4_mse", 0.915)
+        res = run(ref, new)
+        assert row(res, path).outcome == "listed" and row(res, f"{S}/H3c/A5_over_A4_mse").outcome == "FAIL"
+
+
+def test_only_k_reaches_the_k_shaped_leaves() -> None:
+    """R1: an integer of ``H3a`` (``n_per_regime``) or ``regime_curve`` that differs is exact unless K differs in
+    its system, when it is listed as following K; it is never a licensing count itself."""
+    path = f"{S}/H3a/n_per_regime/[0]"
+    res = run(*tier_pair("T1", **{path.replace("/", "__"): 31}))
+    assert row(res, path).outcome == "FAIL"
+    res = run(*tier_pair("T1", **{path.replace("/", "__"): 31, f"{S}__fitted__chosen_K": 4}))
+    assert row(res, path).outcome == "listed" and row(res, path).rule == "follows a differing K"
+    other = f"{S}/regime_curve/realized_K/2"
+    res = run(*tier_pair("T1", **{other.replace("/", "__"): 3}))
+    assert row(res, other).outcome == "listed"                       # realized_K is K itself
 
 
 @pytest.mark.parametrize("path", [f"{S}__fitted__analog_proxy__nfev", f"{S}__fitted__analog_proxy__status",
@@ -687,8 +846,9 @@ def test_ten_times_rule_rounds_up_to_a_power_of_ten(max_rel: float, expected: fl
 
 def test_declaration_per_class_group_and_the_o3_finding() -> None:
     """d3 on a synthetic pair shaped like the kernel pair: (a) max rel 3e-7 declares 1e-5 and (b) to (g)
-    max rel 4.99e-6 declares 1e-4; neither is above the O3 ceiling. A (b) to (g) rel of 2e-4 declares 1e-2: on a
-    T2 pair that is information only (exit 0, a line printed); on the T0 calibration pair it is O3 (exit 1)."""
+    max rel 4.99e-6 declares 1e-4; neither is above the O3 ceiling. A (b) to (g) rel of 2e-4 declares 1e-2 and the leaf
+    exceeds the class tolerance (FINDING, exit 1); on a T2 pair the O3 line is information, on the T0 calibration pair it
+    is O3 itself (R5 is with the owner)."""
     ref, new = tier_pair("T2")
     edit(new, f"{S}/H3c/ci/[1]", 1.2 * (1 + 3e-7))                       # rel to s = 1.2: 3e-7
     edit(new, f"{S}/weight_profile/median/[0]", 0.5 * (1 + 4.99e-6))    # class b, rel 4.99e-6
@@ -699,9 +859,10 @@ def test_declaration_per_class_group_and_the_o3_finding() -> None:
     assert res.declared["(b) to (g)"]["max_rel"] == pytest.approx(4.99e-6, rel=1e-6)
     assert not res.declared["(b) to (g)"]["o3"] and res.exit_code == 0
     edit(new, f"{S}/scores/A1/mse/1LT", 0.2 * (1 + 2e-4))
-    res = run(ref, new, tol_other=1.0)
+    res = run(ref, new)
     assert res.declared["(b) to (g)"]["declared"] == pytest.approx(1e-2) and res.declared["(b) to (g)"]["o3"]
-    assert res.exit_code == 0 and any("information" in ln for ln in cr.render(res, "a", "b"))
+    assert res.exit_code == 1 and row(res, f"{S}/scores/A1/mse/1LT").outcome == "FINDING"    # 2e-4 > 1e-4
+    assert any("information" in ln for ln in cr.render(res, "a", "b"))
 
 
 def test_ten_times_maximum_excludes_the_leaves_the_note_excludes() -> None:
@@ -709,7 +870,7 @@ def test_ten_times_maximum_excludes_the_leaves_the_note_excludes() -> None:
     differing discrete count do not enter the maximum. All of them differ hugely here and the pool stays empty."""
     ref, new = tier_pair("T3", **{
         f"{S}__validation__delay_jacobian_rel_err": 5e-10, f"{S}__validation__crlb_ratio_median": 1.01,
-        f"{S}__fitted__analog_proxy__floor": 0.02, f"{S}__handling__cells__V3__lm__median_iterations": 9.0,
+        f"{S}__fitted__analog_proxy__floor": 0.02, f"{CELL}__lm__median_iterations": 9.0,
         f"{S}__H3c__n_states": 79, f"{S}__H3c__A5_over_A4_mse": 0.91})
     res = run(ref, new)
     assert res.declared["(a)"]["n"] == 0 and res.declared["(b) to (g)"]["n"] == 0
@@ -880,6 +1041,51 @@ def test_td_only_mode_needs_no_selecting_leaves(tmp_path: Path) -> None:
     assert cr.main([str(pa), str(pb), "--td-only"]) == 0
 
 
+def test_a_system_missing_on_one_run_is_not_computable_in_both_modes() -> None:
+    """R2: B1 item 5 fixes 18 parts. A system absent from one run gives its 6 parts as NOT COMPUTABLE (exit 2),
+    in ``td_statistic``, in ``--td-only`` and in a full TD comparison; the expected count (6 x systems) is printed.
+    Reference: 3 systems x 6 parts = 18 by construction."""
+    a, b = trees_from_fixture()
+    del b["systems"]["chua"]
+    td = cr.td_statistic(a, b)
+    assert td["expected"] == 18 and td["k"] == 12 and td["n_error"] == 6
+    assert all("missing" in p["error"] for p in td["parts"] if "error" in p) and not td["n_fail"]
+    assert "12 of 18 expected" in "\n".join(cr.render_td(td))
+    assert cr.td_statistic(b, a)["n_error"] == 6                      # either side
+    lines, code = cr.run_td_only(a, b, "a", "b")
+    assert code == 2 and "UNDETERMINED" in lines[-1]
+    ref, new = td_pair()
+    ref2, new2 = make(("lorenz63", "rossler")), make(("lorenz63", "rossler"))
+    edit(new2, f"{S}/context/main_digest", dig("9"))
+    del new2["systems"]["rossler"]
+    res = run(ref2, new2)
+    assert res.tier.name == "TD" and res.td["expected"] == 12 and res.td["n_error"] == 6 and res.exit_code == 2
+
+
+# ---- verdict-type strings of the real schema
+@pytest.mark.parametrize("tier", ["T0", "T1", "T2", "T3"])
+@pytest.mark.parametrize("path, value", [
+    (f"{S}/clip_sensitivity/by_hypothesis/H3c/parts/A5_over_A4/verdict_2L", "fail"),
+    (f"{S}/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A2/status", "not_computed"),
+    (f"{S}/clip_sensitivity/status", "not_computed")])
+def test_clip_sensitivity_verdict_and_status_strings_give_def_lines(tier: str, path: str, value: str) -> None:
+    """R9: ``verdict_2L`` and ``status`` of the real ``clip_sensitivity`` block are verdict-type strings: a
+    difference prints a DEF line (not a categorical failure). Reference: the real leaf paths of the S3 smoke."""
+    ref, new = (make(), make()) if tier == "T0" else tier_pair(tier)
+    assert get(ref, path) != value
+    edit(new, path, value)
+    res = run(ref, new)
+    assert row(res, path).outcome == "DEF" and res.exit_code == 1
+    assert any(ln.startswith("DEF:") and path in ln for ln in cr.render(res, "a", "b"))
+
+
+def test_best_single_2l_is_a_listed_discrete_count_not_a_failure() -> None:
+    """``clip_sensitivity/.../best_single_2L`` is a best-single, like ``H2c/best_single``: listed (A6)."""
+    path = f"{S}/clip_sensitivity/by_hypothesis/H2c/best_single_2L"
+    res = run(*tier_pair("T1", **{path.replace("/", "__"): "A1"}))
+    assert row(res, path).outcome == "listed" and res.exit_code == 0
+
+
 # ----------------------------------------------------------------------------- d5: accounting and listing
 def test_leaf_accounting_union_one_sided_and_excluded_counts() -> None:
     """d5: the union of leaves is counted, one-sided leaves are listed, timing and provenance are excluded.
@@ -924,19 +1130,20 @@ def test_lm_estimate_check_hand_cases() -> None:
       1.2e-13 violates.
     * c = 1e-12: min(1e-20, eta (2 sqrt(c) + eta) = 6e-18) = 1e-20 (PF-2): d = 5e-21 passes and d = 2e-20
       violates, although it is below the eta bound.
-    * c = 0.15 (c/rho^2 = 15, converged): min(1.5e-9, eta (2 sqrt(0.15) + eta) = 2.324e-12) = 2.324e-12:
-      d = 1.1e-12 passes, 4.8e-12 violates.
+    * c = 0.15 (c/rho^2 = 15, converged): min(1.5e-9, eta (2 sqrt(0.15) + eta) = 2.3238e-12) = 2.3238e-12:
+      d = 0.5 x and 2 x that value (computed in the test).
     * c = 0.2 (c/rho^2 = 20 > 18.47, not converged): the 1e-8 bound alone, 2e-9: d = 1e-9 passes (it would
       violate the tight bound 2.7e-12, which must not apply).
     * a late-flagged estimate (either run) is counted and never checked, however large d.
-    Tolerance: the d values are 0.5 x or 2 x the bound, so the one-ulp error of c + d (at most 3e-17 here,
-    5e-13 relative to the smallest d) never decides a case.
+    Tolerance: the d values are 0.5 x or 2 x the bound; the one-ulp error of c + d (2.8e-17 at c = 0.15, so the
+    realized ratios are 0.5 and 2 to 2.4e-5 there and much better elsewhere) never decides a case.
     """
     eta = 3e-12
     assert eta * (2 * math.sqrt(1e-4) + eta) == pytest.approx(6e-14, rel=1e-9)
-    assert eta * (2 * math.sqrt(0.15) + eta) == pytest.approx(2.324e-12, rel=1e-3)
+    assert eta * (2 * math.sqrt(0.15) + eta) == pytest.approx(2.3238e-12, rel=1e-4)
+    tight = eta * (2 * math.sqrt(0.15) + eta)
     c_ref = [0.5, 0.5, 1e-4, 1e-4, 1e-12, 1e-12, 0.15, 0.15, 0.2, 5.0]
-    d = [2.5e-9, 1e-8, 3e-14, 1.2e-13, 5e-21, 2e-20, 1.1e-12, 4.8e-12, 1e-9, 100.0]
+    d = [2.5e-9, 1e-8, 3e-14, 1.2e-13, 5e-21, 2e-20, 0.5 * tight, 2 * tight, 1e-9, 100.0]
     c_new = [c + x for c, x in zip(c_ref, d)]
     late_ref, late_new = [0] * 10, [0] * 9 + [1]
     out = cr.lm_estimate_check(c_ref, c_new, late_ref, late_new, rho=0.1, x_inf=3.0)
@@ -1019,6 +1226,8 @@ def test_cli_usage_and_input_errors_exit_2(tmp_path: Path, capsys) -> None:
     assert cr.main([str(good), str(bad)]) == 2
     assert cr.main([str(good), str(other)]) == 2
     assert cr.main([str(good), str(good), "--tol-other", "0"]) == 2
+    assert cr.main([str(good), str(good), "--tol-other", "1"]) == 2          # above the O3 ceiling (R4)
+    assert cr.main([str(good), str(good), "--tol-other", "1e-4"]) == 0
     assert cr.main([str(good), str(good), "--tol-other", "nan"]) == 2
     assert cr.main([str(good), str(good), "--show", "-1"]) == 2
     assert cr.main([str(good), str(good), "--nonsense"]) == 2
