@@ -1,0 +1,1 @@
+max |DOP853(1e-10) - ref| = 5.3e-06 sigma;  max |RK4(128 n_c) - ref| = 1.5e-06 sigma (smallest e reported at top states: 1.5e-5)

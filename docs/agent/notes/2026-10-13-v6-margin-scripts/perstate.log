@@ -1,0 +1,32 @@
+lorenz63 orbit 0 max 1.396e-03 2s
+lorenz63 orbit 1 max 1.035e-03 5s
+lorenz63 orbit 2 max 1.403e-03 7s
+lorenz63 orbit 3 max 1.413e-03 9s
+lorenz63 orbit 4 max 1.421e-03 11s
+  P(D>=0.0001) = 5.625e-03  count 5625
+  P(D>=0.0002) = 1.856e-03  count 1856
+  P(D>=0.000483) = 2.810e-04  count 281
+  P(D>=0.001) = 5.500e-05  count 55
+  P(D>=0.002) = 0.000e+00  count 0
+chua orbit 0 max 4.031e-02 11s
+chua orbit 1 max 1.451e-02 21s
+chua orbit 2 max 8.666e-03 31s
+chua orbit 3 max 1.845e-02 37s
+chua orbit 4 max 3.332e-02 40s
+  P(D>=0.0001) = 8.706e-02  count 87060
+  P(D>=0.0002) = 3.333e-02  count 33329
+  P(D>=0.000483) = 7.214e-03  count 7214
+  P(D>=0.001) = 2.274e-03  count 2274
+  P(D>=0.002) = 6.820e-04  count 682
+rossler orbit 0 max 4.452e-05 7s
+rossler orbit 1 max 4.452e-05 11s
+rossler orbit 2 max 4.452e-05 15s
+rossler orbit 3 max 4.452e-05 21s
+rossler orbit 4 max 4.452e-05 29s
+  P(D>=0.0001) = 0.000e+00  count 0
+  P(D>=0.0002) = 0.000e+00  count 0
+  P(D>=0.000483) = 0.000e+00  count 0
+  P(D>=0.001) = 0.000e+00  count 0
+  P(D>=0.002) = 0.000e+00  count 0
+
+[exited with code 0]
