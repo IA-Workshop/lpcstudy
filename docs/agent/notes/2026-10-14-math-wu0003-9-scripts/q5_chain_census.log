@@ -1,0 +1,110 @@
+(untagged)   float leaves   556  differing on pair  111  | H1a:9, H1b:2, H1c:6, H1d:10, H2a:16, H2b:19, H2c:11, H2e:4, H3a:5, H3b:11, H3c:4, Q-N:20, V7:6, clip_sensitivity:30, config:23, fitted:18, handling:86, km_curves:240, oracle_recovery:2, scores:19, verification:15
+cp           float leaves   260  differing on pair   10  | H1a:4, H1b:3, H1c:3, km_curves:240, oracle_recovery:1, scores:8, validation:1
+dynamics     float leaves    13  differing on pair    0  | context:13
+fixture      float leaves     7  differing on pair    4  | validation:7
+network      float leaves  2327  differing on pair  817  | H1b:3, H1c:3, H1d:5, H2a:4, H2b:5, H2c:4, H2d:3, H3a:3, H3b:8, H3c:1, Q-N:12, V7:5, estimators:2, fitted:5, gain_bound:3, km_curves:1440, oracle_recovery:8, regime_curve:3, scores:85, validation:5, weight_profile:720
+
+cp/oracle-tagged leaves that differ (tag, path, rel to |ref|):
+  cp       systems/lorenz63/H1a/by_noise/0.01/ci_inverse_dim/[0]  3.94e-07
+  cp       systems/lorenz63/H1a/by_noise/0.01/ci_inverse_dim/[1]  7.33e-09
+  cp       systems/lorenz63/H1a/by_noise/0.01/fitted_inverse_dim  7.97e-08
+  cp       systems/lorenz63/H1a/by_noise/0.01/floor_rms  2.52e-07
+  cp       systems/lorenz63/H1b/CP/ci/[0]  4.95e-15
+  cp       systems/lorenz63/H1b/CP/ci/[1]  1.58e-15
+  cp       systems/lorenz63/H1b/CP/slope  1.54e-15
+  cp       systems/lorenz63/H1c/CP/ci/[0]  5.17e-16
+  cp       systems/lorenz63/H1c/CP/ci/[1]  2.14e-16
+  cp       systems/lorenz63/H1c/CP/median_ratio  1.48e-16
+  fixture  systems/lorenz63/validation/crlb_ratio_max  2.17e-16
+  fixture  systems/lorenz63/validation/crlb_ratio_median  9.16e-16
+  fixture  systems/lorenz63/validation/crlb_ratio_min  5.23e-16
+  fixture  systems/lorenz63/validation/gain_rel_err  1.87e-07
+
+untagged float leaves that differ, grouped (block / leaf name): count, max rel to |ref|
+  H1a              by_noise/0.01/median_seed_by_n_lib/1000                                  1  8.54e-16
+  H1a              by_noise/0.01/median_seed_by_n_lib/10000                                 1  8.21e-15
+  H1a              by_noise/0.01/ratio                                                      1  7.97e-08
+  H1a              by_noise/0.01/ratio_ci                                                   2  3.97e-07
+  H1a              inverse_dim_reference                                                    1  2.21e-16
+  H2a              complete_case/median_range                                               1  3.3e-09
+  H2a              complete_case/range_ci                                                   2  9.93e-08
+  H2a              part_ii/interior/ci                                                      2  8.39e-08
+  H2a              part_ii/interior/partial_corr                                            1  2.13e-07
+  H2a              part_ii/one/ci                                                           2  5.69e-10
+  H2a              part_ii/one/partial_corr                                                 1  1.35e-09
+  H2a              part_ii/zero/ci                                                          2  2.27e-09
+  H2a              part_ii/zero/partial_corr                                                1  1.14e-08
+  H2a              range_by_span/1-2-4/median                                               1  3.3e-09
+  H2a              range_by_span/1-2/median                                                 1  4.71e-09
+  H2a              range_ci                                                                 2  2.04e-08
+  H2b              library_change/ci                                                        2  5.34e-09
+  H2b              library_change/mean_change                                               1  1.79e-09
+  H2b              library_curves/0.01/1000/mean                                            1  6.51e-10
+  H2b              library_curves/0.01/1000/mean_ci                                         2  7.3e-10
+  H2b              library_curves/0.01/1000/median                                          1  7.15e-09
+  H2b              library_curves/0.01/1000/median_ci                                       2  4.02e-08
+  H2b              library_curves/0.01/10000/mean                                           1  1.19e-10
+  H2b              library_curves/0.01/10000/mean_ci                                        2  3.26e-09
+  H2b              library_curves/0.01/10000/median                                         1  4.36e-09
+  H2b              library_curves/0.01/10000/median_ci                                      2  1.29e-08
+  H2c              A4_minus_A0/ci                                                           2  1.71e-08
+  H2c              A4_minus_A0/mean                                                         1  1.43e-08
+  H2c              A4_minus_A0/relative                                                     1  1.43e-08
+  H2c              A4o_minus_A2/ci                                                          2  1.13e-09
+  H2c              A4o_minus_A2/mean                                                        1  5.22e-10
+  H2c              A4o_minus_A2/relative                                                    1  5.42e-10
+  H2c              calibration_mse/A1                                                       1  7.99e-10
+  H2e              corr_curve/0.01/10000                                                    1  7.15e-08
+  H3b              weight_lambda/ci                                                         2  3.11e-09
+  H3b              weight_lambda/importance                                                 1  6.03e-11
+  H3c              ci                                                                       2  8.31e-09
+  Q-N              deployable/logit_w_interior/ci                                           2  5.14e-08
+  Q-N              deployable/logit_w_interior/delta_r2                                     1  1.36e-05
+  Q-N              deployable/logit_w_interior/r2_four                                      1  1.45e-06
+  Q-N              deployable/logit_w_interior/r2_three                                     1  1.23e-06
+  Q-N              oracle/logit_w_interior/ci                                               2  1.23e-07
+  Q-N              oracle/logit_w_interior/delta_r2                                         1  1.68e-07
+  Q-N              oracle/logit_w_interior/r2_four                                          1  6.83e-08
+  Q-N              oracle/logit_w_interior/r2_three                                         1  5.68e-08
+  V7               efficiency_ci_by_noise/0.01                                              2  1.63e-09
+  V7               efficiency_ci_by_noise/0.02                                              2  1.07e-09
+  fitted           regime_weights_href/2                                                    2  1.95e-10
+  fitted           regime_weights_href/3                                                    3  4.94e-10
+  fitted           regime_weights_href/4                                                    3  5.45e-10
+  handling         cells/V3-cp-horizon/lm/by_kind/check/median_iterations                   1  0.125
+  handling         cells/V3-cp-horizon/lm/by_kind/check/median_residual                     1  4.58e-15
+  handling         cells/V3-cp-horizon/lm/by_kind/check/p95_residual                        1  2.4e-14
+  handling         cells/V3-cp-horizon/lm/median_iterations                                 1  0.125
+  handling         cells/V3-cp-horizon/lm/median_residual                                   1  4.58e-15
+  handling         cells/V3-cp-horizon/lm/p95_residual                                      1  2.4e-14
+  handling         cells/V4-convergence/lm/by_kind/check/median_residual                    1  7.07e-15
+  handling         cells/V4-convergence/lm/by_kind/check/p95_residual                       1  1.36e-13
+  handling         cells/V4-convergence/lm/median_residual                                  1  7.07e-15
+  handling         cells/V4-convergence/lm/p95_residual                                     1  1.36e-13
+  handling         cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_residual     1  2.29e-14
+  handling         cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/p95_residual        1  1.21e-15
+  handling         cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_residual   1  1.93e-15
+  handling         cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/p95_residual      1  6.94e-16
+  handling         cells/base|rho=0.01|n_lib=10000|core/lm/median_residual                  1  1.72e-14
+  handling         cells/base|rho=0.01|n_lib=10000|core/lm/p95_residual                     1  7.45e-15
+  handling         cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/median_residual   1  2.3e-14
+  handling         cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/p95_residual      1  1.69e-15
+  handling         cells/base|rho=0.01|n_lib=1000|sweep/lm/median_residual                  1  2.3e-14
+  handling         cells/base|rho=0.01|n_lib=1000|sweep/lm/p95_residual                     1  1.69e-15
+  handling         cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/median_residua   1  1.13e-14
+  handling         cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/p95_residual     1  1.19e-16
+  handling         cells/base|rho=0.02|n_lib=10000|sweep/lm/median_residual                 1  1.13e-14
+  handling         cells/base|rho=0.02|n_lib=10000|sweep/lm/p95_residual                    1  1.19e-16
+  oracle_recovery  A5_vs_Astar                                                              1  5.2e-08
+  oracle_recovery  mse_at_href/A5                                                           1  4.19e-10
+  scores           A5/mse/0.25LT                                                            1  1.68e-09
+  scores           A5/mse/0.5LT                                                             1  3.69e-11
+  scores           A5/mse/1LT                                                               1  4.19e-10
+  scores           A5/mse/2LT                                                               1  1.69e-11
+  scores           A5/mse/4LT                                                               1  3.23e-10
+  scores           A5/mse_href                                                              1  4.19e-10
+  scores           A5/regret/0.25LT                                                         1  1.75e-09
+  scores           A5/regret/0.5LT                                                          1  4.46e-10
+  scores           A5/regret/1LT                                                            1  1.07e-10
+  scores           A5/regret/2LT                                                            1  7.15e-10
+  scores           A5/regret/4LT                                                            1  8.64e-10
