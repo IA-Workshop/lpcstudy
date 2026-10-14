@@ -1923,6 +1923,77 @@ def test_clip_sensitivity_block_is_new_and_changes_no_other_status() -> None:
         {k: v.status for k, v in plain.items()}
 
 
+# ------------------------------------------------------ WU-0003.7a: digests, nfev and status
+ESTIMATOR_KEY = "('lorenz63', 7, 5, 0.01)"
+DIGEST_LEAF_PATHS = (
+    "systems/lorenz63/context/main_digest",
+    "systems/lorenz63/context/estimator_digest",
+    "systems/lorenz63/fitted/analog_proxy/nfev",
+    "systems/lorenz63/fitted/analog_proxy/status",
+    "systems/lorenz63/fitted/estimation_proxy/nfev",
+    "systems/lorenz63/fitted/estimation_proxy/status",
+    "systems/lorenz63/fitted/a5_leaf_digest",
+    "systems/lorenz63/fitted/allocator_digest",
+    f"estimators/{ESTIMATOR_KEY}/weights_digest",
+    f"systems/lorenz63/validation/estimators/{ESTIMATOR_KEY}/weights_digest",
+)
+
+
+@pytest.mark.parametrize("path", DIGEST_LEAF_PATHS)
+def test_wu0003_7a_leaves_match_exactly_one_new_rule(path: str) -> None:
+    """Each of the ten WU-0003.7a leaf kinds matches exactly one rule, of class ``new`` (a5).
+
+    Reference: the rule table's own contract (``Table.classify`` raises on no match and on two
+    matches, which is exit code 2 of the tool) and the plan (B2 row .7a: ``main_digest`` and
+    ``estimator_digest`` in ``context``; ``nfev`` and ``status`` of both proxy fits and the A5
+    leaf digest and allocator digest in ``fitted``; the estimator weight digest in the
+    ``estimators`` log, at the top level and in ``validation``). The ten paths are typed here
+    from the plan. Exact.
+    """
+    found = cp.TABLE.matches(p(path))
+    assert len(found) == 1, [r.pattern for r in found]
+    assert found[0].cls == "new" and found[0].sub == "WU-0003.7a"
+
+
+def test_wu0003_7a_leaves_are_new_and_change_no_other_status_and_the_tool_exits_zero(
+        tmp_path: Path) -> None:
+    """A tip tree with the ten new leaf kinds against the v1-named old tree: the ten leaves are
+    ``new``, every other leaf has the status it has without them, and the tool exits 0 (not 2) on
+    the pair (a5).
+
+    Reference: the same trees without the leaves (``old_tree`` / ``new_tree``, decided by hand in
+    the tests above) and the exit codes of the tool's own docstring (0 pass, 2 an unclassified
+    leaf). The existing ``fitted`` leaves ``slope`` and ``floor``, present on both sides, stay
+    ``equal`` (their rule is ``unchanged``). Exact.
+    """
+    fitted = {"analog_proxy": {"slope": 1.0, "floor": 2.0},
+              "estimation_proxy": {"slope": 0.5, "floor": 0.25}}
+    log = {ESTIMATOR_KEY: {"chosen_width": 32, "seconds": 1.0}}
+    old, base = old_tree(), new_tree()
+    for tree in (old, base):
+        tree["systems"]["lorenz63"]["fitted"] = copy.deepcopy(fitted)
+        tree["systems"]["lorenz63"]["validation"]["estimators"] = copy.deepcopy(log)
+        tree["estimators"] = copy.deepcopy(log)
+    tip = copy.deepcopy(base)
+    digest = "0" * 64
+    system = tip["systems"]["lorenz63"]
+    system["context"].update(main_digest=digest, estimator_digest=digest)
+    for name in ("analog_proxy", "estimation_proxy"):
+        system["fitted"][name].update(nfev=9, status=2)
+    system["fitted"].update(a5_leaf_digest=digest, allocator_digest=digest)
+    tip["estimators"][ESTIMATOR_KEY]["weights_digest"] = digest
+    system["validation"]["estimators"][ESTIMATOR_KEY]["weights_digest"] = digest
+    found = by_path(sides(old, tip)[2])
+    plain = by_path(sides(old, base)[2])
+    assert {k for k, v in found.items() if v.status == "new"} - \
+        {k for k, v in plain.items() if v.status == "new"} == set(DIGEST_LEAF_PATHS)
+    assert {k: v.status for k, v in found.items() if k not in DIGEST_LEAF_PATHS} == \
+        {k: v.status for k, v in plain.items()}
+    assert found["systems/lorenz63/fitted/analog_proxy/slope"].status == "equal"
+    done, _, _ = run_cli(tmp_path, old, tip)
+    assert done.returncode == 0, done.stdout[-600:] + done.stderr[-600:]
+
+
 # --------------------------------------- WU-0008.2a ci_mc_se leaves at pilot size (fix round 3)
 CI_MC_SE_PATHS = [f"systems/{system}/{where}/ci_mc_se/[{i}]"
                   for system in ("chua", "lorenz63", "rossler")

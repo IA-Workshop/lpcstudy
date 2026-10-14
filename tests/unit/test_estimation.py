@@ -738,3 +738,54 @@ def test_train_estimator_gives_each_width_its_own_fresh_stream(
     for width, rng in seen.items():
         assert rng.bit_generator.state == stream(width).bit_generator.state
     assert seen[32].bit_generator.state != seen[64].bit_generator.state
+
+
+# ------------------------------------------------ weight digest of a trained network (WU-0003.7a)
+def test_trained_network_weights_digest_is_sha256_of_the_layer_arrays_in_order() -> None:
+    """``TrainedNetwork.weights_digest`` hashes weight then bias of every layer, binary64 C order (a2).
+
+    Reference: ``hashlib.sha256`` of the values of a hand-built three-layer network (distinct, non
+    symmetric weights so that a transpose or a layer swap is visible) packed little-endian with
+    ``struct`` in the order W1, b1, W2, b2, W3, b3, written here and not through ``array_digest``.
+    The network is a ``TrainedNetwork`` with those parameters as numpy and as JAX arrays (a trained
+    network holds JAX arrays; both give the same digest). Changing the last bit of one bias
+    changes the digest; swapping two layers changes it; the standardization arrays are not part of
+    it (changing ``in_mean`` leaves it equal, since the digest is of the weights); a float32
+    parameter, even mixed with float64 ones, raises ``TypeError`` (nothing is converted silently).
+    Exact (a digest is a
+    deterministic function of the bytes; no tolerance).
+    """
+    import dataclasses
+    import hashlib
+    import struct
+
+    import jax.numpy as jnp
+
+    from lpcstudy.networks import TrainedNetwork
+
+    params = [(np.array([[0.1, -2.5, 1.0 / 3.0], [4.0, 5.0, 6.0]]), np.array([0.5, 0.25, -1e-300])),
+              (np.array([[1.0, 2.0], [3.0, 4.5], [7.0, 8.0]]), np.array([0.125, 9.0])),
+              (np.array([[2.0], [-3.0]]), np.array([5e-324]))]
+
+    def reference(layers) -> str:
+        values = [v for w, b in layers for a in (w, b) for v in a.ravel().tolist()]
+        return hashlib.sha256(struct.pack("<%dd" % len(values), *values)).hexdigest()
+
+    def network(layers, **changes) -> TrainedNetwork:
+        base = dict(params=layers, in_mean=np.zeros(2), in_scale=np.ones(2),
+                    out_mean=np.zeros(1), out_scale=np.ones(1), val_loss=0.0, width=3)
+        return TrainedNetwork(**{**base, **changes})
+
+    expected = reference(params)
+    assert network(params).weights_digest() == expected
+    as_jax = [(jnp.asarray(w), jnp.asarray(b)) for w, b in params]
+    assert network(as_jax).weights_digest() == expected
+    nudged = [(w.copy(), b.copy()) for w, b in params]
+    nudged[1][1][0] = np.nextafter(nudged[1][1][0], 1.0)
+    assert network(nudged).weights_digest() == reference(nudged) != expected
+    assert network([params[1], params[0], params[2]]).weights_digest() != expected
+    assert network(params, in_mean=np.ones(2)).weights_digest() == expected
+    single = [(w.astype(np.float32), b) for w, b in params]
+    with pytest.raises(TypeError, match="weights_digest"):
+        network(single).weights_digest()
+    assert dataclasses.is_dataclass(network(params))

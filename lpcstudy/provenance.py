@@ -141,6 +141,36 @@ def array_digest(values: np.ndarray) -> str:
     return hashlib.sha256(np.asarray(array, dtype="<f8").tobytes(order="C")).hexdigest()
 
 
+def index_digest(values: np.ndarray) -> str:
+    """Return the SHA-256 of the integers as little-endian int64, row-major (C order).
+
+    The integer counterpart of :func:`array_digest` (WU-0003.7a): it fingerprints an index array
+    such as the leaf id of every (state, draw) in a regression tree. A signed integer dtype of any
+    width is widened to int64 first (lossless, so the same values give the same digest); the
+    digest has no shape or dtype prefix.
+
+    Parameters
+    ----------
+    values : np.ndarray
+        An array of signed integers (any byte order).
+
+    Returns
+    -------
+    str
+        64 lowercase hexadecimal characters.
+
+    Raises
+    ------
+    TypeError
+        If the dtype is not a signed integer (a float, an unsigned integer or a boolean). Nothing
+        is converted silently (PRIME.4).
+    """
+    array = np.asarray(values)
+    if array.dtype.kind != "i":
+        raise TypeError(f"index_digest needs a signed integer array, got {array.dtype}")
+    return hashlib.sha256(np.asarray(array, dtype="<i8").tobytes(order="C")).hexdigest()
+
+
 def _error_text(exc: BaseException) -> str:
     """Return ``"<Type>: <message>"``, the convention of ``git_error``."""
     return f"{type(exc).__name__}: {exc}"

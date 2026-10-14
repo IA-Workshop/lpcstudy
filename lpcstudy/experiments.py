@@ -422,6 +422,48 @@ def context_record(ctx: SystemContext) -> dict:
             "unwhiten_digest": array_digest(ctx.unwhiten)}
 
 
+def fitted_record(core: Cell, rules: FittedRules, cfg: StudyConfig) -> dict:
+    """The ``fitted`` block of a system: the fitted rules and the provenance of their fits.
+
+    The first six entries are the long-standing ones (unchanged, bitwise). WU-0003.7a adds, after
+    them and with no random draw, four leaves that exist so that two runs can be compared and a
+    difference located (``docs/agent/notes/2026-10-14-math-wu0003.md``, M1; needs owner review before
+    freeze): ``nfev`` and ``status`` inside each proxy entry (the ``least_squares`` outcome, which
+    shows where a tolerance-stopped fit ended); ``a5_leaf_digest`` (the A5 tree's leaf id of every
+    (state, draw) of the calibration and then the test split, int64, SHA-256 of the C-order bytes,
+    from the profiles that production assigns); and ``allocator_digest`` (the SHA-256 of the A3
+    allocator network's weights, see ``TrainedNetwork.weights_digest``).
+
+    Parameters
+    ----------
+    core : Cell
+        The core cell (its calibration and test evaluation draws and its noise level).
+    rules : FittedRules
+        The rules fitted on it.
+    cfg : StudyConfig
+        Configuration (``reference_horizon``, ``steps_per_lyapunov``).
+
+    Returns
+    -------
+    dict
+        JSON-serializable ``fitted`` block.
+    """
+    profiles = [deployable_profile(core.splits[split].evals, rules.proxies, core.noise,
+                                   cfg.steps_per_lyapunov) for split in ("calibration", "test")]
+    return {"analog_proxy": vars(rules.proxies.analog),
+            "estimation_proxy": vars(rules.proxies.estimation),
+            "nu_cap": rules.proxies.nu_cap,
+            "chosen_K": rules.chosen_regimes,
+            "regime_weights_href": {
+                str(k): r.weights[:, cfg.reference_horizon - 1].tolist()
+                for k, r in rules.regimes.items()},
+            "regime_horizons_km_lyapunov": {
+                str(k): (r.horizons_km / cfg.steps_per_lyapunov).tolist()
+                for k, r in rules.regimes.items()},
+            "a5_leaf_digest": rules.regimes[rules.chosen_regimes].leaf_digest(*profiles),
+            "allocator_digest": rules.predictor.network.weights_digest()}
+
+
 def run_system(study: Study, system: str) -> dict:
     """Stages (ii)-(iv) for one core system.
 
@@ -466,16 +508,7 @@ def run_system(study: Study, system: str) -> dict:
     rules = fit_rules([core], cfg)
     study.record_rules(system, core, rules)
     weights, scores = _evaluate(core, rules, cfg)
-    res["fitted"] = {"analog_proxy": vars(rules.proxies.analog),
-                     "estimation_proxy": vars(rules.proxies.estimation),
-                     "nu_cap": rules.proxies.nu_cap,
-                     "chosen_K": rules.chosen_regimes,
-                     "regime_weights_href": {
-                         str(k): r.weights[:, cfg.reference_horizon - 1].tolist()
-                         for k, r in rules.regimes.items()},
-                     "regime_horizons_km_lyapunov": {
-                         str(k): (r.horizons_km / cfg.steps_per_lyapunov).tolist()
-                         for k, r in rules.regimes.items()}}
+    res["fitted"] = fitted_record(core, rules, cfg)
     res["scores"] = an.summarize_scores(scores, core.horizons, cfg)
     res["km_curves"] = an.km_curves(scores, cfg.horizon_max)
     res["weight_profile"] = an.weight_profiles(core, cfg)

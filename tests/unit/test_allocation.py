@@ -325,3 +325,104 @@ def test_calibrate_regimes_counts_an_empty_regime_a6() -> None:
     assert np.isnan(result.horizons_km[left])
     assert np.all(np.isfinite(result.horizons_km[~result.empty]))
     assert result.pooled_curvature_floor == 0
+
+
+# ---------------------------------------------- WU-0003.7a: nfev, status and the A5 leaf digest
+def test_seed_proxy_records_nfev_and_status_equal_to_scipys_optimize_result() -> None:
+    """``SeedProxy.fit`` stores ``nfev`` and ``status`` of its ``least_squares`` call (a3).
+
+    Reference: scipy's own ``OptimizeResult`` for the same problem, run in the test: the same
+    manufactured data, the non-negative least-squares start ``nnls`` and the log-scale soft-L1
+    residual written out here from the docstring of ``SeedProxy``. The data have the known
+    solution (a, b) = (2, 3) (the generator, seed and tolerances of the recovery test above: rel
+    0.02 and 0.05, 34 and 29 standard errors), once with multiplicative log-normal noise of sd 0.01
+    and once exact (no noise). ``nfev`` and ``status`` are integers, so they are compared exactly;
+    the same inputs run the same deterministic code in one process, so equality is the
+    expectation. Preconditions asserted, so that the test cannot pass on a constant: the noisy fit
+    needs more than one evaluation and stops by a tolerance (status 1 to 4). A hand-built proxy has
+    ``None`` for both (it was not fitted); ``vars`` gives the four JSON leaves in the order slope,
+    floor, nfev, status.
+    """
+    import json
+
+    from scipy.optimize import least_squares, nnls
+
+    def scipy_fit(feature_sq: np.ndarray, floor_sq: np.ndarray, seed_sq: np.ndarray):
+        scale = np.median(seed_sq)
+        design = np.column_stack([feature_sq, floor_sq]) / scale
+        coef, _ = nnls(design, seed_sq / scale)
+        log_seed = np.log(seed_sq / scale)
+        return least_squares(lambda x: np.log(design @ np.exp(x) + 1e-300) - log_seed,
+                             np.log(np.maximum(coef, 1e-6)), loss="soft_l1")
+
+    rng = np.random.default_rng(5)
+    rho = 0.02
+    feature = rng.uniform(0.01, 0.2, 500)
+    floor = rho * rng.uniform(0.5, 2.0, 500)
+    exact = 2.0 * feature**2 + 3.0 * floor**2
+    noisy = exact * np.exp(0.01 * rng.standard_normal(500))
+    for seed_sq, is_noisy in ((noisy, True), (exact, False)):
+        proxy = SeedProxy.fit(feature**2, floor**2, seed_sq)
+        sol = scipy_fit(feature**2, floor**2, seed_sq)
+        assert type(proxy.nfev) is int and type(proxy.status) is int
+        assert (proxy.nfev, proxy.status) == (sol.nfev, sol.status)
+        assert proxy.slope == pytest.approx(2.0, rel=0.02)
+        assert proxy.floor == pytest.approx(3.0, rel=0.05)
+        if is_noisy:
+            assert sol.nfev > 1 and sol.status in (1, 2, 3, 4)
+    hand = SeedProxy(0.5, 0.25)
+    assert (hand.nfev, hand.status) == (None, None)
+    leaves = vars(SeedProxy(0.5, 0.25, nfev=7, status=2))
+    assert list(leaves) == ["slope", "floor", "nfev", "status"]
+    assert json.loads(json.dumps(leaves)) == leaves
+
+
+def _stump() -> tuple[DecisionTreeRegressor, RegimeMap]:
+    """A 2-leaf tree on one profile coordinate, manufactured: the one split is at 0.5 exactly.
+
+    Fitted on the two points 0.0 and 1.0 with different labels, the split is their midpoint, so by
+    hand a value <= 0.5 goes to node 1 and a value > 0.5 to node 2 (sklearn numbers the root 0,
+    then its left child 1 and its right child 2).
+    """
+    tree = DecisionTreeRegressor(max_leaf_nodes=2, random_state=0)
+    tree.fit(np.array([[0.0], [1.0]]), np.array([0.0, 1.0]))
+    leaf_ids = np.nonzero(tree.tree_.children_left == -1)[0]
+    assert leaf_ids.tolist() == [1, 2] and tree.tree_.threshold[0] == 0.5
+    return tree, RegimeMap(tree=tree, leaf_ids=leaf_ids, weights=np.zeros((2, 1)),
+                           horizons_km=np.full(2, np.nan))
+
+
+def test_regime_leaf_digest_equals_sha256_of_the_int64_leaf_index_and_tracks_one_leaf() -> None:
+    """``RegimeMap.leaf_digest(*profiles)`` is the SHA-256 of the int64 leaf ids (a4).
+
+    Reference: the leaf of every (state, draw) decided by hand from the manufactured split at 0.5
+    (a value <= 0.5 is node 1, above is node 2), packed little-endian int64 with ``struct`` and
+    hashed with ``hashlib``, the first profile array first and the second after it, each flattened
+    in C order, written here and not through ``index_digest``. Profiles are ``(n, E, 1)``. Checks:
+    the digest equals the hand value; moving one state's coordinate across the split (0.4 to 0.8)
+    changes the digest to the new hand value; moving it within its leaf (0.1 to 0.3) leaves the
+    digest unchanged; the order of the two arrays matters; ``tree.apply`` of the library equals
+    the hand leaves (the reference is the tree's own definition). Exact.
+    """
+    import hashlib
+    import struct
+
+    tree, regime_map = _stump()
+    calibration = np.array([[0.1, 0.9], [0.4, 0.6], [0.0, 1.0]])[..., None]  # n = 3, E = 2
+    test = np.array([[0.7, 0.2], [0.5, 0.51]])[..., None]  # n = 2, E = 2
+
+    def by_hand(*profiles: np.ndarray) -> str:
+        leaves = [1 if x <= 0.5 else 2 for p in profiles for x in p[..., 0].ravel()]
+        return hashlib.sha256(struct.pack("<%dq" % len(leaves), *leaves)).hexdigest()
+
+    assert regime_map.leaf_digest(calibration, test) == by_hand(calibration, test)
+    flipped = calibration.copy()
+    flipped[1, 0, 0] = 0.8  # was 0.4: node 1 becomes node 2
+    assert regime_map.leaf_digest(flipped, test) == by_hand(flipped, test)
+    assert regime_map.leaf_digest(flipped, test) != regime_map.leaf_digest(calibration, test)
+    inside = calibration.copy()
+    inside[0, 0, 0] = 0.3  # was 0.1: the same leaf
+    assert regime_map.leaf_digest(inside, test) == regime_map.leaf_digest(calibration, test)
+    assert regime_map.leaf_digest(test, calibration) != regime_map.leaf_digest(calibration, test)
+    assert tree.apply(calibration.reshape(-1, 1)).tolist() == \
+        [1 if x <= 0.5 else 2 for x in calibration.ravel()]

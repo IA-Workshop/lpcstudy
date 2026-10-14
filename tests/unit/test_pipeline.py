@@ -687,7 +687,9 @@ def test_estimator_streams_are_labelled_by_system_dimension_delay_noise_and_widt
 
     def stub(inputs, targets, noise, widths, epochs, stream):
         streams.append((noise, widths, stream))
-        return SimpleNamespace(width=widths[0]), {widths[0]: 1.0}
+        # the stub network has the one method ``setup`` reads since WU-0003.7a
+        return SimpleNamespace(width=widths[0], weights_digest=lambda: "0" * 64), \
+            {widths[0]: 1.0}
 
     monkeypatch.setattr(pipeline, "train_estimator", stub)
     study = pipeline.Study(SMOKE, tmp_path)
@@ -702,3 +704,45 @@ def test_estimator_streams_are_labelled_by_system_dimension_delay_noise_and_widt
         expected = make_rng(SMOKE.seed, "lorenz63", 7, 5, "estimator", "0.01", width)
         assert stream(width).bit_generator.state == expected.bit_generator.state
     assert stream(32).bit_generator.state != stream(64).bit_generator.state
+
+
+def test_setup_logs_the_weights_digest_of_each_trained_estimator(monkeypatch, tmp_path) -> None:
+    """WU-0003.7a (a2): ``estimator_log[<key>]["weights_digest"]`` is the SHA-256 of the trained
+    network's weights, and it is logged once per trained network (a cached network is not logged
+    twice), with the existing leaves unchanged.
+
+    Reference: ``hashlib.sha256`` of the hand-built network's layer arrays (weight then bias per
+    layer, little-endian binary64, row-major), packed with ``struct`` in the test. The training
+    is replaced by a stub that returns that network, so the digest is independent of any
+    training. The existing keys keep their values (``val_loss_by_width``, ``chosen_width``) and the
+    log entry has exactly the keys val_loss_by_width, chosen_width, seconds and weights_digest.
+    Exact.
+    """
+    import hashlib
+    import struct
+    from types import SimpleNamespace
+
+    from lpcstudy import pipeline
+    from lpcstudy.config import SMOKE
+    from lpcstudy.networks import TrainedNetwork
+    from lpcstudy.systems import SYSTEMS
+
+    params = [(np.array([[0.1, 0.2], [0.3, 0.4]]), np.array([0.5, -0.5])),
+              (np.array([[1.0], [2.0]]), np.array([1e-7]))]
+    network = TrainedNetwork(params=params, in_mean=np.zeros(2), in_scale=np.ones(2),
+                             out_mean=np.zeros(1), out_scale=np.ones(1), val_loss=0.5, width=2)
+    monkeypatch.setattr(pipeline, "train_estimator",
+                        lambda *args: (network, {2: 0.5, 4: 0.75}))
+    study = pipeline.Study(SMOKE, tmp_path)
+    ctx = SimpleNamespace(spec=SYSTEMS["lorenz63"], embed_dim=7, delay=5, interval=0.03,
+                          estimator_inputs=np.zeros((4, 7)), estimator_targets=np.zeros((4, 3)))
+    study.setup(ctx, 0.01)
+    study.setup(ctx, 0.01, n_analogs=5)  # cached network: no second entry
+    study.setup(ctx, 0.02)
+    values = [v for w, b in params for a in (w, b) for v in a.ravel().tolist()]
+    expected = hashlib.sha256(struct.pack("<%dd" % len(values), *values)).hexdigest()
+    assert set(study.estimator_log) == {"('lorenz63', 7, 5, 0.01)", "('lorenz63', 7, 5, 0.02)"}
+    for entry in study.estimator_log.values():
+        assert list(entry) == ["val_loss_by_width", "chosen_width", "seconds", "weights_digest"]
+        assert entry["weights_digest"] == expected
+        assert entry["val_loss_by_width"] == {2: 0.5, 4: 0.75} and entry["chosen_width"] == 2

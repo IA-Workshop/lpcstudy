@@ -16,6 +16,8 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 
+from .provenance import array_digest
+
 Params = list[tuple[jnp.ndarray, jnp.ndarray]]
 
 
@@ -91,6 +93,34 @@ class TrainedNetwork:
     out_scale: np.ndarray
     val_loss: float
     width: int
+
+    def weights_digest(self) -> str:
+        """SHA-256 of the weights: weight then bias of every layer, binary64, row-major.
+
+        The arrays are concatenated in the order W1, b1, W2, b2, ... (each flattened in C order)
+        and hashed as :func:`lpcstudy.provenance.array_digest` does, so the digest is of the
+        parameters ``params`` only; the standardization arrays (``in_mean`` and the others) are
+        functions of the training data and are not included. It is provenance (WU-0003.7a, O7):
+        a difference between two runs separates "same trajectory, other weights" from "same
+        weights".
+
+        Returns
+        -------
+        str
+            64 lowercase hexadecimal characters.
+
+        Raises
+        ------
+        TypeError
+            If any parameter array is not float64. Nothing is converted silently (PRIME.4): a
+            float32 parameter next to float64 ones would otherwise be promoted by the
+            concatenation.
+        """
+        arrays = [np.asarray(a) for layer in self.params for a in layer]
+        bad = sorted({str(a.dtype) for a in arrays if a.dtype != np.float64})
+        if bad:
+            raise TypeError(f"weights_digest needs float64 parameters, got {', '.join(bad)}")
+        return array_digest(np.concatenate([a.ravel() for a in arrays]))
 
     def predict(self, inputs: jnp.ndarray) -> jnp.ndarray:
         """Evaluate the network in original units.

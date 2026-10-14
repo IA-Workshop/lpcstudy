@@ -166,7 +166,7 @@ class Study:
             self._networks[base_key] = network
             self.estimator_log[str(base_key)] = {
                 "val_loss_by_width": losses, "chosen_width": network.width,
-                "seconds": time.time() - start}
+                "seconds": time.time() - start, "weights_digest": network.weights_digest()}
             LOG.info("estimator %s trained: %s", base_key, self.estimator_log[str(base_key)])
         params = dict(ctx.spec.params)
         if misspec > 0:
