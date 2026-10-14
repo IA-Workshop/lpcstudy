@@ -129,3 +129,15 @@ The planners' recommendations are working defaults, not covered by the 2026-10-1
 - **Decision for you:** the validity gate can stop the sealed run. Per seed, V6 fails with probability about 4.4% (Chua; Lorenz-63 0.11%, Rossler 0; any system 4.5%) and V4 with a central estimate of 29% for any system (plausible range wide; n=2 per system). A failure at the sealed run is a hard stop, referred to you, never retuned (DEC-0027). Options without recommendation are in `docs/agent/notes/2026-10-13-v6-margin-mathematics.md` section 5 (branch `wu/0002-14-seeded-states`, merged with WU-0002.14): record the risk in the risk register and the preregistration; an offline V6 check on DEV-1 to DEV-4; the WU-0003 rehearsal; a V4 study over development seeds; a pre-seal rule for the response to a gate failure; evaluating the outcome-free gate checks first. Any change to the V4/V6 definition or bar is yours alone.
 - v3 risk R1 and the M5(d) table: replace 'at least 13x margin, essentially no chance' by the draft text in section 4 of that note (for Chua, V6 is a heuristic indicator, not an exact error estimate; hypothesis row H3).
 - Ledger: your `ruling` for the P1 result (WU-0002.14, redrawn start states: D2 exact, I1 33/33, R-f 30/30, D3 57/57, V1 to V7 pass) and, when you want it, the owner review of seed and statistics code that WU-0002.14 touches (needs owner review before freeze).
+
+## 16. Owner flags from the WU-0003 mathematics check (M1 to M8; note `docs/agent/notes/2026-10-14-math-wu0003.md` on branch `wu/0003-rehearsal`, e8a39ed), 2026-10-14
+
+The mathematician's refinements (plan amendment 2) keep every pre-registered threshold at least as strict; the following are yours.
+
+- **OF-1:** whether a fitted-coefficient change beyond 1e-6 licenses H2c, H2d and H3c under tiers T1 to T3 (the cross-host margin there is only 1.7x).
+- **OF-2:** if R0 shows a V1 difference above 1e-12 across devices, refer before R3; the principled replacement (about 1e-9) is wider.
+- **OF-3:** which calibrated block-length reading to use (the acf-based factor or a pooled permutation test); the original rule stays reported.
+- **OF-4:** correct the F1 'worst case' wording in WU-0008 M3 and DEC-0024 point 2 (a synthetic case reaches 1.38 F1; F1/hw_full is 0.54 to 1.20 at M = 200; 'below 10% of the half-width' would need M of about 5,700 to 29,000, so it is practically unreachable at M <= 399).
+- **OF-5:** the change of the TD standard-error form (arms facing away, as DEC-0027 for D3; the constant 3.4 is kept over 18 parts, family level 1.2%).
+- **OF-6:** pre-register the predicted gate failures over DEV-1 and DEV-2 (at least one V6 failure about 8.8%, 12.9% if R3 diverges; at least one V4 failure about 50 to 71%; see DEF-0026). R5's V4 uses 100 states and cannot be pooled with the pilot values.
+- Predictions to read in advance (development, not tests): H2e will read 'not reproduced' on the narrow side (0.44 to 0.76 of v3's 0.04), H2b(ii) sits near its lower edge, Q-N is undetermined; the variance-ratio thresholds of C9 carry almost no information (some fire in about 97% of pilot runs with no dependence).
