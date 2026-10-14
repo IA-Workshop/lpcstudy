@@ -823,7 +823,7 @@ def test_fitted_record_keeps_the_existing_leaves_and_adds_the_integer_and_digest
 
 
 # ------------------------------------------------ V4 arrays for the state dump (WU-0003.7b)
-def _v4_world(monkeypatch, tmp_path, perturb=None, clips=None):
+def _v4_world(monkeypatch, tmp_path, perturb=None, clips=None, nan=False):
     """Two real ``Study`` objects (dump off and on), the same stubbed ``forecast_draws``.
 
     The planned errors at horizon ``h`` for global row i and draw j are ``cp0[i, j] (1 + h / 100)``
@@ -840,6 +840,8 @@ def _v4_world(monkeypatch, tmp_path, perturb=None, clips=None):
     n_states, n_draws = SMOKE.convergence_states, max(SMOKE.convergence_draws)
     rng = np.random.default_rng(4107)
     cp0, plp0 = rng.standard_normal((n_states, n_draws)), rng.standard_normal((n_states, n_draws))
+    if nan:  # an unclipped NaN PLP error in both calls (the same entry)
+        plp0[0, 0] = np.nan
     calls: list[list[int]] = []
 
     def errors(rows, horizons):
@@ -942,18 +944,45 @@ def test_convergence_check_with_the_dump_gives_the_same_leaves_and_the_v4_arrays
 
 
 def test_convergence_check_dump_flags_a_second_call_whose_href_column_differs(
-        monkeypatch, tmp_path) -> None:
+        monkeypatch, tmp_path, caplog) -> None:
     """A broken second forecast is not silent: ``extra_href_equal`` is False; the production leaves are unchanged.
 
     Reference: the stub adds 1e-9 to the ``H_ref`` PLP column of the three-horizon call only. The
     bitwise comparison with the production column must then be False (a defect of the dump would
-    show as a difference, never as a pass), and the V4 leaves still equal the dump-off ones.
+    show as a difference, never as a pass), the V4 leaves still equal the dump-off ones, and one
+    WARNING line names the number of differing entries: all 10 x 30 PLP entries (R5 of the review).
     """
+    import logging
+
     from lpcstudy import experiments
 
     (off, on), cell, _, _ = _v4_world(monkeypatch, tmp_path, perturb=1e-9)
-    assert experiments.convergence_check(on, cell) == experiments.convergence_check(off, cell)
-    assert bool(on.dump._v4["lorenz63"]["extra_href_equal"]) is False
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        out_on = experiments.convergence_check(on, cell)
+    assert out_on == experiments.convergence_check(off, cell)
+    v4 = on.dump._v4["lorenz63"]
+    assert bool(v4["extra_href_equal"]) is False and int(v4["extra_href_diff"]) == 300
+    lines = [r.getMessage() for r in caplog.records if "H_ref errors of the second" in r.getMessage()]
+    assert len(lines) == 1 and "300 of 600 entries" in lines[0]
+
+
+def test_convergence_check_dump_treats_an_identical_nan_as_equal(monkeypatch, tmp_path, caplog) -> None:
+    """A NaN error present in both calls is not a mismatch (R5): ``extra_href_equal`` stays True, no warning.
+
+    Reference: the stub puts the same NaN PLP entry in the production and the second forecast, so
+    a bitwise comparison with NaN equal to NaN finds 0 differing entries; ``np.array_equal``
+    without ``equal_nan`` would call it a mismatch. Exact.
+    """
+    import logging
+
+    from lpcstudy import experiments
+
+    (_, on), cell, _, _ = _v4_world(monkeypatch, tmp_path, nan=True)
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        experiments.convergence_check(on, cell)
+    v4 = on.dump._v4["lorenz63"]
+    assert bool(v4["extra_href_equal"]) is True and int(v4["extra_href_diff"]) == 0
+    assert not [r for r in caplog.records if "H_ref errors of the second" in r.getMessage()]
 
 
 def test_convergence_check_dump_counts_and_logs_the_clips_of_its_second_forecast(
@@ -977,4 +1006,6 @@ def test_convergence_check_dump_counts_and_logs_the_clips_of_its_second_forecast
     assert on.dump._v4["lorenz63"]["extra_clip_entries"].tolist() == [6, 0, 4]
     lines = [r.getMessage() for r in caplog.records if "V4 dump forecasts" in r.getMessage()]
     assert len(lines) == 1 and "states/lorenz63.npz" in lines[0]
+    # R4: the line says what it counts: all three horizons (H_ref, 2 and 4 LT) of 10 x 30 draws
+    assert "H_ref, 2 and 4 LT" in lines[0] and " of 900;" in lines[0]
     assert off._records == on._records

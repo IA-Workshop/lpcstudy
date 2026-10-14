@@ -33,7 +33,9 @@ test states of the system in time order (``n_test``), ``E`` evaluation draws, ``
     for the two halves of the draws: ``E_C_A``, ``E_P_A``, ``C_A``, ``w_star_A`` (draws
     ``[0, M/2)``) and ``E_C_B``, ``E_P_B``, ``C_B``, ``w_star_B`` (draws ``[M/2, M)``);
     ``half_n_draws`` (int64 ``(2,)``) their sizes. For even ``M``,
-    ``(E_C_A + E_C_B) / 2`` is ``E_C`` up to round-off. ``eps_s`` (``analog_seed``), ``delta``
+    ``(E_C_A + E_C_B) / 2`` is ``E_C`` up to round-off; ``abs_C`` (``(n, k)``) is the mean
+    absolute cross term ``mean |e_C e_P|`` over all the draws, the exact scale of that round-off
+    bound for ``C`` (the squares are positive, so ``E_C`` and ``E_P`` are their own scale). ``eps_s`` (``analog_seed``), ``delta``
     (``est_seed``), ``N`` (the oracle noise sensitivity), ``nu``, ``Lambda_bar``, ``d`` (local
     dimension), ``g_H_ref`` (the oracle gain at ``H_ref``): each ``(n,)``. ``R`` (``(n, E)``): the
     recurrence distance of the evaluation draws. ``profile`` (``(n, E, 4)``): the deployable
@@ -44,9 +46,16 @@ test states of the system in time order (``n_test``), ``E`` evaluation draws, ``
     draw. ``state_mse/<rule>`` (``(n, k)``, ``rule`` in A0 .. A5, A4o, A*): the realized squared
     error of the rule averaged over the ``E`` draws, per horizon; the ``H_ref`` column is the
     per-state score the verdicts use (``RuleScores.state_mse_ref``).
-    Handling data: ``oracle_handled`` and ``eval_handled`` (int64 ``(n, 8)``): the per-state
-    ``handled`` counts, columns ``meta/draw_counters``, among them the clipped draws at ``H_ref``.
     ``oracle_state`` (int64 ``(n, 3)``): the sentinel flags of the state oracles.
+
+``handling/<construction|calibration|test>/`` (the clip and replacement counts of the core cell, all
+    three splits because the run's cell record pools them)
+    ``oracle_handled`` and ``eval_handled`` (int64 ``(n_s, 8)``): the per-state ``handled`` counts,
+    columns ``meta/draw_counters``, among them the clipped draws at ``H_ref``;
+    ``oracle_clip_entries`` and ``eval_clip_entries`` (int64 ``(3,)``): the totals over (state,
+    draw, horizon) of the clipped CP, PLP and non-finite error entries (``clip_entry_names``, a
+    str ``(3,)`` array in the group ``meta/``); their sums over the splits are the cell record's
+    counts of the same names.
 
 ``lm/<construction|calibration|test>/`` (the Levenberg-Marquardt data of every estimate of the core
     cell, all three splits because the run's LM summaries pool them; ``n_s`` the states of the
@@ -59,7 +68,9 @@ test states of the system in time order (``n_test``), ``E`` evaluation draws, ``
 ``sweep/rho=<g>|n_lib=<n>/`` (one group per distinct cell of the noise and library sweeps; the
     states are the first ``nS`` test states; the core cell appears as its own sweep view)
     ``w_star_href`` and ``err_corr_href`` (``(nS,)``): ``w*(H_ref)`` and the correlation of the CP
-    and PLP errors over the oracle draws; ``E_C_A``, ``E_P_A``, ``C_A``, ``E_C_B``, ``E_P_B``,
+    and PLP errors over the oracle draws; ``E_C``, ``E_P``, ``C`` (``(nS,)``): the full second
+    moments at ``H_ref``, and ``abs_C``: the mean absolute cross term (the exact scale of the b4
+    bound for ``C``); ``E_C_A``, ``E_P_A``, ``C_A``, ``E_C_B``, ``E_P_B``,
     ``C_B`` (``(nS,)``): the half-draw second moments at ``H_ref``; ``half_n_draws`` (int64 ``(2,)``).
 
 ``v4/`` (the first ``convergence_states`` test states; ``nM`` the convergence draw counts)
@@ -70,14 +81,16 @@ test states of the system in time order (``n_test``), ``E`` evaluation draws, ``
     draws, signed; ``w_ref`` (``(nV, 3)``): the estimate from all the draws. The ``H_ref`` column
     comes from the production forecast; the other two from a second forecast of the same states and
     draws, whose ``H_ref`` column is compared bitwise with the production one
-    (``extra_href_equal``, bool) and whose handling is counted in ``extra_handled`` (int64
-    ``(nV, 8)``) and ``extra_clip_entries`` (int64 ``(3,)``, names ``extra_clip_entry_names``).
+    (``extra_href_equal``, bool; ``extra_href_diff``, the number of differing entries, a NaN equal
+    to a NaN) and whose handling is counted in ``extra_handled`` (int64 ``(nV, 8)``) and
+    ``extra_clip_entries`` (int64 ``(3,)``, over all three horizons, names
+    ``extra_clip_entry_names``).
     The median over states of ``half_width[m, :, 0]`` is the leaf ``validation/convergence/<M>/
     median_half_width`` and the mean of ``abs(signed_dev[m, :, 0])`` is ``mean_abs_dev_from_max``.
 
 ``qn/<oracle|deployable>/`` (Q-N, the test states in time order)
     ``x_test`` (``(n, 4)``): the profile of the kind (the first evaluation draw for the deployable
-    one); ``w_star`` and ``log_horizon`` (``(n,)``): the targets' inputs; and per target
+    one); ``w_star`` and ``log_t`` (``(n,)``: the log state horizon): the targets' inputs; and per target
     (``logit_w_interior``, ``w_zero_indicator``, ``log_horizon``) ``<target>/pred3`` and
     ``<target>/pred4`` (``(n,)``: the predictions of the model with three and with four profile
     coordinates, for every test state), ``<target>/y`` (``(n,)``: the target, with the placeholder
@@ -248,12 +261,14 @@ class StateDump:
         put("meta/steps_per_lyapunov", cfg.steps_per_lyapunov)
         put("meta/reference_horizon", ref)
         put("meta/draw_counters", np.array(DRAW_COUNTERS))
+        put("meta/clip_entry_names", np.array(ENTRY_COUNTERS))
         put("core/horizons", np.array(cfg.eval_horizons))
         put("core/ref_index", cfg.eval_horizons.index(ref))
         for stem, name in HALF_NAMES:
             put(f"core/{name}", getattr(m, stem)[:, cols])
             for tag in ("A", "B"):
                 put(f"core/{name}_{tag}", halves[f"{stem}_{tag}"][:, cols])
+        put("core/abs_C", halves["abs_cross"][:, cols])
         put("core/w_star", oracle_weight(m)[:, cols])
         for tag in ("A", "B"):
             half = dataclasses.replace(
@@ -288,10 +303,12 @@ class StateDump:
                                   scores[rule].state_mse_ref, equal_nan=True):
                 raise ValueError(f"state_mse of {rule} at H_ref differs from the score the "
                                  "verdicts use: a defect of the dump, not a tolerance")
-        put("core/oracle_handled", m.handled)
-        put("core/eval_handled", ev.handled)
-        for split in SPLITS:  # all three splits: the run's LM summaries pool them (b3 of the plan)
+        for split in SPLITS:  # all three splits: the run's cell record pools them (b3 of the plan)
             part = core.splits[split]
+            for kind, source in (("oracle", part.moments), ("eval", part.evals)):
+                put(f"handling/{split}/{kind}_handled", source.handled)
+                put(f"handling/{split}/{kind}_clip_entries",
+                    [source.clip_entries[name] for name in ENTRY_COUNTERS])
             for kind, source in (("oracle", part.moments), ("eval", part.evals)):
                 for name in ("residual", "accepted", "late"):
                     put(f"lm/{split}/{kind}_{name}", getattr(source, f"lm_{name}"))
@@ -309,6 +326,9 @@ class StateDump:
             group = f"sweep/rho={key[0]:g}|n_lib={key[1]}"
             put(f"{group}/w_star_href", oracle_weight(sm)[:, sm.at(ref)])
             put(f"{group}/err_corr_href", sm.err_corr[:, sm.at(ref)])
+            for stem, name in HALF_NAMES:
+                put(f"{group}/{name}", getattr(sm, stem)[:, sm.at(ref)])
+            put(f"{group}/abs_C", half["abs_cross"][:n_rows, hcol])
             for stem, name in HALF_NAMES:
                 for tag in ("A", "B"):
                     put(f"{group}/{name}_{tag}", half[f"{stem}_{tag}"][:n_rows, hcol])

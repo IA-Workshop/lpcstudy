@@ -59,12 +59,17 @@ def test_clean_copies_and_refuses_what_is_not_float64_int_bool_or_str() -> None:
             clean("bad", bad)
 
 
-def _stump_map() -> RegimeMap:
-    """A 2-leaf tree on profile coordinate 2 (``Lambda_hat / lambda_max``), split at 0.5 exactly."""
+def _stump_map(split: float = 0.5) -> RegimeMap:
+    """A 2-leaf tree on profile coordinate 2 (``Lambda_hat / lambda_max``), split at ``split``.
+
+    Fitted on the two points 0 and ``2 * split`` (so the one split is their midpoint). The map
+    under K = 3 of ``_world`` is a decoy with another split (0.1): a dump that read the wrong fitted
+    K would give other leaves.
+    """
     fit = np.zeros((2, 4))
-    fit[:, 2] = [0.0, 1.0]
+    fit[:, 2] = [0.0, 2.0 * split]
     tree = DecisionTreeRegressor(max_leaf_nodes=2, random_state=0).fit(fit, [0.0, 1.0])
-    assert tree.tree_.feature[0] == 2 and tree.tree_.threshold[0] == 0.5
+    assert tree.tree_.feature[0] == 2 and tree.tree_.threshold[0] == pytest.approx(split)
     return RegimeMap(tree=tree, leaf_ids=np.nonzero(tree.tree_.children_left == -1)[0],
                      weights=np.zeros((2, 1)), horizons_km=np.full(2, np.nan))
 
@@ -98,6 +103,7 @@ def _halves(rng: np.random.Generator, m, n_rows: int, n_hor: int) -> dict[str, n
         full = getattr(m, stem)[:n_rows]
         out[f"{stem}_A"] = full * (1.0 + 0.1 * rng.random(full.shape))
         out[f"{stem}_B"] = full * (1.0 - 0.1 * rng.random(full.shape))
+    out["abs_cross"] = 0.9 * np.sqrt(m.sq_cp[:n_rows] * m.sq_plp[:n_rows])
     out["n_draws"] = np.array([M // 2, M - M // 2])
     return out
 
@@ -115,16 +121,23 @@ def _world():
                            handled=rng.integers(0, 2, (N, 3)).astype(np.int64))
     lm = lambda n, k: SimpleNamespace(
         lm_residual=rng.random((n, k)), lm_accepted=rng.integers(0, 15, (n, k)),
-        lm_late=rng.integers(0, 2, (n, k)).astype(bool))
+        lm_late=rng.integers(0, 2, (n, k)).astype(bool),
+        handled=rng.integers(0, 3, (n, 8)).astype(np.int64),
+        clip_entries={"error_clips_cp": int(rng.integers(0, 9)), "error_clips_plp": 3,
+                      "error_clips_nonfinite": int(rng.integers(0, 4))})
     core = SimpleNamespace(
         system="lorenz63", noise=0.01, library_size=10_000, horizons=np.arange(1, n_hor + 1),
         splits={"construction": SimpleNamespace(moments=lm(5, M), evals=lm(5, E)),
                 "calibration": SimpleNamespace(moments=lm(N_CAL, M), evals=cal),
                 "test": SimpleNamespace(moments=m, evals=ev)}, oracles={"test": oracles})
+    # the clip entry totals of the real computations (dicts), distinct per part
+    m.clip_entries = {"error_clips_cp": 1, "error_clips_plp": 2, "error_clips_nonfinite": 0}
+    ev.clip_entries = {"error_clips_cp": 4, "error_clips_plp": 0, "error_clips_nonfinite": 1}
+    cal.clip_entries = {"error_clips_cp": 7, "error_clips_plp": 7, "error_clips_nonfinite": 7}
     rules = SimpleNamespace(
         proxies=ProfileProxies(SeedProxy(1.0, 2.0, nfev=11, status=2),
                                SeedProxy(0.5, 0.25, nfev=5, status=1), nu_cap=7.5),
-        regimes={2: _stump_map()}, chosen_regimes=2)
+        regimes={2: _stump_map(), 3: _stump_map(split=0.1)}, chosen_regimes=2)
     weights = {rule: rng.random((N, E, n_hor)) for rule in RULES}
     scores = {rule: SimpleNamespace(state_mse_ref=(
         (w[:, :, REF - 1] * ev.cp_err[:, :, REF - 1]
@@ -208,13 +221,23 @@ def test_collect_dumps_every_core_array_as_the_hand_formula_says() -> None:
         w = weights[rule]
         err = w[:, :, COLS] * ev.cp_err[:, :, COLS] + (1 - w[:, :, COLS]) * ev.plp_err[:, :, COLS]
         assert np.array_equal(arrays[f"core/state_mse/{rule}"], (err**2).mean(axis=1)), rule
-    assert np.array_equal(arrays["core/oracle_handled"], m.handled)
-    assert np.array_equal(arrays["core/eval_handled"], ev.handled)
+    assert np.array_equal(arrays["core/abs_C"], halves["abs_cross"][:, COLS])
     for split, part in core.splits.items():  # every split: the run's LM summaries pool them
         for kind, source in (("oracle", part.moments), ("eval", part.evals)):
             for name in ("residual", "accepted", "late"):
                 assert np.array_equal(arrays[f"lm/{split}/{kind}_{name}"],
                                       getattr(source, f"lm_{name}")), (split, kind, name)
+    names = ["error_clips_cp", "error_clips_plp", "error_clips_nonfinite"]
+    assert arrays["meta/clip_entry_names"].tolist() == names
+    for split, part in core.splits.items():  # b3: the splits' counts sum to the cell record's
+        for kind, source in (("oracle", part.moments), ("eval", part.evals)):
+            assert np.array_equal(arrays[f"handling/{split}/{kind}_handled"], source.handled)
+            assert arrays[f"handling/{split}/{kind}_handled"].dtype == np.int64
+            assert arrays[f"handling/{split}/{kind}_clip_entries"].tolist() == \
+                [source.clip_entries[k] for k in names]
+    assert arrays["handling/test/oracle_clip_entries"].tolist() == [1, 2, 0]
+    assert arrays["handling/test/eval_clip_entries"].tolist() == [4, 0, 1]
+    assert arrays["handling/calibration/eval_clip_entries"].tolist() == [7, 7, 7]
     assert arrays["lm/test/oracle_late"].dtype == bool
     assert arrays["lm/test/oracle_accepted"].dtype == np.int64
     assert arrays["lm/construction/oracle_residual"].shape == (5, M)
@@ -233,6 +256,7 @@ def test_collect_dumps_the_sweep_cells_with_the_core_view_taken_from_the_core_ha
     moments at ``H_ref``; ``err_corr_href`` is the stored column. Exact.
     """
     dump, core, rules, weights, scores, noise_cells, library_cells, halves, cells = _world()
+    records = dict(dump._halves)  # collect drops the system's records
     arrays = dump.collect("lorenz63", core, rules, weights, scores, noise_cells, library_cells, CFG)
     groups = sorted({k.rsplit("/", 1)[0] for k in arrays if k.startswith("sweep/")})
     assert groups == ["sweep/rho=0.01|n_lib=1000", "sweep/rho=0.01|n_lib=10000",
@@ -245,8 +269,15 @@ def test_collect_dumps_the_sweep_cells_with_the_core_view_taken_from_the_core_ha
         assert np.array_equal(arrays[f"{group}/w_star_href"], oracle_w(
             sm.sq_cp[:, 2], sm.sq_plp[:, 2], sm.cross[:, 2]))
         assert np.array_equal(arrays[f"{group}/err_corr_href"], sm.err_corr[:, 2])
+        for name, stem in (("E_C", "sq_cp"), ("E_P", "sq_plp"), ("C", "cross")):
+            assert np.array_equal(arrays[f"{group}/{name}"], getattr(sm, stem)[:, 2]), name
         assert arrays[f"{group}/half_n_draws"].tolist() == [3, 3]
+    for key in (("0.02", 10_000), ("0.01", 1_000)):  # own records: abs_C at the H_ref position
+        record = records[("lorenz63", float(key[0]), key[1], False)]
+        assert np.array_equal(arrays[f"sweep/rho={key[0]}|n_lib={key[1]}/abs_C"],
+                              record["abs_cross"][:, 2])
     core_group = "sweep/rho=0.01|n_lib=10000"
+    assert np.array_equal(arrays[f"{core_group}/abs_C"], halves["abs_cross"][:N_SWEEP, REF - 1])
     for name, stem in (("E_C", "sq_cp"), ("E_P", "sq_plp"), ("C", "cross")):
         for tag in ("A", "B"):
             assert np.array_equal(arrays[f"{core_group}/{name}_{tag}"],
@@ -320,3 +351,26 @@ def test_the_a5_leaf_arrays_digest_to_the_fitted_leaf() -> None:
               for v in arrays[f"core/{part}"].ravel()]
     reference = hashlib.sha256(struct.pack("<%dq" % len(values), *values)).hexdigest()
     assert fitted_record(core, rules, CFG)["a5_leaf_digest"] == reference
+
+
+def test_the_a5_leaf_arrays_follow_the_chosen_k_not_another_fitted_k() -> None:
+    """``core/a5_leaf`` and ``a5_leaf_calibration`` are the leaves of the map under ``chosen_regimes``.
+
+    Reference: the manufactured stumps decided by hand (``_world`` holds K = 2 split at 0.5 and a
+    decoy K = 3 split at 0.1, on ``growth * 30``, the values 0.0, 0.3, 0.6, 0.9, 1.2 are on the two
+    sides of the decoy's split but not of the other's: 0.3 and 0.6 and 0.9 give leaf 2 under 0.1
+    and 0.3 gives leaf 1 under 0.5). With K = 2 chosen the leaves are the 0.5 ones (and differ from
+    the decoy's); with K = 3 chosen they are the 0.1 ones. A dump that read the first, the largest
+    or a fixed K would fail one of the two. Exact.
+    """
+    hand = lambda g, split: np.where(g * 30 <= split, 1, 2)
+    for chosen, split, other in ((2, 0.5, 0.1), (3, 0.1, 0.5)):
+        dump, core, rules, weights, scores, noise_cells, library_cells, _, _ = _world()
+        rules.chosen_regimes = chosen
+        arrays = dump.collect("lorenz63", core, rules, weights, scores, noise_cells,
+                              library_cells, CFG)
+        test_growth = core.splits["test"].evals.growth_proxy
+        cal_growth = core.splits["calibration"].evals.growth_proxy
+        assert np.array_equal(arrays["core/a5_leaf"], hand(test_growth, split))
+        assert np.array_equal(arrays["core/a5_leaf_calibration"], hand(cal_growth, split))
+        assert not np.array_equal(arrays["core/a5_leaf_calibration"], hand(cal_growth, other))

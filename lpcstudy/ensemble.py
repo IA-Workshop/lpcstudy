@@ -637,8 +637,11 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
         two halves of the oracle draws, from the same draws and the same chunks as the moments
         (no new random number, and no change to the returned moments): the keys ``sq_cp_A``,
         ``sq_plp_A``, ``cross_A`` and the same with ``_B``, each ``(n, nH)`` (draws
-        ``[0, M // 2)`` for ``A`` and ``[M // 2, M)`` for ``B``), and ``n_draws`` ``(2,)`` int64,
-        the sizes of the halves. For even ``M`` the mean of the two halves is the full moment.
+        ``[0, M // 2)`` for ``A`` and ``[M // 2, M)`` for ``B``), ``abs_cross`` ``(n, nH)`` (the
+        mean absolute cross term ``mean |e_C e_P|`` over all the draws: the exact scale of the
+        round-off bound of the cross moment; the two squares are positive, so their moments are
+        their own scale) and ``n_draws`` ``(2,)`` int64, the sizes of the halves. For even ``M``
+        the mean of the two halves is the full moment.
 
     Returns
     -------
@@ -656,8 +659,9 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
         raise ValueError(f"half_out needs at least two oracle draws, got {n_draws}")
     half = n_draws // 2
     halves = None if half_out is None else {
-        f"{name}_{tag}": np.zeros((n_states, len(horizons)))
-        for name in ("sq_cp", "sq_plp", "cross") for tag in ("A", "B")}
+        **{f"{name}_{tag}": np.zeros((n_states, len(horizons)))
+           for name in ("sq_cp", "sq_plp", "cross") for tag in ("A", "B")},
+        "abs_cross": np.zeros((n_states, len(horizons)))}
     per_chunk = max(1, chunk_traj // n_draws)
     out = {k: np.zeros((n_states, len(horizons))) for k in
            ("mean_cp", "mean_plp", "sq_cp", "sq_plp", "cross")}
@@ -692,6 +696,7 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
         out["sq_plp"][rows] = (batch.plp_err**2).mean(axis=1)
         out["cross"][rows] = (batch.cp_err * batch.plp_err).mean(axis=1)
         if halves is not None:
+            halves["abs_cross"][rows] = np.abs(batch.cp_err * batch.plp_err).mean(axis=1)
             for tag, part in (("A", slice(0, half)), ("B", slice(half, None))):
                 cp_half, plp_half = batch.cp_err[:, part], batch.plp_err[:, part]
                 halves[f"sq_cp_{tag}"][rows] = (cp_half**2).mean(axis=1)

@@ -102,10 +102,16 @@ def convergence_check(study: Study, cell: Cell) -> dict:
     extra = None if study.dump is None else _v4_extra_forecasts(
         study, cell, library, noise, n, cp, plp, cfg)
     if extra is not None and extra["clip_entries"].any():  # counted in the dump; never silent
-        LOG.warning("%s V4 dump forecasts (2 and 4 LT): clipped entries %s of %d; counted in "
-                    "states/%s.npz only, not in handling", cell.system,
-                    dict(zip(ENTRY_COUNTERS, extra["clip_entries"].tolist())), cp.size * 2,
-                    cell.system)
+        # the second call covers three horizons (H_ref, 2 and 4 LT), so its totals and the
+        # denominator are over all three; an H_ref clip is also in the production handling
+        LOG.warning("%s V4 dump forecasts (H_ref, 2 and 4 LT): clipped entries %s of %d; counted "
+                    "in states/%s.npz only, not in handling", cell.system,
+                    dict(zip(ENTRY_COUNTERS, extra["clip_entries"].tolist())),
+                    cp.size * len(extra["horizons"]), cell.system)
+    if extra is not None and extra["href_diff"]:  # the dump's 2 and 4 LT columns are suspect
+        LOG.warning("%s V4 dump: the H_ref errors of the second forecast differ from production "
+                    "in %d of %d entries (bitwise, NaN equal to NaN); the 2 and 4 LT arrays come "
+                    "from that second forecast", cell.system, extra["href_diff"], cp.size * 2)
     study.record_cell(cell.system, cell.label, "V4-convergence",
                       check_record(handled, clipped, n, noise.shape[1], 1, cell.noise,
                                    ctx.embed_dim - ctx.spec.dim,
@@ -152,7 +158,8 @@ def convergence_check(study: Study, cell: Cell) -> dict:
             **{k: np.stack(v) for k, v in v4.items()},
             "w_ref": np.column_stack([reference, *[weight(extra["cp"][j], extra["plp"][j])
                                                    for j in range(extra["cp"].shape[0])]]),
-            "extra_href_equal": extra["href_equal"], "extra_handled": extra["handled"],
+            "extra_href_equal": extra["href_equal"], "extra_href_diff": extra["href_diff"],
+            "extra_handled": extra["handled"],
             "extra_clip_entries": extra["clip_entries"],
             "extra_clip_entry_names": entry_names()})
     used = out.get(str(cfg.n_oracle_draws))
@@ -194,8 +201,10 @@ def _v4_extra_forecasts(study: Study, cell: Cell, library: AnalogLibrary, noise:
     -------
     dict
         ``cp`` and ``plp`` (``(2, n, M)``: the errors at 2 and 4 LT), ``horizons`` (all three,
-        steps), ``href_equal`` (bool), ``handled`` (int64 ``(n, 8)``) and ``clip_entries`` (int64
-        ``(3,)``).
+        steps), ``href_equal`` (bool) and ``href_diff`` (the number of entries of the two ``H_ref``
+        arrays, CP and PLP, that differ bitwise; a NaN equals a NaN), ``handled`` (int64
+        ``(n, 8)``) and ``clip_entries`` (int64 ``(3,)``: the totals over all three horizons,
+        ``H_ref`` included).
     """
     del study
     horizons, _ = v4_arrays(cfg)
@@ -213,10 +222,12 @@ def _v4_extra_forecasts(study: Study, cell: Cell, library: AnalogLibrary, noise:
         handled[rows] = batch.handled
         for name in ENTRY_COUNTERS:
             entries[name] += batch.clip_entries[name]
-    equal = bool(np.array_equal(np.concatenate(href_cp), cp_ref)
-                 and np.array_equal(np.concatenate(href_plp), plp_ref))
+    differ = 0  # entries unequal bitwise; a NaN counts as equal to a NaN
+    for second, first in ((np.concatenate(href_cp), cp_ref), (np.concatenate(href_plp), plp_ref)):
+        differ += int(np.count_nonzero(~((second == first) | (np.isnan(second) & np.isnan(first)))))
     return {"cp": np.concatenate(cp, axis=1), "plp": np.concatenate(plp, axis=1),
-            "horizons": horizons, "href_equal": equal, "handled": handled,
+            "horizons": horizons, "href_equal": differ == 0, "href_diff": differ,
+            "handled": handled,
             "clip_entries": np.array([entries[k] for k in ENTRY_COUNTERS])}
 
 

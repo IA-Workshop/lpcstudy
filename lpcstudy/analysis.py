@@ -1027,7 +1027,7 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig,
             boot_seed=make_rng(config.seed, cell.system, "bootstrap", "Q-N"), capture=captured)
         if dump is not None and captured is not None:
             dump.record_qn(cell.system, kind, {"x_test": x_test, "w_star": w_test,
-                                               "log_horizon": log_t_test, **captured})
+                                               "log_t": log_t_test, **captured})
     out["threshold"] = ("estimate, no pass/fail: reading of the oracle Delta R^2 interval for "
                         "the interior logit and for 1{w*=0} by the table of v3 section 7 "
                         "(upper bound < 0.05 and lower bound <= 0: reduces; lower bound > 0 "

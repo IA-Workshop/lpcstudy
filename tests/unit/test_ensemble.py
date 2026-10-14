@@ -713,7 +713,8 @@ def test_ensemble_moments_half_out_holds_the_half_draw_moments_and_changes_nothi
     and the brute force sums the same terms in the same order (a factor of 20 of margin). (iii) For
     even M the average of the halves is the full moment to ``1e-13`` times the mean absolute term
     (b4 of the plan: gamma_M ~ M u, here M = 6; the plan's value 1e-13 at M = 200 has margin 4.5).
-    (iv) ``n_draws`` holds the two sizes (floor and the rest).
+    (iv) ``n_draws`` holds the two sizes (floor and the rest). (v) ``abs_cross`` is ``mean |cp * plp|``
+    over all the draws, the exact scale that the dump hands to b4 (R3 of the review).
     """
     from types import SimpleNamespace
 
@@ -738,9 +739,10 @@ def test_ensemble_moments_half_out_holds_the_half_draw_moments_and_changes_nothi
                             ("cross", cp[:, part] * plp[:, part])):
             np.testing.assert_allclose(half[f"{stem}_{tag}"], brute.mean(axis=1), rtol=1e-14,
                                        atol=0.0)
+    np.testing.assert_allclose(half["abs_cross"], np.abs(cp * plp).mean(axis=1), rtol=1e-14, atol=0.0)
     if n_draws % 2 == 0:
         for stem, brute in (("sq_cp", cp**2), ("sq_plp", plp**2), ("cross", cp * plp)):
-            scale = np.abs(brute).mean(axis=1)
+            scale = np.abs(brute).mean(axis=1)  # the exact mean absolute term (R3: also dumped)
             diff = np.abs(0.5 * (half[f"{stem}_A"] + half[f"{stem}_B"]) - getattr(plain, stem))
             assert np.all(diff <= 1e-13 * scale)
 

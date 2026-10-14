@@ -18,11 +18,14 @@ Two smoke runs on DEV-0 in fresh interpreters, CPU: one without and one with ``-
   holds per-state means, so it is compared to ``2 n E 2**-52`` relative (the worst-case relative
   error of a sum of ``n E`` positive terms is ``gamma_{nE}``, about ``n E 2**-53``, and the two
   orders of summation can differ by twice that).
+* b3 also: the clip and replacement counts. The core cell's record pools the three splits, so the
+  per-split ``handling/<split>/`` arrays are summed and compared exactly with
+  ``handling/cells/<core>/by_kind/<oracle|eval>/counts`` (the eight ``handled`` columns and the
+  three clipped-entry totals).
 * b4: ``(m_A + m_B) / 2 = m`` for ``E_C``, ``E_P`` and ``C`` at every evaluation horizon of the core
-  cell, to ``1e-13`` times the mean absolute term. The dump holds no per-draw terms, so the scale
-  used here is the mean absolute term's upper bound: the moment itself for the squares and
-  ``sqrt(E_C E_P)`` (Cauchy-Schwarz) for the cross moment; the unit test of ``ensemble_moments``
-  (``test_ensemble.py``) checks the exact scale on planned errors.
+  cell and at ``H_ref`` of every sweep cell, to ``1e-13`` times the exact mean absolute term: the
+  moment itself for the two squares (their terms are positive) and the dumped ``abs_C`` (the mean
+  of ``|e_C e_P|`` over the draws) for the cross moment. This is the plan's scale.
 * b5: the median of the per-state V4 half-widths at ``H_ref`` equals the V4 leaf, bitwise.
 * b7: the file size is printed (the Log records it).
 """
@@ -81,7 +84,7 @@ def test_b2_dump_on_equals_dump_off_except_the_provenance_leaf(runs) -> None:
     assert len(outcome["common"]) > 1000
     assert "states_dump" not in off["provenance"] and on["provenance"]["states_dump"] is True
     drop = ("states_dump", "argv", "start_utc", "end_utc", "wall_seconds", "peak_rss_bytes",
-            "device_peak_bytes", "commit", "dirty")
+            "device_peak_bytes")
     assert {k: v for k, v in on["provenance"].items() if k not in drop} == \
         {k: v for k, v in off["provenance"].items() if k not in drop}
     assert not (runs["off"] / "states").exists()
@@ -133,6 +136,19 @@ def test_b3_the_production_summaries_of_the_dumped_arrays_reproduce_their_leaves
         mean_state = float(np.mean(a[f"core/state_mse/{rule}"][:, ref_index]))
         assert mean_state == pytest.approx(score["mse_href"], rel=2 * n_states * n_draws * 2.0**-52,
                                            abs=0.0), rule
+    # the clip and replacement counts: the cell record pools the three splits
+    from lpcstudy.ensemble import DRAW_COUNTERS, ENTRY_COUNTERS
+    cell = runs["results"]["on"]["systems"][SYSTEM]["handling"]["cells"][CORE_CELL]
+    for kind in ("oracle", "eval"):
+        counts = cell["by_kind"][kind]["counts"]
+        for column, name in enumerate(DRAW_COUNTERS):
+            assert sum(int(a[f"handling/{sp}/{kind}_handled"][:, column].sum())
+                       for sp in ("construction", "calibration", "test")) == counts[name], \
+                (kind, name)
+        for column, name in enumerate(ENTRY_COUNTERS):
+            assert sum(int(a[f"handling/{sp}/{kind}_clip_entries"][column])
+                       for sp in ("construction", "calibration", "test")) == counts[name], \
+                (kind, name)
     # the cell's Levenberg-Marquardt block, pooled over the three splits in the run's order
     parts = {kind: [tuple(a[f"lm/{split}/{kind}_{name}"] for name in ("residual", "accepted", "late"))
                     for split in ("construction", "calibration", "test")]
@@ -143,14 +159,18 @@ def test_b3_the_production_summaries_of_the_dumped_arrays_reproduce_their_leaves
 
 
 def test_b4_the_two_halves_average_to_the_full_moment(runs) -> None:
-    """b4: ``(m_A + m_B) / 2 = m`` to 1e-13 times the (bound of the) mean absolute term."""
+    """b4: ``(m_A + m_B) / 2 = m`` to 1e-13 times the exact mean absolute term, core and sweep cells."""
     a = runs["arrays"]
     assert a["core/half_n_draws"].tolist() == [15, 15]
-    scale = {"E_C": a["core/E_C"], "E_P": a["core/E_P"],
-             "C": np.sqrt(a["core/E_C"] * a["core/E_P"])}
-    for name, bound in scale.items():
-        mean_half = 0.5 * (a[f"core/{name}_A"] + a[f"core/{name}_B"])
-        assert np.all(np.abs(mean_half - a[f"core/{name}"]) <= 1e-13 * bound), name
+    groups = [("core/", None)] + [(f"{k.rsplit('/', 1)[0]}/", None) for k in a
+                                  if k.startswith("sweep/") and k.endswith("/w_star_href")]
+    assert len(groups) >= 4  # the core and at least the three sweep cells of the smoke preset
+    for prefix, _ in groups:
+        assert a[f"{prefix}half_n_draws"].tolist() == [15, 15]
+        scale = {"E_C": a[f"{prefix}E_C"], "E_P": a[f"{prefix}E_P"], "C": a[f"{prefix}abs_C"]}
+        for name, bound in scale.items():
+            mean_half = 0.5 * (a[f"{prefix}{name}_A"] + a[f"{prefix}{name}_B"])
+            assert np.all(np.abs(mean_half - a[f"{prefix}{name}"]) <= 1e-13 * bound), (prefix, name)
 
 
 def test_b7_the_dump_size_is_reported(runs) -> None:
