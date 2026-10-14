@@ -329,6 +329,27 @@ Changes by finding (details under each finding in the review file): R1 `licensin
 - Self-check of the diff. `clip|nan_to_num|isfinite|where(|try:|except` sites: unchanged in kind (see the round-0 line above); the new refusal of `--tol-other` raises `ToolError` (exit 2) and is counted nowhere because nothing is replaced. `default_rng|random.|PRNGKey`: none (the hygiene test scans the source). No tolerance in an `assert` or `approx` of the file grew; the only literal changed is the one above, to the hand value.
 - Evidence run again on the scratch copy of the S3 pair (T2, injected digests): declared tolerance still 1e-5 for (a) and 1e-4 for (b) to (g); the four H1a `cp` failures remain (Q1, not in this round). New: 2 integer leaves now FAIL, `gain_bound/n_screened_out/negative_covariance` 25 -> 23 and its `handling/result_counts` mirror, because `n_screened_out` is not on A6's list (`n_states` is, and `gain_bound/n_states` 52 -> 54 stays listed). This follows the strict reading the main session asked for; whether `n_screened_out` is a state count that should license 0.1 hw is an owner question (Q7).
 
+#### WU-0003.9 fix round 2 (developer claude-sonnet-5-5, 2026-10-14; basis: mathematician's note `2026-10-14-math-wu0003-9-q1.md`, c2e1374)
+
+Needs owner review before freeze. Only stricter or informational changes; no tolerance loosened; the re-tagging OF-7 (H1a fit outputs to the QoI rule) is **not adopted** (a loosening, with the owner). Tool and tests only; no preset, no RNG.
+
+1. The cp 1e-12 rule stays on the four H1a fit leaves; a pointer to the note (OF-7, working default cp 1e-12) is printed beside any failure under `H1a/by_noise` (rows and one report line); the exit code is unchanged.
+2. The cp 1e-12 rule now applies to `H1a/inverse_dim_reference` and `H1a/by_noise/*/median_seed_by_n_lib/*` (untagged in `compare_pilot`'s table).
+3. Census: the report prints the number of differing untagged float leaves that fall through to the network (looser) class and the untagged float leaves of the reference run by block (information, never a failure). The count by block is not pinned in a test on the real-schema extract (it holds only `handling` and `clip_sensitivity`, where the count is not meaningful); it is tested on a hand-known tree.
+4. The 3.97e-7 slip: it is not in the tool docstring. In this Log (round 0, "Difference with B2 d3's text") it is stated correctly: 3.97e-7 is |d| / |ref leaf| with no scale, 2.94e-7 is the class-(a) rel under s = max(|lo|, |hi|). The test table lists 3.97e-7 only as one input of the 10x rounding (both give 1e-5). No change needed.
+
+**§4.9 checklist (before the first invocation of this round; code and tests are written, nothing has run on them).**
+1. Change set (`git diff --name-only f381a48...HEAD` plus `git status --porcelain`): `tools/compare_runs.py`, `tests/unit/test_tools_compare_runs.py`, this file. The mathematician's note (c2e1374) is already committed and is not edited.
+2. Radius, `python3 tools/test_impact.py --base 9039bf5 --explain`: rule "`tools/<t>.py` -> `tests/unit/test_tools_<t>.py`". Unit set: `tests/unit/test_tools_compare_runs.py`, once after this code change. Smaller than the whole suite; no gate.
+3. Already run: not on this code (round 1: `2 failed, 211 passed`, then `2 passed` with `--lf`, on the previous code).
+4. Device: `JAX_PLATFORMS=cpu` (wrapper), no JAX import.
+5. Threads and time: `LPC_THREADS` 4; wrapper timeout 300 s; the file took 2 s.
+6. Contention: no preset or GPU job is started here; another lane's pilot may be running.
+7. Output: `-q --tb=short -rfE`.
+8. Command: `tools/run_tests.sh unit tests/unit/test_tools_compare_runs.py`.
+
+**Results of fix round 2.** Radius, run once: `tools/run_tests.sh unit tests/unit/test_tools_compare_runs.py`: `224 passed in 3.10s` (211 + 2 of round 1, plus 11 new cases: 9 for the untagged H1a leaves x T1, T2, T3, one for the pointer, one for the census). Self-check: no clip, `nan_to_num` or `where(`; no new `try`/`except`; no RNG; no tolerance changed. Evidence run on the scratch copy of the S3 pair (T2): `median_seed_by_n_lib/*` (3 leaves, max 8.2e-15) pass the cp rule, the four H1a fit leaves still fail (1e-12 kept) with the pointer printed once, exit 1 as before; census line: 84 differing untagged float leaves fall through to the class rules, 533 untagged float leaves in the reference run (H1a 9, H1b 2, H1c 6, H1d 10, H2a 16, H2b 19, ...).
+
 ## Review
 
 ## Audit

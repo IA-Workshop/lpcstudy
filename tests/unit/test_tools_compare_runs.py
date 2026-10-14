@@ -830,6 +830,83 @@ def test_config_must_be_identical_except_the_seed_in_td() -> None:
     assert run(ref, new).exit_code == 1
 
 
+# ---- round 2: H1a fit outputs, OF-7 pointer, untagged census
+H1A = f"{S}/H1a/by_noise/0.01"
+
+
+def with_h1a(tree: dict, **leaves: object) -> dict:
+    """Add an ``H1a`` block shaped like the real one (fit outputs, ``ratio`` and its interval, the seeds by n_lib)."""
+    block = {"by_noise": {"0.01": {"fitted_inverse_dim": 0.55, "ci_inverse_dim": [0.48, 0.65], "floor_rms": 0.03,
+                                   "ratio": 1.09, "ratio_ci": [0.96, 1.3],
+                                   "median_seed_by_n_lib": {"1000": 0.16, "10000": 0.14}}},
+             "inverse_dim_reference": 0.6, "verdict": "inconclusive"}
+    tree["systems"]["lorenz63"]["H1a"] = block
+    for path, value in leaves.items():
+        edit(tree, path.replace("__", "/"), value)
+    return tree
+
+
+@pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
+@pytest.mark.parametrize("path, value", [
+    (f"{S}/H1a/inverse_dim_reference", 0.6), (f"{H1A}/median_seed_by_n_lib/1000", 0.16),
+    (f"{H1A}/median_seed_by_n_lib/10000", 0.14)])
+def test_cp_rule_applies_to_the_untagged_h1a_leaves(tier: str, path: str, value: float) -> None:
+    """Round 2, item 2: ``inverse_dim_reference`` and ``median_seed_by_n_lib/*`` are untagged in compare_pilot's
+    table but are cp-chain outputs of H1a: the strict 1e-12 relative rule applies. 0.5 x passes, 2 x fails
+    (a move of 1e-12 |ref| x factor; before the change they got the (b) to (g) class tolerance 1e-4)."""
+    low = tier_pair(tier)
+    for tree in low:
+        with_h1a(tree)
+    edit(low[1], path, value * (1 + 0.5e-12))
+    r = row(run(*low), path)
+    assert r.outcome == "pass" and r.rule == "cp chain relative" and r.tol == 1e-12
+    high = tier_pair(tier)
+    for tree in high:
+        with_h1a(tree)
+    edit(high[1], path, value * (1 + 2e-12))
+    assert row(run(*high), path).outcome == "FAIL"
+
+
+def test_failures_of_the_h1a_fit_keep_the_cp_rule_and_print_the_of7_pointer_with_an_unchanged_exit() -> None:
+    """Round 2, item 1: the four H1a fit leaves that fail the cp rule on a platform pair (here 1e-7 relative, as on
+    the S3 pair) still FAIL (exit 1, nothing loosened) and carry the OF-7 pointer; the report prints it once. A
+    failure outside ``H1a/by_noise`` carries none; a pass carries none."""
+    ref, new = tier_pair("T2")
+    for tree in (ref, new):
+        with_h1a(tree)
+    for leaf, value in (("fitted_inverse_dim", 0.55), ("floor_rms", 0.03)):
+        edit(new, f"{H1A}/{leaf}", value * (1 + 1e-7))
+    edit(new, f"{H1A}/ci_inverse_dim/[0]", 0.48 * (1 + 1e-7))
+    res = run(ref, new)
+    for leaf in ("fitted_inverse_dim", "floor_rms", "ci_inverse_dim/[0]"):
+        r = row(res, f"{H1A}/{leaf}")
+        assert r.outcome == "FAIL" and cr.OF7_POINTER in r.note and "2026-10-14-math-wu0003-9-q1.md" in r.note
+    assert res.exit_code == 1
+    text = "\n".join(cr.render(res, "a", "b"))
+    assert text.count("pointer: " + cr.OF7_POINTER) == 1
+    ref, new = tier_pair("T2", **{f"{S}__H1b__CP__slope": 2.0 * (1 + 1e-7)})
+    res = run(ref, new)
+    assert row(res, f"{S}/H1b/CP/slope").outcome == "FAIL" and cr.OF7_POINTER not in row(res, f"{S}/H1b/CP/slope").note
+    assert "pointer:" not in "\n".join(cr.render(res, "a", "b"))
+
+
+def test_untagged_census_counts_hand_known_leaves_and_the_report_prints_it() -> None:
+    """Round 2, item 3: the census counts float leaves without a chain tag, by block, and the report prints
+    it. Reference: a tree of four floats whose tags are known from compare_pilot's table (checked by hand):
+    ``H1b/CP/slope`` is cp, ``H3c/A5_over_A4_mse`` is network, ``H2e/corr_curve/..`` and ``scores/A*/regret/1LT`` are
+    untagged; integers, strings and ``config`` are not counted. The census is information: no exit code depends on it."""
+    flat = cr.flatten({"config": {"n_test": 1.0}, "systems": {"lorenz63": {
+        "H1b": {"CP": {"slope": 1.0}}, "H3c": {"A5_over_A4_mse": 0.9, "n_states": 80},
+        "H2e": {"corr_curve": {"0.01": {"10000": 0.05}}}, "scores": {"A*": {"regret": {"1LT": 0.0}}}}}})
+    assert cr.untagged_census(flat) == {"H2e": 1, "scores": 1}
+    ref, new = tier_pair("T3", **{f"{S}__H2e__corr_curve__0.01__10000": 0.0500001})
+    res = run(ref, new)
+    assert res.untagged == 1 and res.census.get("H2e") == 1 and res.census.get("scores") == 1
+    text = "\n".join(cr.render(res, "a", "b"))
+    assert "census (information, not a failure)" in text and "H2e 1" in text
+    assert run(ref, new).exit_code == res.exit_code
+
+
 # ---------------------------------------------------------------------------------- d3: 10x rule
 @pytest.mark.parametrize("max_rel, expected", [
     (0.0, None), (1e-16, 1e-15), (3.97e-7, 1e-5), (2.94e-7, 1e-5), (1e-5, 1e-4), (1.0000001e-5, 1e-3),

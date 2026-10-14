@@ -95,7 +95,15 @@ Readings that the plan leaves open (strict reading applied; owner questions)
 * The leaf-to-chain map is ``compare_pilot``'s rule table. **A leaf without a chain tag is treated as
   network chain (class rules, 1e-4), which is the looser choice** (the strict choice, 1e-12, would fail
   the many QoI leaves that the table leaves untagged: 111 differing leaves on the S3 pair). The count
-  is printed, nothing is silent; this is an owner reading.
+  is printed, nothing is silent; this is an owner reading. The report prints a census: the number of
+  differing untagged float leaves that fall through to the class rules, and the untagged float leaves of
+  the reference run by block (information, never a failure).
+* The cp 1e-12 rule also applies to ``H1a`` ``inverse_dim_reference`` and ``median_seed_by_n_lib/*``, which
+  the table leaves untagged (strict). The four H1a fit outputs that fail the cp rule on a platform pair
+  (``fitted_inverse_dim``, ``ci_inverse_dim``, ``floor_rms``) are tolerance-stopped fits; the mathematician
+  proposes class (a) or (g) for them (OF-7, a loosening, **not adopted**: working default cp 1e-12). A
+  pointer to ``docs/agent/notes/2026-10-14-math-wu0003-9-q1.md`` is printed beside any failure under
+  ``H1a/by_noise``; the exit code is unchanged.
 * A ``cov_digest`` difference alone is undetermined (see above); a ``None`` system never opens a scope.
 * ``fraction_above_chi2`` and ``fraction_late_progress`` have no T2/T3 tolerance in A6: class (c)
   applies (T1: ``1e-8 |ref|``); the two-proportion band is printed beside them.
@@ -134,6 +142,8 @@ if cp is None or not hasattr(cp, "TABLE"):
     sys.modules["compare_pilot"] = cp
     _SPEC.loader.exec_module(cp)
 
+OF7_POINTER = ("OF-7 (proposed, not adopted): the H1a fit outputs are tolerance-stopped, see "
+               "docs/agent/notes/2026-10-14-math-wu0003-9-q1.md; cp 1e-12 kept as the working default")
 LABEL = "DEVELOPMENT: comparison of two runs, not a hypothesis test"
 REVIEW = ("needs owner review before freeze (tolerance and verdict-comparison code; "
           "CSQ2 use in WU-0016)")
@@ -644,6 +654,21 @@ def chain_of(path: Path_) -> str:
         return ""
 
 
+def h1a_cp_leaf(path: Path_) -> bool:
+    """The untagged outputs of the H1a fit that are cp-chain by construction (``inverse_dim_reference``,
+    ``median_seed_by_n_lib/*``): the strict cp 1e-12 rule applies (mathematician's note, Q1 follow-up)."""
+    return "H1a" in path and (path[-1] == "inverse_dim_reference" or "median_seed_by_n_lib" in path)
+
+
+def untagged_census(flat: dict[Path_, object]) -> dict[str, int]:
+    """Float leaves without a chain tag in ``compare_pilot``'s table, by block (Q9 gap; information only)."""
+    out: dict[str, int] = defaultdict(int)
+    for path, value in flat.items():
+        if is_float(value) and path[0] != "config" and not chain_of(path):
+            out[loc(path)[1]] += 1
+    return dict(sorted(out.items()))
+
+
 def lm_name(path: Path_) -> str | None:
     """The LM summary name of a leaf under ``handling/**/lm`` (else ``None``)."""
     return path[-1] if "lm" in path and path[-1] in LM_SUMMARY and "handling" in (path[0], *path[2:3]) else None
@@ -668,6 +693,7 @@ class Comparison:
     untagged: int
     exit_code: int
     reasons: list[str]
+    census: dict[str, int] = field(default_factory=dict)    # untagged float leaves by block (whole run)
 
 
 def compare_leaves(ref_tree: dict, new_tree: dict, tier: Tier, tol_other: float = TOL_O3) -> tuple:
@@ -780,7 +806,10 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
     # float leaves ------------------------------------------------------------------------------------------
     interval = interval_of(ref, path)
     chain = chain_of(path)
-    untagged = 0 if chain else 1
+    untagged = 0                                  # 1 only if an untagged leaf falls through to the class rules
+    if not chain and h1a_cp_leaf(path):
+        chain = "cp"                              # strict: cp rule on the untagged H1a fit outputs (round 2)
+        row.note = "cp 1e-12 applied: untagged in compare_pilot's table"
     lm = lm_name(path)
     row.for_10x = True
     if lm == "median_iterations":
@@ -814,9 +843,13 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
     elif row.cls == "a":
         row.rule, row.tol = "QoI / interval endpoint", TOL_QOI
         row.outcome = "pass" if row.metric <= row.tol else "FAIL"
+        untagged = 0 if chain else 1
     else:
         row.rule, row.tol = "class (b) to (g)", tol_other
         row.outcome = "pass" if row.metric <= row.tol else "FINDING"
+        untagged = 0 if chain else 1
+    if row.outcome == "FAIL" and "H1a" in path and "by_noise" in path:
+        row.note = (row.note + "; " if row.note else "") + OF7_POINTER
     return untagged
 
 
@@ -1021,7 +1054,8 @@ def compare_trees(ref_tree: dict, new_tree: dict, tol_other: float = TOL_O3,
         code = EXIT_UNDETERMINED
         reasons.append(f"{len(not_computed)} required checks NOT COMPUTED")
     return Comparison(tier, len(flat_ref), len(flat_new), len(set(flat_ref) & set(flat_new)), n_equal, rows,
-                      one_sided, excluded, scopes, declared, td, not_computed, untagged, code, reasons)
+                      one_sided, excluded, scopes, declared, td, not_computed, untagged, code, reasons,
+                      untagged_census(flat_ref))
 
 
 def load(path: Path) -> dict:
@@ -1069,7 +1103,12 @@ def render(cmp: Comparison, ref_path: str, new_path: str, show: int = 20, every:
                    f"timing {cmp.excluded[side]['timing']} leaves")
     if tier.name == "undetermined":
         return out + [f"RESULT: UNDETERMINED (exit {cmp.exit_code}): " + "; ".join(cmp.reasons)]
-    out.append(f"leaves without a chain rule in compare_pilot's table (treated as network): {cmp.untagged}")
+    out.append("census (information, not a failure): differing float leaves with no chain tag that fall through to "
+               f"the class rules, i.e. the looser network treatment: {cmp.untagged}; untagged float leaves of the "
+               f"reference run by block: {sum(cmp.census.values())} ("
+               + ", ".join(f"{b} {n}" for b, n in cmp.census.items()) + ")")
+    if any(OF7_POINTER in r.note for r in cmp.rows):
+        out.append("pointer: " + OF7_POINTER)
     if cmp.scopes:
         out.append("discrete counts that differ (scope of the 0.1 hw exception): "
                    + ", ".join(sorted({f"{s or '*'}/{b}" for s, b in cmp.scopes})))
