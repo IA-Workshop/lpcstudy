@@ -483,17 +483,17 @@ def test_t8_h3c_flips_when_one_clipped_draw_doubles() -> None:
     config = _config()
     w5, w4 = np.full((n, 2), 0.5), np.full((n, 2), 0.75)
     a5, a4 = cs.rule_state_mse(w5, cp, plp), cs.rule_state_mse(w4, cp, plp)
-    original = an.h3c_ratio(a5, a4, config)
+    original = an.h3c_ratio(a5, a4, config, "mini")
     assert abs(original["A5_over_A4_mse"] - 41 / 42.25) <= 2 * np.spacing(41 / 42.25)
     assert original["verdict"] == "pass" and original["ci"][0] == original["ci"][1]
     plp2 = cs.perturb_errors(plp, sign)
     entry = cs.h3c_part(original, cs.rule_state_mse(w5, cp, plp2), cs.rule_state_mse(w4, cp, plp2),
-                        config, n)
+                        config, "mini", n)
     assert entry["status"] == "computed" and entry["flag"] is True
     assert entry["verdict_2L"] == "fail" and entry["ratio"] is None  # hw = 0
     assert abs(entry["delta"] - (116 / 61 - 41 / 42.25)) <= 4 * np.spacing(2.0)
     # the same arrays with no clipped entry: delta is 0.0 exactly, the verdict is the same, no flag
-    null = cs.h3c_part(original, a5, a4, config, 0)
+    null = cs.h3c_part(original, a5, a4, config, "mini", 0)
     assert null["delta"] == 0.0 and null["verdict_2L"] == "pass" and null["flag"] is False
 
 
@@ -529,13 +529,13 @@ def test_t9_h2c_best_single_changes_when_the_calibration_mses_are_closer_than_th
     sign = np.zeros((n, 2), dtype=np.int8)
     sign[0, 0] = 1
     mse, scores, calibration = _h2c_fixture(n, cal_cp, cal_plp, config)
-    original = an.h2c_state_dependence(scores, calibration, config)
+    original = an.h2c_state_dependence(scores, calibration, config, "mini")
     assert original["best_single"] == "A1"
     shifted = SimpleNamespace(evals=SimpleNamespace(
         horizons=calibration.evals.horizons, cp_err=calibration.evals.cp_err,
         plp_err=(cal_plp + LEVEL * sign)[:, :, None]))
     counts = {"A4_minus_A2": 5, "A4_minus_A1": 3}
-    out = cs.h2c_parts(original, mse, shifted, config, counts)
+    out = cs.h2c_parts(original, mse, shifted, config, "mini", counts)
     assert out["best_single_2L"] == "A0" and out["flag"] is True
     part = out["parts"]["A4_minus_A1"]
     assert part["delta"] is None and part["flag"] is True and part["status"] == "computed"
@@ -543,7 +543,7 @@ def test_t9_h2c_best_single_changes_when_the_calibration_mses_are_closer_than_th
     assert part["n_clipped_inputs"] == 3
     assert out["parts"]["A4_minus_A2"]["status"] == "computed"
     assert out["parts"]["A4_minus_A2"]["delta"] == 0.0  # the test errors are unchanged here
-    null = cs.h2c_parts(original, mse, calibration, config, counts)
+    null = cs.h2c_parts(original, mse, calibration, config, "mini", counts)
     assert null["best_single_2L"] == "A1" and null["flag"] is False
     assert null["parts"]["A4_minus_A1"]["delta"] == 0.0
     assert null["parts"]["A4_minus_A1"]["verdict_2L"] == original["A4_minus_A1"]["verdict"]
@@ -700,7 +700,7 @@ def _world(seed: int, inject: bool = True, cp_inject: int = 0, with_reference: b
         test = SplitData(moments["test"], evals["test"])
         weights = rule_weights(rules, test, 0.01, config, horizons)
         scores = score_rules(weights, test, horizons, config, config.primary_threshold)
-        cell_of = lambda key: SimpleNamespace(splits={"test": SplitData(sweep[key], None)})
+        cell_of = lambda key: SimpleNamespace(system="mini", splits={"test": SplitData(sweep[key], None)})
         core_sub = cell_of((0.01, 10000))  # one object in both sweeps, as in run_system
         noise_cells = {0.01: core_sub, 0.02: cell_of(NOISE_KEYS[0.02]),
                        0.05: cell_of(NOISE_KEYS[0.05])}
@@ -715,10 +715,11 @@ def _world(seed: int, inject: bool = True, cp_inject: int = 0, with_reference: b
             "H1c": an.h1c_horizon_law(cell, config),
             "H2a": an.h2a_separation(cell, config),
             "H2b": an.h2b_knob_response(noise_cells, library_cells, config),
-            "H2c": an.h2c_state_dependence(scores, cell.splits["calibration"], config),
-            "H2d": an.h2d_empirical_comparison(scores, config),
+            "H2c": an.h2c_state_dependence(scores, cell.splits["calibration"], config, "mini"),
+            "H2d": an.h2d_empirical_comparison(scores, config, "mini"),
             "H2e": an.h2e_noise_matching(library_cells, config),
-            "H3c": an.h3c_ratio(scores["A5"].state_mse_ref, scores["A4"].state_mse_ref, config)}
+            "H3c": an.h3c_ratio(scores["A5"].state_mse_ref, scores["A4"].state_mse_ref, config,
+                                  "mini")}
         return SimpleNamespace(config=config, cell=cell, rules=rules, weights=weights,
                                scores=scores, noise_cells=noise_cells, library_cells=library_cells,
                                results=results)
@@ -897,7 +898,7 @@ def test_world_without_a_clipped_entry_is_bitwise_unchanged() -> None:
 
     Reference: the definition (the same operations on the same arrays): the increments are + 0.0, the
     perturbed errors are the stored ones, and the verdict code rebuilds each bootstrap from the same
-    seed and labels. Bitwise (``==`` on floats, strings and booleans); nothing is skipped: the
+    generator and labels (the system included). Bitwise (``==`` on floats, strings and booleans); nothing is skipped: the
     mini-world has all seven criteria and the two sweep verdicts.
     """
     world = _world(1102, inject=False, with_reference=False)
@@ -1058,7 +1059,8 @@ def _tiny_world(config, raws, growth, level, masked, tree=None):
     horizons = np.arange(1, 4)
     weights = rule_weights(rules, test, 0.01, config, horizons)
     scores = score_rules(weights, test, horizons, config, config.primary_threshold)
-    cell = SimpleNamespace(noise=0.01, splits={s: SplitData(moments[s], evals[s]) for s in splits})
+    cell = SimpleNamespace(system="mini", noise=0.01,
+                           splits={s: SplitData(moments[s], evals[s]) for s in splits})
     return SimpleNamespace(cell=cell, rules=rules, weights=weights, scores=scores, tree=tree,
                            config=config)
 
@@ -1166,7 +1168,7 @@ def _t14_world(test_growth: float):
     world = _tiny_world(config, raws, growth, LEVEL, True)
     reference = _tiny_world(config, raws, growth, 2 * LEVEL, False, tree=world.tree)
     results = {"H3c": an.h3c_ratio(world.scores["A5"].state_mse_ref,
-                                   world.scores["A4"].state_mse_ref, config)}
+                                   world.scores["A4"].state_mse_ref, config, "mini")}
     return world, reference, results
 
 
@@ -1201,6 +1203,41 @@ def test_t14_h3c_counts_the_construction_oracle_only_when_a_test_draw_is_in_an_e
     assert block["status"] == "computed"
     assert block["by_hypothesis"]["H3c"]["parts"]["A5_over_A4"]["n_clipped_inputs"] == 0
     assert block["invariance"]["H3a"] == "exact"
+
+
+def test_every_tier_a_recomputation_draws_the_resamples_of_its_verdict(monkeypatch) -> None:
+    """P9 (review R1, WU-0002.14): on unchanged inputs each recomputed interval IS the verdict's.
+
+    Reference: the verdicts of the mini-world, computed by the production functions (``h3c_ratio``,
+    ``h2d_empirical_comparison``, ``h2c_state_dependence``, ``h1b_seed_amplifier``,
+    ``h2a_separation``, ``h2b_knob_response``), against the interval that each clip recomputation
+    hands to ``part_entry`` for the perturbed arrays. With no clipped entry the perturbed arrays are
+    the stored ones, so the intervals are bitwise equal if and only if the recomputation uses the same
+    generator, labels, indices and level as the verdict. ``delta == 0.0`` (T6) cannot see this: the
+    point estimate does not depend on the resamples. All eight tier-A parts are checked (H3c, H2d, the
+    two H2c parts, H1b PLP, the H2a(ii) parts, H2b(i), H2b(ii)). Non-vacuity: the same H3c recomputation
+    under another system label gives a different interval. Tolerance: none (``==`` on the floats).
+    """
+    seen: list[tuple] = []
+    real = cs.part_entry
+
+    def spy(estimate, interval, verdict, estimate_2l, interval_2l, verdict_2l, n_clipped):
+        seen.append((estimate, interval, estimate_2l, interval_2l))
+        return real(estimate, interval, verdict, estimate_2l, interval_2l, verdict_2l, n_clipped)
+
+    monkeypatch.setattr(cs, "part_entry", spy)
+    world = _world(1102, inject=False, with_reference=False)
+    block = _run(world)
+    n_expected = 1 + 1 + 2 + 1 + len(world.results["H2a"]["part_ii"]) + 2
+    assert len(seen) == n_expected, (len(seen), n_expected)
+    for estimate, interval, estimate_2l, interval_2l in seen:
+        assert interval is not None and interval_2l is not None
+        assert estimate_2l == estimate
+        assert [float(v) for v in interval_2l] == [float(v) for v in interval], (interval, interval_2l)
+    other = an.h3c_ratio(world.scores["A5"].state_mse_ref, world.scores["A4"].state_mse_ref,
+                         world.config, "another-system")
+    assert other["ci"] != world.results["H3c"]["ci"]
+    assert block["by_hypothesis"]["H3c"]["parts"]["A5_over_A4"]["delta"] == 0.0
 
 
 def test_t15_h1c_and_h2a_part_i_are_bitwise_unchanged_at_twenty_sigma() -> None:

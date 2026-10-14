@@ -1,0 +1,9 @@
+pooled log-SD s = 0.314 (3 df), 95% CI [0.178, 1.169]; per-system |d|/sqrt2: {'lorenz63': np.float64(0.484), 'rossler': np.float64(0.111), 'chua': np.float64(0.219)}
+  without Lorenz: s = 0.174 (2 df)
+lorenz63  geo-mean 0.0263  margin x1.90  P(fail) plug-in 0.020  predictive(t3) 0.096  plug-in over sigma CI [0.000, 0.291]
+rossler   geo-mean 0.0361  margin x1.39  P(fail) plug-in 0.149  predictive(t3) 0.229  plug-in over sigma CI [0.033, 0.390]
+chua      geo-mean 0.0359  margin x1.39  P(fail) plug-in 0.146  predictive(t3) 0.227  plug-in over sigma CI [0.031, 0.389]
+P(any V4 fail): plug-in 0.288, predictive 0.461
+V2 medians mean 0.982 SD 0.028; per-state SD from mean range/2.326 = 0.047
+V2 distance of nearest edge in median-SDs: 6.4
+V2 distribution-free: 30 per-state values inside band -> q <= 0.095 (95%); P(median of 5 outside) <= 10 q^3 = 0.0086

@@ -110,7 +110,7 @@ class TrainedNetwork:
 
 
 def train_mlp(inputs: np.ndarray, targets: np.ndarray, width: int, epochs: int,
-              seed: int, input_noise: float = 0.0, batch_size: int = 256,
+              rng: np.random.Generator, input_noise: float = 0.0, batch_size: int = 256,
               learning_rate: float = 2e-3, val_fraction: float = 0.1
               ) -> TrainedNetwork:
     """Train a two-hidden-layer MLP by minibatch Adam on mean-squared error.
@@ -125,8 +125,14 @@ def train_mlp(inputs: np.ndarray, targets: np.ndarray, width: int, epochs: int,
         Hidden width.
     epochs : int
         Passes over the training data.
-    seed : int
-        Seed for initialization, shuffling and input noise.
+    rng : np.random.Generator
+        The only source of randomness, consumed in a fixed order (WU-0002.14, M7): first the
+        32-bit seeds of the two JAX keys (initialization, then the epoch stream), each
+        ``int(rng.integers(0, 2**32))``; then the validation permutation; then, after
+        training, the validation input noise. The keys come first so that they do not depend
+        on ``len(inputs)`` through the amount of stream that ``Generator.permutation``
+        consumes. The caller builds the generator from ``make_rng`` labels. Needs owner review
+        before freeze.
     input_noise : float, optional
         Standard deviation of Gaussian noise added to inputs, redrawn for
         every minibatch (and once for the validation set).
@@ -142,7 +148,8 @@ def train_mlp(inputs: np.ndarray, targets: np.ndarray, width: int, epochs: int,
     TrainedNetwork
         Trained network and its validation loss.
     """
-    rng = np.random.default_rng(seed)
+    init_seed = int(rng.integers(0, 2**32))  # M7: 32-bit JAX keys, drawn first
+    epoch_seed = int(rng.integers(0, 2**32))
     n_samples = len(inputs)
     order = rng.permutation(n_samples)
     n_val = max(1, int(val_fraction * n_samples))
@@ -156,7 +163,7 @@ def train_mlp(inputs: np.ndarray, targets: np.ndarray, width: int, epochs: int,
     noise_scaled = jnp.asarray(input_noise / in_scale)
 
     params = init_mlp([inputs.shape[1], width, width, targets.shape[1]],
-                      jax.random.PRNGKey(seed))
+                      jax.random.PRNGKey(init_seed))
     steps_per_epoch = max(1, len(train_idx) // batch_size)
     schedule = optax.cosine_decay_schedule(learning_rate, epochs * steps_per_epoch,
                                            alpha=0.01)
@@ -185,7 +192,7 @@ def train_mlp(inputs: np.ndarray, targets: np.ndarray, width: int, epochs: int,
         (p, state), _ = jax.lax.scan(step, (p, state), (perm, noise))
         return p, state
 
-    key = jax.random.PRNGKey(seed + 1)
+    key = jax.random.PRNGKey(epoch_seed)
     for _ in range(epochs):
         key, sub = jax.random.split(key)
         params, opt_state = run_epoch(params, opt_state, sub)
@@ -201,7 +208,8 @@ def train_mlp(inputs: np.ndarray, targets: np.ndarray, width: int, epochs: int,
 
 
 def train_estimator(inputs: np.ndarray, targets: np.ndarray, noise: float,
-                    widths: tuple[int, ...], epochs: int, seed: int
+                    widths: tuple[int, ...], epochs: int,
+                    stream: Callable[[int], np.random.Generator]
                     ) -> tuple[TrainedNetwork, dict[int, float]]:
     """Train ``psi`` at several widths and apply the capacity rule.
 
@@ -219,15 +227,18 @@ def train_estimator(inputs: np.ndarray, targets: np.ndarray, noise: float,
         Candidate hidden widths.
     epochs : int
         Training epochs.
-    seed : int
-        Seed.
+    stream : Callable[[int], np.random.Generator]
+        Maps a width to a *fresh* generator for that width's network (the caller builds it from
+        ``make_rng`` labels that include the width), so the widths are trained from
+        independent streams that do not depend on which other widths are trained. Needs owner
+        review before freeze.
 
     Returns
     -------
     tuple[TrainedNetwork, dict[int, float]]
         Selected network and validation loss per width.
     """
-    nets = {w: train_mlp(inputs, targets, w, epochs, seed + w, input_noise=noise)
+    nets = {w: train_mlp(inputs, targets, w, epochs, stream(w), input_noise=noise)
             for w in widths}
     losses = {w: net.val_loss for w, net in nets.items()}
     best = min(losses.values())
