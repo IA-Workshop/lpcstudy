@@ -1,0 +1,47 @@
+(b) prefix: u15 == u30@15 bitwise: True  c15 == c30@15: True  max|du|: 0.0  c30<=c15 all: True
+(a) chunk 40 == full: False  chunk 24 == full: False  batch 1 == full (first 32): False  max|diff| (40, 24, 1): 2.220446049250313e-15 2.220446049250313e-15 3.1532275679424515e-09
+(a) same chunking twice bitwise: True
+
+(c) rho=0.01 start=0.02 (20% at 4x): n=2048
+   err30/(rho nu) median 0.741
+   frac |d15-30|>0.1 rho nu: 0.0254 (cluster SE 0.0093, block-5 SE 0.0078);  frac |d30-60|>0.1: 0.0146
+   frac > 0.1*err30 (WU-0005.4 def): 0.0210
+   quantiles d15-30/(rho nu) 50/90/99/max: [0.      0.      1.85796] 69.6
+   quantiles d30-60/(rho nu) 50/90/99/max: [0.      0.      0.55679] 31.3
+   moving (a>1e-6): 66; median a 0.614, median b 0.0255; sum a 599, sum b 180
+   above chi2(0.999): 15 46, 30 38, 60 31; 15->30 above->below 8, below->above 0; 30->60 above->below 7
+   of the 52 estimates moving >0.1 rho nu (15->30), 8 are chi2 crossings; share of sum a from crossings: 0.109
+   monotone c30<=c15: True, c60<=c30: True
+
+(c) rho=0.01 start=0.2 (20% at 4x): n=2048
+   err30/(rho nu) median 0.925
+   frac |d15-30|>0.1 rho nu: 0.1914 (cluster SE 0.0163, block-5 SE 0.0174);  frac |d30-60|>0.1: 0.1055
+   frac > 0.1*err30 (WU-0005.4 def): 0.1226
+   quantiles d15-30/(rho nu) 50/90/99/max: [  0.        7.13522 125.26181] 261
+   quantiles d30-60/(rho nu) 50/90/99/max: [ 0.       0.14061 42.18666] 351
+   moving (a>1e-6): 524; median a 3.04, median b 0.00173; sum a 1.13e+04, sum b 3.61e+03
+   above chi2(0.999): 15 483, 30 411, 60 387; 15->30 above->below 72, below->above 0; 30->60 above->below 24
+   of the 392 estimates moving >0.1 rho nu (15->30), 71 are chi2 crossings; share of sum a from crossings: 0.268
+   monotone c30<=c15: True, c60<=c30: True
+
+(c) rho=0.05 start=0.02 (20% at 4x): n=2048
+   err30/(rho nu) median 0.721
+   frac |d15-30|>0.1 rho nu: 0.0127 (cluster SE 0.0045, block-5 SE 0.0041);  frac |d30-60|>0.1: 0.0044
+   frac > 0.1*err30 (WU-0005.4 def): 0.0117
+   quantiles d15-30/(rho nu) 50/90/99/max: [0.      0.      0.37776] 38.4
+   quantiles d30-60/(rho nu) 50/90/99/max: [0.      0.      0.00071] 3.25
+   moving (a>1e-6): 66; median a 0.0607, median b 4.85e-08; sum a 152, sum b 15.9
+   above chi2(0.999): 15 43, 30 36, 60 36; 15->30 above->below 7, below->above 0; 30->60 above->below 0
+   of the 26 estimates moving >0.1 rho nu (15->30), 7 are chi2 crossings; share of sum a from crossings: 0.587
+   monotone c30<=c15: True, c60<=c30: True
+
+(c) rho=0.05 start=0.2 (20% at 4x): n=2048
+   err30/(rho nu) median 0.865
+   frac |d15-30|>0.1 rho nu: 0.1616 (cluster SE 0.0156, block-5 SE 0.0140);  frac |d30-60|>0.1: 0.0845
+   frac > 0.1*err30 (WU-0005.4 def): 0.1055
+   quantiles d15-30/(rho nu) 50/90/99/max: [ 0.       1.07749 24.87707] 73.1
+   quantiles d30-60/(rho nu) 50/90/99/max: [0.      0.02514 5.80418] 64.9
+   moving (a>1e-6): 511; median a 0.543, median b 0.000202; sum a 2.2e+03, sum b 682
+   above chi2(0.999): 15 422, 30 364, 60 357; 15->30 above->below 58, below->above 0; 30->60 above->below 7
+   of the 331 estimates moving >0.1 rho nu (15->30), 58 are chi2 crossings; share of sum a from crossings: 0.344
+   monotone c30<=c15: True, c60<=c30: True

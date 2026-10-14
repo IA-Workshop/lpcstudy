@@ -2,7 +2,7 @@
 # Run an lpcstudy preset on a registered DEVELOPMENT seed under the limits of LPC.AUTH.3.
 #
 # Usage: tools/run_preset.sh <preset> <seed-id> <out-dir> [--device cpu|gpu]
-#                            [--systems S...] [--skip-robustness]
+#                            [--systems S...] [--skip-robustness] [--estimator-refine-steps N]
 #
 #   preset   smoke | pilot | full
 #   seed-id  a DEV-n id listed in seeds/development_seeds.json (never a raw integer)
@@ -12,6 +12,10 @@
 # "confirmatory" (any case), a raw integer seed, an id not in the registry (or a registry with
 # another schema), an unknown preset or argument, an out-dir outside runs/, an existing
 # <out-dir>/<preset>/run.meta.json (it would erase GPU hours), or a seed the CLI cannot take.
+# --estimator-refine-steps N (WU-0005.6, the iteration-doubling study) is passed to the CLI as it is:
+# N is a canonical decimal integer from 1 to 999 (no sign, no leading zero), given once, else the
+# wrapper refuses before the lock. The CLI itself refuses it with the confirmatory flag, which this
+# wrapper never accepts. The meta file records it in "command".
 #
 # Device: cpu for smoke, gpu for pilot and full (JAX_PLATFORMS cpu or cuda); thread variables
 # are set from LPC_THREADS (1..99, default 4), as are PJRT_NPROC and NPROC (the XLA CPU thread
@@ -129,7 +133,7 @@ for arg in "$@"; do
     [[ "$lower" != *confirmatory* ]] || refuse "an argument names the confirmatory path, which is owner-only (LPC.PC.7)"
 done
 
-[ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-robustness]"
+[ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-robustness] [--estimator-refine-steps N]"
 preset="$1"
 seed="$2"
 out_arg="$3"
@@ -138,6 +142,7 @@ shift 3
 device=""
 systems=()
 passthrough=()
+refine_given=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --device)
@@ -158,6 +163,13 @@ while [ "$#" -gt 0 ]; do
         --skip-robustness)
             passthrough+=("$1")
             shift
+            ;;
+        --estimator-refine-steps)
+            [ "$refine_given" = 0 ] || refuse "--estimator-refine-steps is given twice"
+            [ "$#" -ge 2 ] && [[ "$2" =~ ^[1-9][0-9]{0,2}$ ]] || refuse "--estimator-refine-steps needs an integer from 1 to 999"
+            refine_given=1
+            passthrough+=("$1" "$2")
+            shift 2
             ;;
         *) refuse "unexpected argument ${1@Q}" ;;
     esac
