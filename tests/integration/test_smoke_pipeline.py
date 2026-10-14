@@ -64,6 +64,12 @@ def assert_wu0003_7a_leaves(results: dict) -> None:
     values are checked against independent recomputations in the unit tests, so only the
     schema is asserted here, and that the four per-system digests are pairwise different (a constant
     would pass the schema). Exact.
+
+    The two estimator blocks do not hold the same keys: ``systems.<s>.validation.estimators`` is a
+    snapshot taken in ``run_system`` after the core cell and before the noise sweep, so an
+    estimator trained later (the 0.02 noise level at smoke) is only in the top-level
+    ``estimators``. Where a key is in both, the entries are the same object, so the digests agree.
+    (WU-0003.7a review R1.)
     """
     digest = re.compile(r"[0-9a-f]{64}")
     for name, system in results["systems"].items():

@@ -742,7 +742,8 @@ def test_fitted_record_keeps_the_existing_leaves_and_adds_the_integer_and_digest
     little-endian int64 with ``struct``, calibration first and test second, C order. (ii) The
     allocator digest is ``hashlib.sha256`` of the allocator network's weight and bias values
     (binary64, row-major) packed with ``struct``. (iii) The integer leaves are the typed values
-    11, 2, 5, 1. (iv) The existing leaves are the hand values of the fields they read. Moving one
+    11, 2, 5, 1. (iv) The existing leaves are the hand values of the fields they read. A decoy map under a second K,
+    split at 0.1, must not be hashed while K = 2 is chosen, and is when K = 3 is. Moving one
     calibration state across the split changes ``a5_leaf_digest`` and nothing else. Exact.
     """
     from lpcstudy.allocation import ProfileProxies, RegimeMap, SeedProxy
@@ -772,6 +773,14 @@ def test_fitted_record_keeps_the_existing_leaves_and_adds_the_integer_and_digest
     assert tree.tree_.feature[0] == 2 and tree.tree_.threshold[0] == 0.5
     regime_map = RegimeMap(tree=tree, leaf_ids=leaf_ids, weights=np.full((2, 30), 0.25),
                            horizons_km=np.array([60.0, 90.0]))
+    # R2 of the review: a decoy map under another K, split at 0.1 instead of 0.5 (fitted on 0 and
+    # 0.2), so that hashing any other K than ``chosen_regimes`` gives a different digest
+    fit_decoy = np.zeros((2, 4))
+    fit_decoy[:, 2] = [0.0, 0.2]
+    decoy_tree = DecisionTreeRegressor(max_leaf_nodes=2, random_state=0).fit(fit_decoy, [0.0, 1.0])
+    assert decoy_tree.tree_.feature[0] == 2 and decoy_tree.tree_.threshold[0] == pytest.approx(0.1)
+    decoy_map = RegimeMap(tree=decoy_tree, leaf_ids=np.nonzero(decoy_tree.tree_.children_left == -1)[0],
+                          weights=np.full((2, 30), 0.75), horizons_km=np.array([30.0, 30.0]))
     params = [(np.array([[0.1, 0.2], [0.3, 0.4]]), np.array([0.5, -0.5])),
               (np.array([[1.0], [2.0]]), np.array([1e-7]))]
     network = TrainedNetwork(params=params, in_mean=np.zeros(2), in_scale=np.ones(2),
@@ -779,10 +788,11 @@ def test_fitted_record_keeps_the_existing_leaves_and_adds_the_integer_and_digest
     rules = SimpleNamespace(
         proxies=ProfileProxies(SeedProxy(1.0, 2.0, nfev=11, status=2),
                                SeedProxy(0.5, 0.25, nfev=5, status=1), nu_cap=7.5),
-        predictor=SimpleNamespace(network=network), regimes={2: regime_map}, chosen_regimes=2)
+        predictor=SimpleNamespace(network=network), regimes={2: regime_map, 3: decoy_map},
+        chosen_regimes=2)
 
-    def hand_leaves(*growths: np.ndarray) -> str:
-        leaves = [1 if g * lt <= 0.5 else 2 for growth in growths for g in growth.ravel()]
+    def hand_leaves(*growths: np.ndarray, split: float = 0.5) -> str:
+        leaves = [1 if g * lt <= split else 2 for growth in growths for g in growth.ravel()]
         return hashlib.sha256(struct.pack("<%dq" % len(leaves), *leaves)).hexdigest()
 
     values = [v for w, b in params for a in (w, b) for v in a.ravel().tolist()]
@@ -793,8 +803,8 @@ def test_fitted_record_keeps_the_existing_leaves_and_adds_the_integer_and_digest
     assert record["analog_proxy"] == {"slope": 1.0, "floor": 2.0, "nfev": 11, "status": 2}
     assert record["estimation_proxy"] == {"slope": 0.5, "floor": 0.25, "nfev": 5, "status": 1}
     assert record["nu_cap"] == 7.5 and record["chosen_K"] == 2
-    assert record["regime_weights_href"] == {"2": [0.25, 0.25]}
-    assert record["regime_horizons_km_lyapunov"] == {"2": [2.0, 3.0]}
+    assert record["regime_weights_href"] == {"2": [0.25, 0.25], "3": [0.75, 0.75]}
+    assert record["regime_horizons_km_lyapunov"] == {"2": [2.0, 3.0], "3": [1.0, 1.0]}
     assert record["a5_leaf_digest"] == hand_leaves(cal_growth, test_growth)
     assert record["allocator_digest"] == hashlib.sha256(
         struct.pack("<%dd" % len(values), *values)).hexdigest()
@@ -805,3 +815,8 @@ def test_fitted_record_keeps_the_existing_leaves_and_adds_the_integer_and_digest
     assert again["a5_leaf_digest"] == hand_leaves(moved, test_growth) != record["a5_leaf_digest"]
     assert {k: v for k, v in again.items() if k != "a5_leaf_digest"} == \
         {k: v for k, v in record.items() if k != "a5_leaf_digest"}
+    # the digest follows the chosen K: the decoy's digest is different, and choosing K = 3 gives it
+    assert hand_leaves(cal_growth, test_growth, split=0.1) != record["a5_leaf_digest"]
+    rules.chosen_regimes = 3
+    assert fitted_record(core, rules, cfg)["a5_leaf_digest"] == \
+        hand_leaves(moved, test_growth, split=0.1)
