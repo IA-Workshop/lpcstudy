@@ -130,6 +130,7 @@ class Study:
         self._records: dict[tuple[str, str], dict[str, dict]] = {}
         self._fit_records: dict[str, dict] = {}
         self.failed_variants: dict[str, list[str]] = {}
+        self.skipped_variants: dict[str, list[str]] = {}
         self.estimator_log: dict[str, dict] = {}
         self.core_cells: dict[str, Cell] = {}
         self.fitted: dict[str, FittedRules] = {}
@@ -156,10 +157,12 @@ class Study:
         network = self._networks.get(base_key)
         if network is None:
             start = time.time()
+            # one fresh stream per width (WU-0002.14; seed code: needs owner review before freeze)
             network, losses = train_estimator(
                 ctx.estimator_inputs, ctx.estimator_targets, noise,
                 self.config.estimator_widths, self.config.estimator_epochs,
-                self.config.seed + int(1e4 * noise))
+                lambda width: make_rng(self.config.seed, ctx.spec.name, ctx.embed_dim, ctx.delay,
+                                       "estimator", f"{noise:g}", width))
             self._networks[base_key] = network
             self.estimator_log[str(base_key)] = {
                 "val_loss_by_width": losses, "chosen_width": network.width,
@@ -207,7 +210,8 @@ class Study:
         """Oracle state quantities (cached; independent of noise and library)."""
         key = (ctx.spec.name, ctx.embed_dim, ctx.delay, split)
         if key not in self._oracles:
-            self._oracles[key] = state_oracles(ctx, split, self.config.steps_per_lyapunov)
+            self._oracles[key] = state_oracles(
+                ctx, split, self.config.steps_per_lyapunov, self.config.seed)
         return self._oracles[key]
 
     # --------------------------------------------------------------------- handling
@@ -264,6 +268,10 @@ class Study:
             self._fit_records[system] = fit
         else:
             record["fitting"] = fit
+
+    def record_skipped_variant(self, system: str, label: str) -> None:
+        """Count a robustness variant that was not run (``skipped_variants``; DEF-0025)."""
+        self.skipped_variants.setdefault(system, []).append(label)
 
     def record_failed_variant(self, system: str, label: str) -> None:
         """Count a robustness variant that raised (``failed_variants``; the result keeps its error)."""
@@ -470,7 +478,7 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
     predictor = ErrorPredictor.fit(
         con_moments.kept["inputs"], con_moments.kept["cp_err"], con_moments.kept["plp_err"],
         allocator_grid(config), noise, width=64, epochs=config.allocator_epochs,
-        seed=config.seed)
+        rng=make_rng(config.seed, cells[0].system, cells[0].ctx.embed_dim, "allocator"))
 
     con_profile = np.concatenate([deployable_profile(s.evals, proxies, noise,
                                                      config.steps_per_lyapunov)
@@ -915,6 +923,7 @@ def _concat_moments(parts: list[EnsembleMoments]) -> EnsembleMoments:
         horizons=parts[0].horizons,
         kept={k: np.concatenate([p.kept[k] for p in parts]) for k in kept_keys},
         handled=_stack_handled(parts), clip_entries=_sum_entries(parts),
+        clip_cross_ref=stack_optional([p.clip_cross_ref for p in parts]),
         **{k: stack_optional([getattr(p, k) for p in parts]) for k in LM_FIELDS},
         **correlation, **{k: np.concatenate([getattr(p, k) for p in parts]) for k in keys})
 
@@ -924,9 +933,10 @@ def _concat_evals(parts: list[EvaluationDraws]) -> EvaluationDraws:
     if len(parts) == 1:
         return parts[0]
     stacked = {k: np.concatenate([getattr(p, k) for p in parts]) for k in parts[0].__dict__
-               if k not in ("horizons", "handled", "clip_entries", *LM_FIELDS)}
+               if k not in ("horizons", "handled", "clip_entries", "clip_sign_ref", *LM_FIELDS)}
     return EvaluationDraws(horizons=parts[0].horizons, handled=_stack_handled(parts),
                            clip_entries=_sum_entries(parts),
+                           clip_sign_ref=stack_optional([p.clip_sign_ref for p in parts]),
                            **{k: stack_optional([getattr(p, k) for p in parts])
                               for k in LM_FIELDS}, **stacked)
 

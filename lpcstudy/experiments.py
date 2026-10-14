@@ -17,6 +17,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from . import analysis as an
+from . import clip_sensitivity
 from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, make_rng
@@ -111,7 +112,8 @@ def convergence_check(study: Study, cell: Cell) -> dict:
         den = np.mean((c - p) ** 2, axis=-1)
         return np.clip(num / np.maximum(den, 1e-300), 0, 1)
 
-    rng = np.random.default_rng(cfg.seed)
+    # one stream over the M loop (WU-0002.14; seed code: needs owner review before freeze)
+    rng = make_rng(cfg.seed, cell.system, "V4-convergence")
     reference = weight(cp, plp)
     out = {}
     for m_draws in cfg.convergence_draws:
@@ -384,6 +386,10 @@ def run_handling(study: Study, results: dict) -> dict:
     if failed:
         LOG.warning("handling run: failed_variants = %d of %d variants (%s)", failed, n_variants,
                     "; ".join(f"{s}: {', '.join(v)}" for s, v in study.failed_variants.items()))
+    skipped = sum(len(labels) for labels in study.skipped_variants.values())
+    if skipped:  # not in the results block: no schema change (DEF-0025); the log carries it
+        LOG.warning("handling run: skipped_variants = %d (%s)", skipped,
+                    "; ".join(f"{s}: {', '.join(v)}" for s, v in study.skipped_variants.items()))
     return {"schema": HANDLING_SCHEMA, "totals": totals, "by_system": by_system,
             "robustness": robustness, "failed_variants": failed}
 
@@ -459,7 +465,7 @@ def run_system(study: Study, system: str) -> dict:
 
     rules = fit_rules([core], cfg)
     study.record_rules(system, core, rules)
-    _, scores = _evaluate(core, rules, cfg)
+    weights, scores = _evaluate(core, rules, cfg)
     res["fitted"] = {"analog_proxy": vars(rules.proxies.analog),
                      "estimation_proxy": vars(rules.proxies.estimation),
                      "nu_cap": rules.proxies.nu_cap,
@@ -508,13 +514,18 @@ def run_system(study: Study, system: str) -> dict:
     res["Q-N"] = an.qn_noise_redundancy(core, rules, cfg)
     res["H2a"] = an.h2a_separation(core, cfg)
     res["H2b"] = an.h2b_knob_response(noise_cells, library_cells, cfg)
-    res["H2c"] = an.h2c_state_dependence(scores, core.splits["calibration"], cfg)
-    res["H2d"] = an.h2d_empirical_comparison(scores, cfg)
+    res["H2c"] = an.h2c_state_dependence(scores, core.splits["calibration"], cfg, system)
+    res["H2d"] = an.h2d_empirical_comparison(scores, cfg, system)
     res["H2e"] = an.h2e_noise_matching(library_cells, cfg)
     res["gain_bound"] = an.gain_horizon_bound(core, cfg)
     res.update(an.h3_regimes(core, rules, scores, cfg))
     res["oracle_recovery"] = an.oracle_recovery(scores, cfg)
     check_keys(res)
+    # WU-0002.11e: how far each verdict would move if the clip level doubled; reported next to the
+    # verdicts, changes none of them, draws no random number (needs owner review before freeze).
+    res["clip_sensitivity"] = clip_sensitivity.clip_sensitivity_block(
+        core, rules, weights, scores, noise_cells, library_cells, res, cfg)
+    clip_sensitivity.log_flags(system, res["clip_sensitivity"])
     res["handling"] = study.system_handling(system, collect_result_counts(res))
     log_handling(system, res["handling"])
     res["seconds"] = time.time() - t0
@@ -528,7 +539,7 @@ def _variant_summary(cell: Cell, rules: FittedRules, config: StudyConfig) -> dic
     """Key statistics of a robustness variant."""
     _, scores = _evaluate(cell, rules, config)
     h2a = an.h2a_separation(cell, config)
-    h2c = an.h2c_state_dependence(scores, cell.splits["calibration"], config)
+    h2c = an.h2c_state_dependence(scores, cell.splits["calibration"], config, cell.system)
     profile = deployable_profile(cell.splits["test"].evals, rules.proxies, cell.noise,
                                  config.steps_per_lyapunov)
     regret = regime_regret(rules.regimes[rules.chosen_regimes], profile,
@@ -553,8 +564,11 @@ def _perturbation_scale_variant(study: Study, cell: Cell, rules: FittedRules,
     ctx = cell.ctx
     window = cfg.steps_per_lyapunov
     eps = scale * cell.noise
+    # a fresh generator per call, no scale in the label: the same directions at every scale
+    # (common random numbers across scales; WU-0002.14, M4)
     fin = make_finite_growth(cell.setup.model_step, ctx.spec.observed_index, ctx.obs_scale,
-                             ctx.unwhiten, window, cfg.perturbation_dirs, cfg.seed)
+                             ctx.unwhiten, window, cfg.perturbation_dirs,
+                             make_rng(cfg.seed, cell.system, "finite-growth"))
     test = cell.splits["test"]
     true_states = ctx.eval_states[ctx.split_indices["test"]]
     oracle_growth = np.concatenate([np.asarray(fin(jnp.asarray(true_states[i:i + 200]), eps))
@@ -563,16 +577,41 @@ def _perturbation_scale_variant(study: Study, cell: Cell, rules: FittedRules,
     w_ref = oracle_weight(m)[:, m.at(cfg.reference_horizon)]
     seeds = np.column_stack([np.log(m.analog_seed / cell.noise),
                              np.log(m.est_seed / cell.noise)])
-    # The same two-part statistic and index sets as H2a(ii), with Lambda_fin for Lambda_tilde.
+    # The same two-part statistic and index sets as H2a(ii), with Lambda_fin for Lambda_tilde:
+    # the generator labels are those of analysis.h2a_separation, so the resamples are shared.
     two = an.h2a_part_ii(w_ref, oracle_growth * window, seeds,
                          n_resamples=cfg.bootstrap_resamples, block=cfg.bootstrap_block,
-                         seed=make_rng(cfg.seed, "h2a-two-part"), level=an.PRIMARY_LEVEL)
+                         seed=make_rng(cfg.seed, cell.system, "h2a-two-part"),
+                         level=an.PRIMARY_LEVEL)
     agreement = float(np.corrcoef(oracle_growth, cell.oracles["test"].growth)[0, 1])
     return {"scale_times_rho": scale,
             "H2a_partial_corr_zero_fin": two["part_ii"]["zero"]["partial_corr"],
             "H2a_partial_corr_interior_fin": two["part_ii"]["interior"]["partial_corr"],
             "ci_zero": two["part_ii"]["zero"]["ci"], "ci_interior": two["part_ii"]["interior"]["ci"],
             "corr_fin_vs_linear": agreement}
+
+
+def robustness_dimensions(cfg: StudyConfig, state_dim: int) -> tuple[list[int], list[int]]:
+    """Split the configured robustness dimensions into those run and those skipped (DEF-0025).
+
+    A variant needs ``d - state_dim`` positive chi-square degrees of freedom (the goodness-of-fit
+    threshold has none at ``d == state_dim``), so the kept dimensions are ``d > state_dim``. The
+    base dimension ``cfg.embedding_dim`` is the base cell, neither a variant nor a skip.
+
+    Parameters
+    ----------
+    cfg : StudyConfig
+        Configuration (``robustness_dims`` and ``embedding_dim``).
+    state_dim : int
+        Dimension of the system (``spec.dim``).
+
+    Returns
+    -------
+    tuple of list of int
+        ``(kept, skipped)``, each in configured order; ``skipped`` holds ``d <= state_dim``.
+    """
+    candidates = [d for d in cfg.robustness_dims if d != cfg.embedding_dim]
+    return [d for d in candidates if d > state_dim], [d for d in candidates if d <= state_dim]
 
 
 def run_robustness(study: Study, system: str) -> dict:
@@ -593,8 +632,14 @@ def run_robustness(study: Study, system: str) -> dict:
     cfg = study.config
     out: dict = {"base": _variant_summary(study.core_cells[system], study.fitted[system], cfg)}
     variants: list[tuple[str, dict]] = []
-    variants += [(f"D={d}", {"embed_dim": d}) for d in cfg.robustness_dims
-                 if d != cfg.embedding_dim and d >= study.context(system).spec.dim]
+    kept, skipped = robustness_dimensions(cfg, study.context(system).spec.dim)
+    variants += [(f"D={d}", {"embed_dim": d}) for d in kept]
+    for d in skipped:  # counted and reported, never dropped silently (DEF-0025, PRIME.4)
+        study.record_skipped_variant(system, f"D={d}")
+    if skipped:
+        LOG.warning("robustness %s: skipped_variants = %d (%s): dimension not above the state "
+                    "dimension, zero chi-square degrees of freedom", system, len(skipped),
+                    ", ".join(f"D={d}" for d in skipped))
     variants += [(f"k={k}", {"n_analogs": k}) for k in cfg.analog_counts if k != 1]
     variants += [(f"misspec={p:g}", {"misspec": p}) for p in cfg.misspec_levels]
     for label, kwargs in variants:

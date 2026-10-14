@@ -1,0 +1,7 @@
+DOP853 first k with |x|>3: 81; |x_(k-1)|=2.680819 |x_k|=3.128149; max|x| before: 2.866971
+RK4    first k with |x|>3: 81; |x_(k-1)|=2.679006 |x_k|=3.126980; max|x| before: 2.866068
+max |RK4 - DOP853| over k<=K: 1.12e-02
+old estimate_lyapunov (verbatim) = 0.30547112037677077  (finite positive: DEF-0015 reproduced)
+guarded, burn-in carried: lambda=0.30547112037677077 max=nan first_fail=81
+guarded, final burn-in + averaging only: lambda=0.30547112037677077 max=nan first_fail=5000
+short run burn 200 / n 1000, burn-in carried: first_fail=81, max=1129297297771994.8

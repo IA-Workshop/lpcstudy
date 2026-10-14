@@ -1,0 +1,36 @@
+states 1000000, per-state P(D>=bar) = 5.500e-05 (55 states, 22 episodes)
+per-state quantiles: 50% 9.87e-06 90% 2.30e-05 99% 7.29e-05 99.9% 2.92e-04 max 1.42e-03
+V6 quantiles: 0.5:3.77e-05 0.9:1.04e-04 0.95:1.60e-04 0.99:4.04e-04 0.999:1.03e-03
+P(V6 >= bar) = 1.077e-03;  20*p = 1.100e-03
+rank of P0 value 3.92e-05: F = 0.531;  P1 value 4.83e-04: F = 0.994
+  P(V6 >= 0.0002) = 3.640e-02   per-state 1.86e-03  episodes 655
+  P(V6 >= 0.0005) = 4.696e-03   per-state 2.40e-04  episodes 115
+  P(V6 >= 0.001) = 1.077e-03   per-state 5.50e-05  episodes 22
+  P(V6 >= 0.002) = 0.000e+00   per-state 0.00e+00  episodes 0
+  P(V6 >= 0.005) = 0.000e+00   per-state 0.00e+00  episodes 0
+  P(V6 >= 0.01) = 0.000e+00   per-state 0.00e+00  episodes 0
+P(V6>=bar): 1.086e-03, block-bootstrap 95% CI [6.23e-04, 1.60e-03], n_segments 95, segments with any exceedance 21
+states 1000000, per-state P(D>=bar) = 0.000e+00 (0 states, 0 episodes)
+per-state quantiles: 50% 1.65e-05 90% 3.25e-05 99% 4.28e-05 99.9% 4.43e-05 max 4.45e-05
+V6 quantiles: 0.5:3.72e-05 0.9:4.35e-05 0.95:4.39e-05 0.99:4.44e-05 0.999:4.45e-05
+P(V6 >= bar) = 0.000e+00;  20*p = 0.000e+00
+rank of P0 value 3.30e-05: F = 0.149;  P1 value 4.25e-05: F = 0.786
+  P(V6 >= 0.0002) = 0.000e+00   per-state 0.00e+00  episodes 0
+  P(V6 >= 0.0005) = 0.000e+00   per-state 0.00e+00  episodes 0
+  P(V6 >= 0.001) = 0.000e+00   per-state 0.00e+00  episodes 0
+  P(V6 >= 0.002) = 0.000e+00   per-state 0.00e+00  episodes 0
+  P(V6 >= 0.005) = 0.000e+00   per-state 0.00e+00  episodes 0
+  P(V6 >= 0.01) = 0.000e+00   per-state 0.00e+00  episodes 0
+P(V6>=bar): 0.000e+00, block-bootstrap 95% CI [0.00e+00, 0.00e+00], n_segments 95, segments with any exceedance 0
+states 1000000, per-state P(D>=bar) = 2.274e-03 (2274 states, 277 episodes)
+per-state quantiles: 50% 1.29e-05 90% 8.92e-05 99% 3.98e-04 99.9% 1.60e-03 max 4.03e-02
+V6 quantiles: 0.5:1.96e-04 0.9:5.71e-04 0.95:9.52e-04 0.99:2.48e-03 0.999:1.09e-02
+P(V6 >= bar) = 4.479e-02;  20*p = 4.548e-02
+rank of P0 value 7.55e-05: F = 0.075;  P1 value 2.92e-04: F = 0.699
+  P(V6 >= 0.0002) = 4.881e-01   per-state 3.33e-02  episodes 2899
+  P(V6 >= 0.0005) = 1.278e-01   per-state 6.80e-03  episodes 678
+  P(V6 >= 0.001) = 4.479e-02   per-state 2.27e-03  episodes 277
+  P(V6 >= 0.002) = 1.367e-02   per-state 6.82e-04  episodes 100
+  P(V6 >= 0.005) = 3.088e-03   per-state 1.57e-04  episodes 29
+  P(V6 >= 0.01) = 1.116e-03   per-state 5.50e-05  episodes 15
+P(V6>=bar): 4.432e-02, block-bootstrap 95% CI [3.96e-02, 4.94e-02], n_segments 95, segments with any exceedance 93

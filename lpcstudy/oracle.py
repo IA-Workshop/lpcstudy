@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 from scipy.spatial import cKDTree
 
-from .data import SystemContext
+from .data import SystemContext, make_rng
 from .dynamics import growth_exponent, make_amplification, make_observability
 from .ensemble import EnsembleMoments, worker_count
 
@@ -139,7 +139,7 @@ def inverse_dimension(local_dim: np.ndarray, n_neighbors: int = 20) -> np.ndarra
     return (n_neighbors - 2) / ((n_neighbors - 1) * np.asarray(local_dim, dtype=float))
 
 
-def state_oracles(ctx: SystemContext, split: str, window: int,
+def state_oracles(ctx: SystemContext, split: str, window: int, seed: int,
                   chunk: int = 2000) -> StateOracles:
     """Compute ``nu``, ``g_H`` and ``Lambda_bar`` along the true trajectory.
 
@@ -151,6 +151,11 @@ def state_oracles(ctx: SystemContext, split: str, window: int,
         Split name.
     window : int
         Number of horizons for ``g_H`` and for the exponent fit (one Lyapunov time).
+    seed : int
+        Master seed (``config.seed``). The 1/d reference pool is drawn from a fresh
+        ``make_rng(seed, system, "oracle-pool")`` at every call, so all splits of a system
+        share one pool and systems and seeds do not (DEF-0011, DEC-0008 B; WU-0002.14).
+        Needs owner review before freeze.
     chunk : int, optional
         States per batch.
 
@@ -174,7 +179,7 @@ def state_oracles(ctx: SystemContext, split: str, window: int,
         gain_parts.append(np.asarray(amp_fn(jnp.asarray(ctx.eval_states[t_chunk]))))
     gains = np.concatenate(gain_parts)
     nu = np.concatenate(nu_parts)
-    rng = np.random.default_rng(0)
+    rng = make_rng(seed, ctx.spec.name, "oracle-pool")
     pool = ctx.library_states[rng.choice(len(ctx.library_states),
                                          size=min(20_000, len(ctx.library_states)),
                                          replace=False)]

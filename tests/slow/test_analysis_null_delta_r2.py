@@ -40,11 +40,15 @@ out of 500:
   stationary states (Monte Carlo error 0.05 of the half-width on average), >= 461 of 500. Predicted
   P(fail) 0.03 to 0.07 per row (the block-5 percentile interval covers Delta_cond at 0.941 to 0.946,
   2.0 to 2.4 SE above the bound).
-* The nominal bounds of N1, N2 and N3 are asserted while ``ASSERT_ROADMAP_BOUNDS`` is True (Option K;
-  DEC-0018, main-session decision after addendum A9; before it N2 and N3 were always asserted).
-  Over the 8 N2 and N3 rows a correct implementation fails at least one with probability about 0.15 per
-  run (almost all from N3): such a failure at a count inside its range is a predicted finding of class
-  "method", not a defect.
+* The nominal bounds of N1, N2 and N3 are recorded characterization rows while
+  ``ASSERT_ROADMAP_BOUNDS`` is False (Option C, in force since the owner's ratification of 2026-10-12,
+  DEC-0026 item 2; DEC-0018): the outcome is computed, written to the results table and shown as a
+  pytest warning, never asserted. They are asserted only under Option K (True). Before addendum A9,
+  N2 and N3 were always asserted; they joined the switch after it (main-session decision), and DEC-0026
+  item 2 names them the criteria of this study with N1 reported (DEF-0021; the ROADMAP row amendment
+  is the owner's edit). Over the 8 N2 and N3 rows a correct implementation fails at least one with
+  probability about 0.15 per run (almost all from N3): such a failure at a count inside its range is a
+  predicted finding of class "method", not a defect.
 * Consistency (always asserted, any switch position): each of the 12 counts lies in its range above,
   the defect test; family-wise false alarm at most 12 x 0.0005 = 0.6%. The ranges were fixed AFTER
   the run-2 counts were known (VV.3), and a rerun with the same design and seeds is bitwise
@@ -110,7 +114,7 @@ def test_roadmap_false_distinct_rate_and_conditional_coverage(pool, cache: wu.Ru
 
     Nominal -/+ 3 SE with R = 500: 0.045946 and 0.92076 (rounded up to the ROADMAP's 0.921). Predicted
     P(fail) per row: N2 at most 0.001, N3 0.03 to 0.07 (module table). Under the switch since
-    addendum A9: asserted under Option K, only recorded under Option C."""
+    addendum A9: only recorded under Option C (as shipped), asserted under Option K."""
     evaluation = cache.delta(pool, phi)
     assert wu.enforce(wu.delta_rows(evaluation, "n2", "n3")) in ("pass", "fail")
 
@@ -121,7 +125,9 @@ def test_roadmap_interval_contains_zero(pool, cache: wu.RunCache, phi: float) ->
 
     Predicted P(fail) 0.19 to 0.54 per row (estimand mismatch: the interval is for Delta_cond, whose
     mean is negative under the null). A failure is a finding for the owner, who may amend the ROADMAP
-    row (DEC-0018), and is never tuned away. Under Option C the outcome is only recorded."""
+    row (DEC-0018), and is never tuned away. Under Option C (``ASSERT_ROADMAP_BOUNDS = False``, as
+    shipped) the outcome is only recorded and warned about; under Option K (True) a failed bound
+    raises."""
     evaluation = cache.delta(pool, phi)
     assert wu.enforce(wu.delta_rows(evaluation, "n1")) in ("pass", "fail")
 

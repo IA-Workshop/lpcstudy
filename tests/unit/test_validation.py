@@ -30,6 +30,7 @@ CONFIG = dataclasses.replace(SMOKE, bootstrap_resamples=40)
 LEVELS = np.array([0.005, 0.01, 0.02, 0.05])
 NU11 = 2.0 ** ((np.arange(11) - 5) / 2.0)  # distinct, geometric: median / mean = 0.582
 TOL = 1e-12
+SYSTEM = "lorenz63"  # the system label of the V7 bootstrap generators
 
 
 def _exact(levels: np.ndarray, nu: np.ndarray, factor: float = 1.0) -> np.ndarray:
@@ -46,7 +47,7 @@ def test_v7_passes_at_unit_efficiency_and_fails_at_085() -> None:
     outside the band, so the test is not vacuous: only the per-state oracle nu gives 1.
     Tolerance: abs 1e-12 (module note); decision margins 0.05 and 0.15.
     """
-    out = v7_efficiency(LEVELS, _exact(LEVELS, NU11), NU11, CONFIG)
+    out = v7_efficiency(LEVELS, _exact(LEVELS, NU11), NU11, CONFIG, SYSTEM)
     assert out["pass"] is True and out["slope_pass"] is True
     assert out["n_states"] == 11 and out["n_nonfinite"] == 0
     assert out["median_slope"] == pytest.approx(1.0, abs=TOL)
@@ -60,7 +61,7 @@ def test_v7_passes_at_unit_efficiency_and_fails_at_085() -> None:
     mean_variant = np.median(NU11) / np.mean(NU11)
     assert mean_variant == pytest.approx(0.5824, abs=1e-4) and not 0.9 <= mean_variant <= 1.1
 
-    low = v7_efficiency(LEVELS, _exact(LEVELS, NU11, 0.85), NU11, CONFIG)
+    low = v7_efficiency(LEVELS, _exact(LEVELS, NU11, 0.85), NU11, CONFIG, SYSTEM)
     assert low["median_slope"] == pytest.approx(1.0, abs=TOL) and low["slope_pass"] is True
     for value in low["efficiency_median_by_noise"].values():
         assert value == pytest.approx(0.85, abs=TOL)
@@ -81,7 +82,7 @@ def test_v7_slope_band_is_part_of_pass() -> None:
     levels = np.array([0.01, 0.011])
     for b, slope_ok in ((0.2, False), (0.05, True)):
         deltas = _exact(levels, NU11) * (levels[None, :] / 0.01) ** b
-        out = v7_efficiency(levels, deltas, NU11, CONFIG)
+        out = v7_efficiency(levels, deltas, NU11, CONFIG, SYSTEM)
         assert out["median_slope"] == pytest.approx(1.0 + b, abs=TOL)
         assert out["slope_pass"] is slope_ok
         assert out["efficiency_median_by_noise"]["0.011"] == pytest.approx(1.1**b, abs=TOL)
@@ -104,7 +105,7 @@ def test_v7_holds_at_every_noise_level() -> None:
     """
     deltas = _exact(LEVELS, NU11)
     deltas[:, 3] *= 1.15
-    out = v7_efficiency(LEVELS, deltas, NU11, CONFIG)
+    out = v7_efficiency(LEVELS, deltas, NU11, CONFIG, SYSTEM)
     eff = out["efficiency_median_by_noise"]
     assert eff["0.05"] == pytest.approx(1.15, abs=TOL)
     for key in ("0.005", "0.01", "0.02"):
@@ -137,14 +138,14 @@ def test_v7_uses_medians_over_states_not_means_or_ratios_of_medians() -> None:
     deltas = eff[:, None] * _exact(levels, nu)
     assert np.mean(eff) == pytest.approx(1.16, abs=TOL)
     assert np.median(deltas[:, 0] / levels[0]) / np.median(nu) == pytest.approx(0.80, abs=TOL)
-    out = v7_efficiency(levels, deltas, nu, CONFIG)
+    out = v7_efficiency(levels, deltas, nu, CONFIG, SYSTEM)
     assert out["efficiency_median_by_noise"]["0.01"] == pytest.approx(1.0, abs=TOL)
     assert out["efficiency_median_by_noise"]["0.02"] == pytest.approx(1.0, abs=TOL)
     assert out["pass"] is True
 
     exponents = np.array([-0.5, 0.0, 0.05, 0.1, 3.0])
     deltas = _exact(levels, nu) * (levels[None, :] / 0.01) ** exponents[:, None]
-    out = v7_efficiency(levels, deltas, nu, CONFIG)
+    out = v7_efficiency(levels, deltas, nu, CONFIG, SYSTEM)
     assert out["median_slope"] == pytest.approx(1.05, abs=TOL)
     assert np.mean(1.0 + exponents) == pytest.approx(1.53, abs=TOL)
     assert out["efficiency_median_by_noise"]["0.02"] == pytest.approx(2.0**0.05, abs=TOL)
@@ -158,7 +159,7 @@ def test_v7_band_is_closed_and_edges_are_sharp() -> None:
     margin 1e-4 is eight orders above the rounding of the ratio (about 1e-16). Exact decisions.
     """
     for factor, expected in ((1.0999, True), (0.9001, True), (1.1001, False), (0.8999, False)):
-        out = v7_efficiency(LEVELS, _exact(LEVELS, NU11, factor), NU11, CONFIG)
+        out = v7_efficiency(LEVELS, _exact(LEVELS, NU11, factor), NU11, CONFIG, SYSTEM)
         assert out["pass"] is expected, factor
         assert all(v is expected for v in out["efficiency_pass_by_noise"].values()), factor
         assert out["slope_pass"] is True
@@ -180,7 +181,7 @@ def test_v7_band_edges_are_inside_exactly() -> None:
     for edge in (1.1, 0.9):
         deltas = edge * levels[None, :] * nu[:, None]
         assert np.all(deltas / (levels[None, :] * nu[:, None]) == edge)  # exact, by construction
-        out = v7_efficiency(levels, deltas, nu, CONFIG)
+        out = v7_efficiency(levels, deltas, nu, CONFIG, SYSTEM)
         assert list(out["efficiency_median_by_noise"].values()) == [edge, edge], edge
         assert all(out["efficiency_pass_by_noise"].values()), edge
         assert out["slope_pass"] is True and out["pass"] is True, edge
@@ -199,20 +200,20 @@ def test_v7_counts_non_finite_input_and_fails() -> None:
 
     deltas = base.copy()
     deltas[2, 1] = np.nan
-    out = v7_efficiency(LEVELS, deltas, NU11, CONFIG)
+    out = v7_efficiency(LEVELS, deltas, NU11, CONFIG, SYSTEM)
     assert out["n_nonfinite"] == 1 and out["n_states"] == 11
     assert out["pass"] is False and out["slope_pass"] is False
     assert np.isnan(out["median_slope"])
 
     nu = NU11.copy()
     nu[5] = -1.0
-    out = v7_efficiency(LEVELS, deltas, nu, CONFIG)
+    out = v7_efficiency(LEVELS, deltas, nu, CONFIG, SYSTEM)
     assert out["n_nonfinite"] == 2 and out["pass"] is False
 
     for bad in (0.0, np.nan, np.inf, -1.0):
         nu = NU11.copy()
         nu[4] = bad
-        out = v7_efficiency(LEVELS, base, nu, CONFIG)
+        out = v7_efficiency(LEVELS, base, nu, CONFIG, SYSTEM)
         assert out["n_nonfinite"] == 1 and out["pass"] is False, bad
         assert not any(out["efficiency_pass_by_noise"].values()), bad
 
@@ -220,11 +221,11 @@ def test_v7_counts_non_finite_input_and_fails() -> None:
     both[3, 0] = np.inf
     nu = NU11.copy()
     nu[3] = 0.0
-    assert v7_efficiency(LEVELS, both, nu, CONFIG)["n_nonfinite"] == 1
+    assert v7_efficiency(LEVELS, both, nu, CONFIG, SYSTEM)["n_nonfinite"] == 1
 
     zero = base.copy()
     zero[7, 2] = 0.0  # delta = 0 has no logarithm: counted too
-    assert v7_efficiency(LEVELS, zero, NU11, CONFIG)["n_nonfinite"] == 1
+    assert v7_efficiency(LEVELS, zero, NU11, CONFIG, SYSTEM)["n_nonfinite"] == 1
 
 
 def test_v7_rejects_malformed_arrays() -> None:
@@ -235,20 +236,20 @@ def test_v7_rejects_malformed_arrays() -> None:
     """
     good = _exact(LEVELS, NU11)
     with pytest.raises(ValueError):
-        v7_efficiency(LEVELS, good[:, :3], NU11, CONFIG)
+        v7_efficiency(LEVELS, good[:, :3], NU11, CONFIG, SYSTEM)
     with pytest.raises(ValueError):
-        v7_efficiency(LEVELS, good, NU11[:5], CONFIG)
+        v7_efficiency(LEVELS, good, NU11[:5], CONFIG, SYSTEM)
     with pytest.raises(ValueError):
-        v7_efficiency(LEVELS[:1], good[:, :1], NU11, CONFIG)
+        v7_efficiency(LEVELS[:1], good[:, :1], NU11, CONFIG, SYSTEM)
     with pytest.raises(ValueError):
-        v7_efficiency(np.array([0.01, 0.01]), good[:, :2], NU11, CONFIG)
+        v7_efficiency(np.array([0.01, 0.01]), good[:, :2], NU11, CONFIG, SYSTEM)
     with pytest.raises(ValueError):
-        v7_efficiency(np.array([-0.01, 0.02]), good[:, :2], NU11, CONFIG)
+        v7_efficiency(np.array([-0.01, 0.02]), good[:, :2], NU11, CONFIG, SYSTEM)
 
 
 def _stub_cell(est_seed: np.ndarray, nu: np.ndarray) -> SimpleNamespace:
     moments = SimpleNamespace(est_seed=est_seed)
-    return SimpleNamespace(splits={"test": SimpleNamespace(moments=moments)},
+    return SimpleNamespace(system=SYSTEM, splits={"test": SimpleNamespace(moments=moments)},
                            oracles={"test": SimpleNamespace(nu=nu)})
 
 
@@ -267,7 +268,7 @@ def test_v7_wrapper_sorts_the_levels_and_only_extracts_arrays() -> None:
     cells = {float(LEVELS[i]): _stub_cell(deltas[:, i], NU11) for i in order}
     assert list(cells) != sorted(cells)
     out = v7_noise_scaling(cells, CONFIG)
-    assert out == v7_efficiency(LEVELS, deltas, NU11, CONFIG)
+    assert out == v7_efficiency(LEVELS, deltas, NU11, CONFIG, SYSTEM)
     assert out["n_states"] == 11
 
 

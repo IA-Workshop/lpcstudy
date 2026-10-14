@@ -1,0 +1,13 @@
+start (np.float64(0.0), np.float64(-1.0), np.float64(-6.0)) first fail k=2 |x_(k-1)|=1.963386 |x_k|=3.725518 margin=0.7255; 1e-3 ball all diverge: True, k range 2-2
+start (np.float64(0.0), np.float64(1.0), np.float64(6.0)) first fail k=2 |x_(k-1)|=1.963386 |x_k|=3.725518 margin=0.7255; 1e-3 ball all diverge: True, k range 2-2
+start (np.float64(-1.0), np.float64(1.0), np.float64(-6.0)) first fail k=4 |x_(k-1)|=2.026932 |x_k|=3.660467 margin=0.6605; 1e-3 ball all diverge: True, k range 4-4
+start (np.float64(1.0), np.float64(-1.0), np.float64(6.0)) first fail k=4 |x_(k-1)|=2.026932 |x_k|=3.660467 margin=0.6605; 1e-3 ball all diverge: True, k range 4-4
+start (np.float64(-1.0), np.float64(1.0), np.float64(-4.0)) first fail k=5 |x_(k-1)|=2.245976 |x_k|=3.585876 margin=0.5859; 1e-3 ball all diverge: True, k range 5-5
+start (np.float64(1.0), np.float64(-1.0), np.float64(4.0)) first fail k=5 |x_(k-1)|=2.245976 |x_k|=3.585876 margin=0.5859; 1e-3 ball all diverge: True, k range 5-5
+start (np.float64(-1.0), np.float64(-1.0), np.float64(6.0)) first fail k=6 |x_(k-1)|=2.417042 |x_k|=3.879800 margin=0.5830; 1e-3 ball all diverge: True, k range 6-6
+start (np.float64(1.0), np.float64(1.0), np.float64(-6.0)) first fail k=6 |x_(k-1)|=2.417042 |x_k|=3.879800 margin=0.5830; 1e-3 ball all diverge: True, k range 6-6
+start (np.float64(-2.0), np.float64(1.0), np.float64(-4.0)) first fail k=4 |x_(k-1)|=2.300645 |x_k|=3.536550 margin=0.5366; 1e-3 ball all diverge: True, k range 4-4
+start (np.float64(2.0), np.float64(-1.0), np.float64(4.0)) first fail k=4 |x_(k-1)|=2.300645 |x_k|=3.536550 margin=0.5366; 1e-3 ball all diverge: True, k range 4-4
+start (np.float64(-2.0), np.float64(-1.0), np.float64(-6.0)) first fail k=1 |x_(k-1)|=2.000000 |x_k|=3.493958 margin=0.4940; 1e-3 ball all diverge: True, k range 1-1
+start (np.float64(2.0), np.float64(1.0), np.float64(6.0)) first fail k=1 |x_(k-1)|=2.000000 |x_k|=3.493958 margin=0.4940; 1e-3 ball all diverge: True, k range 1-1
+bounded candidates: [(np.float64(-2.0), np.float64(0.0), np.float64(4.0)), (np.float64(2.0), np.float64(0.0), np.float64(-4.0)), (np.float64(3.0), np.float64(0.0), np.float64(0.0)), (np.float64(2.5), np.float64(0.0), np.float64(0.0))]

@@ -1,0 +1,2 @@
+lorenz63: spearman(log D, ln s1) = 0.20; ln s1 random median 1.83, 99% 5.81; top-0.1% D states: ln s1 median 6.06, min 4.23
+chua: spearman(log D, ln s1) = 0.35; ln s1 random median 2.42, 99% 5.12; top-0.1% D states: ln s1 median 4.93, min 3.56

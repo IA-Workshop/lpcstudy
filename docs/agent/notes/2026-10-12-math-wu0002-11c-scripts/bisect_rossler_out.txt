@@ -1,0 +1,7 @@
+pair 0: |a-b|=2.7e-15; diverging end: first refusal step 8 (3.7 t.u.); non-diverging end: refused=True at 8, max|x|=25.926
+pair 1: |a-b|=1.8e-15; diverging end: first refusal step 13 (6.0 t.u.); non-diverging end: refused=True at 13, max|x|=25.912
+pair 2: |a-b|=1.9e-15; diverging end: first refusal step 8 (3.7 t.u.); non-diverging end: refused=True at 8, max|x|=25.661
+pair 3: |a-b|=8.9e-16; diverging end: first refusal step 6 (2.8 t.u.); non-diverging end: refused=True at 6, max|x|=26.127
+pair 4: |a-b|=2.2e-15; diverging end: first refusal step 9 (4.2 t.u.); non-diverging end: refused=True at 9, max|x|=26.001
+pair 5: |a-b|=3.6e-15; diverging end: first refusal step 4 (1.9 t.u.); non-diverging end: refused=True at 4, max|x|=25.855
+worst first refusal of diverging end: 13

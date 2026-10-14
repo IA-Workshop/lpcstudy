@@ -8,26 +8,29 @@ Each evaluation set holds states thinned by ``spacing`` steps and carries a
 lead of ``(D-1) tau_d`` steps (delay history) and a tail of ``H_max`` steps
 (forecast verification). Gaps between segments exceed
 ``theiler + (D-1) tau_d + H_max`` so no delay window or verification window of
-one set overlaps another set or the library (leakage rule L1). The state
-estimator is trained on a separate trajectory started from a different
-initial condition.
+one set overlaps another set or the library (leakage rule L1). The main trajectory and the
+separate trajectory on which the state estimator is trained start from seed-drawn points of
+the statistics orbit (:func:`draw_starts`) and discard the same burn-in; the statistics
+orbit, which defines the units, starts at the registry state for every seed.
 """
 
 from __future__ import annotations
 
 import json
 import math
+import struct
 import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NamedTuple
 
 import jax.numpy as jnp
 import numpy as np
 
 from .config import StudyConfig
 from .embedding import autocorrelation_time, delay_vectors, select_delay
-from .systems import SYSTEMS, SystemSpec, estimate_lyapunov, make_flow_step, \
-    simulate_trajectory
+from .systems import SYSTEMS, OrbitDivergence, SystemSpec, checked_bound, guard_orbit, \
+    lyapunov_guarded, make_flow_step, simulate_trajectory
 
 SPLITS: tuple[str, ...] = ("construction", "calibration", "test")
 
@@ -49,6 +52,72 @@ def make_rng(seed: int, *keys: object) -> np.random.Generator:
     """
     label = "|".join(str(k) for k in keys).encode()
     return np.random.default_rng([seed, zlib.crc32(label)])
+
+
+START_PERTURBATION: float = 1e-6
+"""``eta``: the whitened size of the perturbation of a start state (WU-0002.14, M1).
+
+Fixed by the mathematics check: the saturation of the perturbation takes about ln(1/eta) = 14
+Lyapunov times, leaving at least 70 of the 100-LT burn-in, and the basin margin around the
+attractor (Rossler about 0.015 to 0.02 whitened, Chua about 0.15 to 0.2) is more than 10^4 eta.
+Needs owner review before freeze."""
+
+
+class Starts(NamedTuple):
+    """The seed-drawn start states of the two data trajectories (WU-0002.14).
+
+    Attributes
+    ----------
+    main_index, estimator_index : int
+        Index ``k`` into the post-burn-in statistics orbit.
+    main_state, estimator_state : np.ndarray
+        Start state ``stats[k] + eta C^{1/2} u``, shape ``(m,)``, float64.
+    """
+
+    main_index: int
+    main_state: np.ndarray
+    estimator_index: int
+    estimator_state: np.ndarray
+
+
+def draw_starts(seed: int, system: str, stats: np.ndarray, unwhiten: np.ndarray,
+                eta: float = START_PERTURBATION) -> Starts:
+    """Draw the start states of the main and estimator trajectories of one system.
+
+    One generator ``make_rng(seed, "start", system)`` is consumed in a fixed order: ``k_main``
+    (``integers(0, n)``, an index into the post-burn-in statistics orbit), ``u_main``
+    (``standard_normal(m)``), ``k_est`` and ``u_est``. A start is ``stats[k] + eta * (unwhiten
+    @ u)``: a point of the sampled invariant measure, shifted by ``eta`` in whitened units in a
+    random direction. The label has no embedding dimension, so the robustness contexts of one
+    system share the start (common random numbers across ``D``). Needs owner review before
+    freeze: it decides which attractor points the study's data come from.
+
+    Parameters
+    ----------
+    seed : int
+        Master seed (``config.seed``); any non-negative integer, including a 62-bit one.
+    system : str
+        System name (a label of the generator).
+    stats : np.ndarray
+        Post-burn-in statistics orbit, shape ``(n, m)``.
+    unwhiten : np.ndarray
+        ``C^{1/2}``, shape ``(m, m)``.
+    eta : float, optional
+        Whitened perturbation size.
+
+    Returns
+    -------
+    Starts
+        The two indices and start states.
+    """
+    rng = make_rng(seed, "start", system)
+    n_states, dim = stats.shape
+    main_index = int(rng.integers(0, n_states))
+    main_noise = rng.standard_normal(dim)
+    estimator_index = int(rng.integers(0, n_states))
+    estimator_noise = rng.standard_normal(dim)
+    return Starts(main_index, stats[main_index] + eta * (unwhiten @ main_noise),
+                  estimator_index, stats[estimator_index] + eta * (unwhiten @ estimator_noise))
 
 
 SKLEARN_SEED_LIMIT: int = 2**32
@@ -141,7 +210,11 @@ class SystemContext:
         (``s_{t-(D-1) tau}``), paired with ``estimator_inputs``; the learned
         estimate initializes a Gauss-Newton refinement in that parametrization.
     meta : dict
-        Diagnostic information (sizes, timings).
+        Diagnostic information (sizes, timings, the orbit-guard maxima of DEF-0015:
+        ``lyapunov_orbit_max_abs`` and ``trajectory_max_abs`` with the keys ``statistics``,
+        ``main`` and ``estimator``, each ``max |x|`` of that orbit, burn-in included; and the
+        start states of WU-0002.14: ``start_index`` and ``start_state`` with the keys ``main``
+        and ``estimator``, the raw start before the burn-in).
     """
 
     spec: SystemSpec
@@ -215,8 +288,65 @@ def _symmetric_root(cov: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return inv_root, root
 
 
+def lyapunov_record(spec: SystemSpec, cache: Path) -> tuple[float, float]:
+    """Largest Lyapunov exponent and the orbit maximum under the guard, cached on disk.
+
+    The cache holds ``{name: {"lambda_max": ..., "orbit_max_abs": ...}}``. An entry in that form
+    is read without recomputation. A legacy entry (a bare float, written before the orbit guard
+    of DEF-0015) is recomputed once under the guard: its IEEE bytes must equal the cached value
+    (the regression check of DEC-0017 Q1), and the entry is then rewritten in the new form.
+    Needs owner review before freeze: it sets the study's time unit.
+
+    Parameters
+    ----------
+    spec : SystemSpec
+        System description (``orbit_bound`` is required).
+    cache : Path
+        JSON file holding previously computed exponents.
+
+    Returns
+    -------
+    tuple[float, float]
+        The exponent per natural time unit and ``max |x|`` over the orbit that produced it.
+
+    Raises
+    ------
+    OrbitDivergence
+        If the orbit fails the guard (when computed), or a cached ``orbit_max_abs`` exceeds
+        the bound or is not finite.
+    RuntimeError
+        If the recomputation of a legacy entry differs from it in a single bit.
+    ValueError
+        If the bound is unusable, or the entry is neither a float nor a complete new-form entry.
+    """
+    bound = checked_bound(spec)
+    store = json.loads(cache.read_text()) if cache.exists() else {}
+    entry = store.get(spec.name)
+    if isinstance(entry, dict):
+        if set(entry) != {"lambda_max", "orbit_max_abs"} or not all(
+                isinstance(v, float) for v in entry.values()):
+            raise ValueError(f"{cache}: entry '{spec.name}' is malformed: {entry!r}")
+        if not entry["orbit_max_abs"] <= bound:  # also refuses NaN
+            raise OrbitDivergence(f"{cache}: cached orbit max|x| {entry['orbit_max_abs']!r} of "
+                                  f"'{spec.name}' exceeds the bound {bound:g}")
+        return entry["lambda_max"], entry["orbit_max_abs"]
+    if entry is not None and (isinstance(entry, bool) or not isinstance(entry, (int, float))):
+        raise ValueError(f"{cache}: entry '{spec.name}' is malformed: {entry!r}")
+    interval = 20 * spec.max_dt
+    lam, largest = lyapunov_guarded(spec, interval, n_steps=100_000, burn_in=5_000)
+    if entry is not None and struct.pack("<d", lam) != struct.pack("<d", float(entry)):
+        raise RuntimeError(
+            f"{cache}: legacy exponent of '{spec.name}' {float(entry)!r} differs from the "
+            f"recomputation under the orbit guard {lam!r} (a CPU, XLA build or code change; "
+            "delete the cache entry only after the owner has seen this)")
+    store[spec.name] = {"lambda_max": lam, "orbit_max_abs": largest}
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(json.dumps(store, indent=2))
+    return lam, largest
+
+
 def lyapunov_cached(spec: SystemSpec, cache: Path) -> float:
-    """Largest Lyapunov exponent, cached on disk.
+    """Largest Lyapunov exponent, cached on disk (see ``lyapunov_record``).
 
     Parameters
     ----------
@@ -230,14 +360,7 @@ def lyapunov_cached(spec: SystemSpec, cache: Path) -> float:
     float
         Largest Lyapunov exponent per natural time unit.
     """
-    store = json.loads(cache.read_text()) if cache.exists() else {}
-    if spec.name not in store:
-        interval = 20 * spec.max_dt
-        store[spec.name] = estimate_lyapunov(spec, interval, n_steps=100_000,
-                                             burn_in=5_000)
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps(store, indent=2))
-    return float(store[spec.name])
+    return lyapunov_record(spec, cache)[0]
 
 
 def build_context(system: str, config: StudyConfig, cache_dir: Path,
@@ -262,15 +385,18 @@ def build_context(system: str, config: StudyConfig, cache_dir: Path,
     """
     spec = SYSTEMS[system]
     dim = embed_dim or config.embedding_dim
-    lam = lyapunov_cached(spec, cache_dir / "lyapunov.json")
+    lam, lyapunov_max = lyapunov_record(spec, cache_dir / "lyapunov.json")
     interval = 1.0 / (config.steps_per_lyapunov * lam)
     step_fn = make_flow_step(spec, spec.params, interval)
     burn = int(config.burn_in_lyapunov * config.steps_per_lyapunov)
     lt_steps = config.steps_per_lyapunov
 
-    # Statistics trajectory: sigma_x, invariant covariance, delay, ACF time.
-    stats = simulate_trajectory(step_fn, jnp.asarray(spec.initial_state),
-                                burn + 200_000)[burn:]
+    # Statistics trajectory: sigma_x, invariant covariance, delay, ACF time. It starts at the
+    # registry state for every seed: it defines the units (sigma_x, C, tau_d, spacing, lambda),
+    # which are system constants (WU-0002.14, M2); the data trajectories below are seed-drawn.
+    stats_full = simulate_trajectory(step_fn, jnp.asarray(spec.initial_state), burn + 200_000)
+    stats_max = guard_orbit(spec, "statistics", stats_full)  # burn-in included (DEF-0015)
+    stats = stats_full[burn:]
     obs_raw = stats[:, spec.observed_index]
     obs_mean, obs_scale = float(obs_raw.mean()), float(obs_raw.std())
     state_mean = stats.mean(axis=0)
@@ -301,15 +427,22 @@ def build_context(system: str, config: StudyConfig, cache_dir: Path,
         offsets[split] = start + spacing * np.arange(split_sizes[split])
         cursor = int(offsets[split][-1]) + horizon_max + gap
     total = cursor
-    perturbed = np.asarray(spec.initial_state) + 1e-3
-    main = simulate_trajectory(step_fn, jnp.asarray(stats[-1]), total)
+    # Seed-drawn starts on the statistics orbit (WU-0002.14, DEF-0017); each data trajectory
+    # discards the same burn-in as the statistics orbit, so its first state is a fresh point of
+    # the attractor (the perturbation saturates within about 14 LT, M1).
+    starts = draw_starts(config.seed, system, stats, unwhiten)
+    main_full = simulate_trajectory(step_fn, jnp.asarray(starts.main_state), burn + total)
+    main_max = guard_orbit(spec, "main", main_full)  # burn-in included
+    main = main_full[burn:]
     library_states = main[:library_len]
     observe = lambda states: (states[:, spec.observed_index] - obs_mean) / obs_scale
 
-    # Separate trajectory for the state estimator (different initial condition).
+    # Separate trajectory for the state estimator (its own seed-drawn start).
     stride = 5
     est_len = history + stride * config.estimator_pairs + 1
-    est_traj = simulate_trajectory(step_fn, jnp.asarray(perturbed), burn + est_len)[burn:]
+    est_full = simulate_trajectory(step_fn, jnp.asarray(starts.estimator_state), burn + est_len)
+    est_max = guard_orbit(spec, "estimator", est_full)
+    est_traj = est_full[burn:]
     est_obs = observe(est_traj)
     est_idx = history + stride * np.arange(config.estimator_pairs)
     est_inputs = delay_vectors(est_obs, est_idx, delay, dim)
@@ -327,5 +460,11 @@ def build_context(system: str, config: StudyConfig, cache_dir: Path,
         meta={"lambda_max": lam, "interval": interval, "delay": delay, "ami_delay": ami_delay,
               "embed_dim": dim, "acf_time": acf_time, "spacing": spacing,
               "obs_scale": obs_scale, "trajectory_len": total,
-              "library_len": library_len, "theiler": theiler},
+              "library_len": library_len, "theiler": theiler,
+              "lyapunov_orbit_max_abs": lyapunov_max,
+              "trajectory_max_abs": {"statistics": stats_max, "main": main_max,
+                                     "estimator": est_max},
+              "start_index": {"main": starts.main_index, "estimator": starts.estimator_index},
+              "start_state": {"main": [float(v) for v in starts.main_state],
+                              "estimator": [float(v) for v in starts.estimator_state]}},
     )

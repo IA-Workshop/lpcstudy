@@ -23,6 +23,7 @@ used). Each test runs in well under 5 s; T9 classifies 11 540 leaves in about 0.
 from __future__ import annotations
 
 import ast
+import copy
 import hashlib
 import importlib.util
 import json
@@ -1301,6 +1302,57 @@ def digest_context(**changes) -> dict:
     return {**CONTEXT, **digests, **changes}
 
 
+GUARD_LEAVES = ("lyapunov_orbit_max_abs", "trajectory_max_abs/statistics",
+                "trajectory_max_abs/main", "trajectory_max_abs/estimator")
+
+
+def guard_context(**changes) -> dict:
+    """The fixture context plus the four orbit-guard leaves of ``build_context`` (hand-typed)."""
+    return {**CONTEXT, "lyapunov_orbit_max_abs": 19.27,
+            "trajectory_max_abs": {"statistics": 19.5, "main": 19.4, "estimator": 18.9}, **changes}
+
+
+def test_v3_the_four_orbit_guard_leaves_are_new_and_everything_classifies() -> None:
+    """V3 (WU-0002.11c): the four orbit-guard context leaves classify as ``new``, chain dynamics.
+
+    Reference: the plan (rule ``new``, chain ``dynamics``, sub-task WU-0002.11c, item DEF-0015),
+    decided by hand: the old side never has the leaves, so each is ``new`` with that rule, no
+    leaf is unclassified, and the other leaves' statuses equal those of the trees without them.
+    Exact.
+    """
+    new = new_tree()
+    new["systems"]["lorenz63"]["context"] = guard_context()
+    _, _, results = sides(old_tree(), new)
+    found = by_path(results)
+    for leaf in GUARD_LEAVES:
+        row = found[f"systems/lorenz63/context/{leaf}"]
+        assert row.status == "new" and row.rule.cls == "new" and row.rule.chain == "dynamics"
+        assert row.rule.sub == "WU-0002.11c" and row.rule.item == "DEF-0015"
+    plain = by_path(sides(old_tree(), new_tree())[2])
+    assert {k: v.status for k, v in found.items() if "max_abs" not in k} == \
+        {k: v.status for k, v in plain.items()}
+
+
+@pytest.mark.parametrize("changes, branch", [
+    ({}, "B"),                                                     # identical context
+    ({"obs_scale": 2.0 * (1.0 + 5e-13)}, "N"),                    # within 1e-12 relative
+    ({"lambda_max": math.nextafter(0.9056, 1.0)}, "D"),           # one ulp
+])
+def test_v3_branch_selection_is_unchanged_by_the_guard_leaves(changes, branch) -> None:
+    """V3: ``select_branch`` returns the same result with and without the orbit-guard leaves.
+
+    Reference: the T6 fixtures for B, N and D (decided by hand in T6). The old side never has the
+    leaves and the rule reads the old side's context paths only. Exact.
+    """
+    old = {"systems": {"lorenz63": {"context": dict(CONTEXT)}}}
+    results = []
+    for context in ({**CONTEXT, **changes}, guard_context(**changes)):
+        new = {"systems": {"lorenz63": {"context": context}}}
+        old_l, new_l, res = sides(old, new)
+        results.append(cp.select_branch(res, old_l, new_l))
+    assert results[0] == results[1] and results[0][0] == branch
+
+
 def platform_block(model: str = "Test CPU", cores: tuple[str | None, ...] = ("Haswell", "Haswell"),
                    coretype: str | None = None) -> dict:
     """A hand-built provenance block with the keys of ``provenance.collect`` that the tool reads."""
@@ -1531,3 +1583,380 @@ def test_r5_a_failed_probe_is_not_a_value_in_the_platform_row() -> None:
     block["cpu"].update(error=None)
     rows, _ = cp.platform_rows({"new": cp.platform_record({"provenance": block})})
     assert rows == [("new run", "unknown (source none)", "none mapped", "unset")]
+
+
+# ------------------------------------------------------------- WU-0002.14: --redrawn-states
+START_LEAVES = {"start_index": {"main": 165362, "estimator": 199474},
+                "start_state": {"main": [-13.1, -14.4, 31.9], "estimator": [-13.5, -13.1, 34.0]}}
+
+
+RF_COMMON = {"config": {"n_oracle_draws": 200, "n_test_sweep": 300},
+             "scores_star": {"agreement_href": 1.0},
+             "validation": {"convergence": {"50": {"mean_abs_dev_from_max": 0.01},
+                                            "200": {"mean_abs_dev_from_max": 0.0},
+                                            "used_M": 200, "pass": True},
+                            "km_max_abs_dev": 0.005830472656782881}}
+"""The leaves that both runs carry for the R-f checks (the same values on both sides, so the
+'unchanged' rules hold); ``V7/n_states`` (a new leaf) is added to the new side."""
+
+
+def redrawn_trees(**changes):
+    """The pilot tree and a new tree with the same context, the start leaves, the R-f leaves
+    (all invariants hold) and given changes (``a__b__c=value`` sets ``new[a][b][c]``)."""
+    old, new = old_tree(), new_tree()
+    for tree in (old, new):
+        tree["config"].update(RF_COMMON["config"])
+        system = tree["systems"]["lorenz63"]
+        system["scores"]["A*"].update(RF_COMMON["scores_star"])
+        system["validation"].update(copy.deepcopy(RF_COMMON["validation"]))
+    new["systems"]["lorenz63"]["context"].update(START_LEAVES)
+    new["systems"]["lorenz63"]["V7"]["n_states"] = 300
+    for dotted, value in changes.items():
+        node = new["systems"]["lorenz63"]
+        *head, last = dotted.split("__")
+        for part in head:
+            node = node[part]
+        node[last] = value
+    return old, new
+
+
+def test_the_eight_start_leaves_are_new_leaves_of_the_dynamics_chain() -> None:
+    """WU-0002.14: ``context/start_index/*`` and ``context/start_state/*/[i]`` match exactly one rule.
+
+    Reference: hand-written paths (the 2 + 6 leaves per system of the plan) and the class ``new``
+    with chain ``dynamics``; a run without the start leaves needs no rule for them (no leaf, no
+    finding). Exact.
+    """
+    old, new = old_tree(), redrawn_trees()[1]
+    _, _, results = sides(old, new)
+    found = {cp.show(r.path): r for r in results if "start_" in "/".join(r.path)}
+    expected = {f"systems/lorenz63/context/start_index/{k}" for k in ("main", "estimator")} | {
+        f"systems/lorenz63/context/start_state/{k}/[{i}]" for k in ("main", "estimator")
+        for i in range(3)}
+    assert set(found) == expected and len(found) == 8
+    assert all(r.rule.cls == "new" and r.status == "new" and r.rule.chain == "dynamics"
+               for r in found.values())
+    _, _, plain = sides(old_tree(), new_tree())
+    assert not [r for r in plain if "start_" in "/".join(r.path)]
+
+
+@pytest.mark.parametrize(("arms", "expected"), [
+    ("away", (0.1, 0.15)), ("delta-side", (0.25, 0.15)), ("half-width", (0.175, 0.1))])
+def test_se_pair_arms_by_hand(arms, expected) -> None:
+    """The D3 standard errors for old = (1.0; [0.8, 1.5]) and new = (1.4; [1.3, 1.7]) at z = 2.
+
+    Reference: hand arithmetic. delta = +0.4 (new above old). ``away``: the old lower arm
+    (1.0 - 0.8) / 2 = 0.1 and the new upper arm (1.7 - 1.4) / 2 = 0.15. ``delta-side`` (DEC-0019):
+    both on the side of delta: (1.5 - 1.0) / 2 = 0.25 and 0.15. ``half-width``: (1.5 - 0.8) / 4 =
+    0.175 and (1.7 - 1.3) / 4 = 0.1. Tolerance ``abs 1e-15`` (a few operations on numbers of
+    order 1).
+    """
+    got = cp.se_pair((1.0, 0.8, 1.5, 2.0), (1.4, 1.3, 1.7, 2.0), 1.4 - 1.0, arms)
+    assert got == pytest.approx(expected, abs=1e-15, rel=0)
+
+
+def test_se_pair_away_is_symmetric_under_swapping_the_runs() -> None:
+    """Both arms facing away: swapping old and new (and the sign of delta) swaps the two values.
+
+    Reference: hand arithmetic on the numbers of the previous test, and the same for a negative
+    delta. ``delta-side`` is not symmetric (the test asserts that it changes), which is why the
+    redrawn mode does not use it. Tolerance ``abs 1e-15``.
+    """
+    a, b = (1.0, 0.8, 1.5, 2.0), (1.4, 1.3, 1.7, 2.0)
+    forward = cp.se_pair(a, b, 0.4, "away")
+    backward = cp.se_pair(b, a, -0.4, "away")
+    assert backward == pytest.approx(forward[::-1], abs=1e-15, rel=0)
+    assert backward == pytest.approx((0.15, 0.1), abs=1e-15, rel=0)
+    assert cp.se_pair(b, a, -0.4, "delta-side") != pytest.approx(
+        cp.se_pair(a, b, 0.4, "delta-side")[::-1], abs=1e-15, rel=0)
+    with pytest.raises(cp.ToolError, match="unknown D3 arms"):
+        cp.se_pair(a, b, 0.4, "toward")
+
+
+def test_cli_redrawn_states_with_equal_context_forces_branch_d_and_passes(tmp_path) -> None:
+    """The context equals the pilot's, the statistics are inside the D3 bound: branch D, exit 0.
+
+    Reference: the plan (c): the mode forces branch D with the reason "state sample redrawn by
+    design (WU-0002.14)", applies D2, N4, D3 and I1. Hand data: the CP slope of H1b is 1.0 with
+    the interval [0.5, 1.5] in both runs (delta 0), so D3 passes with m = 1 statistic; I1 lists
+    the 4 context leaves of the pilot, all bitwise equal; the start leaves are new. The report
+    names the arms and says that they are a working default.
+    """
+    old, new = redrawn_trees()
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 0, done.stdout + done.stderr
+    text = report.read_text()
+    assert "- branch: D (forced by --redrawn-states" in text
+    assert "- state sample redrawn by design (WU-0002.14)" in text
+    assert "mode: D3" in text and "I1 (--redrawn-states): 4 context leaves of the pilot, 4 bitwise equal" in text
+    assert "D3 standard-error arms: away" in text and "WORKING DEFAULT" not in text
+    assert "owner ruling O4, DEC-0027" in text and "never retuned" in text
+    assert "NOT checked by this tool" in text and "tools/leafdiff.py" in text
+    for line in cp.REDRAWN_NOT_CHECKED:
+        assert f"- {line}" in text
+    # the R-a wording of the Log (review R6/R11), pinned: exactly 24 start leaves, K versus K-1
+    r_a = cp.REDRAWN_NOT_CHECKED[0]
+    for phrase in ("exactly the 24 start leaves", "iqr_lt and n_per_regime have length K",
+                   "pairs, logrank_p_raw and logrank_p_holm have length K-1",
+                   "implied by P1's H3a.chosen_K", "H2c A4_minus_<best_single> given P1's H2c.best_single",
+                   "every other added or removed leaf is a finding"):
+        assert phrase in r_a, phrase
+    assert "exactly the 24 start leaves" in cp.__doc__
+    assert "SE_old changes" in text
+    assert "m = 1 statistics with intervals in both runs" in text
+
+
+def test_cli_redrawn_states_flags_a_changed_context_leaf_as_i1(tmp_path) -> None:
+    """A pilot ``context`` leaf that moves by one ulp (or is missing) fails I1: exit 1.
+
+    Reference: hand data. ``obs_scale`` 2.0 -> nextafter(2.0, 3.0) is not bitwise equal; the
+    mode forces branch D, but I1 still applies (the units are system constants).
+    """
+    old, new = redrawn_trees(context__obs_scale=math.nextafter(2.0, 3.0))
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 1
+    assert "I1: systems/lorenz63/context/obs_scale" in report.read_text()
+    old, new = redrawn_trees()
+    del new["systems"]["lorenz63"]["context"]["delay"]
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 1 and "I1: systems/lorenz63/context/delay" in report.read_text()
+
+
+def test_cli_redrawn_states_applies_d3_with_the_away_arms(tmp_path) -> None:
+    """D3 in the redrawn mode uses the arms facing away, and an excess is a finding.
+
+    Reference: hand arithmetic for one statistic (H1b CP slope; m = 1, so z_B = Phi^-1(1 - 0.025)
+    = 1.959964, and z = 1.960 at 95%). Old: 1.0 with [0.5, 1.5]. New: 2.0 with [1.9, 2.1]. delta =
+    +1.0. Away arms: old lower arm (1.0 - 0.5)/1.960 = 0.2551, new upper arm (2.1 - 2.0)/1.960 =
+    0.0510, bound = z_B hypot = 1.959964 * 0.2601 = 0.5098 < 1.0: an excess, exit 1. With the new
+    interval [1.0, 3.0] (arms 0.510) the bound is 1.959964 * 0.5702 = 1.1176 > 1.0 and D3 passes.
+    The reported SEs in the leaves JSON are not asserted; the verdict is. Tolerance: none (the
+    outcomes are far from the bound).
+    """
+    old, new = redrawn_trees(H1b__CP__slope=2.0, H1b__CP__ci=[1.9, 2.1])
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 1
+    assert "D3: systems/lorenz63/H1b/CP/slope moves 1.0, more than" in report.read_text()
+    old, new = redrawn_trees(H1b__CP__slope=2.0, H1b__CP__ci=[1.0, 3.0])
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_cli_redrawn_states_arms_option_changes_the_bound(tmp_path) -> None:
+    """``--d3-arms delta-side`` gives the old DEC-0019 bound; the choice is recorded in the report.
+
+    Reference: hand arithmetic, same data as the previous test with new [1.9, 2.1]: delta-side arms
+    are the old upper arm (1.5 - 1.0)/1.960 = 0.2551 and the new upper arm 0.0510, the same two
+    numbers as ``away`` here (the old interval is symmetric), so the outcome (an excess) is the
+    same and only the recorded arms differ; with the asymmetric old interval [0.9, 2.0] the
+    delta-side old arm (2.0 - 1.0)/1.96 = 0.510 gives the bound 1.959964 * 0.5127 = 1.0049 > 1.0
+    (pass) while the away arm (1.0 - 0.9)/1.96 = 0.0510 gives 1.959964 * 0.0722 = 0.1415 (excess).
+    """
+    old, new = redrawn_trees(H1b__CP__slope=2.0, H1b__CP__ci=[1.9, 2.1])
+    old["systems"]["lorenz63"]["H1c"]["CP"]["ci"] = [0.9, 2.0]
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference",
+                                "--d3-arms", "delta-side")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "D3 standard-error arms: delta-side" in report.read_text()
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference",
+                                "--d3-arms", "away")
+    assert done.returncode == 1 and "D3: systems/lorenz63/H1b/CP/slope" in report.read_text()
+
+
+def test_cli_redrawn_states_usage_errors_exit_two(tmp_path) -> None:
+    """Exit 2 (usage): ``--redrawn-states`` with ``--reference`` (the v1 code cannot draw the new
+    states, so D1 cannot apply), without ``--no-reference``, and ``--d3-arms`` without the mode."""
+    old, new = redrawn_trees()
+    done, _ = run_cli_with(tmp_path, old, new, "--redrawn-states", reference=old_tree())
+    assert done.returncode == 2 and "--no-reference" in done.stderr
+    done, _ = run_cli_with(tmp_path, old, new, "--redrawn-states")
+    assert done.returncode == 2
+    done, _ = run_cli_with(tmp_path, old, new, "--no-reference", "--d3-arms", "away")
+    assert done.returncode == 2
+    with pytest.raises(cp.ToolError, match="redrawn-states requires"):
+        cp.compare_files(tmp_path / "new.json", tmp_path / "old.json", "r", "m",
+                         redrawn_states=True)
+
+
+def test_d3_without_the_redrawn_mode_keeps_the_delta_side_arms(tmp_path) -> None:
+    """Regression guard: plain D3 (--no-reference) still uses the arm on the side of delta.
+
+    Reference: hand arithmetic as above (old [0.9, 2.0], new [1.9, 2.1], delta = 1): delta-side
+    arms 0.510 and 0.0510, bound 1.0049 > 1.0, so the D3 row is ok; a context difference
+    (lambda inside the 5 SE band) puts the run in branch D by the old rule. This is a guard that
+    the new option did not change the existing D3.
+    """
+    old, new = branch_d_trees(lambda_max=0.9056 + 0.0030)
+    new["systems"]["lorenz63"]["H1b"]["CP"].update(slope=2.0, ci=[1.9, 2.1])
+    old["systems"]["lorenz63"]["H1c"]["CP"]["ci"] = [0.9, 2.0]
+    done, report = run_cli_with(tmp_path, old, new, "--no-reference")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "D3 standard-error arms: delta-side" in report.read_text()
+
+
+# --------------------------------------------- WU-0002.14: R-f exact invariants (redrawn mode)
+def rf_tree() -> dict:
+    """A new-run tree on which every R-f invariant holds (hand-built from the plan, M5(c))."""
+    return {"config": {"n_oracle_draws": 200, "n_test_sweep": 300},
+            "systems": {"lorenz63": {
+                "scores": {"A*": {"regret": {"1LT": 0.0, "2LT": 0.0}, "agreement_href": 1.0}},
+                "validation": {"convergence": {"50": {"mean_abs_dev_from_max": 0.01},
+                                               "200": {"mean_abs_dev_from_max": 0.0},
+                                               "used_M": 200, "pass": True},
+                               "km_max_abs_dev": 0.005830472656782881},
+                "V7": {"n_states": 300}}}}
+
+
+def test_rf_rows_hold_on_a_hand_built_tree_and_name_each_invariant() -> None:
+    """R-f: 2 A* regrets, the agreement, the V4 deviation and used_M, V5 and V7 n_states: 7 rows.
+
+    Reference: the four invariants of the mathematics check (M5(c)), typed by hand: A* regret 0.0
+    and agreement 1.0 (A* is the oracle rule), the largest-M weight is its own reference (deviation
+    0.0; the smaller M is not asserted), ``used_M`` = ``n_oracle_draws``, V5 the fixed fixture
+    0.005830472656782881, V7 ``n_states`` = ``n_test_sweep``. Exact (IEEE bytes for floats).
+    """
+    rows = cp.rf_rows(cp.flatten(rf_tree()))
+    assert [r[0] for r in rows] == ["A* regret", "A* regret", "A* agreement",
+                                    "V4 largest-M deviation", "V4 used_M", "V5 km_max_abs_dev",
+                                    "V7 n_states"]
+    assert all(r[4] for r in rows)
+    assert rows[3][1] == "systems/lorenz63/validation/convergence/200/mean_abs_dev_from_max"
+
+
+@pytest.mark.parametrize(("edit", "name"), [
+    (lambda t: t["systems"]["lorenz63"]["scores"]["A*"]["regret"].update({"2LT": 1e-300}), "A* regret"),
+    (lambda t: t["systems"]["lorenz63"]["scores"]["A*"]["regret"].update({"1LT": -0.0}), "A* regret"),
+    (lambda t: t["systems"]["lorenz63"]["scores"]["A*"].update(agreement_href=0.999), "A* agreement"),
+    (lambda t: t["systems"]["lorenz63"]["validation"]["convergence"]["200"].update(
+        mean_abs_dev_from_max=1e-17), "V4 largest-M deviation"),
+    (lambda t: t["systems"]["lorenz63"]["validation"]["convergence"].update(used_M=100), "V4 used_M"),
+    (lambda t: t["systems"]["lorenz63"]["validation"].update(
+        km_max_abs_dev=math.nextafter(0.005830472656782881, 1.0)), "V5 km_max_abs_dev"),
+    (lambda t: t["systems"]["lorenz63"]["V7"].update(n_states=299), "V7 n_states"),
+    (lambda t: t["systems"]["lorenz63"].pop("V7"), "V7 n_states"),
+    (lambda t: t["systems"]["lorenz63"]["scores"]["A*"].pop("regret"), "A* regret"),
+    (lambda t: t["config"].pop("n_oracle_draws"), "V4 used_M"),
+])
+def test_rf_rows_flag_each_violation_exactly(edit, name) -> None:
+    """Each invariant fails on a one-ulp, a sign (-0.0) or an absence change, and only it does.
+
+    Reference: hand edits of the passing tree. A regret of 1e-300 or -0.0, an agreement of 0.999,
+    a deviation of 1e-17, a changed ``used_M``, the V5 fixture one ulp away, V7 ``n_states`` 299 or
+    absent, a missing regret block, a missing ``n_oracle_draws``: each makes exactly the named row
+    fail. Exact.
+    """
+    tree = rf_tree()
+    edit(tree)
+    failed = [r[0] for r in cp.rf_rows(cp.flatten(tree)) if not r[4]]
+    assert failed == [name], failed
+
+
+def test_cli_redrawn_states_applies_rf(tmp_path) -> None:
+    """The redrawn mode fails (exit 1) when an R-f invariant is violated, and names it.
+
+    Reference: the standard redrawn trees, in which the 7 invariants hold (A* regret 0.0 at one
+    horizon, agreement 1.0, the V4 deviation of M = 200 is 0.0, used_M = 200, V5 the fixture, V7
+    ``n_states`` = 300); a non-zero A* regret in the new run is a finding in this mode (the same
+    leaf is not judged in plain D3). Exact.
+    """
+    old, new = redrawn_trees()
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "R-f (--redrawn-states): 6 exact invariants, 6 hold, 0 do not" in report.read_text()
+    old, new = redrawn_trees()
+    new["systems"]["lorenz63"]["scores"]["A*"]["regret"]["1LT"] = 1e-9
+    done, report = run_cli_with(tmp_path, old, new, "--redrawn-states", "--no-reference")
+    assert done.returncode == 1
+    assert "R-f: A* regret: systems/lorenz63/scores/A*/regret/1LT" in report.read_text()
+
+
+# ------------------------------------------------------------------ WU-0002.11e: clip_sensitivity
+CLIP_PATHS = (
+    "systems/lorenz63/clip_sensitivity/status",
+    "systems/lorenz63/clip_sensitivity/clip_level",
+    "systems/rossler/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A0/delta",
+    "systems/rossler/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A1/verdict_2L",
+    "systems/chua/clip_sensitivity/by_hypothesis/H2e/parts/0.01/delta_bound",
+    "systems/chua/clip_sensitivity/by_hypothesis/H2a/parts_2L/[0]",
+    "systems/chua/clip_sensitivity/by_hypothesis/H2b/parts/library_change/flag",
+    "systems/chua/clip_sensitivity/invariance/H3a",
+    "systems/chua/clip_sensitivity/affected_states/Q-N",
+    "systems/lorenz63/clip_sensitivity/share_test/A4",
+    "systems/lorenz63/clip_sensitivity/href_clipped_draws/test_eval",
+)
+
+
+@pytest.mark.parametrize("path", CLIP_PATHS)
+def test_clip_sensitivity_leaves_match_exactly_one_new_rule(path: str) -> None:
+    """Every leaf of the per-system ``clip_sensitivity`` subtree matches exactly one rule, class ``new``.
+
+    Reference: the rule table's own contract (``Table.classify`` raises on no match and on two
+    matches, which is exit code 2 of the tool) and WU-0002.11e (sub-task, DEC-0017 Q6): the subtree is
+    one tail-wildcard rule and sits outside every existing ``**`` rule (``H2e/**``,
+    ``H2b/library_change/**``, ``H2a/part_ii/**``, ``H2c/A4_minus_<single>/**`` and
+    ``handling/**`` would match a leaf below them a second time). Exact.
+    """
+    found = cp.TABLE.matches(p(path))
+    assert len(found) == 1, [r.pattern for r in found]
+    assert found[0].cls == "new" and found[0].sub == "WU-0002.11e"
+
+
+def test_clip_sensitivity_block_is_new_and_changes_no_other_status() -> None:
+    """A new tree with a ``clip_sensitivity`` block: its leaves are ``new``, every other leaf has the
+    status it has without the block, and nothing is a finding.
+
+    Reference: the same trees without the block (``old_tree``/``new_tree``, decided by hand in the
+    tests above). Exact.
+    """
+    block = {"status": "computed", "reason": None, "clip_level": 10.0,
+             "by_hypothesis": {"H2d": {"parts": {"A4_over_A3": {"delta": 0.0, "flag": False}},
+                                       "flag": False}},
+             "invariance": {"H3a": "exact"}, "affected_states": {"Q-N": 0, "H3b": 0}}
+    with_block = new_tree()
+    with_block["systems"]["lorenz63"]["clip_sensitivity"] = block
+    _, _, results = sides(old_tree(), with_block)
+    found = by_path(results)
+    leaves = [path for path in found if "/clip_sensitivity/" in path]
+    assert leaves and all(found[path].status == "new" for path in leaves)
+    plain = by_path(sides(old_tree(), new_tree())[2])
+    assert {k: v.status for k, v in found.items() if "/clip_sensitivity/" not in k} == \
+        {k: v.status for k, v in plain.items()}
+
+
+# --------------------------------------- WU-0008.2a ci_mc_se leaves at pilot size (fix round 3)
+CI_MC_SE_PATHS = [f"systems/{system}/{where}/ci_mc_se/[{i}]"
+                  for system in ("chua", "lorenz63", "rossler")
+                  for where in ("H2a", "H2b/noise", "H3c") for i in (0, 1)]
+
+
+def test_the_eighteen_ci_mc_se_leaves_of_the_pilot_have_exactly_one_new_rule() -> None:
+    """The top-level ``ci_mc_se`` of H2a, H2b(i) and H3c (WU-0008.2a; the pilot P0 showed 18 leaves
+    with no rule, exit 2) match exactly one rule each, of class ``new``.
+
+    Reference: the 18 paths listed by hand from the P0 error message (3 systems x {H2a, H2b/noise, H3c}
+    x two endpoints). The ``part_ii`` and ``library_change`` ``ci_mc_se`` leaves keep their tail rules
+    (checked on hand paths), and a path under another key stays unclassified. Exact.
+    """
+    assert len(CI_MC_SE_PATHS) == 18
+    for path in CI_MC_SE_PATHS:
+        found = cp.TABLE.matches(p(path))
+        assert len(found) == 1 and found[0].cls == "new" and found[0].sub == "WU-0008.2a", path
+    for path in ("systems/chua/H2a/part_ii/zero/ci_mc_se/[0]",
+                 "systems/rossler/H2b/library_change/ci_mc_se/[1]",
+                 "systems/lorenz63/H2b/library_change_reported/0.02/ci_mc_se/[0]"):
+        found = cp.TABLE.matches(p(path))
+        assert len(found) == 1 and found[0].cls == "new", path
+    assert cp.TABLE.matches(p("systems/chua/H1b/ci_mc_se/[0]")) == []
+
+
+def test_a_tree_with_the_ci_mc_se_leaves_compares_without_an_unclassified_leaf() -> None:
+    """``compare_leaves`` on a new tree that carries the 18 leaves (and none in the old) raises no
+    ``Unclassified`` and gives status ``new`` for each. Reference: hand-built tree."""
+    new = new_tree()
+    system = new["systems"]["lorenz63"]
+    system["H2a"] = {"ci_mc_se": [0.01, 0.02]}
+    system["H2b"] = {"noise": {"ci_mc_se": [None, 0.03]}}
+    system["H3c"] = {"ci_mc_se": [0.1, 0.2]}
+    results = by_path(sides(old_tree(), new)[2])
+    for path in [x for x in CI_MC_SE_PATHS if "lorenz63" in x]:
+        assert results[path].status == "new", path

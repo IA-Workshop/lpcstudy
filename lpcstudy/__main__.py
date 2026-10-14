@@ -7,6 +7,7 @@ import dataclasses
 import json
 import logging
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -40,7 +41,38 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-robustness", action="store_true")
     parser.add_argument("--report-only", action="store_true",
                         help="Rebuild RESULTS.md and figures from an existing results.json.")
+    parser.add_argument("--estimator-refine-steps", default=None, metavar="N",
+                        help="Levenberg-Marquardt iterations of the PLP estimator, an integer of "
+                             "from 1 to 999 (WU-0005.6: iteration-doubling study; default: the "
+                             "preset's value, 15). Not accepted with the confirmatory flag.")
     return parser
+
+
+def choose_refine_steps(args: argparse.Namespace) -> int | None:
+    """Return the requested Levenberg-Marquardt budget, or ``None`` if the flag is absent.
+
+    The value is a canonical decimal integer from 1 to 999 (no sign, no leading zero, no space; the
+    study needs at most 240, and a longer string would hit Python's digit limit). Anything else is
+    refused, and so is any use of the flag together with the confirmatory flag
+    (the sealed run takes the preset's value, LPC.PC.7). The value is never echoed. This runs
+    before the seed is chosen, so a refused request has not read the sealed seed. Needs owner
+    review before freeze (LPC.PC.11): it sits beside the seed guard.
+
+    Raises
+    ------
+    SeedRefusal
+        If the flag is given with the confirmatory flag, or its value is not an integer from 1
+        to 999.
+    """
+    text = args.estimator_refine_steps
+    if text is None:
+        return None
+    if args.confirmatory:
+        raise SeedRefusal("--estimator-refine-steps is not accepted with the confirmatory flag "
+                          "(the sealed run uses the preset's value)")
+    if re.fullmatch(r"[1-9][0-9]{0,2}", text) is None:
+        raise SeedRefusal("--estimator-refine-steps needs an integer from 1 to 999")
+    return int(text)
 
 
 def choose_seed(args: argparse.Namespace, extras: list[str], registry_path: Path,
@@ -90,6 +122,7 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     parser = build_parser()
     args, extras = parser.parse_known_args(argv)
     try:
+        refine_steps = choose_refine_steps(args)  # before the seed: a sealed request stops here
         seed_id, seed = choose_seed(args, extras, registry_path, ledger_path)
     except SeedRefusal as refusal:
         print(f"lpcstudy: refused (LPC.PC.7): {refusal.reason}", file=sys.stderr)
@@ -98,6 +131,8 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     config = with_seed(PRESETS[args.preset], seed_id, seed)
     if args.systems:
         config = dataclasses.replace(config, core_systems=tuple(args.systems))
+    if refine_steps is not None:  # WU-0005.6: the only knob; the preset's value is the design (15)
+        config = dataclasses.replace(config, estimator_refine_steps=refine_steps)
     out_dir = args.out / config.name
     if not args.report_only:  # read once, before any output exists (LPC.PC.18)
         clock = provenance.RunClock()
@@ -106,6 +141,15 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     out_dir.mkdir(parents=True, exist_ok=True)
     if args.report_only:
         results = json.loads((out_dir / "results.json").read_text())
+        stored = results.get("config", {}).get("estimator_refine_steps")
+        if (refine_steps is not None and stored != refine_steps) or (
+                refine_steps is None and stored is not None
+                and stored != config.estimator_refine_steps):
+            # The report prints the budget from ``config`` (iterative_label), so a mismatch would
+            # label the results with the wrong number of iterations (PRIME.4: refuse, say why).
+            print("lpcstudy: refused (LPC.PC.7): --estimator-refine-steps does not match the "
+                  "budget stored in results.json (pass the stored value)", file=sys.stderr)
+            return REFUSAL_EXIT
         try:
             results["verdicts"] = verdicts(results, config)  # refuses a pre-v3 file, writes nothing
         except ValueError as stale:

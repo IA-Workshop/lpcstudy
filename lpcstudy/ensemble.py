@@ -298,6 +298,11 @@ class DrawBatch:
         Levenberg-Marquardt diagnostics per estimate, ``(n, M)`` (WU-0005.4, NVVUQ.10): the final
         cost, the accepted iterations and the ``late_progress`` flag. ``None`` for batches built
         by hand.
+    clip_sign_ref : np.ndarray or None
+        Sign of every clipped PLP error at ``H_ref``, ``(n, M)`` int8 (WU-0002.11e): ``+1`` or
+        ``-1`` where the stored error is ``+clip`` or ``-clip`` (a finite error beyond the clip, or
+        a non-finite one), 0 elsewhere. ``None`` without a reference horizon and for batches built
+        by hand.
     """
 
     cp_err: np.ndarray
@@ -314,6 +319,7 @@ class DrawBatch:
     lm_residual: np.ndarray | None = None
     lm_accepted: np.ndarray | None = None
     lm_late: np.ndarray | None = None
+    clip_sign_ref: np.ndarray | None = None
 
 
 LM_FIELDS: tuple[str, ...] = ("lm_residual", "lm_accepted", "lm_late")
@@ -422,6 +428,10 @@ def forecast_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
         handled[:, DRAW_COLUMN["error_clips_plp_href"]] = masks.plp[:, :, ref_col].sum(axis=1)
         handled[:, DRAW_COLUMN["error_clips_nonfinite_href"]] = \
             masks.nonfinite[:, :, ref_col].sum(axis=1)
+    clip_sign = None
+    if ref_col is not None:  # WU-0002.11e: the sign of each clipped PLP error at H_ref (the stored +-clip)
+        clipped_ref = masks.plp[:, :, ref_col] | masks.nonfinite[:, :, ref_col]
+        clip_sign = np.where(clipped_ref, np.sign(plp_err[:, :, ref_col]), 0.0).astype(np.int8)
     entries = masks.counts()
     return DrawBatch(cp_err=cp_err, plp_err=plp_err, analog_seed_sq=analog_seed,
                      est_seed_sq=est_seed, distance=dist[:, 0].reshape(n_states, n_draws),
@@ -432,7 +442,8 @@ def forecast_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
                      clip_entries={k: entries[k] for k in ENTRY_COUNTERS},
                      lm_residual=lm.residual.reshape(n_states, n_draws),
                      lm_accepted=lm.accepted.reshape(n_states, n_draws),
-                     lm_late=lm.late_progress.reshape(n_states, n_draws))
+                     lm_late=lm.late_progress.reshape(n_states, n_draws),
+                     clip_sign_ref=clip_sign)
 
 
 def retrieval_spread(analog_vecs: np.ndarray, noise: float) -> np.ndarray:
@@ -547,6 +558,12 @@ class EnsembleMoments:
         Levenberg-Marquardt diagnostics of every oracle estimate, ``(n, M)`` (WU-0005.4,
         NVVUQ.10): final cost, accepted iterations, ``late_progress``. Horizon-free, so a row
         subset slices them and a horizon subset leaves them. ``None`` for hand-built moments.
+    clip_cross_ref : np.ndarray or None
+        ``(n,)`` float64 (WU-0002.11e): per state, ``(1/M) sum over the clipped PLP draws at H_ref of
+        sign * e_C``, the one number the clip sensitivity needs besides the counts in ``handled``
+        (it is the change of the cross moment per unit clip level at ``H_ref``). Like ``handled``
+        it refers to ``H_ref`` only, so a row subset slices it and a horizon subset leaves it.
+        ``None`` for hand-built moments and when no reference horizon was given.
     """
 
     horizons: np.ndarray
@@ -567,6 +584,7 @@ class EnsembleMoments:
     lm_residual: np.ndarray | None = None
     lm_accepted: np.ndarray | None = None
     lm_late: np.ndarray | None = None
+    clip_cross_ref: np.ndarray | None = None
 
     def at(self, horizon: int) -> int:
         """Column index of a horizon."""
@@ -583,7 +601,7 @@ class EnsembleMoments:
             kept={k: v[rows] for k, v in self.kept.items()},
             handled=None if self.handled is None else self.handled[rows], clip_entries=None,
             **{k: None if getattr(self, k) is None else getattr(self, k)[rows]
-               for k in (*CORRELATION_FIELDS, *LM_FIELDS)})
+               for k in (*CORRELATION_FIELDS, *LM_FIELDS, "clip_cross_ref")})
 
 
 def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
@@ -636,11 +654,16 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
     handled = np.zeros((n_states, len(DRAW_COUNTERS)), dtype=np.int64)
     clip_entries = dict.fromkeys(ENTRY_COUNTERS, 0)
     lm_parts: dict[str, list[np.ndarray | None]] = {k: [] for k in LM_FIELDS}
+    ref_col = None if reference_horizon is None else int(
+        np.nonzero(np.asarray(horizons) == reference_horizon)[0][0])
+    cross_parts: list[np.ndarray | None] = []
     for start in range(0, n_states, per_chunk):
         rows = np.arange(start, min(n_states, start + per_chunk))
         batch = forecast_draws(setup, library, split, rows, unit_noise[rows], horizons,
                                reference_horizon)
         handled[rows] = batch.handled
+        cross_parts.append(None if batch.clip_sign_ref is None else
+                           (batch.clip_sign_ref * batch.cp_err[:, :, ref_col]).mean(axis=1))
         for name in LM_FIELDS:
             lm_parts[name].append(getattr(batch, name))
         for name in ENTRY_COUNTERS:
@@ -664,7 +687,7 @@ def ensemble_moments(setup: ForecastSetup, library: AnalogLibrary, split: str,
                            est_seed=est_seed, noise_sens=noise_sens, kept=kept_arrays,
                            err_corr=err_corr, cp_constant=cp_constant,
                            plp_constant=plp_constant, handled=handled,
-                           clip_entries=clip_entries,
+                           clip_entries=clip_entries, clip_cross_ref=stack_optional(cross_parts),
                            **{k: stack_optional(v) for k, v in lm_parts.items()}, **out)
 
 
@@ -701,6 +724,10 @@ class EvaluationDraws:
     lm_residual, lm_accepted, lm_late : np.ndarray or None
         Levenberg-Marquardt diagnostics of every evaluation estimate, ``(n, E)`` (WU-0005.4,
         NVVUQ.10). ``None`` for hand-built draws.
+    clip_sign_ref : np.ndarray or None
+        Sign of every clipped PLP error at ``H_ref``, ``(n, E)`` int8, as in ``DrawBatch``
+        (WU-0002.11e). It refers to ``H_ref`` only, so a row subset slices it and the horizon
+        slicing of the sweep views leaves it. ``None`` for hand-built draws.
     """
 
     horizons: np.ndarray
@@ -718,6 +745,7 @@ class EvaluationDraws:
     lm_residual: np.ndarray | None = None
     lm_accepted: np.ndarray | None = None
     lm_late: np.ndarray | None = None
+    clip_sign_ref: np.ndarray | None = None
 
     def subset(self, rows: np.ndarray) -> "EvaluationDraws":
         """Restrict to a subset of states (``clip_entries`` is dropped; ``None`` stays ``None``)."""
@@ -800,6 +828,7 @@ def evaluation_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
         "inputs", "noise_sens", "handled")}
     lm_parts: dict[str, list[np.ndarray | None]] = {k: [] for k in LM_FIELDS}
     clip_entries = dict.fromkeys(ENTRY_COUNTERS, 0)
+    sign_parts: list[np.ndarray | None] = []
     amp_steps = max(int(horizons[-1]), growth_window)
     amp_fn = setup.amplification(amp_steps)
     for start in range(0, n_states, per_chunk):
@@ -814,6 +843,7 @@ def evaluation_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
         chunk_handled[:, DRAW_COLUMN["gain_replacements"]] = gain_replaced.reshape(shape).sum(1)
         chunk_handled[:, DRAW_COLUMN["gain_floor"]] = gain_floored.reshape(shape).sum(1)
         parts["handled"].append(chunk_handled)
+        sign_parts.append(batch.clip_sign_ref)
         for name in LM_FIELDS:
             lm_parts[name].append(getattr(batch, name))
         for name in ENTRY_COUNTERS:
@@ -833,5 +863,5 @@ def evaluation_draws(setup: ForecastSetup, library: AnalogLibrary, split: str,
     merged = {k: np.concatenate(v) for k, v in parts.items()}
     verify = setup.noise * verify_unit[:, :, horizons - 1]
     return EvaluationDraws(horizons=np.asarray(horizons), verify_noise=verify,
-                           clip_entries=clip_entries,
+                           clip_entries=clip_entries, clip_sign_ref=stack_optional(sign_parts),
                            **{k: stack_optional(v) for k, v in lm_parts.items()}, **merged)

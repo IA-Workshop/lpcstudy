@@ -95,4 +95,28 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
 
 - 2026-10-11, claude-opus-5-5 (planner): WU-0005.4 **plan written** on branch `wu/0005-4-lm-diagnostics` (`WU-0005.4-lm-diagnostics.md`): residual, accepted-step count and the S3/S4 counters returned from the same compiled LM loop (no separate pass), summarized per cell under `handling.cells[<id>].lm`, with a RESULTS.md row. Criteria L1-L7 and V1-V3 (V1: every pre-existing smoke leaf bitwise equal, `handling` included). The applied-mathematician answers M1-M7 before execution; owner questions O1-O4 (schema id, placement, wrong-basin rate, other solvers) block nothing before M1-M7.
 
+## Added 2026-10-12: DEC-0026 items 3 and 4 (claude-opus-5-5, planner)
+
+| Unit | Title | Depends on | Owner checkpoint | Status |
+| --- | --- | --- | --- | --- |
+| WU-0002.11c | DEF-0015 guard: a diverging Lyapunov or `build_context` orbit refuses the run (bounds on \|x\| 40, 25, 3, plus finiteness); orbit maxima as `context` leaves; cache recomputed once and asserted bitwise | WU-0002.11 (lanes .11a, .11b merged) | owner ruling given (DEC-0026 item 3); needs owner review before freeze | planned |
+| WU-0002.14 | Seed-dependent start states (`make_rng(seed, "start", system)`) plus the remaining `default_rng` conversions (DEF-0011, R1 table), as one numbers-changing step; DEV-0 pilot regenerated and adopted as the new reference | WU-0002.11c merged | seed and statistics code: needs owner review before freeze; O1 to O8 (O4 before the P1 run) | planned |
+
+- 2026-10-12, claude-opus-5-5 (planner): WU-0002.11c and WU-0002.14 **plans written** on branch `wu/0002-11c-start-states` (`WU-0002.11c-orbit-guard.md`, `WU-0002.14-seeded-states.md`).
+  - **.11c.** Criteria G1 to G8 (analytic RK4 references; λ bitwise against a verbatim copy of the pre-change Benettin loop) and V1 to V4 (smoke neutrality: exactly 4 new `context` leaves at smoke). The applied-mathematician checks M1 to M5. Owner questions Q1 and Q2.
+  - **.14.** It starts after .11c merges, on a fresh branch. Split .14a (conversions), .14b (start states), .14c (`compare_pilot --redrawn-states`), .14d (runs).
+  - **.14 verification.** Property tests P1 to P7 and slow distributional checks S-D1 and S-D2. Staged smokes S1 and S2 with predicted divergence loci. A P0 pilot at the base (branch B against the local baseline), then P1 under D3 plus exact invariants I1 and R-c to R-h. P1 becomes the new reference.
+  - **.14 questions.** The applied-mathematician checks M1 to M7. Owner questions O1 to O8; O4 (the regression reading and the DEC-0020 SE_new arm) is needed before P1.
+- 2026-10-14, claude-sonnet-5-5 (main session): **WU-0002.14 merged to develop** (4aa16a5) after plan, mathematics check, implementation, review, two fix rounds plus a text/rule round, the P0 (branch B) and P1 (branch D) pilots, the independent P1 review (accept; R2 to R4 closed) and the integration tier (12 passed) at the branch tip; needs owner review before freeze (seed, provenance, statistics code). New reference `docs/study/pilot_results_v3_dev0_reference.json`. DEF-0011 and DEF-0017 resolved; DEF-0026 opened (V6/V4 gate risk, owner decision). Next: WU-0005.6 merge (review round 2 accepted, tip 0896d1a; R9 post-merge radius and smoke redo), then a merge gate on develop.
+- 2026-10-12, claude-opus-5-5 (planner): WU-0005.6 (LM iteration-doubling study, DEC-0026 item 9) **plan written** on branch `wu/0005-6-lm-doubling` (`WU-0005.6-lm-doubling.md`). The plan has three steps:
+  - .6a: a CLI flag `--estimator-refine-steps N` (refused with `--confirmatory`) with a `run_preset.sh` pass-through. The production default stays 15.
+  - .6b: `tools/lm_doubling.py`, with `compare` (QoI level) and `probe` (per estimate, core cell, 15/30/60).
+  - .6c: DEV-0 smoke runs at 15, 30 and 60, then pilots at 15 and 30 (60 only under rule D2), all on CPU, one at a time.
+
+  The decision rule (d1 = max relative change of point and endpoints over the half-width) is fixed in advance:
+  - negligible if d1 < 0.05 with a credible 30-iteration reference;
+  - not negligible if d1 ≥ 0.1 or a verdict changes;
+  - undetermined in between, which triggers the 60 arm.
+
+  The applied-mathematician answers M1 to M8 before execution. Owner questions O1 to O6; O3 is an identifier clash with the ROADMAP's WU-0005.6 review sub-task. Recommendation: run now, before the seed step. Needs owner review before freeze (the seed-guard parser and the wrapper).
 - 2026-10-12, claude-opus-5-5 (planner): WU-0003 **plan amendment 1 written** on branch `wu/0003-rehearsal` (`WU-0003-dev-rehearsal.md`; DEC-0026 item 10). Procedure: R0 smoke and device probe; R1 pilot on DEV-1 on the GPU with a per-state dump; R2 and R3 reproducibility (GPU against GPU, GPU against CPU); R4 optional forced-BLAS CPU run; R5 full on DEV-2 (owner authorizes); R6 optional full on CPU. New sub-tasks .7 (dump, split-half moments, V4 by horizon, weight digests), .8 (diagnostics) and .9 (`compare_runs`, WU-0016.3 pulled forward). Reproducibility tiers T0 to TD are fixed by digests before the runs. **Blocked until** DEF-0025, the WU-0002.11e implementation, WU-0002.11c, the seed step (DEF-0017 with .11d and the regenerated DEV-0 reference), the WU-0005.6 report, .7 to .9 and a gate at `C_R`. The applied-mathematician answers M1 to M8 before execution; owner questions O1 to O8.

@@ -12,7 +12,11 @@ truth checks): the checks of the harness itself that must hold before its number
 * the independent verdict rule agrees with ``criterion_verdict`` at the band edges, including ties
   (which a continuous simulation never produces, so A4 alone cannot check the open and closed edges);
 * the evaluation functions apply the registered bounds and ranges exactly (boundary counts), and the
-  Option C/K switch ``ASSERT_ROADMAP_BOUNDS`` works in both modes;
+  switch ``ASSERT_ROADMAP_BOUNDS`` works in both positions: Option C (False, in force since the
+  owner's ratification of 2026-10-12, DEC-0026 item 2, and the default tested here) records the
+  ROADMAP-bound rows and asserts nothing about them, Option K (True) asserts them; the always-asserted
+  groups (exact checks, consistency ranges) are asserted in both positions, which is tested on the
+  real study test bodies driven by a stub cache;
 * every design runs end to end on the pool at a tiny R, and the exact checks (identity with the
   production function, A4, A5, the C7 zero column, L3, the bitwise refit) hold there.
 
@@ -38,6 +42,10 @@ from lpcstudy.config import FULL
 from lpcstudy.data import make_rng
 from lpcstudy.statistics import criterion_verdict, partial_correlation, spearman
 
+import test_analysis_coverage as study_analysis
+import test_analysis_logrank_size as study_logrank
+import test_analysis_null_delta_r2 as study_delta
+import test_statistics_coverage as study_statistics
 import wu0006_harness as wu
 import wu0006_reference as ref
 
@@ -362,7 +370,8 @@ def test_roadmap_switch_has_both_modes(monkeypatch: pytest.MonkeyPatch) -> None:
 
     The outcome is "fail" in both modes, so the results table always shows it. The constant is read
     at call time, so flipping the module attribute flips the behaviour of every test that calls
-    ``enforce``.
+    ``enforce``. Option C is the default (DEC-0026 item 2): see
+    ``test_default_position_is_option_c``.
     """
     assert wu.enforce([], asserting=True) == wu.enforce([], asserting=False) == "pass"
     with pytest.raises(AssertionError, match="finding"):
@@ -633,3 +642,149 @@ def test_option_c_failure_warns_instead_of_passing_silently() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         assert wu.enforce([], asserting=False) == "pass"
+
+
+# ------------------------------------------------------------ Option C (DEC-0026 item 2) and Option K
+class StubCache:
+    """Stands in for ``RunCache``: every design returns the given evaluation, and no pool is needed.
+
+    It lets the real study test bodies run on a manufactured evaluation, so what each one asserts
+    under each switch position is read from the code, not from a description of it.
+    """
+
+    def __init__(self, evaluation: wu.Evaluation) -> None:
+        self.evaluation = evaluation
+
+    def coverage(self, pool, spec, phi) -> wu.Evaluation:
+        return self.evaluation
+
+    def logrank(self, pool, row, phi) -> wu.Evaluation:
+        return self.evaluation
+
+    def delta(self, pool, phi) -> wu.Evaluation:
+        return self.evaluation
+
+
+def roadmap_bodies(evaluation: wu.Evaluation) -> list:
+    """Each ROADMAP-bound test body of the four study files as a zero-argument call on a stub cache."""
+    cache = StubCache(evaluation)
+    return [
+        lambda: study_statistics.test_roadmap_coverage_bounds(None, cache, "C1", 0.3),
+        lambda: study_analysis.test_roadmap_coverage_and_verdict_bounds(None, cache, "C2", 0.3),
+        lambda: study_logrank.test_roadmap_size_bound(None, cache, "L1", 0.3),
+        lambda: study_delta.test_roadmap_false_distinct_rate_and_conditional_coverage(
+            None, cache, 0.3),
+        lambda: study_delta.test_roadmap_interval_contains_zero(None, cache, 0.3),
+    ]
+
+
+def failing_roadmap(row_keys: tuple[str, ...] = ("n1", "n2", "n3")) -> wu.Evaluation:
+    """An evaluation whose ROADMAP bounds failed and whose exact and consistency groups are clean."""
+    rows = {key: [f"x {key.upper()} failed"] for key in row_keys}
+    rows |= {key: [] for key in ("n1", "n2", "n3") if key not in rows}
+    flat = [message for key in ("n1", "n2", "n3") for message in rows[key]]
+    return wu.Evaluation(row={}, roadmap=flat, roadmap_rows=rows,
+                         consistency_rows={f"{k}|{t}": None for k in ("n1", "n2", "n3")
+                                           for t in wu.DELTA_TARGETS})
+
+
+def test_default_position_is_option_c() -> None:
+    """The shipped switch position is Option C: ``ASSERT_ROADMAP_BOUNDS`` is False (DEC-0026 item 2).
+
+    Reference: the owner's ratification, quoted from DEC-0026 item 2 ("``ASSERT_ROADMAP_BOUNDS`` is
+    set to False"), not the code. With the shipped constant, ``enforce`` called as the study tests call
+    it (no ``asserting`` argument) reports a failed bound as "fail" with a UserWarning and does not
+    raise. Exact (a boolean and a string).
+    """
+    assert wu.ASSERT_ROADMAP_BOUNDS is False
+    with pytest.warns(UserWarning, match="Option C"):
+        assert wu.enforce(["C4: A1 929 < 930"]) == "fail"
+    assert wu.enforce([]) == "pass"
+
+
+@pytest.mark.parametrize("position", (True, False), ids=("option_K", "option_C"))
+def test_results_table_records_the_switch_position(monkeypatch: pytest.MonkeyPatch, tmp_path,
+                                                   position: bool) -> None:
+    """Every results file states the switch position it was written under (``_meta``), so a reader of
+    the JSON can tell recorded characterization rows (Option C) from asserted ones (Option K)."""
+    monkeypatch.setattr(wu, "ASSERT_ROADMAP_BOUNDS", position)
+    table = wu.ResultTable("switch", tmp_path)
+    table.add("row", {"roadmap_outcome": "fail"}, workers=1)
+    assert json.loads(table.path.read_text())["_meta"]["assert_roadmap_bounds"] is position
+
+
+@pytest.mark.parametrize("position", (True, False), ids=("option_K", "option_C"))
+def test_study_roadmap_bodies_follow_the_switch(monkeypatch: pytest.MonkeyPatch,
+                                                position: bool) -> None:
+    """The five ROADMAP-bound test bodies of the study files, run on a failed-bound evaluation.
+
+    Option K (True): every body raises AssertionError. Option C (False): every body passes and emits
+    the UserWarning naming the failure (the recorded outcome shown by pytest). Also: a body selects
+    only its own rows (the N2/N3 body ignores an N1-only failure; the N1 body ignores an N2/N3-only
+    failure), and with no failed bound no body raises or warns in either position. Exact.
+    """
+    monkeypatch.setattr(wu, "ASSERT_ROADMAP_BOUNDS", position)
+    for body in roadmap_bodies(failing_roadmap()):
+        if position:
+            with pytest.raises(AssertionError, match="ROADMAP bound failed"):
+                body()
+        else:
+            with pytest.warns(UserWarning, match="Option C"):
+                body()
+    # row selection of the two delta-R2 bodies
+    n1_only, n23_only = failing_roadmap(("n1",)), failing_roadmap(("n2", "n3"))
+    for evaluation, quiet_body in ((n1_only, 3), (n23_only, 4)):
+        body = roadmap_bodies(evaluation)[quiet_body]
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            body()                      # no failure of its own rows: passes silently in both positions
+    # nothing failed: silent and passing in both positions
+    for body in roadmap_bodies(failing_roadmap(())):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            body()
+
+
+@pytest.mark.parametrize("position", (True, False), ids=("option_K", "option_C"))
+def test_exact_and_consistency_bodies_are_asserted_in_both_positions(
+        monkeypatch: pytest.MonkeyPatch, position: bool) -> None:
+    """The exact checks and the pre-registered consistency ranges raise whatever the switch says.
+
+    Option C moves only the ROADMAP-bound rows; the 70 + 12 consistency ranges (the defect test) and
+    the exact checks stay asserted (DEC-0026 item 2). Each study test body of those two groups is run
+    on an evaluation with one failure in its group: it must raise in both positions, and it must pass
+    on a clean evaluation. Exact.
+    """
+    monkeypatch.setattr(wu, "ASSERT_ROADMAP_BOUNDS", position)
+    clean = failing_roadmap(())
+    bad_exact = wu.Evaluation(row={}, exact=["x: identity with production"],
+                              roadmap=["x: A1 failed"])
+    bad_range = wu.Evaluation(row={}, consistency=["x: outside the pre-registered range"],
+                              roadmap=["x: A1 failed"])
+    cache = {"clean": StubCache(clean), "exact": StubCache(bad_exact), "range": StubCache(bad_range)}
+    exact_bodies = [
+        lambda c: study_statistics.test_exact_checks(None, c, "C1", 0.3),
+        lambda c: study_analysis.test_exact_checks(None, c, "C2", 0.3),
+        lambda c: study_logrank.test_no_pair_is_left_uncomputed(None, c, "L1", 0.3),
+        lambda c: study_delta.test_refit_reproduces_the_returned_gain_bitwise(None, c, 0.3)]
+    range_bodies = [
+        lambda c: study_statistics.test_counts_are_consistent_with_the_reference(None, c, "C1", 0.3),
+        lambda c: study_analysis.test_counts_are_consistent_with_the_reference(None, c, "C2", 0.3),
+        lambda c: study_logrank.test_counts_are_consistent_with_the_reference(None, c, "L1", 0.3)]
+    for body in exact_bodies:
+        body(cache["clean"])
+        with pytest.raises(AssertionError):
+            body(cache["exact"])
+    for body in range_bodies:
+        body(cache["clean"])
+        with pytest.raises(AssertionError):
+            body(cache["range"])
+    # delta-R2 consistency is keyed by row and target; one failing key fails its own test only
+    keyed = failing_roadmap(())
+    keyed.consistency_rows["n2|" + wu.DELTA_TARGETS[0]] = "x: N2 outside the range"
+    delta_cache = StubCache(keyed)
+    with pytest.raises(AssertionError):
+        study_delta.test_count_is_consistent_with_the_reference(
+            None, delta_cache, "n2", wu.DELTA_TARGETS[0], 0.3)
+    study_delta.test_count_is_consistent_with_the_reference(
+        None, delta_cache, "n1", wu.DELTA_TARGETS[0], 0.3)

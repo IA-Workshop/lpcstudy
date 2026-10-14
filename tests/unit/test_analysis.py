@@ -23,6 +23,7 @@ from lpcstudy.statistics import block_bootstrap, block_bootstrap_counted, holm_a
 
 LEVEL = 1.0 - 0.05 / 3.0  # the primary level of v3 section 7, written out again here
 CONFIG = dataclasses.replace(SMOKE, bootstrap_resamples=200)  # 200 resamples, block 5
+SYSTEM = "lorenz63"  # the system label of the bootstrap generators (the stub cells carry it too)
 
 
 def _stub_cell(weights: np.ndarray, err_corr: np.ndarray | None = None,
@@ -138,7 +139,7 @@ def test_h2d_is_the_in_distribution_part_only() -> None:
         return {"A3": make(base), "A4": make(factor * base)}
 
     for factor, excess, ok in ((1.05, 0.05, True), (1.2, 0.2, False)):
-        out = h2d_empirical_comparison(scores(factor), SMOKE)
+        out = h2d_empirical_comparison(scores(factor), SMOKE, SYSTEM)
         assert set(out) == {"in_distribution_excess", "ci", "n_failed_resamples", "verdict",
                             "reason", "pass"}
         assert out["in_distribution_excess"] == pytest.approx(excess, abs=1e-12)
@@ -1195,7 +1196,7 @@ def _fake_h1b_cell(rng: np.random.Generator, n_states: int, slope_cp: float, slo
         sq_cp=(copied + squared(slope_cp, seed_cp))[:, None],
         sq_plp=squared(slope_plp, seed_plp)[:, None])
     return SimpleNamespace(
-        noise=noise, setup=SimpleNamespace(n_analogs=n_analogs),
+        system=SYSTEM, noise=noise, setup=SimpleNamespace(n_analogs=n_analogs),
         ctx=SimpleNamespace(spec=SimpleNamespace(dim=dim)),
         splits={"test": SimpleNamespace(moments=moments)},
         oracles={"test": SimpleNamespace(gains=gains)})
@@ -1240,9 +1241,10 @@ def test_h1b_verdict_uses_the_plp_slope_only() -> None:
 def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases() -> None:
     """Regression guard: slopes and intervals of both forecasters are those of ``block_bootstrap``.
 
-    This compares with the old function at the seed ``config.seed`` (the pre-existing
-    ``_boot(..., salt=0)`` integer seed, DEC-0012 keeps it), so it is a guard against moving the
-    bootstrap, not evidence of correctness (T8 above is). On noisy data (log-scale noise 0.1) the
+    This compares with the old function at ``make_rng(config.seed, system, "bootstrap", "H1b")``
+    (WU-0002.14: the label shared by the CP and the PLP; this test used the integer seed
+    ``config.seed`` before), so it is a guard against moving the bootstrap, not evidence of
+    correctness (T8 above is). On noisy data (log-scale noise 0.1) the
     CP interval equals ``block_bootstrap`` and the PLP interval equals it too, because no
     resample fails and ``block_bootstrap_counted`` is bitwise equal then. Edge cases (exact): a
     NaN gain state is excluded and counted (fix R2): the PLP slope and interval equal
@@ -1263,7 +1265,8 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
         x = np.log(gain * seed / np.sqrt(cell.ctx.spec.dim))
         y = 0.5 * np.log(np.maximum(sq - floor, 1e-12))
         old = block_bootstrap(lambda idx: ols_slope(x[idx], y[idx]), 100,
-                              config.bootstrap_resamples, config.bootstrap_block, config.seed)
+                              config.bootstrap_resamples, config.bootstrap_block,
+                              make_rng(config.seed, SYSTEM, "bootstrap", "H1b"))
         assert (out[name]["slope"], *out[name]["ci"]) == old
     assert out["PLP"]["n_failed_resamples"] == 0
 
@@ -1279,7 +1282,8 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
     xp = np.log(gain_p * mp.est_seed / np.sqrt(3))[keep]
     yp = 0.5 * np.log(mp.sq_plp[:, 0])[keep]
     kept = block_bootstrap(lambda idx: ols_slope(xp[idx], yp[idx]), 99,
-                           config.bootstrap_resamples, config.bootstrap_block, config.seed)
+                           config.bootstrap_resamples, config.bootstrap_block,
+                           make_rng(config.seed, SYSTEM, "bootstrap", "H1b"))
     assert (nan_out["PLP"]["slope"], *nan_out["PLP"]["ci"]) == kept
     assert nan_out["PLP"]["n_failed_resamples"] == 0 and nan_out["reason"] != "not computable"
 
@@ -1523,7 +1527,7 @@ def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> No
     Reference: the six-state table ``TABLE`` (values in [0, 1], multiples of 1/8). Hand differences
     (column 10^4 minus column 10^3): 0.25, 0.25, 0, 0.125, 0.25, 0.25, sum 1.125, mean 0.1875.
     The interval is compared with ``statistics.block_bootstrap`` (the pre-existing, separately
-    tested function) at the same generator ``make_rng(seed, "h2b-library-change", "0.01")``, 200
+    tested function) at the same generator ``make_rng(seed, system, "h2b-library-change", "0.01")``, 200
     resamples, block 5, level 1 - 0.05/3, by exact equality (the counted helper is bitwise equal
     without failed resamples). Six states are below the 50-state minimum of DEC-0008 A3, so the
     verdict is inconclusive with that reason (pass False).
@@ -1538,7 +1542,7 @@ def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> No
     assert change["level"] == LEVEL and change["n_states"] == 6 and change["rho"] == 0.01
     diff = TABLE[:, 2] - TABLE[:, 0]
     reference = block_bootstrap(lambda idx: float(np.mean(diff[idx])), 6, 200, 5,
-                                make_rng(CONFIG.seed, "h2b-library-change", "0.01"), LEVEL)
+                                make_rng(CONFIG.seed, SYSTEM, "h2b-library-change", "0.01"), LEVEL)
     assert change["ci"] == [reference[1], reference[2]]
     assert change["pass"] is False and change["reason"] == "n_states < 50"
     assert change["verdict"] == "inconclusive"
@@ -1549,13 +1553,16 @@ def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> No
     assert out["reason"] == "noise: n_states < 50; library_change: n_states < 50"
 
 
-def test_regression_h2b_noise_part_keeps_salt_three() -> None:
-    """The noise part of H2b is unchanged: salt 3, level 1 - 0.05/3 (a regression guard).
+def test_regression_h2b_noise_part_uses_its_own_generator() -> None:
+    """The noise part of H2b: ``make_rng(seed, system, "bootstrap", "H2b-noise")``, level 1 - 0.05/3.
+
+    A regression guard (WU-0002.14: the integer seed ``config.seed + 3`` of this test became the
+    generator).
 
     Reference: ``statistics.block_bootstrap`` of the mean of the per-state Spearman correlation
-    (hand values: states whose weight rises with rho have +1, a flat state 0) at seed
-    ``config.seed + 3``. This is a regression guard on the pre-existing statistic, not new
-    correctness evidence. Exact equality (same function, same seed).
+    (hand values: states whose weight rises with rho have +1, a flat state 0) at that generator.
+    This is a regression guard on the pre-existing statistic, not new correctness evidence.
+    Exact equality (same function, same generator).
     """
     from lpcstudy.analysis import h2b_knob_response
 
@@ -1565,7 +1572,7 @@ def test_regression_h2b_noise_part_keeps_salt_three() -> None:
                             _library_cells(TABLE), CONFIG)["noise"]
     per_state = np.array([1.0, 1.0, 1.0, 1.0, 0.0, 1.0])  # Spearman with two levels: sign of the change
     reference = block_bootstrap(lambda idx: float(np.mean(per_state[idx])), 6, 200, 5,
-                                CONFIG.seed + 3, LEVEL)
+                                make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"), LEVEL)
     assert out["mean_state_spearman"] == pytest.approx(5.0 / 6.0, abs=1e-12)
     assert out["ci"] == [reference[1], reference[2]]
 
@@ -1616,7 +1623,7 @@ def test_h2b_curves_and_the_reported_change_at_two_percent() -> None:
     takes them inside the bootstrap statistic), ``abs=1e-12`` (one reduction of exact binary
     fractions). Every size has a 2-element interval at level 0.95 with ``lo <= hi``. The change at
     rho = 2% (same table) is the hand mean 0.1875 at level 0.95, role "reported", and equals
-    ``block_bootstrap`` at ``make_rng(seed, "h2b-library-change", "0.02")`` exactly. The library
+    ``block_bootstrap`` at ``make_rng(seed, system, "h2b-library-change", "0.02")`` exactly. The library
     Spearman keys of v1 and the saturation rule are gone.
     """
     from lpcstudy.analysis import h2b_knob_response
@@ -1638,7 +1645,7 @@ def test_h2b_curves_and_the_reported_change_at_two_percent() -> None:
     assert reported["0.02"]["mean_change"] == pytest.approx(0.1875, abs=1e-12)
     diff = TABLE[:, 2] - TABLE[:, 0]
     reference = block_bootstrap(lambda idx: float(np.mean(diff[idx])), 6, 200, 5,
-                                make_rng(CONFIG.seed, "h2b-library-change", "0.02"), 0.95)
+                                make_rng(CONFIG.seed, SYSTEM, "h2b-library-change", "0.02"), 0.95)
     assert reported["0.02"]["ci"] == [reference[1], reference[2]] and reported["0.02"]["level"] == 0.95
     assert "pass" not in reported["0.02"]
     assert "library" not in out and "median_at_largest_n_lib" not in json.dumps(out)
@@ -1668,7 +1675,7 @@ def test_h2e_median_change_with_a_cp_constant_state_and_the_counts() -> None:
     one subtraction of numbers of order 1 per state), pass True at both rho (every resample median
     is at least 0.25 > 0), ``zero_variance_corr`` shows exactly one CP-constant state at 10^3
     (rho = 1% and 2%) and none at 10^5, and the interval equals ``block_bootstrap`` of the median
-    at ``make_rng(seed, "h2e", "0.01")``, level 0.95, exactly.
+    at ``make_rng(seed, system, "h2e", "0.01")``, level 0.95, exactly.
     """
     from lpcstudy.analysis import h2e_noise_matching
 
@@ -1693,7 +1700,7 @@ def test_h2e_median_change_with_a_cp_constant_state_and_the_counts() -> None:
         assert out["corr_curve"][rho]["10000"] == 0.5
     diff = (low + delta) - low
     reference = block_bootstrap(lambda i: float(np.median(diff[i])), 50, 200, 5,
-                                make_rng(CONFIG.seed, "h2e", "0.01"), 0.95)
+                                make_rng(CONFIG.seed, SYSTEM, "h2e", "0.01"), 0.95)
     assert out["by_noise"]["0.01"]["ci"] == [reference[1], reference[2]]
     assert out["pass"] is True and out["reason"] is None and not _has_nan(out)
 
@@ -1902,7 +1909,7 @@ def test_h3b_known_ordering_lambda_irrelevant_for_the_weight_and_first_for_the_h
     x, profile, curvature = _h3b_data(31)
     w_star = 0.5 * (x[:, 0] > 0.5) + 0.25 * (x[:, 1] > 0.3)
     log_t = 3.0 * x[:, 2] + 0.5 * x[:, 0]
-    out = h3b_importances(profile, w_star, curvature, log_t, CONFIG)
+    out = h3b_importances(profile, w_star, curvature, log_t, CONFIG, SYSTEM)
     weight = out["weight_lambda"]
     assert weight["importance"] == 0.0 and weight["ci"] == [0.0, 0.0]
     assert weight["pass"] is True and weight["n_failed_resamples"] == 0
@@ -1929,7 +1936,7 @@ def test_h3b_reversed_ordering_fails_both_parts() -> None:
 
     x, profile, curvature = _h3b_data(31)
     out = h3b_importances(profile, 0.5 * (x[:, 2] > 0.5), curvature,
-                          3.0 * x[:, 0] + 0.5 * x[:, 2], CONFIG)
+                          3.0 * x[:, 0] + 0.5 * x[:, 2], CONFIG, SYSTEM)
     assert out["weight_lambda"]["importance"] == 1.0 and out["weight_lambda"]["ci"] == [1.0, 1.0]
     assert out["weight_lambda"]["pass"] is False
     assert out["D"]["ci"][1] <= -0.9 and out["stability"] == 0.0 and out["D"]["pass"] is False
@@ -1957,7 +1964,7 @@ def test_h3b_construction_leaf_count_row_expansion_and_point_fit() -> None:
     x, profile, curvature = _h3b_data(32, n=200)
     w_star = 0.5 * (x[:, 0] > 0.5) + 0.25 * (x[:, 1] > 0.3) + 0.0625 * (x[:, 3] > 0.9)
     log_t = 3.0 * x[:, 2] + 0.5 * x[:, 0] + 0.1 * x[:, 1]
-    out = h3b_importances(profile, w_star, curvature, log_t, CONFIG)
+    out = h3b_importances(profile, w_star, curvature, log_t, CONFIG, SYSTEM)
     flat = profile.reshape(-1, 4)
     ref_w = DecisionTreeRegressor(max_leaf_nodes=8, random_state=CONFIG.seed).fit(
         flat, np.repeat(w_star, 2), sample_weight=np.repeat(curvature, 2))
@@ -1993,7 +2000,7 @@ def test_h3b_degenerate_fits_are_counted_failed_resamples_and_not_zeros() -> Non
     constant = np.full(60, 0.5)
     assert DecisionTreeRegressor(max_leaf_nodes=8).fit(
         profile.reshape(-1, 4), np.repeat(constant, 2)).get_n_leaves() == 1  # premise
-    out = h3b_importances(profile, constant, curvature, log_t, CONFIG)
+    out = h3b_importances(profile, constant, curvature, log_t, CONFIG, SYSTEM)
     weight = out["weight_lambda"]
     assert weight["importance"] is None and weight["pass"] is False
     assert "degenerate full-data fit" in weight["reason"]
@@ -2004,15 +2011,15 @@ def test_h3b_degenerate_fits_are_counted_failed_resamples_and_not_zeros() -> Non
 
     sparse = np.zeros(60)
     sparse[20:25] = 0.5
-    out = h3b_importances(profile, sparse, curvature, log_t, CONFIG)
+    out = h3b_importances(profile, sparse, curvature, log_t, CONFIG, SYSTEM)
     expected = sum(not np.isin(idx, np.arange(20, 25)).any() for idx in block_resample_indices(
-        60, 200, 5, make_rng(CONFIG.seed, "h3b-bootstrap")))
+        60, 200, 5, make_rng(CONFIG.seed, SYSTEM, "h3b-bootstrap")))
     assert expected > 0  # premise: the replay finds resamples that miss all five states
     assert out["degenerate_fits"]["weight_tree"] == expected
     assert out["weight_lambda"]["n_failed_resamples"] == expected
     assert out["degenerate_fits"]["full_data"]["weight_tree"] is False
 
-    out = h3b_importances(profile, 0.5 * (x[:, 0] > 0.5), curvature, constant, CONFIG)
+    out = h3b_importances(profile, 0.5 * (x[:, 0] > 0.5), curvature, constant, CONFIG, SYSTEM)
     assert out["D"]["value"] is None and out["D"]["pass"] is False
     assert "degenerate full-data fit" in out["D"]["reason"]
     assert out["stability"] == 0.0 and out["degenerate_fits"]["horizon_tree"] == 200
@@ -2028,7 +2035,7 @@ def test_h3c_ratio_of_means_paired_resampling_and_closed_bound() -> None:
     pair (60 states, ``default_rng(21)``, A4 uniform on [1, 2], A5 = A4 (1 + 0.1 u) with u
     uniform): the point ratio equals ``np.mean(a5) / np.mean(a4)`` (abs 1e-12) and the
     interval equals ``statistics.block_bootstrap`` of the ratio at
-    ``make_rng(seed, "h3c-ratio")``, level 1 - 0.05/3, exactly (the same index array in the
+    ``make_rng(seed, system, "h3c-ratio")``, level 1 - 0.05/3, exactly (the same index array in the
     numerator and the denominator). (c) The closed bound: a ratio interval whose upper
     bound is exactly 1.05 passes; this is tested through the verdict helper
     ``criterion_verdict``, which has its own tests, by the resample-constant case A5 = 1.05 A4 only up to
@@ -2039,26 +2046,26 @@ def test_h3c_ratio_of_means_paired_resampling_and_closed_bound() -> None:
 
     rng = np.random.default_rng(21)
     a4 = rng.uniform(1.0, 2.0, 60)
-    same = h3c_ratio(a4, a4, CONFIG)
+    same = h3c_ratio(a4, a4, CONFIG, SYSTEM)
     assert same["ci"] == [1.0, 1.0] and same["A5_over_A4_mse"] == 1.0
     assert same["pass"] is True and same["reason"] is None
     assert same["level"] == LEVEL and same["n_states"] == 60 and same["n_failed_resamples"] == 0
-    worse = h3c_ratio(1.2 * a4, a4, CONFIG)
+    worse = h3c_ratio(1.2 * a4, a4, CONFIG, SYSTEM)
     assert worse["ci"] == pytest.approx([1.2, 1.2], abs=1e-12)
     assert worse["pass"] is False and worse["reason"] is None
     assert "fail" not in worse
 
     a5 = a4 * (1.0 + 0.1 * rng.uniform(size=60))
-    out = h3c_ratio(a5, a4, CONFIG)
+    out = h3c_ratio(a5, a4, CONFIG, SYSTEM)
     assert out["A5_over_A4_mse"] == pytest.approx(np.mean(a5) / np.mean(a4), abs=1e-12)
     reference = block_bootstrap(lambda idx: float(a5[idx].mean() / a4[idx].mean()), 60, 200, 5,
-                                make_rng(CONFIG.seed, "h3c-ratio"), LEVEL)
+                                make_rng(CONFIG.seed, SYSTEM, "h3c-ratio"), LEVEL)
     assert out["ci"] == [reference[1], reference[2]]
 
-    short = h3c_ratio(a4[:30], a4[:30], CONFIG)
+    short = h3c_ratio(a4[:30], a4[:30], CONFIG, SYSTEM)
     assert short["pass"] is False and short["reason"] == "n_states < 50"
     with pytest.raises(ValueError):
-        h3c_ratio(a4[:30], a4[:20], CONFIG)
+        h3c_ratio(a4[:30], a4[:20], CONFIG, SYSTEM)
 
 
 def _scores(**state_mse: np.ndarray) -> dict[str, RuleScores]:
@@ -2104,29 +2111,30 @@ def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o
     a4 = a2 - 0.5
     a4o = a2 - np.tile(np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]), 10)
     scores = _scores(A2=a2, A4=a4, A4o=a4o, A0=np.full(60, 0.2), A1=np.full(60, 0.1))
-    out = h2c_state_dependence(scores, _calibration(0.25, 4.0), CONFIG)
+    out = h2c_state_dependence(scores, _calibration(0.25, 4.0), CONFIG, SYSTEM)
     assert out["best_single"] == "A0"
     assert out["calibration_mse"] == {"A0": 0.25, "A1": 4.0}
     assert "A4_minus_A0" in out and "A4_minus_A1" not in out
     assert out["A4_minus_A0"]["mean"] == pytest.approx(np.mean(a4 - 0.2), abs=1e-12)
     reported = out["A4o_minus_A2"]
     assert reported["mean"] == pytest.approx(-0.35, abs=1e-12)  # mean of -0.1 .. -0.6
-    # Review R4: counted bootstrap, same resamples as the other H2c parts (seed + 5), bitwise
-    # equal to the pre-existing block_bootstrap when nothing fails; failures would be counted.
+    # Review R4: counted bootstrap, same resamples as the other H2c parts (the generator
+    # make_rng(seed, system, "bootstrap", "H2c")), bitwise equal to the pre-existing
+    # block_bootstrap when nothing fails; failures would be counted.
     reference = block_bootstrap(lambda idx: float(np.mean((a4o - a2)[idx])), 60, 200, 5,
-                                CONFIG.seed + 5, 0.95)
+                                make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c"), 0.95)
     assert reported["ci"] == [reference[1], reference[2]] and reported["mean"] == reference[0]
     assert reported["n_failed_resamples"] == 0
     assert reported["level"] == 0.95 and reported["role"] == "reported" and "pass" not in reported
     assert reported["relative"] == pytest.approx(-0.35 / np.mean(a2), abs=1e-12)
     assert out["A4_minus_A2"]["pass"] is True  # a4 - a2 = -0.5 in every resample
     assert out["A4_minus_A0"]["pass"] is False and out["pass"] is False  # a4 - 0.2 > 0 everywhere
-    tie = h2c_state_dependence(scores, _calibration(1.0, 1.0), CONFIG)
+    tie = h2c_state_dependence(scores, _calibration(1.0, 1.0), CONFIG, SYSTEM)
     assert tie["best_single"] == "A0"
-    flipped = h2c_state_dependence(scores, _calibration(4.0, 0.25), CONFIG)
+    flipped = h2c_state_dependence(scores, _calibration(4.0, 0.25), CONFIG, SYSTEM)
     assert flipped["best_single"] == "A1" and "A4_minus_A1" in flipped
     with pytest.raises(ValueError):
-        h2c_state_dependence(scores, SplitData(moments=None, evals=None), CONFIG)
+        h2c_state_dependence(scores, SplitData(moments=None, evals=None), CONFIG, SYSTEM)
 
 
 def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2191,11 +2199,11 @@ def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -
                                "pass", "reason"}
     assert set(out["H3c"]) == {"A5_over_A4_mse", "ci", "ci_mc_se", "level", "n_states",
                                "n_failed_resamples", "threshold", "verdict", "pass", "reason"}
-    assert out["H3c"] == analysis.h3c_ratio(a5.state_mse_ref, a4.state_mse_ref, CONFIG)
+    assert out["H3c"] == analysis.h3c_ratio(a5.state_mse_ref, a4.state_mse_ref, CONFIG, SYSTEM)
     col = CONFIG.reference_horizon - 1
     assert out["H3b"] == analysis.h3b_importances(
         profiles["construction"], oracle_weight(con_m)[:, col], curvature(con_m)[:, col],
-        np.log(state_horizon_target(con_m, 0.01, CONFIG.primary_threshold)), CONFIG)
+        np.log(state_horizon_target(con_m, 0.01, CONFIG.primary_threshold)), CONFIG, SYSTEM)
     first = rmap.assign(profiles["test"])[:, 0]
     assert out["H3a"]["n_per_regime"] == [int(np.sum(first == k)) for k in range(3)]
     assert out["H3a"]["chosen_K"] == 3 and set(out["regime_curve"]) == {"regret_ratio_by_K",
@@ -2211,8 +2219,8 @@ def test_h2c_a4o_minus_a2_counts_failed_resamples() -> None:
     helper puts failures at the unfavourable tail (``percentile_interval``): the bounds become
     infinite once the count reaches floor((B - 1) a) + 1 = 5 at B = 200, level 0.95 (a = 0.025).
     The point estimate is NaN. The number of failures equals a replay of the same resamples with
-    ``block_resample_indices`` at the seed ``config.seed + 5`` (independent use of the tested
-    helper). Exact.
+    ``block_resample_indices`` at ``make_rng(config.seed, system, "bootstrap", "H2c")``
+    (independent use of the tested helper). Exact.
     """
     from lpcstudy.analysis import h2c_state_dependence
     from lpcstudy.statistics import block_resample_indices
@@ -2222,9 +2230,10 @@ def test_h2c_a4o_minus_a2_counts_failed_resamples() -> None:
     a4o = a2 - 0.1
     a4o[7] = np.nan
     scores = _scores(A2=a2, A4=a2 - 0.5, A4o=a4o, A0=np.full(n, 0.2), A1=np.full(n, 0.1))
-    out = h2c_state_dependence(scores, _calibration(0.25, 4.0, n=n), CONFIG)["A4o_minus_A2"]
+    out = h2c_state_dependence(scores, _calibration(0.25, 4.0, n=n), CONFIG, SYSTEM)["A4o_minus_A2"]
     expected = sum(bool((idx == 7).any()) for idx in
-                   block_resample_indices(n, 200, 5, CONFIG.seed + 5))
+                   block_resample_indices(n, 200, 5,
+                                          make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c")))
     assert expected >= 5  # premise: enough failures to reach the threshold
     assert out["n_failed_resamples"] == expected
     assert out["ci"] == [-np.inf, np.inf] and np.isnan(out["mean"])
@@ -2283,10 +2292,10 @@ def test_h3c_closed_edge_at_exactly_1_05_passes() -> None:
     """
     from lpcstudy.analysis import h3c_ratio
 
-    edge = h3c_ratio(np.full(60, 21.0), np.full(60, 20.0), CONFIG)
+    edge = h3c_ratio(np.full(60, 21.0), np.full(60, 20.0), CONFIG, SYSTEM)
     assert edge["ci"] == [1.05, 1.05] and edge["A5_over_A4_mse"] == 1.05
     assert edge["verdict"] == "pass" and edge["pass"] is True and edge["reason"] is None
-    over = h3c_ratio(np.full(60, 21.000001), np.full(60, 20.0), CONFIG)
+    over = h3c_ratio(np.full(60, 21.000001), np.full(60, 20.0), CONFIG, SYSTEM)
     assert over["verdict"] == "fail" and over["pass"] is False and over["reason"] is None
 
 
@@ -2315,7 +2324,7 @@ def test_h3b_weight_band_is_open_at_0_2(monkeypatch: pytest.MonkeyPatch) -> None
             return (0.0, float(upper), 0) if len(calls) == 1 else real(values, level)
 
         monkeypatch.setattr(analysis, "percentile_interval", fake)
-        out = analysis.h3b_importances(profile, w_star, curvature, log_t, CONFIG)
+        out = analysis.h3b_importances(profile, w_star, curvature, log_t, CONFIG, SYSTEM)
         assert out["weight_lambda"]["verdict"] == verdict, upper
         assert out["weight_lambda"]["pass"] is (verdict == "pass")
         if verdict == "inconclusive":
@@ -2343,7 +2352,7 @@ def test_h1c_ratio_block_closed_band_edges_and_state_minimum() -> None:
     from lpcstudy.analysis import h1c_ratio_block
 
     def block(value: float, n: int = 60) -> dict:
-        return h1c_ratio_block(np.full(n, value), CONFIG)
+        return h1c_ratio_block(np.full(n, value), CONFIG, SYSTEM)
 
     for value, ci, verdict in ((1.25, [1.25, 1.25], "pass"), (0.8, [0.8, 0.8], "pass"),
                                (1.5, [1.5, 1.5], "fail")):
@@ -2352,7 +2361,7 @@ def test_h1c_ratio_block_closed_band_edges_and_state_minimum() -> None:
         assert out["verdict"] == verdict and out["reason"] is None
         assert out["pass"] is (verdict == "pass")
         assert out["n_failed_resamples"] == 0 and out["n_excluded_nonfinite"] == 0
-    alternating = h1c_ratio_block(np.tile([0.7, 1.0], 30), CONFIG)
+    alternating = h1c_ratio_block(np.tile([0.7, 1.0], 30), CONFIG, SYSTEM)
     assert alternating["verdict"] == "inconclusive"
     assert alternating["reason"] == "interval meets band edge" and alternating["pass"] is False
     assert 0.7 <= alternating["ci"][0] < 0.8 < alternating["ci"][1] <= 1.0
@@ -2362,23 +2371,23 @@ def test_h1c_ratio_block_closed_band_edges_and_state_minimum() -> None:
     tiny = block(1.0, 9)
     assert tiny["median_ratio"] is None and tiny["ci"] is None and tiny["n_states"] == 9
     assert tiny["verdict"] == "inconclusive" and tiny["reason"] == "n_states < 50"
-    reported = h1c_ratio_block(np.full(60, 1.0), CONFIG, with_verdict=False)
+    reported = h1c_ratio_block(np.full(60, 1.0), CONFIG, SYSTEM, with_verdict=False)
     assert set(reported) == {"median_ratio", "ci", "n_states", "n_excluded_nonfinite",
                              "n_failed_resamples"}
-    mixed = h1c_ratio_block(np.concatenate([np.full(60, 1.0), [np.nan, np.inf]]), CONFIG)
+    mixed = h1c_ratio_block(np.concatenate([np.full(60, 1.0), [np.nan, np.inf]]), CONFIG, SYSTEM)
     assert mixed["n_states"] == 60 and mixed["n_excluded_nonfinite"] == 2
     assert mixed["verdict"] == "pass"
 
 
 @pytest.mark.parametrize("n_states", [51, 60])
-def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_seed(n_states: int
-                                                                               ) -> None:
+def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_generator(
+        n_states: int) -> None:
     """The counted intervals equal the earlier ``block_bootstrap`` bitwise (plan V7).
 
     This is a regression guard against the previous code path, which stays in
     ``lpcstudy.statistics``: with no failed resample the estimate and both bounds of the H1c
-    median (integer seed ``config.seed``), the H2c mean differences (``seed + 5``) and the H2d
-    excess (``seed + 6``) are the same floats. 51 is the smoke size of the H1c PLP ratios. Synthetic
+    median (generator ``make_rng(seed, system, "bootstrap", "H1c")``), the H2c mean differences
+    (``... "H2c"``) and the H2d excess (``... "H2d"``) are the same floats. 51 is the smoke size of the H1c PLP ratios. Synthetic
     data from ``default_rng(11)``. Exact (``==``) on floats; non-finite ratios are excluded
     before the median, so the reference runs on the finite ones.
     """
@@ -2386,9 +2395,9 @@ def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_seed(n
 
     rng = np.random.default_rng(11)
     ratios = rng.uniform(0.5, 1.5, n_states)
-    block = h1c_ratio_block(np.concatenate([ratios, [np.nan]]), CONFIG)
+    block = h1c_ratio_block(np.concatenate([ratios, [np.nan]]), CONFIG, SYSTEM)
     est, lo, hi = block_bootstrap(lambda idx: float(np.median(ratios[idx])), n_states, 200, 5,
-                                  CONFIG.seed, 0.95)
+                                  make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H1c"), 0.95)
     assert (block["median_ratio"], *block["ci"]) == (est, lo, hi) and block["n_failed_resamples"] == 0
 
     a2 = rng.uniform(1.0, 2.0, n_states)
@@ -2396,16 +2405,17 @@ def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_seed(n
     a0 = a2 * rng.uniform(0.9, 1.3, n_states)
     a3 = a2 * rng.uniform(0.8, 1.0, n_states)
     scores = _scores(A2=a2, A4=a4, A4o=a4, A0=a0, A1=a0, A3=a3)
-    h2c = h2c_state_dependence(scores, _calibration(0.25, 4.0), CONFIG)
+    h2c = h2c_state_dependence(scores, _calibration(0.25, 4.0), CONFIG, SYSTEM)
     for name, other in (("A4_minus_A2", a2), ("A4_minus_A0", a0)):
         diff = a4 - other
         est, lo, hi = block_bootstrap(lambda idx: float(np.mean(diff[idx])), n_states, 200, 5,
-                                      CONFIG.seed + 5, 0.95)
+                                      make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c"), 0.95)
         assert (h2c[name]["mean"], *h2c[name]["ci"]) == (est, lo, hi)
         assert h2c[name]["n_failed_resamples"] == 0
-    h2d = h2d_empirical_comparison(scores, CONFIG)
+    h2d = h2d_empirical_comparison(scores, CONFIG, SYSTEM)
     est, lo, hi = block_bootstrap(lambda idx: float(a4[idx].mean() / a3[idx].mean() - 1.0),
-                                  n_states, 200, 5, CONFIG.seed + 6, 0.95)
+                                  n_states, 200, 5,
+                                  make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2d"), 0.95)
     assert (h2d["in_distribution_excess"], *h2d["ci"]) == (est, lo, hi)
     assert h2d["n_failed_resamples"] == 0
 
@@ -2524,7 +2534,7 @@ def test_h2c_multi_part_verdicts_all_nine_combinations_and_the_open_edge() -> No
     assert len(combos) == 9
     for first, second in combos:
         out = h2c_state_dependence(_h2c_stub_scores(parts[first], parts[second]), calibration,
-                                   CONFIG)
+                                   CONFIG, SYSTEM)
         assert out["best_single"] == "A0"
         assert out["A4_minus_A2"]["verdict"] == first and out["A4_minus_A0"]["verdict"] == second
         want = ("fail" if "fail" in (first, second) else
@@ -2540,12 +2550,12 @@ def test_h2c_multi_part_verdicts_all_nine_combinations_and_the_open_edge() -> No
             assert out[name]["n_failed_resamples"] == 0
         assert out["n_failed_resamples"] == 0
     zero = np.zeros(n)
-    edge = h2c_state_dependence(_h2c_stub_scores(zero, zero), calibration, CONFIG)
+    edge = h2c_state_dependence(_h2c_stub_scores(zero, zero), calibration, CONFIG, SYSTEM)
     assert edge["A4_minus_A2"]["ci"] == [0.0, 0.0] and edge["A4_minus_A0"]["ci"] == [0.0, 0.0]
     assert edge["A4_minus_A2"]["verdict"] == "fail" and edge["A4_minus_A0"]["verdict"] == "fail"
     assert edge["verdict"] == "fail" and edge["pass"] is False
     short = h2c_state_dependence(_h2c_stub_scores(parts["pass"][:49], parts["pass"][:49]),
-                                 calibration, CONFIG)
+                                 calibration, CONFIG, SYSTEM)
     assert short["verdict"] == "inconclusive"
     assert short["reason"] == "A4_minus_A2: n_states < 50; A4_minus_A0: n_states < 50"
 
@@ -2575,9 +2585,9 @@ def test_h2d_closed_edge_at_one_tenth_through_the_real_percentile_interval(
     a3 = rng.uniform(1.0, 2.0, 60)
     make = lambda e: RuleScores(mse=np.zeros(1), state_mse_ref=e, regret=np.zeros(1),
                                 agreement=0.0, km_median=0.0, rmst=0.0)
-    same = analysis.h2d_empirical_comparison({"A3": make(a3), "A4": make(a3)}, CONFIG)
+    same = analysis.h2d_empirical_comparison({"A3": make(a3), "A4": make(a3)}, CONFIG, SYSTEM)
     assert same["ci"] == [0.0, 0.0] and same["verdict"] == "pass" and same["pass"] is True
-    double = analysis.h2d_empirical_comparison({"A3": make(a3), "A4": make(2.0 * a3)}, CONFIG)
+    double = analysis.h2d_empirical_comparison({"A3": make(a3), "A4": make(2.0 * a3)}, CONFIG, SYSTEM)
     assert double["ci"] == [1.0, 1.0] and double["verdict"] == "fail" and double["pass"] is False
 
     low = 0.09999999999999987
@@ -2590,7 +2600,7 @@ def test_h2d_closed_edge_at_one_tenth_through_the_real_percentile_interval(
         values = np.array([low] * 1950 + [low + k * 2.0 ** -52] * 50)
         monkeypatch.setattr(statistics_module, "bootstrap_values",
                             lambda *args, _v=values: (0.05, _v))
-        out = analysis.h2d_empirical_comparison(scores, CONFIG)
+        out = analysis.h2d_empirical_comparison(scores, CONFIG, SYSTEM)
         assert out["ci"][1] == upper and out["verdict"] == verdict
         assert out["reason"] == (None if verdict == "pass" else "interval meets band edge")
         assert out["pass"] is (verdict == "pass") and out["n_failed_resamples"] == 0
@@ -2657,10 +2667,11 @@ def test_gain_bound_has_no_bar_and_reports_each_screen() -> None:
 # file and again below where a closure of the old expression is available.
 # ----------------------------------------------------------------------------------------
 def test_boot_returns_the_old_interval_and_the_dropped_count() -> None:
-    """B1 at the call site: ``_boot`` is ``block_bootstrap`` at ``seed + salt`` plus the NaN count.
+    """B1 at the call site: ``_boot`` is ``block_bootstrap`` at its generator plus the NaN count.
 
     Reference: ``statistics.block_bootstrap`` (separately tested against a verbatim pre-refactor
-    copy) at the integer seed ``CONFIG.seed + 3``, with a statistic that is NaN on calls 4, 11
+    copy) at a fresh ``make_rng(CONFIG.seed, SYSTEM, "bootstrap", "B1")`` (the integer seed
+    ``CONFIG.seed + 3`` before WU-0002.14), with a statistic that is NaN on calls 4, 11
     and 25 of the 200 resamples (a fresh closure per function: the call order is resamples, then
     the point). Count 3 by construction. Tolerance: none (``==``).
     """
@@ -2672,10 +2683,12 @@ def test_boot_returns_the_old_interval_and_the_dropped_count() -> None:
         counter = itertools.count()
         return lambda idx: float("nan") if next(counter) in calls else float(np.mean(x_values[idx]))
 
-    got = _boot(CONFIG, nan_on({4, 11, 25}), 60, LEVEL, salt=3)
+    got = _boot(CONFIG, nan_on({4, 11, 25}), 60, make_rng(CONFIG.seed, SYSTEM, "bootstrap", "B1"),
+                LEVEL)
     assert got[3] == 3
     assert got[:3] == block_bootstrap(nan_on({4, 11, 25}), 60, CONFIG.bootstrap_resamples,
-                                      CONFIG.bootstrap_block, CONFIG.seed + 3, LEVEL)
+                                      CONFIG.bootstrap_block,
+                                      make_rng(CONFIG.seed, SYSTEM, "bootstrap", "B1"), LEVEL)
 
 
 def test_v7_reports_the_dropped_resamples_of_each_bootstrap(monkeypatch: pytest.MonkeyPatch
@@ -2693,18 +2706,18 @@ def test_v7_reports_the_dropped_resamples_of_each_bootstrap(monkeypatch: pytest.
     levels = np.array([0.01, 0.02])
     nu = np.linspace(1.0, 2.0, 60)
     deltas = np.outer(nu, levels) * np.exp(np.random.default_rng(32).normal(0, 0.05, (60, 2)))
-    real = analysis.v7_efficiency(levels, deltas, nu, CONFIG)
+    real = analysis.v7_efficiency(levels, deltas, nu, CONFIG, SYSTEM)
     assert real["n_dropped_resamples"] == {"slope": 0, "efficiency": {"0.01": 0, "0.02": 0}}
 
     counts = iter([5, 6, 7])
     monkeypatch.setattr(analysis, "block_bootstrap_dropped",
                         lambda *a, **k: (1.0, 0.9, 1.1, next(counts)))
-    stub = analysis.v7_efficiency(levels, deltas, nu, CONFIG)
+    stub = analysis.v7_efficiency(levels, deltas, nu, CONFIG, SYSTEM)
     assert stub["n_dropped_resamples"] == {"slope": 5, "efficiency": {"0.01": 6, "0.02": 7}}
 
     bad = deltas.copy()
     bad[3, 0] = np.nan
-    flagged = analysis.v7_efficiency(levels, bad, nu, CONFIG)
+    flagged = analysis.v7_efficiency(levels, bad, nu, CONFIG, SYSTEM)
     assert flagged["n_nonfinite"] == 1 and flagged["pass"] is False
     assert flagged["n_dropped_resamples"] == {"slope": 0, "efficiency": {"0.01": 0, "0.02": 0}}
 
@@ -2887,7 +2900,8 @@ def test_h1b_counts_floored_states_among_the_regression_states_and_dropped_cp_re
         keep = np.isfinite(x_all) & np.isfinite(y_all)
         x, y = x_all[keep], y_all[keep]
         old = block_bootstrap(lambda idx: ols_slope(x[idx], y[idx]), len(x),
-                              config.bootstrap_resamples, config.bootstrap_block, config.seed)
+                              config.bootstrap_resamples, config.bootstrap_block,
+                              make_rng(config.seed, SYSTEM, "bootstrap", "H1b"))
         assert (out[name]["slope"], *out[name]["ci"]) == old and len(x) == 99
 
     flat = _fake_h1b_cell(np.random.default_rng(31003), 100, 1.0, 1.0)
@@ -2966,11 +2980,13 @@ def test_h3a_counts_empty_regimes_and_degenerate_pairs() -> None:
     assert clean["n_empty_regimes"] == 0 and clean["n_degenerate_pairs"] == 0
 
 
-def _old_boot(config: StudyConfig, stat, n_items: int, level: float = 0.95, salt: int = 0):
-    """Verbatim body of ``analysis._boot`` before WU-0002.9b (the independent reference)."""
+def _old_boot(config: StudyConfig, stat, n_items: int, rng: np.random.Generator,
+              level: float = 0.95):
+    """Body of ``analysis._boot`` before WU-0002.9b (the independent reference), taking the
+    generator that WU-0002.14 gave it in place of the integer ``config.seed + salt``."""
     from lpcstudy.statistics import block_bootstrap_dropped
     return block_bootstrap_dropped(stat, n_items, config.bootstrap_resamples,
-                                   config.bootstrap_block, config.seed + salt, level)
+                                   config.bootstrap_block, rng, level)
 
 
 def _inject_first_call(monkeypatch: pytest.MonkeyPatch, failing: set[int], value: float) -> None:
@@ -3001,8 +3017,8 @@ def _inject_first_call(monkeypatch: pytest.MonkeyPatch, failing: set[int], value
 def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails() -> None:
     """WU-0002.9b (1): with all-finite resamples the new H2b(i) interval equals the old one bitwise.
 
-    Reference: a verbatim copy of the old ``_boot`` body (``block_bootstrap_dropped`` at seed
-    ``config.seed + 3``, ``PRIMARY_LEVEL``), and a hand loop (``block_resample_indices`` then
+    Reference: a copy of the old ``_boot`` body (``block_bootstrap_dropped`` at
+    ``make_rng(config.seed, system, "bootstrap", "H2b-noise")``, ``PRIMARY_LEVEL``), and a hand loop (``block_resample_indices`` then
     ``np.nanquantile``). Both use the per-state correlations of the unchanged
     ``_per_state_spearman_counted`` (the changed part is only the bootstrap path). Tolerance: none,
     exact; with no failed resample the percentile computation is the same ``np.quantile``
@@ -3017,11 +3033,14 @@ def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails(
     weights[:, 1] += 0.15 * np.random.default_rng(90202).uniform(size=60)  # a clear but noisy rise
     corr, _ = _per_state_spearman_counted(levels, weights)
     stat = lambda idx: float(np.mean(corr[idx]))
-    est, lo, hi, n_dropped = _old_boot(CONFIG, stat, len(corr), PRIMARY_LEVEL, salt=3)
+    est, lo, hi, n_dropped = _old_boot(
+        CONFIG, stat, len(corr), make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"),
+        PRIMARY_LEVEL)
     assert n_dropped == 0 and lo < est < hi  # premise: a non-degenerate interval
 
     values = np.array([stat(idx) for idx in block_resample_indices(
-        len(corr), CONFIG.bootstrap_resamples, CONFIG.bootstrap_block, CONFIG.seed + 3)])
+        len(corr), CONFIG.bootstrap_resamples, CONFIG.bootstrap_block,
+        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"))])
     alpha = (1.0 - PRIMARY_LEVEL) / 2.0
     assert (lo, hi) == (float(np.nanquantile(values, alpha)),
                         float(np.nanquantile(values, 1.0 - alpha)))  # reference is self-consistent
@@ -3064,7 +3083,8 @@ def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_incon
     weights = np.random.default_rng(90203).uniform(0.0, 1.0, (60, 3))
     corr, _ = _per_state_spearman_counted(levels, weights)
     values = np.array([float(np.mean(corr[idx])) for idx in block_resample_indices(
-        len(corr), n_res, CONFIG.bootstrap_block, CONFIG.seed + 3)])
+        len(corr), n_res, CONFIG.bootstrap_block,
+        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"))])
     failing = {7}
     mask = np.zeros(n_res, dtype=bool)
     mask[list(failing)] = True
@@ -3109,8 +3129,9 @@ def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
     """A2: ``ci_mc_se`` equals ``endpoint_mc_error`` of the same resample values, exactly.
 
     Reference: the values are recomputed in the test with ``statistics.bootstrap_values`` at the
-    documented seeds (H3c ``make_rng(seed, "h3c-ratio")``; H2b(i) the integer ``seed + 3``; H2b(ii)
-    ``make_rng(seed, "h2b-library-change", "0.01")``), and ``endpoint_mc_error`` is the helper
+    documented generators (H3c ``make_rng(seed, system, "h3c-ratio")``; H2b(i)
+    ``make_rng(seed, system, "bootstrap", "H2b-noise")``; H2b(ii)
+    ``make_rng(seed, system, "h2b-library-change", "0.01")``), and ``endpoint_mc_error`` is the helper
     tested in ``test_statistics`` (E1 to E3). H2a(i) and H2a(ii) are checked by spying on the
     helper: the array it receives for each part is the one the reported interval is the percentile
     interval of (``percentile_interval`` of that array equals ``ci``), and the key equals the
@@ -3125,9 +3146,9 @@ def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
     rng = np.random.default_rng(21)
     a4 = rng.uniform(1.0, 2.0, 60)
     a5 = a4 * (1.0 + 0.1 * rng.uniform(size=60))
-    out = an.h3c_ratio(a5, a4, CONFIG)
+    out = an.h3c_ratio(a5, a4, CONFIG, SYSTEM)
     _, values = bootstrap_values(lambda idx: float(a5[idx].mean() / a4[idx].mean()), 60, 200, 5,
-                                 make_rng(CONFIG.seed, "h3c-ratio"))
+                                 make_rng(CONFIG.seed, SYSTEM, "h3c-ratio"))
     assert out["ci_mc_se"] == list(endpoint_mc_error(values, LEVEL))
     assert all(isinstance(v, float) for v in out["ci_mc_se"])
 
@@ -3137,13 +3158,13 @@ def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
     res = an.h2b_knob_response(noise_cells, _library_cells(TABLE, (0.01, 0.02)), CONFIG)
     diff = TABLE[:, 2] - TABLE[:, 0]
     _, values = bootstrap_values(lambda idx: float(np.mean(diff[idx])), 6, 200, 5,
-                                 make_rng(CONFIG.seed, "h2b-library-change", "0.01"))
+                                 make_rng(CONFIG.seed, SYSTEM, "h2b-library-change", "0.01"))
     assert res["library_change"]["ci_mc_se"] == list(endpoint_mc_error(values, LEVEL))
     rho_levels = np.array([0.01, 0.02])
     w_rho = np.column_stack([an._split_weights(noise_cells[r], CONFIG) for r in rho_levels])
     corr, _ = an._per_state_spearman_counted(rho_levels, w_rho)
     _, values = bootstrap_values(lambda idx: float(np.mean(corr[idx])), len(corr), 200, 5,
-                                 CONFIG.seed + 3)
+                                 make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"))
     assert res["noise"]["ci_mc_se"] == list(endpoint_mc_error(values, LEVEL))
     assert "ci_mc_se" not in res["library_change_reported"]["0.02"]
     n_h2e = 50
@@ -3211,8 +3232,8 @@ def test_stored_levels_are_found_on_real_producer_output() -> None:
         "H2b": an.h2b_knob_response(noise_cells, _library_cells(TABLE), CONFIG),
         "H2e": an.h2e_noise_matching(_h2e_cells(low, low + 0.3), CONFIG),
         "H3b": an.h3b_importances(profile, 0.5 * (x[:, 0] > 0.5), curvature,
-                                  3.0 * x[:, 2] + 0.5 * x[:, 0], CONFIG),
-        "H3c": an.h3c_ratio(a4 * 1.01, a4, CONFIG)}
+                                  3.0 * x[:, 2] + 0.5 * x[:, 0], CONFIG, SYSTEM),
+        "H3c": an.h3c_ratio(a4 * 1.01, a4, CONFIG, SYSTEM)}
     expected = {"H1a": 1, "H1d": 1, "H2b": 1, "H2e": 2, "H3b": 2, "H3c": 1}
     assert set(budget.STORED_LEVEL_PATHS) == set(expected) == set(produced)
     for row in HYPOTHESIS_TABLE:
@@ -3220,3 +3241,65 @@ def test_stored_levels_are_found_on_real_producer_output() -> None:
             levels = budget.stored_levels(row, produced[row.key])
             assert len(levels) == expected[row.key], row.key
             assert all(abs(v - budget.role_level(row)) < 1e-12 for v in levels), row.key
+
+
+# ------------------------------------------------------- WU-0002.14: the pairings are kept (P9)
+def test_h2c_parts_resample_with_identical_index_arrays() -> None:
+    """P9: the three H2c differences use the same resamples (a fresh generator per part).
+
+    Reference: with the A2 scores equal to the best single's (A0) and A4o equal to A4, the three
+    differences ``A4 - A2``, ``A4 - A0`` and ``A4o - A2`` are the same array, so their intervals
+    must be bitwise equal when every part draws from its own fresh generator of the same labels
+    (M4); a generator shared across the parts would advance and give different intervals. The
+    premise that the test can see the difference is checked: the same statistic on a generator
+    that has already drawn gives another interval. Tolerance: none (``==``).
+    """
+    from lpcstudy.analysis import h2c_state_dependence
+
+    rng = np.random.default_rng(14021)
+    a2 = rng.uniform(1.0, 2.0, 60)
+    a4 = a2 - rng.uniform(0.0, 0.5, 60)
+    scores = _scores(A2=a2, A4=a4, A4o=a4, A0=a2, A1=a2 + 1.0)
+    out = h2c_state_dependence(scores, _calibration(0.25, 4.0), CONFIG, SYSTEM)
+    assert out["best_single"] == "A0"
+    first, second, third = out["A4_minus_A2"], out["A4_minus_A0"], out["A4o_minus_A2"]
+    assert first["ci"] == second["ci"] == third["ci"] and first["mean"] == second["mean"]
+    assert first["n_failed_resamples"] == second["n_failed_resamples"] == 0
+    diff = a4 - a2
+    stat = lambda idx: float(np.mean(diff[idx]))
+    used = make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c")
+    block_bootstrap(stat, 60, 200, 5, used, 0.95)  # the generator has advanced
+    advanced = block_bootstrap(stat, 60, 200, 5, used, 0.95)
+    assert [advanced[1], advanced[2]] != first["ci"]  # premise: sharing would be visible
+
+
+def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(monkeypatch) -> None:
+    """P9: the oracle and the deployable profile of Q-N bootstrap from identical generator states.
+
+    Reference: ``qn_profile_block`` is replaced by a recorder (its numerical content is tested
+    elsewhere); the ``boot_seed`` it receives for each profile must be a generator in the initial
+    state of ``make_rng(seed, system, "bootstrap", "Q-N")``: the same state for both profiles,
+    equal to a fresh one (a shared generator would have advanced). The data stubs only supply
+    shapes. Tolerance: none (bit-generator state equality).
+    """
+    from lpcstudy import allocation
+    from lpcstudy import analysis as an
+
+    n = 8
+    states: list[dict] = []
+
+    def record(*args, boot_seed, **kwargs):
+        states.append(boot_seed.bit_generator.state)
+        return {}
+
+    monkeypatch.setattr(an, "qn_profile_block", record)
+    monkeypatch.setattr(an, "_oracle_profile", lambda cell, split, config: np.zeros((n, 4)))
+    monkeypatch.setattr(an, "deployable_profile", lambda ev, proxies, noise, lt: np.zeros((n, 1, 4)))
+    monkeypatch.setattr(an, "oracle_weight", lambda m: np.full((n, CONFIG.reference_horizon), 0.5))
+    monkeypatch.setattr(allocation, "state_horizon_target", lambda m, noise, thr: np.ones(n))
+    split = SimpleNamespace(moments=None, evals=None)
+    cell = SimpleNamespace(system=SYSTEM, noise=0.01,
+                           splits={s: split for s in ("construction", "calibration", "test")})
+    an.qn_noise_redundancy(cell, SimpleNamespace(proxies=None), CONFIG)
+    fresh = make_rng(CONFIG.seed, SYSTEM, "bootstrap", "Q-N").bit_generator.state
+    assert states == [fresh, fresh]

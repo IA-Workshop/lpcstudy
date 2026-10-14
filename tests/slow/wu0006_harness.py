@@ -22,9 +22,11 @@ Design (plan d954db9, the applied-mathematician's review 9d1152e, the main-sessi
   is ``min(LPC_THREADS, 4)`` of the invoking environment.
 * **Assertion groups.** ``Evaluation.exact`` (identity with production, A4 verdict equality per
   replication, A5 no failed resamples, the C7 zero column), ``Evaluation.consistency`` (the
-  pre-registered reference ranges, the defect test) and ``Evaluation.roadmap`` (the ROADMAP bounds,
-  asserted only while ``ASSERT_ROADMAP_BOUNDS`` is True; Option K of DEC-0018). Every group is always
-  computed and written to the results table.
+  pre-registered reference ranges, the defect test) and ``Evaluation.roadmap`` (the ROADMAP bounds).
+  The exact and consistency groups are asserted in every run. The ROADMAP-bound group is recorded
+  and not asserted (``ASSERT_ROADMAP_BOUNDS = False``, Option C of DEC-0018, owner-ratified on
+  2026-10-12, DEC-0026 item 2); it would be asserted only if the constant were set to True (Option K).
+  Every group is always computed and written to the results table.
 """
 
 from __future__ import annotations
@@ -89,14 +91,20 @@ from wu0006_reference import (
 )
 
 # ------------------------------------------------------------------------------------ constants
-ASSERT_ROADMAP_BOUNDS = True
-"""Option K of DEC-0018: the ROADMAP-bound rows (A1, A2, A3, L1, L2 and N1, N2, N3) are asserted.
+ASSERT_ROADMAP_BOUNDS = False
+"""Option C of DEC-0018, in force since the owner's ratification of 2026-10-12 (DEC-0026 item 2).
 
-Flipping it to False is Option C, which only the owner may rule: those rows are then computed,
-written to the results table and reported as characterization rows, and the pytest outcome is the
-consistency ranges (the defect test) and the exact checks. N2 and N3 of the delta-R2 study joined
-the switch after addendum A9 (their nominal bounds, like A1 and A2, are method-validity bounds that
-correct code fails with probability about 0.15 per run); the 12 delta-R2 ranges are always asserted."""
+False: the ROADMAP-bound rows (A1, A2, A3, L1, L2 and N1, N2, N3) are computed, written to the results
+table and reported as labelled characterization rows (a UserWarning in the pytest output names each
+failed bound); they are never asserted. The pytest outcome is the consistency ranges (the defect
+test) and the exact checks, which are asserted whatever this constant says. True is Option K: the
+same rows are asserted and a failed bound raises. DEC-0018 predicts that 16 to 17 of the 82
+probabilistic assertions at the nominal bounds fail for correct code (about 13 of them in the coverage rows
+alone; DEF-0020 and DEF-0021), across the L, A1 to A3, C and N1 to N3 families; under Option C none of
+those fails a node. N2 and N3 of the delta-R2 study joined the switch after addendum A9 (their
+nominal bounds, like A1 and A2, are method-validity bounds that correct code fails with probability
+about 0.15 per run); the 12 delta-R2 ranges are always asserted. No bound, level, R or B depends on
+the constant."""
 
 WU0006_SEED = 6006
 """Literal master seed of the simulation studies; not a registered DEV or confirmatory seed."""
@@ -353,14 +361,16 @@ def _bootstrap_plan(spec: CaseSpec, data: dict[str, np.ndarray], cfg
                 lambda: make_rng(cfg.seed, "wu0006", "C3"))
     if base == "C2":
         diff = data["a"] - data["b"]
-        return (lambda idx: float(np.mean(diff[idx])), lambda: cfg.seed + 5)
+        return (lambda idx: float(np.mean(diff[idx])),
+                lambda: make_rng(cfg.seed, SYSTEM_LABEL, "bootstrap", "H2c"))
     if base == "C4":
         a, b = data["a"], data["b"]
         return (lambda idx: float(a[idx].mean() / b[idx].mean()),
-                lambda: make_rng(cfg.seed, "h3c-ratio"))
+                lambda: make_rng(cfg.seed, SYSTEM_LABEL, "h3c-ratio"))
     if base == "C5":
         a, b = data["a"], data["b"]
-        return (lambda idx: float(a[idx].mean() / b[idx].mean() - 1.0), lambda: cfg.seed + 6)
+        return (lambda idx: float(a[idx].mean() / b[idx].mean() - 1.0),
+                lambda: make_rng(cfg.seed, SYSTEM_LABEL, "bootstrap", "H2d"))
     if base == "C6":
         x, y = data["x"], data["y"]
         return (lambda idx: spearman(x[idx], y[idx]),
@@ -398,15 +408,17 @@ def _production(spec: CaseSpec, data: dict[str, np.ndarray], cfg, seed_factory
                   "A1": _state(data["b"]), "A4o": _state(data["b"])}
         evals = SimpleNamespace(horizons=np.array([cfg.reference_horizon]),
                                 cp_err=np.ones((1, 1, 1)), plp_err=np.ones((1, 1, 1)))
-        out = h2c_state_dependence(scores, SimpleNamespace(evals=evals), cfg)["A4_minus_A2"]
+        out = h2c_state_dependence(scores, SimpleNamespace(evals=evals), cfg,
+                                   SYSTEM_LABEL)["A4_minus_A2"]
         return ({"estimate": out["mean"], "lower": out["ci"][0], "upper": out["ci"][1],
                  "n_failed": out["n_failed_resamples"], "verdict": out["verdict"]}, None)
     if base == "C4":
-        out = h3c_ratio(data["a"], data["b"], cfg)
+        out = h3c_ratio(data["a"], data["b"], cfg, SYSTEM_LABEL)
         return ({"estimate": out["A5_over_A4_mse"], "lower": out["ci"][0], "upper": out["ci"][1],
                  "n_failed": out["n_failed_resamples"], "verdict": out["verdict"]}, None)
     if base == "C5":
-        out = h2d_empirical_comparison({"A3": _state(data["b"]), "A4": _state(data["a"])}, cfg)
+        out = h2d_empirical_comparison({"A3": _state(data["b"]), "A4": _state(data["a"])}, cfg,
+                                      SYSTEM_LABEL)
         return ({"estimate": out["in_distribution_excess"], "lower": out["ci"][0],
                  "upper": out["ci"][1], "n_failed": out["n_failed_resamples"],
                  "verdict": out["verdict"]}, None)
@@ -564,7 +576,7 @@ def enforce(failures: Sequence[str], *, asserting: bool | None = None) -> str:
         One message per failed ROADMAP-bound row.
     asserting : bool, optional
         True for Option K (raise), False for Option C (only report). Default: the module constant
-        ``ASSERT_ROADMAP_BOUNDS`` read at call time.
+        ``ASSERT_ROADMAP_BOUNDS`` read at call time (False, Option C, as shipped).
 
     Returns
     -------
@@ -899,7 +911,7 @@ def evaluate_delta(run: DeltaRun, *, strict: bool = True) -> Evaluation:
     """N1, N2, N3 against the ROADMAP bounds, the A9 ranges and the exact refit check.
 
     The nominal bounds of all three rows (N1 and N3 >= 461 of 500, N2 <= 22 of 500) go to ``roadmap``
-    and are asserted only while ``ASSERT_ROADMAP_BOUNDS`` is True (DEC-0018, as for A1 to A3). The
+    and are recorded, asserted only if ``ASSERT_ROADMAP_BOUNDS`` is True (Option K; DEC-0018, as for A1 to A3). The
     pre-registered consistency ranges of the 3000/1000 reference (addendum A9, 12 in all) are the
     always-asserted defect test; ``consistency_rows`` holds one entry per row.
     """

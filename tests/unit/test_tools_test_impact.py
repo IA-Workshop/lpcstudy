@@ -555,7 +555,7 @@ def test_graph_equals_hand_derived_fixture() -> None:
 
 
 def test_fixture_schema() -> None:
-    """The fixture has the 22 module stems as keys and sorted lists of keys as values.
+    """The fixture has the 23 module stems as keys and sorted lists of keys as values.
 
     Reference: the file listing of ``lpcstudy/`` (``*.py`` stems) and the schema of the plan.
     """
@@ -563,7 +563,7 @@ def test_fixture_schema() -> None:
     assert set(data) == {"description", "source_commit", "graph"}
     graph = data["graph"]
     stems = sorted(path.stem for path in (ROOT / "lpcstudy").glob("*.py"))
-    assert sorted(graph) == stems and len(stems) == 22
+    assert sorted(graph) == stems and len(stems) == 23
     for deps in graph.values():
         assert deps == sorted(set(deps)) and set(deps) <= set(stems)
 
@@ -668,3 +668,133 @@ def test_core_and_pipeline_constants_equal_the_workflow_lists() -> None:
     assert tool.CORE_MODULES == frozenset(
         {"config", "data", "systems", "dynamics", "statistics", "ensemble", "oracle"})
     assert tool.PIPELINE_MODULES == frozenset({"pipeline", "experiments", "report", "__main__"})
+
+
+# ----------------------------------- WU-0011.5: direct-import rule and scan-the-source rule (DEF-0016)
+
+WIDE = ("from lpcstudy.leaf import h\nfrom lpcstudy import cyc\n\n\n"
+        "def test_a():\n    import lpcstudy.mid as m\n    assert m and h and cyc\n")
+TEXT_ONLY = ("import numpy\n# lpcstudy.leaf is only named in this comment\n\n\n"
+             "def test_a():\n    assert 'from lpcstudy.leaf import h' and numpy\n")
+
+
+def test_direct_import_selects_a_test_whatever_its_name(repo: Path) -> None:
+    """T1: a test that imports a changed module directly is selected; one that does not is not.
+
+    Reference: ``test_wide.py`` (WIDE above) imports ``leaf`` (``from lpcstudy.leaf import``),
+    ``cyc`` (``from lpcstudy import cyc``) and, inside a function, ``mid`` (``import
+    lpcstudy.mid as m``): read by hand, no module named ``wide`` exists. Expected sets are
+    written literally from the rules: the name rules (own file, direct dependents' files) plus
+    the direct importers. ``base`` is imported by ``cyc`` and ``mid``, not by the test, so a
+    change to ``base`` must not select it (not transitive). Exact equality.
+    """
+    write(repo, "tests/unit/test_wide.py", WIDE)
+    assert pick(repo, ["lpcstudy/leaf.py"]).tiers["unit"] == [
+        UNIT + "test_leaf.py", UNIT + "test_mid.py", UNIT + "test_wide.py"]
+    assert UNIT + "test_wide.py" in pick(repo, ["lpcstudy/mid.py"]).tiers["unit"]
+    cyc = pick(repo, ["lpcstudy/cyc.py"])
+    assert UNIT + "test_wide.py" in cyc.tiers["unit"]
+    assert "test_wide.py" in " ".join(cyc.reasons["lpcstudy/cyc.py"])
+    assert UNIT + "test_wide.py" not in pick(repo, ["lpcstudy/base.py"]).tiers["unit"]
+
+
+def test_a_text_mention_is_not_an_import_and_a_broken_test_is_named(repo: Path) -> None:
+    """T2: strings, comments and other packages do not select; an unparsable test is a warning.
+
+    Reference: ``TEXT_ONLY`` imports only numpy and names ``lpcstudy.leaf`` in a comment and a
+    string. ``def (`` is not valid Python (the file also names the package, so its imports matter; a broken
+    file that never names the package cannot affect the selection and is not read). Expected: the text-only file is not selected; the
+    broken file is not selected (no import can be read) and a warning names it (PRIME.4:
+    never skipped silently). Exact equality.
+    """
+    write(repo, "tests/unit/test_text.py", TEXT_ONLY)
+    write(repo, "tests/unit/test_broken.py", "from lpcstudy.leaf import h\ndef (\n")
+    sel = pick(repo, ["lpcstudy/leaf.py"])
+    assert sel.tiers["unit"] == [UNIT + "test_leaf.py", UNIT + "test_mid.py"]
+    assert any("test_broken.py" in w and "syntax" in w for w in sel.warnings)
+    assert not any("test_text.py" in w for w in sel.warnings)
+
+
+def test_direct_import_respects_the_tiers(repo: Path) -> None:
+    """T3: slow and gpu importers are listed as excluded without the flags; integration is kept.
+
+    Reference: the plan (slow and gpu files reached by a rule follow the flags, as for every
+    rule). Files written by hand, each importing ``lpcstudy.leaf``. Exact equality.
+    """
+    write(repo, "tests/slow/test_wide_slow.py", "from lpcstudy.leaf import h\n")
+    write(repo, "tests/gpu/test_wide_gpu.py", "from lpcstudy.leaf import h\n")
+    write(repo, "tests/integration/test_wide_int.py", "from lpcstudy.leaf import h\n")
+    plain = pick(repo, ["lpcstudy/leaf.py"])
+    assert plain.tiers["integration"] == ["tests/integration/test_wide_int.py"]
+    assert plain.tiers["slow"] == [] and plain.tiers["gpu"] == []
+    assert ("slow", "tests/slow/test_wide_slow.py") in plain.excluded
+    assert ("gpu", "tests/gpu/test_wide_gpu.py") in plain.excluded
+    both = pick(repo, ["lpcstudy/leaf.py"], include_slow=True, include_gpu=True)
+    assert "tests/slow/test_wide_slow.py" in both.tiers["slow"]
+    assert "tests/gpu/test_wide_gpu.py" in both.tiers["gpu"]
+    assert both.excluded == []
+
+
+def test_scan_rule_selects_source_scanning_tests_for_any_package_change(repo: Path) -> None:
+    """T4: tests that read the package source or the graph fixture follow every package change.
+
+    Reference: DEF-0016's status line. ``test_scan.py`` globs ``*.py`` and ``test_graphref.py``
+    names ``lpcstudy_graph.json``; neither imports the package and no module is named ``scan``
+    or ``graphref``. Expected: selected for ``leaf.py`` and for ``__init__.py`` (any module), not
+    for a change to a test, a tool or a doc. Exact equality.
+    """
+    write(repo, "tests/unit/test_scan.py", "def test_a(p):\n    return sorted(p.glob(\"*.py\"))\n")
+    write(repo, "tests/unit/test_graphref.py", "NAME = 'lpcstudy_graph.json'\n")
+    both = [UNIT + "test_graphref.py", UNIT + "test_scan.py"]
+    assert pick(repo, ["lpcstudy/leaf.py"]).tiers["unit"] == sorted(
+        [UNIT + "test_leaf.py", UNIT + "test_mid.py", *both])
+    assert all(p in pick(repo, ["lpcstudy/__init__.py"]).tiers["unit"] for p in both)
+    for other in ("tests/unit/test_leaf.py", "tools/foo.py", "docs/x.md"):
+        assert not set(both) & set(pick(repo, [other]).tiers["unit"]), other
+
+
+def test_fixture_graph_on_the_real_tree_selects_the_def_0016_cases() -> None:
+    """T5: with the hand-written fixture graph, the two DEF-0016 cases are selected.
+
+    Reference: DEF-0016 (entry and status line): ``test_identifiers.py`` scans the source text of
+    every ``lpcstudy/*.py`` and must follow any package change (a docstring change in
+    ``statistics.py`` made develop red); ``test_validation.py`` imports ``lpcstudy.analysis``
+    (its line 22) and was missed on a change to ``analysis``; ``test_tools_test_impact.py``
+    checks the fixture. The graph is the fixture, not the tool's own graph. Membership checks
+    on the real tree (T6 bounds the rest).
+    """
+    graph = json.loads(FIXTURE.read_text())["graph"]
+    stats = tool.select(["lpcstudy/statistics.py"], graph, ROOT, tool.CORE_MODULES, False, False)
+    assert UNIT + "test_identifiers.py" in stats.tiers["unit"]
+    assert UNIT + "test_tools_test_impact.py" in stats.tiers["unit"]
+    analysis = tool.select(["lpcstudy/analysis.py"], graph, ROOT, tool.CORE_MODULES, False, False)
+    assert {UNIT + "test_validation.py", UNIT + "test_identifiers.py",
+            UNIT + "test_tools_test_impact.py"} <= set(analysis.tiers["unit"])
+
+
+def test_selection_is_no_larger_than_the_rules_a_change_to_embedding() -> None:
+    """T6: for a change to ``embedding.py`` every selected unit/integration file has a reason.
+
+    Reference: an independent method. The reasons allowed are (a) the name rules read from the
+    fixture graph (own file ``test_embedding``, files of modules that import ``embedding``
+    directly: ``data``, ``ensemble``; ``embedding`` is not a core module, so no transitive
+    step; no integration directory for a plain module), (b) a text match by regular expression
+    of ``lpcstudy.embedding`` or ``from lpcstudy import ... embedding`` in the test file (not
+    the tool's ``ast``), (c) a scan marker (``glob("*.py")`` or ``lpcstudy_graph.json``) in the
+    text. A selected file with none of these fails. Exact membership, no tolerance.
+    """
+    import re
+
+    graph = json.loads(FIXTURE.read_text())["graph"]
+    sel = tool.select(["lpcstudy/embedding.py"], graph, ROOT, tool.CORE_MODULES, False, False)
+    by_name = {f"tests/unit/test_{m}.py" for m in ["embedding", *[
+        k for k, deps in graph.items() if "embedding" in deps]]}
+    pattern = re.compile(r"lpcstudy\.embedding\b|from lpcstudy import[^\n]*\bembedding\b")
+    for tier in ("unit", "integration"):
+        for path in sel.tiers[tier]:
+            text = (ROOT / path).read_text()
+            explained = (path in by_name or pattern.search(text)
+                         or 'glob("*.py")' in text or "lpcstudy_graph.json" in text)
+            assert explained, f"{path} selected with no rule that explains it"
+    assert sel.tiers["integration"] == [] or all(
+        pattern.search((ROOT / p).read_text()) for p in sel.tiers["integration"])

@@ -568,7 +568,8 @@ def test_state_oracles_attaches_handled_and_keeps_values(monkeypatch) -> None:
     gains = np.full((3, 4), 2.0)
     gains[2, 1] = 0.0
     nu = np.array([np.nan, 1.0, 2.0])
-    ctx = SimpleNamespace(spec=SimpleNamespace(params={}, observed_index=0), interval=0.1,
+    ctx = SimpleNamespace(spec=SimpleNamespace(name="lorenz63", params={}, observed_index=0),
+                          interval=0.1,
                           obs_scale=1.0, whiten=np.eye(2), unwhiten=np.eye(2), delay=1,
                           embed_dim=3, history=2, library_states=library, eval_states=eval_states,
                           split_indices={"test": np.array([10, 12, 14])},
@@ -576,7 +577,7 @@ def test_state_oracles_attaches_handled_and_keeps_values(monkeypatch) -> None:
     monkeypatch.setattr(systems, "make_flow_step", lambda *a, **k: None)
     monkeypatch.setattr(oracle, "make_observability", lambda *a, **k: (lambda s: nu))
     monkeypatch.setattr(oracle, "make_amplification", lambda *a, **k: (lambda s: gains))
-    out = oracle.state_oracles(ctx, "test", 4)
+    out = oracle.state_oracles(ctx, "test", 4, 20261005)
     np.testing.assert_array_equal(out.handled, [[0, 0, 1], [1, 0, 0], [0, 1, 0]])
     assert out.growth.tobytes() == growth_exponent(gains, 4).tobytes()
     assert out.gains.tobytes() == gains.tobytes() and out.nu.tobytes() == nu.tobytes()
@@ -662,3 +663,54 @@ def test_local_dimension_is_bitwise_independent_of_workers(monkeypatch, threads:
                                   / np.maximum(dist, 1e-300)[:, :-1]), axis=1)
     assert dims.tobytes() == ref_dims.tobytes()
     assert not floored.any()
+
+
+def test_oracle_pool_is_the_seeded_labelled_draw_shared_by_the_splits(monkeypatch) -> None:
+    """P9 and DEC-0008 B: the 1/d pool is ``make_rng(seed, system, "oracle-pool")``, per call fresh.
+
+    Reference: a hand re-draw from ``np.random.default_rng([seed, crc32(b"<system>|oracle-pool")])``
+    (NumPy used directly): ``choice(len(library), size, replace=False)``. The pool that
+    ``state_oracles`` hands to ``local_dimension_counted`` is recorded. Every split of a system
+    (two calls, different ``split``) gets the same pool; another seed or another system gives a
+    different one; the old literal ``default_rng(0)`` pool is not used. Tolerance: none (the
+    stubbed pipeline passes the rows through unchanged).
+    """
+    import zlib
+    from types import SimpleNamespace
+
+    from lpcstudy import oracle, systems
+
+    library = np.random.default_rng(1409).standard_normal((300, 2))
+    eval_states = np.random.default_rng(1410).standard_normal((60, 2))
+    gains = np.full((3, 4), 2.0)
+    pools: list[np.ndarray] = []
+
+    def spy(pool, queries):
+        pools.append(np.array(pool))
+        return np.ones(len(queries)), np.zeros(len(queries), dtype=bool)
+
+    monkeypatch.setattr(systems, "make_flow_step", lambda *a, **k: None)
+    monkeypatch.setattr(oracle, "make_observability", lambda *a, **k: (lambda s: np.ones(3)))
+    monkeypatch.setattr(oracle, "make_amplification", lambda *a, **k: (lambda s: gains))
+    monkeypatch.setattr(oracle, "local_dimension_counted", spy)
+
+    def ctx(name: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            spec=SimpleNamespace(name=name, params={}, observed_index=0), interval=0.1,
+            obs_scale=1.0, whiten=np.eye(2), unwhiten=np.eye(2), delay=1, embed_dim=3, history=2,
+            library_states=library, eval_states=eval_states,
+            split_indices={"test": np.array([10, 12, 14]), "calibration": np.array([20, 22, 24])},
+            whiten_states=lambda x: x)
+
+    seed = 20261005
+    oracle.state_oracles(ctx("rossler"), "test", 4, seed)
+    oracle.state_oracles(ctx("rossler"), "calibration", 4, seed)
+    oracle.state_oracles(ctx("rossler"), "test", 4, seed + 1)
+    oracle.state_oracles(ctx("chua"), "test", 4, seed)
+    hand = np.random.default_rng([seed, zlib.crc32(b"rossler|oracle-pool")])
+    expected = library[hand.choice(len(library), size=len(library), replace=False)]
+    assert np.array_equal(pools[0], expected) and np.array_equal(pools[1], expected)
+    assert not np.array_equal(pools[2], expected) and not np.array_equal(pools[3], expected)
+    legacy = library[np.random.default_rng(0).choice(len(library), size=len(library),
+                                                     replace=False)]
+    assert not np.array_equal(pools[0], legacy)

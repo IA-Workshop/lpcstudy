@@ -307,8 +307,8 @@ class ErrorPredictor:
 
     @classmethod
     def fit(cls, inputs: np.ndarray, cp_err: np.ndarray, plp_err: np.ndarray,
-            grid: np.ndarray, noise: float, width: int, epochs: int, seed: int
-            ) -> "ErrorPredictor":
+            grid: np.ndarray, noise: float, width: int, epochs: int,
+            rng: np.random.Generator) -> "ErrorPredictor":
         """Train on construction states x retained oracle draws.
 
         Parameters
@@ -325,8 +325,9 @@ class ErrorPredictor:
             Hidden width.
         epochs : int
             Epochs.
-        seed : int
-            Seed.
+        rng : np.random.Generator
+            Randomness of the network (see ``networks.train_mlp``); the caller builds it from
+            ``make_rng(seed, system, embed_dim, "allocator")``. Needs owner review before freeze.
 
         Returns
         -------
@@ -337,7 +338,7 @@ class ErrorPredictor:
         targets = np.concatenate([np.log(cp_err**2 + floor), np.log(plp_err**2 + floor)],
                                  axis=-1)
         net = train_mlp(inputs.reshape(-1, inputs.shape[-1]),
-                        targets.reshape(-1, targets.shape[-1]), width, epochs, seed)
+                        targets.reshape(-1, targets.shape[-1]), width, epochs, rng)
         return cls(network=net, grid=np.asarray(grid))
 
     def weights(self, inputs: np.ndarray, horizons: np.ndarray) -> np.ndarray:
