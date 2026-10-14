@@ -431,6 +431,18 @@ Written before the fix-round unit run, and before any smoke or integration prese
 
 **Results (fix round).** Unit radius, run once: `1 failed, 623 passed in 52.36s`. The failure was a bug in my own updated sweep test (`dump._halves` is emptied by `collect`, and the test read it afterwards); fixed by copying the records before `collect`; `tools/run_tests.sh unit --lf tests/unit/test_dump.py`: `1 passed, 6 deselected in 0.60s`. Everything else passed in the first run, including `test_rng_hygiene` and `test_identifiers`. Self-check of the diff: no `default_rng`, `random.`, `PRNGKey` or new `make_rng` in `lpcstudy/`; the one `isnan` is the NaN-aware mismatch count (reported by a WARNING, R5); no `try:` or `except`; no existing `assert`, `approx` or tolerance in a test was loosened (the one removed line is the old b4 assertion, replaced by the plan's exact scale, which is stricter). Still pending, and unchanged: the integration tier, the three dump-off smokes (R8) with `leafdiff`, `compare_pilot` and the b7 size.
 
+### WU-0003.7b fix round 2 (developer claude-sonnet-5-5, 2026-10-14; re-review `WU-0003.7b-review-round2.md`, 00669fa)
+
+Written before the fix-round-2 unit run, and before any preset.
+
+**R9 (conform to amendment 4, D3).** The second-call `H_ref` comparison is now strict and bitwise: the bit patterns of the float64 arrays are compared (`view(uint64)`), so `+0.0` and `-0.0` differ, and a NaN counts as unequal even when both calls carry the same NaN. A NaN in production therefore makes `v4/extra_href_diff` nonzero and logs the WARNING. **The NaN-equal reading adopted in fix round 1 (R5) is withdrawn.** The docstrings, the dump schema text and the warning wording ("bit patterns; a NaN counts as different") are updated; the NaN test is inverted (a shared NaN gives `extra_href_equal` False, `extra_href_diff` 1 and one WARNING) and a `+0.0` against `-0.0` test is added (one differing entry, one WARNING).
+
+**R10.** `test_dump` asserts over the real `collect` output that no key is also the `/` prefix of another; a new test in `test_analysis.py` checks the wiring of `qn_noise_redundancy` with a dump (the exact key set per kind, `x_test`, `w_star`, `log_t` and the four keys of each of the three targets, and the same prefix invariant), so reverting the R6 rename fails; the integration test asserts the same invariant and the presence of `qn/<kind>/{x_test, w_star, log_t}` and of the target keys on the real file.
+
+**§4.9 checklist (fix round 2).** 1. Change set since the last run: `lpcstudy/experiments.py`, `lpcstudy/dump.py` (docstring only); `tests/unit/test_experiments.py`, `test_dump.py`, `test_analysis.py`; `tests/integration/test_states_dump.py`; this file. 2. Radius: `python3 tools/test_impact.py --base 2ddb824 --explain` gives 9 unit files (`test___main__`, `test_analysis`, `test_data`, `test_dump`, `test_experiments`, `test_identifiers`, `test_pipeline`, `test_rng_hygiene`, `test_tools_test_impact`) and `tests/integration` (pending, presets); hand additions (`test_identifiers`, `test_rng_hygiene`, `test___main__` plus integration) are in it. 3. Already run on this code: no. 4. CPU. 5. `LPC_THREADS` 4, 300 s. 6. No preset or GPU job. 7. `-q --tb=short -rfE`. 8. `tools/run_tests.sh unit <the 9 files>`.
+
+**Results (fix round 2).** Unit radius, run once: `293 passed in 36.85s` (no failure, no `--lf`). Self-check of the diff: no new RNG site, no `try:` or `except`, no tolerance loosened (the only changed assertions invert the NaN reading to D3's, a stricter one for the code under test). Still pending and unchanged: the integration tier, the three dump-off smokes with `leafdiff`, `compare_pilot` and the b7 size.
+
 ## Review
 
 ## Audit

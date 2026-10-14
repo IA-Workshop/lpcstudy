@@ -173,6 +173,21 @@ def test_b4_the_two_halves_average_to_the_full_moment(runs) -> None:
             assert np.all(np.abs(mean_half - a[f"{prefix}{name}"]) <= 1e-13 * bound), (prefix, name)
 
 
+def test_the_key_tree_has_no_key_that_is_also_a_prefix_and_the_qn_inputs_exist(runs) -> None:
+    """R6 and R10: no dumped key is the ``/`` prefix of another, and ``qn/<kind>/`` has its inputs.
+
+    Reference: the schema in ``lpcstudy/dump.py`` (names typed here). Exact.
+    """
+    keys = set(runs["arrays"])
+    assert not any(other.startswith(key + "/") for key in keys for other in keys)
+    for kind in ("oracle", "deployable"):
+        for name in ("x_test", "w_star", "log_t"):
+            assert f"qn/{kind}/{name}" in keys, (kind, name)
+        for target in ("logit_w_interior", "w_zero_indicator", "log_horizon"):
+            for name in ("pred3", "pred4", "y", "domain"):
+                assert f"qn/{kind}/{target}/{name}" in keys, (kind, target, name)
+
+
 def test_b7_the_dump_size_is_reported(runs) -> None:
     """b7: the size at smoke (recorded in the unit Log; the pilot and full sizes are estimated there)."""
     path = runs["on"] / "states" / f"{SYSTEM}.npz"

@@ -81,8 +81,8 @@ test states of the system in time order (``n_test``), ``E`` evaluation draws, ``
     draws, signed; ``w_ref`` (``(nV, 3)``): the estimate from all the draws. The ``H_ref`` column
     comes from the production forecast; the other two from a second forecast of the same states and
     draws, whose ``H_ref`` column is compared bitwise with the production one
-    (``extra_href_equal``, bool; ``extra_href_diff``, the number of differing entries, a NaN equal
-    to a NaN) and whose handling is counted in ``extra_handled`` (int64 ``(nV, 8)``) and
+    (``extra_href_equal``, bool; ``extra_href_diff``, the number of entries that differ in their
+    bit patterns or are NaN: the comparison is strict) and whose handling is counted in ``extra_handled`` (int64 ``(nV, 8)``) and
     ``extra_clip_entries`` (int64 ``(3,)``, over all three horizons, names
     ``extra_clip_entry_names``).
     The median over states of ``half_width[m, :, 0]`` is the leaf ``validation/convergence/<M>/

@@ -304,6 +304,8 @@ def test_collect_and_write_round_trip_and_the_schema_is_documented(tmp_path: Pat
             assert loaded[key].dtype == arrays[key].dtype and \
                 np.array_equal(loaded[key], arrays[key]), key
     assert arrays["v4/w_hat"].shape == (2, 5, 3) and arrays["qn/oracle/x_test"].shape == (N, 4)
+    # R10: no key is also the "/" prefix of another (a tree built from the keys must not collide)
+    assert not any(other.startswith(key + "/") for key in arrays for other in arrays)
     skip = set(weights) | {"qn", "sweep", "construction", "calibration", "test"}
     text = dump_module.__doc__
     for key in arrays:

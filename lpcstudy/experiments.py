@@ -110,8 +110,9 @@ def convergence_check(study: Study, cell: Cell) -> dict:
                     cp.size * len(extra["horizons"]), cell.system)
     if extra is not None and extra["href_diff"]:  # the dump's 2 and 4 LT columns are suspect
         LOG.warning("%s V4 dump: the H_ref errors of the second forecast differ from production "
-                    "in %d of %d entries (bitwise, NaN equal to NaN); the 2 and 4 LT arrays come "
-                    "from that second forecast", cell.system, extra["href_diff"], cp.size * 2)
+                    "in %d of %d entries (bit patterns; a NaN counts as different); the 2 and 4 "
+                    "LT arrays come from that second forecast", cell.system, extra["href_diff"],
+                    cp.size * 2)
     study.record_cell(cell.system, cell.label, "V4-convergence",
                       check_record(handled, clipped, n, noise.shape[1], 1, cell.noise,
                                    ctx.embed_dim - ctx.spec.dim,
@@ -174,7 +175,9 @@ def _v4_extra_forecasts(study: Study, cell: Cell, library: AnalogLibrary, noise:
 
     The same states, the same noise and the same estimator as ``convergence_check``, in one more
     ``forecast_draws`` call per batch of five states. It draws no random number (the noise array is
-    given). Its ``H_ref`` column is compared bitwise with the production one (``href_equal``); the
+    given). Its ``H_ref`` column is compared with the production one strictly (``href_equal``: bit
+    patterns, so ``+0.0`` and ``-0.0`` differ, and a NaN counts as different, even when both calls
+    have the same NaN; amendment 4, D3); the
     production column, not this one, feeds the ``H_ref`` results. The clipped entries and the
     handling counts of the call are summed and returned (the caller writes them to the dump and a
     nonzero clip count to the run log, PRIME.4), though nothing of it enters ``handling``: the run
@@ -202,7 +205,7 @@ def _v4_extra_forecasts(study: Study, cell: Cell, library: AnalogLibrary, noise:
     dict
         ``cp`` and ``plp`` (``(2, n, M)``: the errors at 2 and 4 LT), ``horizons`` (all three,
         steps), ``href_equal`` (bool) and ``href_diff`` (the number of entries of the two ``H_ref``
-        arrays, CP and PLP, that differ bitwise; a NaN equals a NaN), ``handled`` (int64
+        arrays, CP and PLP, that differ in their bit patterns or are NaN), ``handled`` (int64
         ``(n, 8)``) and ``clip_entries`` (int64 ``(3,)``: the totals over all three horizons,
         ``H_ref`` included).
     """
@@ -222,9 +225,11 @@ def _v4_extra_forecasts(study: Study, cell: Cell, library: AnalogLibrary, noise:
         handled[rows] = batch.handled
         for name in ENTRY_COUNTERS:
             entries[name] += batch.clip_entries[name]
-    differ = 0  # entries unequal bitwise; a NaN counts as equal to a NaN
+    differ = 0  # strict (amendment 4, D3): bit patterns, so +0.0 and -0.0 differ, and a NaN differs
     for second, first in ((np.concatenate(href_cp), cp_ref), (np.concatenate(href_plp), plp_ref)):
-        differ += int(np.count_nonzero(~((second == first) | (np.isnan(second) & np.isnan(first)))))
+        bits = lambda a: np.ascontiguousarray(a, dtype=np.float64).view(np.uint64)
+        differ += int(np.count_nonzero((bits(second) != bits(first)) | np.isnan(second)
+                                       | np.isnan(first)))
     return {"cp": np.concatenate(cp, axis=1), "plp": np.concatenate(plp, axis=1),
             "horizons": horizons, "href_equal": differ == 0, "href_diff": differ,
             "handled": handled,

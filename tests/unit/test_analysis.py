@@ -3305,6 +3305,50 @@ def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(monkeypa
     assert states == [fresh, fresh]
 
 
+def test_qn_noise_redundancy_records_the_dump_keys_without_a_key_that_is_also_a_prefix(
+        monkeypatch) -> None:
+    """With a dump, ``qn_noise_redundancy`` records ``x_test``, ``w_star`` and ``log_t`` per kind (R6, R10).
+
+    Reference: the schema of ``lpcstudy/dump.py`` (written by hand in the test): per kind
+    (``oracle``, ``deployable``) the keys ``x_test``, ``w_star``, ``log_t`` and, per target
+    (``logit_w_interior``, ``w_zero_indicator``, ``log_horizon``), ``pred3``, ``pred4``, ``y``,
+    ``domain``. ``qn_profile_block`` is a stub that fills ``capture`` with those target keys, so
+    only the wiring of ``qn_noise_redundancy`` is under test. The key set is exact, and no key is
+    also the ``/`` prefix of another (a tree built from the keys must not collide: R6 renamed the
+    input ``log_horizon`` to ``log_t`` because it was also the folder of the target's keys), so
+    reverting the rename fails here. Exact.
+    """
+    from lpcstudy import allocation
+    from lpcstudy import analysis as an
+    from lpcstudy.dump import StateDump
+
+    n = 8
+    targets = ("logit_w_interior", "w_zero_indicator", "log_horizon")
+
+    def stub(*args, capture=None, **kwargs):
+        capture.update({f"{t}/{k}": np.zeros(n) for t in targets
+                        for k in ("pred3", "pred4", "y", "domain")})
+        return {}
+
+    monkeypatch.setattr(an, "qn_profile_block", stub)
+    monkeypatch.setattr(an, "_oracle_profile", lambda cell, split, config: np.zeros((n, 4)))
+    monkeypatch.setattr(an, "deployable_profile", lambda ev, proxies, noise, lt: np.zeros((n, 1, 4)))
+    monkeypatch.setattr(an, "oracle_weight", lambda m: np.full((n, CONFIG.reference_horizon), 0.5))
+    monkeypatch.setattr(allocation, "state_horizon_target", lambda m, noise, thr: np.ones(n))
+    split = SimpleNamespace(moments=None, evals=None)
+    cell = SimpleNamespace(system=SYSTEM, noise=0.01,
+                           splits={s: split for s in ("construction", "calibration", "test")})
+    dump = StateDump()
+    an.qn_noise_redundancy(cell, SimpleNamespace(proxies=None), CONFIG, dump=dump)
+    keys = set(dump._qn[SYSTEM])
+    expected = {f"{kind}/{name}" for kind in ("oracle", "deployable")
+                for name in ("x_test", "w_star", "log_t",
+                             *(f"{t}/{k}" for t in targets
+                               for k in ("pred3", "pred4", "y", "domain")))}
+    assert keys == expected
+    assert not any(other.startswith(key + "/") for key in keys for other in keys)
+
+
 def test_qn_profile_block_capture_holds_the_predictions_and_changes_nothing() -> None:
     """``capture`` (the state dump's hook) gets both models' predictions, the targets and the domains.
 
