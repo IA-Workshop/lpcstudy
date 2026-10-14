@@ -431,6 +431,39 @@ Written before the fix-round unit run, and before any smoke or integration prese
 
 **Results (fix round).** Unit radius, run once: `1 failed, 623 passed in 52.36s`. The failure was a bug in my own updated sweep test (`dump._halves` is emptied by `collect`, and the test read it afterwards); fixed by copying the records before `collect`; `tools/run_tests.sh unit --lf tests/unit/test_dump.py`: `1 passed, 6 deselected in 0.60s`. Everything else passed in the first run, including `test_rng_hygiene` and `test_identifiers`. Self-check of the diff: no `default_rng`, `random.`, `PRNGKey` or new `make_rng` in `lpcstudy/`; the one `isnan` is the NaN-aware mismatch count (reported by a WARNING, R5); no `try:` or `except`; no existing `assert`, `approx` or tolerance in a test was loosened (the one removed line is the old b4 assertion, replaced by the plan's exact scale, which is stricter). Still pending, and unchanged: the integration tier, the three dump-off smokes (R8) with `leafdiff`, `compare_pilot` and the b7 size.
 
+### WU-0003.8 (developer claude-sonnet-5-5, 2026-10-14; branch `wu/0003-8-diagnostics`, from `2ddb824`)
+
+`tools/rehearsal_diagnostics.py` (D1 to D6, B1 item 7 as amended, B2 row .8 c1 to c7, amendments 3 and 4 for the dump). **Needs owner review before freeze** (statistics feeding the block-length and M decisions). Tool only: nothing in `lpcstudy/` touched, no preset, no GPU. Development seeds only; the tool refuses a seed id that is not `DEV-n`, never reads the run's seed, and draws only through `lpcstudy.data.make_rng(--seed, system, label)` (default: the literal scratch seed 20261018, printed in every report). **Real-data checks wait for the rehearsal:** no run with a dump exists yet (the dump of the .7b tip has only been exercised in unit tests), so every number below is from synthetic arrays in the schema `lpcstudy.states/1`; the first real report is R1's. The scripts of `2026-10-14-math-wu0003-scripts/` are never imported; the model of `m5_d5split.py` is re-implemented in the test.
+
+**Schema re-check at my start.** `lpcstudy/dump.py` on the branch (tip `2ddb824`) read in full; every key the tool reads is in its module docstring (`core/*`, `sweep/<cell>/*`, `v4/*`, `qn/<kind>/<target>/*`, `meta/*`). Not read by this tool: `lm/*`, `handling/*` (B1 item 9 and C4 are not in the .8 row, see the open questions).
+
+**What was built** (function, plan item):
+
+| Item | Where | Notes |
+| --- | --- | --- |
+| D1 series (M4.1) | `series_*`, `psi_sign`, `psi_mean`, `psi_ratio`, `psi_partial_corr`, `psi_slope`, `psi_delta_r2`, `per_state_spearman` | H2a(i), H2a(ii) zero/interior/(one), H2b(i), H2b(ii), H3c (primaries); H2c (two parts), H2d, H2e (per rho), Q-N (3 targets x 2 kinds), H1b PLP. H1a, H1c, H1d are listed as outside the schema |
+| D1 readings | `acf`, `acf_reading` | thresholds 0.15 (n <= 500) and 0.11 (above); case values 0.30/0.19/0.16/0.09; weight toward phi = 0.3 between the readings |
+| D2 | `block_variance` (exact V\*), `variance_summary`, `beta_reading`, `permutation_null` | A5 rule with its predicted rate beside it (0.21/0.164/0.094; 0.401/0.425/0.400 at phi = 0.3), beta_5 reading, pooled per-system permutation reading (1000 permutations, 0.99 quantile), owner flag if any fires |
+| D3 | `log_sd`, `logsd_at_draws`, `hybrid_state_mse`, `section_d3` | A1 to A5 at H_ref, run's E, projection to E = 4 by `sigma^2 - psi'(E/2) + psi'(2)`, draw-free state part from the oracle moments and the dumped weights |
+| D4 | `interior_attenuation`, `zero_reliability` | split-half on the unclipped u; delta-valid states and the excluded count; Spearman-Brown beside it; indicator reliability; Spearman(v, Lambda_tilde given Q) |
+| D5 | `split_half_shift`, `three_way_reading`, `v4_order`, `full_halfwidth`, `_d5_primary`, `_d5_v4` | Delta_sh, B = Delta_sh/(sqrt 2 - 1) (order 1 printed), block-bootstrap SE (production `block_resample_indices`, blocks of 5), three-way reading against 0.1 hw_full, V4 three-level check with `extra_href_equal` printed beside it |
+| D6 | `section_d6`, `near_clip` | split-half Richardson on the mean paired change of the two library cells; f_b by weight bin |
+| Reproduction checks | `check` | where `results.json` carries the statistic a series is the influence of, it is recomputed from the dump and printed MATCH or MISMATCH (a mismatch is exit 1) |
+
+**Exit codes.** 0 complete with no mismatch; 1 a MISMATCH; 2 unreadable input, usage, a refused seed id, or any "not computable" (the report is printed in full; 1 wins over 2).
+
+**Radius (hand, 4.2; and `python3 tools/test_impact.py --base 2ddb824 --explain`).** Change set: new `tools/rehearsal_diagnostics.py`, new `tests/unit/test_tools_rehearsal_diagnostics.py`, new `tests/slow/test_rehearsal_diagnostics_mc.py`, this file. By hand: row "`tools/<t>.py`: `tests/unit/test_tools_<t>.py`" gives `tests/unit/test_tools_rehearsal_diagnostics.py`; row "a statistic that `tests/slow/` verifies" gives the slow test that owns it, the new `tests/slow/test_rehearsal_diagnostics_mc.py` (plan B2 .8: run once by the .8 developer); `docs/**` no tests. Nothing under `lpcstudy/` changed, so no package module, graph fixture or integration test is affected. The tool at `--base 2ddb824` prints exactly `unit: tests/unit/test_tools_rehearsal_diagnostics.py` and no integration set. (At `--base develop` it prints the 21 unit files of the .7a/.7b branch changes, which are not this change set and already ran in their own radii.)
+
+**§4.9 checklist (before the first invocation).**
+1. Change set (`git diff --name-only 2ddb824...HEAD` plus `git status --porcelain`): `tools/rehearsal_diagnostics.py`, `tests/unit/test_tools_rehearsal_diagnostics.py`, `tests/slow/test_rehearsal_diagnostics_mc.py`, this file.
+2. Radius: `tests/unit/test_tools_rehearsal_diagnostics.py` (unit) and `tests/slow/test_rehearsal_diagnostics_mc.py` (slow, once, by its owner); far smaller than the whole suite; I am not at a gate.
+3. Already run on this code: no.
+4. Device: `JAX_PLATFORMS=cpu` (set by `tools/run_tests.sh`).
+5. Threads and time: `LPC_THREADS` 4 (default); unit timeout 300 s (the file builds a world of 80 states and runs in a few seconds); slow timeout 3600 s (S1 about 2000 series, S2 500 systems x 1000 permutations x 3 series, S3 400 replications).
+6. Contention: the slow test is CPU only and starts no preset or GPU job; I check `pgrep -fa "lpcstudy --preset"` before it and start it only if empty.
+7. Output: `-q --tb=short -rfE` (the wrapper's).
+8. Commands: `tools/run_tests.sh unit tests/unit/test_tools_rehearsal_diagnostics.py`; then `tools/run_tests.sh slow tests/slow/test_rehearsal_diagnostics_mc.py`.
+
 ## Review
 
 ## Audit
