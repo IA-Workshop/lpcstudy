@@ -1,0 +1,51 @@
+leaves 4674 float diffs 942 non-float diffs 6
+  NONFLOAT systems/lorenz63/context/cov_digest dcc58031abdb35d59fded99ec85e4312f71eaab1fe8d7813bd2891e294fb00b1 a57c5d73bbda0b9d20e14cbfa2ad139b4e3e62030f2d8670fc0156d03a946b59
+  NONFLOAT systems/lorenz63/context/unwhiten_digest 77661d8bd94302b90ccf93acf8505eec8220652d9dbdcc326a07553b40c14c4e 2b98a6ce388916afe892bf6351d8d410b5dd9f5d53c91007a7b572a6d276bc7e
+  NONFLOAT systems/lorenz63/context/whiten_digest 0b8cff7fae06e76f13c8a65a049dda9b252b8bd8552861ed204f14e4d3a3aa32 17ec869d685e9249d2bbcec2a876f26da5a1fed9cf8097a672a5e572239be49c
+  NONFLOAT systems/lorenz63/gain_bound/n_screened_out/negative_covariance 25 23
+  NONFLOAT systems/lorenz63/gain_bound/n_states 52 54
+  NONFLOAT systems/lorenz63/handling/result_counts/gain_bound/n_screened_out/negative_covariance 25 23
+group                                  n   med rel   p90 rel   max rel  max abs   argmax
+H1a                                   10  7.97e-08  3.94e-07  3.97e-07  3.83e-07  systems/lorenz63/H1a/by_noise/0.01/ratio_ci/[0]
+H1b                                    6  3.44e-11  6.66e-10  1.79e-09  1.78e-09  systems/lorenz63/H1b/PLP/ci/[1]
+H1c                                    6  2.82e-16  2.89e-16  5.17e-16  1.67e-16  systems/lorenz63/H1c/CP/ci/[0]
+H2a/complete_case                      3  6.90e-09  6.90e-09  9.93e-08  8.54e-08  systems/lorenz63/H2a/complete_case/range_ci/[1]
+H2a/median_range                       1  8.15e-10  8.15e-10  8.15e-10  8.14e-11  systems/lorenz63/H2a/median_range
+H2a/median_range_unrestricted          1  9.14e-09  9.14e-09  9.14e-09  3.41e-09  systems/lorenz63/H2a/median_range_unrestricted
+H2a/part_ii                            9  2.27e-09  8.39e-08  2.13e-07  2.86e-08  systems/lorenz63/H2a/part_ii/interior/partial_corr
+H2a/range_by_span                      2  4.71e-09  3.30e-09  4.71e-09  1.19e-09  systems/lorenz63/H2a/range_by_span/1-2/median
+H2a/range_ci                           2  2.04e-08  1.73e-12  2.04e-08  3.75e-09  systems/lorenz63/H2a/range_ci/[1]
+H2a/short_horizon_range_median         1  2.07e-10  2.07e-10  2.07e-10  1.18e-10  systems/lorenz63/H2a/short_horizon_range_median
+H2b/library_change                     3  5.10e-09  5.10e-09  5.34e-09  7.87e-10  systems/lorenz63/H2b/library_change/ci/[1]
+H2b/library_curves                    12  1.35e-09  7.15e-09  4.02e-08  1.76e-09  systems/lorenz63/H2b/library_curves/0.01/1000/median_ci/[0]
+H2b/noise                              2  4.36e-09  2.98e-09  4.36e-09  1.57e-09  systems/lorenz63/H2b/noise/median_w_by_noise/0.01
+H2c                                   13  5.35e-09  1.43e-08  1.71e-08  1.11e-07  systems/lorenz63/H2c/A4_minus_A0/ci/[0]
+H2d                                    3  3.83e-08  3.83e-08  5.01e-07  9.95e-09  systems/lorenz63/H2d/in_distribution_excess
+H2e                                    1  7.15e-08  7.15e-08  7.15e-08  3.62e-09  systems/lorenz63/H2e/corr_curve/0.01/10000
+H3b                                    6  3.98e-10  9.56e-10  3.11e-09  1.32e-09  systems/lorenz63/H3b/weight_lambda/ci/[0]
+H3c                                    3  8.31e-09  8.31e-09  1.21e-08  1.36e-09  systems/lorenz63/H3c/A5_over_A4_mse
+Q-N                                   10  1.23e-07  1.45e-06  1.36e-05  2.44e-08  systems/lorenz63/Q-N/deployable/logit_w_interior/delta_r2
+V7                                     9  1.63e-09  3.90e-09  5.30e-09  1.34e-08  systems/lorenz63/V7/ci/[0]
+estimators                             2  1.48e-15  1.41e-15  1.48e-15  3.11e-15  estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/32
+fitted                                13  1.95e-10  2.32e-08  7.99e-06  2.59e-07  systems/lorenz63/fitted/analog_proxy/floor
+handling/cells                        24  1.13e-14  1.36e-13  1.11e-01  1.00e+00  systems/lorenz63/handling/cells/V3-cp-horizon/lm/median_iterations
+oracle_recovery                       10  2.40e-09  1.47e-08  5.20e-08  2.17e-07  systems/lorenz63/oracle_recovery/A5_vs_Astar
+regime_curve                           3  5.92e-11  5.92e-11  3.69e-10  7.42e-10  systems/lorenz63/regime_curve/regret_ratio_by_K/2
+scores                                77  8.15e-10  9.20e-09  5.83e-08  9.02e-09  systems/lorenz63/scores/A4o/regret/1LT
+validation/convergence                 3  3.71e-09  3.71e-09  2.82e-08  1.58e-09  systems/lorenz63/validation/convergence/10/mean_abs_dev_from_max
+validation/crlb_ratio_max              1  2.17e-16  2.17e-16  2.17e-16  2.22e-16  systems/lorenz63/validation/crlb_ratio_max
+validation/crlb_ratio_median           1  9.16e-16  9.16e-16  9.16e-16  8.88e-16  systems/lorenz63/validation/crlb_ratio_median
+validation/crlb_ratio_min              1  5.23e-16  5.23e-16  5.23e-16  4.44e-16  systems/lorenz63/validation/crlb_ratio_min
+validation/estimators                  1  1.48e-15  1.48e-15  1.48e-15  3.11e-15  systems/lorenz63/validation/estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/32
+validation/gain_rel_err                1  1.87e-07  1.87e-07  1.87e-07  1.67e-16  systems/lorenz63/validation/gain_rel_err
+weight_profile                       702  3.89e-09  1.06e-07  4.99e-06  1.89e-06  systems/lorenz63/weight_profile/q25/[165]
+
+primaries: |d| / max(|lo|,|hi|) (T1-T3 tolerance 1e-4) and |d| / hw
+  lorenz63  H2a(i)             scale 0.184 hw 0.0674  rel(pt,lo,hi) = 4.4e-10, 4.6e-13, 2.0e-08   /hw = 1.2e-09, 1.2e-12, 5.6e-08
+  lorenz63  H2a(ii) zero       scale 0.225 hw 0.216  rel(pt,lo,hi) = 1.6e-09, 2.3e-09, 1.8e-10   /hw = 1.6e-09, 2.4e-09, 1.9e-10
+  lorenz63  H2a(ii) interior   scale 0.511 hw 0.426  rel(pt,lo,hi) = 3.1e-08, 4.4e-08, 5.6e-08   /hw = 3.8e-08, 5.2e-08, 6.7e-08
+  lorenz63  H2b(i)             scale 0.42 hw 0.236  rel(pt,lo,hi) = 0.0e+00, 0.0e+00, 0.0e+00   /hw = 0.0e+00, 0.0e+00, 0.0e+00
+  lorenz63  H2b(ii)            scale 0.147 hw 0.0687  rel(pt,lo,hi) = 1.2e-09, 3.5e-10, 5.3e-09   /hw = 2.6e-09, 7.4e-10, 1.1e-08
+  lorenz63  H3c                scale 0.236 hw 0.103  rel(pt,lo,hi) = 5.8e-09, 1.0e-09, 5.4e-09   /hw = 1.3e-08, 2.3e-09, 1.2e-08
+  lorenz63  H2c A4-A2          scale 0.863 hw 0.279  rel(pt,lo,hi) = nan, 5.8e-09, 5.4e-09   /hw = nan, 1.8e-08, 1.7e-08
+  lorenz63  H2d                scale 0.246 hw 0.242  rel(pt,lo,hi) = 4.0e-08, 3.7e-08, 4.2e-09   /hw = 4.1e-08, 3.8e-08, 4.2e-09
