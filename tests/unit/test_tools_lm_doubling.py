@@ -1358,3 +1358,23 @@ def test_probe_file_records_its_provenance() -> None:
     arms = {k: {"provenance": block} for k in (15, 30, 60)}
     assert lm.probe_problems(header, arms) == []
     assert lm.arm_identity(arms[15]) == {"start_utc": block["start_utc"], "end_utc": block["end_utc"]}
+
+
+def test_empty_robustness_blocks_are_not_coverage_gaps_and_the_probe_line_is_honest() -> None:
+    """Smoke writes empty ``robustness`` and ``handling.robustness`` blocks: not a gap (no leaves).
+
+    Found on the first clean smoke compare: the empty dict is a leaf of its own and made the root
+    "present". Also the Part A line says "none given" without a probe file, not "accepted".
+    """
+    tree = {"config": {"seed": 1}, "robustness": {}, "handling": {"robustness": {}, "totals": {"a": 1}},
+            "systems": {}}
+    out = lm.c0_coverage(tree)
+    assert all(g["root"] != "robustness" and g["root"] != "handling/robustness" for g in out["gaps"])
+    assert out["gaps"] == []
+    arms = {15: tree, 30: {**tree, "config": {"seed": 2}}}
+    text = "\n".join(lm.render(lm.build_comparison(arms)))
+    assert "Part A file: none given, r_A unknown" in text
+    with_probe = lm.build_comparison(
+        {k: results_with_h3c(est(pt)) for k, pt in zip((15, 30, 60), (0.0, 0.03125, 0.046875))},
+        probe=probe_with_tail(0.25))
+    assert "Part A file: accepted (same run, exact P0 at every arm)" in "\n".join(lm.render(with_probe))

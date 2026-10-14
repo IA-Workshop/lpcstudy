@@ -741,6 +741,7 @@ def build_comparison(arms: Mapping[int, Mapping], probe: Mapping | None = None) 
     report: dict = {"label": make_label(arm_facts(arms[15])["seed_id"]), "arms": ordered,
                     "qoi": {}, "membership": {}, "lm": {}}
     report["pairing_problems"] = pairing_problems(arms)
+    report["probe_given"] = probe is not None
     report["probe_problems"] = [] if probe is None else probe_problems(probe, arms)
     if report["probe_problems"]:
         probe = None   # not a Part A of these arms: r_A stays unknown, so no class N
@@ -808,7 +809,8 @@ def _se_over_hw(est: Est | None, design: Est | None) -> float | None:
 def c0_coverage(arm: Mapping) -> dict:
     """How many leaves of one arm each C0 pattern matches, and the patterns that match none.
 
-    A pattern that matches no leaf while its root block is present in the arm (``systems``,
+    A pattern that matches no leaf while its root block is present with content in the arm (an
+    empty block, as smoke writes for the skipped robustness sweep, does not count) (``systems``,
     ``robustness``, ``handling.robustness``, ``config``, ``estimators``) is a gap: either the block
     lacks that leaf or the pattern is mis-shaped, and C0 is narrower than its list (PRIME.4). The
     gaps are reported, not hidden; they do not halt.
@@ -824,7 +826,7 @@ def c0_coverage(arm: Mapping) -> dict:
     gaps = []
     for i, (pattern, why) in enumerate(C0_PATTERNS):
         root = pattern[:2] if pattern[0] == "handling" else pattern[:1]
-        if matched[i] == 0 and any(p[:len(root)] == root for p in paths):
+        if matched[i] == 0 and any(p[:len(root)] == root and len(p) > len(root) for p in paths):
             gaps.append({"pattern": i + 1, "root": "/".join(root), "why": why})
     return {"matched": matched, "gaps": gaps}
 
@@ -903,7 +905,8 @@ def render(report: Mapping) -> list[str]:
     lines += ["", "Pairing (seed id, preset, commit, clean tree, CPU, LPC_THREADS, XLA_FLAGS, jax, "
               "jaxlib): " + ("the same in every arm" if not report["pairing_problems"]
                              else "NOT PAIRED: " + "; ".join(report["pairing_problems"])),
-              "Part A file: " + ("accepted (same run, exact P0 at every arm)"
+              "Part A file: " + ("none given, r_A unknown" if not report["probe_given"] else
+                                 "accepted (same run, exact P0 at every arm)"
                                  if not report["probe_problems"] else
                                  "NOT USED, r_A unknown: " + "; ".join(report["probe_problems"])),
               f"C0: {report['c0']['n_patterns']} patterns; pairs {report['c0']['pairs']}",
