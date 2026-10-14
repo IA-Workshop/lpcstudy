@@ -20,3 +20,12 @@ Gate: merge (DEVELOPMENT_WORKFLOW.md 4.3), run by the main session with `LPC_GAT
 ## Results
 
 (appended below after the runs)
+
+- `LPC_GATE=merge tools/run_tests.sh unit tests/unit`: `1202 passed in 119.36s`.
+- `LPC_GATE=merge tools/run_tests.sh integration tests/integration`: `14 passed in 345.18s (0:05:45)`.
+- No failure, no rerun. The tree was clean for both runs.
+- **Gate result: pass** for `develop` tip `083f594` (the gate-log commit `fc75886` precedes the runs and changes docs only; this results commit follows them). R9 of the WU-0005.6 re-review (post-merge radius) is covered: all six named test files are inside the whole suite.
+
+## Items the gate does not settle (owner checkpoints, needs owner review before freeze)
+
+As in `GATE-2026-10-12-develop.md`, plus: WU-0002.14 (seed, provenance and statistics code: start states, RNG conversions, `compare_pilot` rules), WU-0005.6 (`choose_refine_steps`, `tools/run_preset.sh`, and the LM row's `classify`, `tail_ratio`, `pairing_problems`, `probe_problems`). The WU-0005.6 smoke evidence is pre-merge (1886c6b): smoke steps 1 and 2 are redone at a post-merge commit before any pilot-size arm. The slow tier is not part of this gate. Not green for `main`: DEF-0026 (V6/V4 gate-failure risk), DEF-0018, N3 scope, the estimator convention, Chua H2a(i) under finite-M bias, D1 layout of WU-0002.11e, the owner's ledger entries and the confirmation of the remaining proposed DECs; no request for `main` is made.
