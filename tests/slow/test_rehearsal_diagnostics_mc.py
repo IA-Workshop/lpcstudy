@@ -15,17 +15,22 @@ not among the null draws the size is 0.01 up to the quantile's own error. R = 50
 iid series (lengths 500, 500 and 300: the induced-order rule is exercised). The bound is the plan's:
 rate <= 0.01 + 3 sqrt(0.0099/500) = 0.0233 (MC SE of a rate of 0.01 at R = 500 is 0.0045).
 
-**S3. The attenuation A of D4 against a known A0.** Design: n = 1000 states, logit w ~ N(0, 0.35^2)
-(so w in about (0.26, 0.74): every state delta-valid), the two half-draw optima ``u_A = w + e_A``,
-``u_B = w + e_B`` with e ~ N(0, 0.036^2), so the 200-draw optimum is ``(u_A + u_B)/2`` with noise
-variance ``0.036^2/2``; five independent N(0, 1) controls. The known value is the delta-method
-reliability of the logit of the 200-draw weight, ``A0^2 = Var(l)/(Var(l) + E v)`` with
-``E v = E[sigma_200^2/(w (1 - w))^2]`` integrated by 80-point Gauss-Hermite quadrature over l (the
-true w, not the noisy one), which is independent of the estimator. The tool's plug-in uses the noisy
-``w`` in ``v`` and the sample variance, so it has a second-order bias (estimated by hand at about
--2e-4 in A: relative 0.3% in v from ``f''(w) sigma^2/2`` and 5e-4 in the variance ratio), smaller
-than 4 MC SE = 4 x 1.5e-4 at R = 400. The check: |mean(A) - A0| <= 4 SE, SE = SD(A)/sqrt(R), R = 400.
-No bound was changed after a result was seen (PRIME.2).
+**S3. The attenuation A of D4 against a known A0.** Design (fixed before the run): n = 4000 states,
+logit w ~ N(0, 0.18^2) (w in about (0.36, 0.64): every state delta-valid), the two half-draw optima
+``u_A = w + e_A``, ``u_B = w + e_B`` with e ~ N(0, 0.02^2/2), so the 200-draw optimum is
+``(u_A + u_B)/2`` with noise SD exactly 0.01 (the SD of a half is 0.01 sqrt 2); five independent N(0, 1) controls and an N(0, 1)
+Lambda. The known value is the delta-method reliability of the logit of the 200-draw weight,
+``A0^2 = Var(l)/(Var(l) + E v)`` with ``E v = E[sigma_200^2/(w (1 - w))^2]`` integrated by 80-point
+Gauss-Hermite quadrature over l (the true w, not the noisy one): about 0.9755 (share of noise 0.049),
+independent of the estimator. The tool's plug-in has three known finite-sample biases, all
+well below the MC error here: (i) the ``w`` in ``v`` is the noisy one, a second-order relative bias
+of ``8 sigma_200^2 = 8e-4`` in ``v`` (A: 2e-5); (ii) the residual variance of ``y~`` loses the
+6 degrees of freedom of the intercept and five controls, ``(1 - 6/n)``, so the noise share is
+overstated by 0.15% (A: -4e-5; at the pilot's ~330 interior states it is 1.8% of the share, a
+stricter reading, noted in the unit Log); (iii) the ratio of two sample moments (1e-5). Their sum
+is about 6e-5 against an MC SE of SD(A)/sqrt(R) = 5e-5 at R = 200, so the bound
+``|mean(A) - A0| <= 4 SE`` has a margin of about 3. No bound was changed after a result was seen
+(PRIME.2).
 """
 
 from __future__ import annotations
@@ -73,11 +78,10 @@ def test_s2_permutation_reading_has_size_at_most_the_plan_bound_on_iid_data() ->
 
 
 def test_s3_attenuation_matches_the_known_delta_method_value_within_four_mc_se() -> None:
-    """|mean A - A0| <= 4 SE over R = 400 replications of n = 1000 states (design in the docstring)."""
-    n, reps, sd_l, sigma_h = 1000, 400, 0.35, 0.036
+    """|mean A - A0| <= 4 SE over R = 200 replications of n = 4000 states (design in the docstring)."""
+    n, reps, sd_l, sigma_h = 4000, 200, 0.18, 0.01 * math.sqrt(2.0)  # SD of one half-draw optimum
     nodes, weights = np.polynomial.hermite_e.hermegauss(80)
-    ell = sd_l * nodes
-    w_true = 1.0 / (1.0 + np.exp(-ell))
+    w_true = 1.0 / (1.0 + np.exp(-sd_l * nodes))
     e_v = float(np.sum(weights * (sigma_h**2 / 2) / (w_true * (1 - w_true)) ** 2) / np.sum(weights))
     a0 = math.sqrt(sd_l**2 / (sd_l**2 + e_v))
     rng = make_rng(SEED, "mc", "s3")

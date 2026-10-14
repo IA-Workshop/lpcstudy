@@ -758,7 +758,8 @@ def build_results(d: dict) -> dict:
     spear = []
     for row in rows_w:
         spear.append(0.0 if np.ptp(row) == 0 else sps.spearmanr(levels, row).statistic)
-    sysd["H2b"] = {"noise": {"mean_state_spearman": float(np.mean(spear))},
+    sysd["H2b"] = {"noise": {"mean_state_spearman": float(np.mean(spear)),
+                             "n_constant_states": int(sum(np.ptp(r) == 0 for r in rows_w))},
                    "library_change": {
                        "mean_change": float(np.mean(d["sweep/rho=0.01|n_lib=10000/w_star_href"]
                                                     - d["sweep/rho=0.01|n_lib=1000/w_star_href"])),
@@ -781,15 +782,20 @@ def build_results(d: dict) -> dict:
             y, dom = d[f"qn/{kind}/{target}/y"], d[f"qn/{kind}/{target}/domain"]
             f3, f4 = d[f"qn/{kind}/{target}/pred3"], d[f"qn/{kind}/{target}/pred4"]
             sysd["Q-N"][kind][target] = {"delta_r2": float(r2(y[dom], f4[dom]) - r2(y[dom], f3[dom]))}
-    x = np.log(d["core/g_H_ref"] * d["core/delta"])
+    with np.errstate(divide="ignore"):
+        x = np.log(d["core/g_H_ref"] * d["core/delta"])
     y = 0.5 * np.log(np.maximum(e_p[:, REF], 1e-12))
-    sysd["H1b"] = {"PLP": {"slope": float(np.polyfit(x, y, 1)[0])}}
+    keep = np.isfinite(x) & np.isfinite(y)
+    sysd["H1b"] = {"PLP": {"slope": float(np.polyfit(x[keep], y[keep], 1)[0]),
+                           "n_excluded_nonfinite": int((~keep).sum()),
+                           "n_floored": int((e_p[:, REF][keep] < 1e-12).sum())}}
     return {"config": dict(CFG), "provenance": {"seed_id": "DEV-1", "commit": "synthetic"},
             "systems": {"lorenz63": sysd}}
 
 
 def write_run(tmp_path: Path, d: dict, res: dict) -> Path:
     """Write ``results.json`` and ``states/lorenz63.npz`` and return the run directory."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
     (tmp_path / "results.json").write_text(json.dumps(res))
     (tmp_path / "states").mkdir(exist_ok=True)
     np.savez(tmp_path / "states" / "lorenz63.npz", **d)
@@ -822,6 +828,8 @@ def test_a_full_run_on_a_consistent_world_reproduces_every_leaf_and_exits_0(tmp_
     names = set(data["lorenz63"]["D1"])
     assert {"H2a(i)", "H2a(ii) zero", "H2a(ii) interior", "H2b(i)", "H2b(ii)", "H3c"} <= names
     assert data["lorenz63"]["D1"]["H3c"]["primary"] is True
+    assert data["lorenz63"]["D1"]["H3c"]["domain"] == N and data["lorenz63"]["D1"]["H2b(i)"]["domain"] == NS
+    assert 2 <= data["lorenz63"]["D1"]["H2a(i)"]["domain"] < N  # the eligible states
     assert data["lorenz63"]["D5"]["reading"] in ("below 10%", "not below 10%", "not determined")
 
 
@@ -836,7 +844,8 @@ def test_a_perturbed_results_leaf_is_a_mismatch_with_exit_1(tmp_path, capsys) ->
     del d["core/Lambda_bar"]  # also makes H2a(ii) not computable: 1 must still win over 2
     code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "100", "--permutations", "50"])
     out = capsys.readouterr().out
-    assert "MISMATCH: lorenz63 H3c A5/A4 ratio" in out and code == 1
+    assert "check H3c A5/A4 ratio: dump" in out and "(|diff| " in out
+    assert out.count(": MISMATCH") == 1 and "MISMATCH: 1 item(s)" in out and code == 1
 
 
 def test_a_missing_array_prints_not_computable_and_every_other_diagnostic_still_runs(
@@ -874,6 +883,53 @@ def test_a_system_without_a_dump_file_is_listed_and_a_non_dev_seed_is_refused(tm
         assert rd.main([str(run_dir)]) == 2
         captured = capsys.readouterr()
         assert captured.out == "" and ("refused" in captured.err or "no config" in captured.err)
+
+
+def test_constant_h2b_states_and_nonfinite_h1b_states_are_counted_against_the_results(
+        tmp_path, capsys) -> None:
+    """The tie-convention count of H2b(i) and the non-finite exclusion of H1b are recomputed and compared.
+
+    Reference: by hand. Making state 0's weight the same at all four noise levels (so its rank
+    denominator is 0) gives n_constant_states = 1 (the world has none otherwise); making state 1's
+    PLP gain 0 gives log(0) = -inf, one excluded state. The results leaves written to match are
+    MATCH; the same leaves left at 0 are a MISMATCH (exact integer comparison, tolerance 0).
+    """
+    d, res, _ = build_world(rng_for("world"))
+    for r in RHOS:
+        d[f"sweep/rho={r:g}|n_lib=10000/w_star_href"][0] = 0.25
+    d["core/g_H_ref"][1] = 0.0
+    sysd = build_results(d)["systems"]["lorenz63"]
+    assert sysd["H2b"]["noise"]["n_constant_states"] == 1
+    res["systems"]["lorenz63"]["H2b"]["noise"] = sysd["H2b"]["noise"]
+    assert sysd["H1b"]["PLP"]["n_excluded_nonfinite"] == 1
+    res["systems"]["lorenz63"]["H1b"]["PLP"] = sysd["H1b"]["PLP"]
+    rd.main([str(write_run(tmp_path, d, res)), "--resamples", "50", "--permutations", "20"])
+    out = capsys.readouterr().out
+    assert "check H2b(i) constant states (scored 0 by the tie convention): dump 1 vs results 1" in out
+    assert "check H1b PLP states excluded as non-finite: dump 1 vs results 1" in out
+    res["systems"]["lorenz63"]["H2b"]["noise"]["n_constant_states"] = 0
+    code = rd.main([str(write_run(tmp_path / "b", d, res)), "--resamples", "50",
+                    "--permutations", "20"])
+    assert "dump 1 vs results 0" in capsys.readouterr().out and code == 1
+
+
+def test_a_dump_of_another_run_is_a_mismatch(tmp_path, capsys) -> None:
+    """A dump whose ``meta/seed_id`` or ``meta/preset`` differs from the results file is a MISMATCH.
+
+    Reference: the contract (a dump must be the run's own). Exit 1, and the message names the key and
+    both values. A dump without ``meta/preset`` is "not computable" (exit 2).
+    """
+    d, res, _ = build_world(rng_for("world"))
+    d["meta/seed_id"] = np.array("DEV-2")
+    code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "100", "--permutations", "50"])
+    out = capsys.readouterr().out
+    assert "MISMATCH: lorenz63: meta/seed_id is 'DEV-2' in the dump but 'DEV-1' in results.json" in out
+    assert code == 1
+    d, res, _ = build_world(rng_for("world"))
+    del d["meta/preset"]
+    assert rd.main([str(write_run(tmp_path / "b", d, res)), "--resamples", "100",
+                    "--permutations", "50"]) == 2
+    assert "array 'meta/preset' is not in" in capsys.readouterr().out
 
 
 def test_a_wrong_schema_is_not_computable(tmp_path, capsys) -> None:
@@ -955,6 +1011,7 @@ def test_d5_v4_levels_by_hand(tmp_path) -> None:
     assert out["bias_v4"] == pytest.approx(0.30, rel=1e-12)
     text = "\n".join(rep.lines)
     assert "WARNING extra_href_equal FALSE (7 differing" in text
+    assert "[uses the 2 and 4 LT columns; EXTRA_HREF_EQUAL FALSE]" in text  # beside the reading
     assert out["signed_mean_dev_href"][800] == 0.0
 
 

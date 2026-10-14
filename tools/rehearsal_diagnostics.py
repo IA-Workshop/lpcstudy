@@ -6,7 +6,7 @@ test. **Needs owner review before freeze** (statistics feeding the block-length 
 The tool is read-only on run directories, is not imported by the package, and prints one report
 labelled DEVELOPMENT. Usage::
 
-    python3 -I tools/rehearsal_diagnostics.py RUN [--states DIR] [--systems S ...] [--json OUT]
+    .venv/bin/python -I tools/rehearsal_diagnostics.py RUN [--states DIR] [--systems S ...] [--json OUT]
         [--seed N] [--resamples B] [--permutations P]
 
 ``RUN`` is a ``results.json`` or the directory that holds it; the dump of each system is
@@ -185,6 +185,11 @@ class Dump:
     def load(cls, path: Path) -> Dump:
         """Open an archive (never with pickles)."""
         return cls(np.load(path, allow_pickle=False), str(path))
+
+    def close(self) -> None:
+        """Close the archive (a dict has nothing to close)."""
+        if hasattr(self._arrays, "close"):
+            self._arrays.close()
 
     def has(self, key: str) -> bool:
         """Whether the key is present."""
@@ -497,6 +502,8 @@ class Series:
     part: str
     values: np.ndarray
     primary: bool
+    domain: int
+    """States inside the criterion's domain (the series is 0 outside it)."""
 
     @property
     def name(self) -> str:
@@ -840,7 +847,7 @@ def series_h2a_i(ctx: Context) -> list[Series]:
     psi = psi_sign(ranges, eligible)
     check(ctx, "H2a(i) median range", float(np.median(ranges[eligible])),
           ("H2a", "median_range"), 0.0)
-    return [Series(ctx.system, "H2a(i)", "", psi, True)]
+    return [Series(ctx.system, "H2a(i)", "", psi, True, int(eligible.sum()))]
 
 
 def series_h2a_ii(ctx: Context) -> list[Series]:
@@ -868,7 +875,7 @@ def series_h2a_ii(ctx: Context) -> list[Series]:
             continue
         check(ctx, f"H2a(ii) {name} partial correlation", r,
               ("H2a", "part_ii", name, "partial_corr"), 1e-9)
-        out.append(Series(ctx.system, "H2a(ii)", name, psi, True))
+        out.append(Series(ctx.system, "H2a(ii)", name, psi, True, int(dom.sum())))
     return out
 
 
@@ -876,10 +883,12 @@ def series_h2b_i(ctx: Context) -> list[Series]:
     levels = np.array(sorted(float(r) for r in dig(ctx.cfg, "noise_levels")))
     library = int(dig(ctx.cfg, "core_library"))
     w = np.column_stack([ctx.dump[f"{ctx.group(r, library)}/w_star_href"] for r in levels])
-    spear, _ = per_state_spearman(levels, w)
+    spear, n_constant = per_state_spearman(levels, w)
     check(ctx, "H2b(i) mean per-state Spearman", float(spear.mean()),
           ("H2b", "noise", "mean_state_spearman"), 1e-12)
-    return [Series(ctx.system, "H2b(i)", "", psi_mean(spear), True)]
+    check(ctx, "H2b(i) constant states (scored 0 by the tie convention)", float(n_constant),
+          ("H2b", "noise", "n_constant_states"), 0.0)
+    return [Series(ctx.system, "H2b(i)", "", psi_mean(spear), True, len(spear))]
 
 
 def series_h2b_ii(ctx: Context) -> list[Series]:
@@ -888,13 +897,13 @@ def series_h2b_ii(ctx: Context) -> list[Series]:
     diff = high - low
     check(ctx, "H2b(ii) mean paired change", float(diff.mean()),
           ("H2b", "library_change", "mean_change"), 1e-12)
-    return [Series(ctx.system, "H2b(ii)", "", psi_mean(diff), True)]
+    return [Series(ctx.system, "H2b(ii)", "", psi_mean(diff), True, len(diff))]
 
 
 def series_h3c(ctx: Context) -> list[Series]:
     a5, a4 = (ctx.dump[f"core/state_mse/{r}"][:, ctx.ref] for r in ("A5", "A4"))
     check(ctx, "H3c A5/A4 ratio", float(a5.mean() / a4.mean()), ("H3c", "A5_over_A4_mse"), 1e-12)
-    return [Series(ctx.system, "H3c", "", psi_ratio(a5, a4), True)]
+    return [Series(ctx.system, "H3c", "", psi_ratio(a5, a4), True, len(a5))]
 
 
 def series_h2c(ctx: Context) -> list[Series]:
@@ -912,7 +921,7 @@ def series_h2c(ctx: Context) -> list[Series]:
         diff = mse["A4"] - mse[other]
         check(ctx, f"H2c A4-{other} mean", float(diff.mean()),
               ("H2c", f"A4_minus_{other}", "mean"), 1e-12)
-        out.append(Series(ctx.system, "H2c", f"A4-{other}", psi_mean(diff), False))
+        out.append(Series(ctx.system, "H2c", f"A4-{other}", psi_mean(diff), False, len(diff)))
     return out
 
 
@@ -920,7 +929,7 @@ def series_h2d(ctx: Context) -> list[Series]:
     a4, a3 = (ctx.dump[f"core/state_mse/{r}"][:, ctx.ref] for r in ("A4", "A3"))
     check(ctx, "H2d A4/A3 - 1", float(a4.mean() / a3.mean()), ("H2d", "in_distribution_excess"),
           1e-12, offset=-1.0)
-    return [Series(ctx.system, "H2d", "", psi_ratio(a4, a3), False)]
+    return [Series(ctx.system, "H2d", "", psi_ratio(a4, a3), False, len(a4))]
 
 
 def series_h2e(ctx: Context) -> list[Series]:
@@ -930,7 +939,8 @@ def series_h2e(ctx: Context) -> list[Series]:
         diff = high - low
         check(ctx, f"H2e rho={rho:g} median change", float(np.median(diff)),
               ("H2e", "by_noise", f"{float(rho):g}", "median_change"), 1e-12)
-        out.append(Series(ctx.system, "H2e", f"rho={float(rho):g}", psi_sign(diff), False))
+        out.append(Series(ctx.system, "H2e", f"rho={float(rho):g}", psi_sign(diff), False,
+                          len(diff)))
     return out
 
 
@@ -947,7 +957,7 @@ def series_qn(ctx: Context) -> list[Series]:
                 continue
             check(ctx, f"Q-N {kind} {target} delta R^2", delta,
                   ("Q-N", kind, target, "delta_r2"), 1e-12)
-            out.append(Series(ctx.system, "Q-N", f"{kind} {target}", psi, False))
+            out.append(Series(ctx.system, "Q-N", f"{kind} {target}", psi, False, int(dom.sum())))
     return out
 
 
@@ -962,7 +972,11 @@ def series_h1b(ctx: Context) -> list[Series]:
     xc = x[keep] - x[keep].mean()
     slope = float(np.sum(xc * (y[keep] - y[keep].mean())) / np.sum(xc**2))
     check(ctx, "H1b PLP slope", slope, ("H1b", "PLP", "slope"), 1e-9)
-    return [Series(ctx.system, "H1b", "PLP", psi, False)]
+    check(ctx, "H1b PLP states excluded as non-finite", float((~keep).sum()),
+          ("H1b", "PLP", "n_excluded_nonfinite"), 0.0)
+    check(ctx, "H1b PLP states where the floor binds", float((e_p[keep] < 1e-12).sum()),
+          ("H1b", "PLP", "n_floored"), 0.0)
+    return [Series(ctx.system, "H1b", "PLP", psi, False, int(keep.sum()))]
 
 
 SERIES_BUILDERS: tuple[tuple[str, Callable[[Context], list[Series]]], ...] = (
@@ -993,11 +1007,11 @@ def section_d1_d2(ctx: Context) -> list[Series]:
             rep.nc(f"{ctx.system} {s.name} acf", str(exc))
             continue
         text, weight = acf_reading(s.criterion, float(lags[0]), s.n)
-        rep.say(f"  {s.name:28s} n={s.n:5d} {'P' if s.primary else '-'} "
+        rep.say(f"  {s.name:28s} n={s.n:5d} domain={s.domain:5d} {'P' if s.primary else '-'} "
                 + " ".join(f"{a:+.3f}" for a in lags))
         rep.say(f"      reading: {text}; P(|acf1| > {acf_threshold(s.n):g} | no dependence) "
                 f"= {lag_zero_false_trigger(s.n):.4f}")
-        rows[s.name] = {"n": s.n, "primary": s.primary, "acf": lags.tolist(),
+        rows[s.name] = {"n": s.n, "domain": s.domain, "primary": s.primary, "acf": lags.tolist(),
                         "reading": text, "weight_toward_phi03": weight}
     rep.data.setdefault(ctx.system, {})["D1"] = rows
     primaries = [s for s in series if s.primary and s.name in rows]
@@ -1020,10 +1034,12 @@ def section_d1_d2(ctx: Context) -> list[Series]:
         lags = np.array(rows[s.name]["acf"])
         beta = beta_reading(lags, s.n)
         null_rate = UNION_NULL.get(s.n)
-        rep.say(f"  {s.name:28s} V5 {summary['V5']:.4g}  V10/V5 {summary['ratio10']:.3f}  "
-                f"V20/V5 {summary['ratio20']:.3f}  A5 rule {'FIRES' if summary['fires'] else 'quiet'}"
-                f" (predicted {fmt(null_rate, 3)} under no dependence; "
-                f"{fmt(UNION_STRESS.get(s.n), 3)} at phi = 0.3)")
+        rate_text = ("not tabulated for this n" if null_rate is None else
+                     f"{null_rate:.3f} under no dependence; {UNION_STRESS[s.n]:.3f} at phi = 0.3")
+        rep.say(f"  {s.name:28s} {'P' if s.primary else '-'} V5 {summary['V5']:.4g}  "
+                f"V10/V5 {summary['ratio10']:.3f}  V20/V5 {summary['ratio20']:.3f}  "
+                f"A5 rule {'FIRES' if summary['fires'] else 'quiet'} (predicted trigger rate: "
+                f"{rate_text})")
         rep.say(f"      beta5 {beta['beta5']:.4f} +- {beta['se']:.4f} (phi {beta['phi']:+.3f}; "
                 f"geometric acf {'holds' if beta['used'] else 'FAILS'}, max gap {beta['gap']:.3f} "
                 f"vs {2.5 / math.sqrt(s.n):.3f}): "
@@ -1102,7 +1118,9 @@ def section_d3(ctx: Context) -> None:
         else:
             state_sd = log_sd(state)[0]
         reading = ("C2h/C4h rows apply" if sigma > LOGSD_RULE else "C2h/C4h rows do not apply")
-        rep.say(f"  {rule}: log-SD {sigma:.3f} ({reading}); at E = 4: {fmt(proj, 3)}; "
+        proj_text = (f"{proj:.3f}" if proj is not None else
+                     "not defined (log-SD^2 is below psi'(E/2) - psi'(2))")
+        rep.say(f"  {rule}: log-SD {sigma:.3f} ({reading}); at E = 4: {proj_text}; "
                 f"draw-free state part {fmt(state_sd, 3)}"
                 + (f"; {n_bad} non-positive per-state MSE excluded" if n_bad else ""))
         out[rule] = {"log_sd": sigma, "above_rule": bool(sigma > LOGSD_RULE), "log_sd_E4": proj,
@@ -1171,6 +1189,14 @@ def _v4_flag_line(ctx: Context) -> str:
         return "extra_href_equal True (the second V4 forecast reproduces the H_ref column)"
     return (f"WARNING extra_href_equal FALSE ({diff} differing H_ref entries): the 2 and 4 LT "
             "columns come from a call that did not reproduce the production H_ref column")
+
+
+def _v4_flag_short(ctx: Context) -> str:
+    """``extra_href_equal`` in a few words, printed beside a reading that uses the 2 and 4 LT columns."""
+    if not ctx.dump.has("v4/extra_href_equal"):
+        return "extra_href_equal not in the dump"
+    return ("extra_href_equal True" if bool(ctx.dump.scalar("v4/extra_href_equal"))
+            else "EXTRA_HREF_EQUAL FALSE")
 
 
 def section_d5(ctx: Context) -> None:
@@ -1279,7 +1305,7 @@ def _d5_v4(ctx: Context) -> dict:
     shift_b = 2.0 * s["b"]
     rep.say(f"    m({m_a}) {s['a']:+.5f}, m({m_b}) {s['b']:+.5f} (shifts of the median range "
             f"against M = {m_c}); observed order {fmt(p)} ({note}); B_V4({m_b}) = 2 m({m_b}) = "
-            f"{shift_b:+.5f} (order 1/2)")
+            f"{shift_b:+.5f} (order 1/2) [uses the 2 and 4 LT columns; {_v4_flag_short(ctx)}]")
     out.update(shift_a=s["a"], shift_b=s["b"], order=p, order_note=note, bias_v4=shift_b)
     return out
 
@@ -1368,6 +1394,17 @@ def section_d6(ctx: Context) -> None:
 # --------------------------------------------------------------------------------------------
 # driver
 # --------------------------------------------------------------------------------------------
+def check_provenance(ctx: Context, seed_id: str) -> None:
+    """The dump must belong to this run: same system, seed id and preset (else a MISMATCH)."""
+    want = {"meta/system": ctx.system, "meta/seed_id": seed_id, "meta/preset": ctx.cfg.get("name")}
+    for key, expected in want.items():
+        if not ctx.dump.has(key):
+            ctx.rep.nc(f"{ctx.system} dump provenance", f"array {key!r} is not in {ctx.dump.source}")
+        elif str(ctx.dump.scalar(key)) != str(expected):
+            ctx.rep.defect(f"{ctx.system}: {key} is {ctx.dump.scalar(key)!r} in the dump but "
+                           f"{expected!r} in results.json (the dump is not this run's)")
+
+
 def make_label(seed_id: str | None) -> str:
     """The DEVELOPMENT label with the seed id the run recorded."""
     return (f"DEVELOPMENT ({seed_id}): conditional on one realization; not a hypothesis test")
@@ -1435,10 +1472,14 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
             continue
         ctx = Context(system, dump, results["systems"][system], cfg, rep, seed, resamples,
                       permutations)
-        section_d1_d2(ctx)
-        for name, section in (("D3", section_d3), ("D4", section_d4), ("D5", section_d5),
-                              ("D6", section_d6)):
-            attempt(rep, f"{system} {name}", section, ctx)
+        try:
+            check_provenance(ctx, seed_id)
+            section_d1_d2(ctx)
+            for name, section in (("D3", section_d3), ("D4", section_d4), ("D5", section_d5),
+                                  ("D6", section_d6)):
+                attempt(rep, f"{system} {name}", section, ctx)
+        finally:
+            dump.close()
     rep.say("")
     if rep.incomplete:
         rep.say(f"not computable: {len(rep.incomplete)} item(s) (listed above); never skipped")
