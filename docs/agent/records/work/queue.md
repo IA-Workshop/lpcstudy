@@ -125,3 +125,11 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
   - **Order:** .7a, .9, .7b, .8.
   - **Owner:** questions OF-1 to OF-6 and PF-1 to PF-5, and the pre-registration items P-1 (R0 on three systems) and P-2 (the C1 gate-failure probabilities). OF-6/P-2 must be settled before R1.
 - 2026-10-14, claude-sonnet-5-5 (developer): WU-0003.7a **implemented** on branch `wu/0003-rehearsal` (unit radius run once, see `WU-0003-dev-rehearsal.md` `## Log`). New bitwise-neutral `results.json` leaves, no new random draw: `context/main_digest` and `estimator_digest`; `fitted/<proxy>/nfev` and `status` for both proxy fits; `fitted/a5_leaf_digest` and `fitted/allocator_digest`; `weights_digest` in every `estimators` entry. A `new` rule in `tools/compare_pilot.py` for them. **Needs owner review before freeze** (provenance digests and the verdict-chain leaves, B2 row .7a). **Pending:** the a1 DEV-0 smokes (base and tip) and the integration tier, which start smoke presets and wait for a free slot (a pilot arm of another lane was running).
+- 2026-10-14, claude-opus-5-5 (planner): WU-0003 **plan amendment 3 written** (`WU-0003-dev-rehearsal.md`, C1 to C6; from the WU-0003.9 review, note `2026-10-14-math-wu0003-9-q1.md` and the amendments note §17). Contents:
+  - C1: d3 figure corrected to 2.94e-7;
+  - C2: d1 fixture change recorded (Q6);
+  - C3: the R1-against-R2/R3 scope rule; working default (A), R2 and R3 without `--skip-robustness`;
+  - C4: every float leaf tagged or overridden, with a pinning test, before R1 (Q9);
+  - C6: owner questions R5/O3, OF-7, Q7, Q8, `handling` scope, R6, Q6, Q9.
+
+  No threshold is loosened.

@@ -232,6 +232,68 @@ A2 step 6 is unchanged: all four merge before `C_R`, each showing 0 changed leav
 
 **B5. Affected checks of this amendment:** documentation only, so no tests (§4.2). **Owner checkpoints (LPC.PC.11):** .7a (provenance), .7b (validation and LM data, CLI guard), .8 (statistics) and .9 (tolerance and verdict comparison) all need owner review before freeze. No seed code and no dependency changes. The registry status change of A4 is unchanged.
 
+### Plan amendment 3 (2026-10-14, planner claude-opus-5-5)
+
+**Basis:**
+- the WU-0003.9 review, round 1 (`WU-0003.9-review.md`, on `wu/0003-9-compare-runs`);
+- the mathematician's note `2026-10-14-math-wu0003-9-q1.md` (same branch);
+- `2026-10-11-amendments-for-owner.md` §17 (develop).
+
+Amendments 1 and 2 stay in force except where an item below says otherwise. No R0 to R6 output exists at this commit. No threshold is loosened. An item marked **WORKING DEFAULT** holds until the owner rules on it.
+
+**C1. Text correction to B2 d3** (and to the WU-0003 note's §M2 table, row "Interval class", which has the same slip).
+- Under s = max(|lo|, |hi|), the largest class-(a) rel on the kernel pair is **2.94e-7** (2.9357e-7, at `H1a/by_noise/0.01/ratio_ci/[0]`), not 3.97e-7. The value 3.97e-7 is |Δ|/|ref|, without the scale.
+- The declarations are unchanged: 1e-5 for (a), and 1e-4 for (b) to (g). d3's reference becomes "2.94e-7, as in `m2_floors.log`'s M2-scale column".
+- Q-N `r2_three` and `r2_four` are class (f), confirmed by note §Q2. This leaves the declaration unchanged.
+- **Information.** The smoke H1a fit is not identified: 2 library sizes against 3 parameters. Its 1/d, ratio and interval are plumbing values. d3 checks the tool. It calibrates no H1a tolerance.
+
+**C2. Change to B2 d1, recorded after the fact (Q6; review R10).**
+- **What changed.** The d1 truth table was built from synthetic result trees, plus a real-schema extract of about 10 KB (`real_schema_extract.json`). The extract holds the `handling` subtree with the LM kinds, the top-level `handling` block and the `clip_sensitivity` block. It replaces fixtures built from the WU-0002.14 S3 smoke pair.
+- **Who authorized it.** The main session, on 2026-10-14, during WU-0003.9. This line records it as a plan amendment.
+- **Why.** The S3 pair predates .7a. It lacks the new selecting leaves (`main_digest`, `estimator_digest`, the weight digests, `a5_leaf_digest`), so B1 item 1 makes every unedited pair from it "tier undetermined". A truth table built from it would need those leaves added synthetically anyway.
+- **Strictness.** The synthetic table is at least as discriminating for tier selection (note §Q5, reading 12). The extract covers what the synthetic schema lacked: scope, LM kinds, verdict strings and sum-over-systems.
+- **d3 and d4 keep their real-data references.** d3 runs on the unedited S3 pair. A committed extract may stand in for it only if it holds every float leaf of both results, copied bitwise. d4 runs on the P0/P1 extract, which the reviewer checked bitwise.
+- The owner may still require the 164 KB fixtures (C6, Q6).
+
+**C3. Scope rule for R1 against R2 and R3 (review R6; WORKING DEFAULT, owner question C6-R6). Pre-registered before R1.**
+- **The gap.** A4 runs R1 with the robustness block and R2/R3 with `--skip-robustness`. The robustness block trains 4 extra estimators, so the estimator digest sets differ. By B1 item 1, R1 against R2 or R3 is "tier undetermined" by construction. Under the tool's rule that a one-sided leaf fails, every robustness leaf would fail as well.
+- **Option (A), recommended and the working default:** run R2 and R3 **without** `--skip-robustness`, with the same flags as R1.
+  - It keeps `compare_runs`' strict rule (a one-sided leaf fails) unchanged.
+  - Tier selection uses the full digest set.
+  - It needs no tool change.
+  - It also gives reproducibility evidence on the robustness leaves.
+  - Cost: about 660 s more CPU per run at the pilot (A1). The GPU cost is unmeasured and falls under C6.
+  - It replaces the `--skip-robustness` of A4's R2 and R3 rows, and the premise of O8 ("pilot without robustness").
+- **Option (B), fallback only if the owner rules for it:** compare on the common set.
+  - The tier-selection digest set is restricted to the context leaves plus the estimators present in **both** runs. Each of those must be equal under B1 item 1.
+  - A leaf or estimator digest that is present in one run only is "one-sided by configuration". This applies only when the other run's recorded command contains `--skip-robustness`, and the leaf lies under `robustness` or is a robustness-only estimator. Such leaves are listed with counts, as information.
+  - Every other one-sided leaf fails, as now.
+  - Any count that aggregates robustness contributions (for example `handling/totals`) must be compared over the common cells or listed as excluded, with the reason.
+  - (B) relaxes the one-sided rule for a named block, and it needs a tool option that is counted and printed.
+
+**C4. Untagged float leaves (Q9). A requirement on WU-0003.9 and `tools/compare_pilot.py`, to be met before R1.**
+- **Tags or overrides.** Every float leaf of the pilot schema gets either a dependence tag in `compare_pilot`'s `TABLE` or an explicit override in `compare_runs`, each with a printed reason. The tag means the most-downstream module the leaf depends on; that is the meaning of "chain" in A6 and WU-0016.
+- **The census.** The P0/P1 pilot schema has 2849 untagged float leaves, among them H1a 60, H2b 249, `handling` 690 and `km_curves` 720 (`q5_chain_census_pilot.log`).
+- **Uncertain dependence.** Where a leaf's dependence is uncertain, it gets the tag with the tighter tolerance. A failure of correct code that follows is reported and flagged, never loosened.
+- **The pinning test.** It uses a committed fixture of leaf paths only (no values), taken from the DEV-0 pilot P1. It asserts that the untagged set is empty. Radius: `test_tools_compare_pilot` and `test_tools_compare_runs`.
+- **At run time.** An untagged float leaf that is not overridden is NOT COMPUTED (exit 2). The "untagged = network chain" default never decides a tolerance at R1 to R6. Before the R5/R6 comparison, the full-schema paths are checked against the same table.
+- **Adopted now, as a tightening (note §Q1.4).** `H1a/by_noise/*/median_seed_by_n_lib/*` and `H1a/inverse_dim_reference` are tagged cp (1e-12). Their kernel-pair margin is at least 120.
+
+**C5. Status.** Documentation only, so there are no tests (§4.2). C4 touches `tools/compare_pilot.py` and `tools/compare_runs.py`, which need owner review before freeze. C3 changes the run flags of A4, as the owner's choice.
+
+**C6. Owner questions (added to B4; none is decided here; the working default is the tool's strict reading).**
+
+| Id | Question | Working default |
+| --- | --- | --- |
+| C6-R5 | How O3 reads on T1 to T3 pairs. B1 item 4 applies O3 to both class groups. The tool prints O3 as "information" outside T0, because a pair that passes at 0.5× its tolerance would always trigger O3 (a conflict with d2). The mathematician reads the tool as consistent with the ROADMAP rule; the reviewer reads it as looser. | Print "O3 FINDING" on every tier. Exit 1 on T0 (the R1-against-R2 declaration). On T1 to T3 the exit code is otherwise unchanged. |
+| OF-7 | Re-tag the H1a fit outputs (`fitted_inverse_dim`, `ci_inverse_dim`) to the A6 QoI rule, 1e-4·max(\|lo\|, \|hi\|), class (a), and `floor_rms` to class (g), instead of the cp-chain 1e-12. These are tolerance-stopped `curve_fit` outputs with a 2-point Jacobian; the a-priori bound is 4.0e-5·s and the largest measured flip 7.4e-6·s (note §Q1.3). This loosens a tolerance after a result exists. **Not adopted.** | cp 1e-12. Every T2 pair is expected to fail on up to 24 H1a leaves at the pilot. Each failure prints the pointer line to note §Q1, keeps exit 1, and is referred as an OF-7 finding. Any \|Δ\| above 4.0e-5·s is a DEF. **Information for OF-1:** the A6 QoI rule has only a 2.5× a-priori margin on these H1a verdict leaves. |
+| Q7 | Should `gain_bound/n_screened_out` (and its `result_counts` mirror) license the 0.1·hw exception? It is not on A6's list; on the kernel pair it went from 25 to 23. | Exact (FAIL), as the tool does. |
+| Q8 | A `cov_digest` difference alone, with W and U equal, matches no A6 tier. | "Tier undetermined" (exit 2), not T2. |
+| C6-H | Scope of a `handling` count. After the R1 fix, a clip, ν-cap or replacement count licenses 0.1·hw on its own system only. Top-level and `totals` mirrors license nothing. This per-system scope is still wider than the causal reading, where a cell's count reaches only the blocks that read that cell. | The tool's per-system scope, with every licensed leaf printed beside the count that licensed it. The stricter causal map needs the mathematician and the owner's choice. **Flag:** this default is not the strictest reading available. |
+| C6-R6 | The R1-against-R2/R3 scope rule (C3). | Option (A): R2 and R3 without `--skip-robustness`. |
+| Q6 | Accept the d1 change of C2, or require the 164 KB S3-pair fixtures. | C2 as recorded; d3 and d4 keep their real data. |
+| Q9 | The C4 requirement (tag every float leaf, or override it, before R1). | Adopted as a requirement. The owner may rule on individual tags. |
+
 ## Log
 
 ### WU-0003.7a (developer claude-sonnet-5-5, 2026-10-14; branch `wu/0003-rehearsal`, from `dcc4ff2`)
