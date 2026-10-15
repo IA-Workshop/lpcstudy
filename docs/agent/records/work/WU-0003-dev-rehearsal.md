@@ -541,6 +541,9 @@ Written before the fix-round unit run. Findings R1 to R8, R10, R11 are fixed in 
 
 **Planner questions, marked and not decided (the stricter reading is kept in each).** Q1: H1a and H1c outside the schema now exit 2 (the review withdrew the looser reading); Q2: weight-only reading of the interpolation; Q7: the variance denominator over the delta-valid states, and the definitions (b) to (d); Q8: B1 7.D5 and c6 wording (the exact constant, and the generator substitution); Q11: the pilot-equivalent V4 print is an addition to the .8 row; Q12: the f_b bins (and WU-0008's bound `|bias| <= 0.40 s f_b`, not printed); Q13: B1 item 9 (C4) has no owner row. R9 and Q9 (the tool seed and options) are the owner's.
 
+**§4.9 checklist, slow tier (after fix round 1 was committed, a50aa24 and the queue fix).**
+1. Change set: unchanged since the unit run (`tools/rehearsal_diagnostics.py`, the two test files, this file, `queue.md`, the review answers). 2. Radius: `tests/slow/test_rehearsal_diagnostics_mc.py`, once, by the statistic's owner (4.2 row for a statistic verified in `tests/slow/`). 3. Already run: no; the slow file has never run, and the tool code it exercises (`variance_summary`, `permutation_null`, `interior_attenuation`) was not changed by fix round 1. 4. `JAX_PLATFORMS=cpu` (the wrapper). 5. `LPC_THREADS` 4, slow timeout 3600 s. 6. Contention: the coordinator reported the CPU slot free; `pgrep -fa "lpcstudy --preset"` is checked in the same command, and the run starts only if it is empty. 7. `-q --tb=short -rfE`. 8. `tools/run_tests.sh slow tests/slow/test_rehearsal_diagnostics_mc.py`.
+
 ## Review
 
 ## Audit
