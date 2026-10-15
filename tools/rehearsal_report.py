@@ -43,7 +43,8 @@ M3, with the reference script ``2026-10-14-math-wu0003-scripts/m3_projection.py`
 
 Ratio criteria (H1a, H1c, H2d, H3c) are also printed as ``hw / R`` with ``R`` the run's point
 estimate (for H2d ``R = 1 + excess``), projected by the same factor: ``R`` is held at its run value
-(H3c and H2d are conditional on the pilot's K and fitted rules).
+(H3c and H2d are conditional on the pilot's K and fitted rules). H2c is printed relative to its MSE
+level (``mean / relative``).
 
 Readings against the v3 section 7 statements (H2b(ii) 0.03, H2e 0.04, Q-N 0.04, H2a(ii) needing
 ``|pc|`` about 0.01), the band ``[0.67, 1.5]``. Both are reported; "v3 precision not reproduced" is
@@ -72,8 +73,14 @@ printed beside it).
 
 Readings that the plan leaves open (the stricter or the note's reading is applied; owner questions,
 listed in the Log of WU-0003): the form of reading (ii) against a v3 value; the derived v3 half-width
-of H2a(ii); the range fallback of kappa_E counting toward exit 2; H3a (a chi-square, conditional on
-K) and V7 are not half-widths and are not projected (one information line).
+of H2a(ii); the range fallback of kappa_E counting toward exit 2.
+
+V7 (the median slope and the efficiency at each noise level; sweep size, 95%, B 1.007; no v3 value)
+is projected like the others. The H2c rows are also printed as ``hw`` over the MSE level (the mean
+over the leaf ``relative``). H3a is a chi-square conditional on K that the results leaves do not
+hold (only log-rank p-values): it is listed once as "not computable" and counted, so a complete run
+exits 2 until the planner strikes it or defines the leaf. A dump that does not reproduce its results
+leaf is never used: that row falls back to the range (MISMATCH, exit 1).
 
 Exit codes: 0 everything computed and no mismatch; 1 at least one MISMATCH (a dump that does not
 reproduce the results leaf it belongs to, an interval level that disagrees with the table); 2
@@ -408,10 +415,10 @@ class Spec:
         Name in the report (the labels of ``m3_projection.py`` except ``rho=0.01``).
     path : tuple[str, ...]
         Path of the block that holds the interval, under ``systems/<s>``.
-    interval : str
-        Key of the interval in the block.
-    estimate : str | None
-        Key of the point estimate in the block (None: not printed).
+    interval : str | tuple[str, ...]
+        Key (or key path) of the interval in the block.
+    estimate : str | tuple[str, ...] | None
+        Key (or key path) of the point estimate in the block (None: not printed).
     level : str
         ``"primary"`` (1 - 0.05/3) or ``"secondary"`` (95%).
     size_key : str
@@ -430,12 +437,15 @@ class Spec:
         ``(kind, rule_first, rule_second)`` of a kappa_E criterion.
     kappa_leaf : tuple[str, ...] | None
         Path (under ``systems/<s>``) of the leaf that the dump's statistic reproduces.
+    rel_key : str | None
+        Key of a leaf ``relative = estimate / (MSE level)`` in the block: the half-width is then
+        also printed as ``hw / MSE level`` (H2c).
     """
 
     label: str
     path: tuple[str, ...]
-    interval: str
-    estimate: str | None
+    interval: str | tuple[str, ...]
+    estimate: str | tuple[str, ...] | None
     level: str
     size_key: str
     extra: str = "none"
@@ -445,10 +455,16 @@ class Spec:
     v3_note: str = ""
     kappa: tuple[str, str, str] | None = None
     kappa_leaf: tuple[str, ...] | None = None
+    rel_key: str | None = None
+
+
+def keys_of(key: str | tuple[str, ...]) -> tuple[str, ...]:
+    """A key or a key path as a tuple."""
+    return (key,) if isinstance(key, str) else tuple(key)
 
 
 def specs_for(cfg: dict, best_single: str | None) -> list[Spec]:
-    """The projected half-widths of one system (the 18 rows of ``m3_projection.py``).
+    """The projected half-widths of one system (the 18 rows of ``m3_projection.py``, and V7).
 
     ``best_single`` is the H2c better single forecaster of the system (``A0`` or ``A1``), or None
     when the leaf is missing (the H2c second row is then absent and the caller reports it).
@@ -479,12 +495,14 @@ def specs_for(cfg: dict, best_single: str | None) -> list[Spec]:
         Spec("H2b(ii)", ("H2b", "library_change"), "ci", "mean_change", "primary", "n_test_sweep",
              v3=0.03),
         Spec("H2c A4-A2", ("H2c", "A4_minus_A2"), "ci", "mean", "secondary", "n_test", "kappa",
-             kappa=("diff", "A4", "A2"), kappa_leaf=("H2c", "A4_minus_A2", "mean")),
+             kappa=("diff", "A4", "A2"), kappa_leaf=("H2c", "A4_minus_A2", "mean"),
+             rel_key="relative"),
     ]
     if best_single is not None:
         out.append(Spec(f"H2c A4-{best_single}", ("H2c", f"A4_minus_{best_single}"), "ci", "mean",
                         "secondary", "n_test", "kappa", kappa=("diff", "A4", best_single),
-                        kappa_leaf=("H2c", f"A4_minus_{best_single}", "mean")))
+                        kappa_leaf=("H2c", f"A4_minus_{best_single}", "mean"),
+                        rel_key="relative"))
     out.append(Spec("H2d", ("H2d",), "ci", "in_distribution_excess", "secondary", "n_test",
                     "kappa", ratio=True, ratio_offset=1.0, kappa=("ratio", "A4", "A3"),
                     kappa_leaf=("H2d", "in_distribution_excess")))
@@ -494,6 +512,12 @@ def specs_for(cfg: dict, best_single: str | None) -> list[Spec]:
                         "secondary", "n_test_sweep", v3=0.04))
     out.append(Spec("H3c", ("H3c",), "ci", "A5_over_A4_mse", "primary", "n_test", "kappa",
                     ratio=True, kappa=("ratio", "A5", "A4"), kappa_leaf=("H3c", "A5_over_A4_mse")))
+    out.append(Spec("V7 median slope", ("V7",), "ci", "median_slope", "secondary",
+                    "n_test_sweep"))
+    for noise in cfg["noise_levels"]:
+        key = f"{float(noise):g}"
+        out.append(Spec(f"V7 efficiency rho={key}", ("V7",), ("efficiency_ci_by_noise", key),
+                        ("efficiency_median_by_noise", key), "secondary", "n_test_sweep"))
     return out
 
 
@@ -590,8 +614,10 @@ class DumpView:
 
 
 def check_reproduction(view: DumpView, label: str, mine: float, leaf_path: tuple[str, ...],
-                       scale: float = 0.0, offset: float = 0.0, tol: float = 1e-12) -> None:
+                       scale: float = 0.0, offset: float = 0.0, tol: float = 1e-12) -> bool:
     """Compare a statistic recomputed from the dump with its results leaf (MISMATCH if it differs).
+
+    Returns whether it matched; the caller must not use a dump that did not.
 
     The bound is ``|mine + offset - leaf| <= tol max(|leaf|, scale)``. ``tol = 1e-12`` is about 10^3
     additions of unit round-off with a margin of 10 (the dump holds the very arrays that the leaf
@@ -607,6 +633,7 @@ def check_reproduction(view: DumpView, label: str, mine: float, leaf_path: tuple
                  f"(|diff| {diff:.2e}, allowed {allowed:.2e}): {'MATCH' if ok else 'MISMATCH'}")
     if not ok:
         view.rep.defect(f"{view.system} {label}: dump {value!r} vs results {leaf!r}")
+    return ok
 
 
 def draw_free_mse(view: DumpView, rule: str) -> np.ndarray:
@@ -630,8 +657,12 @@ def draw_free_mse(view: DumpView, rule: str) -> np.ndarray:
     return value.mean(axis=1)
 
 
-def kappa_from_dump(view: DumpView, spec: Spec, e_full: int, block: int) -> dict:
+def kappa_from_dump(view: DumpView, spec: Spec, e_full: int) -> dict:
     """kappa_E of one criterion from the dump, after checking the dump against the results leaf.
+
+    A dump that does not reproduce the leaf is not used: ``NotComputable`` after the MISMATCH is
+    recorded, so the caller falls back to the range. The block length is the run's
+    ``bootstrap_block`` (a missing leaf is "not computable", no default).
 
     Returns
     -------
@@ -640,6 +671,7 @@ def kappa_from_dump(view: DumpView, spec: Spec, e_full: int, block: int) -> dict
     """
     assert spec.kappa is not None and spec.kappa_leaf is not None
     kind, first, second = spec.kappa
+    block = int(dig(view.cfg, "bootstrap_block"))
     d, ref = view.dump, view.ref
     n_draws = int(d.scalar("meta/n_eval_draws"))
     if n_draws != int(dig(view.cfg, "n_eval_draws")):
@@ -657,12 +689,16 @@ def kappa_from_dump(view: DumpView, spec: Spec, e_full: int, block: int) -> dict
     a, b = real[first], real[second]
     if kind == "diff":
         diff = a - b
-        check_reproduction(view, f"{spec.label} mean", float(diff.mean()), spec.kappa_leaf,
-                           scale=float(np.mean(np.abs(diff))))
+        ok = check_reproduction(view, f"{spec.label} mean", float(diff.mean()), spec.kappa_leaf,
+                                scale=float(np.mean(np.abs(diff))))
     else:
         ratio = float(a.mean() / b.mean())
-        check_reproduction(view, f"{spec.label} ratio", ratio, spec.kappa_leaf,
-                           offset=-spec.ratio_offset, scale=ratio if spec.ratio_offset else 0.0)
+        ok = check_reproduction(view, f"{spec.label} ratio", ratio, spec.kappa_leaf,
+                                offset=-spec.ratio_offset,
+                                scale=ratio if spec.ratio_offset else 0.0)
+    if not ok:
+        raise NotComputable("the dump does not reproduce the results leaf (MISMATCH above); "
+                            "the dump is not used")
     value, var_state, var_draw = kappa_estimate(state[first], state[second], a, b, kind,
                                                 n_draws, e_full, block)
     return {"kappa": value, "V_s": var_state, "V_d": var_draw, "n": n}
@@ -717,7 +753,7 @@ def open_dump(folder: Path, system: str, cfg: dict, res: dict, seed_id: str,
 # --------------------------------------------------------------------------------------------
 def interval_of(block: dict, spec: Spec) -> tuple[float, float]:
     """The interval of a criterion as two finite floats, ``lo < hi``."""
-    raw = dig(block, spec.interval)
+    raw = dig(block, *keys_of(spec.interval))
     if not isinstance(raw, (list, tuple)) or len(raw) != 2:
         raise NotComputable(f"interval {raw!r} is not a pair")
     lo, hi = float(raw[0]), float(raw[1])
@@ -748,7 +784,7 @@ def project_row(spec: Spec, system: str, tree: dict, cfg: dict, view: DumpView |
     if stated is not None and abs(float(stated) - level_of(spec)) > 1e-9:
         rep.defect(f"{where}: the results record level {stated!r} but the table has "
                    f"{level_of(spec)!r}")
-    estimate = float(dig(block, spec.estimate)) if spec.estimate else None
+    estimate = float(dig(block, *keys_of(spec.estimate))) if spec.estimate else None
     n_run, n_full = int(dig(cfg, spec.size_key)), int(getattr(full, spec.size_key))
     fn = n_factor(n_run, n_full)
     fb = b_factor(spec.level, int(dig(cfg, "bootstrap_resamples")), int(full.bootstrap_resamples))
@@ -772,7 +808,7 @@ def project_row(spec: Spec, system: str, tree: dict, cfg: dict, view: DumpView |
         if view is not None:
             # a failure is recorded by attempt() with its reason (exit 2); the range is used
             got = attempt(rep, f"{where} kappa_E (the range is used)", kappa_from_dump, view,
-                          spec, e_full, int(cfg.get("bootstrap_block", BLOCK)))
+                          spec, e_full)
             if got is not None:
                 kappa_info = got
                 x_lo = x_hi = got["kappa"]
@@ -789,6 +825,13 @@ def project_row(spec: Spec, system: str, tree: dict, cfg: dict, view: DumpView |
         if r_hat == 0.0 or not math.isfinite(r_hat):
             raise NotComputable(f"{where}: ratio estimate {r_hat} cannot scale a half-width")
         row["rel_run"] = hw / abs(r_hat)
+        row["rel_lo"], row["rel_hi"] = row["rel_run"] * f_lo, row["rel_run"] * f_hi
+    if spec.rel_key is not None:
+        relative = float(dig(block, spec.rel_key))
+        if estimate is None or estimate == 0.0 or relative == 0.0 or not math.isfinite(relative):
+            raise NotComputable(f"{where}: mean {estimate} and relative {relative} give no MSE "
+                                "level")
+        row["rel_run"] = hw / abs(estimate / relative)
         row["rel_lo"], row["rel_hi"] = row["rel_run"] * f_lo, row["rel_run"] * f_hi
     if spec.label.startswith("H2a(ii)"):
         row["pass_bound_lo"] = H2A_PARTIAL_EDGE - row["hw_hi"]
@@ -914,7 +957,8 @@ def summary_lines(rep: Report, observed: bool) -> list[str]:
             if which(r, "obs_"):
                 out.append(f"    outside the band ({which(r, 'obs_')}): {r['system']} {r['label']}: "
                            f"observed {r['observed']:.4f} against {r['hw_lo']:.4f}-{r['hw_hi']:.4f}")
-    out.append("  H3a (a chi-square, conditional on K) and V7 are not half-widths: not projected")
+    out.append("  H3a: not computable from the results leaves (listed above, counted): exit 0 is "
+               "unreachable until the planner rules")
     return out
 
 
@@ -953,6 +997,8 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
                                 f"{obs_results['config'].get('name')!r}, not 'full'")
     rep.data["label"] = make_label(seed_id)
     rep.data["rows"] = {}
+    rep.nc("H3a (all systems)", "no chi-square leaf in results.json (only log-rank p-values); the "
+           "rule chi2_full ~ 2 chi2_pilot is conditional on K (not projected)")
     all_systems = list(results.get("systems", {}))
     chosen = [s for s in all_systems if systems is None or s in systems]
     for wanted in systems or ():

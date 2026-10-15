@@ -118,17 +118,19 @@ def test_unmeasured_factor_pairs_are_not_computable() -> None:
         rr.n_factor(0, 1000)
 
 
-def test_specs_are_the_eighteen_rows_of_the_note() -> None:
-    """The rows of M3's ``m3_projection.py``: 18 per system (H2c has two, H2a(ii) two, H2e two)."""
+def test_specs_are_the_eighteen_rows_of_the_note_and_v7() -> None:
+    """The rows of M3's ``m3_projection.py`` (18 per system: H2c two, H2a(ii) two, H2e two) and the
+    five V7 rows (median slope; efficiency at the four noise levels of the configuration)."""
     cfg = json.loads((FIXTURES / "p0_pilot.json").read_text())["config"]
     labels = [s.label for s in rr.specs_for(cfg, "A1")]
     assert labels == ["H1b PLP slope", "H1c PLP median ratio", "H1d analog_seed",
                       "H1a ratio rho=0.01", "Q-N oracle logit", "Q-N oracle zero-ind",
                       "Q-N oracle log_hor", "H2a(i)", "H2a(ii) zero", "H2a(ii) interior",
                       "H2b(i)", "H2b(ii)", "H2c A4-A2", "H2c A4-A1", "H2d", "H2e rho=0.01",
-                      "H2e rho=0.02", "H3c"]
+                      "H2e rho=0.02", "H3c", "V7 median slope", "V7 efficiency rho=0.005",
+                      "V7 efficiency rho=0.01", "V7 efficiency rho=0.02", "V7 efficiency rho=0.05"]
     assert "H2c A4-A0" in [s.label for s in rr.specs_for(cfg, "A0")]
-    assert len([s.label for s in rr.specs_for(cfg, None)]) == 17
+    assert len([s.label for s in rr.specs_for(cfg, None)]) == 22
 
 
 # ------------------------------------------------------------------------------------------ f3
@@ -168,7 +170,9 @@ def test_p0_p1_projections_equal_the_script_log(name: str, tmp_path: Path) -> No
     """
     logged = parse_log()[name]
     mine = tool_rows(name, tmp_path)
-    assert len(logged) == 54 and set(mine) == set(logged)
+    assert len(logged) == 54 and set(logged) <= set(mine)
+    extra = set(mine) - set(logged)
+    assert len(extra) == 15 and all(label.startswith("V7 ") for label, _ in extra)
     for key, expected in logged.items():
         row = mine[key]
         assert abs(row["hw_run"] - expected["hw"]) <= 5e-5 + 1e-12, key
@@ -216,8 +220,9 @@ def test_pilot_fixture_report_is_complete_but_for_kappa(tmp_path: Path, capsys) 
     assert code == 2
     assert out.splitlines()[0] == "DEVELOPMENT (DEV-0): conditional on one realization; not a hypothesis test"
     assert out.count("(FALLBACK)") == 12
-    assert out.count("not computable: ") == 3 + 1  # three systems, plus the closing count line
-    assert "not computable: 3 item(s)" in out
+    # three systems without a dump, the one H3a line, plus the closing count line
+    assert out.count("not computable: ") == 3 + 1 + 1
+    assert "not computable: 4 item(s)" in out and "H3a (all systems)" in out
     assert "kappa_E: point estimate from the dump for 0 of 12 parts; range fallback for 12" in out
     assert "MISMATCH" not in out
     assert "v3 precision not reproduced" in out
@@ -315,10 +320,10 @@ def test_false_trigger_rates_against_scipy() -> None:
 
 
 def test_false_trigger_rate_is_printed_per_part(capsys, tmp_path: Path) -> None:
-    """Every part line carries its rate: 0.4% for 51 of the 54 rows, 7.0% for the three H3c rows."""
+    """Every part line carries its rate: 0.4% for 66 of the 69 rows, 7.0% for the three H3c rows."""
     rr.main([str(FIXTURES / "p1_pilot.json"), "--states", str(tmp_path / "none")])
     out = capsys.readouterr().out
-    assert out.count("false-trigger 0.4%") == 51 and out.count("false-trigger 7.0%") == 3
+    assert out.count("false-trigger 0.4%") == 66 and out.count("false-trigger 7.0%") == 3
 
 
 # ------------------------------------------------------------------------------------------ kappa
@@ -422,9 +427,11 @@ def make_dump(system: str, n: int = 500, draws: int = 2, ref: int = 2) -> dict[s
 
 
 def write_run(root: Path, best: str = "A1", scale_h3c: float = 1.0, h3c_level: float | None = None,
-              dump_seed: str = "DEV-0") -> Path:
+              dump_seed: str = "DEV-0", drop_block: bool = False) -> Path:
     """A run directory: the P0 fixture with the kappa leaves recomputed from synthetic dumps."""
     res = json.loads((FIXTURES / "p0_pilot.json").read_text())
+    if drop_block:
+        del res["config"]["bootstrap_block"]
     states = root / "states"
     states.mkdir(parents=True)
     for system in SYSTEMS:
@@ -472,7 +479,7 @@ def kappa_by_hand(system: str, kind: str, first: str, second: str) -> float:
 
 
 def test_whole_dump_path_gives_exit_zero_and_the_hand_kappa(tmp_path: Path, capsys) -> None:
-    """A complete synthetic run (fixture results, three dumps): exit 0; kappa equals the loops.
+    """A complete synthetic run (fixture results, three dumps): only H3a is open; kappa = the loops.
 
     Reference: ``kappa_by_hand`` (loops from the definitions of V_i and the influence series,
     rel 1e-10, see the module docstring). The projected half-widths use the point kappa at both
@@ -482,8 +489,11 @@ def test_whole_dump_path_gives_exit_zero_and_the_hand_kappa(tmp_path: Path, caps
     json_out = tmp_path / "out.json"
     code = rr.main([str(run), "--json", str(json_out)])
     out = capsys.readouterr().out
-    assert code == 0, out
-    assert "MISMATCH" not in out and "not computable" not in out and "FALLBACK" not in out
+    # H3a is listed as not computable and counted, so a complete run exits 2 (plan question)
+    assert code == 2, out
+    incomplete = [line for line in out.splitlines() if line.startswith("  not computable")]
+    assert len(incomplete) == 1 and "H3a (all systems)" in incomplete[0]
+    assert "MISMATCH" not in out and "FALLBACK" not in out
     assert out.count("MATCH") >= 12 and "kappa_E: point estimate from the dump for 12 of 12" in out
     data = json.loads(json_out.read_text())
     expect = {"H2c A4-A2": ("diff", "A4", "A2"), "H2c A4-A1": ("diff", "A4", "A1"),
@@ -506,7 +516,7 @@ def test_best_single_a0_uses_cp_alone(tmp_path: Path, capsys) -> None:
     json_out = tmp_path / "out.json"
     code = rr.main([str(run), "--json", str(json_out)])
     out = capsys.readouterr().out
-    assert code == 0, out
+    assert code == 2 and out.count("  not computable") == 1, out  # H3a only
     rows = {r["label"]: r for r in json.loads(json_out.read_text())["rows"]["rossler"]}
     assert "H2c A4-A0" in rows and "H2c A4-A1" not in rows
     assert rows["H2c A4-A0"]["kappa"]["kappa"] == pytest.approx(
@@ -521,15 +531,25 @@ def test_dump_that_disagrees_with_the_results_is_a_mismatch(tmp_path: Path, caps
     assert code == 1
     assert "MISMATCH: 3 item(s) (listed above)" in out
     assert out.count("  MISMATCH: ") == 3 and out.count("H3c ratio: dump") == 6  # check line + defect
+    # R1: the mismatching dump does not supply kappa_E for H3c: the range, FALLBACK, not counted
+    assert out.count("(FALLBACK)") == 3
+    assert out.count("the dump does not reproduce the results leaf") == 3
+    assert "kappa_E: point estimate from the dump for 9 of 12 parts; range fallback for 3" in out
+    h3c = [line for line in out.splitlines() if line.startswith("  H3c ")]
+    assert len(h3c) == 3 and all("0.507-0.717" in line for line in h3c)
 
 
-@pytest.mark.parametrize(("scale", "code"), [(1.0 + 5e-13, 0), (1.0 + 2e-12, 1)])
+@pytest.mark.parametrize(("scale", "code"), [(1.0 + 5e-13, 2), (1.0 + 2e-12, 1)])
 def test_reproduction_bound_passes_at_half_and_fails_at_twice(tmp_path: Path, capsys, scale, code
                                                               ) -> None:
-    """The dump-to-results bound ``1e-12 |leaf|``: passes at 0.5x of it, fails at 2x."""
+    """The dump-to-results bound ``1e-12 |leaf|``: passes at 0.5x of it, fails at 2x.
+
+    A pass leaves only H3a open (exit 2, no MISMATCH, no FALLBACK); a failure exits 1.
+    """
     run = write_run(tmp_path / "run", scale_h3c=scale)
     assert rr.main([str(run)]) == code
-    capsys.readouterr()
+    out = capsys.readouterr().out
+    assert ("MISMATCH" in out) == (code == 1) and ("(FALLBACK)" in out) == (code == 1)
 
 
 def test_level_disagreement_is_a_mismatch(tmp_path: Path, capsys) -> None:
@@ -711,3 +731,65 @@ def test_qn_prediction_holds_iff_reading_ii_is_silent() -> None:
         row = rr.project_row(spec, "chua", tree, cfg, None, rr.Report(), PRESETS["full"])
         assert row["reading_ii"] is (not within)
         assert row["prediction"]["within"] is within
+
+
+def test_missing_block_length_is_not_computable_not_a_default(tmp_path: Path, capsys) -> None:
+    """R4: no ``bootstrap_block`` in the configuration: kappa_E falls back to the range, FALLBACK,
+    one "not computable" line per part (12), exit 2; the dump is not read with an invented block."""
+    run = write_run(tmp_path / "run", drop_block=True)
+    code = rr.main([str(run)])
+    out = capsys.readouterr().out
+    assert code == 2
+    assert out.count("results leaf bootstrap_block is absent") == 12
+    assert out.count("(FALLBACK)") == 12 and "range fallback for 12" in out
+
+
+def test_v7_rows_are_projected_like_the_sweep_criteria() -> None:
+    """R5: V7 (median slope, efficiency at each noise level) at n_test_sweep, 95%, B 1.007.
+
+    Reference: the fixture's own V7 intervals and the closed form ``sqrt(300/1000) x 1.007``
+    (rel 1e-12, a product of three numbers).
+    """
+    res = json.loads((FIXTURES / "p0_pilot.json").read_text())
+    rows = {r["label"]: r for r in tool_rows_from(res)["lorenz63"]}
+    v7 = res["systems"]["lorenz63"]["V7"]
+    factor = math.sqrt(300 / 1000) * 1.007
+    lo, hi = v7["ci"]
+    row = rows["V7 median slope"]
+    assert row["hw_run"] == pytest.approx((hi - lo) / 2, rel=1e-12)
+    assert row["hw_lo"] == row["hw_hi"] == pytest.approx((hi - lo) / 2 * factor, rel=1e-12)
+    assert row["estimate"] == v7["median_slope"] and "v3" not in row
+    lo, hi = v7["efficiency_ci_by_noise"]["0.05"]
+    row = rows["V7 efficiency rho=0.05"]
+    assert row["hw_run"] == pytest.approx((hi - lo) / 2, rel=1e-12)
+    assert row["hw_hi"] == pytest.approx((hi - lo) / 2 * factor, rel=1e-12)
+    assert row["estimate"] == v7["efficiency_median_by_noise"]["0.05"]
+
+
+def tool_rows_from(res: dict) -> dict[str, list[dict]]:
+    """The rows by system of a results tree held in memory (no dump)."""
+    rep = rr.Report()
+    cfg, full = res["config"], PRESETS["full"]
+    out: dict[str, list[dict]] = {}
+    for system, tree in res["systems"].items():
+        out[system] = [rr.project_row(spec, system, tree, cfg, None, rep, full)
+                       for spec in rr.specs_for(cfg, str(tree["H2c"]["best_single"]))]
+    return out
+
+
+def test_h2c_is_printed_relative_to_its_mse_level() -> None:
+    """R5: hw / MSE level, with level = mean / relative.
+
+    Hand arithmetic: mean 0.02 and relative 0.2 give a level 0.1; hw 0.01 gives 0.1; the
+    projection scales it by the same factor as the half-width. A zero relative leaf is "not
+    computable".
+    """
+    cfg = json.loads((FIXTURES / "p0_pilot.json").read_text())["config"]
+    spec = next(s for s in rr.specs_for(cfg, "A1") if s.label == "H2c A4-A2")
+    tree = {"H2c": {"A4_minus_A2": {"mean": 0.02, "ci": [0.01, 0.03], "relative": 0.2}}}
+    row = rr.project_row(spec, "lorenz63", tree, cfg, None, rr.Report(), PRESETS["full"])
+    assert row["rel_run"] == pytest.approx(0.1, rel=1e-12)
+    assert row["rel_lo"] == pytest.approx(0.1 * row["f_lo"], rel=1e-12)
+    tree["H2c"]["A4_minus_A2"]["relative"] = 0.0
+    with pytest.raises(rr.NotComputable, match="no MSE level"):
+        rr.project_row(spec, "lorenz63", tree, cfg, None, rr.Report(), PRESETS["full"])
