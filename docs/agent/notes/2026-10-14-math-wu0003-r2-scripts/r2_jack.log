@@ -1,0 +1,5 @@
+S2 dependent sa .5 H2c A4-A2: cover 0.845, median SE(k2) 0.080; H2c A4-A1: cover 0.828, median SE(k2) 0.084; H2d A4/A3: cover 0.930, median SE(k2) 0.086; H3c A5/A4: cover 0.940, median SE(k2) 0.104
+S4 dependent sa 1 H2c A4-A2: cover 0.902, median SE(k2) 0.048; H2c A4-A1: cover 0.897, median SE(k2) 0.046; H2d A4/A3: cover 0.955, median SE(k2) 0.059; H3c A5/A4: cover 0.938, median SE(k2) 0.066
+S10 pipeline-like light states, dependent H2c A4-A2: cover 0.910, median SE(k2) 0.075; H2c A4-A1: cover 0.875, median SE(k2) 0.073; H2d A4/A3: cover 0.940, median SE(k2) 0.074; H3c A5/A4: cover 0.935, median SE(k2) 0.077
+toy s 1.0 beta 1.0 dd 1.0: cover 0.955, median SE(k2) 0.021
+toy s 1.0 beta 1.0 dd 2.0: cover 0.955, median SE(k2) 0.047
