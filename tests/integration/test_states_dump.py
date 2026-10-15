@@ -22,6 +22,11 @@ Two smoke runs on DEV-0 in fresh interpreters, CPU: one without and one with ``-
   per-split ``handling/<split>/`` arrays are summed and compared exactly with
   ``handling/cells/<core>/by_kind/<oracle|eval>/counts`` (the eight ``handled`` columns and the
   three clipped-entry totals).
+* b3 also, schema /2 (WU-0003.7c): ``analysis.h1c_ratio_block`` applied to the dumped per-state H1c
+  ratios of the eligible states reproduces the PLP and CP leaves (bitwise); the H1a medians
+  ``median_seed_by_n_lib``, the reference ``inverse_dim_reference`` and, with the production
+  generator labels, the fit statistics ``ratio`` and ``fitted_inverse_dim`` are reproduced from
+  the dumped squared seed errors (bitwise).
 * b4: ``(m_A + m_B) / 2 = m`` for ``E_C``, ``E_P`` and ``C`` at every evaluation horizon of the core
   cell and at ``H_ref`` of every sweep cell, to ``1e-13`` times the exact mean absolute term: the
   moment itself for the two squares (their terms are positive) and the dumped ``abs_C`` (the mean
@@ -136,6 +141,34 @@ def test_b3_the_production_summaries_of_the_dumped_arrays_reproduce_their_leaves
         mean_state = float(np.mean(a[f"core/state_mse/{rule}"][:, ref_index]))
         assert mean_state == pytest.approx(score["mse_href"], rel=2 * n_states * n_draws * 2.0**-52,
                                            abs=0.0), rule
+    # schema /2: H1c from the dumped per-state ratios, H1a from the dumped seed errors
+    from lpcstudy.analysis import _median_fit_stats, h1c_ratio_block
+    from lpcstudy.data import make_rng
+    from lpcstudy.statistics import bootstrap_values
+    assert str(a["meta/schema"]) == "lpcstudy.states/2"
+    for name in ("PLP", "CP"):
+        block = h1c_ratio_block(a[f"h1c/{name}/ratio"][a[f"h1c/{name}/eligible"]], SMOKE, SYSTEM,
+                                with_verdict=name == "PLP")
+        leaf = {k: v for k, v in res["H1c"][name].items() if k != "n_ineligible_states"}
+        assert json.dumps(block, sort_keys=True) == json.dumps(leaf, sort_keys=True), name
+        assert int((~a[f"h1c/{name}/eligible"]).sum()) == res["H1c"][name]["n_ineligible_states"]
+    sizes, inverse = a["h1a/n_lib"], a["h1a/inverse_dim"]
+    keep = np.isfinite(inverse)
+    for rho in a["h1a/noise_levels"].tolist():
+        keep &= np.isfinite(a[f"h1a/rho={rho:g}/seed_sq"]).all(axis=1)
+    assert float(inverse[keep].mean()) == res["H1a"]["inverse_dim_reference"]
+    assert int(keep.sum()) == res["H1a"]["n_states"]
+    for rho in a["h1a/noise_levels"].tolist():
+        leaf = res["H1a"]["by_noise"][f"{rho:g}"]
+        kept = a[f"h1a/rho={rho:g}/seed_sq"][keep]
+        assert {str(int(n)): float(np.sqrt(v)) for n, v in zip(sizes, np.median(kept, axis=0))} == \
+            leaf["median_seed_by_n_lib"]
+        point, _ = bootstrap_values(
+            lambda idx: _median_fit_stats(kept, inverse[keep], sizes, idx), int(keep.sum()),
+            SMOKE.bootstrap_resamples, SMOKE.bootstrap_block,
+            make_rng(SMOKE.seed, SYSTEM, "bootstrap", "H1a", f"{rho:g}"))
+        same = lambda x, y: np.float64(x).tobytes() == np.float64(y).tobytes()
+        assert same(point[0], leaf["ratio"]) and same(point[1], leaf["fitted_inverse_dim"]), rho
     # the clip and replacement counts: the cell record pools the three splits
     from lpcstudy.ensemble import DRAW_COUNTERS, ENTRY_COUNTERS
     cell = runs["results"]["on"]["systems"][SYSTEM]["handling"]["cells"][CORE_CELL]

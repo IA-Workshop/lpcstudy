@@ -647,9 +647,14 @@ def run_system(study: Study, system: str) -> dict:
         LOG.warning("%s: VALIDATION GATE FAILED %s; results are flagged as provisional",
                     system, res["validation"]["gate"])
     LOG.info("%s validation gate: %s", system, res["validation"]["gate"])
-    res["H1a"] = an.h1a_library_scaling(library_cells, cfg)
+    h1a_capture: dict | None = None if study.dump is None else {}
+    res["H1a"] = an.h1a_library_scaling(library_cells, cfg, capture=h1a_capture)
     res["H1b"] = an.h1b_seed_amplifier(core, cfg)
-    res["H1c"] = an.h1c_horizon_law(core, cfg)
+    h1c_capture: dict | None = None if study.dump is None else {}
+    res["H1c"] = an.h1c_horizon_law(core, cfg, capture=h1c_capture)
+    if study.dump is not None:  # copies, for the dump only (WU-0003.7c)
+        study.dump.record_extra(system, {**{f"h1a/{k}": v for k, v in h1a_capture.items()},
+                                         **{f"h1c/{k}": v for k, v in h1c_capture.items()}})
     res["H1d"] = an.h1d_proxies(core, rules, cfg)
     res["Q-N"] = an.qn_noise_redundancy(core, rules, cfg, dump=study.dump)
     res["H2a"] = an.h2a_separation(core, cfg)

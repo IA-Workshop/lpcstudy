@@ -15,6 +15,9 @@ index sets, so no random number is drawn). With the flag off, ``Study.dump`` is 
 line of this module runs. With it on, ``results.json`` is bitwise the same except one provenance
 leaf, ``provenance.states_dump``.
 
+Schema version. ``/2`` adds the ``h1c/`` and ``h1a/`` groups (WU-0003.7c); every key of ``/1`` keeps
+its name and meaning.
+
 File format. A NumPy ``.npz`` archive (uncompressed, ``allow_pickle`` never needed). Keys are
 ``/``-separated. Dtypes: float64, int64, bool, or a unicode string. Shapes below use ``n`` for the
 test states of the system in time order (``n_test``), ``E`` evaluation draws, ``M`` oracle draws,
@@ -88,6 +91,20 @@ test states of the system in time order (``n_test``), ``E`` evaluation draws, ``
     The median over states of ``half_width[m, :, 0]`` is the leaf ``validation/convergence/<M>/
     median_half_width`` and the mean of ``abs(signed_dev[m, :, 0])`` is ``mean_abs_dev_from_max``.
 
+``h1c/`` (schema /2; H1c, the test states in time order, ``nT`` the admissible thresholds)
+    ``thresholds`` (``(nT,)``). For ``PLP`` and ``CP``: ``<name>/ratio`` (``(n,)``: the per-state
+    ratio ``Lambda_bar x slope`` of every state, NaN where the state is not eligible) and
+    ``<name>/eligible`` (bool ``(n,)``). The ratios of the eligible states, in order, are the
+    array that ``analysis.h1c_ratio_block`` receives; its median and interval are the H1c leaves.
+
+``h1a/`` (schema /2; H1a, the test-sweep states, ``nS`` of them, ``nL`` library sizes)
+    ``noise_levels`` (float64 ``(nR,)``) and ``n_lib`` (float64 ``(nL,)``): the sorted levels and
+    sizes; ``local_dim`` and ``inverse_dim`` (``(nS,)``): the Levina-Bickel local dimension and
+    its inverse (``S / (k - 1)``), before the finite filter; ``rho=<g>/seed_sq`` (``(nS, nL)``, one
+    per level): the squared analog seed errors of the library cells, before the filter. The
+    production keeps the states where every ``seed_sq`` and ``inverse_dim`` is finite; the medians,
+    the reference ``mean(inverse_dim)`` and the fit statistics of the H1a leaves follow from these.
+
 ``qn/<oracle|deployable>/`` (Q-N, the test states in time order)
     ``x_test`` (``(n, 4)``): the profile of the kind (the first evaluation draw for the deployable
     one); ``w_star`` and ``log_t`` (``(n,)``: the log state horizon): the targets' inputs; and per target
@@ -110,7 +127,7 @@ from .data import SPLITS
 from .ensemble import DRAW_COUNTERS, ENTRY_COUNTERS
 from .oracle import oracle_weight
 
-SCHEMA = "lpcstudy.states/1"
+SCHEMA = "lpcstudy.states/2"
 """Schema version key (``meta/schema``). A change of any key or shape below changes the version."""
 
 V4_MULTIPLES: tuple[int, ...] = (2, 4)
@@ -162,6 +179,7 @@ class StateDump:
         self._halves: dict[tuple, dict[str, np.ndarray]] = {}
         self._v4: dict[str, dict[str, np.ndarray]] = {}
         self._qn: dict[str, dict[str, np.ndarray]] = {}
+        self._extra: dict[str, dict[str, np.ndarray]] = {}
 
     def record_halves(self, system: str, noise: float, library_size: int, core: bool,
                       horizons: np.ndarray, halves: dict[str, np.ndarray]) -> None:
@@ -187,6 +205,10 @@ class StateDump:
     def record_v4(self, system: str, arrays: dict[str, np.ndarray]) -> None:
         """Store the V4 arrays of a system (keys of the ``v4/`` group, without the prefix)."""
         self._v4[system] = {k: clean(f"v4/{k}", v) for k, v in arrays.items()}
+
+    def record_extra(self, system: str, arrays: dict[str, np.ndarray]) -> None:
+        """Store arrays under their full keys (the ``h1a/`` and ``h1c/`` groups of schema /2)."""
+        self._extra.setdefault(system, {}).update({k: clean(k, v) for k, v in arrays.items()})
 
     def record_qn(self, system: str, kind: str, arrays: dict[str, np.ndarray]) -> None:
         """Store the Q-N arrays of one profile kind (keys of ``qn/<kind>/``, without it)."""
@@ -338,6 +360,8 @@ class StateDump:
             put(f"v4/{name}", value)
         for name, value in self._qn.pop(system).items():
             put(f"qn/{name}", value)
+        for name, value in self._extra.pop(system).items():
+            put(name, value)
         for key in [k for k in self._halves if k[0] == system]:
             del self._halves[key]
         return out

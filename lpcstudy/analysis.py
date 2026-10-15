@@ -307,7 +307,7 @@ def h1a_ratio(seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.ndarray,
 
 
 def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
-                        config: StudyConfig) -> dict:
+                        config: StudyConfig, capture: dict | None = None) -> dict:
     """H1a: median fit of ``eps_s^2 ~ b^2 n_lib^{-2/d} + f^2``; ratio of ``1/d`` to Levina-Bickel.
 
     Implements DEC-0008 A4(h), A5, A1 and A3. At each noise level the fit is to the *median*
@@ -335,6 +335,12 @@ def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
         Cells keyed by ``(rho, n_lib)``, all on the same test-sweep states.
     config : StudyConfig
         Study configuration.
+    capture : dict, optional
+        If given (the opt-in state dump, WU-0003.7c), it is filled with copies of what the function
+        already computed: ``noise_levels`` and ``n_lib`` (the sorted levels and sizes),
+        ``local_dim`` and ``inverse_dim`` (per test-sweep state, before the finite filter), and
+        ``rho=<g>/seed_sq`` (``(n, len(n_lib))``, the squared analog seed errors before the
+        filter). Nothing is computed for it and nothing flows back.
 
     Returns
     -------
@@ -366,6 +372,10 @@ def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
     seed_sq = {rho: np.column_stack([library_cells[(rho, int(n))].splits["test"]
                                      .moments.analog_seed ** 2 for n in sizes])
                for rho in noises}
+    if capture is not None:
+        capture.update({"noise_levels": np.array(noises), "n_lib": sizes, "local_dim": local_dim,
+                        "inverse_dim": inverse_all,
+                        **{f"rho={rho:g}/seed_sq": sq for rho, sq in seed_sq.items()}})
     finite = np.isfinite(inverse_all)
     for rho, sq in seed_sq.items():
         if sq.shape[0] != len(local_dim):
@@ -553,7 +563,7 @@ def h1c_ratio_block(ratios: np.ndarray, config: StudyConfig, system: str, *,
     return out
 
 
-def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
+def h1c_horizon_law(cell: Cell, config: StudyConfig, capture: dict | None = None) -> dict:
     """H1c: state-wise slope of ``T`` against ``ln theta`` equals ``1 / Lambda_bar``.
 
     The verdict rests on the PLP median only (v3 H1c "(PLP)"): its 95% block-bootstrap interval
@@ -571,6 +581,12 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
         Core cell.
     config : StudyConfig
         Study configuration.
+    capture : dict, optional
+        If given (the opt-in state dump, WU-0003.7c), it is filled with ``thresholds`` and, for
+        ``PLP`` and ``CP``, ``<name>/ratio`` (the per-state ratio of every state, NaN where the
+        state is not eligible) and ``<name>/eligible`` (bool): the ratios of the eligible states,
+        in order, are the array that ``h1c_ratio_block`` receives. Nothing is computed for it and
+        nothing flows back.
 
     Returns
     -------
@@ -584,17 +600,24 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig) -> dict:
     growth = cell.oracles["test"].growth
     thetas = np.array(config.admissible_thresholds(cell.noise))
     res: dict = {"thresholds": thetas.tolist()}
+    if capture is not None:
+        capture["thresholds"] = thetas
     for name, mse in (("PLP", m.sq_plp), ("CP", m.sq_cp)):
         horizons = np.column_stack([characteristic_horizon(mse, m.horizons, cell.noise, t)[0]
                                     for t in thetas])
         events = np.column_stack([characteristic_horizon(mse, m.horizons, cell.noise, t)[1]
                                   for t in thetas])
-        ratios = []
+        ratios, eligible = [], np.zeros(len(horizons), dtype=bool)
         for i in range(len(horizons)):
             ok = events[i] & (horizons[i] > 1)
             if ok.sum() >= 3 and growth[i] > 0 and np.ptp(horizons[i][ok]) > 0:
                 ratios.append(growth[i] * ols_slope(np.log(thetas[ok]),
                                                     horizons[i][ok].astype(float)))
+                eligible[i] = True
+        if capture is not None:
+            per_state = np.full(len(horizons), np.nan)
+            per_state[eligible] = ratios
+            capture.update({f"{name}/ratio": per_state, f"{name}/eligible": eligible})
         res[name] = h1c_ratio_block(np.asarray(ratios), config, cell.system,
                                     with_verdict=name == "PLP")
         res[name]["n_ineligible_states"] = int(len(horizons) - len(ratios))
