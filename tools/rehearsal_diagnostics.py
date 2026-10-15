@@ -11,8 +11,9 @@ labelled DEVELOPMENT. Usage::
 
 ``RUN`` is a ``results.json`` or the directory that holds it; the dump of each system is
 ``<dir>/states/<system>.npz`` (schema ``lpcstudy.states/1``, the module docstring of
-``lpcstudy/dump.py``; ``--states`` overrides the folder). The run's ``seed_id`` must be a
-development seed ``DEV-n`` (anything else is refused, exit 2).
+``lpcstudy/dump.py``; ``--states`` overrides the folder). Every recorded seed id (``config.seed_id``,
+``provenance.seed_id``, ``provenance.seed_kind == "development"``, and each dump's ``meta/seed_id``)
+must be present, agree and be a development seed ``DEV-n``; otherwise the run is refused (exit 2).
 
 What it computes (plan amendment 2, B1 item 7 as amended; mathematics check
 ``docs/agent/notes/2026-10-14-math-wu0003.md``, M3 to M5; amendments 3 and 4 for the dump):
@@ -56,19 +57,28 @@ What it computes (plan amendment 2, B1 item 7 as amended; mathematics check
   H2b(ii), and ``f_b``, the share of states whose unclipped optimum lies within 2 s of a clip
   bound (``s = |u_A - u_B|/2``), pooled by weight bin.
 
-A missing array, a schema other than ``lpcstudy.states/1``, or a series that cannot be formed
-prints ``not computable: <what>: <why>`` and is never skipped or replaced. Criteria whose arrays are
-not part of the schema (H1a, H1c, H1d) are listed once as "outside the schema". Where the results
-file carries the statistic that a series is the influence of, the tool recomputes the statistic from
-the dump and prints MATCH or MISMATCH (a mismatch is a defect of the dump or of this tool).
+A missing array, a schema other than ``lpcstudy.states/1``, a non-finite half-width, a series that
+cannot be formed, or an unexpected exception (an "INTERNAL ERROR" line with the place it happened)
+prints ``not computable: <what>: <why>`` and is never skipped or replaced; the rest of the section
+and of the report is still computed. H1a and H1c have no arrays in the schema: each is one "not
+computable" line per run (so every run exits 2 until the schema carries them). H1d is computed from
+``core/profile`` (columns 0 to 3 of the first evaluation draw are strictly increasing transforms of
+the proxies, which Spearman ignores) and ``core/eps_s``, ``delta``, ``Lambda_bar``, ``N``. Where the
+results file carries the statistic that a series is the influence of, the tool recomputes it from
+the dump and prints MATCH or MISMATCH (a mismatch is a defect of the dump or of this tool) with
+``|diff| <= tol max(|leaf|, scale)``, the scale being the natural size of the statistic's terms.
+After the systems it prints the run-level D1 line (every |acf(1)| within its threshold?) and the
+D2 line (at least one primary series triggers the A5 rule, against its predicted probability).
 
 The bootstrap and permutation generators are ``make_rng(--seed, system, label)``; the default seed
 is a literal scratch seed (``TOOL_SEED``), not a development or confirmatory seed, so a report is
 reproducible. The run's own seed is never read.
 
-Exit codes: 0 everything computed and no mismatch; 1 at least one MISMATCH; 2 unreadable input,
-a usage error, a refused seed id, or at least one "not computable" (the report is still printed in
-full; 1 takes precedence over 2).
+Exit codes: 0 everything computed and no mismatch; 1 at least one MISMATCH; 2 unreadable input, a
+usage error, a refused run, an internal error, or at least one "not computable" (the report is still
+printed in full; 1 takes precedence over 2). The seed and the options are printed prominently and
+recorded in the ``--json`` output: rerunning with other options to change a reading is not allowed
+(an owner question).
 """
 
 from __future__ import annotations
@@ -116,13 +126,22 @@ PRIMARY_LEVEL_FACTOR = 1.014
 """E hw(B = 2000)/E hw(B = 500) at 1 - 0.05/3 (M3, ``m3_bfactor.log``)."""
 RICHARDSON = 1.0 / (math.sqrt(2.0) - 1.0)
 """1/(2^(1/2) - 1) = 2.4142: the order-1/2 Richardson factor from M = 100 to M = 200."""
-WEIGHT_BINS = ((0.0, 0.0), (0.0, 0.1), (0.1, 0.9), (0.9, 1.0), (1.0, 1.0))
-"""Bins of ``w`` for ``f_b``: exactly 0, (0, 0.1), [0.1, 0.9], (0.9, 1), exactly 1."""
+WEIGHT_BINS = (("w=0", 0.0, 0.0, True, True), ("0<w<0.1", 0.0, 0.1, False, False),
+               ("0.1<=w<=0.9", 0.1, 0.9, True, True), ("0.9<w<1", 0.9, 1.0, False, False),
+               ("w=1", 1.0, 1.0, True, True))
+"""Bins of ``w`` for ``f_b``: label, edges and whether each edge is included."""
 H2B_LIBRARY = (1_000, 10_000)
 H2E_LIBRARY = (1_000, 100_000)
 QN_TARGETS = ("logit_w_interior", "w_zero_indicator", "log_horizon")
 RULES_LOGSD = ("A1", "A2", "A3", "A4", "A5")
-OUTSIDE_SCHEMA = ("H1a", "H1c", "H1d")
+OUTSIDE_SCHEMA = ("H1a", "H1c")
+"""Criteria whose arrays are not in ``lpcstudy.states/1``; each is "not computable" (exit 2)."""
+H1D_ROWS = (("analog_seed", 0, "eps_s"), ("estimation_seed", 1, "delta"),
+            ("growth", 2, "Lambda_bar"), ("nhat", 3, "N"))
+"""H1d pairs: name, column of ``core/profile`` (a strictly increasing transform of the proxy of the
+first evaluation draw: ``log(x/rho)``, ``log(x/rho)``, ``x steps_per_lyapunov``, ``log(x + c)``)
+and the dumped oracle array."""
+H1D_TESTED = ("analog_seed", "estimation_seed", "growth")
 
 
 # --------------------------------------------------------------------------------------------
@@ -136,6 +155,10 @@ class Missing(NotComputable):
     """An array or leaf that the diagnostic needs is not in the file."""
 
 
+class Refused(NotComputable):
+    """The run is refused (a seed id that is not a development seed, or disagreeing ids)."""
+
+
 @dataclass
 class Report:
     """Lines, the "not computable" and mismatch lists, and the numbers (for ``--json``)."""
@@ -144,6 +167,8 @@ class Report:
     incomplete: list[str] = field(default_factory=list)
     defects: list[str] = field(default_factory=list)
     data: dict = field(default_factory=dict)
+    series_log: list[dict] = field(default_factory=list)
+    """One entry per series with an acf (and its A5 trigger), for the run-level D1/D2 lines (R7)."""
 
     def say(self, text: str = "") -> None:
         """Add a line."""
@@ -152,6 +177,15 @@ class Report:
     def nc(self, where: str, why: str) -> None:
         """Record and print a diagnostic that cannot be computed."""
         line = f"not computable: {where}: {why}"
+        self.incomplete.append(line)
+        self.lines.append("  " + line)
+
+    def internal(self, where: str, exc: Exception) -> None:
+        """Record and print an unexpected exception (never lost, never read as a MISMATCH)."""
+        import traceback
+        frame = traceback.extract_tb(exc.__traceback__)[-1]
+        line = (f"INTERNAL ERROR: {where}: {type(exc).__name__}: {exc} "
+                f"(at {Path(frame.filename).name}:{frame.lineno} in {frame.name})")
         self.incomplete.append(line)
         self.lines.append("  " + line)
 
@@ -166,11 +200,20 @@ class Report:
 
 
 def attempt(rep: Report, where: str, fn: Callable, *args, **kwargs):
-    """Call ``fn``; a ``NotComputable`` is recorded under ``where`` and ``None`` is returned."""
+    """Call ``fn``; a ``NotComputable`` is recorded under ``where`` and ``None`` is returned.
+
+    Any other exception is recorded as an INTERNAL ERROR (exit 2) and also returns ``None``, so
+    the rest of the report is still computed; a ``Refused`` is never caught.
+    """
     try:
         return fn(*args, **kwargs)
+    except Refused:
+        raise
     except NotComputable as exc:
         rep.nc(where, str(exc))
+        return None
+    except Exception as exc:  # noqa: BLE001  (unexpected: reported, exit 2)
+        rep.internal(where, exc)
         return None
 
 
@@ -401,6 +444,44 @@ def psi_delta_r2(y: np.ndarray, pred_three: np.ndarray, pred_four: np.ndarray,
     return out, delta
 
 
+def psi_spearman(x: np.ndarray, y: np.ndarray, domain: np.ndarray | None = None
+                 ) -> tuple[np.ndarray, float]:
+    """Influence of the Spearman correlation at the empirical measure, and its value (H1d).
+
+    With the mid-distribution functions ``a_j = F(x_j) = (#{x < x_j} + #{x = x_j}/2)/n`` and
+    ``b_j = G(y_j)`` (an affine function of the average ranks), ``rho = (T - 1/4)/sqrt((S_F -
+    1/4)(S_G - 1/4))`` with ``T = mean(ab)``, ``S_F = mean(a^2)``, ``S_G = mean(b^2)`` (the means of
+    ``a`` and ``b`` are exactly 1/2). The Gateaux derivative at the point ``i``, which includes the
+    change of the ranks themselves, is
+
+    ``dT = a_i b_i + mean_j(c^x_ij b_j) + mean_j(a_j c^y_ij) - 3 T``,
+    ``dS_F = a_i^2 + 2 mean_j(c^x_ij a_j) - 3 S_F`` (likewise ``dS_G``),
+    ``psi_i = dT/D - (rho/2)(dS_F/(S_F - 1/4) + dS_G/(S_G - 1/4))``,
+
+    with ``c^x_ij = 1{x_i < x_j} + 1{x_i = x_j}/2`` and ``D`` the denominator. O(n^2). 0 outside the
+    domain. Spearman is invariant to strictly increasing transforms of ``x`` and ``y``.
+    """
+    xv, dom = _domain(x, domain)
+    yv, _ = _domain(y, dom)
+    xs, ys = xv[dom], yv[dom]
+    n = len(xs)
+    if n < 3 or np.ptp(xs) == 0.0 or np.ptp(ys) == 0.0:
+        raise NotComputable("Spearman correlation undefined (too few states or a constant series)")
+    cx = (xs[:, None] < xs[None, :]).astype(float) + 0.5 * (xs[:, None] == xs[None, :])
+    cy = (ys[:, None] < ys[None, :]).astype(float) + 0.5 * (ys[:, None] == ys[None, :])
+    a, b = cx.sum(axis=0) / n, cy.sum(axis=0) / n
+    t, s_f, s_g = float(np.mean(a * b)), float(np.mean(a * a)), float(np.mean(b * b))
+    var_f, var_g = s_f - 0.25, s_g - 0.25
+    denom = math.sqrt(var_f * var_g)
+    rho = (t - 0.25) / denom
+    d_t = a * b + cx @ b / n + cy @ a / n - 3.0 * t
+    d_f = a * a + 2.0 * (cx @ a) / n - 3.0 * s_f
+    d_g = b * b + 2.0 * (cy @ b) / n - 3.0 * s_g
+    out = np.zeros(xv.shape)
+    out[dom] = d_t / denom - 0.5 * rho * (d_f / var_f + d_g / var_g)
+    return out, rho
+
+
 def per_state_spearman(levels: np.ndarray, values: np.ndarray) -> tuple[np.ndarray, int]:
     """Spearman of each row of ``values`` with ``levels`` (average ranks), constant rows score 0.
 
@@ -620,7 +701,17 @@ def split_half_shift(stat_a: float, stat_b: float, stat_full: float) -> float:
 
 
 def three_way_reading(bias: float, se: float, limit: float) -> str:
-    """"below 10%", "not below 10%" or "not determined" (limit is ``0.1 hw_full``)."""
+    """"below 10%", "not below 10%" or "not determined" (limit is ``0.1 hw_full``).
+
+    Raises
+    ------
+    NotComputable
+        If any input is not finite: an infinite half-width (failed resamples put the interval at
+        ``(-inf, inf)``) would otherwise read "below 10%", the favourable direction (R1).
+    """
+    if not all(math.isfinite(v) for v in (bias, se, limit)):
+        raise NotComputable(f"non-finite input to the reading (bias {bias}, SE {se}, "
+                            f"limit {limit})")
     if abs(bias) + 2.0 * se < limit:
         return "below 10%"
     if abs(bias) - 2.0 * se >= limit:
@@ -742,6 +833,8 @@ def full_halfwidth(hw: float, cfg: dict, size_key: str) -> tuple[float, str]:
     preset's 2000 (the B factor of M3 at 1 - 0.05/3); with another B the factor is 1 and the
     note says so.
     """
+    if not math.isfinite(hw) or not hw > 0.0:
+        raise NotComputable(f"half-width not finite and positive: {hw}")
     full = PRESETS["full"]
     if cfg.get("name") == "full":
         return hw, "observed (full preset)"
@@ -807,11 +900,19 @@ class Context:
 
 
 def check(ctx: Context, label: str, mine: float, path: tuple[str, ...], tol: float,
-          offset: float = 0.0) -> None:
+          offset: float = 0.0, scale: float = 0.0) -> None:
     """Compare a recomputed statistic with the results leaf; a MISMATCH is a defect.
 
-    ``|mine - leaf| <= tol |leaf|`` (relative, no floor; an exact 0 needs equality). ``offset`` is
-    added to ``mine`` first (H2d is a ratio minus 1).
+    The bound is ``|mine - leaf| <= tol max(|leaf|, scale)``. ``scale`` is the natural size of the
+    terms of the statistic (for example ``mean |terms|`` of a mean, ``max(|R^2_3|, |R^2_4|)`` for a
+    difference of two R^2, 1 for a correlation), the scale at which a different order of the same
+    additions rounds: without it a statistic near 0 that is a difference of larger numbers gets a
+    false MISMATCH on correct code (R4: a Delta R^2 of 7e-5 differs from production by about 2e-14
+    absolute, 3e-10 relative). ``tol`` is a multiple of the round-off of the terms (1e-12: about
+    10^3 additions of unit round-off times a margin of 10; 1e-9 where a least-squares fit or a
+    logarithm intervenes). With ``scale = 0`` and ``tol = 0`` the comparison is exact. ``offset`` is
+    added to ``mine`` first (H2d is a ratio minus 1). The floor ``tol x scale`` is at most 1e-9 of
+    a natural scale, six orders below any real mismatch (a mutation test perturbs by 1e-6).
     """
     try:
         leaf = float(dig(ctx.res, *path))
@@ -820,9 +921,11 @@ def check(ctx: Context, label: str, mine: float, path: tuple[str, ...], tol: flo
         return
     value = mine + offset
     diff = abs(value - leaf)
-    ok = diff <= tol * abs(leaf)
+    allowed = tol * max(abs(leaf), scale)
+    ok = bool(diff <= allowed)
     ctx.rep.say(f"  check {label}: dump {value:.12g} vs results {leaf:.12g} "
-                f"(|diff| {diff:.2e}, tol {tol:g} relative): {'MATCH' if ok else 'MISMATCH'}")
+                f"(|diff| {diff:.2e}, allowed {allowed:.2e} = {tol:g} x max(|leaf|, scale "
+                f"{scale:.3g})): {'MATCH' if ok else 'MISMATCH'}")
     if not ok:
         ctx.rep.defects.append(f"{ctx.system} {label}: dump {value!r} vs results {leaf!r}")
 
@@ -874,7 +977,7 @@ def series_h2a_ii(ctx: Context) -> list[Series]:
             ctx.rep.nc(f"{ctx.system} H2a(ii) {name}", str(exc))
             continue
         check(ctx, f"H2a(ii) {name} partial correlation", r,
-              ("H2a", "part_ii", name, "partial_corr"), 1e-9)
+              ("H2a", "part_ii", name, "partial_corr"), 1e-9, scale=1.0)
         out.append(Series(ctx.system, "H2a(ii)", name, psi, True, int(dom.sum())))
     return out
 
@@ -885,7 +988,7 @@ def series_h2b_i(ctx: Context) -> list[Series]:
     w = np.column_stack([ctx.dump[f"{ctx.group(r, library)}/w_star_href"] for r in levels])
     spear, n_constant = per_state_spearman(levels, w)
     check(ctx, "H2b(i) mean per-state Spearman", float(spear.mean()),
-          ("H2b", "noise", "mean_state_spearman"), 1e-12)
+          ("H2b", "noise", "mean_state_spearman"), 1e-12, scale=float(np.mean(np.abs(spear))))
     check(ctx, "H2b(i) constant states (scored 0 by the tie convention)", float(n_constant),
           ("H2b", "noise", "n_constant_states"), 0.0)
     return [Series(ctx.system, "H2b(i)", "", psi_mean(spear), True, len(spear))]
@@ -896,7 +999,7 @@ def series_h2b_ii(ctx: Context) -> list[Series]:
     low, high = (ctx.dump[f"{ctx.group(rho, n)}/w_star_href"] for n in H2B_LIBRARY)
     diff = high - low
     check(ctx, "H2b(ii) mean paired change", float(diff.mean()),
-          ("H2b", "library_change", "mean_change"), 1e-12)
+          ("H2b", "library_change", "mean_change"), 1e-12, scale=float(np.mean(np.abs(diff))))
     return [Series(ctx.system, "H2b(ii)", "", psi_mean(diff), True, len(diff))]
 
 
@@ -920,7 +1023,7 @@ def series_h2c(ctx: Context) -> list[Series]:
             continue
         diff = mse["A4"] - mse[other]
         check(ctx, f"H2c A4-{other} mean", float(diff.mean()),
-              ("H2c", f"A4_minus_{other}", "mean"), 1e-12)
+              ("H2c", f"A4_minus_{other}", "mean"), 1e-12, scale=float(np.mean(np.abs(diff))))
         out.append(Series(ctx.system, "H2c", f"A4-{other}", psi_mean(diff), False, len(diff)))
     return out
 
@@ -928,7 +1031,7 @@ def series_h2c(ctx: Context) -> list[Series]:
 def series_h2d(ctx: Context) -> list[Series]:
     a4, a3 = (ctx.dump[f"core/state_mse/{r}"][:, ctx.ref] for r in ("A4", "A3"))
     check(ctx, "H2d A4/A3 - 1", float(a4.mean() / a3.mean()), ("H2d", "in_distribution_excess"),
-          1e-12, offset=-1.0)
+          1e-12, offset=-1.0, scale=float(a4.mean() / a3.mean()))
     return [Series(ctx.system, "H2d", "", psi_ratio(a4, a3), False, len(a4))]
 
 
@@ -938,7 +1041,8 @@ def series_h2e(ctx: Context) -> list[Series]:
         low, high = (ctx.dump[f"{ctx.group(float(rho), n)}/err_corr_href"] for n in H2E_LIBRARY)
         diff = high - low
         check(ctx, f"H2e rho={rho:g} median change", float(np.median(diff)),
-              ("H2e", "by_noise", f"{float(rho):g}", "median_change"), 1e-12)
+              ("H2e", "by_noise", f"{float(rho):g}", "median_change"), 1e-12,
+              scale=float(np.mean(np.abs(diff))))
         out.append(Series(ctx.system, "H2e", f"rho={float(rho):g}", psi_sign(diff), False,
                           len(diff)))
     return out
@@ -955,9 +1059,43 @@ def series_qn(ctx: Context) -> list[Series]:
             except NotComputable as exc:
                 ctx.rep.nc(f"{ctx.system} Q-N {kind} {target}", str(exc))
                 continue
+            yd = y[dom]
+            sst = float(np.sum((yd - yd.mean()) ** 2))
+            r2_size = max(abs(1.0 - float(np.sum((yd - p3[dom]) ** 2)) / sst),
+                          abs(1.0 - float(np.sum((yd - p4[dom]) ** 2)) / sst))
             check(ctx, f"Q-N {kind} {target} delta R^2", delta,
-                  ("Q-N", kind, target, "delta_r2"), 1e-12)
+                  ("Q-N", kind, target, "delta_r2"), 1e-12, scale=r2_size)
             out.append(Series(ctx.system, "Q-N", f"{kind} {target}", psi, False, int(dom.sum())))
+    return out
+
+
+def series_h1d(ctx: Context) -> list[Series]:
+    """H1d: Spearman of each deployable proxy (first evaluation draw) with its oracle.
+
+    The proxies enter ``core/profile[:, 0, k]`` through strictly increasing transforms (``log(x/rho)``
+    for the two seeds, ``x steps_per_lyapunov`` for the growth, ``log(x + c)`` for N-hat), which
+    leave every rank, tie and Spearman correlation unchanged. A proxy that is finite but maps to
+    a non-finite profile entry (``log 0``) is excluded here and not in production: the exclusion
+    counts are compared with the results, so that case is a MISMATCH, never silent.
+    """
+    d = ctx.dump
+    profile = d["core/profile"]
+    if profile.ndim != 3 or profile.shape[2] != 4:
+        raise NotComputable(f"core/profile has shape {profile.shape}, not (n, E, 4)")
+    out = []
+    for name, column, oracle in H1D_ROWS:
+        proxy, truth = profile[:, 0, column], d[f"core/{oracle}"]
+        keep = np.isfinite(proxy) & np.isfinite(truth)
+        try:
+            psi, rho = psi_spearman(proxy, truth, keep)
+        except NotComputable as exc:
+            ctx.rep.nc(f"{ctx.system} H1d {name}", str(exc))
+            continue
+        check(ctx, f"H1d {name} Spearman", rho, ("H1d", "rows", name, "spearman"), 1e-12,
+              scale=1.0 / math.sqrt(int(keep.sum())))
+        check(ctx, f"H1d {name} states excluded as non-finite", float((~keep).sum()),
+              ("H1d", "rows", name, "n_excluded_nonfinite"), 0.0)
+        out.append(Series(ctx.system, "H1d", name, psi, False, int(keep.sum())))
     return out
 
 
@@ -971,7 +1109,8 @@ def series_h1b(ctx: Context) -> list[Series]:
     psi = psi_slope(x, y, keep)
     xc = x[keep] - x[keep].mean()
     slope = float(np.sum(xc * (y[keep] - y[keep].mean())) / np.sum(xc**2))
-    check(ctx, "H1b PLP slope", slope, ("H1b", "PLP", "slope"), 1e-9)
+    check(ctx, "H1b PLP slope", slope, ("H1b", "PLP", "slope"), 1e-9,
+          scale=float(np.std(y[keep]) / np.std(x[keep])))
     check(ctx, "H1b PLP states excluded as non-finite", float((~keep).sum()),
           ("H1b", "PLP", "n_excluded_nonfinite"), 0.0)
     check(ctx, "H1b PLP states where the floor binds", float((e_p[keep] < 1e-12).sum()),
@@ -982,7 +1121,7 @@ def series_h1b(ctx: Context) -> list[Series]:
 SERIES_BUILDERS: tuple[tuple[str, Callable[[Context], list[Series]]], ...] = (
     ("H2a(i)", series_h2a_i), ("H2a(ii)", series_h2a_ii), ("H2b(i)", series_h2b_i),
     ("H2b(ii)", series_h2b_ii), ("H3c", series_h3c), ("H2c", series_h2c), ("H2d", series_h2d),
-    ("H2e", series_h2e), ("Q-N", series_qn), ("H1b", series_h1b))
+    ("H2e", series_h2e), ("Q-N", series_qn), ("H1b", series_h1b), ("H1d", series_h1d))
 
 
 # --------------------------------------------------------------------------------------------
@@ -1013,6 +1152,9 @@ def section_d1_d2(ctx: Context) -> list[Series]:
                 f"= {lag_zero_false_trigger(s.n):.4f}")
         rows[s.name] = {"n": s.n, "domain": s.domain, "primary": s.primary, "acf": lags.tolist(),
                         "reading": text, "weight_toward_phi03": weight}
+        rep.series_log.append({"system": ctx.system, "name": s.name, "n": s.n,
+                               "primary": s.primary, "acf1": float(lags[0]),
+                               "within": bool(abs(lags[0]) <= acf_threshold(s.n)), "fires": None})
     rep.data.setdefault(ctx.system, {})["D1"] = rows
     primaries = [s for s in series if s.primary and s.name in rows]
     if primaries:
@@ -1046,6 +1188,9 @@ def section_d1_d2(ctx: Context) -> list[Series]:
                 + ("DESIGN QUESTION (beta5 + 2 SE < 0.8685)" if beta["fires"]
                    else ("no" if beta["used"] else "not used")))
         d2[s.name] = {**summary, "beta": beta, "null_rate": null_rate, "primary": s.primary}
+        for entry in rep.series_log:
+            if entry["system"] == ctx.system and entry["name"] == s.name:
+                entry["fires"] = bool(summary["fires"])
         if s.primary:
             fires += summary["fires"]
             beta_fires += beta["fires"]
@@ -1091,7 +1236,7 @@ def _permutation_reading(ctx: Context, primaries: list[Series]) -> dict:
 
 
 def section_d3(ctx: Context) -> None:
-    """D3: log-SD of the per-state evaluation MSE and of its draw-free state part."""
+    """D3: log-SD of the per-state evaluation MSE and of its draw-free state part (each rule alone)."""
     rep, d = ctx.rep, ctx.dump
     n_draws = int(d.scalar("meta/n_eval_draws"))
     rep.say(f"D3 log-SD of the per-state evaluation MSE at H_ref, {ctx.system} "
@@ -1099,33 +1244,32 @@ def section_d3(ctx: Context) -> None:
     e_c, e_p, cross = (d[f"core/{k}"][:, ctx.ref] for k in ("E_C", "E_P", "C"))
     out: dict = {}
     for rule in RULES_LOGSD:
-        try:
-            sigma, n_bad = log_sd(d[f"core/state_mse/{rule}"][:, ctx.ref])
-        except NotComputable as exc:
-            rep.nc(f"{ctx.system} D3 {rule}", str(exc))
-            continue
-        proj = logsd_at_draws(sigma, n_draws)
-        if rule == "A1":
-            state = hybrid_state_mse(np.zeros(len(e_c)), e_c, e_p, cross)
-        elif rule in ("A2", "A3", "A4", "A5"):
-            state = (hybrid_state_mse(d[f"core/weight_href/{rule}"], e_c, e_p, cross)
-                     if d.has(f"core/weight_href/{rule}") else None)
-        else:
-            state = None
-        state_sd = None
-        if state is None:
-            rep.nc(f"{ctx.system} D3 {rule} state part", f"array 'core/weight_href/{rule}' missing")
-        else:
-            state_sd = log_sd(state)[0]
-        reading = ("C2h/C4h rows apply" if sigma > LOGSD_RULE else "C2h/C4h rows do not apply")
-        proj_text = (f"{proj:.3f}" if proj is not None else
-                     "not defined (log-SD^2 is below psi'(E/2) - psi'(2))")
-        rep.say(f"  {rule}: log-SD {sigma:.3f} ({reading}); at E = 4: {proj_text}; "
-                f"draw-free state part {fmt(state_sd, 3)}"
-                + (f"; {n_bad} non-positive per-state MSE excluded" if n_bad else ""))
-        out[rule] = {"log_sd": sigma, "above_rule": bool(sigma > LOGSD_RULE), "log_sd_E4": proj,
-                     "state_part_log_sd": state_sd, "n_nonpositive": n_bad}
+        got = attempt(rep, f"{ctx.system} D3 {rule}", _d3_rule, ctx, rule, n_draws, e_c, e_p, cross)
+        if got is not None:
+            out[rule] = got
     rep.data.setdefault(ctx.system, {})["D3"] = {"E": n_draws, "rules": out}
+
+
+def _d3_rule(ctx: Context, rule: str, n_draws: int, e_c, e_p, cross) -> dict:
+    rep, d = ctx.rep, ctx.dump
+    sigma, n_bad = log_sd(d[f"core/state_mse/{rule}"][:, ctx.ref])
+    proj = logsd_at_draws(sigma, n_draws)
+    reading = "C2h/C4h rows apply" if sigma > LOGSD_RULE else "C2h/C4h rows do not apply"
+    proj_text = (f"{proj:.3f}" if proj is not None else
+                 "not defined (log-SD^2 is below psi'(E/2) - psi'(2))")
+    state_sd, state_bad = None, None
+    try:
+        weight = (np.zeros(len(e_c)) if rule == "A1" else d[f"core/weight_href/{rule}"])
+        state_sd, state_bad = log_sd(hybrid_state_mse(weight, e_c, e_p, cross))
+    except NotComputable as exc:
+        rep.nc(f"{ctx.system} D3 {rule} state part", str(exc))
+    rep.say(f"  {rule}: log-SD {sigma:.3f} ({reading}); at E = 4: {proj_text}; "
+            f"draw-free state part {fmt(state_sd, 3)}"
+            + (f"; {n_bad} non-positive per-state MSE excluded" if n_bad else "")
+            + (f"; {state_bad} non-positive state-part values excluded" if state_bad else ""))
+    return {"log_sd": sigma, "above_rule": bool(sigma > LOGSD_RULE), "log_sd_E4": proj,
+            "state_part_log_sd": state_sd, "n_nonpositive": n_bad,
+            "state_part_n_nonpositive": state_bad}
 
 
 def _half_arrays(ctx: Context) -> dict:
@@ -1217,12 +1361,47 @@ def section_d5(ctx: Context) -> None:
     rep.data.setdefault(ctx.system, {})["D5"] = out
 
 
+def budget_reading(ctx: Context, bias: float, se: float | None, ci_path: tuple[str, ...],
+                   size_key: str) -> dict:
+    """The three-way reading of a finite-M bias against ``0.1 hw_full`` (D5 and D6).
+
+    Raises
+    ------
+    NotComputable
+        If the SE is not available or the interval of the criterion is absent or not finite (an
+        interval at ``(-inf, inf)`` from failed resamples must never read "below 10%", R1).
+    """
+    if se is None:
+        raise NotComputable("the bootstrap SE is not available, so there is no reading")
+    ci = dig(ctx.res, *ci_path)
+    lo, hi = float(ci[0]), float(ci[1])
+    if not (math.isfinite(lo) and math.isfinite(hi)):
+        raise NotComputable(f"half-width not finite: interval [{lo}, {hi}] of "
+                            f"{'/'.join(ci_path)}; no reading")
+    hw = (hi - lo) / 2.0
+    hw_full, how = full_halfwidth(hw, ctx.cfg, size_key)
+    limit = 0.1 * hw_full
+    reading = three_way_reading(bias, se, limit)
+    point = "above" if abs(bias) > limit else "not above"
+    row1 = ("may be stated below 10%" if reading == "below 10%"
+            else "stays 'not below 10%' (PF-5: 'not determined' is treated as not below)")
+    ctx.rep.say(f"  hw (pilot or run) {hw:.5f}; hw_full {hw_full:.5f} ({how}); "
+                f"0.1 hw_full {limit:.5f}")
+    ctx.rep.say(f"  reading: {reading}; point reading |B| {point} 0.1 hw_full; budget row 1 {row1}")
+    return {"hw": hw, "hw_full": hw_full, "hw_full_how": how, "limit": limit, "reading": reading,
+            "point_reading": point}
+
+
 def _d5_primary(ctx: Context, r_full, r_a, r_b, eligible) -> dict:
     rep = ctx.rep
     n = len(r_full)
     med = lambda r: float(np.median(r[eligible]))  # noqa: E731
     shift = split_half_shift(med(r_a), med(r_b), med(r_full))
     bias = RICHARDSON * shift
+    out: dict = {"n_eligible": int(eligible.sum()), "delta_sh": shift, "bias_order_half": bias,
+                 "bias_order_one": shift}
+    rep.say(f"  eligible states {int(eligible.sum())} of {n}; med r_A {med(r_a):.5f}, med r_B "
+            f"{med(r_b):.5f}, med r_200 {med(r_full):.5f}")
 
     def stat(idx: np.ndarray) -> float:
         rows = idx[eligible[idx]]
@@ -1230,27 +1409,20 @@ def _d5_primary(ctx: Context, r_full, r_a, r_b, eligible) -> dict:
             return float("nan")
         return RICHARDSON * split_half_shift(*(float(np.median(r[rows])) for r in (r_a, r_b, r_full)))
 
-    block = int(dig(ctx.cfg, "bootstrap_block"))
-    se, failed = bootstrap_se(stat, n, ctx.resamples, block, ctx.rng("d5-bootstrap"))
-    ci = dig(ctx.res, "H2a", "range_ci")
-    hw = (ci[1] - ci[0]) / 2.0
-    hw_full, how = full_halfwidth(hw, ctx.cfg, "n_test")
-    limit = 0.1 * hw_full
-    reading = three_way_reading(bias, se, limit)
-    point = "above" if abs(bias) > limit else "not above"
-    row1 = ("may be stated below 10%" if reading == "below 10%"
-            else "stays 'not below 10%' (PF-5: 'not determined' is treated as not below)")
-    rep.say(f"  eligible states {int(eligible.sum())} of {n}; med r_A {med(r_a):.5f}, med r_B "
-            f"{med(r_b):.5f}, med r_200 {med(r_full):.5f}")
-    rep.say(f"  Delta_sh {shift:+.5f}; B(200) order 1/2 {bias:+.5f}; order 1 {shift:+.5f}; "
-            f"SE {se:.5f} ({failed} failed of {ctx.resamples} resamples, block {block}, "
-            f"seed {ctx.seed})")
-    rep.say(f"  hw (pilot or run) {hw:.5f}; hw_full {hw_full:.5f} ({how}); 0.1 hw_full {limit:.5f}")
-    rep.say(f"  reading: {reading}; point reading |B| {point} 0.1 hw_full; budget row 1 {row1}")
     check(ctx, "H2a(i) median range (D5 input)", med(r_full), ("H2a", "median_range"), 0.0)
-    return {"n_eligible": int(eligible.sum()), "delta_sh": shift, "bias_order_half": bias,
-            "bias_order_one": shift, "se": se, "n_failed": failed, "hw": hw, "hw_full": hw_full,
-            "hw_full_how": how, "limit": limit, "reading": reading, "point_reading": point}
+    block = attempt(rep, f"{ctx.system} D5 block length", lambda: int(dig(ctx.cfg, "bootstrap_block")))
+    boot = (attempt(rep, f"{ctx.system} D5 bootstrap", bootstrap_se, stat, n, ctx.resamples,
+                    block, ctx.rng("d5-bootstrap")) if block is not None else None)
+    se, failed = boot if boot is not None else (None, None)
+    rep.say(f"  Delta_sh {shift:+.5f}; B(200) order 1/2 {bias:+.5f}; order 1 {shift:+.5f}; "
+            f"SE {fmt(se, 4)} ({failed} failed of {ctx.resamples} resamples, block {block}, "
+            f"seed {ctx.seed})")
+    out.update(se=se, n_failed=failed)
+    got = attempt(rep, f"{ctx.system} D5 reading", budget_reading, ctx, bias, se,
+                  ("H2a", "range_ci"), "n_test")
+    if got is not None:
+        out.update(got)
+    return out
 
 
 def _d5_v4(ctx: Context) -> dict:
@@ -1310,28 +1482,55 @@ def _d5_v4(ctx: Context) -> dict:
     return out
 
 
+def weight_bin_mask(w: np.ndarray, lo: float, hi: float, lo_closed: bool, hi_closed: bool
+                    ) -> np.ndarray:
+    """States of ``w`` in the bin with the given edges and closure."""
+    return ((w >= lo) if lo_closed else (w > lo)) & ((w <= hi) if hi_closed else (w < hi))
+
+
+def f_b_by_bin(w: np.ndarray, u: np.ndarray, u_a: np.ndarray, u_b: np.ndarray) -> dict:
+    """``f_b``: the share of states within 2 s of a clip bound, overall and by weight bin.
+
+    ``u`` is the unclipped optimum of the 200 draws, ``s = |u_A - u_B|/2`` from the halves, ``w``
+    the clipped weight that sets the bin. States with an undefined (NaN) optimum are excluded from
+    every share and counted (``n_undefined``).
+    """
+    ok = np.isfinite(u) & np.isfinite(u_a) & np.isfinite(u_b)
+    half_sd = np.where(ok, np.abs(u_a - u_b) / 2.0, 0.0)
+    near = ok & near_clip(np.where(ok, u, 0.5), half_sd)
+    out: dict = {"n_undefined": int((~ok).sum()), "n_defined": int(ok.sum()),
+                 "f_b": float(near[ok].mean()) if ok.any() else None, "bins": {}}
+    for label, lo, hi, lo_closed, hi_closed in WEIGHT_BINS:
+        sel = ok & weight_bin_mask(w, lo, hi, lo_closed, hi_closed)
+        out["bins"][label] = (int(sel.sum()), float(near[sel].mean()) if sel.any() else None)
+    return out
+
+
+def _d6_cells(ctx: Context, rho: float) -> dict:
+    d, cells = ctx.dump, {}
+    for n_lib in H2B_LIBRARY:
+        g = ctx.group(rho, n_lib)
+        mom = {t: tuple(d[f"{g}/{k}{t}"] for k in ("E_C", "E_P", "C")) for t in ("_A", "_B", "")}
+        u = [unclipped_optimum(*mom[t])[0] for t in ("_A", "_B", "")]
+        w = {t: weight_from_moments(*mom[t]) for t in mom}
+        if not np.array_equal(w[""], d[f"{g}/w_star_href"]):
+            ctx.rep.defect(f"{ctx.system} D6 {g}: the weight rebuilt from the dumped moments "
+                           "differs from w_star_href")
+        cells[n_lib] = {"u_a": u[0], "u_b": u[1], "u": u[2], "w_a": w["_A"], "w_b": w["_B"],
+                        "w": w[""]}
+    return cells
+
+
 def section_d6(ctx: Context) -> None:
     """D6: the H2b(ii) bias by split-half Richardson on the paired change, and f_b."""
-    rep, d = ctx.rep, ctx.dump
+    rep = ctx.rep
     rep.say(f"D6 H2b(ii) clip-boundary bias, {ctx.system} (split-half Richardson on the mean "
             "paired change of the library cells; f_b = share within 2 s of a clip bound)")
-    rho = float(dig(ctx.cfg, "core_noise"))
-    cells: dict = {}
-    try:
-        for n_lib in H2B_LIBRARY:
-            g = ctx.group(rho, n_lib)
-            mom = {t: tuple(d[f"{g}/{k}{t}"] for k in ("E_C", "E_P", "C"))
-                   for t in ("_A", "_B", "")}
-            u, _ = zip(*(unclipped_optimum(*mom[t]) for t in ("_A", "_B", "")))
-            w = {t: weight_from_moments(*mom[t]) for t in mom}
-            if not np.array_equal(w[""], d[f"{g}/w_star_href"]):
-                ctx.rep.defects.append(f"{ctx.system} D6 {g}: the weight rebuilt from the dumped "
-                                       "moments differs from w_star_href")
-                rep.say(f"  MISMATCH: weight rebuilt from the moments of {g} differs from w_star_href")
-            cells[n_lib] = {"u_a": u[0], "u_b": u[1], "u": u[2], "w_a": w["_A"], "w_b": w["_B"],
-                            "w": w[""]}
-    except NotComputable as exc:
-        rep.nc(f"{ctx.system} D6 inputs", str(exc))
+    out: dict = {}
+    rep.data.setdefault(ctx.system, {})["D6"] = out
+    rho = attempt(rep, f"{ctx.system} D6 core noise", lambda: float(dig(ctx.cfg, "core_noise")))
+    cells = attempt(rep, f"{ctx.system} D6 inputs", _d6_cells, ctx, rho) if rho is not None else None
+    if cells is None:
         return
     lo, hi = H2B_LIBRARY
     change = {k: cells[hi][k] - cells[lo][k] for k in ("w_a", "w_b", "w")}
@@ -1339,70 +1538,126 @@ def section_d6(ctx: Context) -> None:
     shift = split_half_shift(float(change["w_a"].mean()), float(change["w_b"].mean()),
                              float(change["w"].mean()))
     bias = RICHARDSON * shift
-    block = int(dig(ctx.cfg, "bootstrap_block"))
-    se, failed = attempt(rep, f"{ctx.system} D6 bootstrap", bootstrap_se,
-                         lambda idx: RICHARDSON * split_half_shift(
-                             *(float(change[k][idx].mean()) for k in ("w_a", "w_b", "w"))),
-                         n, ctx.resamples, block, ctx.rng("d6-bootstrap")) or (None, None)
-    out: dict = {"n_states": n, "delta_sh": shift, "bias_order_half": bias,
-                 "bias_order_one": shift, "se": se, "n_failed": failed}
-    check(ctx, "H2b(ii) mean change (D6 input)", float(change["w"].mean()),
-          ("H2b", "library_change", "mean_change"), 1e-12)
-    try:
-        ci = dig(ctx.res, "H2b", "library_change", "ci")
-        hw_full, how = full_halfwidth((ci[1] - ci[0]) / 2.0, ctx.cfg, "n_test_sweep")
-        out.update(hw_full=hw_full, hw_full_how=how)
-    except Missing as exc:
-        ctx.rep.nc(f"{ctx.system} D6 hw_full", str(exc))
-        hw_full, how = None, ""
+    out.update(n_states=n, delta_sh=shift, bias_order_half=bias, bias_order_one=shift)
+    mean_change = float(change["w"].mean())
+    check(ctx, "H2b(ii) mean change (D6 input)", mean_change,
+          ("H2b", "library_change", "mean_change"), 1e-12,
+          scale=float(np.mean(np.abs(change["w"]))))
+    block = attempt(rep, f"{ctx.system} D6 block length",
+                    lambda: int(dig(ctx.cfg, "bootstrap_block")))
+    boot = (attempt(rep, f"{ctx.system} D6 bootstrap", bootstrap_se,
+                    lambda idx: RICHARDSON * split_half_shift(
+                        *(float(change[k][idx].mean()) for k in ("w_a", "w_b", "w"))),
+                    n, ctx.resamples, block, ctx.rng("d6-bootstrap")) if block is not None else None)
+    se, failed = boot if boot is not None else (None, None)
+    out.update(se=se, n_failed=failed)
     rep.say(f"  {n} sweep states; Delta_sh {shift:+.5f}; B order 1/2 {bias:+.5f}; order 1 {shift:+.5f};"
             f" SE {fmt(se, 4)} ({failed} failed of {ctx.resamples}, block {block}, seed {ctx.seed})")
-    if hw_full is not None and se is not None:
-        limit = 0.1 * hw_full
-        reading = three_way_reading(bias, se, limit)
-        point = "above" if abs(bias) > limit else "not above"
-        rep.say(f"  hw_full {hw_full:.5f} ({how}); 0.1 hw_full {limit:.5f}; reading: {reading}; "
-                f"point reading |B| {point} 0.1 hw_full")
-        out.update(limit=limit, reading=reading, point_reading=point)
+    got = attempt(rep, f"{ctx.system} D6 reading", budget_reading, ctx, bias, se,
+                  ("H2b", "library_change", "ci"), "n_test_sweep")
+    if got is not None:
+        out.update(got)
     fb: dict = {}
     for n_lib in H2B_LIBRARY:
         c = cells[n_lib]
-        ok = np.isfinite(c["u"]) & np.isfinite(c["u_a"]) & np.isfinite(c["u_b"])
-        s = np.where(ok, np.abs(c["u_a"] - c["u_b"]) / 2.0, np.nan)
-        near = np.where(ok, near_clip(np.where(ok, c["u"], 0.5), np.where(ok, s, 0.0)), False)
-        row = {"n_undefined": int((~ok).sum()), "f_b": float(near[ok].mean()) if ok.any() else None,
-               "bins": {}}
-        for lo_w, hi_w in WEIGHT_BINS:
-            if lo_w == hi_w:
-                sel = ok & (c["w"] == lo_w)
-            elif hi_w == 1.0:
-                sel = ok & (c["w"] > lo_w) & (c["w"] < 1.0)
-            elif lo_w == 0.1:
-                sel = ok & (c["w"] >= lo_w) & (c["w"] <= hi_w)
-            else:
-                sel = ok & (c["w"] > lo_w) & (c["w"] < hi_w)
-            row["bins"][f"{lo_w:g}-{hi_w:g}"] = (int(sel.sum()), float(near[sel].mean())
-                                                 if sel.any() else None)
+        row = attempt(rep, f"{ctx.system} D6 f_b n_lib {n_lib}", f_b_by_bin, c["w"], c["u"],
+                      c["u_a"], c["u_b"])
+        if row is None:
+            continue
         fb[n_lib] = row
         rep.say(f"  n_lib {n_lib}: f_b {fmt(row['f_b'], 3)} ({row['n_undefined']} states with an "
                 "undefined half optimum); by w bin (count, f_b): "
                 + ", ".join(f"[{k}] {v[0]}, {fmt(v[1], 3)}" for k, v in row["bins"].items()))
     out["f_b"] = fb
-    rep.data.setdefault(ctx.system, {})["D6"] = out
 
 
 # --------------------------------------------------------------------------------------------
 # driver
 # --------------------------------------------------------------------------------------------
+def run_level_lines(rep: Report) -> None:
+    """D1 and D2 over the whole run (B1 7.D1: every |acf(1)|; 7.D2: at least one of the primaries).
+
+    The predicted probability of at least one A5 trigger under no dependence is
+    ``1 - prod(1 - r_i)`` over the primary series with the tabulated per-series rates (n = 300, 500,
+    1000); it is 0.97 for the pilot's 18 primaries and 0.83 for the full preset's.
+    """
+    log = rep.series_log
+    rep.say("Run level (all systems)")
+    if not log:
+        rep.nc("run-level D1 and D2", "no series had an autocorrelation")
+        return
+    within = [e for e in log if e["within"]]
+    prim = [e for e in log if e["primary"]]
+    prim_within = [e for e in prim if e["within"]]
+    outside = [f"{e['system']} {e['name']} ({e['acf1']:+.3f})" for e in log if not e["within"]]
+    rep.say(f"  D1: |acf(1)| within its threshold for {len(within)} of {len(log)} series "
+            f"({len(prim_within)} of {len(prim)} primary): "
+            + ("every series is within: the phi = 0 rows apply" if not outside else
+               "NOT every series is within: " + "; ".join(outside)))
+    fired = [e for e in prim if e["fires"]]
+    known = [e for e in prim if e["fires"] is not None]
+    rates = [UNION_NULL.get(e["n"]) for e in known]
+    if known and all(r is not None for r in rates):
+        predicted = 1.0 - float(np.prod([1.0 - r for r in rates]))
+        pred_text = f"{predicted:.3f}"
+    else:
+        predicted, pred_text = None, "not tabulated for these n"
+    rep.say(f"  D2: the A5 rule fires on {len(fired)} of {len(known)} primary series; at least one "
+            f"fired: {'yes' if fired else 'no'}; predicted P(at least one) under no dependence "
+            f"{pred_text} (0.97 pilot, 0.83 full for the plan's 18 primaries)")
+    rep.data["run_level"] = {"n_series": len(log), "n_within": len(within), "n_primary": len(prim),
+                             "n_primary_within": len(prim_within), "n_fired": len(fired),
+                             "n_primary_known": len(known), "predicted_at_least_one": predicted,
+                             "at_least_one_fired": bool(fired)}
+
+
 def check_provenance(ctx: Context, seed_id: str) -> None:
-    """The dump must belong to this run: same system, seed id and preset (else a MISMATCH)."""
-    want = {"meta/system": ctx.system, "meta/seed_id": seed_id, "meta/preset": ctx.cfg.get("name")}
-    for key, expected in want.items():
+    """The dump must belong to this run.
+
+    ``meta/seed_id`` must be present, agree with the run's id and be ``DEV-n`` (else the run is
+    refused, R8); ``meta/system`` and ``meta/preset`` that differ from the results are a MISMATCH.
+    """
+    for key, expected in (("meta/system", ctx.system), ("meta/preset", ctx.cfg.get("name"))):
         if not ctx.dump.has(key):
             ctx.rep.nc(f"{ctx.system} dump provenance", f"array {key!r} is not in {ctx.dump.source}")
         elif str(ctx.dump.scalar(key)) != str(expected):
             ctx.rep.defect(f"{ctx.system}: {key} is {ctx.dump.scalar(key)!r} in the dump but "
                            f"{expected!r} in results.json (the dump is not this run's)")
+    if not ctx.dump.has("meta/seed_id"):
+        raise Refused(f"refused: the dump of {ctx.system} records no seed id ({ctx.dump.source})")
+    dump_id = str(ctx.dump.scalar("meta/seed_id"))
+    if dump_id != seed_id or not is_dev_id(dump_id):
+        raise Refused(f"refused: the dump of {ctx.system} records seed id {dump_id!r} but the run "
+                      f"records {seed_id!r} (all recorded ids must agree and be DEV-n)")
+
+
+def is_dev_id(seed_id: object) -> bool:
+    """Whether a recorded seed id is a development id ``DEV-n``."""
+    return isinstance(seed_id, str) and seed_id.startswith("DEV-") and seed_id[4:].isdigit()
+
+
+def run_seed_id(results: dict) -> str:
+    """The run's seed id: ``config.seed_id`` and ``provenance.seed_id`` must both be present, agree
+    and be ``DEV-n``, and a recorded ``provenance.seed_kind`` must be ``development`` (R8).
+
+    Raises
+    ------
+    Refused
+        Otherwise.
+    """
+    cfg, prov = results.get("config"), results.get("provenance")
+    if not isinstance(cfg, dict) or not isinstance(prov, dict):
+        raise Refused("refused: results.json has no config block or no provenance block")
+    ids = {"config.seed_id": cfg.get("seed_id"), "provenance.seed_id": prov.get("seed_id")}
+    for where, value in ids.items():
+        if not is_dev_id(value):
+            raise Refused(f"refused: {where} is {value!r}, not a development seed id DEV-n")
+    if ids["config.seed_id"] != ids["provenance.seed_id"]:
+        raise Refused(f"refused: the recorded seed ids disagree: {ids}")
+    if prov.get("seed_kind") != "development":
+        raise Refused(f"refused: provenance.seed_kind is {prov.get('seed_kind')!r}, not "
+                      "'development'")
+    return str(ids["config.seed_id"])
 
 
 def make_label(seed_id: str | None) -> str:
@@ -1419,36 +1674,46 @@ def find_results(path: Path) -> Path:
 
 
 def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[str] | None = None,
-        seed: int = TOOL_SEED, resamples: int = 2000, permutations: int = 1000) -> Report:
-    """Build the whole report for one run.
+        seed: int = TOOL_SEED, resamples: int = 2000, permutations: int = 1000,
+        rep: Report | None = None) -> Report:
+    """Build the whole report for one run (into ``rep`` if given, so a caller keeps it on a crash).
 
     Raises
     ------
     NotComputable
-        If the results file is unreadable or its seed id is not a development seed.
+        If the results file is unreadable.
+    Refused
+        If a recorded seed id is not a development id or the recorded ids disagree.
     """
     path = find_results(results_path)
     try:
         results = json.loads(path.read_text())
     except (OSError, ValueError) as exc:
         raise NotComputable(f"{path} is unreadable: {exc}") from exc
-    cfg = results.get("config")
-    prov = results.get("provenance", {})
-    seed_id = (prov.get("seed_id") if isinstance(prov, dict) else None) or (
-        cfg.get("seed_id") if isinstance(cfg, dict) else None)
-    if not isinstance(cfg, dict) or not isinstance(seed_id, str):
-        raise NotComputable("results.json has no config block or no seed id")
-    if not (seed_id.startswith("DEV-") and seed_id[4:].isdigit()):
-        raise NotComputable(f"refused: seed id {seed_id!r} is not a development seed DEV-n")
+    if not isinstance(results, dict):
+        raise NotComputable(f"{path} does not hold a JSON object")
+    seed_id = run_seed_id(results)
+    cfg, prov = results["config"], results["provenance"]
     folder = states_dir if states_dir is not None else path.parent / "states"
-    rep = Report()
+    rep = rep if rep is not None else Report()
+    options = {"seed": seed, "resamples": resamples, "permutations": permutations,
+               "default": bool((seed, resamples, permutations) == (TOOL_SEED, 2000, 1000))}
     rep.say(make_label(seed_id))
     rep.say("rehearsal_diagnostics (WU-0003.8): D1 to D6; needs owner review before freeze "
             "(statistics feeding the block-length and M decisions)")
-    rep.say(f"run: {path}; preset {cfg.get('name')}; commit {prov.get('commit', 'not recorded')}; "
-            f"tool seed {seed} (literal scratch seed, not a development or confirmatory seed)")
-    rep.say(f"outside schema {SCHEMA} (no arrays; not computed): " + ", ".join(OUTSIDE_SCHEMA))
+    rep.say(f"NOTICE: every reading below is computed with tool seed {seed} (a literal scratch seed, "
+            f"not a development or confirmatory seed), {resamples} bootstrap resamples and "
+            f"{permutations} permutations"
+            + ("" if options["default"] else " -- NON-DEFAULT OPTIONS")
+            + f" (defaults: seed {TOOL_SEED}, 2000, 1000). Rerunning with other --seed, --resamples "
+            "or --permutations to change a reading is not allowed; the seed and the options are an "
+            "owner question (review R9).")
+    rep.say(f"run: {path}; preset {cfg.get('name')}; commit {prov.get('commit', 'not recorded')}")
     rep.data["label"] = make_label(seed_id)
+    rep.data["options"] = options
+    for name in OUTSIDE_SCHEMA:
+        rep.nc(f"{name} (all systems)", f"its arrays are not in schema {SCHEMA}; no influence "
+               "series or diagnostic")
     all_systems = list(results.get("systems", {}))
     chosen = [s for s in all_systems if systems is None or s in systems]
     for wanted in systems or ():
@@ -1461,25 +1726,31 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
         if not file.is_file():
             rep.nc(f"{system} (D1 to D6)", f"{file} not found (run without --states-dump?)")
             continue
-        dump = Dump.load(file)
+        dump = None
         try:
+            dump = Dump.load(file)
             schema = dump.scalar("meta/schema")
-        except NotComputable as exc:
-            rep.nc(f"{system} (D1 to D6)", str(exc))
-            continue
-        if schema != SCHEMA:
-            rep.nc(f"{system} (D1 to D6)", f"schema {schema!r} is not {SCHEMA!r}")
-            continue
-        ctx = Context(system, dump, results["systems"][system], cfg, rep, seed, resamples,
-                      permutations)
-        try:
+            if schema != SCHEMA:
+                rep.nc(f"{system} (D1 to D6)", f"schema {schema!r} is not {SCHEMA!r}")
+                continue
+            ctx = Context(system, dump, results["systems"][system], cfg, rep, seed, resamples,
+                          permutations)
             check_provenance(ctx, seed_id)
             section_d1_d2(ctx)
             for name, section in (("D3", section_d3), ("D4", section_d4), ("D5", section_d5),
                                   ("D6", section_d6)):
                 attempt(rep, f"{system} {name}", section, ctx)
+        except Refused:
+            raise
+        except NotComputable as exc:
+            rep.nc(f"{system} (D1 to D6)", str(exc))
+        except Exception as exc:  # noqa: BLE001  (a corrupt archive and the like: exit 2, R6)
+            rep.internal(f"{system} (D1 to D6)", exc)
         finally:
-            dump.close()
+            if dump is not None:
+                dump.close()
+    rep.say("")
+    run_level_lines(rep)
     rep.say("")
     if rep.incomplete:
         rep.say(f"not computable: {len(rep.incomplete)} item(s) (listed above); never skipped")
@@ -1520,12 +1791,16 @@ def main(argv: list[str] | None = None) -> int:
         print("rehearsal_diagnostics: error: --resamples and --permutations need at least 2",
               file=sys.stderr)
         return EXIT_INCOMPLETE
+    rep = Report()
     try:
-        rep = run(args.run, args.states, args.systems, args.seed, args.resamples,
-                  args.permutations)
-    except NotComputable as exc:
+        run(args.run, args.states, args.systems, args.seed, args.resamples, args.permutations,
+            rep=rep)
+    except NotComputable as exc:  # unreadable input or a refused run: nothing else is trusted
         print(f"rehearsal_diagnostics: error: {exc}", file=sys.stderr)
         return EXIT_INCOMPLETE
+    except Exception as exc:  # noqa: BLE001  (R6: keep the report, exit 2, never the MISMATCH code)
+        rep.internal("run", exc)
+        rep.say("INTERNAL ERROR: the report above is partial; exit 2")
     print("\n".join(rep.lines))
     if args.json is not None:
         args.json.write_text(json.dumps(_json_ready(rep.data), indent=1))

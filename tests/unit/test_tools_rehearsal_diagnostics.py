@@ -681,6 +681,18 @@ def build_world(rng: np.random.Generator) -> tuple[dict, dict, dict]:
     d["core/Lambda_bar"] = rng.uniform(0.0, 0.05, N)
     d["core/eps_s"], d["core/delta"] = np.exp(rng.normal(-4, 0.3, N)), np.exp(rng.normal(-4, 0.3, N))
     d["core/g_H_ref"] = np.exp(rng.normal(1, 0.5, N))
+    d["core/N"] = np.exp(rng.normal(-2, 0.7, N))
+    # the deployable profile of E = 2 draws: strictly increasing transforms of noisy proxies of the
+    # oracle quantities (log(x/rho), log(x/rho), x steps_per_lyapunov, log(x + c))
+    proxy = [d["core/eps_s"], d["core/delta"], d["core/Lambda_bar"], d["core/N"]]
+    prof = np.empty((N, 2, 4))
+    for draw in range(2):
+        noisy = [v * np.exp(rng.normal(0, 0.4, N)) for v in proxy]
+        prof[:, draw, 0] = np.log(noisy[0] / 0.01)
+        prof[:, draw, 1] = np.log(noisy[1] / 0.01)
+        prof[:, draw, 2] = noisy[2] * LT
+        prof[:, draw, 3] = np.log(noisy[3] + 1e-3)
+    d["core/profile"] = prof
     for rule in ("A0", "A1", "A2", "A3", "A4", "A5", "A4o", "A*"):
         d[f"core/state_mse/{rule}"] = np.exp(rng.normal(-3, 1.0, (N, 5)))
     for rule in ("A2", "A3", "A4", "A5"):
@@ -789,7 +801,15 @@ def build_results(d: dict) -> dict:
     sysd["H1b"] = {"PLP": {"slope": float(np.polyfit(x[keep], y[keep], 1)[0]),
                            "n_excluded_nonfinite": int((~keep).sum()),
                            "n_floored": int((e_p[:, REF][keep] < 1e-12).sum())}}
-    return {"config": dict(CFG), "provenance": {"seed_id": "DEV-1", "commit": "synthetic"},
+    sysd["H1d"] = {"rows": {}}
+    for name, col, oracle in rd.H1D_ROWS:
+        proxy, truth = d["core/profile"][:, 0, col], d[f"core/{oracle}"]
+        keep = np.isfinite(proxy) & np.isfinite(truth)
+        sysd["H1d"]["rows"][name] = {
+            "spearman": float(sps.spearmanr(proxy[keep], truth[keep]).statistic),
+            "n_excluded_nonfinite": int((~keep).sum())}
+    return {"config": dict(CFG),
+            "provenance": {"seed_id": "DEV-1", "seed_kind": "development", "commit": "synthetic"},
             "systems": {"lorenz63": sysd}}
 
 
@@ -802,13 +822,15 @@ def write_run(tmp_path: Path, d: dict, res: dict) -> Path:
     return tmp_path
 
 
-def test_a_full_run_on_a_consistent_world_reproduces_every_leaf_and_exits_0(tmp_path, capsys) -> None:
-    """End to end: the report is labelled DEVELOPMENT, every recomputed leaf is MATCH, exit 0.
+def test_a_full_run_on_a_consistent_world_reproduces_every_leaf_and_lists_h1a_h1c(
+        tmp_path, capsys) -> None:
+    """End to end: labelled DEVELOPMENT, every recomputed leaf is MATCH, H1a and H1c are the only
+    "not computable" lines (their arrays are not in the schema), so the exit code is 2.
 
     Reference: the results tree of ``build_world``, computed in this file by independent routes. The
-    run must print D1 to D6 for the system, list H1a, H1c and H1d as outside the schema, and compute the
-    18 + 7 series of the criteria (the primaries: H2a(i), H2a(ii) zero and interior (and one if
-    triggered), H2b(i), H2b(ii), H3c). Exit 0.
+    run must print D1 to D6 for the system and the run-level D1/D2 lines, compute the primaries
+    (H2a(i), H2a(ii) zero and interior (and one if triggered), H2b(i), H2b(ii), H3c) and H1d, and
+    record the seed and options in the JSON and prominently in the text (R9).
     """
     d, res, _ = build_world(rng_for("world"))
     run_dir = write_run(tmp_path, d, res)
@@ -819,18 +841,27 @@ def test_a_full_run_on_a_consistent_world_reproduces_every_leaf_and_exits_0(tmp_
     assert out.splitlines()[0].startswith("DEVELOPMENT (DEV-1): conditional on one realization")
     assert "needs owner review before freeze" in out
     for header in ("D1 influence series", "D2 block-length", "D3 log-SD", "D4 split-half",
-                   "D5 finite-M bias", "D6 H2b(ii)", "outside schema lpcstudy.states/1"):
+                   "D5 finite-M bias", "D6 H2b(ii)", "Run level (all systems)"):
         assert header in out
-    assert "MISMATCH" not in out and "not computable" not in out, out
-    assert out.count(": MATCH") >= 16
-    assert code == 0
+    assert "MISMATCH" not in out and "INTERNAL ERROR" not in out, out
+    nc = [line.strip() for line in out.splitlines() if line.strip().startswith("not computable:")
+          and "items" not in line and "item(s)" not in line]
+    assert [line.split(":")[1].strip() for line in nc] == ["H1a (all systems)", "H1c (all systems)"]
+    assert out.count(": MATCH") >= 28  # 20 earlier leaves, H1d: 4 rho + 4 exclusion counts
+    assert code == 2
     data = json.loads(json_path.read_text())
     names = set(data["lorenz63"]["D1"])
-    assert {"H2a(i)", "H2a(ii) zero", "H2a(ii) interior", "H2b(i)", "H2b(ii)", "H3c"} <= names
+    assert {"H2a(i)", "H2a(ii) zero", "H2a(ii) interior", "H2b(i)", "H2b(ii)", "H3c",
+            "H1d analog_seed", "H1d estimation_seed", "H1d growth", "H1d nhat"} <= names
     assert data["lorenz63"]["D1"]["H3c"]["primary"] is True
+    assert data["lorenz63"]["D1"]["H1d growth"]["primary"] is False
     assert data["lorenz63"]["D1"]["H3c"]["domain"] == N and data["lorenz63"]["D1"]["H2b(i)"]["domain"] == NS
     assert 2 <= data["lorenz63"]["D1"]["H2a(i)"]["domain"] < N  # the eligible states
     assert data["lorenz63"]["D5"]["reading"] in ("below 10%", "not below 10%", "not determined")
+    assert data["options"] == {"seed": rd.TOOL_SEED, "resamples": 100, "permutations": 50,
+                               "default": False}
+    assert "NON-DEFAULT OPTIONS" in out and "owner question" in out and "not allowed" in out
+    assert data["run_level"]["n_series"] == len(data["lorenz63"]["D1"])
 
 
 def test_a_perturbed_results_leaf_is_a_mismatch_with_exit_1(tmp_path, capsys) -> None:
@@ -882,7 +913,7 @@ def test_a_system_without_a_dump_file_is_listed_and_a_non_dev_seed_is_refused(tm
         run_dir = write_run(tmp_path, d, tree)
         assert rd.main([str(run_dir)]) == 2
         captured = capsys.readouterr()
-        assert captured.out == "" and ("refused" in captured.err or "no config" in captured.err)
+        assert captured.out == "" and "refused" in captured.err
 
 
 def test_constant_h2b_states_and_nonfinite_h1b_states_are_counted_against_the_results(
@@ -913,23 +944,58 @@ def test_constant_h2b_states_and_nonfinite_h1b_states_are_counted_against_the_re
     assert "dump 1 vs results 0" in capsys.readouterr().out and code == 1
 
 
-def test_a_dump_of_another_run_is_a_mismatch(tmp_path, capsys) -> None:
-    """A dump whose ``meta/seed_id`` or ``meta/preset`` differs from the results file is a MISMATCH.
+def test_a_dump_of_another_run_is_refused_or_a_mismatch(tmp_path, capsys) -> None:
+    """A dump whose ``meta/seed_id`` differs from the run's is REFUSED (exit 2, stderr); a differing
+    ``meta/preset`` is a MISMATCH (exit 1); a dump without ``meta/preset`` is "not computable".
 
-    Reference: the contract (a dump must be the run's own). Exit 1, and the message names the key and
-    both values. A dump without ``meta/preset`` is "not computable" (exit 2).
+    Reference: the contract of R8 (every recorded seed id agrees and is DEV-n) and of the dump's
+    provenance check.
     """
     d, res, _ = build_world(rng_for("world"))
     d["meta/seed_id"] = np.array("DEV-2")
     code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "100", "--permutations", "50"])
-    out = capsys.readouterr().out
-    assert "MISMATCH: lorenz63: meta/seed_id is 'DEV-2' in the dump but 'DEV-1' in results.json" in out
-    assert code == 1
+    captured = capsys.readouterr()
+    assert code == 2 and captured.out == ""
+    assert "the dump of lorenz63 records seed id 'DEV-2' but the run records 'DEV-1'" in captured.err
+    d, res, _ = build_world(rng_for("world"))
+    del d["meta/seed_id"]
+    assert rd.main([str(write_run(tmp_path / "n", d, res))]) == 2
+    assert "records no seed id" in capsys.readouterr().err
+    d, res, _ = build_world(rng_for("world"))
+    d["meta/preset"] = np.array("full")
+    code = rd.main([str(write_run(tmp_path / "p", d, res)), "--resamples", "100",
+                    "--permutations", "50"])
+    assert "MISMATCH: lorenz63: meta/preset is 'full' in the dump but 'pilot' in results.json" in \
+        capsys.readouterr().out and code == 1
     d, res, _ = build_world(rng_for("world"))
     del d["meta/preset"]
     assert rd.main([str(write_run(tmp_path / "b", d, res)), "--resamples", "100",
                     "--permutations", "50"]) == 2
     assert "array 'meta/preset' is not in" in capsys.readouterr().out
+
+
+def test_every_recorded_seed_id_must_be_present_agree_and_be_a_development_id(
+        tmp_path, capsys) -> None:
+    """R8: config.seed_id, provenance.seed_id and provenance.seed_kind are all required.
+
+    Reference: the contract. A disagreeing pair (DEV-1 and DEV-2), a missing provenance id, a
+    missing config id, ``seed_kind`` 'confirmatory' or absent are each refused (exit 2, nothing on
+    stdout); the consistent tree is accepted.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    cases = {
+        "disagree": {"config": {**res["config"], "seed_id": "DEV-2"}},
+        "no provenance id": {"provenance": {"seed_kind": "development"}},
+        "no config id": {"config": {k: v for k, v in res["config"].items() if k != "seed_id"}},
+        "confirmatory kind": {"provenance": {**res["provenance"], "seed_kind": "confirmatory"}},
+        "no kind": {"provenance": {"seed_id": "DEV-1", "commit": "x"}},
+    }
+    for name, change in cases.items():
+        run_dir = write_run(tmp_path / name.replace(" ", "_"), d, {**res, **change})
+        assert rd.main([str(run_dir)]) == 2, name
+        captured = capsys.readouterr()
+        assert captured.out == "" and "refused" in captured.err, name
+    assert rd.run_seed_id(res) == "DEV-1"
 
 
 def test_a_wrong_schema_is_not_computable(tmp_path, capsys) -> None:
@@ -1066,3 +1132,368 @@ def test_dump_loads_an_npz_without_pickles_and_names_the_missing_array(tmp_path)
     assert dump.has("core/x") and not dump.has("core/y")
     with pytest.raises(rd.Missing, match="array 'core/y' is not in"):
         dump["core/y"]
+
+
+# ------------------------------------------------------------------------------------------ fix round 1
+def weighted_spearman(w: np.ndarray, x: np.ndarray, y: np.ndarray) -> float:
+    """Spearman at a weighted measure: Pearson of the weighted mid-distribution functions.
+
+    ``F(x_j) = sum_i w_i (1{x_i < x_j} + 1{x_i = x_j}/2)``, likewise ``G``; the weighted Pearson
+    correlation of ``(F, G)`` written with weighted means (it does not assume they are 1/2).
+    """
+    cx = (x[:, None] < x[None, :]) + 0.5 * (x[:, None] == x[None, :])
+    cy = (y[:, None] < y[None, :]) + 0.5 * (y[:, None] == y[None, :])
+    a, b = w @ cx, w @ cy
+    ma, mb = w @ a, w @ b
+    return float((w @ (a * b) - ma * mb) / np.sqrt((w @ (a * a) - ma**2) * (w @ (b * b) - mb**2)))
+
+
+def test_r2_spearman_influence_equals_gateaux_derivative_with_and_without_ties() -> None:
+    """psi of the Spearman correlation (H1d) equals the Gateaux derivative of the weighted-rank
+    correlation, n = 50, on a tie-free sample and on a sample with many ties, and with a domain.
+
+    Reference: ``weighted_spearman`` above (weighted mid-distribution functions; the ranks move with
+    the weights, so the derivative includes the rank-change terms). The value equals
+    ``scipy.stats.spearmanr`` to 1e-12; sum psi = 0 within 1e-12 of sum |psi| (c1 rules); the
+    result is unchanged, exactly, by strictly increasing transforms of either variable (the
+    transforms of ``core/profile``). Tolerance of the derivative as in c1.
+    """
+    rng = rng_for("r2-spearman")
+    n = 50
+    x = rng.standard_normal(n)
+    y = 0.6 * x + 0.8 * rng.standard_normal(n)
+    for xs, ys in ((x, y), (np.round(x, 1), np.round(y, 0))):  # the second has ties
+        psi, rho = rd.psi_spearman(xs, ys)
+        assert rho == pytest.approx(sps.spearmanr(xs, ys).statistic, abs=1e-12)
+        assert_gateaux(psi, gateaux(lambda w: weighted_spearman(w, xs, ys), n))
+    ties = np.round(x, 1)
+    assert len(np.unique(ties)) < n
+    dom = rng.random(n) < 0.8
+    rows = np.flatnonzero(dom)
+    psi, rho = rd.psi_spearman(x, y, dom)
+    assert np.all(psi[~dom] == 0.0)
+    assert_gateaux(psi[rows], gateaux(lambda w: weighted_spearman(w, x[rows], y[rows]), len(rows)))
+    again, rho2 = rd.psi_spearman(np.exp(3 * x), np.log(y - y.min() + 1.0))
+    base_psi, base_rho = rd.psi_spearman(x, y)
+    assert rho2 == base_rho and np.array_equal(again, base_psi)
+    with pytest.raises(rd.NotComputable, match="Spearman"):
+        rd.psi_spearman(np.ones(10), np.arange(10.0))
+
+
+def test_r1_a_non_finite_half_width_is_not_computable_and_never_reads_below_10(
+        tmp_path, capsys) -> None:
+    """An interval at (-inf, inf) (failed resamples) or NaN makes the D5 and D6 readings "not
+    computable"; nothing reads "below 10%" and exit is 2.
+
+    Reference: the finding's probe. ``three_way_reading(0.03, 0.004, 0.1 * inf)`` read "below 10%";
+    now every non-finite input raises ``NotComputable``, as does ``full_halfwidth`` of an infinite
+    or NaN half-width. End to end the world's H2a range interval is [-inf, inf] and its H2b(ii)
+    interval [nan, nan]: both readings are "not computable: ... half-width not finite", the shifts
+    and SEs are still printed, and "may be stated below 10%" never appears.
+    """
+    for bad in (math.inf, math.nan):
+        with pytest.raises(rd.NotComputable, match="non-finite"):
+            rd.three_way_reading(0.03, 0.004, 0.1 * bad)
+        with pytest.raises(rd.NotComputable, match="non-finite"):
+            rd.three_way_reading(bad, 0.004, 0.01)
+        with pytest.raises(rd.NotComputable, match="half-width"):
+            rd.full_halfwidth(bad, {"name": "pilot", "n_test": 500}, "n_test")
+    d, res, _ = build_world(rng_for("world"))
+    res["systems"]["lorenz63"]["H2a"]["range_ci"] = [-math.inf, math.inf]
+    res["systems"]["lorenz63"]["H2b"]["library_change"]["ci"] = [math.nan, math.nan]
+    code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "100", "--permutations", "50"])
+    out = capsys.readouterr().out
+    assert "D5 reading: half-width not finite: interval [-inf, inf]" in out
+    assert "D6 reading: half-width not finite: interval [nan, nan]" in out
+    assert "reading: below 10%" not in out and "may be stated below 10%" not in out
+    assert "Delta_sh" in out and "SE " in out and code == 2
+
+
+def build_d5_dump(n: int = 300):
+    """A constructed dump for the whole D5 estimator: the model of ``m5_d5split.py`` as
+    ``w_star``, ``w_star_A``, ``w_star_B`` at 1, 2 and 4 LT, with states that are ineligible
+    (not small at 1 LT), non-contiguous (small only at 1 LT and 4 LT) or short (small at 1 and 2 LT)."""
+    a, b, m = d5_script_model(20261017, n, 0.3, 0.5)
+    e_c, e_p = np.full((n, 3), 0.01), np.full((n, 3), 0.01)
+    idx = np.arange(n)
+    e_c[idx % 7 == 0, 0] = 0.9
+    e_c[idx % 11 == 1, 1] = 0.9
+    e_p[idx % 13 == 2, 2] = 0.9
+    d = {"core/horizons": np.array([30, 60, 120]), "core/ref_index": np.array(0),
+         "meta/steps_per_lyapunov": np.array(30), "core/E_C": e_c, "core/E_P": e_p,
+         "core/w_star": m, "core/w_star_A": a, "core/w_star_B": b}
+    return d, (a, b, m, e_c, e_p)
+
+
+def loop_d5(a, b, m, e_c, e_p) -> tuple[float, float, int, float]:
+    """The D5 estimator by explicit loops: leading segment, eligibility, the three medians."""
+    n = len(m)
+
+    def segment(i: int) -> int:
+        length = 0
+        while length < 3 and math.sqrt(e_c[i, length]) <= 0.5 and math.sqrt(e_p[i, length]) <= 0.5:
+            length += 1
+        return length
+
+    rows = [i for i in range(n) if segment(i) >= 2]
+
+    def med(w) -> float:
+        return float(np.median([max(w[i, :segment(i)]) - min(w[i, :segment(i)]) for i in rows]))
+
+    shift = 0.5 * (med(a) + med(b)) - med(m)
+    return shift, shift / (math.sqrt(2.0) - 1.0), len(rows), med(m)
+
+
+def test_r3_the_whole_d5_estimator_equals_an_independent_loop_value() -> None:
+    """Eligibility, the fixed segments, the half-draw ranges and the medians over the eligible states.
+
+    Reference: ``loop_d5`` (explicit loops over states: the leading small-error segment from the
+    200-draw moments, eligible iff at least two horizons, the range of each of the three weight sets
+    over that fixed segment, medians over the eligible states, ``Delta_sh = (med A + med B)/2 - med
+    200`` and ``B = Delta_sh/(sqrt 2 - 1)``), on the model of ``m5_d5split.py`` placed in a dump with
+    ineligible, non-contiguous and short states (the generator is this file's ``make_rng``
+    re-implementation, not the script's own stream: the plan's "match the script" cannot hold
+    bitwise under the make_rng rule, a planner point). Tolerance 1e-12 relative (medians of the same
+    floats; the Richardson factor is one division).
+    """
+    d, parts = build_d5_dump()
+    shift, bias, n_eligible, med_full = loop_d5(*parts)
+    assert 150 < n_eligible < 270  # the construction removes some states and keeps most
+    rep = rd.Report()
+    cfg = {"linear_regime_rms": 0.5, "bootstrap_block": 5, "name": "pilot", "n_test": 300,
+           "bootstrap_resamples": 500}
+    res = {"H2a": {"median_range": med_full, "range_ci": [0.1, 0.3]}}
+    ctx = rd.Context("s", rd.Dump(d, "mem"), res, cfg, rep, 7, 100, 10)
+    rd.section_d5(ctx)
+    out = rep.data["s"]["D5"]
+    assert out["n_eligible"] == n_eligible
+    assert out["delta_sh"] == pytest.approx(shift, rel=1e-12, abs=1e-15)
+    assert out["bias_order_half"] == pytest.approx(bias, rel=1e-12, abs=1e-15)
+    assert out["reading"] in ("below 10%", "not below 10%", "not determined")
+    assert not rep.defects  # the median range of the dump is the results leaf, exactly
+    assert any("D5 V4 check" in line for line in rep.incomplete)  # the V4 arrays are absent here
+    # an infinite interval: the shift is still computed and printed, the reading is not computable
+    res["H2a"]["range_ci"] = [-math.inf, math.inf]
+    rep2 = rd.Report()
+    rd.section_d5(rd.Context("s", rd.Dump(d, "mem"), res, cfg, rep2, 7, 100, 10))
+    out2 = rep2.data["s"]["D5"]
+    assert out2["delta_sh"] == out["delta_sh"] and "reading" not in out2
+    assert any("D5 reading: half-width not finite" in line for line in rep2.incomplete)
+    assert any("D5 V4 check" in line for line in rep2.incomplete)  # the V4 check still ran
+
+
+def test_r4_the_reproduction_floor_removes_false_mismatches_and_hides_no_real_one() -> None:
+    """Delta R^2 near 0: the tool's ``mean(gain)/SST`` and production's ``R^2(F4) - R^2(F3)`` differ
+    by round-off (about 1e-14 absolute); the check is ``tol max(|leaf|, scale)`` with ``scale =
+    max(|R^2_3|, |R^2_4|)``.
+
+    Reference: 200 probes (n = 500, |Delta R^2| about 1e-4, ``make_rng``): the old bound ``1e-12
+    |leaf|`` is exceeded on some (so the probe is exercising the case), the new bound on none. Mutation
+    test: a leaf off by a relative 1e-6 (7e-11 absolute at 7e-5, against an allowed 4e-13), by 1e-9
+    absolute, or by 1% is a MISMATCH; off by 1e-14 absolute is a MATCH; the same for the class with
+    tolerance 1e-9 and scale 1 (a partial correlation): 1e-6 mismatches, 1e-11 matches.
+    """
+    rng = rng_for("r4")
+    old_fail = new_fail = 0
+    for _ in range(200):
+        y = rng.standard_normal(500)
+        f3 = 0.5 * y + 0.5 * rng.standard_normal(500)
+        f4 = f3 + 0.01 * rng.standard_normal(500)
+        mine = rd.psi_delta_r2(y, f3, f4)[1]
+        sst = np.sum((y - y.mean()) ** 2)
+        r3, r4 = 1 - np.sum((y - f3) ** 2) / sst, 1 - np.sum((y - f4) ** 2) / sst
+        leaf = r4 - r3
+        old_fail += abs(mine - leaf) > 1e-12 * abs(leaf)
+        new_fail += abs(mine - leaf) > 1e-12 * max(abs(leaf), abs(r3), abs(r4))
+    assert old_fail >= 1 and new_fail == 0
+
+    def verdict(mine: float, leaf: float, tol: float, scale: float) -> bool:
+        rep = rd.Report()
+        ctx = rd.Context("s", rd.Dump({}, "mem"), {"a": {"b": leaf}}, {}, rep, 1, 2, 2)
+        rd.check(ctx, "x", mine, ("a", "b"), tol, scale=scale)
+        return not rep.defects
+
+    leaf = 7e-5
+    assert verdict(leaf + 1e-14, leaf, 1e-12, 0.4)
+    for off in (leaf * 1e-6, 1e-9, leaf * 0.01):
+        assert not verdict(leaf + off, leaf, 1e-12, 0.4)
+    assert verdict(0.3 + 1e-11, 0.3, 1e-9, 1.0) and not verdict(0.3 + 1e-6, 0.3, 1e-9, 1.0)
+    assert verdict(1e-12, 0.0, 1e-9, 1.0) and not verdict(1e-6, 0.0, 1e-9, 1.0)
+
+
+def test_r4_a_near_zero_delta_r2_in_the_world_is_a_match_and_a_one_percent_error_is_not(
+        tmp_path, capsys) -> None:
+    """End to end with a Q-N target whose gain is about 1e-5, the leaf computed by the test's route.
+
+    Reference: ``r2(F4) - r2(F3)`` (this file). The run reports MATCH for it, and the same run with
+    the leaf off by 1% of itself reports MISMATCH (exit 1).
+    """
+    d, res, _ = build_world(rng_for("world"))
+    y = d["qn/oracle/log_horizon/y"]
+    rng = rng_for("r4-world")
+    d["qn/oracle/log_horizon/pred3"] = 0.5 * y + 0.5 * rng.standard_normal(N)
+    d["qn/oracle/log_horizon/pred4"] = d["qn/oracle/log_horizon/pred3"] + 0.002 * rng.standard_normal(N)
+    res = build_results(d)
+    leaf = res["systems"]["lorenz63"]["Q-N"]["oracle"]["log_horizon"]["delta_r2"]
+    assert 0 < abs(leaf) < 1e-3
+    rd.main([str(write_run(tmp_path, d, res)), "--resamples", "50", "--permutations", "20"])
+    assert "MISMATCH" not in capsys.readouterr().out
+    res["systems"]["lorenz63"]["Q-N"]["oracle"]["log_horizon"]["delta_r2"] = leaf * 1.01
+    code = rd.main([str(write_run(tmp_path / "b", d, res)), "--resamples", "50",
+                    "--permutations", "20"])
+    assert "check Q-N oracle log_horizon delta R^2" in capsys.readouterr().out and code == 1
+
+
+def test_r2_h1d_leaf_mutation_is_a_mismatch(tmp_path, capsys) -> None:
+    """H1d's reproduction check reads ``H1d/rows/<name>/spearman``: a leaf off by 1e-6 is a MISMATCH.
+
+    Reference: the unperturbed leaf is the test's ``scipy.stats.spearmanr`` of the proxy with the
+    oracle (MATCH in the full-run test); perturbing it by 1e-6 is 10^6 times the 1e-12 bound.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    res["systems"]["lorenz63"]["H1d"]["rows"]["growth"]["spearman"] += 1e-6
+    code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "50", "--permutations", "20"])
+    out = capsys.readouterr().out
+    assert "check H1d growth Spearman" in out and out.count(": MISMATCH") == 1 and code == 1
+
+
+def test_r5_a_failure_inside_a_section_names_what_is_skipped_and_continues(capsys) -> None:
+    """D3: a missing weight array loses only that rule's state part (named), the rule's own log-SD
+    and the other rules still print, and the non-positive count of the state part is reported. D6:
+    a missing ``bootstrap_block`` is named, the shifts and f_b still print, no reading is made.
+
+    Reference: the contract (every skipped item is named "not computable" with its reason).
+    """
+    n = 40
+    rng = rng_for("r5")
+    d = {"meta/n_eval_draws": np.array(2), "core/ref_index": np.array(0),
+         "core/E_C": 1.0 + rng.random((n, 1)), "core/E_P": 1.0 + rng.random((n, 1)),
+         "core/C": 0.2 * rng.random((n, 1))}
+    for rule in ("A1", "A2", "A3", "A4", "A5"):
+        d[f"core/state_mse/{rule}"] = np.exp(rng.normal(-3, 1, (n, 1)))
+    for rule in ("A2", "A4", "A5"):  # A3's weights are absent
+        d[f"core/weight_href/{rule}"] = rng.random((n, 2))
+    rep = rd.Report()
+    rd.section_d3(rd.Context("s", rd.Dump(d, "mem"), {}, {}, rep, 1, 2, 2))
+    text = "\n".join(rep.lines)
+    assert "not computable: s D3 A3 state part: array 'core/weight_href/A3' is not in" in text
+    for rule in ("A1", "A2", "A3", "A4", "A5"):
+        assert f"  {rule}: log-SD" in text
+    assert set(rep.data["s"]["D3"]["rules"]) == {"A1", "A2", "A3", "A4", "A5"}
+    # a zero state part is counted, not dropped: A1 with E_P = 0 on one state
+    d["core/E_P"][3, 0] = 0.0
+    rep = rd.Report()
+    rd.section_d3(rd.Context("s", rd.Dump(d, "mem"), {}, {}, rep, 1, 2, 2))
+    assert rep.data["s"]["D3"]["rules"]["A1"]["state_part_n_nonpositive"] == 1
+    assert "1 non-positive state-part values excluded" in "\n".join(rep.lines)
+    world, res, _ = build_world(rng_for("world"))
+    cfg = {k: v for k, v in CFG.items() if k != "bootstrap_block"}
+    rep = rd.Report()
+    rd.section_d6(rd.Context("lorenz63", rd.Dump(world, "mem"), res["systems"]["lorenz63"], cfg,
+                             rep, 1, 50, 10))
+    text = "\n".join(rep.lines)
+    assert "D6 block length: results leaf bootstrap_block is absent" in text.replace("lorenz63 ", "")
+    assert "Delta_sh" in text and "n_lib 1000: f_b" in text
+    assert "point reading" not in text and "0.1 hw_full" not in text
+
+
+def test_r6_unexpected_exceptions_exit_2_with_the_partial_report(tmp_path, capsys,
+                                                                 monkeypatch) -> None:
+    """A corrupt archive and an unexpected exception exit 2 (not the MISMATCH code), print what was
+    computed so far and an INTERNAL ERROR line naming the place.
+
+    Reference: the finding. A garbage ``.npz`` raises inside ``np.load``; a patched
+    ``run_level_lines`` raises ``RuntimeError`` after the systems were done: the header, the system
+    block and the exception line are all printed.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    run_dir = write_run(tmp_path, d, res)
+    (run_dir / "states" / "lorenz63.npz").write_bytes(b"this is not a zip archive")
+    code = rd.main([str(run_dir)])
+    out = capsys.readouterr().out
+    assert code == 2 and out.startswith("DEVELOPMENT (DEV-1)")
+    assert "INTERNAL ERROR: lorenz63 (D1 to D6):" in out and "MISMATCH" not in out
+    run_dir = write_run(tmp_path / "b", d, res)
+
+    def boom(rep):
+        raise RuntimeError("simulated defect")
+
+    monkeypatch.setattr(rd, "run_level_lines", boom)
+    code = rd.main([str(run_dir), "--resamples", "50", "--permutations", "20"])
+    out = capsys.readouterr().out
+    assert code == 2 and "=== lorenz63 ===" in out and "D6 H2b(ii)" in out
+    assert "INTERNAL ERROR: run: RuntimeError: simulated defect" in out
+    assert "the report above is partial" in out
+
+
+def test_r7_run_level_lines_reproduce_the_plans_probabilities() -> None:
+    """The run-level D2 line: P(at least one) = 1 - prod(1 - r_i) over the primary series, 0.97 for the
+    pilot's 18 (12 at n = 500, 6 at n = 300) and 0.83 for the full preset's 18 at n = 1000.
+
+    Reference: the plan's numbers (B1 7.D2) and the per-series rates 0.164, 0.210, 0.094, hand
+    products. The D1 line counts every series, not only primaries.
+    """
+    def log_of(ns: list[int], fired: list[bool], within: list[bool]) -> rd.Report:
+        rep = rd.Report()
+        for k, (n, f, w) in enumerate(zip(ns, fired, within)):
+            rep.series_log.append({"system": "s", "name": f"series {k}", "n": n, "primary": True,
+                                   "acf1": 0.0 if w else 0.3, "within": w, "fires": f})
+        rep.series_log.append({"system": "s", "name": "other", "n": 500, "primary": False,
+                               "acf1": 0.5, "within": False, "fires": None})
+        rd.run_level_lines(rep)
+        return rep
+
+    pilot = log_of([500] * 12 + [300] * 6, [False] * 17 + [True], [True] * 18)
+    assert round(pilot.data["run_level"]["predicted_at_least_one"], 2) == 0.97
+    assert pilot.data["run_level"]["predicted_at_least_one"] == pytest.approx(
+        1 - 0.836**12 * 0.79**6, rel=1e-12)
+    text = "\n".join(pilot.lines)
+    assert "D2: the A5 rule fires on 1 of 18 primary series; at least one fired: yes" in text
+    assert "18 of 19 series" in text and "NOT every series is within: s other (+0.500)" in text
+    full = log_of([1000] * 18, [False] * 18, [True] * 18)
+    assert round(full.data["run_level"]["predicted_at_least_one"], 2) == 0.83
+    assert "at least one fired: no" in "\n".join(full.lines)
+    odd = log_of([80] * 3, [False] * 3, [True] * 3)
+    assert odd.data["run_level"]["predicted_at_least_one"] is None
+    assert "not tabulated for these n" in "\n".join(odd.lines)
+    empty = rd.Report()
+    rd.run_level_lines(empty)
+    assert empty.incomplete and "no series had an autocorrelation" in empty.incomplete[0]
+
+
+def test_r9_default_options_are_not_flagged_and_the_notice_is_always_printed(tmp_path, capsys) -> None:
+    """With the default seed, resamples and permutations the report has no "NON-DEFAULT" flag and
+    ``options.default`` is true; the NOTICE (seed, options, "not allowed", owner question) is printed
+    either way.
+
+    Reference: the finding R9 (the owner's decision; only the wording and the record are the tool's).
+    """
+    d, res, _ = build_world(rng_for("world"))
+    json_path = tmp_path / "o.json"
+    rd.main([str(write_run(tmp_path, d, res)), "--json", str(json_path)])
+    out = capsys.readouterr().out
+    assert "NOTICE: every reading below is computed with tool seed 20261018" in out
+    assert "NON-DEFAULT" not in out and "is not allowed" in out and "owner question" in out
+    assert json.loads(json_path.read_text())["options"] == {
+        "seed": 20261018, "resamples": 2000, "permutations": 1000, "default": True}
+
+
+def test_r10_f_b_bins_and_their_edges_by_hand() -> None:
+    """``f_b`` overall and by weight bin on ten constructed states, every edge hit.
+
+    Reference: by hand. (w, u, s): 0 is (0.0, -0.3, 0.05) near (u - 2s <= 0); 1 is (0.0, 0.0, 0) near;
+    2 is (0.05, 0.05, 0.01) not near (0.03 > 0); 3 is (0.1, 0.1, 0.04) not near and in [0.1, 0.9]
+    (closed edge); 4 is (0.5, 0.5, 0.3) near (-0.1 <= 0); 5 is (0.9, 0.9, 0.04) not near (0.98 < 1),
+    in [0.1, 0.9] (closed edge); 6 is (0.95, 0.95, 0.03) near (1.01 >= 1); 7 is (1.0, 1.2, 0.01) near;
+    8 is (1.0, 1.0, 0) near (u + 0 >= 1); 9 has an undefined optimum (excluded, counted). Bins:
+    w = 0: 2 states, f_b 1; (0, 0.1): 1, 0; [0.1, 0.9]: 3 (states 3, 4, 5), 1/3; (0.9, 1): 1, 1;
+    w = 1: 2, 1. Overall 6 near of 9 defined = 2/3. Exact (the comparisons are of floats that are
+    sums of two decimals: checked at the edges by the rounding noted in the tool: 0.1 - 0.08 > 0).
+    """
+    w = np.array([0.0, 0.0, 0.05, 0.1, 0.5, 0.9, 0.95, 1.0, 1.0, 0.3])
+    u = np.array([-0.3, 0.0, 0.05, 0.1, 0.5, 0.9, 0.95, 1.2, 1.0, np.nan])
+    s = np.array([0.05, 0.0, 0.01, 0.04, 0.3, 0.04, 0.03, 0.01, 0.0, 0.0])
+    out = rd.f_b_by_bin(w, u, u - s, u + s)
+    assert out["n_undefined"] == 1 and out["n_defined"] == 9 and out["f_b"] == pytest.approx(6 / 9)
+    assert out["bins"] == {"w=0": (2, 1.0), "0<w<0.1": (1, 0.0), "0.1<=w<=0.9": (3, 1 / 3),
+                           "0.9<w<1": (1, 1.0), "w=1": (2, 1.0)}
