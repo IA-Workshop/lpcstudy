@@ -22,7 +22,9 @@ Two smoke runs on DEV-0 in fresh interpreters, CPU: one without and one with ``-
   per-split ``handling/<split>/`` arrays are summed and compared exactly with
   ``handling/cells/<core>/by_kind/<oracle|eval>/counts`` (the eight ``handled`` columns and the
   three clipped-entry totals).
-* b3 also, schema /2 (WU-0003.7c): ``analysis.h1c_ratio_block`` applied to the dumped per-state H1c
+* b3 also, schema /2 (WU-0003.7c; a **dump-fidelity check**: the reference is the production
+  statistic itself, so it proves that the dump holds what the run used, not that H1c or H1a is
+  right): ``analysis.h1c_ratio_block`` applied to the dumped per-state H1c
   ratios of the eligible states reproduces the PLP and CP leaves (bitwise); the H1a medians
   ``median_seed_by_n_lib``, the reference ``inverse_dim_reference`` and, with the production
   generator labels, the fit statistics ``ratio`` and ``fitted_inverse_dim`` are reproduced from
@@ -142,6 +144,7 @@ def test_b3_the_production_summaries_of_the_dumped_arrays_reproduce_their_leaves
         assert mean_state == pytest.approx(score["mse_href"], rel=2 * n_states * n_draws * 2.0**-52,
                                            abs=0.0), rule
     # schema /2: H1c from the dumped per-state ratios, H1a from the dumped seed errors
+    # (dump-fidelity check: the reference is the production statistic itself)
     from lpcstudy.analysis import _median_fit_stats, h1c_ratio_block
     from lpcstudy.data import make_rng
     from lpcstudy.statistics import bootstrap_values

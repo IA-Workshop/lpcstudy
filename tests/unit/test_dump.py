@@ -394,3 +394,30 @@ def test_the_a5_leaf_arrays_follow_the_chosen_k_not_another_fitted_k() -> None:
         assert np.array_equal(arrays["core/a5_leaf"], hand(test_growth, split))
         assert np.array_equal(arrays["core/a5_leaf_calibration"], hand(cal_growth, split))
         assert not np.array_equal(arrays["core/a5_leaf_calibration"], hand(cal_growth, other))
+
+
+def test_record_extra_refuses_keys_outside_h1a_h1c_and_a_key_recorded_twice() -> None:
+    """``record_extra`` takes only ``h1a/`` and ``h1c/`` keys, once each; a refusal records nothing (R2).
+
+    Reference: the contract (a key of schema /1 is never silently replaced, PRIME.4), decided by
+    hand: a ``core/`` key, a ``meta/`` key, a ``qn/`` key and a bare name are refused with
+    ``ValueError`` naming the key; an ``h1c/`` key given twice, in one call or two, is refused; a
+    call that mixes a good key and a bad one records neither (so the system has no pending record
+    and ``collect`` still raises ``KeyError`` for the missing extras, not a half-filled dict).
+    Exact.
+    """
+    dump = StateDump()
+    for bad in ("core/E_C", "meta/schema", "qn/oracle/x_test", "h1c", "h1a"):
+        with pytest.raises(ValueError, match="record_extra takes keys"):
+            dump.record_extra("lorenz63", {bad: np.zeros(2)})
+    with pytest.raises(ValueError, match="record_extra takes keys"):
+        dump.record_extra("lorenz63", {"h1c/thresholds": np.zeros(2), "core/w_star": np.zeros(2)})
+    assert "lorenz63" not in dump._extra
+    dump.record_extra("lorenz63", {"h1c/thresholds": np.array([0.1, 0.2])})
+    with pytest.raises(ValueError, match="already recorded"):
+        dump.record_extra("lorenz63", {"h1c/thresholds": np.array([9.0])})
+    with pytest.raises(ValueError, match="already recorded"):
+        dump.record_extra("lorenz63", {"h1a/n_lib": np.zeros(1), "h1c/thresholds": np.zeros(1)})
+    assert list(dump._extra["lorenz63"]) == ["h1c/thresholds"]
+    assert dump._extra["lorenz63"]["h1c/thresholds"].tolist() == [0.1, 0.2]
+    dump.record_extra("rossler", {"h1c/thresholds": np.zeros(1)})  # another system: its own record

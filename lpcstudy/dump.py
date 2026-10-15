@@ -130,6 +130,9 @@ from .oracle import oracle_weight
 SCHEMA = "lpcstudy.states/2"
 """Schema version key (``meta/schema``). A change of any key or shape below changes the version."""
 
+EXTRA_GROUPS: tuple[str, ...] = ("h1a/", "h1c/")
+"""The key prefixes that ``StateDump.record_extra`` accepts (the groups added in schema /2)."""
+
 V4_MULTIPLES: tuple[int, ...] = (2, 4)
 """Lyapunov times of the V4 arrays beyond ``H_ref`` (``H_ref`` itself is the first column)."""
 
@@ -172,7 +175,8 @@ class StateDump:
 
     The run feeds it from four places: ``Study.run_cell`` (``record_halves``),
     ``convergence_check`` (``record_v4``), ``qn_noise_redundancy`` (``record_qn``) and
-    ``run_system`` (``collect`` and ``write``). It never returns anything to the study.
+    ``run_system`` (``record_extra`` for the H1a and H1c arrays of schema /2, then ``collect`` and
+    ``write``). It never returns anything to the study.
     """
 
     def __init__(self) -> None:
@@ -207,7 +211,22 @@ class StateDump:
         self._v4[system] = {k: clean(f"v4/{k}", v) for k, v in arrays.items()}
 
     def record_extra(self, system: str, arrays: dict[str, np.ndarray]) -> None:
-        """Store arrays under their full keys (the ``h1a/`` and ``h1c/`` groups of schema /2)."""
+        """Store arrays under their full keys (the ``h1a/`` and ``h1c/`` groups of schema /2).
+
+        Only these two groups may be added this way, and a key can be recorded once: a key of
+        schema ``/1`` (or any other) is never silently replaced (PRIME.4).
+
+        Raises
+        ------
+        ValueError
+            If a key is outside ``h1a/`` and ``h1c/``, or is already recorded for the system.
+        """
+        recorded = self._extra.get(system, {})
+        for key in arrays:
+            if not key.startswith(EXTRA_GROUPS):
+                raise ValueError(f"record_extra takes keys under {EXTRA_GROUPS}, got {key!r}")
+            if key in recorded:
+                raise ValueError(f"record_extra: {key!r} is already recorded for {system}")
         self._extra.setdefault(system, {}).update({k: clean(k, v) for k, v in arrays.items()})
 
     def record_qn(self, system: str, kind: str, arrays: dict[str, np.ndarray]) -> None:
@@ -258,7 +277,13 @@ class StateDump:
         Raises
         ------
         KeyError
-            If a half-draw record, the V4 arrays or the Q-N arrays of the system are missing.
+            If a half-draw record, the V4 arrays, the Q-N arrays or the extra (``h1a/`` and
+            ``h1c/``) arrays of the system are missing.
+        ValueError
+            If the core horizons are not 1..H_max, or the per-state MSE of a rule at ``H_ref``
+            differs from the score the verdicts use.
+        TypeError
+            If an array is not float64, int, bool or str (``clean``).
         """
         test = core.splits["test"]
         m, ev, oracles = test.moments, test.evals, core.oracles["test"]

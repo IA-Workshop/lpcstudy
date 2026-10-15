@@ -336,8 +336,9 @@ def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
     config : StudyConfig
         Study configuration.
     capture : dict, optional
-        If given (the opt-in state dump, WU-0003.7c), it is filled with copies of what the function
-        already computed: ``noise_levels`` and ``n_lib`` (the sorted levels and sizes),
+        If given (the opt-in state dump, WU-0003.7c), it is filled with references to the arrays
+        the function already computes and goes on to use (the caller copies them, as
+        ``StateDump.record_extra`` does; nothing here writes to them): ``noise_levels`` and ``n_lib`` (the sorted levels and sizes),
         ``local_dim`` and ``inverse_dim`` (per test-sweep state, before the finite filter), and
         ``rho=<g>/seed_sq`` (``(n, len(n_lib))``, the squared analog seed errors before the
         filter). Nothing is computed for it and nothing flows back.
@@ -582,7 +583,8 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig, capture: dict | None = None
     config : StudyConfig
         Study configuration.
     capture : dict, optional
-        If given (the opt-in state dump, WU-0003.7c), it is filled with ``thresholds`` and, for
+        If given (the opt-in state dump, WU-0003.7c), it is filled with references to arrays the
+        function builds (the caller copies them, as ``StateDump.record_extra`` does): ``thresholds`` and, for
         ``PLP`` and ``CP``, ``<name>/ratio`` (the per-state ratio of every state, NaN where the
         state is not eligible) and ``<name>/eligible`` (bool): the ratios of the eligible states,
         in order, are the array that ``h1c_ratio_block`` receives. Nothing is computed for it and

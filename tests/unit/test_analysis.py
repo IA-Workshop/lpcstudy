@@ -2511,10 +2511,11 @@ def test_h1c_horizon_law_capture_holds_the_per_state_ratios_and_reproduces_the_l
     eligible. (i) ``eligible`` is that mask, ``ratio`` is NaN exactly where it is False and the
     ratio of the good states is 1 to 1e-12 (the tolerance of the test above: a few operations of
     order 1); ``thresholds`` is [0.1, 0.2, 0.3, 0.5]. (ii) The returned block is the same with and
-    without ``capture`` (JSON text). (iii) ``h1c_ratio_block`` applied to ``ratio[eligible]`` (the
-    production summary function on the dumped array) equals the PLP and CP leaves, bitwise (same
-    function, same array, same generator label), apart from ``n_ineligible_states``. Exact except
-    the 1e-12 above.
+    without ``capture`` (JSON text). (iii) **Dump-fidelity check** (reference: the production
+    statistic itself; not an independent verification of H1c): ``h1c_ratio_block`` applied to
+    ``ratio[eligible]`` equals the PLP and CP leaves, bitwise (same function, same array, same
+    generator label), apart from ``n_ineligible_states``. The independent parts are the hand-built
+    mask and NaN placement and the ratio 1 to 1e-12. Exact except the 1e-12 above.
     """
     import json
 
@@ -2540,12 +2541,11 @@ def test_h1c_horizon_law_capture_holds_the_per_state_ratios_and_reproduces_the_l
         eligible, ratio = capture[f"{name}/eligible"], capture[f"{name}/ratio"]
         assert eligible.dtype == bool and ratio.dtype == np.float64 and ratio.shape == (66,)
         assert np.array_equal(eligible, want)
-        assert np.isnan(ratio[~eligible]).all() and ratio[60:].size == 6
+        assert np.isnan(ratio[~eligible]).all() and np.isinf(ratio[65])  # the eligible inf state
         again = h1c_ratio_block(ratio[eligible], CONFIG, SYSTEM, with_verdict=name == "PLP")
         leaf = {k: v for k, v in out[name].items() if k != "n_ineligible_states"}
         assert json.dumps(again, sort_keys=True) == json.dumps(leaf, sort_keys=True)
     assert np.allclose(capture["PLP/ratio"][:60], 1.0, rtol=0.0, atol=1e-12)
-    assert np.isinf(capture["PLP/ratio"][65])
 
 
 def test_h1a_library_scaling_capture_holds_the_seed_errors_and_reproduces_the_statistics() -> None:
@@ -2559,7 +2559,9 @@ def test_h1a_library_scaling_capture_holds_the_seed_errors_and_reproduces_the_st
     (ii) ``inverse_dim`` equals ``18 / (19 local_dim)`` (the formula of the Levina-Bickel
     correction, ``(k - 2) / ((k - 1) local_dim)`` at k = 20, written here). (iii) The medians and
     the reference of the leaf are reproduced from the dumped arrays by the production formulas:
-    ``sqrt(median(seed_sq[keep], 0))`` equals ``median_seed_by_n_lib`` and ``mean(inverse_dim[keep])``
+    **Dump-fidelity check** (reference: the production statistic itself; not an independent
+    verification of H1a; the independent parts are the formula ``18 / (19 local_dim)`` and the
+    hand-written filter, median and mean): ``sqrt(median(seed_sq[keep], 0))`` equals ``median_seed_by_n_lib`` and ``mean(inverse_dim[keep])``
     equals ``inverse_dim_reference``, bitwise, with ``keep`` the states where every ``seed_sq`` and
     ``inverse_dim`` is finite (one state is made non-finite to exercise the filter); the fit
     statistics ``ratio`` and ``fitted_inverse_dim`` equal ``_median_fit_stats`` on the dumped
