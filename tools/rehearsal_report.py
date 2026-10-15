@@ -28,15 +28,23 @@ M3, with the reference script ``2026-10-14-math-wu0003-scripts/m3_projection.py`
 * **B:** ``E hw(B = 2000) / E hw(B = 500)``, ``1.014`` at the primary level ``1 - 0.05/3`` and
   ``1.007`` at 95% (``m3_bfactor.log``). It is defined only for B 500 to 2000: equal B gives 1, any
   other pair is "not computable";
-* **kappa_E,** for the criteria on evaluation-draw MSEs (H2c, H2d, H3c; E 2 to 4): the point
-  estimate ``kappa = sqrt((V_s + V_d E_run/E_full) / (V_s + V_d))`` from the dump. ``V_i(w) =
+* **kappa_E,** for the criteria on evaluation-draw MSEs (H2c, H2d, H3c; E 2 to 4). **The range
+  ``[sqrt(E_run/E_full), 1]`` ([0.7071, 1]; 0.504-0.712 for H2c and H2d, 0.507-0.717 for H3c)
+  governs** (module constant ``KAPPA_POLICY = "range"``; note
+  ``2026-10-14-math-wu0003-3a-kappa.md``, review R2: the point estimator below is biased, sign
+  undetermined, +0.003 to +0.135 in the mathematician's worlds, and no unbiased estimator exists
+  from the present dump). The row is printed ``FALLBACK`` with "kappa_E point estimator biased
+  (R2): range governs", and, as plan amendment 7 G2 counts a FALLBACK, it is listed as "not
+  computable": **exit 0 is unreachable under this policy** until the owner chooses (a) the range as
+  final or (b) a dump with ``core/cp_err_href`` and ``core/plp_err_href`` and the half-split
+  estimator. With ``KAPPA_POLICY = "point"`` the point estimate governs (the exit-0 path of G2). The
+  point estimate ``kappa = sqrt((V_s + V_d E_run/E_full) / (V_s + V_d))`` from the dump is printed as
+  information, after the dump has reproduced its results leaf. ``V_i(w) =
   w^2 E_C + (1 - w)^2 E_P + 2 w (1 - w) C`` (A0: w = 1, A1: w = 0; the dumped weight of every
   evaluation draw otherwise, averaged over the draws) is the draw-free per-state MSE. ``V_s`` is
   the long-run variance of the influence series computed with ``V_i`` in place of the evaluation
   MSE, ``V_d`` that of the difference of the two series (both as ``b`` times the variance of the
-  overlapping block means, ``b`` = 5: the exact moving-block variance, no resampling). Without a
-  usable dump the range ``[sqrt(E_run/E_full), 1]`` ([0.707, 1]) is used, **printed as a fallback,
-  counted as "not computable" (exit 2)**, and never silent;
+  overlapping block means, ``b`` = 5: the exact moving-block variance, no resampling);
 * **Q-N training size,** 900 to 3000: the range ``[0.61, 1]`` (logit, log-horizon) or ``[0.74, 1]``
   (indicator), the WU-0006 synthetic ratios; equal sizes give 1, any other pair is "not
   computable".
@@ -68,30 +76,44 @@ failure. Findings never change the exit code.
 The v3 statements (``docs/study/proposal_and_methods_v3.md``, section 7, "Precision") are compared for
 H2b(ii) (0.03), H2e (0.04, both noise levels), the Q-N oracle logit (the reading of Q-N is on the oracle
 logit; 0.04) and H2a(ii) (both parts), whose "partial correlation within about 0.01 of zero" is taken
-as ``hw = 0.1 - 0.01 = 0.09`` (derived, labelled in the report; the required ``|pc|`` bound is
-printed beside it).
+as the margin ``m = 0.1 - hw_full`` (plan amendment 7, G3, owner flag OF-G3): the band applies to
+the margin, so "v3 precision not reproduced" iff ``m < 0.0067`` or ``m > 0.015`` (``hw_full > 0.0933``
+or ``< 0.0850``), by reading (i) on the n-only value and reading (ii) on the whole range. The earlier
+comparison of ``hw_full`` with ``0.09 x [0.67, 1.5]`` = [0.0603, 0.135] is printed beside it,
+non-governing; the required ``|pc|`` bound is printed too.
 
 Readings that the plan leaves open (the stricter or the note's reading is applied; owner questions,
-listed in the Log of WU-0003): the form of reading (ii) against a v3 value; the derived v3 half-width
-of H2a(ii); the range fallback of kappa_E counting toward exit 2.
+listed in the Log of WU-0003): the form of reading (ii) against a v3 value; the range governing
+kappa_E and counting toward exit 2.
 
 V7 (the median slope and the efficiency at each noise level; sweep size, 95%, B 1.007; no v3 value)
 is projected like the others. The H2c rows are also printed as ``hw`` over the MSE level (the mean
-over the leaf ``relative``). H3a is a chi-square conditional on K that the results leaves do not
-hold (only log-rank p-values): it is listed once as "not computable" and counted, so a complete run
-exits 2 until the planner strikes it or defines the leaf. A dump that does not reproduce its results
-leaf is never used: that row falls back to the range (MISMATCH, exit 1).
+over the leaf ``relative``).
 
-Exit codes: 0 everything computed and no mismatch; 1 at least one MISMATCH (a dump that does not
-reproduce the results leaf it belongs to, an interval level that disagrees with the table); 2
-unreadable input, a usage error, a refused run, an internal error, or at least one "not
-computable" including a kappa_E fallback (the report is still printed in full; 1 takes precedence
-over 2).
+H3a (plan amendment 7, G1; conditional on K_pilot, printed beside every line): each pair is a 1-df
+log-rank test, so ``chi2_pilot = chi2.isf(logrank_p_raw, 1)`` exactly; ``chi2_full = (n_test_full /
+n_test_run) chi2_pilot`` (2x), ``p_full = chi2.sf``, Holm over the run's pairs on ``p_full``, and
+"pass reachable at full size" iff every projected Holm-adjusted p is below ``H3A_ALPHA``, read from
+``lpcstudy/analysis.py``. A ``p_raw`` below 1e-300 prints ``chi2 >= isf(1e-300, 1)`` and counts as
+computed; ``None`` (zero log-rank variance) is "not computable" (counted) and the reading "not
+determined" (it enters the Holm step as 1.0, as in production).
+
+A dump that does not reproduce its results leaf is never used: that row falls back to the range
+(MISMATCH, exit 1).
+
+Exit codes (plan amendment 7, G2): 0 iff every row is computed (the 18 criteria, V7, every H3a pair
+with a p-value), every reproduction check passes and kappa_E is a point estimate from a reproducing
+dump (no FALLBACK); 1 at least one MISMATCH (a dump that does not reproduce the results leaf it
+belongs to, an interval level that disagrees with the table; it takes precedence); 2 unreadable input,
+a usage error, a refused run, an internal error, or at least one "not computable" including a
+FALLBACK, a ``None`` H3a pair, or a run without a dump (the report is still printed in full). P0 and
+P1, which have no dump, exit 2.
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import math
 import sys
@@ -100,6 +122,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+from scipy import stats as sps
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -129,6 +152,18 @@ H2A_PARTIAL_EDGE = 0.1
 """Half-width of the H2a(ii) band on the partial correlation: pass needs ``|pc| < 0.1 - hw``."""
 V3_H2A_II = H2A_PARTIAL_EDGE - 0.01
 """v3 section 7 "needing ``|pc|`` about 0.01" as a half-width (derived, labelled in the report)."""
+MARGIN_V3 = 0.01
+"""v3 section 7: a pass of H2a(ii) "would need a partial correlation within about 0.01 of zero",
+i.e. the margin ``m = 0.1 - hw_full`` is about 0.01. The band [0.67, 1.5] applies to this margin
+(plan amendment 7, G3): "not reproduced" iff ``m < 0.0067`` or ``m > 0.015``."""
+KAPPA_POLICY = "range"
+"""Which kappa_E governs the H2c, H2d and H3c projections. ``"range"`` (the working default, note
+``2026-10-14-math-wu0003-3a-kappa.md``, R2): the pre-registered range [sqrt(E_run/E_full), 1]; the
+tool's point estimate is printed as information only (it is biased, sign undetermined). ``"point"``:
+the point estimate governs when the dump reproduces its leaves (the c7d6e41 behaviour; what the
+G2 exit-0 condition describes). The owner's choice (a) or (b) of the note replaces this constant."""
+H3A_TINY = 1e-300
+"""A log-rank p below this has no finite chi-square in float64: chi2 is a lower bound."""
 SLACK = 0.005
 """Half a unit of the last printed digit of the pre-registered ranges (two decimals)."""
 
@@ -402,6 +437,105 @@ def kappa_estimate(state_first: np.ndarray, state_second: np.ndarray, real_first
     return kappa_combine(var_state, var_draw, e_run, e_full), var_state, var_draw
 
 
+def production_constant(name: str) -> float:
+    """A numeric constant of ``lpcstudy/analysis.py``, read from its source (no jax import).
+
+    Raises
+    ------
+    NotComputable
+        If the file or the assignment is absent or not a literal number.
+    """
+    path = ROOT / "lpcstudy" / "analysis.py"
+    try:
+        tree = ast.parse(path.read_text())
+    except (OSError, SyntaxError) as exc:
+        raise NotComputable(f"{path} cannot be read: {exc}") from exc
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name
+                                                for t in node.targets):
+            try:
+                return float(ast.literal_eval(node.value))
+            except (ValueError, TypeError) as exc:
+                raise NotComputable(f"{name} in {path} is not a numeric literal") from exc
+    raise NotComputable(f"{name} is not assigned in {path}")
+
+
+def holm_adjust(p_values: Sequence[float]) -> list[float]:
+    """Holm step-down adjusted p-values, in the original order (the production definition)."""
+    p = np.asarray(p_values, dtype=float)
+    adjusted = np.empty_like(p)
+    running = 0.0
+    for rank, idx in enumerate(np.argsort(p)):
+        running = max(running, min(1.0, (len(p) - rank) * p[idx]))
+        adjusted[idx] = running
+    return adjusted.tolist()
+
+
+def outside_margin(margin_low: float, margin_high: float) -> bool:
+    """G3: the whole margin range ``[low, high]`` outside ``0.01 x [0.67, 1.5]`` (edges inside).
+
+    For a single value pass the same number twice (reading (i) on the n-only value).
+    """
+    return bool(margin_high < BAND[0] * MARGIN_V3 or margin_low > BAND[1] * MARGIN_V3)
+
+
+def h3a_projection(p_raw: float | None, factor: float) -> dict:
+    """The projected H3a statistic of one pair (note M3, conditional on K_pilot).
+
+    ``chi2_pilot = chi2.isf(p_raw, 1)`` (exact for a 1-df log-rank test), ``chi2_full = factor x
+    chi2_pilot``, ``p_full = chi2.sf(chi2_full, 1)``. A ``p_raw`` below ``H3A_TINY`` gives the lower
+    bound ``chi2 >= chi2.isf(H3A_TINY, 1)`` (an exact inequality; the pair counts as computed and
+    its projected p, an upper bound, is below every bar). ``None`` (zero log-rank variance) gives
+    ``computed = False``.
+
+    Raises
+    ------
+    NotComputable
+        If ``p_raw`` is outside [0, 1] or not a number, or the factor is not positive.
+    """
+    if not factor > 0:
+        raise NotComputable(f"H3a size factor {factor} is not positive")
+    if p_raw is None:
+        return {"computed": False, "p_raw": None, "chi2_pilot": None, "lower_bound": False,
+                "chi2_full": None, "p_full": None}
+    p = float(p_raw)
+    if not (0.0 <= p <= 1.0):
+        raise NotComputable(f"log-rank p {p_raw!r} is not in [0, 1]")
+    lower = p < H3A_TINY
+    chi_pilot = float(sps.chi2.isf(H3A_TINY if lower else p, 1))
+    chi_full = factor * chi_pilot
+    return {"computed": True, "p_raw": p, "chi2_pilot": chi_pilot, "lower_bound": lower,
+            "chi2_full": chi_full, "p_full": float(sps.chi2.sf(chi_full, 1))}
+
+
+def h3a_system(tree: dict, cfg: dict, full) -> dict:
+    """H3a of one system: every pair projected, Holm on the projected p, the reading.
+
+    The reading is ``"reachable"`` iff every projected Holm-adjusted p is below ``H3A_ALPHA`` (read
+    from ``lpcstudy/analysis.py``), ``"not reachable"`` otherwise, and ``"not determined"`` if a pair
+    has ``p_raw`` None (it enters the Holm step as 1.0, as in production, so the other pairs'
+    adjusted values stay valid).
+    """
+    block = dig(tree, "H3a")
+    raw, pairs = dig(block, "logrank_p_raw"), dig(block, "pairs")
+    k = dig(block, "chosen_K")
+    if len(raw) != len(pairs) or not len(raw):
+        raise NotComputable(f"H3a has {len(raw)} p-values for {len(pairs)} pairs")
+    factor = int(full.n_test) / int(dig(cfg, "n_test"))
+    alpha = production_constant("H3A_ALPHA")
+    entries = [dict(h3a_projection(p, factor), pair=list(pair)) for p, pair in
+               zip(raw, pairs, strict=True)]
+    adjusted = holm_adjust([1.0 if e["p_full"] is None else e["p_full"] for e in entries])
+    for entry, adj in zip(entries, adjusted, strict=True):
+        entry["holm_full"] = adj
+    if any(not e["computed"] for e in entries):
+        reading = "not determined"
+    else:
+        reading = "reachable" if max(adjusted) < alpha else "not reachable"
+    return {"chosen_K": k, "factor": factor, "alpha": alpha, "entries": entries,
+            "reading": reading, "largest_holm_full": max(adjusted)}
+
+
 # --------------------------------------------------------------------------------------------
 # the criteria
 # --------------------------------------------------------------------------------------------
@@ -440,6 +574,9 @@ class Spec:
     rel_key : str | None
         Key of a leaf ``relative = estimate / (MSE level)`` in the block: the half-width is then
         also printed as ``hw / MSE level`` (H2c).
+    margin : bool
+        Whether the governing v3 comparison is on the margin ``0.1 - hw`` (H2a(ii), G3); ``v3`` is
+        then the non-governing half-width equivalent.
     """
 
     label: str
@@ -456,6 +593,7 @@ class Spec:
     kappa: tuple[str, str, str] | None = None
     kappa_leaf: tuple[str, ...] | None = None
     rel_key: str | None = None
+    margin: bool = False
 
 
 def keys_of(key: str | tuple[str, ...]) -> tuple[str, ...]:
@@ -486,11 +624,11 @@ def specs_for(cfg: dict, best_single: str | None) -> list[Spec]:
              "secondary", "n_test", "qn:log_horizon"),
         Spec("H2a(i)", ("H2a",), "range_ci", "median_range", "primary", "n_test"),
         Spec("H2a(ii) zero", ("H2a", "part_ii", "zero"), "ci", "partial_corr", "primary",
-             "n_test", v3=V3_H2A_II,
-             v3_note="derived: v3 needs |pc| about 0.01, so hw = 0.1 - 0.01 = 0.09"),
+             "n_test", v3=V3_H2A_II, margin=True,
+             v3_note="non-governing: derived hw = 0.1 - 0.01 = 0.09 x [0.67, 1.5]"),
         Spec("H2a(ii) interior", ("H2a", "part_ii", "interior"), "ci", "partial_corr", "primary",
-             "n_test", v3=V3_H2A_II,
-             v3_note="derived: v3 needs |pc| about 0.01, so hw = 0.1 - 0.01 = 0.09"),
+             "n_test", v3=V3_H2A_II, margin=True,
+             v3_note="non-governing: derived hw = 0.1 - 0.01 = 0.09 x [0.67, 1.5]"),
         Spec("H2b(i)", ("H2b", "noise"), "ci", "mean_state_spearman", "primary", "n_test_sweep"),
         Spec("H2b(ii)", ("H2b", "library_change"), "ci", "mean_change", "primary", "n_test_sweep",
              v3=0.03),
@@ -771,8 +909,11 @@ def project_row(spec: Spec, system: str, tree: dict, cfg: dict, view: DumpView |
                 rep: Report, full) -> dict:
     """Everything the report says about one criterion of one system (``NotComputable`` if none).
 
-    A kappa_E that cannot be estimated from the dump falls back to the range, which is printed as
-    a fallback and recorded as "not computable" (exit 2).
+    kappa_E: with ``KAPPA_POLICY == "range"`` (the default, R2) the pre-registered range governs,
+    printed as FALLBACK and recorded as "not computable" (plan amendment 7, G2 counts a FALLBACK),
+    and the point estimate from the dump (after its reproduction check) is only information. With
+    ``"point"`` the point estimate governs when the dump reproduces its leaf; otherwise the range is
+    used, printed as a fallback and recorded as "not computable" (exit 2).
     """
     where = f"{system} {spec.label}"
     block = dig(tree, *spec.path)
@@ -811,15 +952,27 @@ def project_row(spec: Spec, system: str, tree: dict, cfg: dict, view: DumpView |
                           spec, e_full)
             if got is not None:
                 kappa_info = got
-                x_lo = x_hi = got["kappa"]
-                note = (f"kappa_E {got['kappa']:.4f} from the dump (V_s {got['V_s']:.3g}, "
-                        f"V_d {got['V_d']:.3g})")
+                if KAPPA_POLICY == "point":
+                    x_lo = x_hi = got["kappa"]
+                    note = (f"kappa_E {got['kappa']:.4f} from the dump (V_s {got['V_s']:.3g}, "
+                            f"V_d {got['V_d']:.3g})")
+                else:
+                    note += (f" -- kappa_E point estimator biased (R2): range governs; point "
+                             f"kappa {got['kappa']:.4f} is information only, biased")
+        elif KAPPA_POLICY == "range":
+            note += " -- kappa_E point estimator biased (R2): range governs; no dump"
+        if KAPPA_POLICY == "range":
+            rep.nc(f"{where} kappa_E", "range governs (R2: the point estimator is biased, sign "
+                   "undetermined; working default (a)); amendment 7 G2 counts a FALLBACK")
         # with no dump at all, open_dump has recorded the one "not computable" line of the system
     f_lo, f_hi = fn * fb * x_lo, fn * fb * x_hi
     row = {"label": spec.label, "system": system, "hw_run": hw, "estimate": estimate,
            "n_run": n_run, "n_full": n_full, "f_n": fn, "f_b": fb, "f_lo": f_lo, "f_hi": f_hi,
            "hw_lo": hw * f_lo, "hw_hi": hw * f_hi, "nominal": hw * fn, "note": note,
-           "kappa": kappa_info, "level": level_of(spec)}
+           "kappa": kappa_info, "level": level_of(spec),
+           "kappa_governs": ("point" if kappa_info is not None and KAPPA_POLICY == "point"
+                             else ("range" if spec.extra == "kappa" and e_run != e_full
+                                   else "n/a"))}
     if spec.ratio and estimate is not None:
         r_hat = estimate + spec.ratio_offset
         if r_hat == 0.0 or not math.isfinite(r_hat):
@@ -846,6 +999,15 @@ def project_row(spec: Spec, system: str, tree: dict, cfg: dict, view: DumpView |
         row["ratio_nominal"] = row["nominal"] / v3
         row["reading_i"] = outside_nominal(row["nominal"], v3)
         row["reading_ii"] = outside_v3_range(row["hw_lo"], row["hw_hi"], v3)
+        if spec.margin:
+            # G3: the governing comparison is on the margin m = 0.1 - hw; the hw band is kept
+            row["legacy_reading_i"], row["legacy_reading_ii"] = (row["reading_i"],
+                                                                 row["reading_ii"])
+            m_nom = H2A_PARTIAL_EDGE - row["nominal"]
+            row["margin_nominal"] = m_nom
+            row["margin_lo"], row["margin_hi"] = row["pass_bound_lo"], row["pass_bound_hi"]
+            row["reading_i"] = outside_margin(m_nom, m_nom)
+            row["reading_ii"] = outside_margin(row["margin_lo"], row["margin_hi"])
     prediction = prediction_for(spec.label)
     if prediction is not None and spec.v3 is not None:
         text, p_lo, p_hi = prediction
@@ -901,7 +1063,24 @@ def format_row(row: dict) -> list[str]:
         impossible = "; IMPOSSIBLE at the lower projection of hw" if row["pass_bound_hi"] < 0 else ""
         lines.append(f"      pass needs |pc| < {row['pass_bound_lo']:+.3f} .. "
                      f"{row['pass_bound_hi']:+.3f}{impossible} (v3: about 0.01)")
-    if "v3" in row:
+    if "margin_nominal" in row:
+        flag = which(row)
+        lo_m, hi_m = BAND[0] * MARGIN_V3, BAND[1] * MARGIN_V3
+        legacy = " and ".join(name for name, key in (("(i)", "legacy_reading_i"),
+                                                     ("(ii)", "legacy_reading_ii")) if row[key])
+        lines.append(f"      v3 margin about {MARGIN_V3:g} x [0.67, 1.5] = [{lo_m:.4f}, {hi_m:.3f}] "
+                     f"(hw_full in [{H2A_PARTIAL_EDGE - hi_m:.4f}, {H2A_PARTIAL_EDGE - lo_m:.4f}]): "
+                     f"margin {row['margin_lo']:+.4f}..{row['margin_hi']:+.4f} (n only "
+                     f"{row['margin_nominal']:+.4f}); GOVERNING reading (i) "
+                     f"{'OUTSIDE' if row['reading_i'] else 'inside'}, (ii) "
+                     f"{'OUTSIDE' if row['reading_ii'] else 'inside'}"
+                     + (f" -> v3 precision not reproduced by {flag}" if flag else ""))
+        lines.append(f"      non-governing, hw against 0.09 x [0.67, 1.5] = [{0.67 * 0.09:.4f}, "
+                     f"{1.5 * 0.09:.3f}]: ratio {row['ratio_lo']:.3f}-{row['ratio_hi']:.3f}; "
+                     f"(i) {'OUTSIDE' if row['legacy_reading_i'] else 'inside'}, (ii) "
+                     f"{'OUTSIDE' if row['legacy_reading_ii'] else 'inside'}"
+                     + (f" -> would be not reproduced by {legacy}" if legacy else ""))
+    elif "v3" in row:
         flag = which(row)
         lines.append(f"      v3 {row['v3']:g}: ratio to v3 {row['ratio_lo']:.3f}-{row['ratio_hi']:.3f} "
                      f"(n only: {row['ratio_nominal']:.3f}); reading (i) "
@@ -923,6 +1102,25 @@ def format_row(row: dict) -> list[str]:
     return lines
 
 
+def format_h3a(system: str, got: dict) -> list[str]:
+    """The report lines of the H3a projection of one system."""
+    lines = [f"  H3a {system}: conditional on K_pilot = {got['chosen_K']}; chi2_full = "
+             f"{got['factor']:g} x chi2_pilot, Holm on the projected p, bar {got['alpha']:g} "
+             f"(analysis.H3A_ALPHA)"]
+    for e in got["entries"]:
+        if not e["computed"]:
+            lines.append(f"      pair {tuple(e['pair'])}: p_raw None (zero log-rank variance): not "
+                         "computable")
+            continue
+        bound = ">= " if e["lower_bound"] else ""
+        lines.append(f"      pair {tuple(e['pair'])}: p_raw {e['p_raw']:.4g}, chi2 {bound}"
+                     f"{e['chi2_pilot']:.4g} -> {bound}{e['chi2_full']:.4g}, p_full "
+                     f"{'<= ' if e['lower_bound'] else ''}{e['p_full']:.4g}, Holm {e['holm_full']:.4g}")
+    lines.append(f"      pass reachable at full size: {got['reading']} (largest projected "
+                 f"Holm-adjusted p {got['largest_holm_full']:.3g}), conditional on K_pilot")
+    return lines
+
+
 def summary_lines(rep: Report, observed: bool) -> list[str]:
     """The run-level summary: readings that fire, predictions, fallbacks."""
     rows = [r for rows in rep.data.get("rows", {}).values() for r in rows]
@@ -932,9 +1130,18 @@ def summary_lines(rep: Report, observed: bool) -> list[str]:
                f"{sum(r['reading_i'] for r in v3)}, reading (ii) on {sum(r['reading_ii'] for r in v3)}, "
                f"either on {sum(bool(which(r)) for r in v3)}")
     for r in v3:
-        if which(r):
+        if which(r) and "margin_nominal" in r:
+            out.append(f"    v3 precision not reproduced ({which(r)}, margin reading): {r['system']} "
+                       f"{r['label']}: margin 0.1 - hw_full = {r['margin_lo']:+.4f}..{r['margin_hi']:+.4f} "
+                       f"against {BAND[0] * MARGIN_V3:.4f}..{BAND[1] * MARGIN_V3:.3f}")
+        elif which(r):
             out.append(f"    v3 precision not reproduced ({which(r)}): {r['system']} {r['label']}: "
                        f"projected {r['hw_lo']:.4f}-{r['hw_hi']:.4f} against v3 {r['v3']:g}")
+    margin_rows = [r for r in v3 if "margin_nominal" in r]
+    out.append(f"  H2a(ii) margin reading (governing, G3): fires on "
+               f"{sum(bool(which(r)) for r in margin_rows)} of {len(margin_rows)} parts "
+               "(pre-registered: most); the hw band 0.09 x [0.67, 1.5] would fire on "
+               f"{sum(bool(r['legacy_reading_i'] or r['legacy_reading_ii']) for r in margin_rows)}")
     preds = [r for r in rows if "prediction" in r]
     out.append(f"  pre-registered predictions: {sum(r['prediction']['within'] for r in preds)} of "
                f"{len(preds)} parts within")
@@ -942,9 +1149,11 @@ def summary_lines(rep: Report, observed: bool) -> list[str]:
         if not r["prediction"]["within"]:
             out.append(f"    outside (finding): {r['system']} {r['label']}: {r['prediction']['text']}")
     kappa_rows = [r for r in rows if r["label"].startswith(("H2c", "H2d", "H3c"))]
-    point = sum(r["kappa"] is not None for r in kappa_rows)
-    out.append(f"  kappa_E: point estimate from the dump for {point} of {len(kappa_rows)} parts; "
-               f"range fallback for {len(kappa_rows) - point}")
+    point = sum(r["kappa_governs"] == "point" for r in kappa_rows)
+    info = sum(r["kappa"] is not None for r in kappa_rows)
+    out.append(f"  kappa_E: point estimate from the dump governs for {point} of {len(kappa_rows)} "
+               f"parts; range fallback for {len(kappa_rows) - point} (KAPPA_POLICY "
+               f"{KAPPA_POLICY!r}; point kappa shown for {info})")
     expected = sum(r["false_trigger"] for r in rows)
     out.append(f"  predicted false triggers of the band over the {len(rows)} parts: {expected:.2f} "
                "(sum of the per-part rates)")
@@ -957,8 +1166,14 @@ def summary_lines(rep: Report, observed: bool) -> list[str]:
             if which(r, "obs_"):
                 out.append(f"    outside the band ({which(r, 'obs_')}): {r['system']} {r['label']}: "
                            f"observed {r['observed']:.4f} against {r['hw_lo']:.4f}-{r['hw_hi']:.4f}")
-    out.append("  H3a: not computable from the results leaves (listed above, counted): exit 0 is "
-               "unreachable until the planner rules")
+    h3a = rep.data.get("h3a", {})
+    for system, got in h3a.items():
+        out.append(f"  H3a {system} (conditional on K_pilot = {got['chosen_K']}): pass reachable at "
+                   f"full size: {got['reading']} (largest projected Holm p "
+                   f"{got['largest_holm_full']:.3g}, bar {got['alpha']:g})")
+    if KAPPA_POLICY == "range" and kappa_rows:
+        out.append("  exit 0 is unreachable while the range governs kappa_E (amendment 7 G2 "
+                   "counts a FALLBACK): owner choice (a) or (b) of the R2 note")
     return out
 
 
@@ -997,8 +1212,7 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
                                 f"{obs_results['config'].get('name')!r}, not 'full'")
     rep.data["label"] = make_label(seed_id)
     rep.data["rows"] = {}
-    rep.nc("H3a (all systems)", "no chi-square leaf in results.json (only log-rank p-values); the "
-           "rule chi2_full ~ 2 chi2_pilot is conditional on K (not projected)")
+    rep.data["h3a"] = {}
     all_systems = list(results.get("systems", {}))
     chosen = [s for s in all_systems if systems is None or s in systems]
     for wanted in systems or ():
@@ -1033,6 +1247,15 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
                 rows.append(row)
                 for line in format_row(row):
                     rep.say(line)
+            got = attempt(rep, f"{system} H3a", h3a_system, tree, cfg, full)
+            if got is not None:
+                rep.data["h3a"][system] = got
+                for line in format_h3a(system, got):
+                    rep.say(line)
+                for entry in got["entries"]:
+                    if not entry["computed"]:
+                        rep.nc(f"{system} H3a pair {tuple(entry['pair'])}",
+                               "zero log-rank variance (p_raw is None): chi2 not computable")
         finally:
             if view is not None:
                 view.dump.close()

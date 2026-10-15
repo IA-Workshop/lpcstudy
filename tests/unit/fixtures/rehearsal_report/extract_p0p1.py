@@ -36,6 +36,7 @@ LEAVES = {
     "H2c": ("best_single",),
     "H2c/A4_minus_A2": ("mean", "ci", "relative"),
     "H2c/A4_minus_A1": ("mean", "ci", "relative"),
+    "H3a": ("chosen_K", "pairs", "logrank_p_raw"),
     "V7": ("median_slope", "ci", "efficiency_median_by_noise", "efficiency_ci_by_noise"),
     "H2d": ("in_distribution_excess", "ci"),
     "H2e/by_noise/0.01": ("median_change", "ci", "level"),

@@ -55,6 +55,12 @@ SEED = 20261031
 SYSTEMS = ("lorenz63", "rossler", "chua")
 
 
+@pytest.fixture
+def point_policy(monkeypatch):
+    """The ``"point"`` kappa policy: the c7d6e41 behaviour that the exit-0 condition of G2 describes."""
+    monkeypatch.setattr(rr, "KAPPA_POLICY", "point")
+
+
 def rng_for(label: str) -> np.random.Generator:
     """A generator from ``make_rng`` (the project's only source of randomness)."""
     return make_rng(SEED, "test_rehearsal_report", label)
@@ -209,21 +215,21 @@ def test_ratios_to_v3_equal_the_note_table(tmp_path: Path) -> None:
 
 
 def test_pilot_fixture_report_is_complete_but_for_kappa(tmp_path: Path, capsys) -> None:
-    """Without a dump the range is used and shown (FALLBACK), three "not computable" lines, exit 2.
+    """Without a dump the range is used and shown (FALLBACK), exit 2, nothing else open.
 
     Reference: the arithmetic of the plan (12 kappa_E parts: H2c x2, H2d, H3c over 3 systems; one
-    line per system), not the tool's output. Findings ("v3 precision not reproduced") never change
-    the exit code, and no MISMATCH arises.
+    "no dump" line per system and one "range governs" line per part, G2: a FALLBACK is counted).
+    Findings ("v3 precision not reproduced") never change the exit code, and no MISMATCH arises.
     """
     code = rr.main([str(FIXTURES / "p0_pilot.json"), "--states", str(tmp_path / "none")])
     out = capsys.readouterr().out
     assert code == 2
     assert out.splitlines()[0] == "DEVELOPMENT (DEV-0): conditional on one realization; not a hypothesis test"
     assert out.count("(FALLBACK)") == 12
-    # three systems without a dump, the one H3a line, plus the closing count line
-    assert out.count("not computable: ") == 3 + 1 + 1
-    assert "not computable: 4 item(s)" in out and "H3a (all systems)" in out
-    assert "kappa_E: point estimate from the dump for 0 of 12 parts; range fallback for 12" in out
+    # three systems without a dump, twelve parts with the range governing, plus the closing count
+    assert out.count("not computable: ") == 3 + 12 + 1
+    assert "not computable: 15 item(s)" in out
+    assert "kappa_E: point estimate from the dump governs for 0 of 12 parts; range fallback for 12" in out
     assert "MISMATCH" not in out
     assert "v3 precision not reproduced" in out
 
@@ -427,7 +433,7 @@ def make_dump(system: str, n: int = 500, draws: int = 2, ref: int = 2) -> dict[s
 
 
 def write_run(root: Path, best: str = "A1", scale_h3c: float = 1.0, h3c_level: float | None = None,
-              dump_seed: str = "DEV-0", drop_block: bool = False) -> Path:
+              dump_seed: str = "DEV-0", drop_block: bool = False, mutate=None) -> Path:
     """A run directory: the P0 fixture with the kappa leaves recomputed from synthetic dumps."""
     res = json.loads((FIXTURES / "p0_pilot.json").read_text())
     if drop_block:
@@ -449,6 +455,8 @@ def write_run(root: Path, best: str = "A1", scale_h3c: float = 1.0, h3c_level: f
         if h3c_level is not None:
             tree["H3c"]["level"] = h3c_level
         np.savez(states / f"{system}.npz", **arrays)
+    if mutate is not None:
+        mutate(res)
     (root / "results.json").write_text(json.dumps(res))
     return root
 
@@ -478,28 +486,34 @@ def kappa_by_hand(system: str, kind: str, first: str, second: str) -> float:
     return math.sqrt((v_s + v_d * 2 / 4) / (v_s + v_d))
 
 
-def test_whole_dump_path_gives_exit_zero_and_the_hand_kappa(tmp_path: Path, capsys) -> None:
-    """A complete synthetic run (fixture results, three dumps): only H3a is open; kappa = the loops.
+def run_world(tmp_path: Path, capsys, **kwargs) -> tuple[int, str, dict]:
+    """Write a synthetic run, report it with ``--json``, return (code, stdout, parsed json)."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    run = write_run(tmp_path / "run", **kwargs)
+    json_out = tmp_path / "out.json"
+    code = rr.main([str(run), "--json", str(json_out)])
+    return code, capsys.readouterr().out, json.loads(json_out.read_text())
+
+
+def test_complete_pilot_with_dump_exits_zero_when_the_point_estimate_governs(
+        tmp_path: Path, capsys, point_policy) -> None:
+    """G2: every row computed (18 criteria, V7, every H3a pair), every reproduction check passed,
+    kappa_E a point estimate from a reproducing dump: exit 0, nothing open, no FALLBACK.
 
     Reference: ``kappa_by_hand`` (loops from the definitions of V_i and the influence series,
     rel 1e-10, see the module docstring). The projected half-widths use the point kappa at both
-    ends (lo = hi), and the reproduction checks of the dump against the results leaves match.
+    ends (lo = hi).
     """
-    run = write_run(tmp_path / "run")
-    json_out = tmp_path / "out.json"
-    code = rr.main([str(run), "--json", str(json_out)])
-    out = capsys.readouterr().out
-    # H3a is listed as not computable and counted, so a complete run exits 2 (plan question)
-    assert code == 2, out
-    incomplete = [line for line in out.splitlines() if line.startswith("  not computable")]
-    assert len(incomplete) == 1 and "H3a (all systems)" in incomplete[0]
-    assert "MISMATCH" not in out and "FALLBACK" not in out
-    assert out.count("MATCH") >= 12 and "kappa_E: point estimate from the dump for 12 of 12" in out
-    data = json.loads(json_out.read_text())
+    code, out, data = run_world(tmp_path, capsys)
+    assert code == 0, out
+    assert "not computable" not in out and "FALLBACK" not in out
+    assert "MISMATCH" not in out and out.count("MATCH") >= 12
+    assert "kappa_E: point estimate from the dump governs for 12 of 12" in out
     expect = {"H2c A4-A2": ("diff", "A4", "A2"), "H2c A4-A1": ("diff", "A4", "A1"),
               "H2d": ("ratio", "A4", "A3"), "H3c": ("ratio", "A5", "A4")}
     for system in SYSTEMS:
         rows = {r["label"]: r for r in data["rows"][system]}
+        assert len(rows) == 23 and set(data["h3a"]) == set(SYSTEMS)
         for label, (kind, first, second) in expect.items():
             want = kappa_by_hand(system, kind, first, second)
             row = rows[label]
@@ -510,20 +524,44 @@ def test_whole_dump_path_gives_exit_zero_and_the_hand_kappa(tmp_path: Path, caps
                 * want, rel=1e-10)
 
 
-def test_best_single_a0_uses_cp_alone(tmp_path: Path, capsys) -> None:
+def test_default_policy_range_governs_and_exit_is_two(tmp_path: Path, capsys) -> None:
+    """R2 working default (a): with a reproducing dump the range [0.7071, 1] still governs the
+    H2c, H2d and H3c projections (0.504-0.712 and 0.507-0.717), the point kappa is information
+    only, labelled biased, and G2 counts the FALLBACK: exit 2, with exactly the 12 parts open.
+
+    Reference: the note's ranges (closed forms) and ``kappa_by_hand`` for the information value.
+    """
+    code, out, data = run_world(tmp_path, capsys)
+    assert code == 2
+    open_lines = [line for line in out.splitlines() if line.startswith("  not computable")]
+    assert len(open_lines) == 12 and all("range governs (R2" in line for line in open_lines)
+    assert out.count("(FALLBACK)") == 12 and out.count("kappa_E point estimator biased (R2): range governs") == 12
+    assert "MISMATCH" not in out and "exit 0 is unreachable while the range governs" in out
+    for system in SYSTEMS:
+        for row in data["rows"][system]:
+            if row["label"].startswith(("H2c", "H2d")):
+                assert row["f_lo"] == pytest.approx(math.sqrt(0.5) * 1.007 * math.sqrt(0.5), rel=1e-12)
+                assert row["f_hi"] == pytest.approx(math.sqrt(0.5) * 1.007, rel=1e-12)
+                assert row["kappa_governs"] == "range"
+            if row["label"] == "H3c":
+                assert row["f_lo"] == pytest.approx(math.sqrt(0.5) * 1.014 * math.sqrt(0.5), rel=1e-12)
+                assert row["f_hi"] == pytest.approx(math.sqrt(0.5) * 1.014, rel=1e-12)
+                assert row["kappa"]["kappa"] == pytest.approx(
+                    kappa_by_hand(system, "ratio", "A5", "A4"), rel=1e-10)
+
+
+def test_best_single_a0_uses_cp_alone(tmp_path: Path, capsys, point_policy) -> None:
     """With ``best_single = A0`` the second H2c row is A4 - A0 and V is E_C (weight 1)."""
-    run = write_run(tmp_path / "run", best="A0")
-    json_out = tmp_path / "out.json"
-    code = rr.main([str(run), "--json", str(json_out)])
-    out = capsys.readouterr().out
-    assert code == 2 and out.count("  not computable") == 1, out  # H3a only
-    rows = {r["label"]: r for r in json.loads(json_out.read_text())["rows"]["rossler"]}
+    code, out, data = run_world(tmp_path, capsys, best="A0")
+    assert code == 0, out
+    rows = {r["label"]: r for r in data["rows"]["rossler"]}
     assert "H2c A4-A0" in rows and "H2c A4-A1" not in rows
     assert rows["H2c A4-A0"]["kappa"]["kappa"] == pytest.approx(
         kappa_by_hand("rossler", "diff", "A4", "A0"), rel=1e-10)
 
 
-def test_dump_that_disagrees_with_the_results_is_a_mismatch(tmp_path: Path, capsys) -> None:
+def test_dump_that_disagrees_with_the_results_is_a_mismatch(tmp_path: Path, capsys,
+                                                            point_policy) -> None:
     """The H3c leaf off by a relative 1e-6 (the allowed 1e-12): MISMATCH, exit 1 (1 beats 2)."""
     run = write_run(tmp_path / "run", scale_h3c=1.0 + 1e-6)
     code = rr.main([str(run)])
@@ -534,17 +572,33 @@ def test_dump_that_disagrees_with_the_results_is_a_mismatch(tmp_path: Path, caps
     # R1: the mismatching dump does not supply kappa_E for H3c: the range, FALLBACK, not counted
     assert out.count("(FALLBACK)") == 3
     assert out.count("the dump does not reproduce the results leaf") == 3
-    assert "kappa_E: point estimate from the dump for 9 of 12 parts; range fallback for 3" in out
+    assert "kappa_E: point estimate from the dump governs for 9 of 12 parts; range fallback for 3" in out
     h3c = [line for line in out.splitlines() if line.startswith("  H3c ")]
     assert len(h3c) == 3 and all("0.507-0.717" in line for line in h3c)
 
 
-@pytest.mark.parametrize(("scale", "code"), [(1.0 + 5e-13, 2), (1.0 + 2e-12, 1)])
-def test_reproduction_bound_passes_at_half_and_fails_at_twice(tmp_path: Path, capsys, scale, code
-                                                              ) -> None:
+def test_mismatch_beats_not_computable_and_nothing_is_skipped(tmp_path: Path, capsys,
+                                                              point_policy) -> None:
+    """G2 precedence: a MISMATCH together with a H3a pair of p_raw None and a missing V7 block is
+    still exit 1; without the mismatch the same run is exit 2."""
+    def edit(res: dict) -> None:
+        res["systems"]["chua"]["H3a"]["logrank_p_raw"][1] = None
+        del res["systems"]["rossler"]["V7"]
+    code, out, _ = run_world(tmp_path / "a", capsys, scale_h3c=1.0 + 1e-6, mutate=edit)
+    assert code == 1 and "p_raw None" in out and "rossler V7 median slope" in out
+    code, out, _ = run_world(tmp_path / "b", capsys, mutate=edit)
+    assert code == 2 and "MISMATCH" not in out
+    open_lines = [line for line in out.splitlines() if line.startswith("  not computable")]
+    assert len(open_lines) == 1 + 5  # the H3a pair and the five V7 rows of rossler
+    assert any("chua H3a pair (1, 0)" in line or "chua H3a pair (2, 1)" in line for line in open_lines)
+
+
+@pytest.mark.parametrize(("scale", "code"), [(1.0 + 5e-13, 0), (1.0 + 2e-12, 1)])
+def test_reproduction_bound_passes_at_half_and_fails_at_twice(tmp_path: Path, capsys, scale, code,
+                                                              point_policy) -> None:
     """The dump-to-results bound ``1e-12 |leaf|``: passes at 0.5x of it, fails at 2x.
 
-    A pass leaves only H3a open (exit 2, no MISMATCH, no FALLBACK); a failure exits 1.
+    A pass is a complete run (exit 0, no MISMATCH, no FALLBACK); a failure exits 1.
     """
     run = write_run(tmp_path / "run", scale_h3c=scale)
     assert rr.main([str(run)]) == code
@@ -793,3 +847,210 @@ def test_h2c_is_printed_relative_to_its_mse_level() -> None:
     tree["H2c"]["A4_minus_A2"]["relative"] = 0.0
     with pytest.raises(rr.NotComputable, match="no MSE level"):
         rr.project_row(spec, "lorenz63", tree, cfg, None, rr.Report(), PRESETS["full"])
+
+
+# ------------------------------------------------------------------------------------------ G1: H3a
+def erfc_p(chi: float) -> float:
+    """The 1-df chi-square survival function, ``erfc(sqrt(x/2))`` (an exact closed form)."""
+    return math.erfc(math.sqrt(chi / 2.0))
+
+
+def test_production_alpha_is_read_from_the_source() -> None:
+    """The bar is the constant of ``lpcstudy/analysis.py`` (read as text), equal to the imported one."""
+    from lpcstudy import analysis
+    assert rr.production_constant("H3A_ALPHA") == analysis.H3A_ALPHA == 0.01
+    with pytest.raises(rr.NotComputable, match="not assigned"):
+        rr.production_constant("NO_SUCH_CONSTANT")
+
+
+def test_holm_equals_production_and_hand_values() -> None:
+    """Holm step-down: hand case (0.01, 0.04, 0.03) -> (0.03, 0.06, 0.06); equal to production's."""
+    from lpcstudy.statistics import holm_adjust
+    assert rr.holm_adjust([0.01, 0.04, 0.03]) == pytest.approx([0.03, 0.06, 0.06], rel=1e-15)
+    g = rng_for("holm")
+    for _ in range(5):
+        p = g.uniform(0, 0.05, 7).tolist()
+        assert rr.holm_adjust(p) == holm_adjust(p)
+    assert rr.holm_adjust([1.0, 0.9]) == [1.0, 1.0]
+
+
+def test_h3a_projection_against_closed_forms() -> None:
+    """chi2_pilot = isf(p, 1), doubled, p_full = sf: textbook values and the erfc closed form.
+
+    Reference: the chi-square(1) quantiles 3.841458820694124 (p = 0.05) and 6.634896601021213
+    (p = 0.01) (rel 1e-9: ten digits typed), and ``erfc(sqrt(x/2))`` for the survival function
+    (rel 1e-9: the quantile is exact to a few ulp, the sensitivity of erfc to x is below 40).
+    """
+    for p, chi in ((0.05, 3.841458820694124), (0.01, 6.634896601021213)):
+        got = rr.h3a_projection(p, 2.0)
+        assert got["chi2_pilot"] == pytest.approx(chi, rel=1e-9) and got["computed"]
+        assert got["chi2_full"] == pytest.approx(2.0 * chi, rel=1e-9) and not got["lower_bound"]
+        assert got["p_full"] == pytest.approx(erfc_p(2.0 * chi), rel=1e-9)
+        assert erfc_p(got["chi2_pilot"]) == pytest.approx(p, rel=1e-9)
+    one = rr.h3a_projection(1.0, 2.0)
+    assert one["chi2_pilot"] == 0.0 and one["p_full"] == 1.0
+    with pytest.raises(rr.NotComputable):
+        rr.h3a_projection(1.5, 2.0)
+    with pytest.raises(rr.NotComputable):
+        rr.h3a_projection(0.5, 0.0)
+
+
+@pytest.mark.parametrize("p_raw", [1e-301, 0.0])
+def test_h3a_tiny_p_is_a_lower_bound_and_counted_computed(p_raw: float) -> None:
+    """p_raw below 1e-300: chi2 is the lower bound isf(1e-300, 1) (about 1380), computed, and the
+    projected p (an upper bound) is below every bar. Reference: erfc closed form at 1e-300."""
+    got = rr.h3a_projection(p_raw, 2.0)
+    assert got["computed"] and got["lower_bound"]
+    assert erfc_p(got["chi2_pilot"]) == pytest.approx(1e-300, rel=1e-6)
+    assert got["chi2_full"] == 2.0 * got["chi2_pilot"] and got["p_full"] <= 1e-300
+
+
+def test_h3a_none_is_not_computed() -> None:
+    """p_raw None (zero log-rank variance): not computed; no number is invented."""
+    got = rr.h3a_projection(None, 2.0)
+    assert got["computed"] is False and got["chi2_pilot"] is None and got["p_full"] is None
+
+
+def h3a_tree(raw: list) -> tuple[dict, dict]:
+    """A results tree with an H3a block of ``len(raw)`` pairs, and the pilot configuration."""
+    cfg = json.loads((FIXTURES / "p0_pilot.json").read_text())["config"]
+    pairs = [[i + 1, i] for i in range(len(raw))]
+    return {"H3a": {"chosen_K": len(raw) + 1, "pairs": pairs, "logrank_p_raw": raw}}, cfg
+
+
+def test_h3a_reading_reachable_not_reachable_and_not_determined() -> None:
+    """The reading by hand (n_test 500 -> 1000: chi2 doubles; p_full = erfc(sqrt(chi2_pilot))).
+
+    * (1e-10, 0.05): p_full 1e-20-ish and erfc(sqrt(3.8415)) = 0.0056; Holm over 2: (2e-20, 0.0056)
+      both below 0.01: reachable.
+    * (1e-10, 0.1): chi2_pilot 2.7055, p_full = erfc(1.645) = 0.0200 > 0.01: not reachable.
+    * a None pair: not determined, the others' values stay.
+    * (0.0, 1e-5): the tiny pair counts as computed; reachable.
+    """
+    full = PRESETS["full"]
+    for raw, reading in (([1e-10, 0.05], "reachable"), ([1e-10, 0.1], "not reachable"),
+                         ([1e-10, None], "not determined"), ([0.0, 1e-5], "reachable")):
+        tree, cfg = h3a_tree(raw)
+        got = rr.h3a_system(tree, cfg, full)
+        assert got["reading"] == reading, raw
+        assert got["factor"] == 2.0 and got["alpha"] == 0.01 and got["chosen_K"] == len(raw) + 1
+    tree, cfg = h3a_tree([1e-10, 0.05])
+    got = rr.h3a_system(tree, cfg, full)
+    chi = 3.841458820694124
+    assert got["entries"][1]["p_full"] == pytest.approx(erfc_p(2 * chi), rel=1e-9)
+    assert got["largest_holm_full"] == pytest.approx(erfc_p(2 * chi), rel=1e-9)  # rank 1 of 2
+    assert got["entries"][0]["holm_full"] == pytest.approx(2 * got["entries"][0]["p_full"], rel=1e-15)
+    tree, cfg = h3a_tree([1e-10, None])
+    got = rr.h3a_system(tree, cfg, full)
+    assert got["entries"][1]["computed"] is False and got["entries"][1]["holm_full"] == 1.0
+
+
+def test_h3a_missing_leaves_are_not_computable() -> None:
+    """A block without ``logrank_p_raw``, or with unequal lengths, is "not computable"."""
+    tree, cfg = h3a_tree([0.1, 0.2])
+    with pytest.raises(rr.NotComputable):
+        rr.h3a_system({"H3a": {"chosen_K": 3, "pairs": [[1, 0]]}}, cfg, PRESETS["full"])
+    tree["H3a"]["logrank_p_raw"] = [0.1]
+    with pytest.raises(rr.NotComputable):
+        rr.h3a_system(tree, cfg, PRESETS["full"])
+
+
+def test_h3a_is_printed_conditional_on_k_and_matches_a_hand_holm(tmp_path: Path, capsys) -> None:
+    """P0 fixture: each system prints its pairs, "conditional on K_pilot", a reading; the Chua
+    largest projected Holm p equals a hand computation (erfc, loops) to 1e-9.
+
+    Chua pairs p_raw (0.14112, 1.4872e-5, 0.0072534): p_full = erfc(sqrt(chi2_pilot)), Holm
+    (3, 2, 1) x sorted p_full.
+    """
+    rr.main([str(FIXTURES / "p0_pilot.json"), "--states", str(tmp_path / "none"), "--json",
+             str(tmp_path / "o.json")])
+    out = capsys.readouterr().out
+    assert out.count("conditional on K_pilot") >= 6 and "H3a chua: conditional on K_pilot = 4" in out
+    data = json.loads((tmp_path / "o.json").read_text())["h3a"]
+    raw = json.loads((FIXTURES / "p0_pilot.json").read_text())["systems"]["chua"]["H3a"]["logrank_p_raw"]
+    chi = [float(rr.sps.chi2.isf(p, 1)) for p in raw]
+    full = sorted(erfc_p(2.0 * c) for c in chi)
+    hand = max(min(1.0, (3 - i) * p) for i, p in enumerate(full))
+    assert data["chua"]["largest_holm_full"] == pytest.approx(hand, rel=1e-9)
+    assert data["chua"]["reading"] == "not reachable" and data["lorenz63"]["reading"] == "not reachable"
+
+
+def test_h3a_tiny_and_none_pairs_in_the_report(tmp_path: Path, capsys) -> None:
+    """A tiny pair prints a lower bound (">=") and counts computed; a None pair is listed as not
+    computable (exit 2) and the reading is "not determined"."""
+    res = json.loads((FIXTURES / "p0_pilot.json").read_text())
+    res["systems"]["rossler"]["H3a"]["logrank_p_raw"] = [1e-301, None]
+    path = tmp_path / "results.json"
+    path.write_text(json.dumps(res))
+    code = rr.main([str(path), "--states", str(tmp_path / "none")])
+    out = capsys.readouterr().out
+    assert code == 2
+    assert "chi2 >= " in out and "p_full <= " in out
+    assert "not computable: rossler H3a pair (1, 0): zero log-rank variance" in out
+    assert "H3a rossler (conditional on K_pilot = 3): pass reachable at full size: not determined" in out
+
+
+# ------------------------------------------------------------------------------------------ G3: margin
+def test_margin_reading_at_the_edges() -> None:
+    """G3: m = 0.1 - hw_full against 0.01 x [0.67, 1.5] = [0.0067, 0.015]; edges inside.
+
+    Reference: hand values; hw_full 0.0933 and 0.0850 are the same bounds on the half-width.
+    """
+    lo, hi = 0.67 * 0.01, 1.5 * 0.01
+    assert not rr.outside_margin(lo, lo) and not rr.outside_margin(hi, hi)
+    assert rr.outside_margin(np.nextafter(lo, 0.0), np.nextafter(lo, 0.0))
+    assert rr.outside_margin(np.nextafter(hi, 1.0), np.nextafter(hi, 1.0))
+    assert not rr.outside_margin(0.001, 0.05)  # a range reaching into the band is undetermined
+    assert rr.outside_margin(0.02, 0.05) and rr.outside_margin(-0.01, 0.005)
+    for hw, outside in ((0.09, False), (0.0933 - 1e-4, False), (0.0933 + 1e-4, True),
+                        (0.0850 + 1e-4, False), (0.0850 - 1e-4, True), (0.1458 * 0.717, True)):
+        m = rr.H2A_PARTIAL_EDGE - hw
+        assert rr.outside_margin(m, m) is outside, hw
+
+
+def h2a_row(hw_projected: float, label: str = "H2a(ii) zero") -> dict:
+    """A row of H2a(ii) whose projected half-width is ``hw_projected`` (primary level, n factor)."""
+    cfg = json.loads((FIXTURES / "p0_pilot.json").read_text())["config"]
+    hw = hw_projected / (math.sqrt(0.5) * 1.014)
+    part = {"partial_corr": 0.0, "ci": [-hw, hw]}
+    tree = {"H2a": {"part_ii": {"zero": part, "interior": part}}}
+    spec = next(s for s in rr.specs_for(cfg, "A1") if s.label == label)
+    return rr.project_row(spec, "lorenz63", tree, cfg, None, rr.Report(), PRESETS["full"])
+
+
+def test_h2a_ii_governing_reading_is_the_margin_and_the_hw_band_is_beside_it() -> None:
+    """Hand arithmetic at projected hw (n factor 0.7071, B 1.014; nominal = projected / 1.014):
+
+    * 0.0900: m = 0.0100, inside both readings, and inside the old hw band.
+    * 0.0950: m = 0.0050 < 0.0067: both fire; the old hw band (ratio 1.06) is silent.
+    * 0.0935: m = 0.0065 fires (ii); the n-only value 0.0935/1.014 = 0.09221 has m = 0.0078, so
+      (i) is silent: the readings differ on the low side, as PF-4 says.
+    * 0.0800: m = 0.0200 > 0.015 fires both; the old band (ratio 0.89) is silent.
+    """
+    for hw, i, ii in ((0.0900, False, False), (0.0950, True, True), (0.0935, False, True),
+                      (0.0800, True, True)):
+        row = h2a_row(hw)
+        assert (row["reading_i"], row["reading_ii"]) == (i, ii), hw
+        assert row["margin_lo"] == pytest.approx(0.1 - hw, rel=1e-9)
+        assert row["margin_nominal"] == pytest.approx(0.1 - hw / 1.014, rel=1e-9)
+        assert not row["legacy_reading_i"] and not row["legacy_reading_ii"]
+    assert rr.which(h2a_row(0.0935)) == "(ii)"
+    lines = rr.format_row(h2a_row(0.0950))
+    assert any("GOVERNING" in line and "[0.0067, 0.015]" in line for line in lines)
+    assert any("non-governing" in line and "[0.0603, 0.135]" in line for line in lines)
+    far = h2a_row(0.0950 * 1.8 / 1.06)  # hw/0.09 = 1.8 > 1.5: the old band fires as well
+    assert far["legacy_reading_i"] and far["legacy_reading_ii"]
+
+
+@pytest.mark.parametrize("name", ["p0", "p1"])
+def test_h2a_ii_governing_readings_on_p0_p1_against_the_log(name: str, tmp_path: Path) -> None:
+    """Pre-registered: the margin reading fires on most parts. Reference: the log's projected
+    half-widths (4 decimals, the margin is known to 5e-5; no part lies within 1e-4 of an edge)."""
+    logged, mine = parse_log()[name], tool_rows(name, tmp_path)
+    for label in ("H2a(ii) zero", "H2a(ii) interior"):
+        for system in SYSTEMS:
+            margin = 0.1 - logged[(label, system)]["hi"]
+            assert min(abs(margin - 0.0067), abs(margin - 0.015)) > 1e-4, (label, system)
+            fires = margin < 0.0067 or margin > 0.015
+            row = mine[(label, system)]
+            assert row["reading_i"] is fires and row["reading_ii"] is fires, (name, label, system)
