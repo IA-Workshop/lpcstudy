@@ -1,0 +1,49 @@
+design: c = 0.7, c_r = 0.5, kappa = [0.6, 1.075, 1.55, 2.025, 2.5], g_true = [0.2452, 0.3629, 0.4535, 0.5296, 0.5963]
+
+### p0 lorenz63 rho=0.01: T0 = 1.0657 (1/d 0.5213, mu 0.4891); w_j = A_j/g_j [1.148, -0.26, -0.585, -0.204, 0.312]
+  population, phi=0.0: acf1(psi_ratio) 0.0039  acf1(psi_1/d) 0.0038  arcsin formula (1/d part) 0.0000  var share reference/fit 0.0436  beta5(acf1) 0.9984
+  population, phi=0.3: acf1(psi_ratio) 0.1547  acf1(psi_1/d) 0.1544  arcsin formula (1/d part) 0.1543  var share reference/fit 0.0439  beta5(acf1) 0.9366
+  n=300 phi=0.0 (R=400, 0 failed fits): sd(T) 0.0666  bias(T) -0.0015  corr(T - T0, L) 0.9365  sd(T)/sd(L) 0.9939
+     SE from psi_hat (sbg; iid form) mean 0.0706, (kde) 0.0709; MBB-5 long-run form (sbg) 0.0701  -> ratio to sd(T): iid 1.061, block 1.052
+     acf1: population-psi mean -0.0002 (sd 0.0541); true-g -0.0039 (sd 0.0546); sbg -0.0040 (sd 0.0549); kde -0.0040 (sd 0.0548)
+     acf1(est g) - acf1(true g): sbg mean -0.00016 sd 0.00690 max|.| 0.0400; kde mean -0.00013 sd 0.00564 max|.| 0.0276
+     g_hat/g - 1 per column: sbg mean [-0.026, -0.02, -0.021, -0.009, -0.017] sd [0.095, 0.091, 0.097, 0.089, 0.095]; kde mean [-0.031, -0.031, -0.038, -0.023, -0.03] sd [0.077, 0.076, 0.078, 0.073, 0.075]
+  n=300 phi=0.3 (R=400, 0 failed fits): sd(T) 0.0789  bias(T) -0.0006  corr(T - T0, L) 0.9426  sd(T)/sd(L) 0.9794
+     SE from psi_hat (sbg; iid form) mean 0.0697, (kde) 0.0700; MBB-5 long-run form (sbg) 0.0791  -> ratio to sd(T): iid 0.884, block 1.003
+     acf1: population-psi mean +0.1490 (sd 0.0574); true-g +0.1474 (sd 0.0531); sbg +0.1488 (sd 0.0529); kde +0.1484 (sd 0.0529)
+     acf1(est g) - acf1(true g): sbg mean +0.00149 sd 0.00820 max|.| 0.0653; kde mean +0.00107 sd 0.00734 max|.| 0.0750
+     g_hat/g - 1 per column: sbg mean [-0.007, -0.009, -0.013, -0.012, -0.005] sd [0.11, 0.1, 0.099, 0.095, 0.101]; kde mean [-0.014, -0.022, -0.024, -0.026, -0.019] sd [0.09, 0.081, 0.081, 0.077, 0.084]
+  n=1000 phi=0.0 (R=400, 0 failed fits): sd(T) 0.0372  bias(T) -0.0036  corr(T - T0, L) 0.9713  sd(T)/sd(L) 1.0538
+     SE from psi_hat (sbg; iid form) mean 0.0376, (kde) 0.0378; MBB-5 long-run form (sbg) 0.0374  -> ratio to sd(T): iid 1.009, block 1.005
+     acf1: population-psi mean -0.0019 (sd 0.0312); true-g -0.0024 (sd 0.0311); sbg -0.0023 (sd 0.0309); kde -0.0023 (sd 0.0310)
+     acf1(est g) - acf1(true g): sbg mean +0.00004 sd 0.00290 max|.| 0.0146; kde mean +0.00006 sd 0.00215 max|.| 0.0094
+     g_hat/g - 1 per column: sbg mean [-0.008, -0.002, -0.005, -0.001, -0.012] sd [0.067, 0.071, 0.066, 0.069, 0.065]; kde mean [-0.015, -0.016, -0.018, -0.019, -0.023] sd [0.049, 0.052, 0.048, 0.049, 0.048]
+  n=1000 phi=0.3 (R=400, 0 failed fits): sd(T) 0.0429  bias(T) +0.0024  corr(T - T0, L) 0.9675  sd(T)/sd(L) 0.9947
+     SE from psi_hat (sbg; iid form) mean 0.0376, (kde) 0.0379; MBB-5 long-run form (sbg) 0.0429  -> ratio to sd(T): iid 0.877, block 1.001
+     acf1: population-psi mean +0.1516 (sd 0.0317); true-g +0.1509 (sd 0.0306); sbg +0.1515 (sd 0.0308); kde +0.1513 (sd 0.0308)
+     acf1(est g) - acf1(true g): sbg mean +0.00063 sd 0.00317 max|.| 0.0157; kde mean +0.00040 sd 0.00246 max|.| 0.0121
+     g_hat/g - 1 per column: sbg mean [-0.003, 0.002, -0.009, -0.004, -0.006] sd [0.074, 0.068, 0.069, 0.069, 0.066]; kde mean [-0.012, -0.01, -0.023, -0.018, -0.019] sd [0.055, 0.051, 0.052, 0.049, 0.047]
+
+### p1 rossler rho=0.02: T0 = 1.1414 (1/d 0.5821, mu 0.5100); w_j = A_j/g_j [2.31, -2.108, -1.105, 0.313, 0.896]
+  population, phi=0.0: acf1(psi_ratio) -0.0022  acf1(psi_1/d) -0.0020  arcsin formula (1/d part) 0.0000  var share reference/fit 0.0089  beta5(acf1) 1.0009
+  population, phi=0.3: acf1(psi_ratio) 0.1502  acf1(psi_1/d) 0.1500  arcsin formula (1/d part) 0.1490  var share reference/fit 0.0089  beta5(acf1) 0.9385
+  n=300 phi=0.0 (R=400, 0 failed fits): sd(T) 0.1666  bias(T) +0.0177  corr(T - T0, L) 0.9134  sd(T)/sd(L) 1.0263
+     SE from psi_hat (sbg; iid form) mean 0.1702, (kde) 0.1712; MBB-5 long-run form (sbg) 0.1683  -> ratio to sd(T): iid 1.021, block 1.010
+     acf1: population-psi mean -0.0046 (sd 0.0578); true-g -0.0022 (sd 0.0593); sbg -0.0023 (sd 0.0595); kde -0.0023 (sd 0.0594)
+     acf1(est g) - acf1(true g): sbg mean -0.00008 sd 0.00766 max|.| 0.0350; kde mean -0.00004 sd 0.00619 max|.| 0.0283
+     g_hat/g - 1 per column: sbg mean [-0.014, -0.009, -0.014, -0.016, -0.01] sd [0.098, 0.1, 0.096, 0.097, 0.097]; kde mean [-0.019, -0.02, -0.029, -0.032, -0.029] sd [0.079, 0.082, 0.075, 0.077, 0.076]
+  n=300 phi=0.3 (R=400, 0 failed fits): sd(T) 0.1917  bias(T) +0.0042  corr(T - T0, L) 0.9160  sd(T)/sd(L) 1.0392
+     SE from psi_hat (sbg; iid form) mean 0.1681, (kde) 0.1687; MBB-5 long-run form (sbg) 0.1908  -> ratio to sd(T): iid 0.877, block 0.995
+     acf1: population-psi mean +0.1464 (sd 0.0615); true-g +0.1440 (sd 0.0630); sbg +0.1461 (sd 0.0623); kde +0.1457 (sd 0.0624)
+     acf1(est g) - acf1(true g): sbg mean +0.00210 sd 0.00868 max|.| 0.0431; kde mean +0.00172 sd 0.00709 max|.| 0.0480
+     g_hat/g - 1 per column: sbg mean [-0.012, -0.008, -0.016, -0.004, -0.01] sd [0.105, 0.105, 0.097, 0.104, 0.099]; kde mean [-0.019, -0.018, -0.029, -0.024, -0.024] sd [0.083, 0.082, 0.077, 0.082, 0.081]
+  n=1000 phi=0.0 (R=400, 0 failed fits): sd(T) 0.0863  bias(T) +0.0052  corr(T - T0, L) 0.9644  sd(T)/sd(L) 0.9836
+     SE from psi_hat (sbg; iid form) mean 0.0896, (kde) 0.0902; MBB-5 long-run form (sbg) 0.0891  -> ratio to sd(T): iid 1.038, block 1.033
+     acf1: population-psi mean -0.0034 (sd 0.0304); true-g -0.0021 (sd 0.0292); sbg -0.0018 (sd 0.0290); kde -0.0019 (sd 0.0291)
+     acf1(est g) - acf1(true g): sbg mean +0.00023 sd 0.00290 max|.| 0.0108; kde mean +0.00018 sd 0.00205 max|.| 0.0076
+     g_hat/g - 1 per column: sbg mean [-0.005, -0.006, -0.009, -0.003, -0.002] sd [0.067, 0.066, 0.067, 0.065, 0.07]; kde mean [-0.012, -0.018, -0.021, -0.02, -0.02] sd [0.048, 0.051, 0.05, 0.046, 0.052]
+  n=1000 phi=0.3 (R=400, 0 failed fits): sd(T) 0.1039  bias(T) -0.0003  corr(T - T0, L) 0.9572  sd(T)/sd(L) 1.0336
+     SE from psi_hat (sbg; iid form) mean 0.0903, (kde) 0.0909; MBB-5 long-run form (sbg) 0.1027  -> ratio to sd(T): iid 0.870, block 0.989
+     acf1: population-psi mean +0.1460 (sd 0.0315); true-g +0.1458 (sd 0.0314); sbg +0.1467 (sd 0.0317); kde +0.1465 (sd 0.0316)
+     acf1(est g) - acf1(true g): sbg mean +0.00089 sd 0.00324 max|.| 0.0219; kde mean +0.00066 sd 0.00239 max|.| 0.0138
+     g_hat/g - 1 per column: sbg mean [-0.011, -0.007, -0.003, -0.003, -0.005] sd [0.069, 0.073, 0.067, 0.066, 0.069]; kde mean [-0.016, -0.018, -0.017, -0.017, -0.02] sd [0.054, 0.056, 0.05, 0.05, 0.051]
