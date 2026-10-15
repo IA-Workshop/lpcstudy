@@ -544,6 +544,8 @@ Written before the fix-round unit run. Findings R1 to R8, R10, R11 are fixed in 
 **§4.9 checklist, slow tier (after fix round 1 was committed, a50aa24 and the queue fix).**
 1. Change set: unchanged since the unit run (`tools/rehearsal_diagnostics.py`, the two test files, this file, `queue.md`, the review answers). 2. Radius: `tests/slow/test_rehearsal_diagnostics_mc.py`, once, by the statistic's owner (4.2 row for a statistic verified in `tests/slow/`). 3. Already run: no; the slow file has never run, and the tool code it exercises (`variance_summary`, `permutation_null`, `interior_attenuation`) was not changed by fix round 1. 4. `JAX_PLATFORMS=cpu` (the wrapper). 5. `LPC_THREADS` 4, slow timeout 3600 s. 6. Contention: the coordinator reported the CPU slot free; `pgrep -fa "lpcstudy --preset"` is checked in the same command, and the run starts only if it is empty. 7. `-q --tb=short -rfE`. 8. `tools/run_tests.sh slow tests/slow/test_rehearsal_diagnostics_mc.py`.
 
+**Slow tier result.** `pgrep` empty; `tools/run_tests.sh slow tests/slow/test_rehearsal_diagnostics_mc.py`: `3 passed in 15.58s` (S1 variance-ratio mean, S2 permutation-reading size, S3 attenuation against the known A0; bounds as fixed before the run, unchanged). Run once; the slot is released.
+
 ## Review
 
 ## Audit
