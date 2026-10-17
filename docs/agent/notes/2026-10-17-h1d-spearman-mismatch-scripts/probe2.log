@@ -1,0 +1,25 @@
+floor c = 0.01  ulp(c) = 1.734723475976807e-18
+== lorenz63: leaf 0.6253384766872416; dump column 3: np.float64(0.6253419658279905); diff +3.489e-06
+   analog_seed: dump np.float64(0.8283583214332857) leaf 0.8283583214332857 diff +0.0e+00
+   estimation_seed: dump np.float64(0.8921251173229291) leaf 0.8921251173229291 diff +0.0e+00
+   growth: dump np.float64(0.9853337333349333) leaf 0.9853337333349333 diff +0.0e+00
+   states: 500, column-3 distinct 467, tied groups 27, largest tie 5 at value np.float64(-4.605170185985116); log(c)=-4.605170185988091
+   tied-at-the-floor states: 1; their N range [1.064e+00, 1.064e+00]; raw x=exp(x)-c would be <= 1.73e-18 (float64 resolution at c)
+   Spearman over all tie-breaks of column 3: [0.625044355, 0.625637926]; leaf inside: True; mid-rank (dump) 0.625341966
+   leaf n_states 500, excluded 0; N finite True, x finite True
+== rossler: leaf 0.6229817515055563; dump column 3: np.float64(0.6229708428646754); diff -1.091e-05
+   analog_seed: dump np.float64(0.7390234360937443) leaf 0.7390234360937443 diff +0.0e+00
+   estimation_seed: dump np.float64(0.9620382036237878) leaf 0.9620382036237878 diff +0.0e+00
+   growth: dump np.float64(0.9938565514262058) leaf 0.9938565514262058 diff +0.0e+00
+   states: 500, column-3 distinct 467, tied groups 23, largest tie 4 at value np.float64(-4.605170185986578); log(c)=-4.605170185988091
+   tied-at-the-floor states: 1; their N range [1.861e-13, 1.861e-13]; raw x=exp(x)-c would be <= 1.73e-18 (float64 resolution at c)
+   Spearman over all tie-breaks of column 3: [0.622571994, 0.623367837]; leaf inside: True; mid-rank (dump) 0.622970843
+   leaf n_states 500, excluded 0; N finite True, x finite True
+== chua: leaf 0.5750938101005836; dump column 3: np.float64(0.5750074724623595); diff -8.634e-05
+   analog_seed: dump np.float64(0.6883587534350137) leaf 0.6883587534350137 diff +0.0e+00
+   estimation_seed: dump np.float64(0.9323176255130009) leaf 0.9323176255130009 diff +0.0e+00
+   growth: dump np.float64(0.979982843000807) leaf 0.979982843000807 diff +0.0e+00
+   states: 500, column-3 distinct 453, tied groups 24, largest tie 7 at value np.float64(-4.605170185986578); log(c)=-4.605170185988091
+   tied-at-the-floor states: 1; their N range [1.866e-13, 1.866e-13]; raw x=exp(x)-c would be <= 1.73e-18 (float64 resolution at c)
+   Spearman over all tie-breaks of column 3: [0.574374521, 0.575636063]; leaf inside: True; mid-rank (dump) 0.575007472
+   leaf n_states 500, excluded 0; N finite True, x finite True
