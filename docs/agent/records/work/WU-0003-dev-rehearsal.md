@@ -433,6 +433,70 @@ Earlier amendments stay in force except where an item below says otherwise. This
 
 The developer appends the R21 Log correction: the H1d 98.3% row was the looser direction, applied as written until this ruling. The code changes under I1 and I2 are .8 work, with radius `tests/unit/test_tools_rehearsal_diagnostics.py`. **Affected checks** for this amendment: none (documentation only).
 
+### Plan amendment 10 (2026-10-17, planner claude-opus-5-5)
+
+**Basis:** R23 and R26 of the .8 round-4 review (`WU-0003.8-review-round4.md`, on `wu/0003-8-diagnostics`). Earlier amendments stay in force except where an item below says otherwise. This amendment is fixed before any R-run, and no threshold moves.
+
+**J1. Correction of the recorded acf familywise rates (R23).** These are the predicted probabilities, under no dependence, that at least one |acf(1)| exceeds its threshold.
+
+- **Formula:** 1 − ∏(1 − r_i), with r_i = erfc(thr·√n_i/√2). That is the two-sided normal tail of acf(1), whose SD is 1/√n (0.058, 0.044 and 0.032 at n = 300, 500 and 1000). The threshold thr is 0.15 at n ≤ 500 and 0.11 at n = 1000.
+- **Per-series rates:** r = 0.009375 (n = 300), 7.96e-4 (500) and 5.04e-4 (1000).
+- **Series sizes:** at the pilot, H2b(i), H2b(ii) and H1a run at n = 300 and the others at 500. At full, every series runs at n = 1000.
+- **Why the figures differ:** the earlier full-preset figures used an SD rounded to 0.032 (per-series rate about 5.8e-4).
+
+| Set (N) | Recorded earlier | Corrected (formula) |
+| --- | --- | --- |
+| Pilot 18 | 0.064 | 0.0639 |
+| Pilot 24 | 0.11 (F3) | 0.1154 |
+| Pilot 27 | 0.116 (I2) | **0.1175** |
+| Full 18 | 0.010 (F3) | **0.0090** |
+| Full 24 | 0.014 (F3, H4) | **0.0120** |
+| Full 27 | 0.016 (I2) | **0.0135** |
+
+- **Which values govern:** the tool prints the formula value for the N it uses. The corrected values replace the recorded ones in F3, H4 and I2.
+- **D2 rates are unchanged:** pilot 0.9717 (N = 18), 0.9931 (24), 0.9960 (27); full 0.8308, 0.9064, 0.9304.
+- **Test (.8, developer):** `predicted_acf_any` is checked against the hand product of erfc terms to 1e-12 relative, as D2 already is. The absolute windows go.
+- **Strictness:** this changes predicted rates only. No threshold and no reading rule moves, so it is not an owner item.
+
+**J2. The reproduction check of `fitted_inverse_dim` (.8c a7; R26).** This is the reviewer's recommendation, adopted as the working default.
+
+- **The analysis stack** is compared field by field with the run's `provenance`:
+  - `python`;
+  - `packages.numpy` and `packages.scipy`;
+  - `cpu.model` and `cpu.isa`;
+  - `blas.libraries` (each entry's `library` and `corename`);
+  - `numpy_simd.found`;
+  - `env.OPENBLAS_CORETYPE` and `env.NPY_DISABLE_CPU_FEATURES`.
+- **The tool's own values** come from the same `lpcstudy.provenance` functions in its own process.
+- **"Different stack."** A field that is missing, null, or recorded with a non-null `error` on either side counts as different. The tool prints the comparison field by field beside the a7 line.
+
+**The three branches:**
+
+| Case | Outcome |
+| --- | --- |
+| Same stack | Bitwise. Any difference is MISMATCH, exit 1. |
+| Different stack, \|Δ\| ≤ 4e-5·s | "Not computable: bitwise reproduction needs the run's stack", exit 2, **never exit 0**. |
+| Different stack, \|Δ\| > 4e-5·s | MISMATCH, exit 1. |
+
+Here s = max(|lo|, |hi|) of `ci_inverse_dim`, and 4e-5·s is the Q1 a-priori bound for a pair of correct fits (note `2026-10-14-math-wu0003-9-q1.md` §Q1.3; the same constant as `REFIT_TOLERANCE`).
+
+- A failed a7 check withdraws the H1a series for that cell (R24).
+- The `inverse_dim_reference` check keeps a7's γ_n relative tolerance.
+
+**Acceptance (hand cases, in `tests/unit/test_tools_rehearsal_diagnostics.py`):**
+1. **Same stack.** The provenance is copied from the tool's own process. A leaf equal to the refit passes; a leaf one ulp off is MISMATCH, exit 1.
+2. **Different stack, within the bound.** `packages.scipy` is edited. A leaf off by 2e-5·s gives "not computable", exit 2. The report never exits 0 while that line is present.
+3. **Different stack, beyond the bound.** The same edit, with the leaf off by 8e-5·s, gives MISMATCH, exit 1.
+4. **Missing field.** With `cpu.model` absent, or `blas.error` non-null, a leaf off by one ulp follows branch 2, not branch 1.
+5. **Boundary.** Exactly 4e-5·s is "within"; the next float above is "beyond".
+
+**Strictness:**
+- Same stack: unchanged (bitwise).
+- Different stack: correct code no longer gets a false MISMATCH, but it also never gets exit 0.
+- No pre-registered number changes, since 4e-5·s is the existing bound. **Not an owner item.**
+
+**Affected checks:** none for this amendment (documentation only). J1's test and J2 are .8c work, with radius `tests/unit/test_tools_rehearsal_diagnostics.py`.
+
 ## Log
 
 ### WU-0003.7a (developer claude-sonnet-5-5, 2026-10-14; branch `wu/0003-rehearsal`, from `dcc4ff2`)
