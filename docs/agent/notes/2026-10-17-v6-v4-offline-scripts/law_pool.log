@@ -1,0 +1,42 @@
+== lorenz63
+  CPU law 2026-10-13 (5 perturbed orbits)    P(V6>=1e-3) 1.0863e-03  SE 2.5e-04  approx 95% [5.95e-04, 1.58e-03]  (95 segments)
+  CPU law, deterministic continuation        P(V6>=1e-3) 1.5232e-03  SE 3.0e-04  approx 95% [9.41e-04, 2.11e-03]  (95 segments)
+  CPU law, pooled (2e6 states)               P(V6>=1e-3) 1.3047e-03  SE 1.9e-04  approx 95% [9.24e-04, 1.69e-03]  (190 segments)
+  GPU-lambda law, deterministic              P(V6>=1e-3) 1.4947e-03  SE 3.1e-04  approx 95% [8.91e-04, 2.10e-03]  (95 segments)
+  R1 (GPU, DEV-1 pilot) V6 3.773e-05: rank in GPU-lambda law 0.4955; in CPU laws 0.5007 / 0.4980
+    pilot DEV-1 V6 2.603e-05: rank in CPU law 2026-10-13 0.1965, in the deterministic CPU law 0.1937
+    pilot DEV-2 V6 4.642e-05: rank in CPU law 2026-10-13 0.6427, in the deterministic CPU law 0.6334
+    pilot DEV-3 V6 2.956e-05: rank in CPU law 2026-10-13 0.2963, in the deterministic CPU law 0.2909
+    pilot DEV-4 V6 2.827e-05: rank in CPU law 2026-10-13 0.2598, in the deterministic CPU law 0.2547
+    full  DEV-1 V6 4.451e-05: rank in CPU law 2026-10-13 0.6179, in the deterministic CPU law 0.6099
+    full  DEV-2 V6 2.180e-05: rank in CPU law 2026-10-13 0.0626, in the deterministic CPU law 0.0624
+    full  DEV-3 V6 3.091e-05: rank in CPU law 2026-10-13 0.3333, in the deterministic CPU law 0.3275
+    full  DEV-4 V6 3.285e-05: rank in CPU law 2026-10-13 0.3857, in the deterministic CPU law 0.3797
+== rossler
+  CPU law 2026-10-13 (5 perturbed orbits)    P(V6>=1e-3) 0.0000e+00  SE 0.0e+00  approx 95% [0.00e+00, 0.00e+00]  (95 segments)
+  CPU law, deterministic continuation        P(V6>=1e-3) 0.0000e+00  SE 0.0e+00  approx 95% [0.00e+00, 0.00e+00]  (95 segments)
+  CPU law, pooled (2e6 states)               P(V6>=1e-3) 0.0000e+00  SE 0.0e+00  approx 95% [0.00e+00, 0.00e+00]  (190 segments)
+  GPU-lambda law, deterministic              P(V6>=1e-3) 0.0000e+00  SE 0.0e+00  approx 95% [0.00e+00, 0.00e+00]  (95 segments)
+  R1 (GPU, DEV-1 pilot) V6 4.307e-05: rank in GPU-lambda law 0.7889; in CPU laws 0.8460 / 0.8463
+    pilot DEV-1 V6 3.073e-05: rank in CPU law 2026-10-13 0.0853, in the deterministic CPU law 0.0839
+    pilot DEV-2 V6 3.380e-05: rank in CPU law 2026-10-13 0.1822, in the deterministic CPU law 0.1795
+    pilot DEV-3 V6 3.854e-05: rank in CPU law 2026-10-13 0.5494, in the deterministic CPU law 0.5493
+    pilot DEV-4 V6 3.429e-05: rank in CPU law 2026-10-13 0.2065, in the deterministic CPU law 0.2047
+    full  DEV-1 V6 3.698e-05: rank in CPU law 2026-10-13 0.4884, in the deterministic CPU law 0.4871
+    full  DEV-2 V6 3.060e-05: rank in CPU law 2026-10-13 0.0807, in the deterministic CPU law 0.0792
+    full  DEV-3 V6 2.763e-05: rank in CPU law 2026-10-13 0.0219, in the deterministic CPU law 0.0218
+    full  DEV-4 V6 4.369e-05: rank in CPU law 2026-10-13 0.9197, in the deterministic CPU law 0.9196
+== chua
+  CPU law 2026-10-13 (5 perturbed orbits)    P(V6>=1e-3) 4.4323e-02  SE 2.6e-03  approx 95% [3.92e-02, 4.94e-02]  (95 segments)
+  CPU law, deterministic continuation        P(V6>=1e-3) 4.8389e-02  SE 2.6e-03  approx 95% [4.32e-02, 5.35e-02]  (95 segments)
+  CPU law, pooled (2e6 states)               P(V6>=1e-3) 4.6356e-02  SE 1.8e-03  approx 95% [4.27e-02, 5.00e-02]  (190 segments)
+  GPU-lambda law, deterministic              P(V6>=1e-3) 4.2873e-02  SE 3.1e-03  approx 95% [3.68e-02, 4.90e-02]  (95 segments)
+  R1 (GPU, DEV-1 pilot) V6 3.358e-05: rank in GPU-lambda law 0.0025; in CPU laws 0.0017 / 0.0016
+    pilot DEV-1 V6 1.089e-04: rank in CPU law 2026-10-13 0.1955, in the deterministic CPU law 0.1992
+    pilot DEV-2 V6 7.915e-05: rank in CPU law 2026-10-13 0.0870, in the deterministic CPU law 0.0844
+    pilot DEV-3 V6 1.354e-04: rank in CPU law 2026-10-13 0.2955, in the deterministic CPU law 0.3059
+    pilot DEV-4 V6 1.184e-04: rank in CPU law 2026-10-13 0.2306, in the deterministic CPU law 0.2388
+    full  DEV-1 V6 1.530e-03: rank in CPU law 2026-10-13 0.9785, in the deterministic CPU law 0.9739
+    full  DEV-2 V6 3.340e-04: rank in CPU law 2026-10-13 0.7551, in the deterministic CPU law 0.7567
+    full  DEV-3 V6 2.949e-04: rank in CPU law 2026-10-13 0.7026, in the deterministic CPU law 0.7038
+    full  DEV-4 V6 1.695e-04: rank in CPU law 2026-10-13 0.4215, in the deterministic CPU law 0.4293

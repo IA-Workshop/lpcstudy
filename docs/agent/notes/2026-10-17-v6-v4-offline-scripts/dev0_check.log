@@ -1,0 +1,7 @@
+registry /home/brianm/projects/physics/chaos/lpcstudy-wt/develop/seeds/development_seeds.json jax 0.11.2 devices [CpuDevice(id=0)]
+pilot|DEV-0|lorenz63         V6 0.0004832547134836568  per-state max np.float64(0.0004832547134836568)  equal True  test[0] 142151 test[19] 143006 spacing 45 n_c/n_f 4/8  main_digest 9425a94753e5d3bb  9.4s
+    sorted per-state: [4.833e-04 1.987e-05 1.862e-05 1.733e-05 1.556e-05]  argmax step of the max: 30
+pilot|DEV-0|rossler          V6 4.253412949499829e-05  per-state max np.float64(4.253412949499829e-05)  equal True  test[0] 236357 test[19] 239207 spacing 150 n_c/n_f 12/24  main_digest 722bbc0b4743e6f0  10.1s
+    sorted per-state: [4.253e-05 3.664e-05 3.036e-05 3.014e-05 2.933e-05]  argmax step of the max: 28
+pilot|DEV-0|chua             V6 0.00029249004360848153  per-state max np.float64(0.00029249004360848153)  equal True  test[0] 236441 test[19] 239291 spacing 150 n_c/n_f 16/31  main_digest b8810b328ce49bd9  9.9s
+    sorted per-state: [2.925e-04 1.737e-04 1.001e-04 9.729e-05 8.712e-05]  argmax step of the max: 17

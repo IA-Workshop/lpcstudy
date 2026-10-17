@@ -1,0 +1,9 @@
+full|DEV-1|chua: library V6 1.529522e-03; NumPy RK4 max-over-20 D 1.529522e-03 (rel diff 1.7e-11); state k=7 (test index 552491)
+  n_c 16, n_f 31; e_h at n_c,2n_c,4n_c,8n_c vs DOP853: 1.317e-03 3.233e-06 6.144e-05 1.037e-06; observed orders 8.67 -4.25 5.89
+  D / e_h = 1.162; breakpoint crossings in window: 3; ln sigma_1 (1 LT) = 4.99; second-largest D 1.014e-04
+full|DEV-2|chua: library V6 3.339838e-04; NumPy RK4 max-over-20 D 3.339838e-04 (rel diff 1.9e-11); state k=7 (test index 552491)
+  n_c 16, n_f 31; e_h at n_c,2n_c,4n_c,8n_c vs DOP853: 3.001e-04 1.001e-04 9.585e-05 7.937e-07; observed orders 1.58 0.06 6.92
+  D / e_h = 1.113; breakpoint crossings in window: 2; ln sigma_1 (1 LT) = 4.65; second-largest D 3.045e-04
+pilot|DEV-3|chua: library V6 1.353574e-04; NumPy RK4 max-over-20 D 1.353574e-04 (rel diff 8.5e-12); state k=11 (test index 238091)
+  n_c 16, n_f 31; e_h at n_c,2n_c,4n_c,8n_c vs DOP853: 1.693e-04 1.276e-06 2.286e-06 9.336e-07; observed orders 7.05 -0.84 1.29
+  D / e_h = 0.800; breakpoint crossings in window: 3; ln sigma_1 (1 LT) = 3.56; second-largest D 1.066e-04
