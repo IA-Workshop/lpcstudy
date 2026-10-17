@@ -756,6 +756,15 @@ class DumpView:
     cfg: dict
     res: dict
     rep: Report
+    failed: str | None = None
+    """The first defect of the dump (a provenance mismatch, a failed reproduction check, an input
+    that cannot be read); once set, the dump supplies nothing (amendment 8, H1: "not used for
+    anything")."""
+
+    def fail(self, reason: str) -> None:
+        """Mark the dump unusable on its first defect (later ones keep the first reason)."""
+        if self.failed is None:
+            self.failed = reason
 
     @property
     def ref(self) -> int:
@@ -807,21 +816,17 @@ def draw_free_mse(view: DumpView, rule: str) -> np.ndarray:
     return value.mean(axis=1)
 
 
-def kappa_from_dump(view: DumpView, spec: Spec, e_full: int) -> dict:
-    """kappa_E of one criterion from the dump, after checking the dump against the results leaf.
+def kappa_inputs(view: DumpView, spec: Spec) -> dict:
+    """The validated arrays of one kappa criterion: realized and draw-free per-state MSEs.
 
-    A dump that does not reproduce the leaf is not used: ``NotComputable`` after the MISMATCH is
-    recorded, so the caller falls back to the range. The block length is the run's
-    ``bootstrap_block`` (a missing leaf is "not computable", no default).
-
-    Returns
-    -------
-    dict
-        ``kappa``, ``V_s``, ``V_d``, ``n``.
+    Raises
+    ------
+    NotComputable
+        If the draws or the number of states disagree with the configuration, an array is missing
+        or an entry is not finite.
     """
-    assert spec.kappa is not None and spec.kappa_leaf is not None
-    kind, first, second = spec.kappa
-    block = int(dig(view.cfg, "bootstrap_block"))
+    assert spec.kappa is not None
+    _, first, second = spec.kappa
     d, ref = view.dump, view.ref
     n_draws = int(d.scalar("meta/n_eval_draws"))
     if n_draws != int(dig(view.cfg, "n_eval_draws")):
@@ -836,22 +841,60 @@ def kappa_from_dump(view: DumpView, spec: Spec, e_full: int) -> dict:
     for arr in (*real.values(), *state.values()):
         if not np.all(np.isfinite(arr)):
             raise NotComputable("non-finite per-state MSE in the dump")
-    a, b = real[first], real[second]
-    if kind == "diff":
-        diff = a - b
-        ok = check_reproduction(view, f"{spec.label} mean", float(diff.mean()), spec.kappa_leaf,
-                                scale=float(np.mean(np.abs(diff))))
-    else:
-        ratio = float(a.mean() / b.mean())
-        ok = check_reproduction(view, f"{spec.label} ratio", ratio, spec.kappa_leaf,
-                                offset=-spec.ratio_offset,
-                                scale=ratio if spec.ratio_offset else 0.0)
-    if not ok:
-        raise NotComputable("the dump does not reproduce the results leaf (MISMATCH above); "
-                            "the dump is not used")
-    value, var_state, var_draw = kappa_estimate(state[first], state[second], a, b, kind,
-                                                n_draws, e_full, block)
-    return {"kappa": value, "V_s": var_state, "V_d": var_draw, "n": n}
+    return {"real": real, "state": state, "n": n, "n_draws": n_draws}
+
+
+def verify_dump(view: DumpView, specs: Sequence[Spec]) -> None:
+    """Every reproduction check of the system's kappa criteria, once, before any use of the dump.
+
+    A mismatch (MISMATCH, exit 1), an unreadable input (counted) or a provenance defect marks the
+    dump failed; a failed dump supplies no information value for any row.
+    """
+    for spec in specs:
+        if spec.kappa is None or spec.kappa_leaf is None:
+            continue
+        kind, first, second = spec.kappa
+        try:
+            got = kappa_inputs(view, spec)
+            a, b = got["real"][first], got["real"][second]
+            if kind == "diff":
+                diff = a - b
+                ok = check_reproduction(view, f"{spec.label} mean", float(diff.mean()),
+                                        spec.kappa_leaf, scale=float(np.mean(np.abs(diff))))
+            else:
+                ratio = float(a.mean() / b.mean())
+                ok = check_reproduction(view, f"{spec.label} ratio", ratio, spec.kappa_leaf,
+                                        offset=-spec.ratio_offset,
+                                        scale=ratio if spec.ratio_offset else 0.0)
+        except NotComputable as exc:
+            view.rep.nc(f"{view.system} {spec.label} dump check", str(exc))
+            view.fail(f"{spec.label}: {exc}")
+            continue
+        if not ok:
+            view.fail(f"{spec.label} does not reproduce its results leaf")
+
+
+def kappa_from_dump(view: DumpView, spec: Spec, e_full: int) -> dict:
+    """The point kappa_E of one criterion (information only; never enters a projection).
+
+    A dump that failed any check (``verify_dump``, provenance) is not used: ``NotComputable``. The
+    block length is the run's ``bootstrap_block`` (a missing leaf is "not computable", no default).
+
+    Returns
+    -------
+    dict
+        ``kappa``, ``V_s``, ``V_d``, ``n``.
+    """
+    assert spec.kappa is not None and spec.kappa_leaf is not None
+    if view.failed is not None:
+        raise NotComputable(f"the dump of {view.system} failed a check ({view.failed}); not used")
+    kind, first, second = spec.kappa
+    block = int(dig(view.cfg, "bootstrap_block"))
+    got = kappa_inputs(view, spec)
+    value, var_state, var_draw = kappa_estimate(got["state"][first], got["state"][second],
+                                                got["real"][first], got["real"][second], kind,
+                                                got["n_draws"], e_full, block)
+    return {"kappa": value, "V_s": var_state, "V_d": var_draw, "n": got["n"]}
 
 
 def open_dump(folder: Path, system: str, cfg: dict, res: dict, seed_id: str,
@@ -880,12 +923,15 @@ def open_dump(folder: Path, system: str, cfg: dict, res: dict, seed_id: str,
                    f"{SCHEMAS}; the range is used")
             dump.close()
             return None
+        problem: str | None = None
         for key, expected in (("meta/system", system), ("meta/preset", cfg.get("name"))):
             if not dump.has(key):
                 rep.nc(f"{system} dump provenance", f"array {key!r} is not in {dump.source}")
+                problem = problem or f"{key} is absent"
             elif str(dump.scalar(key)) != str(expected):
                 rep.defect(f"{system}: {key} is {dump.scalar(key)!r} in the dump but "
                            f"{expected!r} in results.json (the dump is not this run's)")
+                problem = problem or f"{key} is {dump.scalar(key)!r}, not {expected!r}"
         if not dump.has("meta/seed_id"):
             raise Refused(f"refused: the dump of {system} records no seed id ({dump.source})")
         dump_id = str(dump.scalar("meta/seed_id"))
@@ -895,7 +941,7 @@ def open_dump(folder: Path, system: str, cfg: dict, res: dict, seed_id: str,
     except BaseException:
         dump.close()
         raise
-    return DumpView(system, dump, cfg, res, rep)
+    return DumpView(system, dump, cfg, res, rep, failed=problem)
 
 
 # --------------------------------------------------------------------------------------------
@@ -974,7 +1020,8 @@ def project_row(spec: Spec, system: str, tree: dict, cfg: dict, view: DumpView |
            "n_run": n_run, "n_full": n_full, "f_n": fn, "f_b": fb, "f_lo": f_lo, "f_hi": f_hi,
            "hw_lo": hw * f_lo, "hw_hi": hw * f_hi, "nominal": hw * fn, "note": note,
            "kappa": kappa_info, "level": level_of(spec),
-           "kappa_governs": "range" if spec.extra == "kappa" and e_run != e_full else "n/a"}
+           "kappa_governs": "range" if spec.extra == "kappa" and e_run != e_full else "n/a",
+           "kappa_range": [x_lo, x_hi] if spec.extra == "kappa" and e_run != e_full else None}
     if spec.ratio and estimate is not None:
         r_hat = estimate + spec.ratio_offset
         if r_hat == 0.0 or not math.isfinite(r_hat):
@@ -1154,7 +1201,9 @@ def summary_lines(rep: Report, observed: bool) -> list[str]:
     kappa_rows = [r for r in rows if r["label"].startswith(("H2c", "H2d", "H3c"))]
     governed = sum(r["kappa_governs"] == "range" for r in kappa_rows)
     info = sum(r["kappa"] is not None for r in kappa_rows)
-    out.append(f"  kappa_E: the range [0.7071, 1] governs {governed} of {len(kappa_rows)} parts "
+    ranges = sorted({tuple(r["kappa_range"]) for r in kappa_rows if r["kappa_range"]})
+    text = " and ".join(f"[{lo:.4f}, {hi:g}]" for lo, hi in ranges) or "[none]"
+    out.append(f"  kappa_E: the range {text} governs {governed} of {len(kappa_rows)} parts "
                f"(FALLBACK rows, counted as computed; KAPPA_POLICY {KAPPA_POLICY!r}); point kappa "
                f"shown as information for {info} (not an estimator of kappa_E)")
     expected = sum(r["false_trigger"] for r in rows)
@@ -1219,9 +1268,20 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     rep.data["h3a"] = {}
     all_systems = list(results.get("systems", {}))
     chosen = [s for s in all_systems if systems is None or s in systems]
-    for wanted in systems or ():
+    # R11: every requested system (all of config.core_systems unless restricted) must be present
+    try:
+        core = [str(c) for c in dig(cfg, "core_systems")]
+    except NotComputable as exc:
+        rep.nc("config core_systems", f"{exc}; the systems that must be present are unknown")
+        core = []
+    for wanted in (list(systems) if systems else core):
         if wanted not in all_systems:
-            rep.nc(f"system {wanted}", "not in results.json")
+            rep.nc(f"system {wanted}", "not in results.json" + ("" if systems else
+                   " (it is in config core_systems)"))
+    for extra in chosen:
+        if core and extra not in core:
+            rep.say(f"note: system {extra} is in results.json but not in config core_systems "
+                    f"{core}; it is reported")
     for system in chosen:
         rep.say("")
         rep.say(f"=== {system} ({seed_id}) ===")
@@ -1238,7 +1298,10 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
             except NotComputable as exc:
                 rep.nc(f"{system} H2c second row (A4 against the best single forecaster)", str(exc))
                 best = None
-            for spec in specs_for(cfg, best):
+            specs = specs_for(cfg, best)
+            if view is not None:
+                verify_dump(view, specs)
+            for spec in specs:
                 row = attempt(rep, f"{system} {spec.label}", project_row, spec, system, tree, cfg,
                               view, rep, full)
                 if row is None:

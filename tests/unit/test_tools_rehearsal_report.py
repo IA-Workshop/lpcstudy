@@ -428,7 +428,8 @@ def make_dump(system: str, n: int = 500, draws: int = 2, ref: int = 2) -> dict[s
 
 
 def write_run(root: Path, best: str = "A1", scale_h3c: float = 1.0, h3c_level: float | None = None,
-              dump_seed: str = "DEV-0", drop_block: bool = False, mutate=None) -> Path:
+              dump_seed: str = "DEV-0", drop_block: bool = False, mutate=None,
+              dump_preset: dict | None = None) -> Path:
     """A run directory: the P0 fixture with the kappa leaves recomputed from synthetic dumps."""
     res = json.loads((FIXTURES / "p0_pilot.json").read_text())
     if drop_block:
@@ -438,6 +439,8 @@ def write_run(root: Path, best: str = "A1", scale_h3c: float = 1.0, h3c_level: f
     for system in SYSTEMS:
         arrays = make_dump(system)
         arrays["meta/seed_id"] = np.array(dump_seed)
+        if dump_preset and system in dump_preset:
+            arrays["meta/preset"] = np.array(dump_preset[system])
         mse = {r: arrays[f"core/state_mse/{r}"][:, 2] for r in ("A0", "A1", "A2", "A3", "A4", "A5")}
         tree = res["systems"][system]
         tree["H2c"]["best_single"] = best
@@ -567,8 +570,9 @@ def test_dump_that_disagrees_with_the_results_is_a_mismatch(tmp_path: Path, caps
     # R1: the mismatching dump is not used for H3c (no information value either); all 12 rows are
     # range-governed (FALLBACK) in any case
     assert out.count("(FALLBACK)") == 12
-    assert out.count("the dump does not reproduce the results leaf") == 3
-    assert "point kappa shown as information for 9 (not an estimator of kappa_E)" in out
+    # R12: the dump of a system with one failing leaf is not used for any of its four rows
+    assert out.count("failed a check (H3c does not reproduce its results leaf); not used") == 12
+    assert "point kappa shown as information for 0 (not an estimator of kappa_E)" in out
     h3c = [line for line in out.splitlines() if line.startswith("  H3c ")]
     assert len(h3c) == 3 and all("0.507-0.717" in line for line in h3c)
 
@@ -594,13 +598,13 @@ def test_reproduction_bound_passes_at_half_and_fails_at_twice(tmp_path: Path, ca
     """The dump-to-results bound ``1e-12 |leaf|``: passes at 0.5x of it, fails at 2x.
 
     A pass is a complete run (exit 0, no MISMATCH, information for all 12 parts); a failure exits 1
-    and the failing dump gives no information value (9 of 12).
+    and the failing dump gives no information value for any row (0 of 12, R12).
     """
     run = write_run(tmp_path / "run", scale_h3c=scale)
     assert rr.main([str(run)]) == code
     out = capsys.readouterr().out
     assert ("MISMATCH" in out) == (code == 1)
-    assert f"point kappa shown as information for {9 if code == 1 else 12} " in out
+    assert f"point kappa shown as information for {0 if code == 1 else 12} " in out
 
 
 def test_level_disagreement_is_a_mismatch(tmp_path: Path, capsys) -> None:
@@ -1080,3 +1084,78 @@ def test_policy_is_recorded_in_the_json(tmp_path: Path, capsys) -> None:
     got, out, data = run_world(tmp_path, capsys)
     assert got == 0, out
     assert data["kappa_policy"] == "range" and rr.KAPPA_POLICIES == ("range",)
+
+
+# ------------------------------------------------------------------------------------------ R11 to R13
+def test_a_core_system_missing_from_the_results_is_not_computable(tmp_path: Path, capsys) -> None:
+    """R11 (PRIME.4): chua is in config.core_systems but not in results.json: one "not computable"
+    item naming it, exit 2 (not 0 with "8 of 8"); its absence is not silent in the JSON either."""
+    def edit(res: dict) -> None:
+        del res["systems"]["chua"]
+    code, out, data = run_world(tmp_path, capsys, mutate=edit)
+    assert code == 2
+    open_lines = [line for line in out.splitlines() if line.startswith("  not computable")]
+    assert len(open_lines) == 1 and "system chua: not in results.json" in open_lines[0]
+    assert "(it is in config core_systems)" in open_lines[0] and "chua" not in data["rows"]
+
+
+def test_restricting_systems_checks_only_the_requested_ones(tmp_path: Path, capsys) -> None:
+    """``--systems rossler`` on a run without chua is complete (exit 0); ``--systems chua`` is not."""
+    def edit(res: dict) -> None:
+        del res["systems"]["chua"]
+    tmp_path.mkdir(exist_ok=True)
+    run = write_run(tmp_path / "run", mutate=edit)
+    assert rr.main([str(run), "--systems", "rossler"]) == 0
+    capsys.readouterr()
+    assert rr.main([str(run), "--systems", "chua"]) == 2
+    assert "system chua: not in results.json" in capsys.readouterr().out
+
+
+def test_missing_core_systems_leaf_is_not_computable_without_a_default(tmp_path: Path,
+                                                                       capsys) -> None:
+    """No ``core_systems`` in the configuration: "not computable" (no default list), exit 2."""
+    def edit(res: dict) -> None:
+        del res["config"]["core_systems"]
+    code, out, _ = run_world(tmp_path, capsys, mutate=edit)
+    assert code == 2 and "not computable: config core_systems" in out
+
+
+def test_a_system_not_in_core_systems_is_reported_not_dropped(tmp_path: Path, capsys) -> None:
+    """A system in results.json but not in config.core_systems is noted and still projected."""
+    def edit(res: dict) -> None:
+        res["config"]["core_systems"] = ["lorenz63", "rossler"]
+    code, out, data = run_world(tmp_path, capsys, mutate=edit)
+    assert code == 0, out
+    assert "note: system chua is in results.json but not in config core_systems" in out
+    assert len(data["rows"]["chua"]) == 23
+
+
+def test_a_dump_with_a_provenance_defect_supplies_no_information(tmp_path: Path, capsys) -> None:
+    """R12: the Rossler dump says preset "smoke": MISMATCH (exit 1), and not one of its four rows
+    gets a point kappa, while the other two systems keep theirs (information for 8 of 12)."""
+    code, out, data = run_world(tmp_path, capsys, dump_preset={"rossler": "smoke"})
+    assert code == 1
+    assert "MISMATCH: 1 item(s) (listed above)" in out and "meta/preset is 'smoke'" in out
+    assert all(row["kappa"] is None for row in data["rows"]["rossler"])
+    for system in ("lorenz63", "chua"):
+        assert sum(row["kappa"] is not None for row in data["rows"][system]) == 4
+    assert "point kappa shown as information for 8 " in out
+    assert out.count("failed a check (meta/preset is 'smoke', not 'pilot'); not used") == 4
+
+
+def test_summary_range_follows_the_run_configuration(tmp_path: Path, capsys) -> None:
+    """R13: with one evaluation draw (a smoke-like configuration) kappa_range(1, 4) = (0.5, 1), so
+    the summary says [0.5000, 1] and never the pilot's 0.7071; the pilot world still says
+    [0.7071, 1]."""
+    res = json.loads((FIXTURES / "p0_pilot.json").read_text())
+    res["config"]["n_eval_draws"] = 1
+    path = tmp_path / "results.json"
+    path.write_text(json.dumps(res))
+    rr.main([str(path), "--states", str(tmp_path / "none")])
+    out = capsys.readouterr().out
+    assert rr.kappa_range(1, 4) == (0.5, 1.0)
+    summary = out.split("Summary")[1]
+    assert "kappa_E: the range [0.5000, 1] governs 12 of 12 parts" in summary
+    assert "0.7071" not in summary
+    code, out, _ = run_world(tmp_path / "pilot", capsys)
+    assert "kappa_E: the range [0.7071, 1] governs 12 of 12 parts" in out
