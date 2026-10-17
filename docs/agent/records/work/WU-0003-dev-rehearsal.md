@@ -1141,6 +1141,187 @@ R22 to R25 and R27 are code, test and record fixes. **R26** (the three-branch `f
 - **Stricter or ambiguous readings, listed:** (1) An environment variable recorded as null is a value (unset); with the plan's literal "null counts as different" no run could ever be on the same stack (`OPENBLAS_CORETYPE` is null in every normal run), so only a missing key is "unusable"; both sides null is "same". (2) The `ratio` leaf (`fitted/mu`) follows the same rule, with `s = max(|lo|, |hi|)` of `ratio_ci` (falling back to the `ci_inverse_dim` scale if that is not finite): the plan names only `fitted_inverse_dim`, and the ratio inherits the fit. (3) A cell whose fit check is "not computable" (different stack, within the bound) **keeps** its series: psi comes from the tight refit, which is itself required to lie within the same bound, and enters the production fit only through R-hat; a MISMATCH withdraws it (R24). (4) The stack comparison runs once per report; with `lpcstudy.provenance` unimportable the stack is "different" and an attempt line says so.
 - **Per finding of round 4:** R22, R23, R24, R25, R27 fixed (above); R26 implemented as amendment 10 J2 rules. Slow tier not rerun (nothing it covers changed).
 
+### WU-0003.9b (developer claude-sonnet-5-5, 2026-10-17; branch `wu/0003-9b-tags`, from `wu/0003-rehearsal` d63677d)
+
+Row C4 of plan amendment 3 ("required before R1"; amendment 8 H4, row C4): every float leaf of the pilot schema gets a chain tag in `tools/compare_pilot.py`'s table or an explicit override in `tools/compare_runs.py`, each with a printed reason; a test on committed paths-only fixtures pins the untagged set as empty; at run time an untagged float leaf is NOT COMPUTABLE (exit 2). **Needs owner review before freeze** (tolerance classes). No preset, no GPU, development seeds only (the three results files read are P0 `1b20db9`, P1 `5b3fd8f` and the smoke at the .7c tip, all DEV-0).
+
+**§4.9 checklist (written before the first invocation).**
+1. Change set: `tools/compare_runs.py`, `tests/unit/test_tools_compare_runs.py`, `tests/unit/fixtures/pilot_schema/` (new: `extract_paths.py`, `p1_float_paths.txt`, `p0_smoke_float_paths.txt`), this file. `tools/compare_pilot.py` is **not** changed (the overrides live in `compare_runs`, so no existing tag and no v1-regression behaviour can move).
+2. Radius. By hand (4.2): the only code changed is `tools/compare_runs.py`; nothing imports it except its own test file (`grep -rln compare_runs tools tests lpcstudy`), so the set is `tests/unit/test_tools_compare_runs.py`. `tools/test_impact.py --base wu/0003-rehearsal --explain` selects exactly that file (`unit: tests/unit/test_tools_compare_runs.py`; the three fixture files and the extractor are "test helpers" that map to it). I add `tests/unit/test_tools_compare_pilot.py`: `compare_pilot` is unchanged, but both test files load it through `sys.modules["compare_pilot"]` (`compare_runs` reuses a copy that the other file registered, and the new `Tag` class subclasses its `Rule`), and acceptance t4 asks for both files green in one process. Smaller than the whole suite; no gate.
+3. Already run on this code: no.
+4. `JAX_PLATFORMS=cpu` (the wrapper sets it). 5. `LPC_THREADS` 4; the unit timeout is 300 s (the two files took about 5 s before). 6. No preset or GPU job. 7. `-q --tb=short -rfE`. 8. `tools/run_tests.sh unit tests/unit/test_tools_compare_runs.py tests/unit/test_tools_compare_pilot.py`, once after the code change; `--lf` for failures only.
+- **Red state.** The new tests name attributes that did not exist (`TAGS`, `chain_source`, `untagged_leaves`, `render(tags=)`), so they fail by construction; I did not spend the single run on it.
+
+**Plan (derived from the production code, not from the tool).** Census of the untagged float leaves of P1 with the tool at `d63677d`: 2821 outside `config` (+ 28 `config` floats = the 2849 of the plan); smoke at the .7c tip: 533 (the diff census). Grouped by path pattern, 245 normalized patterns in P1 (listed in the Results). For each pattern I read the producing function and asked which inputs the statistic depends on: `lpcstudy/ensemble.py` (`forecast_draws`: `cp_err`, `analog_seed` and `noise_sens` come from analog retrieval and the true states only; `plp_err`, `est_seed`, `est_nu`, the LM arrays from `StateEstimator.estimate_counted`, i.e. the trained psi), `oracle.py` (`oracle_weight`, `curvature`, `excess_mse` read the PLP moments; `state_oracles` is true states and the model only), `analysis.py` (each statistic's inputs), `pipeline.py` (`score_rules`, `fit_rules`), `allocation.py`, `validation.py` (P2c), `clip_sensitivity.py`, `estimation.py:lm_summary`. Rules: a constant echoed from the configuration or a module constant is `fixture`; a statistic that reads CP quantities and oracle quantities only is `cp`; everything that reads w*, the fitted proxies or regimes, the LM refinement or the PLP errors is `network`; a leaf whose independence cannot be shown is `network` with the reason saying so (none occurred; see the open questions).
+
+**WU-0003.9b results.**
+- **Commands and results.** (1) The radius, once after the code change: `tools/run_tests.sh unit tests/unit/test_tools_compare_runs.py tests/unit/test_tools_compare_pilot.py` gave `3 failed, 419 passed in 15.85s`. The three failures were `test_a_robustness_k_reaches_its_own_variant_only[T1|T2|T3]`: its synthetic variants carry `H3c/A5_over_A4_mse` and `H3c/ci`, which no real robustness variant has, so under C4 the leaf was NOT COMPUTED (correct behaviour; the test input was off-schema). I changed the input to the real `H1b/PLP/slope` and `ci` with the same numbers (estimate 0.9, interval [0.6, 1.2]); no expected value moved. (2) `tools/run_tests.sh unit --lf tests/unit/test_tools_compare_runs.py`: `3 passed, 253 deselected`. (3) One more code change followed (`chain_source` now raises on two matching table rules instead of swallowing it: an ambiguity is a defect, not an untagged leaf; checked beforehand that no float leaf of the 30 v3 results files on disk matches two rules), so the radius ran once more: `422 passed in 15.17s` (25 new tests; 397 before). Slow tier not run (nothing it covers changed).
+- **t1 met.** `test_no_float_leaf_of_the_pilot_schema_is_untagged[p1_float_paths.txt|p0_smoke_float_paths.txt]`: untagged set empty on the 970 shapes of P1 and on the 986 shapes of P0 + smoke (.7a, .7b, .7c leaves). Fixtures: `tests/unit/fixtures/pilot_schema/` (paths and the old chain only, no values; written by `extract_paths.py`, header with the SHA-256 of each source). Cross-check outside the tests, by script, over all 30 v3 `results.json` files on disk (6 pilot-size runs: P0, P1, pilot-dev0 and the three LM pilots; 24 smokes): 0 untagged float leaves in each (the v1 baseline, old schema, has 1468 and is not a compare_runs input).
+- **t2 met.** `test_regression_every_previously_tagged_leaf_keeps_its_chain`: no change of any existing tag; difference list empty on both fixtures. `compare_pilot.py` is untouched (diff empty), so its table, its v1-regression behaviour and its tests are unchanged. The one earlier override (`h1a_cp_leaf`) moved into the table as a `cp` row: same chain, same rule, same 1e-12.
+- **t3 met.** `python3 -I tools/compare_runs.py <P0> <P1>`: tier undetermined (both predate the selecting leaves, as before), exit 2, and the new line `chain tags ...: REF: compare_pilot table 8112, override 2841, untagged 0; NEW: compare_pilot table 8134, override 2849, untagged 0` (2849 = the plan's number: 2821 outside `config` + 28 `config` floats). The .7b tip against the .7c tip smoke (T0, bitwise): `table 2607, override 556, untagged 0`, exit 0. No 'untagged' fallthrough exists any more (the row outcome is `NOT COMPUTED`, rule `untagged: NOT COMPUTABLE`, exit 2). Real values through the tolerance rules (script, not a test, CPU only): the real .7c smoke and P1 trees against a copy on another device (tier T1) with every float outside `config` and `context` moved by 5e-13 (0.5 x 1e-12), 2e-12 and 3e-7: at 5e-13 no failure but T1 `fraction_no_decrease` (exact, 33 leaves in P1; 0 in the smoke), at 2e-12 only chain leaves fail (smoke: cp 255, fixture 53; P1: cp 831, fixture 362, oracle 4, plus the 33), at 3e-7 additionally the LM 1e-8 rule (44 smoke, 462 P1) and V2 (3 smoke, 9 P1); the class-(b)-(g) FINDINGs never fire. Untagged 0 in every case.
+- **t4 met.** `tests/unit/test_tools_compare_pilot.py`: all its tests pass, none edited. `tests/unit/test_tools_compare_runs.py`: every pre-existing test passes; **two edits, listed**: (a) `test_untagged_census_counts_hand_known_leaves_and_the_report_prints_it` is rewritten: it used `H2e/corr_curve` and `scores/A*/regret/1LT` as the examples of untagged leaves and asserted a census of `{"H2e": 1, "scores": 1}` that is "information, not a failure"; both leaves are tagged now and the census is a failure (exit 2) by C4, so it uses a leaf in no table (`novel_block/x`) and asserts `{"novel_block": 1}`, exit 2, outcome NOT COMPUTED and the new report line; (b) `with_robustness` and the `own`/`other` paths of `test_a_robustness_k_reaches_its_own_variant_only`: input leaf `H3c/A5_over_A4_mse` + `ci` changed to the real `H1b/PLP/slope` + `ci` (same numbers; see above). No tolerance, bound or `approx` grew. The existing hand cases of classes (b) to (g) (`SHARED_RULES`, `FLOOR_CASES`) run unchanged on leaves that were untagged before (`H2e/corr_curve`, `H3a/logrank_p_raw`, `Q-N/..r2_four`, `scores/A*/regret`): they now pass through network overrides with the same class rule, which is the evidence that the network rows reproduce the old default.
+- **Self-check (before the review).** Diff re-read item by item against C4: tags or overrides with a printed reason (148 rows, each with a producing function; `--tags` prints them), the pinning test on paths-only fixtures (two files), run-time NOT COMPUTABLE exit 2 (every tier, never waived), network for what is not provable (none occurred), the already tagged leaves unchanged. Grep of the diff for `clip|nan_to_num|isfinite|where(|try:|except`: no new site in the tool (the former `try/except cp.ToolError` of `chain_of` is gone; `clip_sensitivity` appears only as pattern text). Grep for `default_rng|random\.|PRNGKey`: none in the diff (`tests/unit/test_tools_compare_runs.py::test_tool_source_hygiene` also passes). No tolerance in an `assert` or `approx` grew.
+- **Decisions to flag (all stricter or status-quo; the one choice that is not a pure tag is the `class` mode).**
+  1. **Plan C4 against the task text.** C4 says "where a leaf's dependence is uncertain, it gets the tag with the tighter tolerance"; the instruction for this row says the opposite (network, the looser class, unless independence is proven from the code). The two disagree only for a leaf whose dependence is not provable. **None occurred**: every leaf was assigned from the code, network-independent only with a proof, network only with a stated dependence on the PLP or the estimator. If the owner wants the plan's reading for a future leaf, the change is one row.
+  2. **H1a `ratio`, `ratio_ci/[]`: chain `cp`, tolerance mode `class`.** By dependence they are cp (CP seed errors and the oracle local dimension). But they are outputs of the tolerance-stopped `curve_fit`, for which the 1e-12 premise fails (note 2026-10-14-math-wu0003-9-q1 Q1.1, Q1.3: the same mechanism that makes OF-7 for the four sibling leaves, and the note says `ratio` and `ratio_ci` "already fall under the 1e-4 s rule", with an a-priori margin of 2.5). So they keep the A6 QoI rule exactly as before this unit; tagging them plainly `cp` would move 18 leaves per pilot (3 systems x 2 rho x 3) from 1e-4 s to 1e-12 and make every T2 pair fail on 36 H1a leaves, not the 24 of the C6 OF-7 row. This is the status quo, not a new loosening, but it is a tolerance class chosen here: **owner review**. The four siblings (`fitted_inverse_dim`, `ci_inverse_dim`, `floor_rms`) keep `compare_pilot`'s `cp` tag and the working default 1e-12 with the OF-7 pointer (not touched).
+  3. **Finding in an existing tag (not changed, t2):** `H1d/rows/nhat/spearman` is `network` in `compare_pilot`'s table, but by the code it depends on the CP chain only (`ev.noise_sens` and `moments.noise_sens`, both analog retrieval on the noisy library, `ensemble.py:evaluation_draws` and `ensemble_moments`). Its interval endpoints `rows/nhat/interval/[]` are tagged `cp` here (proof in the row's reason), so the point is looser than its interval. Changing the table tag would tighten it; I did not.
+  4. **`scores/A*/regret/*` is `network`:** the leaf is 0.0 by construction (`oracle.py:excess_mse` at `w = w*`), so either class demands d = 0; the tag is network because the code reads the PLP moments.
+  5. **`fixture` for constants.** Module constants and configuration echoes (levels, bands, thresholds, noise, `kappa`, the `config` floats) are tagged `fixture`: they are not computed from data, so 1e-12 relative equals "equal"; `config` is still compared for identity (`decide`) and any difference fails.
+  6. **Untagged = NOT COMPUTABLE applies to every tier and to equal leaves**, and is not waived by `--allow-not-computed` (a failure elsewhere still gives exit 1). It reads the leaves of both runs, so a schema leaf added by a later unit stops every comparison until it is tagged, which is the purpose.
+  7. **Overrides never shadow the table** (a test checks it), and no override pattern contains a literal index or system name, so the shape fixtures cover them. The table is a new copy of the leaf-to-chain map in `compare_runs`; `compare_pilot`'s locus table and N1 to N3 do not see it (they compare v1 against v3 and do not need these leaves).
+
+**Pattern table of the override rows** (pattern | chain, `*` = tolerance mode class | float leaves in P1 | float leaves in the .7c smoke; 148 rows; the reasons, with the producing function of each, are printed by `python3 -I tools/compare_runs.py REF NEW --tags` and are in `_build_tags`). Totals in P1: fixture 387, cp 81, cp* 18, network 2363 = 2849.
+```
+config/** | fixture | 28 | 23
+systems/*/H1a/band/[] | fixture | 6 | 2
+systems/*/H1a/level | fixture | 3 | 1
+systems/*/H1b/threshold/[] | fixture | 6 | 2
+robustness/*/*/H1b/threshold/[] | fixture | 24 | 0
+systems/*/H1c/threshold/[] | fixture | 6 | 2
+systems/*/H1c/thresholds/[] | fixture | 12 | 4
+systems/*/H1d/level | fixture | 3 | 1
+systems/*/H1d/threshold | fixture | 3 | 1
+systems/*/V7/threshold/[] | fixture | 6 | 2
+systems/*/H2b/library_change/level | fixture | 3 | 1
+systems/*/H2b/library_change/rho | fixture | 3 | 1
+systems/*/H2b/library_change_reported/*/level | fixture | 3 | 0
+systems/*/H2b/library_curves/*/*/level | fixture | 30 | 2
+systems/*/H2c/A4o_minus_A2/level | fixture | 3 | 1
+systems/*/H2e/by_noise/*/level | fixture | 6 | 2
+systems/*/H3b/D/level | fixture | 3 | 1
+systems/*/H3b/weight_lambda/level | fixture | 3 | 1
+systems/*/H3b/weight_lambda/band/[] | fixture | 6 | 2
+systems/*/H3c/level | fixture | 3 | 1
+systems/*/H3c/threshold | fixture | 3 | 1
+systems/*/clip_sensitivity/clip_level | fixture | 3 | 1
+systems/*/clip_sensitivity/perturbed_level | fixture | 3 | 1
+robustness/*/*/scale_times_rho | fixture | 4 | 0
+systems/*/handling/cells/*/lm/noise | fixture | 42 | 5
+systems/*/handling/cells/*/lm/by_kind/*/noise | fixture | 126 | 15
+handling/robustness/*/cells/*/lm/noise | fixture | 10 | 0
+handling/robustness/*/cells/*/lm/by_kind/*/noise | fixture | 30 | 0
+systems/*/verification/P2c/cell/noise | fixture | 3 | 1
+systems/*/verification/P2c/tolerances/kappa | fixture | 3 | 1
+systems/*/H1a/inverse_dim_reference | cp | 3 | 1
+systems/*/H1a/by_noise/*/median_seed_by_n_lib/* | cp | 30 | 2
+systems/*/H1a/by_noise/*/ratio | cp* | 6 | 1
+systems/*/H1a/by_noise/*/ratio_ci/[] | cp* | 12 | 2
+systems/*/H1d/rows/nhat/interval/[] | cp | 6 | 2
+systems/*/H2c/calibration_mse/A0 | cp | 3 | 1
+systems/*/verification/P2c/fraction_switching_draws | cp | 3 | 1
+systems/*/verification/P2c/fraction_violations | cp | 3 | 1
+systems/*/verification/P2c/population/* | cp | 6 | 2
+systems/*/verification/P2c/noise_second_moment/* | cp | 6 | 2
+systems/*/verification/P2c/tightness/* | cp | 9 | 3
+systems/*/verification/P2c/tightness/N_over_sqrt_B/* | cp | 9 | 3
+systems/*/verification/P2c/tolerances/tau_N_max | cp | 3 | 1
+systems/*/handling/cells/*/lm/fraction_above_chi2 | network | 42 | 5
+systems/*/handling/cells/*/lm/fraction_late_progress | network | 42 | 5
+systems/*/handling/cells/*/lm/fraction_no_decrease | network | 42 | 5
+systems/*/handling/cells/*/lm/median_iterations | network | 42 | 5
+systems/*/handling/cells/*/lm/median_residual | network | 42 | 5
+systems/*/handling/cells/*/lm/p95_residual | network | 42 | 5
+systems/*/handling/cells/*/lm/by_kind/*/fraction_above_chi2 | network | 45 | 6
+systems/*/handling/cells/*/lm/by_kind/*/fraction_late_progress | network | 45 | 6
+systems/*/handling/cells/*/lm/by_kind/*/fraction_no_decrease | network | 45 | 6
+systems/*/handling/cells/*/lm/by_kind/*/median_iterations | network | 45 | 6
+systems/*/handling/cells/*/lm/by_kind/*/median_residual | network | 45 | 6
+systems/*/handling/cells/*/lm/by_kind/*/p95_residual | network | 45 | 6
+handling/robustness/*/cells/*/lm/fraction_above_chi2 | network | 10 | 0
+handling/robustness/*/cells/*/lm/fraction_late_progress | network | 10 | 0
+handling/robustness/*/cells/*/lm/fraction_no_decrease | network | 10 | 0
+handling/robustness/*/cells/*/lm/median_iterations | network | 10 | 0
+handling/robustness/*/cells/*/lm/median_residual | network | 10 | 0
+handling/robustness/*/cells/*/lm/p95_residual | network | 10 | 0
+handling/robustness/*/cells/*/lm/by_kind/*/fraction_above_chi2 | network | 20 | 0
+handling/robustness/*/cells/*/lm/by_kind/*/fraction_late_progress | network | 20 | 0
+handling/robustness/*/cells/*/lm/by_kind/*/fraction_no_decrease | network | 20 | 0
+handling/robustness/*/cells/*/lm/by_kind/*/median_iterations | network | 20 | 0
+handling/robustness/*/cells/*/lm/by_kind/*/median_residual | network | 20 | 0
+handling/robustness/*/cells/*/lm/by_kind/*/p95_residual | network | 20 | 0
+systems/*/V7/efficiency_ci_by_noise/*/[] | network | 24 | 4
+systems/*/H1d/rows/analog_seed/interval/[] | network | 6 | 2
+systems/*/H1d/rows/estimation_seed/interval/[] | network | 6 | 2
+systems/*/H1d/rows/growth/interval/[] | network | 6 | 2
+systems/*/Q-N/deployable/logit_w_interior/ci/[] | network | 6 | 2
+systems/*/Q-N/deployable/logit_w_interior/delta_r2 | network | 3 | 1
+systems/*/Q-N/deployable/logit_w_interior/r2_four | network | 3 | 1
+systems/*/Q-N/deployable/logit_w_interior/r2_three | network | 3 | 1
+systems/*/Q-N/deployable/w_zero_indicator/ci/[] | network | 6 | 2
+systems/*/Q-N/deployable/w_zero_indicator/delta_r2 | network | 3 | 1
+systems/*/Q-N/deployable/w_zero_indicator/r2_four | network | 3 | 1
+systems/*/Q-N/deployable/w_zero_indicator/r2_three | network | 3 | 1
+systems/*/Q-N/oracle/logit_w_interior/ci/[] | network | 6 | 2
+systems/*/Q-N/oracle/logit_w_interior/delta_r2 | network | 3 | 1
+systems/*/Q-N/oracle/logit_w_interior/r2_four | network | 3 | 1
+systems/*/Q-N/oracle/logit_w_interior/r2_three | network | 3 | 1
+systems/*/Q-N/oracle/w_zero_indicator/ci/[] | network | 6 | 2
+systems/*/Q-N/oracle/w_zero_indicator/delta_r2 | network | 3 | 1
+systems/*/Q-N/oracle/w_zero_indicator/r2_four | network | 3 | 1
+systems/*/Q-N/oracle/w_zero_indicator/r2_three | network | 3 | 1
+systems/*/H2a/ci_mc_se/[] | network | 6 | 0
+systems/*/H2a/range_ci/[] | network | 6 | 2
+systems/*/H2a/complete_case/median_range | network | 3 | 1
+systems/*/H2a/complete_case/range_ci/[] | network | 6 | 2
+systems/*/H2a/range_by_span/*/median | network | 6 | 2
+systems/*/H2a/part_ii/*/ci/[] | network | 12 | 6
+systems/*/H2a/part_ii/*/ci_mc_se/[] | network | 12 | 0
+systems/*/H2a/part_ii/*/partial_corr | network | 6 | 3
+systems/*/H2b/noise/ci_mc_se/[] | network | 6 | 0
+systems/*/H2b/library_change/ci/[] | network | 6 | 2
+systems/*/H2b/library_change/ci_mc_se/[] | network | 6 | 0
+systems/*/H2b/library_change/mean_change | network | 3 | 1
+systems/*/H2b/library_change_reported/*/ci/[] | network | 6 | 0
+systems/*/H2b/library_change_reported/*/mean_change | network | 3 | 0
+systems/*/H2b/library_curves/*/*/mean | network | 30 | 2
+systems/*/H2b/library_curves/*/*/median | network | 30 | 2
+systems/*/H2b/library_curves/*/*/mean_ci/[] | network | 60 | 4
+systems/*/H2b/library_curves/*/*/median_ci/[] | network | 60 | 4
+systems/*/H2c/A4o_minus_A2/ci/[] | network | 6 | 2
+systems/*/H2c/A4o_minus_A2/mean | network | 3 | 1
+systems/*/H2c/A4o_minus_A2/relative | network | 3 | 1
+systems/*/H2c/calibration_mse/A1 | network | 3 | 1
+systems/*/H2c/re:A4_minus_(?!A1$|A2$)\w+/ci/[] | network | 0 | 2
+systems/*/H2c/re:A4_minus_(?!A1$|A2$)\w+/mean | network | 0 | 1
+systems/*/H2c/re:A4_minus_(?!A1$|A2$)\w+/relative | network | 0 | 1
+systems/*/H2e/by_noise/*/ci/[] | network | 12 | 0
+systems/*/H2e/by_noise/*/median_change | network | 6 | 0
+systems/*/H2e/corr_curve/*/* | network | 30 | 2
+systems/*/H3a/iqr_lt/[] | network | 19 | 3
+systems/*/H3a/logrank_p_raw/[] | network | 16 | 2
+systems/*/H3b/D/ci/[] | network | 6 | 2
+systems/*/H3b/D/value | network | 3 | 1
+systems/*/H3b/stability | network | 3 | 1
+systems/*/H3b/weight_lambda/ci/[] | network | 6 | 2
+systems/*/H3b/weight_lambda/importance | network | 3 | 1
+systems/*/H3c/ci/[] | network | 6 | 2
+systems/*/H3c/ci_mc_se/[] | network | 6 | 0
+systems/*/clip_sensitivity/by_hypothesis/*/parts/*/delta | network | 27 | 10
+systems/*/clip_sensitivity/by_hypothesis/*/parts/*/delta_bound | network | 6 | 0
+systems/*/clip_sensitivity/by_hypothesis/*/parts/*/ratio | network | 33 | 10
+systems/*/clip_sensitivity/share_test/* | network | 18 | 6
+systems/*/clip_sensitivity/weight_shift/A2 | network | 3 | 1
+systems/*/clip_sensitivity/weight_shift/A5_max | network | 3 | 1
+systems/*/fitted/regime_weights_href/*/[] | network | 120 | 9
+systems/*/fitted/regime_horizons_km_lyapunov/*/[] | network | 120 | 9
+systems/*/km_curves/A5/[] | network | 720 | 240
+systems/*/oracle_recovery/A5_vs_Astar | network | 3 | 1
+systems/*/oracle_recovery/mse_at_href/A5 | network | 3 | 1
+systems/*/scores/A5/agreement_href | network | 3 | 1
+systems/*/scores/A5/km_median_lyapunov | network | 3 | 1
+systems/*/scores/A5/mse_href | network | 3 | 1
+systems/*/scores/A5/rmst_lyapunov | network | 3 | 1
+systems/*/scores/A5/mse/* | network | 15 | 5
+systems/*/scores/A5/regret/* | network | 15 | 5
+systems/*/scores/A\*/regret/* | network | 15 | 5
+robustness/*/*/H2a_partial_corr_zero | network | 12 | 0
+robustness/*/*/H2a_partial_corr_interior | network | 12 | 0
+robustness/*/*/H2a_partial_corr_zero_fin | network | 4 | 0
+robustness/*/*/H2a_partial_corr_interior_fin | network | 4 | 0
+robustness/*/*/ci_zero/[] | network | 8 | 0
+robustness/*/*/ci_interior/[] | network | 8 | 0
+```
+
 ## Review
 
 ## Audit

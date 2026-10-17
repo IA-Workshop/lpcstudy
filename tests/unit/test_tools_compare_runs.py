@@ -44,6 +44,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -897,26 +898,37 @@ def test_failures_of_the_h1a_fit_keep_the_cp_rule_and_print_the_of7_pointer_with
 
 
 def test_untagged_census_counts_hand_known_leaves_and_the_report_prints_it() -> None:
-    """Round 2, item 3: the census counts float leaves without a chain tag, by block, and the report prints
-    it. Reference: a tree of four floats whose tags are known from compare_pilot's table (checked by hand):
-    ``H1b/CP/slope`` is cp, ``H3c/A5_over_A4_mse`` is network, ``H2e/corr_curve/..`` and ``scores/A*/regret/1LT`` are
-    untagged; integers, strings and ``config`` are not counted. The census is information: no exit code depends on it."""
+    """Round 2, item 3, rewritten for WU-0003.9b (plan amendment 3 C4): the census counts float leaves without a
+    chain tag, by block, and the report prints it. An untagged float leaf is NOT COMPUTABLE (exit 2).
+
+    Reference: a tree of six floats whose tags are known by hand. ``H1b/CP/slope`` is cp and ``H3c/A5_over_A4_mse``
+    network (``compare_pilot``'s table); ``H2e/corr_curve/..`` and ``scores/A*/regret/1LT`` are tagged by override
+    since WU-0003.9b (they were the untagged examples of round 2); ``config`` is an override too; ``novel_block/x`` is
+    in no table. Integers and strings are not counted. The round-2 version of this test expected ``{"H2e": 1,
+    "scores": 1}`` and a census that was "information, not a failure"; both are what C4 retires."""
     flat = cr.flatten({"config": {"n_test": 1.0}, "systems": {"lorenz63": {
         "H1b": {"CP": {"slope": 1.0}}, "H3c": {"A5_over_A4_mse": 0.9, "n_states": 80},
-        "H2e": {"corr_curve": {"0.01": {"10000": 0.05}}}, "scores": {"A*": {"regret": {"1LT": 0.0}}}}}})
-    assert cr.untagged_census(flat) == {"H2e": 1, "scores": 1}
-    ref, new = tier_pair("T3", **{f"{S}__H2e__corr_curve__0.01__10000": 0.0500001})
+        "H2e": {"corr_curve": {"0.01": {"10000": 0.05}}}, "scores": {"A*": {"regret": {"1LT": 0.0}}},
+        "novel_block": {"x": 1.0}}}})
+    assert cr.untagged_census(flat) == {"novel_block": 1}
+    ref, new = tier_pair("T3")
+    edit(ref, f"{S}/novel_block", {"x": 1.0})
+    edit(new, f"{S}/novel_block", {"x": 1.0000001})
     res = run(ref, new)
-    assert res.untagged == 1 and res.census.get("H2e") == 1 and res.census.get("scores") == 1
+    assert res.untagged == 1 and res.census == {"novel_block": 1} and res.exit_code == 2
+    assert row(res, f"{S}/novel_block/x").outcome == "NOT COMPUTED"
     text = "\n".join(cr.render(res, "a", "b"))
-    assert "census (information, not a failure)" in text and "H2e 1" in text
-    assert run(ref, new).exit_code == res.exit_code
+    assert "untagged 1" in text and "novel_block 1" in text and "NOT COMPUTABLE" in text
 
 
 # ---- round 3: robustness K scope (R14) and the cp rule against the whole-system clip scope (R17)
 def with_robustness(tree: dict) -> dict:
-    """Two robustness variants shaped like the real ``robustness/<s>/<variant>/`` (own ``chosen_K`` and an H3c)."""
-    tree["robustness"]["lorenz63"].update({v: {"chosen_K": 3, "H3c": {"A5_over_A4_mse": 0.9, "ci": [0.6, 1.2]}}
+    """Two robustness variants shaped like the real ``robustness/<s>/<variant>/`` (own ``chosen_K`` and an H1b PLP
+    slope with its interval). WU-0003.9b: the interval leaf was ``H3c/A5_over_A4_mse`` and ``H3c/ci``, which no real
+    variant has (a real variant holds ``H1b``, the ``H2a_*`` leaves, ``A4_*``, ``mse_href`` and ``chosen_K``); a
+    float leaf of a path outside the schema is NOT COMPUTABLE now (C4), so the test uses a real one, with the same
+    numbers (estimate 0.9, interval [0.6, 1.2])."""
+    tree["robustness"]["lorenz63"].update({v: {"chosen_K": 3, "H1b": {"PLP": {"slope": 0.9, "ci": [0.6, 1.2]}}}
                                            for v in ("base", "misspec=0.1")})
     return tree
 
@@ -948,7 +960,7 @@ def test_a_robustness_k_reaches_its_own_variant_only(tier: str) -> None:
     assert row(res, variant_k).outcome == "listed" and row(res, h3c).outcome == "FAIL" and res.exit_code == 1
     res = robustness_case(tier, **{variant_k.replace("/", "__"): 4, f"{S}__H3a__n_per_regime__[0]": 31})
     assert row(res, f"{S}/H3a/n_per_regime/[0]").outcome == "FAIL"
-    own, other = "robustness/lorenz63/misspec=0.1/H3c/A5_over_A4_mse", "robustness/lorenz63/base/H3c/A5_over_A4_mse"
+    own, other = "robustness/lorenz63/misspec=0.1/H1b/PLP/slope", "robustness/lorenz63/base/H1b/PLP/slope"
     res = robustness_case(tier, **{variant_k.replace("/", "__"): 4, own.replace("/", "__"): 0.915,
                                    other.replace("/", "__"): 0.915})
     assert row(res, own).outcome == "pass" and row(res, other).outcome == "FAIL"
@@ -1440,3 +1452,336 @@ def test_chain_tags_of_the_imported_rule_table_are_the_known_set() -> None:
     tags = {rule.chain for rule in cr.cp.TABLE.rules}
     assert tags <= {"", "network", "dynamics", "fixture", "cp", "oracle"}
     assert cr.cp.NETWORK_INDEPENDENT == {"fixture", "dynamics", "cp", "oracle"}
+
+
+# ======================================================================================================
+# WU-0003.9b (plan amendment 3 C4): every float leaf of the pilot schema has a chain tag
+# ======================================================================================================
+# Needs owner review before freeze: the tags decide tolerance classes (network-independent chains meet 1e-12,
+# the network chain the class rules).
+#
+# References, all independent of the tag table under test:
+#   * the paths of the real DEV-0 pilot P1 (5b3fd8f), of P0 (1b20db9) and of the smoke preset at the .7c tip,
+#     committed as shapes without values (``fixtures/pilot_schema``, written by ``extract_paths.py``);
+#   * the chain each of those leaves had BEFORE this unit (column 2 of the fixtures; a regression guard, not
+#     correctness evidence, so the test is named ``test_regression_*``);
+#   * the plan's numbers (1e-12 for the network-independent chains, 1e-4 s for class (a)), typed in the tests.
+# Tolerances: every comparison of a tag, a count or an exit code is exact; the numeric cases use the factors 0.5
+# and 2 around the plan's tolerance, so round-off (1e-16 relative) never decides a case.
+SCHEMA_DIR = ROOT / "tests" / "unit" / "fixtures" / "pilot_schema"
+FIXTURE_FILES = ("p1_float_paths.txt", "p0_smoke_float_paths.txt")
+OVERRIDE_CHAINS = {"fixture", "cp", "oracle", "dynamics", "network"}
+
+
+def read_shapes(name: str) -> dict[str, str]:
+    """``{shape: chain before WU-0003.9b}`` from a fixture file (comment lines start with ``#``)."""
+    out = {}
+    for line in (SCHEMA_DIR / name).read_text().splitlines():
+        if line and not line.startswith("#"):
+            shape, chain = line.split("\t")
+            out[shape] = chain
+    return out
+
+
+def concrete(shape: str) -> tuple[str, ...]:
+    """The path a shape stands for: every ``[]`` is ``[0]`` and ``<sys>`` is ``lorenz63``."""
+    return tuple("[0]" if s == "[]" else "lorenz63" if s == "<sys>" else s for s in shape.split("/"))
+
+
+ALL_SHAPES = {name: read_shapes(name) for name in FIXTURE_FILES}
+
+
+def test_the_schema_fixtures_hold_paths_and_old_chains_only() -> None:
+    """The fixtures are what the header says: shapes of float leaves, no values, a chain column from the known set,
+    and they hold the blocks the census named (config, H1a, handling lm, km_curves, clip_sensitivity, verification).
+    A reading of the real pilot gave 970 shapes for P1 (``extract_paths.py``)."""
+    for name, shapes in ALL_SHAPES.items():
+        assert len(shapes) > 900, name
+        assert {c for c in shapes.values()} <= {"", "network", "dynamics", "fixture", "cp", "oracle"}
+        blocks = {shape.split("/")[2] if shape.startswith("systems/") else shape.split("/")[0] for shape in shapes}
+        assert {"config", "H1a", "handling", "km_curves", "clip_sensitivity", "verification", "robustness"} <= blocks
+        assert all("\t" not in shape for shape in shapes)
+    assert "systems/<sys>/H1a/by_noise/0.01/ratio" in ALL_SHAPES["p1_float_paths.txt"]
+    assert any(s.startswith("systems/<sys>/context/start_state/") for s in ALL_SHAPES["p0_smoke_float_paths.txt"])
+
+
+@pytest.mark.parametrize("name", FIXTURE_FILES)
+def test_no_float_leaf_of_the_pilot_schema_is_untagged(name: str) -> None:
+    """C4 (t1): the untagged set is EMPTY on the paths of P1, and on the union of the paths of P0 and the smoke
+    preset (which has the .7a, .7b and .7c leaves). Before WU-0003.9b it held 2849 leaves in P1 (609 shapes in
+    the shapes of this fixture, of which the ``config`` ones are tagged by override now)."""
+    untagged = [shape for shape in ALL_SHAPES[name] if not cr.chain_of(concrete(shape))]
+    assert untagged == []
+
+
+@pytest.mark.parametrize("name", FIXTURE_FILES)
+def test_regression_every_previously_tagged_leaf_keeps_its_chain(name: str) -> None:
+    """C4 (t2), a regression guard: the chain each leaf had before this unit (column 2, written by
+    ``extract_paths.py`` from ``compare_pilot``'s unchanged table and the one H1a override) is the chain it has
+    now. The assertion message lists every difference."""
+    changed = [(shape, before, cr.chain_of(concrete(shape)))
+               for shape, before in ALL_SHAPES[name].items() if before and cr.chain_of(concrete(shape)) != before]
+    assert changed == [], "\n".join(f"{s}: {a} -> {b}" for s, a, b in changed)
+
+
+@pytest.mark.parametrize("name", FIXTURE_FILES)
+def test_overrides_never_shadow_a_compare_pilot_tag_and_never_overlap(name: str) -> None:
+    """An override applies only where ``compare_pilot``'s table has no chain (the table decides first, so a
+    shadowing override would be dead code that misleads a reader), and no leaf matches two overrides."""
+    for shape in ALL_SHAPES[name]:
+        path = concrete(shape)
+        found = cr.TAGS.matches(path)
+        assert len(found) <= 1, (shape, [t.pattern for t in found])
+        table_chain = ""
+        try:
+            table_chain = cr.cp.TABLE.classify(path).chain
+        except cr.cp.ToolError:
+            pass
+        assert not (table_chain and found), (shape, table_chain, found[0].pattern)
+
+
+def test_every_override_matches_a_leaf_of_the_fixtures_and_names_no_index_or_system() -> None:
+    """No dead pattern (a typo would leave its leaves untagged and the pin red, but a pattern that matches nothing
+    is also a defect), and the patterns use the wildcards that the fixtures' shapes assume (``[]``, ``systems/*``):
+    no literal list index and no literal system name."""
+    used = set()
+    for shapes in ALL_SHAPES.values():
+        for shape in shapes:
+            used.update(t.pattern for t in cr.TAGS.matches(concrete(shape)))
+    assert sorted(t.pattern for t in cr.TAGS.rules if t.pattern not in used) == []
+    for tag in cr.TAGS.rules:
+        segs = tag.pattern.split("/")
+        assert not any(re.fullmatch(r"\[\d+\]", seg) for seg in segs), tag.pattern
+        assert not any(seg in ("lorenz63", "rossler", "chua") for seg in segs), tag.pattern
+
+
+def test_every_override_has_a_known_chain_a_reason_that_cites_its_source_and_a_known_tolerance() -> None:
+    """Each override carries a printed reason that cites the producing function (``file.py:function``) or says
+    that the leaf is a run configuration or a constant, a chain from the known set, and a tolerance mode."""
+    assert len(cr.TAGS.rules) > 40
+    for tag in cr.TAGS.rules:
+        assert tag.chain in OVERRIDE_CHAINS, tag.pattern
+        assert tag.tolerance in ("chain", "class"), tag.pattern
+        assert re.search(r"\w+\.py:\w+", tag.reason) or tag.reason.startswith("run configuration"), tag.pattern
+        assert len(tag.reason) > 25, tag.pattern
+        if tag.tolerance == "class":
+            assert tag.chain in cr.cp.NETWORK_INDEPENDENT and "tolerance-stopped" in tag.reason, tag.pattern
+
+
+def test_the_chain_of_a_leaf_is_the_table_chain_then_the_override() -> None:
+    """``chain_of`` and ``chain_source`` on hand-known paths: a table tag keeps its reason, an override says so,
+    and a leaf in no table has none."""
+    cases = [(("systems", "lorenz63", "H1b", "CP", "slope"), "cp", "table"),
+             (("systems", "lorenz63", "scores", "A1", "mse", "1LT"), "network", "table"),
+             (("systems", "lorenz63", "H2e", "corr_curve", "0.01", "10000"), "network", "override"),
+             (("systems", "lorenz63", "verification", "P2c", "fraction_violations"), "cp", "override"),
+             (("systems", "lorenz63", "H3c", "level"), "fixture", "override"),
+             (("config", "core_noise"), "fixture", "override"),
+             (("systems", "lorenz63", "novel_block", "x"), "", "")]
+    for path, chain, source in cases:
+        got_chain, got_source, reason = cr.chain_source(path)
+        assert (got_chain, got_source) == (chain, source), path
+        assert cr.chain_of(path) == chain
+        assert bool(reason) == bool(source)
+
+
+def test_an_untagged_float_leaf_is_not_computable_in_every_tier_even_when_equal() -> None:
+    """C4: an untagged float leaf of either run is NOT COMPUTABLE: exit 2 in every tier, also when the leaf is equal
+    in both runs, also when it is on one side only, and ``allow_not_computed`` does not waive it. A real failure
+    elsewhere still gives exit 1 (the pair fails whatever the untagged leaves say), and the untagged leaf is listed."""
+    for tier in ("T1", "T2", "T3"):
+        ref, new = tier_pair(tier)
+        for tree in (ref, new):
+            edit(tree, f"{S}/novel_block", {"x": 1.0})
+        res = run(ref, new)
+        assert res.exit_code == 2 and res.untagged == 0, tier          # equal: not decided, but not computable
+        assert res.untagged_leaves == [("systems", "lorenz63", "novel_block", "x")]
+        assert any("NOT COMPUTABLE" in reason for reason in res.reasons)
+        edit(new, f"{S}/novel_block", {"x": 2.0})
+        res = run(ref, new)
+        assert res.exit_code == 2 and res.untagged == 1 and row(res, f"{S}/novel_block/x").outcome == "NOT COMPUTED"
+    ref, new = make(), make()
+    assert cr.compare_trees(ref, new).exit_code == 0
+    edit(new, f"{S}/novel_extra", {"y": 1.0})                              # one-sided and untagged, T0
+    res = cr.compare_trees(ref, new, allow_not_computed=True)
+    assert res.untagged_leaves == [("systems", "lorenz63", "novel_extra", "y")]
+    assert res.exit_code == 1                                              # the one-sided leaf itself is a failure
+    ref, new = tier_pair("T1", **{f"{S}__scores__A1__mse__1LT": 0.3})
+    edit(new, f"{S}/novel_block", {"x": 1.0})
+    assert run(ref, new).exit_code == 1                                    # a failure outranks the untagged leaf
+    td_ref, td_new = make(), make()
+    edit(td_new, f"{S}/context/state_mean_digest", dig("9"))
+    for tree in (td_ref, td_new):
+        edit(tree, f"{S}/novel_block", {"x": 1.0})
+    res = run(td_ref, td_new)
+    assert res.tier.name == "TD" and res.exit_code in (1, 2) and res.untagged_leaves
+
+
+def test_a_config_float_is_tagged_and_still_compared_exactly() -> None:
+    """The ``config`` floats get an override (so that the census is 0), but ``config`` stays compared for identity:
+    a differing config float is a failure in T1 exactly as before."""
+    ref, new = tier_pair("T1")
+    for tree in (ref, new):
+        edit(tree, "config", {"name": "smoke", "seed": 7, "n_test": 80, "core_noise": 0.01})
+    assert run(ref, new).exit_code == 0
+    edit(new, "config/core_noise", 0.0100000001)
+    res = run(ref, new)
+    assert res.exit_code == 1 and row(res, "config/core_noise").outcome == "FAIL" and res.untagged == 0
+
+
+# ---- the tolerance follows the chain of an override (hand cases at 0.5 x and 2 x the plan's number)
+def block_leaf(tree: dict, block: str, content: dict) -> dict:
+    """Add a block to the system of a synthetic tree (``edit`` cannot create a missing parent)."""
+    tree["systems"]["lorenz63"][block] = content
+    return tree
+
+
+OVERRIDE_CASES = {
+    # a cp-chain override: A6 T1, |d| <= 1e-12 |ref|
+    "cp (P2c)": ("verification", {"P2c": {"fraction_violations": 0.2}}, "verification/P2c/fraction_violations",
+                 0.2, 1e-12 * 0.2, "cp chain relative"),
+    # a constant: fixture chain, the same 1e-12
+    "fixture (level)": ("H3c", {"level": 0.9833333333333333}, "H3c/level", 0.9833333333333333,
+                        1e-12 * 0.9833333333333333, "fixture chain relative"),
+}
+
+
+@pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
+@pytest.mark.parametrize("name", sorted(OVERRIDE_CASES))
+def test_an_override_chain_meets_the_chain_tolerance(tier: str, name: str) -> None:
+    """A6 T1 to T3: the network-independent chains meet ``|d| <= 1e-12 |ref|``; 0.5 x passes, 2 x fails.
+
+    Reference: the plan's number, evaluated by hand in ``OVERRIDE_CASES``. Tolerance: the factors 0.5 and 2."""
+    block, content, leaf, value, tol, rule = OVERRIDE_CASES[name]
+    path = f"{S}/{leaf}"
+    for factor, outcome in ((0.5, "pass"), (2.0, "FAIL")):
+        ref, new = tier_pair(tier)
+        for tree in (ref, new):
+            block_leaf(tree, block, copy.deepcopy(content))
+        edit(new, path, value + factor * tol)
+        r = row(run(ref, new), path)
+        assert r.outcome == outcome and r.rule == rule and r.tol == 1e-12, (name, factor)
+
+
+@pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
+def test_the_h1a_ratio_is_cp_by_dependence_and_keeps_the_class_a_rule(tier: str) -> None:
+    """``ratio`` and ``ratio_ci`` depend on the cp chain only (the table's tag is ``cp``), but they are outputs of
+    the tolerance-stopped ``curve_fit`` (note 2026-10-14-math-wu0003-9-q1 sections Q1.1 and Q1.3), for which the
+    1e-12 premise of N1 fails: they stay under the A6 QoI rule 1e-4 s, as before WU-0003.9b (s = max(|lo|, |hi|) of
+    ``ratio_ci`` = 1.3 here). Reference: the plan's number by hand; 0.5 x passes and 2 x fails."""
+    assert cr.chain_of(("systems", "lorenz63", "H1a", "by_noise", "0.01", "ratio")) == "cp"
+    for factor, outcome in ((0.5, "pass"), (2.0, "FAIL")):
+        low = tier_pair(tier)
+        for tree in low:
+            with_h1a(tree)
+        edit(low[1], f"{H1A}/ratio", 1.09 + factor * 1e-4 * 1.3)
+        r = row(run(*low), f"{H1A}/ratio")
+        assert r.outcome == outcome and r.rule == "QoI / interval endpoint" and r.tol == 1e-4
+        low = tier_pair(tier)
+        for tree in low:
+            with_h1a(tree)
+        edit(low[1], f"{H1A}/ratio_ci/[1]", 1.3 + factor * 1e-4 * 1.3)
+        r = row(run(*low), f"{H1A}/ratio_ci/[1]")
+        assert r.outcome == outcome and r.rule == "QoI / interval endpoint"
+
+
+# ---- the whole real schema, with made-up values
+def tree_from_shapes(shapes: dict[str, str]) -> dict:
+    """A results tree with a 1.0 at every float shape (index 0 of each list, system ``lorenz63``) and the leaves
+    that the tier selection reads (digests, host facts)."""
+    root: dict = {}
+    for shape in shapes:
+        node = root
+        segs = concrete(shape)
+        for seg in segs[:-1]:
+            node = node.setdefault(seg, {})
+        node[segs[-1]] = 1.0
+
+    def finalize(node: object) -> object:
+        if not isinstance(node, dict):
+            return node
+        if set(node) == {"[0]"}:
+            return [finalize(node["[0]"])]
+        return {k: finalize(v) for k, v in node.items()}
+
+    tree = finalize(root)
+    assert isinstance(tree, dict)
+    tree["provenance"] = {"device": {"backend": "cpu", "kind": "cpu", "count": 1}, "platform": "Linux-test",
+                          "cpu": {"model": "TestCPU"}, "env": {"LPC_THREADS": "4"}}
+    for block in tree["systems"].values():
+        block["context"].update({n: dig("1") for n in ("state_mean_digest", "cov_digest", "whiten_digest",
+                                                       "unwhiten_digest", "main_digest", "estimator_digest")})
+        block.setdefault("fitted", {})["allocator_digest"] = dig("a")
+        for entry in block.get("validation", {}).get("estimators", {}).values():
+            entry["weights_digest"] = dig("e")
+    for entry in tree.get("estimators", {}).values():
+        entry["weights_digest"] = dig("e")
+    return tree
+
+
+def scaled(tree: object, factor: float, path: tuple[str, ...] = ()) -> object:
+    """A copy with every float multiplied by ``factor``, except under ``config`` and ``context``."""
+    if isinstance(tree, dict):
+        return {k: tree[k] if (not path and k in ("config", "provenance")) or k == "context"
+                else scaled(tree[k], factor, (*path, k)) for k in tree}
+    if isinstance(tree, list):
+        return [scaled(v, factor, path) for v in tree]
+    return tree * factor if type(tree) is float else tree
+
+
+@pytest.mark.parametrize("name", FIXTURE_FILES)
+def test_the_whole_pilot_schema_runs_through_the_tolerance_rules_with_no_untagged_leaf(name: str) -> None:
+    """C4 (t3 in miniature): a results tree with every float shape of the real P1 (or P0 + smoke) schema, run
+    against a copy on another device (tier T1) with every float moved by a relative 5e-13 (0.5 x the chain
+    tolerance 1e-12) and then by 2e-12 (2 x). Reference: the plan's 1e-12 and 1e-4 s, and the chain of each
+    leaf from the fixture's own old column or the known set.
+
+    Asserted: no leaf is untagged or NOT COMPUTED for lack of a tag; at 0.5 x nothing fails except the T1 LM rule
+    ``fraction_no_decrease`` (exact); at 2 x every failure is a network-independent leaf, a V1/V2 or LM rule, and at
+    least one failure is a leaf that an override tagged (so the overrides are consulted)."""
+    tree = tree_from_shapes(ALL_SHAPES[name])
+    new = copy.deepcopy(tree)
+    edit(new, "provenance/device/backend", "gpu")
+    edit(new, "provenance/device/kind", "gpu")
+    for factor, label in ((1 + 5e-13, "low"), (1 + 2e-12, "high")):
+        res = cr.compare_trees(tree, scaled(new, factor), allow_not_computed=True)
+        assert res.tier.name == "T1", res.tier
+        assert res.untagged == 0 and res.untagged_leaves == [] and res.census == {}
+        assert not [r for r in res.rows if r.outcome == "NOT COMPUTED" and r.rule == cr.UNTAGGED_RULE]
+        failing = [r for r in res.rows if r.outcome in ("FAIL", "FINDING")]
+        if label == "low":
+            assert {r.rule for r in failing} <= {"T1: exact"}, {r.rule for r in failing}
+        else:
+            assert failing
+            for r in failing:
+                assert (cr.chain_of(r.path) in cr.cp.NETWORK_INDEPENDENT or r.rule.startswith(("V1", "V2", "T1:"))
+                        or "LM summary" in r.rule), (r.path, r.rule)
+            assert any(cr.chain_source(r.path)[1] == "override" for r in failing
+                       if cr.chain_of(r.path) in cr.cp.NETWORK_INDEPENDENT)
+
+
+# ---- what the report prints
+def test_the_report_prints_the_tag_summary_and_the_reason_of_each_override_in_use() -> None:
+    """C4: the report says how many float leaves each source tagged and that none is untagged, and prints the
+    reason of every override pattern that tagged a DIFFERING leaf; ``--tags`` prints the whole override table."""
+    ref, new = tier_pair("T1")
+    for tree in (ref, new):
+        block_leaf(tree, "verification", {"P2c": {"fraction_violations": 0.2}})
+    edit(new, f"{S}/verification/P2c/fraction_violations", 0.2 + 2e-12 * 0.2)
+    res = run(ref, new)
+    text = "\n".join(cr.render(res, "a", "b"))
+    assert "untagged 0" in text and "compare_pilot table" in text and "override" in text
+    assert "systems/*/verification/P2c/fraction_violations" in text and "validation.py" in text
+    full = "\n".join(cr.render(res, "a", "b", tags=True))
+    assert full.count("\n") > text.count("\n")
+    for tag in cr.TAGS.rules:
+        assert tag.pattern in full, tag.pattern
+
+
+def test_the_command_line_prints_the_tag_table_with_tags(tmp_path: Path, capsys) -> None:
+    """``--tags`` is an option of the comparison (it needs the two files), changes no exit code and prints the table."""
+    a = tmp_path / "a.json"
+    a.write_text(json.dumps(make()))
+    assert cr.main([str(a), str(a), "--tags"]) == 0
+    out = capsys.readouterr().out
+    assert "chain tags assigned by override" in out and "RESULT: PASS" in out
