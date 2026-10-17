@@ -1,0 +1,61 @@
+exit code: 2
+--- stdout ---
+DEVELOPMENT (DEV-1): conditional on one realization; not a hypothesis test
+rehearsal_diagnostics (WU-0003.8): D1 to D6; needs owner review before freeze (statistics feeding the block-length and M decisions)
+NOTICE: every reading below is computed with tool seed 20261018 (a literal scratch seed, not a development or confirmatory seed), 2000 bootstrap resamples and 1000 permutations (defaults: seed 20261018, 2000, 1000). Rerunning with other --seed, --resamples or --permutations to change a reading is not allowed; the seed and the options are an owner question (review R9).
+run: <TMP>/diag_nodump/results.json; preset pilot; commit synthetic
+Analysis stack against the run's provenance (a7): SAME stack (fit-derived leaves are reproduced bitwise)
+  python: <values>: same
+  packages.numpy: <values>: same
+  packages.scipy: <values>: same
+  cpu.model: <values>: same
+  cpu.isa: <values>: same
+  blas.libraries: <values>: same
+  numpy_simd.found: <values>: same
+  env.OPENBLAS_CORETYPE: <values>: same
+  env.NPY_DISABLE_CPU_FEATURES: <values>: same
+
+=== lorenz63 ===
+C4 Levenberg-Marquardt readings, lorenz63 (bands of note M6; a value outside is a FINDING, not a failure)
+  base|rho=0.01|n_lib=10000|core [oracle] n=280000, median c/rho^2 3.4495
+      fraction_above_chi2 0.029 vs [0.011, 0.047]: in band
+      fraction_late_progress 0.0305 vs [0.012, 0.049]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 7 vs [6, 8]: in band
+      relation: median c/rho^2 3.4495 vs Q 3.4495 (SE_iid 0.0061, z -0.00): within 4 SE
+  base|rho=0.01|n_lib=10000|core [eval] n=2800, median c/rho^2 3.4495
+      fraction_above_chi2 0.029 vs [0.011, 0.047] -> count 81 in 99% Poisson [18, 162] of 2800: in band
+      fraction_late_progress 0.0305 vs [0.012, 0.049] -> count 85 in 99% Poisson [20, 168] of 2800: in band
+      fraction_no_decrease 0 vs [0, 0.0001] -> count 0 in 99% Poisson [0, 2] of 2800: in band
+      median_iterations 7 vs [6, 8]: in band
+      relation: median c/rho^2 3.4495 vs Q 3.4495 (SE_iid 0.0615, z -0.00): within 4 SE
+  base|rho=0.005|n_lib=10000|sweep [oracle] n=60000, median c/rho^2 3.4373
+      fraction_above_chi2 0.02545 vs [0.0099, 0.041]: in band
+      fraction_late_progress 0.027 vs [0.011, 0.043]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 7 vs [6, 8]: in band
+      relation: median c/rho^2 3.4373 vs Q 3.4373 (SE_iid 0.0132, z -0.00): within 4 SE
+  base|rho=0.02|n_lib=10000|sweep [oracle] n=60000, median c/rho^2 3.4898
+      fraction_above_chi2 0.0405 vs [0.015, 0.066]: in band
+      fraction_late_progress 0.0435 vs [0.017, 0.07]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 7 vs [7, 9]: in band
+      relation: median c/rho^2 3.4898 vs Q 3.4898 (SE_iid 0.0134, z -0.00): within 4 SE
+  base|rho=0.05|n_lib=10000|sweep [oracle] n=60000, median c/rho^2 3.5443
+      fraction_above_chi2 0.0555 vs [0.019, 0.092]: in band
+      fraction_late_progress 0.0645 vs [0.024, 0.105]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 7 vs [7, 9]: in band
+      relation: median c/rho^2 3.5443 vs Q 3.5443 (SE_iid 0.0136, z -0.00): within 4 SE
+  eval kind of the 3 sweep cell(s): not part of the design (n_estimates 0), skipped
+  N_lib check (rho=0.01: n_lib 1000, 3162, 31623, 100000): lm summaries bitwise equal
+  N_lib check (rho=0.02: n_lib 1000, 3162, 10000, 31623, 100000): lm summaries bitwise equal
+  0 finding(s) in the bands and the relation (information; exit code unaffected)
+  not computable: lorenz63 (D1 to D6): <TMP>/diag_nodump/states/lorenz63.npz not found (run without --states-dump?)
+
+Run level (all systems)
+  not computable: run-level D1 and D2: no series had an autocorrelation
+
+Summary
+  not computable: 2 item(s) (listed above); never skipped
+--- stderr ---

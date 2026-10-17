@@ -86,6 +86,7 @@ recorded in the ``--json`` output: rerunning with other options to change a read
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import math
 import sys
@@ -106,10 +107,19 @@ if str(ROOT) not in sys.path:
 from lpcstudy.config import PRESETS  # noqa: E402  (after the path line; no jax import)
 from lpcstudy.statistics import block_resample_indices  # noqa: E402
 
-EXIT_MISMATCH = 1
-EXIT_INCOMPLETE = 2
+common = sys.modules.get("rehearsal_common")
+if common is None:  # the shared code of the two rehearsal tools (WU-0003.10), loaded by path
+    _SPEC = importlib.util.spec_from_file_location("rehearsal_common",
+                                                   Path(__file__).with_name("rehearsal_common.py"))
+    assert _SPEC is not None and _SPEC.loader is not None
+    common = importlib.util.module_from_spec(_SPEC)
+    sys.modules["rehearsal_common"] = common
+    _SPEC.loader.exec_module(common)
+
+EXIT_MISMATCH = common.EXIT_MISMATCH
+EXIT_INCOMPLETE = common.EXIT_INCOMPLETE
 SCHEMA = "lpcstudy.states/1"
-SCHEMAS = ("lpcstudy.states/1", "lpcstudy.states/2")
+SCHEMAS = common.SCHEMAS
 """Accepted schema versions: ``/2`` adds the ``h1a/`` and ``h1c/`` groups and keeps every key of
 ``/1`` (the keys this tool reads are the same)."""
 DEFAULT_RESAMPLES, DEFAULT_PERMUTATIONS = 2000, 1000
@@ -186,26 +196,16 @@ H1D_TESTED = ("analog_seed", "estimation_seed", "growth")
 # --------------------------------------------------------------------------------------------
 # errors and the report
 # --------------------------------------------------------------------------------------------
-class NotComputable(Exception):
-    """A diagnostic cannot be formed from the data given (never replaced by a number)."""
-
-
-class Missing(NotComputable):
-    """An array or leaf that the diagnostic needs is not in the file."""
-
-
-class Refused(NotComputable):
-    """The run is refused (a seed id that is not a development seed, or disagreeing ids)."""
+NotComputable = common.NotComputable
+Missing = common.Missing
+Refused = common.Refused
 
 
 @dataclass
-class Report:
-    """Lines, the "not computable" and mismatch lists, and the numbers (for ``--json``)."""
+class Report(common.Report):
+    """The shared report (lines, "not computable" and mismatch lists, numbers for ``--json``) and
+    the diagnostics' own records."""
 
-    lines: list[str] = field(default_factory=list)
-    incomplete: list[str] = field(default_factory=list)
-    defects: list[str] = field(default_factory=list)
-    data: dict = field(default_factory=dict)
     findings: list[str] = field(default_factory=list)
     """Readings outside a band (C4): information, no effect on the exit code."""
     uncomputed: list[tuple[str, bool]] = field(default_factory=list)
@@ -213,101 +213,11 @@ class Report:
     series_log: list[dict] = field(default_factory=list)
     """One entry per series with an acf (and its A5 trigger), for the run-level D1/D2 lines (R7)."""
 
-    def say(self, text: str = "") -> None:
-        """Add a line."""
-        self.lines.append(text)
 
-    def nc(self, where: str, why: str) -> None:
-        """Record and print a diagnostic that cannot be computed."""
-        line = f"not computable: {where}: {why}"
-        self.incomplete.append(line)
-        self.lines.append("  " + line)
-
-    def internal(self, where: str, exc: Exception) -> None:
-        """Record and print an unexpected exception (never lost, never read as a MISMATCH)."""
-        import traceback
-        frame = traceback.extract_tb(exc.__traceback__)[-1]
-        line = (f"INTERNAL ERROR: {where}: {type(exc).__name__}: {exc} "
-                f"(at {Path(frame.filename).name}:{frame.lineno} in {frame.name})")
-        self.incomplete.append(line)
-        self.lines.append("  " + line)
-
-    def defect(self, text: str, label: str = "MISMATCH") -> None:
-        """Record and print a MISMATCH (or a DEFECT: the N_lib check of C4)."""
-        self.defects.append(text)
-        self.lines.append(f"  {label}: " + text)
-
-    def exit_code(self) -> int:
-        """1 on a mismatch, else 2 on anything not computable, else 0."""
-        return EXIT_MISMATCH if self.defects else (EXIT_INCOMPLETE if self.incomplete else 0)
-
-
-def attempt(rep: Report, where: str, fn: Callable, *args, **kwargs):
-    """Call ``fn``; a ``NotComputable`` is recorded under ``where`` and ``None`` is returned.
-
-    Any other exception is recorded as an INTERNAL ERROR (exit 2) and also returns ``None``, so
-    the rest of the report is still computed; a ``Refused`` is never caught.
-    """
-    try:
-        return fn(*args, **kwargs)
-    except Refused:
-        raise
-    except NotComputable as exc:
-        rep.nc(where, str(exc))
-        return None
-    except Exception as exc:  # noqa: BLE001  (unexpected: reported, exit 2)
-        rep.internal(where, exc)
-        return None
-
-
-class Dump:
-    """One system's ``states/<system>.npz`` (or a dict of the same keys, for tests)."""
-
-    def __init__(self, arrays, source: str) -> None:
-        self._arrays = arrays
-        self.source = source
-
-    @classmethod
-    def load(cls, path: Path) -> Dump:
-        """Open an archive (never with pickles)."""
-        return cls(np.load(path, allow_pickle=False), str(path))
-
-    def close(self) -> None:
-        """Close the archive (a dict has nothing to close)."""
-        if hasattr(self._arrays, "close"):
-            self._arrays.close()
-
-    def has(self, key: str) -> bool:
-        """Whether the key is present."""
-        return key in self._arrays
-
-    def __getitem__(self, key: str) -> np.ndarray:
-        if key not in self._arrays:
-            raise Missing(f"array {key!r} is not in {self.source}")
-        return np.asarray(self._arrays[key])
-
-    def scalar(self, key: str):
-        """A 0-d array as a Python scalar."""
-        return self[key].item()
-
-
-def dig(tree: dict, *path: str):
-    """A leaf of the results tree; ``Missing`` if any key is absent or the leaf is None."""
-    node = tree
-    for key in path:
-        if not isinstance(node, dict) or key not in node:
-            raise Missing(f"results leaf {'/'.join(path)} is absent")
-        node = node[key]
-    if node is None:
-        raise Missing(f"results leaf {'/'.join(path)} is null")
-    return node
-
-
-def fmt(x: float | None, digits: int = 4) -> str:
-    """A number for a report line; None prints as ``n/a``."""
-    if x is None:
-        return "n/a"
-    return f"{x:.{digits}g}"
+attempt = common.attempt
+Dump = common.Dump
+dig = common.dig
+fmt = common.fmt
 
 
 # --------------------------------------------------------------------------------------------
@@ -1850,7 +1760,7 @@ def section_d5(ctx: Context) -> None:
     rep.data.setdefault(ctx.system, {})["D5"] = out
 
 
-PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
+PRIMARY_LEVEL = common.PRIMARY_LEVEL
 
 
 def failure_threshold(n_boot: int, level: float = PRIMARY_LEVEL) -> int:
@@ -2482,46 +2392,11 @@ def check_provenance(ctx: Context, seed_id: str) -> None:
                       f"records {seed_id!r} (all recorded ids must agree and be DEV-n)")
 
 
-def is_dev_id(seed_id: object) -> bool:
-    """Whether a recorded seed id is a development id ``DEV-n``."""
-    return isinstance(seed_id, str) and seed_id.startswith("DEV-") and seed_id[4:].isdigit()
-
-
-def run_seed_id(results: dict) -> str:
-    """The run's seed id: ``config.seed_id`` and ``provenance.seed_id`` must both be present, agree
-    and be ``DEV-n``, and a recorded ``provenance.seed_kind`` must be ``development`` (R8).
-
-    Raises
-    ------
-    Refused
-        Otherwise.
-    """
-    cfg, prov = results.get("config"), results.get("provenance")
-    if not isinstance(cfg, dict) or not isinstance(prov, dict):
-        raise Refused("refused: results.json has no config block or no provenance block")
-    ids = {"config.seed_id": cfg.get("seed_id"), "provenance.seed_id": prov.get("seed_id")}
-    for where, value in ids.items():
-        if not is_dev_id(value):
-            raise Refused(f"refused: {where} is {value!r}, not a development seed id DEV-n")
-    if ids["config.seed_id"] != ids["provenance.seed_id"]:
-        raise Refused(f"refused: the recorded seed ids disagree: {ids}")
-    if prov.get("seed_kind") != "development":
-        raise Refused(f"refused: provenance.seed_kind is {prov.get('seed_kind')!r}, not "
-                      "'development'")
-    return str(ids["config.seed_id"])
-
-
-def make_label(seed_id: str | None) -> str:
-    """The DEVELOPMENT label with the seed id the run recorded."""
-    return (f"DEVELOPMENT ({seed_id}): conditional on one realization; not a hypothesis test")
-
-
-def find_results(path: Path) -> Path:
-    """The ``results.json`` of a run (a file, or the directory that holds it)."""
-    target = path / "results.json" if path.is_dir() else path
-    if not target.is_file():
-        raise NotComputable(f"no results.json at {path}")
-    return target
+is_dev_id = common.is_dev_id
+run_seed_id = common.run_seed_id
+make_label = common.make_label
+find_results = common.find_results
+load_results = common.load_results
 
 
 def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[str] | None = None,
@@ -2536,14 +2411,7 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     Refused
         If a recorded seed id is not a development id or the recorded ids disagree.
     """
-    path = find_results(results_path)
-    try:
-        results = json.loads(path.read_text())
-    except (OSError, ValueError) as exc:
-        raise NotComputable(f"{path} is unreadable: {exc}") from exc
-    if not isinstance(results, dict):
-        raise NotComputable(f"{path} does not hold a JSON object")
-    seed_id = run_seed_id(results)
+    path, results, seed_id = load_results(results_path)
     cfg, prov = results["config"], results["provenance"]
     folder = states_dir if states_dir is not None else path.parent / "states"
     rep = rep if rep is not None else Report()
@@ -2639,20 +2507,7 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     return rep
 
 
-def _json_ready(obj):
-    if isinstance(obj, dict):
-        return {str(k): _json_ready(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_json_ready(v) for v in obj]
-    if isinstance(obj, np.ndarray):
-        return _json_ready(obj.tolist())
-    if isinstance(obj, (np.floating, float)):
-        return None if not math.isfinite(float(obj)) else float(obj)
-    if isinstance(obj, (np.integer,)):
-        return int(obj)
-    if isinstance(obj, (np.bool_,)):
-        return bool(obj)
-    return obj
+_json_ready = common.json_ready
 
 
 def main(argv: list[str] | None = None) -> int:
