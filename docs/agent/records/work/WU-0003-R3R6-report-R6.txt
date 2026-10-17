@@ -1,0 +1,160 @@
+DEVELOPMENT (DEV-2): conditional on one realization; not a hypothesis test
+rehearsal_report (WU-0003.3a): C7 projections to the full preset; needs owner review before freeze (sample-size decision)
+run: runs/r6-cpu-dev2/full/results.json; preset full (n_test 1000, n_test_sweep 1000, E 4, B 2000) -> full (n_test 1000, n_test_sweep 1000, E 4, B 2000); commit 059dc84f7a958b82bedcea7a5f3ed7ff5a6e1091
+
+=== lorenz63 (DEV-2) ===
+  H1b PLP slope          hw    0.0375  x 1.000-1.000  ->   0.0375- 0.0375  [n and B only]  false-trigger 0.4%
+  H1c PLP median ratio   hw    0.0568  x 1.000-1.000  ->   0.0568- 0.0568  rel hw 0.1006 -> 0.1006-0.1006  [n and B only]  false-trigger 0.4%
+  H1d analog_seed        hw    0.0288  x 1.000-1.000  ->   0.0288- 0.0288  [n and B only]  false-trigger 0.4%
+  H1a ratio rho=0.01     hw    0.1425  x 1.000-1.000  ->   0.1425- 0.1425  rel hw 0.1184 -> 0.1184-0.1184  [n and B only]  false-trigger 0.4%
+  Q-N oracle logit       hw    0.0210  x 1.000-1.000  ->   0.0210- 0.0210  [Q-N training-size range]  false-trigger 0.4%
+      v3 0.04: ratio to v3 0.525-0.525 (n only: 0.525); reading (i) OUTSIDE, (ii) OUTSIDE -> v3 precision not reproduced by (i) and (ii)
+      pre-registered: undetermined by the projection (reading (ii) silent): OUTSIDE (finding)
+  Q-N oracle zero-ind    hw    0.0545  x 1.000-1.000  ->   0.0545- 0.0545  [Q-N training-size range]  false-trigger 0.4%
+  Q-N oracle log_hor     hw    0.0182  x 1.000-1.000  ->   0.0182- 0.0182  [Q-N training-size range]  false-trigger 0.4%
+  H2a(i)                 hw    0.0266  x 1.000-1.000  ->   0.0266- 0.0266  [n and B only]  false-trigger 0.4%
+  H2a(ii) zero           hw    0.0646  x 1.000-1.000  ->   0.0646- 0.0646  [n and B only]  false-trigger 0.4%
+      pass needs |pc| < +0.035 .. +0.035 (v3: about 0.01)
+      v3 margin about 0.01 x [0.67, 1.5] = [0.0067, 0.015] (hw_full in [0.0850, 0.0933]): margin +0.0354..+0.0354 (n only +0.0354); GOVERNING reading (i) OUTSIDE, (ii) OUTSIDE -> v3 precision not reproduced by (i) and (ii)
+      non-governing, hw against 0.09 x [0.67, 1.5] = [0.0603, 0.135]: ratio 0.718-0.718; (i) inside, (ii) inside
+  H2a(ii) interior       hw    0.0992  x 1.000-1.000  ->   0.0992- 0.0992  [n and B only]  false-trigger 0.4%
+      pass needs |pc| < +0.001 .. +0.001 (v3: about 0.01)
+      v3 margin about 0.01 x [0.67, 1.5] = [0.0067, 0.015] (hw_full in [0.0850, 0.0933]): margin +0.0008..+0.0008 (n only +0.0008); GOVERNING reading (i) OUTSIDE, (ii) OUTSIDE -> v3 precision not reproduced by (i) and (ii)
+      non-governing, hw against 0.09 x [0.67, 1.5] = [0.0603, 0.135]: ratio 1.102-1.102; (i) inside, (ii) inside
+  H2b(i)                 hw    0.0505  x 1.000-1.000  ->   0.0505- 0.0505  [n and B only]  false-trigger 0.4%
+  H2b(ii)                hw    0.0239  x 1.000-1.000  ->   0.0239- 0.0239  [n and B only]  false-trigger 0.4%
+      v3 0.03: ratio to v3 0.796-0.796 (n only: 0.796); reading (i) inside, (ii) inside
+      pre-registered: near the lower edge of the band (0.68 to 0.85 of 0.03): within
+  H2c A4-A2              hw    0.0105  x 1.000-1.000  ->   0.0105- 0.0105  rel hw 0.1326 -> 0.1326-0.1326  [kappa_E 1 (same number of evaluation draws)]  false-trigger 0.4%
+  H2c A4-A1              hw    0.0083  x 1.000-1.000  ->   0.0083- 0.0083  rel hw 0.0791 -> 0.0791-0.0791  [kappa_E 1 (same number of evaluation draws)]  false-trigger 0.4%
+  H2d                    hw    0.2561  x 1.000-1.000  ->   0.2561- 0.2561  rel hw 0.2192 -> 0.2192-0.2192  [kappa_E 1 (same number of evaluation draws)]  false-trigger 0.4%
+  H2e rho=0.01           hw    0.0207  x 1.000-1.000  ->   0.0207- 0.0207  [n and B only]  false-trigger 0.4%
+      v3 0.04: ratio to v3 0.517-0.517 (n only: 0.517); reading (i) OUTSIDE, (ii) OUTSIDE -> v3 precision not reproduced by (i) and (ii)
+      pre-registered: narrower than v3 (0.44 to 0.76 of 0.04): within
+  H2e rho=0.02           hw    0.0283  x 1.000-1.000  ->   0.0283- 0.0283  [n and B only]  false-trigger 0.4%
+      v3 0.04: ratio to v3 0.707-0.707 (n only: 0.707); reading (i) inside, (ii) inside
+      pre-registered: narrower than v3 (0.44 to 0.76 of 0.04): within
+  H3c                    hw    0.1677  x 1.000-1.000  ->   0.1677- 0.1677  rel hw 0.2250 -> 0.2250-0.2250  [kappa_E 1 (same number of evaluation draws)]  false-trigger 7.0%
+  V7 median slope        hw    0.0002  x 1.000-1.000  ->   0.0002- 0.0002  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.005 hw    0.0035  x 1.000-1.000  ->   0.0035- 0.0035  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.01 hw    0.0034  x 1.000-1.000  ->   0.0034- 0.0034  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.02 hw    0.0036  x 1.000-1.000  ->   0.0036- 0.0036  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.05 hw    0.0034  x 1.000-1.000  ->   0.0034- 0.0034  [n and B only]  false-trigger 0.4%
+  H3a lorenz63: conditional on K_pilot = 8; chi2_full = 1 x chi2_pilot, Holm on the projected p, bar 0.01 (analysis.H3A_ALPHA)
+      pair (1, 0): p_raw 0.3732, chi2 0.7929 -> 0.7929, p_full 0.3732, Holm 0.6843
+      pair (0, 7): p_raw 2.697e-32, chi2 140 -> 140, p_full 2.697e-32, Holm 1.888e-31
+      pair (7, 3): p_raw 0.07384, chi2 3.195 -> 3.195, p_full 0.07384, Holm 0.3692
+      pair (3, 6): p_raw 0.1136, chi2 2.503 -> 2.503, p_full 0.1136, Holm 0.4544
+      pair (6, 2): p_raw 0.3421, chi2 0.9024 -> 0.9024, p_full 0.3421, Holm 0.6843
+      pair (2, 4): p_raw 0.0002469, chi2 13.44 -> 13.44, p_full 0.0002469, Holm 0.001482
+      pair (4, 5): p_raw 0.1902, chi2 1.716 -> 1.716, p_full 0.1902, Holm 0.5705
+      pass reachable at full size: not reachable (largest projected Holm-adjusted p 0.684), conditional on K_pilot
+
+=== rossler (DEV-2) ===
+  H1b PLP slope          hw    0.0393  x 1.000-1.000  ->   0.0393- 0.0393  [n and B only]  false-trigger 0.4%
+  H1c PLP median ratio   hw    0.0444  x 1.000-1.000  ->   0.0444- 0.0444  rel hw 0.0451 -> 0.0451-0.0451  [n and B only]  false-trigger 0.4%
+  H1d analog_seed        hw    0.0295  x 1.000-1.000  ->   0.0295- 0.0295  [n and B only]  false-trigger 0.4%
+  H1a ratio rho=0.01     hw    0.0660  x 1.000-1.000  ->   0.0660- 0.0660  rel hw 0.0717 -> 0.0717-0.0717  [n and B only]  false-trigger 0.4%
+  Q-N oracle logit       hw    0.0353  x 1.000-1.000  ->   0.0353- 0.0353  [Q-N training-size range]  false-trigger 0.4%
+      v3 0.04: ratio to v3 0.881-0.881 (n only: 0.881); reading (i) inside, (ii) inside
+      pre-registered: undetermined by the projection (reading (ii) silent): within
+  Q-N oracle zero-ind    hw    0.0521  x 1.000-1.000  ->   0.0521- 0.0521  [Q-N training-size range]  false-trigger 0.4%
+  Q-N oracle log_hor     hw    0.0222  x 1.000-1.000  ->   0.0222- 0.0222  [Q-N training-size range]  false-trigger 0.4%
+  H2a(i)                 hw    0.0349  x 1.000-1.000  ->   0.0349- 0.0349  [n and B only]  false-trigger 0.4%
+  H2a(ii) zero           hw    0.0798  x 1.000-1.000  ->   0.0798- 0.0798  [n and B only]  false-trigger 0.4%
+      pass needs |pc| < +0.020 .. +0.020 (v3: about 0.01)
+      v3 margin about 0.01 x [0.67, 1.5] = [0.0067, 0.015] (hw_full in [0.0850, 0.0933]): margin +0.0202..+0.0202 (n only +0.0202); GOVERNING reading (i) OUTSIDE, (ii) OUTSIDE -> v3 precision not reproduced by (i) and (ii)
+      non-governing, hw against 0.09 x [0.67, 1.5] = [0.0603, 0.135]: ratio 0.887-0.887; (i) inside, (ii) inside
+  H2a(ii) interior       hw    0.0885  x 1.000-1.000  ->   0.0885- 0.0885  [n and B only]  false-trigger 0.4%
+      pass needs |pc| < +0.011 .. +0.011 (v3: about 0.01)
+      v3 margin about 0.01 x [0.67, 1.5] = [0.0067, 0.015] (hw_full in [0.0850, 0.0933]): margin +0.0115..+0.0115 (n only +0.0115); GOVERNING reading (i) inside, (ii) inside
+      non-governing, hw against 0.09 x [0.67, 1.5] = [0.0603, 0.135]: ratio 0.984-0.984; (i) inside, (ii) inside
+  H2b(i)                 hw    0.0532  x 1.000-1.000  ->   0.0532- 0.0532  [n and B only]  false-trigger 0.4%
+  H2b(ii)                hw    0.0221  x 1.000-1.000  ->   0.0221- 0.0221  [n and B only]  false-trigger 0.4%
+      v3 0.03: ratio to v3 0.736-0.736 (n only: 0.736); reading (i) inside, (ii) inside
+      pre-registered: near the lower edge of the band (0.68 to 0.85 of 0.03): within
+  H2c A4-A2              hw    0.0000  x 1.000-1.000  ->   0.0000- 0.0000  rel hw 0.0364 -> 0.0364-0.0364  [kappa_E 1 (same number of evaluation draws)]  false-trigger 0.4%
+  H2c A4-A1              hw    0.0000  x 1.000-1.000  ->   0.0000- 0.0000  rel hw 0.0427 -> 0.0427-0.0427  [kappa_E 1 (same number of evaluation draws)]  false-trigger 0.4%
+  H2d                    hw    0.0495  x 1.000-1.000  ->   0.0495- 0.0495  rel hw 0.0494 -> 0.0494-0.0494  [kappa_E 1 (same number of evaluation draws)]  false-trigger 0.4%
+  H2e rho=0.01           hw    0.0218  x 1.000-1.000  ->   0.0218- 0.0218  [n and B only]  false-trigger 0.4%
+      v3 0.04: ratio to v3 0.546-0.546 (n only: 0.546); reading (i) OUTSIDE, (ii) OUTSIDE -> v3 precision not reproduced by (i) and (ii)
+      pre-registered: narrower than v3 (0.44 to 0.76 of 0.04): within
+  H2e rho=0.02           hw    0.0277  x 1.000-1.000  ->   0.0277- 0.0277  [n and B only]  false-trigger 0.4%
+      v3 0.04: ratio to v3 0.692-0.692 (n only: 0.692); reading (i) inside, (ii) inside
+      pre-registered: narrower than v3 (0.44 to 0.76 of 0.04): within
+  H3c                    hw    0.0431  x 1.000-1.000  ->   0.0431- 0.0431  rel hw 0.0446 -> 0.0446-0.0446  [kappa_E 1 (same number of evaluation draws)]  false-trigger 7.0%
+  V7 median slope        hw    0.0000  x 1.000-1.000  ->   0.0000- 0.0000  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.005 hw    0.0037  x 1.000-1.000  ->   0.0037- 0.0037  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.01 hw    0.0037  x 1.000-1.000  ->   0.0037- 0.0037  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.02 hw    0.0035  x 1.000-1.000  ->   0.0035- 0.0035  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.05 hw    0.0037  x 1.000-1.000  ->   0.0037- 0.0037  [n and B only]  false-trigger 0.4%
+  H3a rossler: conditional on K_pilot = 3; chi2_full = 1 x chi2_pilot, Holm on the projected p, bar 0.01 (analysis.H3A_ALPHA)
+      pair (1, 2): p_raw 0.2045, chi2 1.61 -> 1.61, p_full 0.2045, Holm 0.2045
+      pair (2, 0): p_raw 2.376e-17, chi2 71.8 -> 71.8, p_full 2.376e-17, Holm 4.751e-17
+      pass reachable at full size: not reachable (largest projected Holm-adjusted p 0.204), conditional on K_pilot
+
+=== chua (DEV-2) ===
+  H1b PLP slope          hw    0.0265  x 1.000-1.000  ->   0.0265- 0.0265  [n and B only]  false-trigger 0.4%
+  H1c PLP median ratio   hw    0.0511  x 1.000-1.000  ->   0.0511- 0.0511  rel hw 0.0669 -> 0.0669-0.0669  [n and B only]  false-trigger 0.4%
+  H1d analog_seed        hw    0.0323  x 1.000-1.000  ->   0.0323- 0.0323  [n and B only]  false-trigger 0.4%
+  H1a ratio rho=0.01     hw    0.0801  x 1.000-1.000  ->   0.0801- 0.0801  rel hw 0.1074 -> 0.1074-0.1074  [n and B only]  false-trigger 0.4%
+  Q-N oracle logit       hw    0.0316  x 1.000-1.000  ->   0.0316- 0.0316  [Q-N training-size range]  false-trigger 0.4%
+      v3 0.04: ratio to v3 0.790-0.790 (n only: 0.790); reading (i) inside, (ii) inside
+      pre-registered: undetermined by the projection (reading (ii) silent): within
+  Q-N oracle zero-ind    hw    0.0465  x 1.000-1.000  ->   0.0465- 0.0465  [Q-N training-size range]  false-trigger 0.4%
+  Q-N oracle log_hor     hw    0.0165  x 1.000-1.000  ->   0.0165- 0.0165  [Q-N training-size range]  false-trigger 0.4%
+  H2a(i)                 hw    0.0298  x 1.000-1.000  ->   0.0298- 0.0298  [n and B only]  false-trigger 0.4%
+  H2a(ii) zero           hw    0.0785  x 1.000-1.000  ->   0.0785- 0.0785  [n and B only]  false-trigger 0.4%
+      pass needs |pc| < +0.021 .. +0.021 (v3: about 0.01)
+      v3 margin about 0.01 x [0.67, 1.5] = [0.0067, 0.015] (hw_full in [0.0850, 0.0933]): margin +0.0215..+0.0215 (n only +0.0215); GOVERNING reading (i) OUTSIDE, (ii) OUTSIDE -> v3 precision not reproduced by (i) and (ii)
+      non-governing, hw against 0.09 x [0.67, 1.5] = [0.0603, 0.135]: ratio 0.873-0.873; (i) inside, (ii) inside
+  H2a(ii) interior       hw    0.1306  x 1.000-1.000  ->   0.1306- 0.1306  [n and B only]  false-trigger 0.4%
+      pass needs |pc| < -0.031 .. -0.031; IMPOSSIBLE at the lower projection of hw (v3: about 0.01)
+      v3 margin about 0.01 x [0.67, 1.5] = [0.0067, 0.015] (hw_full in [0.0850, 0.0933]): margin -0.0306..-0.0306 (n only -0.0306); GOVERNING reading (i) OUTSIDE, (ii) OUTSIDE -> v3 precision not reproduced by (i) and (ii)
+      non-governing, hw against 0.09 x [0.67, 1.5] = [0.0603, 0.135]: ratio 1.451-1.451; (i) inside, (ii) inside
+  H2b(i)                 hw    0.0532  x 1.000-1.000  ->   0.0532- 0.0532  [n and B only]  false-trigger 0.4%
+  H2b(ii)                hw    0.0223  x 1.000-1.000  ->   0.0223- 0.0223  [n and B only]  false-trigger 0.4%
+      v3 0.03: ratio to v3 0.743-0.743 (n only: 0.743); reading (i) inside, (ii) inside
+      pre-registered: near the lower edge of the band (0.68 to 0.85 of 0.03): within
+  H2c A4-A2              hw    0.0016  x 1.000-1.000  ->   0.0016- 0.0016  rel hw 0.0880 -> 0.0880-0.0880  [kappa_E 1 (same number of evaluation draws)]  false-trigger 0.4%
+  H2c A4-A1              hw    0.0014  x 1.000-1.000  ->   0.0014- 0.0014  rel hw 0.0720 -> 0.0720-0.0720  [kappa_E 1 (same number of evaluation draws)]  false-trigger 0.4%
+  H2d                    hw    0.0583  x 1.000-1.000  ->   0.0583- 0.0583  rel hw 0.0590 -> 0.0590-0.0590  [kappa_E 1 (same number of evaluation draws)]  false-trigger 0.4%
+  H2e rho=0.01           hw    0.0241  x 1.000-1.000  ->   0.0241- 0.0241  [n and B only]  false-trigger 0.4%
+      v3 0.04: ratio to v3 0.602-0.602 (n only: 0.602); reading (i) OUTSIDE, (ii) OUTSIDE -> v3 precision not reproduced by (i) and (ii)
+      pre-registered: narrower than v3 (0.44 to 0.76 of 0.04): within
+  H2e rho=0.02           hw    0.0244  x 1.000-1.000  ->   0.0244- 0.0244  [n and B only]  false-trigger 0.4%
+      v3 0.04: ratio to v3 0.609-0.609 (n only: 0.609); reading (i) OUTSIDE, (ii) OUTSIDE -> v3 precision not reproduced by (i) and (ii)
+      pre-registered: narrower than v3 (0.44 to 0.76 of 0.04): within
+  H3c                    hw    0.0606  x 1.000-1.000  ->   0.0606- 0.0606  rel hw 0.0616 -> 0.0616-0.0616  [kappa_E 1 (same number of evaluation draws)]  false-trigger 7.0%
+  V7 median slope        hw    0.0002  x 1.000-1.000  ->   0.0002- 0.0002  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.005 hw    0.0035  x 1.000-1.000  ->   0.0035- 0.0035  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.01 hw    0.0037  x 1.000-1.000  ->   0.0037- 0.0037  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.02 hw    0.0037  x 1.000-1.000  ->   0.0037- 0.0037  [n and B only]  false-trigger 0.4%
+  V7 efficiency rho=0.05 hw    0.0034  x 1.000-1.000  ->   0.0034- 0.0034  [n and B only]  false-trigger 0.4%
+  H3a chua: conditional on K_pilot = 4; chi2_full = 1 x chi2_pilot, Holm on the projected p, bar 0.01 (analysis.H3A_ALPHA)
+      pair (3, 2): p_raw 6.714e-05, chi2 15.89 -> 15.89, p_full 6.714e-05, Holm 6.714e-05
+      pair (2, 1): p_raw 2.192e-18, chi2 76.51 -> 76.51, p_full 2.192e-18, Holm 6.575e-18
+      pair (1, 0): p_raw 9.302e-08, chi2 28.51 -> 28.51, p_full 9.302e-08, Holm 1.86e-07
+      pass reachable at full size: reachable (largest projected Holm-adjusted p 6.71e-05), conditional on K_pilot
+
+Summary
+  v3 section 7 comparison: 18 parts; reading (i) fires on 10, reading (ii) on 10, either on 10
+    v3 precision not reproduced ((i) and (ii)): lorenz63 Q-N oracle logit: projected 0.0210-0.0210 against v3 0.04
+    v3 precision not reproduced ((i) and (ii), margin reading): lorenz63 H2a(ii) zero: margin 0.1 - hw_full = +0.0354..+0.0354 against 0.0067..0.015
+    v3 precision not reproduced ((i) and (ii), margin reading): lorenz63 H2a(ii) interior: margin 0.1 - hw_full = +0.0008..+0.0008 against 0.0067..0.015
+    v3 precision not reproduced ((i) and (ii)): lorenz63 H2e rho=0.01: projected 0.0207-0.0207 against v3 0.04
+    v3 precision not reproduced ((i) and (ii), margin reading): rossler H2a(ii) zero: margin 0.1 - hw_full = +0.0202..+0.0202 against 0.0067..0.015
+    v3 precision not reproduced ((i) and (ii)): rossler H2e rho=0.01: projected 0.0218-0.0218 against v3 0.04
+    v3 precision not reproduced ((i) and (ii), margin reading): chua H2a(ii) zero: margin 0.1 - hw_full = +0.0215..+0.0215 against 0.0067..0.015
+    v3 precision not reproduced ((i) and (ii), margin reading): chua H2a(ii) interior: margin 0.1 - hw_full = -0.0306..-0.0306 against 0.0067..0.015
+    v3 precision not reproduced ((i) and (ii)): chua H2e rho=0.01: projected 0.0241-0.0241 against v3 0.04
+    v3 precision not reproduced ((i) and (ii)): chua H2e rho=0.02: projected 0.0244-0.0244 against v3 0.04
+  H2a(ii) margin reading (governing, G3): fires on 5 of 6 parts (pre-registered: most); the hw band 0.09 x [0.67, 1.5] would fire on 0
+  pre-registered predictions: 11 of 12 parts within
+    outside (finding): lorenz63 Q-N oracle logit: undetermined by the projection (reading (ii) silent)
+  kappa_E: the range [none] governs 0 of 12 parts (FALLBACK rows, counted as computed; KAPPA_POLICY 'range'); point kappa shown as information for 0 (not an estimator of kappa_E)
+  predicted false triggers of the band over the 69 parts: 0.47 (sum of the per-part rates)
+  H3a lorenz63 (conditional on K_pilot = 8): pass reachable at full size: not reachable (largest projected Holm p 0.684, bar 0.01)
+  H3a rossler (conditional on K_pilot = 3): pass reachable at full size: not reachable (largest projected Holm p 0.204, bar 0.01)
+  H3a chua (conditional on K_pilot = 4): pass reachable at full size: reachable (largest projected Holm p 6.71e-05, bar 0.01)
+
