@@ -2836,3 +2836,116 @@ def test_j2_compare_stack_field_by_field() -> None:
         result = rd.compare_stack(prov, own)
         status = {r[0]: r[3] for r in result["rows"]}
         assert result["same"] is False and status[field] == "unusable", field
+
+
+# ------------------------------------------------------------------------------------------ fix round 5
+def test_tiebreak_interval_equals_brute_force_over_all_tie_orders() -> None:
+    """The extremes of Spearman over the tie-breaks of ``x`` equal an enumeration of every order.
+
+    Reference: ``itertools.permutations`` inside each tied group, ``scipy.stats.spearmanr`` per
+    order (exact up to round-off, 1e-12). x has two tied groups (sizes 2 and 3), y has a tie.
+    """
+    import itertools
+    x = np.array([1.0, 2.0, 2.0, 3.0, 4.0, 4.0, 4.0, 5.0])
+    y = np.array([0.5, 3.0, 1.0, 2.0, 7.0, 2.0, 5.0, 6.0])
+    groups = [np.flatnonzero(x == v) for v in np.unique(x) if (x == v).sum() > 1]
+    values = []
+    for first in itertools.permutations(range(2)):
+        for second in itertools.permutations(range(3)):
+            ranks = sps.rankdata(x, method="ordinal").astype(float)
+            base = {int(i): float(r) for i, r in zip(range(len(x)), ranks)}
+            for grp, perm in ((groups[0], first), (groups[1], second)):
+                slots = sorted(base[int(i)] for i in grp)
+                for i, k in zip(grp, perm):
+                    base[int(i)] = slots[k]
+            values.append(sps.spearmanr([base[i] for i in range(len(x))], y).statistic)
+    lo, hi = rd.spearman_tiebreak_interval(x, y)
+    assert lo == pytest.approx(min(values), abs=1e-12) and hi == pytest.approx(max(values), abs=1e-12)
+    assert lo < sps.spearmanr(x, y).statistic < hi  # the mid-rank value lies inside
+
+
+def test_h1d_reproduction_decision_with_the_three_r1_numbers() -> None:
+    """The decision on the recorded R1 case (a documented hand case, the arrays are not copied):
+    for each system the leaf differs from the dump value by 3.5e-6, 1.1e-5, 8.6e-5 (allowed 6e-13)
+    and lies inside the tie-break interval, so the verdict is "tie_bound", never "match".
+
+    Reference: the numbers of the note ``2026-10-17-h1d-spearman-mismatch.md`` (leaf, dump value,
+    interval), and the same leaf moved outside the interval is a mismatch.
+    """
+    cases = (("lorenz63", 0.625338477, 0.625341966, (0.625044355, 0.625637926)),
+             ("rossler", 0.622981752, 0.622970843, (0.622571994, 0.623367837)),
+             ("chua", 0.575093810, 0.575007472, (0.574374521, 0.575636063)))
+    for name, leaf, dump, interval in cases:
+        assert rd.h1d_reproduction(dump, leaf, interval, 6e-13) == "tie_bound", name
+        assert rd.h1d_reproduction(dump, interval[1] + 1e-6, interval, 6e-13) == "mismatch", name
+        assert rd.h1d_reproduction(dump, interval[0] - 1e-6, interval, 6e-13) == "mismatch", name
+        assert rd.h1d_reproduction(dump, dump, interval, 6e-13) == "match"
+        assert rd.h1d_reproduction(dump, leaf, None, 6e-13) == "mismatch"  # no ties: exact
+
+
+def tie_world(collapse: bool):
+    """A small dump whose N-hat profile column ``log(x + 0.01)`` collapses two raw values (1.0e-14
+    and 1.0000001e-14: float64 cannot tell them apart after the transform) and the results rows
+    computed from the RAW proxies, as production does."""
+    rng = rng_for("tie-world")
+    n = 14
+    raw = np.exp(rng.normal(-3, 1, n))
+    raw[3], raw[9] = (1.0e-14, 1.0000001e-14) if collapse else (1.0e-14, 5.0e-2)
+    truth = np.exp(rng.normal(-2, 0.5, n))
+    truth[3], truth[9] = (2.0, 1.0) if collapse else (2.0, 1.0)  # the raw order disagrees with truth
+    profile = np.empty((n, 2, 4))
+    for col in range(3):
+        profile[:, :, col] = rng.normal(size=(n, 2))
+    profile[:, 0, 3] = np.log(raw + 1e-2)
+    profile[:, 1, 3] = profile[:, 0, 3]
+    if collapse:
+        assert profile[3, 0, 3] == profile[9, 0, 3] and raw[3] != raw[9]
+    oracles = {"eps_s": rng.random(n) + 0.1, "delta": rng.random(n) + 0.1,
+               "Lambda_bar": rng.random(n) + 0.1, "N": truth}
+    d = {"core/profile": profile, **{f"core/{k}": v for k, v in oracles.items()}}
+    rows = {}
+    for name, col, oracle in rd.H1D_ROWS:
+        proxy = raw if col == 3 else profile[:, 0, col]
+        rows[name] = {"spearman": float(sps.spearmanr(proxy, oracles[oracle]).statistic),
+                      "n_excluded_nonfinite": 0}
+    return d, {"H1d": {"rows": rows}}, raw, truth
+
+
+def run_h1d(d: dict, res: dict) -> rd.Report:
+    rep = rd.Report()
+    ctx = rd.Context("s", rd.Dump(d, "mem"), res, {}, rep, 1, 2, 2)
+    rd.series_h1d(ctx)
+    return rep
+
+
+def test_h1d_a_transform_that_creates_ties_is_not_computable_inside_the_interval_and_a_mismatch_outside() -> None:
+    """A constructed column collapsing two raw values: the production leaf (raw, distinct ranks)
+    differs from the dump value and lies inside the tie-break interval, so "not computable exactly:
+    the transform created ties" (exit 2, no MISMATCH); the same leaf pushed outside the interval is a
+    MISMATCH (exit 1); a column without ties is compared exactly as before; the other three rows
+    (whose columns have no ties here) MATCH.
+
+    Reference: the raw arrays of the test, ``scipy.stats.spearmanr`` of the raw proxy against the
+    oracle (as production), and the interval from ``spearman_tiebreak_interval``.
+    """
+    d, res, raw, truth = tie_world(collapse=True)
+    leaf = res["H1d"]["rows"]["nhat"]["spearman"]
+    dump_value = float(sps.spearmanr(d["core/profile"][:, 0, 3], truth).statistic)
+    lo, hi = rd.spearman_tiebreak_interval(d["core/profile"][:, 0, 3], truth)
+    assert dump_value != leaf and lo <= leaf <= hi and lo < hi
+    rep = run_h1d(d, res)
+    assert rep.exit_code() == 2 and not rep.defects
+    assert any("H1d nhat Spearman" in x and "not computable exactly: the transform created ties" in x
+               and f"[{lo:.9f}, {hi:.9f}]" in x for x in rep.incomplete)
+    assert sum(": MATCH" in line for line in rep.lines) >= 7  # three rows and the exclusion counts
+    outside = {"H1d": {"rows": {**res["H1d"]["rows"], "nhat": {**res["H1d"]["rows"]["nhat"],
+                                                                "spearman": hi + 1e-3}}}}
+    rep = run_h1d(d, outside)
+    assert rep.exit_code() == 1 and len(rep.defects) == 1 and "H1d nhat Spearman" in rep.defects[0]
+    assert not rep.incomplete
+    d2, res2, _, _ = tie_world(collapse=False)  # no ties created: the exact reproduction as before
+    rep = run_h1d(d2, res2)
+    assert rep.exit_code() == 0 and not rep.defects and not rep.incomplete
+    res2["H1d"]["rows"]["nhat"]["spearman"] += 1e-6
+    rep = run_h1d(d2, res2)
+    assert rep.exit_code() == 1 and "H1d nhat Spearman" in rep.defects[0]
