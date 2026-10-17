@@ -1056,6 +1056,17 @@ R17 to R20 are code and test fixes; R21 is a planner ruling (no code change). Th
 - **R20 fixed:** `chi2_relation` is defined only for a share below 1/2; otherwise "not computable" (never NaN, never a FINDING).
 - **R21:** the correction note is above; I1 and I2 (amendment 9) are implemented as the planner ruled.
 
+### WU-0003.8 fix round 4 (developer claude-sonnet-5-5, 2026-10-17; re-review `WU-0003.8-review-round4.md`, 5b56f16; tip before this round 05ad36a)
+
+R22 to R25 and R27 are code, test and record fixes. **R26** (the three-branch `fitted_inverse_dim` rule) waits for the planner's amendment 10: it was not on `wu/0003-rehearsal` when I looked (`git show wu/0003-rehearsal:...` has amendments 1 to 9 only); I will merge it as its own command when it lands and implement R26 as a separate step.
+
+**Correction note (R27; append-only).** The fix-round-3 results paragraph above gives three counts for the first invocation. The correct record: the first unit invocation of the R17 to R20 code was `1 failed, 73 passed` (70 tests of .8c plus 4 new = 74; my R19 test's helper passed 20 permutations so the default-options line carried a flag); after fixing that test and the `not prim` branch, `--lf` gave `1 passed`; the single full-radius invocation after the I1/I2 change gave `77 passed`. The sentences "74 passed, 1 failed" and "the R17 to R20 code ran: 74 passed" are wrong. In the same way the a7 line of the .8c results ("`inverse_dim_reference` to 1e-12") was looser than the pre-registered gamma_n relative bound: R24 corrects it (tolerance `gamma_n = nu/(1 - nu)`, `nu = n u`, with `n` the kept states).
+
+**§4.9 checklist (before the first invocation of this round).**
+1. Change set: `tools/rehearsal_diagnostics.py`, `tests/unit/test_tools_rehearsal_diagnostics.py`, this file, `WU-0003.8-review-round4.md` (answers). 2. Radius: `tests/unit/test_tools_rehearsal_diagnostics.py` once after the code change (`--lf` for failures only); the slow file is not rerun (what it covers is untouched). 3. Already run on this code: no. 4. `JAX_PLATFORMS=cpu`. 5. `LPC_THREADS` 4, 300 s. 6. No preset or GPU job. 7. `-q --tb=short -rfE`. 8. `tools/run_tests.sh unit tests/unit/test_tools_rehearsal_diagnostics.py`.
+
+**Plan.** R22: every builder that reports a failed part as "not computable" also records it in `rep.uncomputed` (H2a(ii) parts: primary; H2c rules and `best_single`, Q-N targets, H1d pairs: non-primary), so the D2 owner flag and the run-level lines name the gap; the run-level D2 line prints "k computed of m expected". R23: the acf-rate assertions compare with the hand product `1 - prod(1 - 2 norm.sf(thr sqrt(n)))` to 1e-12 relative (no tabulated figure in an assertion). R24: `inverse_dim_reference` at `gamma_n`; the shared H1a checks run after `before` is taken, and when one fails both H1a series are withdrawn. R25: a value test of `sbg_density` (exact-quantile normal sample, closed-form difference quotient, the `(pi/3) h^2` bias; a bandwidth or factor slip must fail).
+
 ## Review
 
 ## Audit
