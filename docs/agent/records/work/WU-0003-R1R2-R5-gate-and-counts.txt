@@ -1,0 +1,25 @@
+== r5 DEV-2 full GPU, wall 2735.9
+lorenz63 gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}
+  V1 delay_jac 1.35e-09 gain 1.57e-09 | V6 crlb median/min/max 1.0585 0.9003 1.0997 | V2 km_max_abs_dev 0.00583 integrator_max_dev 3.59e-05
+  V4 used_M 200 hw M=50/200/800 [0.0514, 0.0263, 0.0137] pass True
+  P2c n_viol 0 chain {'N_le_A': 0, 'A_le_B': 0, 'p2a': 0, 'triangle': 0, 'consistency': 0} states 4000 switching 2972
+  clips href {'construction_oracle': 0, 'calibration_oracle': 0, 'calibration_eval': 0, 'test_oracle': 0, 'test_eval': 0} held_fixed 0 test_eval_clipped 0 status computed
+  flags 11e: {'H3c': False, 'H2d': False, 'H2c': False, 'H1b': False, 'H2a': False, 'H2b': False, 'H2e': False}
+  handling nonzero: {'zero_variance_corr': 259535, 'zero_variance_corr_cp': 259535, 'lm_nonfinite_cost': 4, 'nu_cap_clips': 140}
+  V7: {"median_slope": 1.0008426094489358, "ci": [1.0006631241774737, 1.0011216160381413], "threshold": [0.9, 1.1], "slope_pass": true, "efficiency_median_by_noise": {"0.005": 0.999793324171133, "0.01": 1.0
+rossler gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}
+  V1 delay_jac 9.47e-10 gain 6.52e-10 | V6 crlb median/min/max 1.1056 0.9469 1.1613 | V2 km_max_abs_dev 0.00583 integrator_max_dev 3.81e-05
+  V4 used_M 200 hw M=50/200/800 [0.0688, 0.0424, 0.0222] pass True
+  P2c n_viol 0 chain {'N_le_A': 0, 'A_le_B': 0, 'p2a': 0, 'triangle': 0, 'consistency': 0} states 4000 switching 3550
+  clips href {'construction_oracle': 0, 'calibration_oracle': 0, 'calibration_eval': 0, 'test_oracle': 0, 'test_eval': 0} held_fixed 0 test_eval_clipped 0 status computed
+  flags 11e: {'H3c': False, 'H2d': False, 'H2c': False, 'H1b': False, 'H2a': False, 'H2b': False, 'H2e': False}
+  handling nonzero: {'invariant_mean_replacements': 163, 'nu_replacements': 163, 'zero_variance_corr': 117290, 'zero_variance_corr_cp': 117290, 'lm_nonfinite_cost': 468, 'lm_nonfinite_jacobian': 163, 'nu_cap_clips': 188}
+  V7: {"median_slope": 1.0000979135743142, "ci": [1.0000192718766479, 1.0001956808014298], "threshold": [0.9, 1.1], "slope_pass": true, "efficiency_median_by_noise": {"0.005": 0.9991166165852904, "0.01": 0.
+chua gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': False, 'V7': True, 'gate_pass': False}
+  V1 delay_jac 3.39e-09 gain 1.23e-09 | V6 crlb median/min/max 0.9877 0.8897 1.0268 | V2 km_max_abs_dev 0.00583 integrator_max_dev 0.00241
+  V4 used_M 200 hw M=50/200/800 [0.058, 0.0299, 0.0148] pass True
+  P2c n_viol 0 chain {'N_le_A': 0, 'A_le_B': 0, 'p2a': 0, 'triangle': 0, 'consistency': 0} states 4000 switching 3423
+  clips href {'construction_oracle': 0, 'calibration_oracle': 0, 'calibration_eval': 0, 'test_oracle': 0, 'test_eval': 0} held_fixed 0 test_eval_clipped 0 status computed
+  flags 11e: {'H3c': False, 'H2d': False, 'H2c': False, 'H1b': False, 'H2a': False, 'H2b': False, 'H2e': False}
+  handling nonzero: {'zero_variance_corr': 147310, 'zero_variance_corr_cp': 147310, 'nu_cap_clips': 173}
+  V7: {"median_slope": 1.0003829940214317, "ci": [1.0000992802706978, 1.0005827934800342], "threshold": [0.9, 1.1], "slope_pass": true, "efficiency_median_by_noise": {"0.005": 1.0014970917412498, "0.01": 1.
