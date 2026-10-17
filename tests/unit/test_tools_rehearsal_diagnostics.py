@@ -1604,8 +1604,8 @@ def test_r7_run_level_lines_reproduce_the_plans_probabilities() -> None:
     assert pilot.data["run_level"]["predicted_at_least_one"] == pytest.approx(
         1 - 0.836**12 * 0.79**6, rel=1e-12)
     text = "\n".join(pilot.lines)
-    assert "D2: the A5 rule fired on 1 of the 18 computed primary series (at least one fired: yes)" \
-        in text
+    assert "D2: the A5 rule fired on 1 of the 18 computed primary series (18 computed of 18 expected; " \
+        "at least one fired: yes)" in text
     assert "18 of 19 computed series" in text
     assert "NOT every computed series is within: s other (+0.500)" in text
     full = log_of([1000] * 18, [False] * 18, [True] * 18)
@@ -1637,7 +1637,8 @@ def test_r13_run_level_lines_do_not_read_favourably_over_gaps() -> None:
     text = "\n".join(rep.lines)
     assert "to these computed series only" in text and "every series is within" not in text
     assert "not computed, so not read here: s H2b(i), H1a (all systems)" in text
-    assert "(at least one fired: no; primary series not computed: s H2b(i))" in text
+    assert "(1 computed of 2 expected; at least one fired: no; primary series not computed: s H2b(i))" \
+        in text
     assert not rep.incomplete
     clean = rd.Report()
     clean.series_log.append({"system": "s", "name": "H3c", "n": 500, "primary": True, "acf1": 0.0,
@@ -2347,9 +2348,11 @@ def test_a9_the_predicted_rates_for_24_series_are_0_993_and_0_91_and_the_acf_rat
     rate = pilot.data["run_level"]["predicted_at_least_one"]
     assert rate == pytest.approx(1 - 0.836**12 * 0.79**12, rel=1e-12) and round(rate, 3) == 0.993
     assert "for these 24 series 0.993" in "\n".join(pilot.lines)
-    assert pilot.data["run_level"]["predicted_acf_any"] == pytest.approx(0.11, abs=0.01)
+    assert pilot.data["run_level"]["predicted_acf_any"] == pytest.approx(
+        hand_acf_any([500] * 12 + [300] * 6 + [297] * 6), rel=1e-12)
     eighteen = log_of([(500, None)] * 12 + [(300, None)] * 6)
-    assert eighteen.data["run_level"]["predicted_acf_any"] == pytest.approx(0.064, abs=0.005)
+    assert eighteen.data["run_level"]["predicted_acf_any"] == pytest.approx(
+        hand_acf_any([500] * 12 + [300] * 6), rel=1e-12)
     full = log_of([(1000, None)] * 24)
     assert round(full.data["run_level"]["predicted_at_least_one"], 2) == 0.91
 
@@ -2551,6 +2554,14 @@ def test_i2_the_one_part_takes_c7_and_is_primary_and_the_indicator_parts_say_so(
     assert (cov["cov95"], cov["cov983"]) == (pytest.approx(0.9416), pytest.approx(0.9778))
 
 
+def hand_acf_any(ns: list[int]) -> float:
+    """``1 - prod(1 - p_i)``, ``p_i = 2 norm.sf(thr_i sqrt(n_i))`` with the threshold 0.15 for n <= 500
+    and 0.11 above: the probability that some |acf(1)| exceeds its threshold under no dependence
+    (scipy's normal tail, independent of the tool's ``erfc``)."""
+    return 1.0 - math.prod(1.0 - 2.0 * sps.norm.sf((0.15 if n <= 500 else 0.11) * math.sqrt(n))
+                           for n in ns)
+
+
 def test_i2_the_27_series_rates_are_0_996_pilot_0_93_full_and_0_116_acf() -> None:
     """With the three "one" parts triggered N = 27: the tool prints N and ``1 - prod(1 - r_i)``.
 
@@ -2570,7 +2581,124 @@ def test_i2_the_27_series_rates_are_0_996_pilot_0_93_full_and_0_116_acf() -> Non
     rate = pilot.data["run_level"]["predicted_at_least_one"]
     assert rate == pytest.approx(1 - 0.836**15 * 0.79**12, rel=1e-12) and round(rate, 3) == 0.996
     assert "for these 27 series 0.996" in "\n".join(pilot.lines)
-    assert pilot.data["run_level"]["predicted_acf_any"] == pytest.approx(0.116, abs=0.004)
+    assert pilot.data["run_level"]["predicted_acf_any"] == pytest.approx(
+        hand_acf_any([500] * 15 + [300] * 6 + [297] * 6), rel=1e-12)
     full = log_of([(1000, None)] * 27)
     assert round(full.data["run_level"]["predicted_at_least_one"], 2) == 0.93
-    assert full.data["run_level"]["predicted_acf_any"] == pytest.approx(0.016, abs=0.004)
+    assert full.data["run_level"]["predicted_acf_any"] == pytest.approx(
+        hand_acf_any([1000] * 27), rel=1e-12)
+    # the figures recorded by the planner after the correction (amendment 10), to 4 digits
+    for ns, expected in (([500] * 15 + [300] * 12, 0.1175), ([1000] * 27, 0.0135),
+                         ([1000] * 18, 0.0090), ([1000] * 24, 0.0120)):
+        assert round(hand_acf_any(ns), 4) == expected
+
+
+# ------------------------------------------------------------------------------------------ fix round 4
+def quiet_d2(monkeypatch) -> None:
+    """Make the three D2 triggers quiet, so that the wording of the flag is what is tested."""
+    monkeypatch.setattr(rd, "variance_summary", lambda v, _f=rd.variance_summary: {**_f(v), "fires": False})
+    real_beta = rd.beta_reading
+    monkeypatch.setattr(rd, "beta_reading", lambda lags, n: {**real_beta(lags, n), "fires": False})
+    monkeypatch.setattr(rd, "_permutation_reading", lambda ctx, prim: {"fires": False, "n_series": len(prim)})
+
+
+def d1_d2_report(d: dict, res: dict) -> rd.Report:
+    rep = rd.Report()
+    ctx = rd.Context("lorenz63", rd.Dump(d, "mem"), res["systems"]["lorenz63"], dict(CFG), rep,
+                     rd.TOOL_SEED, rd.DEFAULT_RESAMPLES, rd.DEFAULT_PERMUTATIONS)
+    rd.section_d1_d2(ctx)
+    return rep
+
+
+def test_r22_a_part_that_cannot_be_computed_is_recorded_and_named_in_the_d2_lines(monkeypatch) -> None:
+    """A failed H2a(ii) part (primary), H2c rule, Q-N target or H1d pair is entered in
+    ``rep.uncomputed``: the per-system D2 flag says "among the computed readings; not computed: ...",
+    the run-level D2 line says "k computed of m expected" and names the part, and the run-level D1
+    says "computed series".
+
+    Reference: the finding's probe (``psi_partial_corr`` made to raise on its first call, the zero
+    part; a dump without ``core/state_mse/A1``; without a Q-N array; with a constant H1d oracle).
+    """
+    d, res, _ = build_world(rng_for("world"))
+    quiet_d2(monkeypatch)
+    real = rd.psi_partial_corr
+    calls = {"n": 0}
+
+    def flaky(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise rd.NotComputable("simulated")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(rd, "psi_partial_corr", flaky)
+    rep = d1_d2_report(d, res)
+    assert ("lorenz63 H2a(ii) zero", True) in rep.uncomputed
+    assert "no reading fired among the computed readings; not computed: lorenz63 H2a(ii) zero" in \
+        "\n".join(rep.lines)
+    rd.run_level_lines(rep)
+    text = "\n".join(rep.lines)
+    assert " computed of " in text and " expected; " in text
+    assert "primary series not computed: lorenz63 H2a(ii) zero" in text
+    assert "computed series" in text
+    monkeypatch.setattr(rd, "psi_partial_corr", real)
+    gaps = ("core/state_mse/A1", "qn/oracle/log_horizon/pred3")
+    rep = d1_d2_report({k: v for k, v in d.items() if k not in gaps}, res)
+    names = [n for n, _ in rep.uncomputed]
+    assert any(n.startswith("lorenz63 H2c") for n in names) and any(n.startswith("lorenz63 Q-N") for n in names)
+    assert all(not primary for n, primary in rep.uncomputed if "H2c" in n or "Q-N" in n)
+    changed = dict(d)
+    changed["core/N"] = np.full(N, 1.0)  # a constant oracle: the H1d nhat pair has no Spearman
+    assert ("lorenz63 H1d nhat", False) in d1_d2_report(changed, res).uncomputed
+
+
+def test_r24_inverse_dim_reference_is_checked_at_gamma_n_and_a_shared_failure_withdraws_both_series(
+        tmp_path, capsys) -> None:
+    """The leaf ``inverse_dim_reference`` is compared with ``gamma_n = nu/(1 - nu)``, ``nu = n 2^-53``
+    (3.3e-14 at n = 300, 5.6e-15 at 50): a relative change of 5e-13 (invisible at the former 1e-12)
+    is a MISMATCH, and then no H1a series is used (both rho are withdrawn from D1, D2 and the
+    permutation reading).
+
+    Reference: a7 of the plan (gamma_n relative); the unperturbed world is all MATCH.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    leaf = res["systems"]["lorenz63"]["H1a"]["inverse_dim_reference"]
+    res["systems"]["lorenz63"]["H1a"]["inverse_dim_reference"] = leaf * (1 + 5e-13)
+    json_path = tmp_path / "j.json"
+    code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "50", "--permutations", "20",
+                    "--json", str(json_path)])
+    out = capsys.readouterr().out
+    names = set(json.loads(json_path.read_text())["lorenz63"]["D1"])
+    assert code == 1 and "check H1a inverse_dim_reference (gamma_n)" in out and ": MISMATCH" in out
+    assert not any(n.startswith("H1a") for n in names) and "H1c PLP" in names
+    assert "a shared reproduction check failed; no H1a series is used" in out
+    nu = res["systems"]["lorenz63"]["H1a"]["n_states"] * 2.0**-53
+    assert nu / (1 - nu) < 5e-13
+
+
+def test_r25_sbg_density_returns_the_density_within_the_predicted_bias() -> None:
+    """The value of ``sbg_density`` on an exact-quantile normal sample.
+
+    Reference: the closed forms. For the sample ``x_k = Phi^-1((k - 1/2)/n)`` numpy's linear quantile
+    at ``q`` is ``Phi^-1(q + (1/2 - q)/n)`` up to a convexity error O(1/n^2), so
+    ``1/g_hat = [Phi^-1(1/2 + h - h/n) - Phi^-1(1/2 - h + h/n)]/(2h)`` (compared to 1e-4 relative);
+    and ``g_hat/phi(0) - 1`` equals ``-(pi/3) h^2`` (the leading term of the difference quotient
+    ``(Phi^-1)' + h^2 (Phi^-1)''' / 6`` with ``(Phi^-1)''' = 1/phi^3``) within ``h^4`` and ``3/n``.
+    A bandwidth slip (h doubled) or a factor slip (a dropped 2 in 2h) moves it far outside.
+    """
+    n = 2000
+    x = sps.norm.ppf((np.arange(1, n + 1) - 0.5) / n)
+    h = rd.HALL_SHEATHER * n ** (-1.0 / 3.0)
+    g_hat = rd.sbg_density(x)
+    shifted = (sps.norm.ppf(0.5 + h - h / n) - sps.norm.ppf(0.5 - h + h / n)) / (2 * h)
+    assert 1.0 / g_hat == pytest.approx(shifted, rel=1e-4)
+    g_true = sps.norm.pdf(0.0)
+    bound = h**4 + 3.0 / n
+    assert abs(g_hat / g_true - 1.0 + (math.pi / 3) * h**2) <= bound
+    assert abs(2 * g_hat / g_true - 1.0 + (math.pi / 3) * h**2) > 0.4  # a dropped 2 in 2h: g doubles
+    original = rd.HALL_SHEATHER
+    try:
+        rd.HALL_SHEATHER = 2 * original  # a doubled bandwidth: bias four times larger
+        slipped = rd.sbg_density(x) / g_true - 1.0
+    finally:
+        rd.HALL_SHEATHER = original
+    assert abs(slipped + (math.pi / 3) * h**2) > bound

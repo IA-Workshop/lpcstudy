@@ -1067,6 +1067,7 @@ def series_h2a_ii(ctx: Context) -> list[Series]:
             psi, r = psi_partial_corr(target, lam, controls, dom)
         except NotComputable as exc:
             ctx.rep.nc(f"{ctx.system} H2a(ii) {name}", str(exc))
+            ctx.rep.uncomputed.append((f"{ctx.system} H2a(ii) {name}", True))
             continue
         check(ctx, f"H2a(ii) {name} partial correlation", r,
               ("H2a", "part_ii", name, "partial_corr"), 1e-9, scale=1.0)
@@ -1108,10 +1109,12 @@ def series_h2c(ctx: Context) -> list[Series]:
         others.append(str(dig(ctx.res, "H2c", "best_single")))
     except Missing as exc:
         ctx.rep.nc(f"{ctx.system} H2c A4-best", str(exc))
+        ctx.rep.uncomputed.append((f"{ctx.system} H2c A4-best", False))
     out = []
     for other in others:
         if other not in mse:
             ctx.rep.nc(f"{ctx.system} H2c A4-{other}", f"rule {other} is not a dumped rule")
+            ctx.rep.uncomputed.append((f"{ctx.system} H2c A4-{other}", False))
             continue
         diff = mse["A4"] - mse[other]
         check(ctx, f"H2c A4-{other} mean", float(diff.mean()),
@@ -1150,6 +1153,7 @@ def series_qn(ctx: Context) -> list[Series]:
                 psi, delta = psi_delta_r2(y, p3, p4, dom)
             except NotComputable as exc:
                 ctx.rep.nc(f"{ctx.system} Q-N {kind} {target}", str(exc))
+                ctx.rep.uncomputed.append((f"{ctx.system} Q-N {kind} {target}", False))
                 continue
             yd = y[dom]
             sst = float(np.sum((yd - yd.mean()) ** 2))
@@ -1185,6 +1189,7 @@ def series_h1d(ctx: Context) -> list[Series]:
             psi, rho = psi_spearman(proxy, truth, keep)
         except NotComputable as exc:
             ctx.rep.nc(f"{ctx.system} H1d {name}", str(exc))
+            ctx.rep.uncomputed.append((f"{ctx.system} H1d {name}", False))
             continue
         check(ctx, f"H1d {name} Spearman", rho, ("H1d", "rows", name, "spearman"), 1e-12,
               scale=1.0 / math.sqrt(int(keep.sum())))
@@ -1391,11 +1396,19 @@ def series_h1a(ctx: Context) -> list[Series]:
         keep &= np.all(np.isfinite(sq), axis=1)
     n_rate, n_keep = len(inverse_all), int(keep.sum())
     inverse = inverse_all[keep]
+    shared_before = len(rep.defects)
     check(ctx, "H1a states kept", float(n_keep), ("H1a", "n_states"), 0.0)
     check(ctx, "H1a states excluded as non-finite", float(n_rate - n_keep),
           ("H1a", "n_excluded_nonfinite"), 0.0)
-    check(ctx, "H1a inverse_dim_reference", float(inverse.mean()) if n_keep else float("nan"),
-          ("H1a", "inverse_dim_reference"), 1e-12, scale=float(abs(inverse.mean())) if n_keep else 0.0)
+    nu = n_keep * 2.0**-53
+    check(ctx, "H1a inverse_dim_reference (gamma_n)",
+          float(inverse.mean()) if n_keep else float("nan"), ("H1a", "inverse_dim_reference"),
+          nu / (1.0 - nu))
+    if len(rep.defects) > shared_before:  # a shared input is not reproduced: no H1a reading
+        for rho in raw:
+            rep.uncomputed.append((f"{ctx.system} H1a rho={rho:g}", True))
+        rep.say("  H1a: a shared reproduction check failed; no H1a series is used")
+        return []
     out = []
     for rho, sq_all in raw.items():
         g = f"{rho:g}"
@@ -2321,8 +2334,10 @@ def run_level_lines(rep: Report) -> None:
                + gap_text)
         verdict_text = "no statement (no primary series computed)"
     else:
+        expected = len(known) + len(gaps_primary)
         verdict_text = (f"the A5 rule fired on {len(fired)} of the {len(known)} computed primary "
-                        f"series (at least one fired: {'yes' if fired else 'no'}"
+                        f"series ({len(known)} computed of {expected} expected; at least one "
+                        f"fired: {'yes' if fired else 'no'}"
                         + (f"; primary series not computed: {', '.join(gaps_primary)})"
                            if gaps_primary else ")"))
     rep.say(f"  D2: {verdict_text}; predicted P(at least one) under no dependence for these "
