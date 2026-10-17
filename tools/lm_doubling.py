@@ -270,13 +270,21 @@ def classify(ests: Mapping[int, Est | None], tail: float | None, *,
     ``hw = (hi15 - lo15)/2``; ``d1 = max |D1x|``, ``d2 = max |D2x|``, ``S = d1 + 2 d2``. The Part A
     tail ratio ``tail`` (``r_A``) is given, or ``None`` if there is no Part A.
 
+    The order is that of the plan (DEF-0028, owner ruling of 2026-10-17): rule R makes U "every
+    other case, including the structural switches of M7", and M7 makes a structural switch give
+    class U, so a structural switch is checked **before** every X bullet.
+
+    * **U first** (flag no): a structural switch of M7: a non-empty ``structural``, or an infinite
+      bound or half-width (M7: "an infinite bound at any arm"). It rules out N and every X bullet,
+      whatever the verdicts, ``d1`` or ``S``; the reasons of the bullets that would have fired are
+      kept in ``reasons``. A part that is not estimated at an arm is U as well.
     * **N** (flag yes): the verdict is the same at 15, 30 and 60, ``d2 <= d1/2``, ``r_A <= 1/2``,
       ``S < 0.1`` (strict, ``strict_flag``), and no structural switch.
-    * **X** (flag no): the verdicts differ among the arms, or ``d1 >= 0.1``, or (``d2 <= d1/2``,
-      ``r_A <= 1/2``, ``S >= 0.1`` and no structural switch).
-    * **U** (flag no): every other case: a part that is not estimated at an arm, a non-finite
-      endpoint or ``hw <= 0`` or non-finite (nothing can be computed, unless the verdicts differ,
-      which is X), a tail that is not supported, a structural switch, or no 60 arm.
+    * **X** (flag no): no structural switch, and the verdicts differ among the arms, or
+      ``d1 >= 0.1``, or (``d2 <= d1/2``, ``r_A <= 1/2`` and ``S >= 0.1``).
+    * **U** (flag no): every other case: a tail that is not supported, no 60 arm, and a half-width
+      that is not positive or a value that is NaN (not listed in M7 as a switch: U, or X if the
+      verdicts differ).
 
     Parameters
     ----------
@@ -288,7 +296,8 @@ def classify(ests: Mapping[int, Est | None], tail: float | None, *,
     components : Sequence[str], optional
         Components entering ``d1`` and ``d2`` (``("pt",)`` for the endpoint-limited test).
     structural : Sequence[str], optional
-        Structural switches (M7) found for this part; they block N and the third bullet of X.
+        Structural switches (M7) found for this part; any one makes the part class U, before the
+        X bullets.
 
     Returns
     -------
@@ -321,8 +330,10 @@ def classify(ests: Mapping[int, Est | None], tail: float | None, *,
                   and all(math.isfinite(v) for v in values))
     if not computable:
         reasons.append("not computable: an endpoint is infinite or the half-width is not positive")
-        return Classification("U" if verdict_same else "X", "no", hw=width,
-                              verdict_same=verdict_same, reasons=tuple(reasons))
+        # M7: an infinite bound at any arm is a structural switch, hence U before the X bullets
+        infinite = ((width is not None and math.isinf(width)) or any(math.isinf(v) for v in values))
+        return Classification("U" if verdict_same or structural or infinite else "X", "no",
+                              hw=width, verdict_same=verdict_same, reasons=tuple(reasons))
     r1 = {c: (ests[30].value(c) - e15.value(c)) / width for c in components}
     d1, sets1 = _largest(r1)
     r2: dict = {}
@@ -350,12 +361,15 @@ def classify(ests: Mapping[int, Est | None], tail: float | None, *,
     if verdict_same and supported and small and not structural:
         return Classification("N", "yes", size_kind="estimate", size=s * width, reasons=(),
                               **common)
-    third = supported and not small and not structural
+    third = supported and not small
+    if d1 >= TOLERANCE:
+        reasons.append(f"d1 = {d1:.4g} is at least 0.1")
+    if third:
+        reasons.append(f"S = {s:.4g} is not below 0.1")
+    if structural:   # M7, before every X bullet (DEF-0028): the reasons above stay as information
+        return Classification("U", "no", size_kind="unsupported", size=d1 * width,
+                              reasons=tuple(reasons), **common)
     if not verdict_same or d1 >= TOLERANCE or third:
-        if d1 >= TOLERANCE:
-            reasons.append(f"d1 = {d1:.4g} is at least 0.1")
-        if third:
-            reasons.append(f"S = {s:.4g} is not below 0.1")
         kind, size = ("estimate", s * width) if supported else ("lower", d1 * width)
         return Classification("X", "no", size_kind=kind, size=size, reasons=tuple(reasons),
                               **common)

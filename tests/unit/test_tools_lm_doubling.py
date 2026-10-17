@@ -161,22 +161,62 @@ def test_k5_structural_switch_blocks_n_and_the_third_bullet() -> None:
     big = lm.classify(arms3(est(0.0), est(0.0625), est(0.09375)), tail=0.25,
                       structural=("the chosen K differs",))
     assert (big.cls, big.flag) == ("U", "no")
-    clear = lm.classify(arms3(est(0.0), est(0.25), est(0.25)), tail=0.0,
-                        structural=("the chosen K differs",))
-    assert clear.cls == "X"  # d1 >= 0.1 does not need the structural bullet
+
+
+def test_def0028_structural_switch_comes_before_every_x_bullet() -> None:
+    """Rule R and M7 as written (DEF-0028, owner ruling 2026-10-17): a switch gives U, never X.
+
+    Reference: the plan text by hand. Rule R: U is "every other case, including the structural
+    switches of M7"; M7: a switch "makes the part class U". Both hold only if a switch is checked
+    before the X bullets. Hand cases, hw = 1 (est() has the interval [-1, 1]):
+    (a) d1 = 0.25 >= 0.1 (X by the second bullet without a switch) -> U with a switch;
+    (b) the verdict differs (X by the first bullet without a switch) -> U with a switch;
+    (c) both together -> U. The same inputs without a switch keep their X (no change), and an
+    otherwise-N part without a switch is still N. The reasons of the X bullets stay on the U.
+    """
+    switch = ("the part 'one' exists at some arms only",)
+    big = arms3(est(0.0), est(0.25), est(0.25))
+    flipped = arms3(est(0.0), est(0.015625, verdict="inconclusive"), est(0.015625))
+    both = arms3(est(0.0), est(0.25, verdict="inconclusive"), est(0.25))
+    for arms, text in ((big, "d1 = 0.25 is at least 0.1"),
+                       (flipped, "the verdict differs among the arms"),
+                       (both, "the verdict differs among the arms")):
+        without = lm.classify(arms, tail=0.0)
+        assert (without.cls, without.flag) == ("X", "no")
+        with_switch = lm.classify(arms, tail=0.0, structural=switch)
+        assert (with_switch.cls, with_switch.flag) == ("U", "no")
+        assert switch[0] in with_switch.reasons
+        assert any(r.startswith(text) for r in with_switch.reasons)
+        assert with_switch.size_kind == "unsupported"
+    assert lm.classify(arms3(est(0.0), est(0.03125), est(0.046875)), tail=0.5).cls == "N"
+    assert lm.classify(big, tail=0.0, structural=switch).verdict_same is True
+    assert lm.classify(both, tail=0.0, structural=switch).verdict_same is False
 
 
 def test_k5_infinite_endpoint_or_bad_half_width_is_u_without_exception() -> None:
-    """An infinite endpoint at any arm, hw <= 0 or hw not finite: U; if the verdicts differ: X."""
+    """An infinite bound at any arm is a structural switch (M7): U even if the verdicts differ.
+
+    hw <= 0 or NaN is not a listed switch: U, and X if the verdicts differ (first X bullet).
+    """
     infinite = lm.classify(arms3(est(0.0), est(0.0, lo=-math.inf), est(0.0)), tail=0.0)
     assert (infinite.cls, infinite.flag) == ("U", "no") and infinite.d1 is None
     assert "not computable" in infinite.reasons[-1]
     flipped = lm.classify(arms3(est(0.0), est(0.0, lo=-math.inf, verdict="inconclusive"),
                                 est(0.0)), tail=0.0)
-    assert flipped.cls == "X"
+    assert (flipped.cls, flipped.flag, flipped.verdict_same) == ("U", "no", False)
+    assert flipped.reasons[0].startswith("the verdict differs among the arms")
     for bad in (est(0.0, lo=1.0, hi=1.0), est(0.0, lo=1.0, hi=0.0), est(0.0, lo=0.0, hi=math.inf),
                 est(0.0, lo=math.nan, hi=1.0)):
         assert lm.classify(arms3(bad, bad, bad), tail=0.0).cls == "U"
+    zero = est(0.0, lo=1.0, hi=1.0)
+    assert lm.classify(arms3(zero, est(0.0, lo=1.0, hi=1.0, verdict="inconclusive"), zero),
+                       tail=0.0).cls == "X"
+    nan_flip = est(0.0, lo=math.nan, hi=1.0, verdict="inconclusive")
+    assert lm.classify(arms3(est(0.0, lo=math.nan, hi=1.0), nan_flip, nan_flip),
+                       tail=0.0).cls == "X"
+    # a switch passed in wins over a non-computable half-width as well
+    assert lm.classify(arms3(zero, est(0.0, lo=1.0, hi=1.0, verdict="inconclusive"), zero),
+                       tail=0.0, structural=("K differs",)).cls == "U"
 
 
 def test_k5_missing_part_or_arm_is_u_and_never_an_exception() -> None:
