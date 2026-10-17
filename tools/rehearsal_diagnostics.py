@@ -88,6 +88,7 @@ import argparse
 import json
 import math
 import sys
+import warnings
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -95,6 +96,7 @@ from pathlib import Path
 import numpy as np
 from scipy import special
 from scipy import stats as sps
+from scipy.optimize import OptimizeWarning, curve_fit, least_squares
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -152,12 +154,26 @@ H2B_LIBRARY = (1_000, 10_000)
 H2E_LIBRARY = (1_000, 100_000)
 QN_TARGETS = ("logit_w_interior", "w_zero_indicator", "log_horizon")
 RULES_LOGSD = ("A1", "A2", "A3", "A4", "A5")
-OUTSIDE_SCHEMA = (
-    ("H1a", "no influence series yet (MA-1; row .8c)"),
-    ("H1c", "no influence series yet (row .8c; its per-state ratios are in schema /2)"))
-"""Criteria without a series in this tool (plan amendment 5, E1; amendment 6 assigns them to row
-.8c): each is "not computable" by name (exit 2) and is named in the summary."""
-PRIMARY_CRITERIA = ("H2a(i)", "H2a(ii)", "H2b(i)", "H2b(ii)", "H3c")
+OUTSIDE_SCHEMA: tuple[tuple[str, str], ...] = ()
+"""Criteria with no series at all (none since row .8c: H1a and H1c are computed from schema /2; a
+dump of schema /1, or a cell that cannot be computed, makes them "not computable" by name)."""
+NOT_TABULATED = {
+    "H1a": "coverage not tabulated (no WU-0006 case for H1a); phi = 0 reading only",
+    "H1c": "coverage not tabulated; phi = 0 reading only"}
+PRIMARY_CRITERIA = ("H2a(i)", "H2a(ii)", "H2b(i)", "H2b(ii)", "H3c", "H1a")
+"""The familywise set (F3): the 18 primaries plus H1a, 24 series at the pilot."""
+NAMED_WHEN_MISSING = ("H1a", "H1c")
+"""Criteria named in the summary when they are not computable (plan amendment 5, E1)."""
+H1A_BOUNDS = (0.01, 10.0)
+H1A_BOUND_TOL = 1e-6
+H1A_LO = np.array([-50.0, H1A_BOUNDS[0], -60.0])
+H1A_HI = np.array([50.0, H1A_BOUNDS[1], 10.0])
+HALL_SHEATHER = 1.96 ** (2.0 / 3.0) * (1.5 / (2.0 * math.pi)) ** (1.0 / 3.0)
+"""0.97157: the Hall-Sheather bandwidth constant, ``h = HALL_SHEATHER n^(-1/3)`` (MA-1 section 5)."""
+REFIT_TOLERANCE = 4e-5
+"""The a-priori bound on the production fit's stopping noise, as a fraction of the interval scale."""
+HESSIAN_COND_MAX = 1e8
+H1A_MIN_STATES = 8
 H1D_ROWS = (("analog_seed", 0, "eps_s"), ("estimation_seed", 1, "delta"),
             ("growth", 2, "Lambda_bar"), ("nhat", 3, "N"))
 """H1d pairs: name, column of ``core/profile`` (a strictly increasing transform of the proxy of the
@@ -600,7 +616,7 @@ def acf_reading(criterion: str, lag1: float, n: int) -> tuple[str, dict | None]:
     case = CASE_VALUE.get(criterion)
     cov = coverage_at(criterion, lag1)
     if cov is None:
-        cov_text = "coverage not tabulated"
+        cov_text = NOT_TABULATED.get(criterion, "coverage not tabulated")
     elif cov["beyond"]:
         cov_text = (f"coverage <= {cov['bound95']:.4f} (95%) / {cov['bound983']:.4f} (98.3%) "
                     "(beyond the tabulated stress)")
@@ -637,6 +653,8 @@ class Series:
     primary: bool
     domain: int
     """States inside the criterion's domain (the series is 0 outside it)."""
+    n_rate: int | None = None
+    """Length at which the predicted D2 rate is looked up (None: the series length)."""
 
     @property
     def name(self) -> str:
@@ -1192,10 +1210,258 @@ def series_h1b(ctx: Context) -> list[Series]:
     return [Series(ctx.system, "H1b", "PLP", psi, False, int(keep.sum()))]
 
 
+# --------------------------------------------------------------------------------------------
+# H1a and H1c (row .8c; plan amendment 6 F1, F2; MA-1)
+# --------------------------------------------------------------------------------------------
+def production_model(log_n: np.ndarray, log_c2: float, exponent: float, log_f2: float) -> np.ndarray:
+    """``log(c^2 n^-b + f^2)``: the floor power law of ``analysis._floor_power_law``, verbatim."""
+    return np.log(np.exp(log_c2) * np.exp(log_n) ** (-exponent) + np.exp(log_f2))
+
+
+def production_fit(sizes: np.ndarray, medians: np.ndarray) -> np.ndarray:
+    """The production H1a fit (``analysis._fit_seed_law``: ``curve_fit``, TRF, default tolerances,
+    2-point Jacobian, the same guess and bounds), returning all three parameters.
+
+    Raises
+    ------
+    NotComputable
+        If the fit does not converge or meets a non-finite residual.
+    """
+    log_n = np.log(sizes)
+    guess = (np.log(medians[0]) + 2 * 0.5 * log_n[0], 1.0, np.log(medians[-1] * 0.5))
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", OptimizeWarning)
+            params, _ = curve_fit(production_model, log_n, np.log(medians), p0=guess,
+                                  bounds=([-50, H1A_BOUNDS[0], -60], [50, H1A_BOUNDS[1], 10]),
+                                  maxfev=20_000)
+    except (RuntimeError, ValueError) as exc:
+        raise NotComputable(f"the production fit failed: {exc}") from exc
+    return np.asarray(params, dtype=float)
+
+
+def h1a_fraction(log_n: np.ndarray, theta: np.ndarray) -> np.ndarray:
+    """``p = e^(a - b x)/(e^(a - b x) + e^c)``, the share of the power-law term."""
+    return 1.0 / (1.0 + np.exp(theta[2] - (theta[0] - theta[1] * log_n)))
+
+
+def h1a_jacobian(log_n: np.ndarray, theta: np.ndarray) -> np.ndarray:
+    """``dg/d(a, b, c) = (p, -x p, 1 - p)`` of ``g = log(e^(a - b x) + e^c)``."""
+    p = h1a_fraction(log_n, theta)
+    return np.column_stack([p, -log_n * p, 1.0 - p])
+
+
+def h1a_residual(log_n: np.ndarray, y: np.ndarray, theta: np.ndarray) -> np.ndarray:
+    """``g(x; theta) - y`` computed stably (``logaddexp``)."""
+    return np.logaddexp(theta[0] - theta[1] * log_n, theta[2]) - y
+
+
+def h1a_hessian(log_n: np.ndarray, y: np.ndarray, theta: np.ndarray, curvature: bool = True
+                ) -> np.ndarray:
+    """The exact Hessian of ``F = 1/2 sum (g_j - y_j)^2``: ``J^T J + sum r_j p_j (1 - p_j) v_j v_j^T``
+    with ``v = (1, -x, -1)``. ``curvature=False`` drops the second term (the Gauss-Newton form,
+    24% wrong on a pilot cell: it exists for the mutation test a5 only)."""
+    jac = h1a_jacobian(log_n, theta)
+    hess = jac.T @ jac
+    if curvature:
+        p = h1a_fraction(log_n, theta)
+        v = np.column_stack([np.ones_like(log_n), -log_n, -np.ones_like(log_n)])
+        hess = hess + (v * (h1a_residual(log_n, y, theta) * p * (1.0 - p))[:, None]).T @ v
+    return hess
+
+
+def h1a_fit_tight(log_n: np.ndarray, y: np.ndarray, x0: np.ndarray) -> np.ndarray:
+    """The minimiser to machine precision: TRF with the analytic Jacobian (tolerances 1e-15), then
+    Newton steps on the gradient with the exact Hessian until the step is below 1e-15 relative."""
+    res = least_squares(lambda t: h1a_residual(log_n, y, t), np.asarray(x0, float),
+                        jac=lambda t: h1a_jacobian(log_n, t), method="trf",
+                        bounds=(H1A_LO, H1A_HI), ftol=1e-15, xtol=1e-15, gtol=1e-15,
+                        max_nfev=20_000)
+    theta = res.x.copy()
+    for _ in range(20):
+        grad = h1a_jacobian(log_n, theta).T @ h1a_residual(log_n, y, theta)
+        try:
+            step = np.linalg.solve(h1a_hessian(log_n, y, theta), grad)
+        except np.linalg.LinAlgError as exc:
+            raise NotComputable("the Hessian of the refit is singular (the floor or the exponent "
+                                "is not identified by the five medians)") from exc
+        theta = theta - step
+        if np.max(np.abs(step) / np.maximum(1.0, np.abs(theta))) < 1e-15:
+            break
+    return theta
+
+
+def h1a_fit_weights(sizes: np.ndarray, medians: np.ndarray, theta: np.ndarray,
+                    curvature: bool = True) -> dict:
+    """``A_j = (1/2) [H^-1 J^T]_{b, j}``: the response of ``1/d_fit = b/2`` to ``log m_j``.
+
+    Raises
+    ------
+    NotComputable
+        If ``lambda_min(H) <= 0`` or ``cond(H) > 1e8`` (hypothesis H-d of MA-1).
+    """
+    log_n, y = np.log(sizes), np.log(medians)
+    hess = h1a_hessian(log_n, y, theta, curvature)
+    eig = np.linalg.eigvalsh(hess)
+    cond = float(np.linalg.cond(hess))
+    if not eig[0] > 0.0:
+        raise NotComputable(f"the Hessian is not positive definite (lambda_min {eig[0]:.3g})")
+    if not cond <= HESSIAN_COND_MAX:
+        raise NotComputable(f"the Hessian is ill conditioned (cond {cond:.3g} > 1e8)")
+    weights = 0.5 * np.linalg.solve(hess, h1a_jacobian(log_n, theta).T)[1]
+    return {"A": weights, "cond": cond, "lambda_min": float(eig[0])}
+
+
+def sbg_density(log_values: np.ndarray) -> float:
+    """Siddiqui-Bloch-Gastwirth density of the values at their median, Hall-Sheather bandwidth.
+
+    ``h = 0.97157 n^(-1/3)``, ``1/g = (Q(1/2 + h) - Q(1/2 - h))/(2h)`` with numpy's default quantile.
+
+    Raises
+    ------
+    NotComputable
+        If there are fewer than ``H1A_MIN_STATES`` values (``1/2 +- h`` must stay inside (0, 1)) or
+        the spread is not positive.
+    """
+    n = len(log_values)
+    if n < H1A_MIN_STATES:
+        raise NotComputable(f"{n} states are too few for the density bandwidth (need {H1A_MIN_STATES})")
+    h = HALL_SHEATHER * n ** (-1.0 / 3.0)
+    high, low = np.quantile(log_values, [0.5 + h, 0.5 - h])
+    if not high - low > 0.0:
+        raise NotComputable("the density spread of a column is zero")
+    return 2.0 * h / float(high - low)
+
+
+def sign_type(x: np.ndarray, m: np.ndarray) -> np.ndarray:
+    """``1/2 - 1{x < m} - 1/2 1{x = m}``: the influence of a median up to ``1/f`` (+1/2 above)."""
+    return 0.5 - (x < m) - 0.5 * (x == m)
+
+
+def h1a_psi(seed_sq: np.ndarray, inverse_dim: np.ndarray, medians: np.ndarray, mu: float,
+            weights: np.ndarray, density: np.ndarray, ratio: float) -> np.ndarray:
+    """``psi_i = [sum_j A_j s_ij/g_j - R (v_i - mu)]/mu`` (MA-1 section 0); rows are the kept states."""
+    return (sign_type(seed_sq, medians[None, :]) @ (weights / density)
+            - ratio * (inverse_dim - mu)) / mu
+
+
+def h1a_cell(seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.ndarray, ci_scale: float,
+             at_bound_leaf: int | None = 0, production: Callable = production_fit) -> dict:
+    """The H1a series of one rho on the compacted kept states, or ``NotComputable`` with the reason.
+
+    The conditions (plan amendment 6 F1): the exponent at a bound (the leaf flag or the recomputed
+    fit); the tight refit differing from the production fit by more than ``4e-5 ci_scale``
+    (``max(|lo|, |hi|)`` of ``ci_inverse_dim``; the difference is printed in the reason);
+    ``lambda_min(H) <= 0`` or ``cond(H) > 1e8``; a zero density spread; too few states.
+    """
+    medians = np.median(seed_sq, axis=0)
+    if not np.all(np.isfinite(medians) & (medians > 0)):
+        raise NotComputable("a column median is not positive and finite")
+    params = production(sizes, medians)
+    two_over_d = float(params[1])
+    if (at_bound_leaf or 0) == 1 or min(abs(two_over_d - b) for b in H1A_BOUNDS) <= H1A_BOUND_TOL:
+        raise NotComputable("exponent at a bound")
+    fitted = two_over_d / 2.0
+    log_n, y = np.log(sizes), np.log(medians)
+    theta = h1a_fit_tight(log_n, y, params)
+    diff = abs(theta[1] / 2.0 - fitted)
+    if diff > REFIT_TOLERANCE * ci_scale:
+        raise NotComputable(f"refit differs: |b*/2 - fitted_inverse_dim| = {diff:.3g} > "
+                            f"{REFIT_TOLERANCE:g} x {ci_scale:.3g}")
+    fit = h1a_fit_weights(sizes, medians, theta)
+    density = np.array([sbg_density(np.log(seed_sq[:, j])) for j in range(seed_sq.shape[1])])
+    mu = float(inverse_dim.mean())
+    ratio = fitted / mu
+    psi = h1a_psi(seed_sq, inverse_dim, medians, mu, fit["A"], density, ratio)
+    return {"psi": psi, "A": fit["A"], "g": density, "theta": theta, "fitted": fitted, "mu": mu,
+            "ratio": ratio, "cond": fit["cond"], "lambda_min": fit["lambda_min"],
+            "medians": medians, "refit_diff": diff}
+
+
+def series_h1a(ctx: Context) -> list[Series]:
+    """H1a per rho: reproduction checks, then the influence series (primary: F3 counts it)."""
+    d, rep = ctx.dump, ctx.rep
+    levels, sizes, inverse_all = d["h1a/noise_levels"], d["h1a/n_lib"], d["h1a/inverse_dim"]
+    raw = {float(r): d[f"h1a/rho={float(r):g}/seed_sq"] for r in levels}
+    keep = np.isfinite(inverse_all)
+    for sq in raw.values():
+        keep &= np.all(np.isfinite(sq), axis=1)
+    n_rate, n_keep = len(inverse_all), int(keep.sum())
+    inverse = inverse_all[keep]
+    check(ctx, "H1a states kept", float(n_keep), ("H1a", "n_states"), 0.0)
+    check(ctx, "H1a states excluded as non-finite", float(n_rate - n_keep),
+          ("H1a", "n_excluded_nonfinite"), 0.0)
+    check(ctx, "H1a inverse_dim_reference", float(inverse.mean()) if n_keep else float("nan"),
+          ("H1a", "inverse_dim_reference"), 1e-12, scale=float(abs(inverse.mean())) if n_keep else 0.0)
+    out = []
+    for rho, sq_all in raw.items():
+        g = f"{rho:g}"
+        where = f"{ctx.system} H1a rho={g}"
+        before = len(rep.defects)
+        sq = sq_all[keep]
+        medians = np.median(sq, axis=0) if n_keep else np.full(len(sizes), np.nan)
+        for j, n_lib in enumerate(sizes):
+            check(ctx, f"H1a rho={g} median_seed_by_n_lib {int(n_lib)}", float(np.sqrt(medians[j])),
+                  ("H1a", "by_noise", g, "median_seed_by_n_lib", str(int(n_lib))), 0.0)
+        got = attempt(rep, where, _h1a_one, ctx, g, sq, inverse, sizes)
+        if len(rep.defects) > before:
+            rep.uncomputed.append((where, True))
+            continue
+        if got is None:
+            rep.uncomputed.append((where, True))
+            continue
+        out.append(Series(ctx.system, "H1a", f"rho={g}", got["psi"], True, n_keep, n_rate=n_rate))
+    return out
+
+
+def _h1a_one(ctx: Context, g: str, sq: np.ndarray, inverse: np.ndarray, sizes: np.ndarray) -> dict:
+    ci = dig(ctx.res, "H1a", "by_noise", g, "ci_inverse_dim")
+    ci_scale = max(abs(float(ci[0])), abs(float(ci[1])))
+    if not math.isfinite(ci_scale) or ci_scale == 0.0:
+        raise NotComputable(f"ci_inverse_dim not finite and non-zero: {ci}")
+    flag = int(dig(ctx.res, "H1a", "by_noise", g, "n_exponent_at_bound", "point"))
+    cell = h1a_cell(sq, inverse, sizes, ci_scale, flag)
+    check(ctx, f"H1a rho={g} fitted_inverse_dim (production fit)", cell["fitted"],
+          ("H1a", "by_noise", g, "fitted_inverse_dim"), 0.0)
+    check(ctx, f"H1a rho={g} ratio", cell["ratio"], ("H1a", "by_noise", g, "ratio"), 0.0)
+    psi, n = cell["psi"], len(cell["psi"])
+    se_iid = float(np.std(psi, ddof=1)) / math.sqrt(n)
+    se_mbb = math.sqrt(block_variance(psi, 5) / n)
+    rci = dig(ctx.res, "H1a", "by_noise", g, "ratio_ci")
+    ref = (float(rci[1]) - float(rci[0])) / 3.92
+    ctx.rep.say(f"  H1a rho={g}: cond(H) {cell['cond']:.3g}, lambda_min {cell['lambda_min']:.3g}, "
+                f"refit difference {cell['refit_diff']:.2g}; information: SE_iid of psi {se_iid:.4f}, "
+                f"SE_MBB5 {se_mbb:.4f} against (hi - lo)/3.92 of ratio_ci {ref:.4f}")
+    return cell
+
+
+def series_h1c(ctx: Context) -> list[Series]:
+    """H1c, PLP and CP: the sign-type series of the eligible, finite ratios in time order (compacted)."""
+    d, out = ctx.dump, []
+    for name in ("PLP", "CP"):
+        ratio, eligible = d[f"h1c/{name}/ratio"], d[f"h1c/{name}/eligible"].astype(bool)
+        kept = ratio[eligible & np.isfinite(ratio)]
+        check(ctx, f"H1c {name} states kept", float(kept.size), ("H1c", name, "n_states"), 0.0)
+        check(ctx, f"H1c {name} ineligible states", float((~eligible).sum()),
+              ("H1c", name, "n_ineligible_states"), 0.0)
+        check(ctx, f"H1c {name} states excluded as non-finite",
+              float((eligible & ~np.isfinite(ratio)).sum()),
+              ("H1c", name, "n_excluded_nonfinite"), 0.0)
+        if kept.size < 10:
+            ctx.rep.nc(f"{ctx.system} H1c {name}", f"{kept.size} eligible finite ratios; the "
+                       "production reports no median below 10")
+            ctx.rep.uncomputed.append((f"{ctx.system} H1c {name}", False))
+            continue
+        check(ctx, f"H1c {name} median ratio", float(np.median(kept)), ("H1c", name, "median_ratio"), 0.0)
+        out.append(Series(ctx.system, "H1c", name, psi_sign(kept), False, int(kept.size)))
+    return out
+
+
 SERIES_BUILDERS: tuple[tuple[str, Callable[[Context], list[Series]]], ...] = (
     ("H2a(i)", series_h2a_i), ("H2a(ii)", series_h2a_ii), ("H2b(i)", series_h2b_i),
     ("H2b(ii)", series_h2b_ii), ("H3c", series_h3c), ("H2c", series_h2c), ("H2d", series_h2d),
-    ("H2e", series_h2e), ("Q-N", series_qn), ("H1b", series_h1b), ("H1d", series_h1d))
+    ("H2e", series_h2e), ("Q-N", series_qn), ("H1b", series_h1b), ("H1d", series_h1d),
+    ("H1a", series_h1a), ("H1c", series_h1c))
 
 
 # --------------------------------------------------------------------------------------------
@@ -1230,7 +1496,7 @@ def section_d1_d2(ctx: Context) -> list[Series]:
         rows[s.name] = {"n": s.n, "domain": s.domain, "primary": s.primary, "acf": lags.tolist(),
                         "reading": text, "coverage": cov}
         rep.series_log.append({"system": ctx.system, "name": s.name, "n": s.n,
-                               "primary": s.primary, "acf1": float(lags[0]),
+                               "n_rate": s.n_rate, "primary": s.primary, "acf1": float(lags[0]),
                                "within": bool(abs(lags[0]) <= acf_threshold(s.n)), "fires": None})
     rep.data.setdefault(ctx.system, {})["D1"] = rows
     primaries = [s for s in series if s.primary and s.name in rows]
@@ -1253,9 +1519,10 @@ def section_d1_d2(ctx: Context) -> list[Series]:
             continue
         lags = np.array(rows[s.name]["acf"])
         beta = beta_reading(lags, s.n)
-        null_rate = UNION_NULL.get(s.n)
+        n_rate = s.n_rate or s.n
+        null_rate = UNION_NULL.get(n_rate)
         rate_text = ("not tabulated for this n" if null_rate is None else
-                     f"{null_rate:.3f} under no dependence; {UNION_STRESS[s.n]:.3f} at phi = 0.3")
+                     f"{null_rate:.3f} under no dependence; {UNION_STRESS[n_rate]:.3f} at phi = 0.3")
         rep.say(f"  {s.name:28s} {'P' if s.primary else '-'} V5 {summary['V5']:.4g}  "
                 f"V10/V5 {summary['ratio10']:.3f}  V20/V5 {summary['ratio20']:.3f}  "
                 f"A5 rule {'FIRES' if summary['fires'] else 'quiet'} (predicted trigger rate: "
@@ -1274,7 +1541,7 @@ def section_d1_d2(ctx: Context) -> list[Series]:
             beta_fires += beta["fires"]
     rep.data.setdefault(ctx.system, {})["D2"] = d2
     prim = [s for s in primaries if s.name in d2]
-    rates = [UNION_NULL.get(s.n) for s in prim]
+    rates = [UNION_NULL.get(s.n_rate or s.n) for s in prim]
     if prim and all(r is not None for r in rates):
         any_rate = 1.0 - float(np.prod([1.0 - r for r in rates]))
         rep.say(f"  A5 rule fires on {fires} of {len(prim)} primary series; predicted P(at least "
@@ -1968,9 +2235,14 @@ def run_level_lines(rep: Report) -> None:
             + (f"every one of the {len(log)} computed series is within (the phi = 0 rows apply to "
                f"these {scope} only)" if not outside else
                "NOT every computed series is within: " + "; ".join(outside)) + gap_text)
+    p_any = None
+    if prim:
+        p_any = 1.0 - float(np.prod([1.0 - lag_zero_false_trigger(e["n"]) for e in prim]))
+        rep.say(f"      predicted P(some |acf(1)| of these {len(prim)} primary series above its "
+                f"threshold) under no dependence: {p_any:.3f}")
     fired = [e for e in prim if e["fires"]]
     known = [e for e in prim if e["fires"] is not None]
-    rates = [UNION_NULL.get(e["n"]) for e in known]
+    rates = [UNION_NULL.get(e.get("n_rate") or e["n"]) for e in known]
     if known and all(r is not None for r in rates):
         predicted = 1.0 - float(np.prod([1.0 - r for r in rates]))
         pred_text = f"{predicted:.3f}"
@@ -1986,11 +2258,13 @@ def run_level_lines(rep: Report) -> None:
                         + (f"; primary series not computed: {', '.join(gaps_primary)})"
                            if gaps_primary else ")"))
     rep.say(f"  D2: {verdict_text}; predicted P(at least one) under no dependence for these "
-            f"{len(known)} series {pred_text} (0.97 pilot, 0.83 full for the plan's 18 primaries)")
+            f"{len(known)} series {pred_text} (18 primaries: 0.97 pilot, 0.83 full; with H1a, 24 series: "
+            "0.993 and 0.91)")
     rep.data["run_level"] = {"n_series": len(log), "n_within": len(within), "n_primary": len(prim),
                              "n_primary_within": len(prim_within), "n_fired": len(fired),
                              "n_primary_known": len(known), "predicted_at_least_one": predicted,
-                             "at_least_one_fired": bool(fired), "uncomputed": gaps}
+                             "at_least_one_fired": bool(fired), "uncomputed": gaps,
+                             "predicted_acf_any": p_any}
 
 
 def check_provenance(ctx: Context, seed_id: str) -> None:
@@ -2139,10 +2413,13 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     rep.say("Summary")
     if rep.incomplete:
         rep.say(f"  not computable: {len(rep.incomplete)} item(s) (listed above); never skipped")
-        by_name = ", ".join(name for name, _ in OUTSIDE_SCHEMA)
-        rep.say(f"  not computable by name: {by_name}. Without them the rehearsal cannot say "
-                "whether the phi = 0 or the phi = 0.3 coverage applies to the H1a interval (nor to "
-                "H1c's); D1 and D2 say nothing about those intervals.")
+        named = [name for name, _ in rep.uncomputed
+                 if any(name.endswith(c) or f" {c} " in f" {name} " or f" {c}" in name
+                        for c in NAMED_WHEN_MISSING)]
+        if named:
+            rep.say(f"  not computable by name: {', '.join(named)}. Without them the rehearsal "
+                    "cannot say whether the phi = 0 or the phi = 0.3 coverage applies to the H1a "
+                    "interval (nor to H1c's); D1 and D2 say nothing about those intervals.")
     if rep.findings:
         rep.say(f"  C4 findings: {len(rep.findings)} reading(s) outside a band or the relation "
                 "(information for the owner; not a failure)")

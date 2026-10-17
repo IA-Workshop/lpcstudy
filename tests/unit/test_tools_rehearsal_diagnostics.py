@@ -39,6 +39,7 @@ import numpy as np
 import pytest
 from scipy import stats as sps
 
+from lpcstudy.analysis import _fit_seed_law
 from lpcstudy.data import make_rng
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -671,6 +672,37 @@ def make_group(rng: np.random.Generator, n: int) -> dict[str, np.ndarray]:
     return out
 
 
+SIZES = np.array([1000.0, 3162.0, 10000.0, 31623.0, 100000.0])
+PILOT_MEDIANS = np.array([0.14651918315989704, 0.08488592337852721, 0.06098987595134838,
+                          0.038825529065113606, 0.031406274510113026]) ** 2
+"""Squared ``median_seed_by_n_lib`` of the DEV-0 pilot P1, Lorenz-63, rho = 1%: a pilot-shaped input."""
+PILOT_MU = 0.4894689705779842
+KAPPA = np.linspace(0.6, 2.5, 5)
+
+
+def gamma_columns(rng: np.random.Generator, medians: np.ndarray, n: int,
+                  kappa: np.ndarray = KAPPA) -> np.ndarray:
+    """``n`` states of five columns with the given medians and Gamma(kappa_j) shapes (MA-1 world)."""
+    q = sps.gamma.ppf(0.5, kappa)
+    return medians[None, :] * sps.gamma.rvs(kappa, size=(n, 5), random_state=rng) / q
+
+
+def make_h1_arrays(rng: np.random.Generator) -> dict:
+    """The ``h1a/`` and ``h1c/`` groups of schema /2 for the world (NS sweep states, N test states)."""
+    out = {"h1a/noise_levels": np.array([0.01, 0.02]), "h1a/n_lib": SIZES,
+           "h1a/local_dim": 1.0 / (PILOT_MU * rng.gamma(19.0, size=NS) / 19.0),
+           "h1a/inverse_dim": PILOT_MU * rng.gamma(19.0, size=NS) / 19.0}
+    for rho, scale in ((0.01, 1.0), (0.02, 1.2)):
+        out[f"h1a/rho={rho:g}/seed_sq"] = gamma_columns(rng, PILOT_MEDIANS * scale, NS,
+                                                        np.full(5, 12.0))  # tight columns: n = 50
+    out["h1c/thresholds"] = np.array([0.1, 0.2, 0.3, 0.5])
+    for name in ("PLP", "CP"):
+        eligible = rng.random(N) < 0.85
+        ratio = np.where(eligible, np.exp(rng.normal(-0.3, 0.3, N)), np.nan)
+        out[f"h1c/{name}/ratio"], out[f"h1c/{name}/eligible"] = ratio, eligible
+    return out
+
+
 def build_world(rng: np.random.Generator) -> tuple[dict, dict, dict]:
     """A dump (as a dict), the results tree that matches it, and the hand-computed extras.
 
@@ -679,7 +711,7 @@ def build_world(rng: np.random.Generator) -> tuple[dict, dict, dict]:
     partial correlations, ``np.polyfit`` for the slope.
     """
     d: dict[str, np.ndarray] = {}
-    d["meta/schema"] = np.array("lpcstudy.states/1")
+    d["meta/schema"] = np.array("lpcstudy.states/2")
     d["meta/system"], d["meta/seed_id"], d["meta/preset"] = (np.array("lorenz63"),
                                                               np.array("DEV-1"), np.array("pilot"))
     for k, v in (("n_oracle_draws", 200), ("n_eval_draws", 2), ("steps_per_lyapunov", LT),
@@ -708,6 +740,7 @@ def build_world(rng: np.random.Generator) -> tuple[dict, dict, dict]:
         prof[:, draw, 2] = noisy[2] * LT
         prof[:, draw, 3] = np.log(noisy[3] + 1e-3)
     d["core/profile"] = prof
+    d.update(make_h1_arrays(rng))
     for rule in ("A0", "A1", "A2", "A3", "A4", "A5", "A4o", "A*"):
         d[f"core/state_mse/{rule}"] = np.exp(rng.normal(-3, 1.0, (N, 5)))
     for rule in ("A2", "A3", "A4", "A5"):
@@ -793,6 +826,30 @@ def lm_cells() -> dict:
     return cells
 
 
+def h1a_leaves(d: dict) -> dict:
+    """The H1a leaves by the production fit (``analysis._fit_seed_law``) and plain numpy."""
+    inverse_all = d["h1a/inverse_dim"]
+    keep = np.isfinite(inverse_all)
+    for rho in d["h1a/noise_levels"]:
+        keep &= np.all(np.isfinite(d[f"h1a/rho={rho:g}/seed_sq"]), axis=1)
+    inverse = inverse_all[keep]
+    leaves = {"inverse_dim_reference": float(inverse.mean()), "n_states": int(keep.sum()),
+              "n_excluded_nonfinite": int((~keep).sum()), "by_noise": {}}
+    for rho in d["h1a/noise_levels"]:
+        sq = d[f"h1a/rho={rho:g}/seed_sq"][keep]
+        medians = np.median(sq, axis=0)
+        two_over_d, _ = _fit_seed_law(d["h1a/n_lib"], medians)
+        fitted = two_over_d / 2.0
+        ratio = fitted / leaves["inverse_dim_reference"]
+        leaves["by_noise"][f"{rho:g}"] = {
+            "fitted_inverse_dim": fitted, "ci_inverse_dim": [fitted - 0.08, fitted + 0.08],
+            "ratio": ratio, "ratio_ci": [ratio - 0.15, ratio + 0.15],
+            "n_exponent_at_bound": {"point": 0, "resamples": 0},
+            "median_seed_by_n_lib": {str(int(n)): float(np.sqrt(m))
+                                     for n, m in zip(d["h1a/n_lib"], medians)}}
+    return leaves
+
+
 def build_results(d: dict) -> dict:
     """The results leaves that the tool recomputes, by independent routes (see ``build_world``)."""
     sysd: dict = {}
@@ -869,6 +926,14 @@ def build_results(d: dict) -> dict:
                            "n_excluded_nonfinite": int((~keep).sum()),
                            "n_floored": int((e_p[:, REF][keep] < 1e-12).sum())}}
     sysd["handling"] = {"cells": lm_cells()}
+    sysd["H1a"] = h1a_leaves(d)
+    sysd["H1c"] = {}
+    for name in ("PLP", "CP"):
+        ratio, eligible = d[f"h1c/{name}/ratio"], d[f"h1c/{name}/eligible"]
+        kept = ratio[eligible & np.isfinite(ratio)]
+        sysd["H1c"][name] = {"median_ratio": float(np.median(kept)), "n_states": int(kept.size),
+                             "n_ineligible_states": int((~eligible).sum()),
+                             "n_excluded_nonfinite": int((eligible & ~np.isfinite(ratio)).sum())}
     sysd["H1d"] = {"rows": {}}
     for name, col, oracle in rd.H1D_ROWS:
         proxy, truth = d["core/profile"][:, 0, col], d[f"core/{oracle}"]
@@ -915,14 +980,19 @@ def test_a_full_run_on_a_consistent_world_reproduces_every_leaf_and_lists_h1a_h1
     nc = [line.strip() for line in out.splitlines() if line.strip().startswith("not computable:")
           and "items" not in line and "item(s)" not in line]
     assert [line.split(":")[1].strip() for line in nc] == [
-        "H1a (all systems)", "H1c (all systems)",
-        "lorenz63 D5 pilot-equivalent V4"]  # E5: the world has 12 V4 states, not 40
+        "lorenz63 D5 pilot-equivalent V4"]  # E5: the world has 12 V4 states, not 40;
+    # H1a and H1c are computed from the schema /2 groups of the world (row .8c)
     assert out.count(": MATCH") >= 28  # 20 earlier leaves, H1d: 4 rho + 4 exclusion counts
     assert code == 2
     data = json.loads(json_path.read_text())
     names = set(data["lorenz63"]["D1"])
     assert {"H2a(i)", "H2a(ii) zero", "H2a(ii) interior", "H2b(i)", "H2b(ii)", "H3c",
-            "H1d analog_seed", "H1d estimation_seed", "H1d growth", "H1d nhat"} <= names
+            "H1d analog_seed", "H1d estimation_seed", "H1d growth", "H1d nhat",
+            "H1a rho=0.01", "H1a rho=0.02", "H1c PLP", "H1c CP"} <= names
+    assert data["lorenz63"]["D1"]["H1a rho=0.01"]["primary"] is True
+    assert data["lorenz63"]["D1"]["H1c PLP"]["primary"] is False
+    assert data["lorenz63"]["D1"]["H1a rho=0.02"]["domain"] <= NS
+    assert "coverage not tabulated (no WU-0006 case for H1a); phi = 0 reading only" in out
     assert data["lorenz63"]["D1"]["H3c"]["primary"] is True
     assert data["lorenz63"]["D1"]["H1d growth"]["primary"] is False
     assert data["lorenz63"]["D1"]["H3c"]["domain"] == N and data["lorenz63"]["D1"]["H2b(i)"]["domain"] == NS
@@ -933,9 +1003,7 @@ def test_a_full_run_on_a_consistent_world_reproduces_every_leaf_and_lists_h1a_h1
     assert "NON-DEFAULT OPTIONS" in out and "owner question" in out and "not allowed" in out
     assert data["run_level"]["n_series"] == len(data["lorenz63"]["D1"])
     summary = out[out.index("Summary"):]
-    assert "not computable by name: H1a, H1c." in summary
-    assert "H1a, H1c. Without them the rehearsal cannot say whether the phi = 0 or the phi = 0.3 " \
-        "coverage applies to the H1a interval" in summary
+    assert "not computable by name" not in summary
     assert "NON-DEFAULT OPTION: seed 20261018, resamples 100, permutations 50" in summary
 
 
@@ -1982,3 +2050,321 @@ def test_e4_a_value_outside_its_band_is_a_finding_and_a_missing_input_is_not_com
     rep = rd.Report()
     attempt_result = rd.attempt(rep, "x", rd.section_c4, rep, "lorenz63", {}, cfg)
     assert attempt_result is None and "handling/cells" in rep.incomplete[0]
+
+
+# ------------------------------------------------------------------------------------------ row .8c
+def model_log(x: np.ndarray, th: np.ndarray) -> np.ndarray:
+    """``log(e^(a - b x) + e^c)`` written here (the fit model of H1a)."""
+    return np.log(np.exp(th[0] - th[1] * x) + np.exp(th[2]))
+
+
+def gradient_of_F(th: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Gradient of ``F = 1/2 sum (g - y)^2`` for the fit model, written here from the derivatives of
+    ``g``: ``(p, -x p, 1 - p)`` with ``p = e^(a - b x)/(e^(a - b x) + e^c)``."""
+    x = np.log(SIZES)
+    p = 1.0 / (1.0 + np.exp(th[2] - th[0] + th[1] * x))
+    jac = np.column_stack([p, -x * p, 1.0 - p])
+    return jac.T @ (model_log(x, th) - y)
+
+
+def tight_reference(y: np.ndarray, start: np.ndarray) -> np.ndarray:
+    """The minimiser of ``F`` to machine precision by a route unlike the tool's: ``fsolve`` on the
+    gradient, then Newton steps whose Hessian is a central difference of the gradient (only the
+    rate of convergence depends on it; the fixed point is where the exact gradient vanishes)."""
+    import warnings
+
+    from scipy.optimize import fsolve
+    with warnings.catch_warnings():  # fsolve cannot meet xtol = 1e-14; the Newton steps finish
+        warnings.simplefilter("ignore", RuntimeWarning)
+        th = fsolve(gradient_of_F, start, args=(y,), xtol=1e-14)
+    for _ in range(4):
+        hess = np.empty((3, 3))
+        for k in range(3):
+            e = np.zeros(3)
+            e[k] = 1e-6
+            hess[:, k] = (gradient_of_F(th + e, y) - gradient_of_F(th - e, y)) / 2e-6
+        th = th - np.linalg.solve(hess, gradient_of_F(th, y))
+    return th
+
+
+def weights_by_differences(medians: np.ndarray, theta: np.ndarray, h: float = 1e-5) -> np.ndarray:
+    """``A_j = (1/2) d b*/d log m_j`` by central differences of the tight fit."""
+    y = np.log(medians)
+    out = np.empty(5)
+    for j in range(5):
+        e = np.zeros(5)
+        e[j] = h
+        up, down = tight_reference(y + e, theta), tight_reference(y - e, theta)
+        out[j] = 0.5 * (up[1] - down[1]) / (2 * h)
+    return out
+
+
+def tool_fit(medians: np.ndarray) -> np.ndarray:
+    """The tool's tight refit started from the production fit."""
+    return rd.h1a_fit_tight(np.log(SIZES), np.log(medians), rd.production_fit(SIZES, medians))
+
+
+RESIDUAL_MEDIANS = PILOT_MEDIANS * np.exp(np.array([0.10, -0.12, 0.09, -0.07, 0.11]))
+"""A cell with large residuals (0.1 in log, as the worst pilot cells), where the curvature term matters."""
+
+
+def test_a1_a2_fit_weights_sum_to_zero_and_equal_differences_of_the_tight_fit() -> None:
+    """a1: ``|sum_j A_j| <= 1e-11 max|A|``; a2: ``A_j`` against central differences of a tight fit,
+    h = 1e-5 in log m_j, ``<= 1e-8 max|A|``.
+
+    Reference: the identity sum A = 0 (a common shift of y is absorbed by (a, c)); and the fit
+    differentiated numerically by ``tight_reference`` (fsolve + Newton on the exact gradient written
+    in this file, not the tool's solver). The tolerances are MA-1's: cond(H) u about 1.5e-12 for a1;
+    truncation and round-off each about 1e-10 for a2. Two cells: the pilot cell and one with
+    residuals of 0.1 in log.
+    """
+    for medians in (PILOT_MEDIANS, RESIDUAL_MEDIANS):
+        theta = tool_fit(medians)
+        assert abs(theta[1] - tight_reference(np.log(medians), theta)[1]) < 1e-12
+        fit = rd.h1a_fit_weights(SIZES, medians, theta)
+        assert abs(fit["A"].sum()) <= 1e-11 * np.max(np.abs(fit["A"]))
+        ref = weights_by_differences(medians, theta)
+        assert np.max(np.abs(fit["A"] - ref)) <= 1e-8 * np.max(np.abs(ref))
+
+
+def test_a5_dropping_the_residual_curvature_term_fails_a2() -> None:
+    """a5: the Gauss-Newton Hessian (``curvature=False``) errs by at least 1.5e-2 of max|A| on a
+    pilot-shaped input, the exact one by under 1e-8 (the mutation the plan asks for)."""
+    medians = RESIDUAL_MEDIANS
+    theta = tool_fit(medians)
+    ref = weights_by_differences(medians, theta)
+    log_n, y = np.log(SIZES), np.log(medians)
+    jac = rd.h1a_jacobian(log_n, theta)
+    for curvature, bad in ((True, False), (False, True)):
+        hess = rd.h1a_hessian(log_n, y, theta, curvature)
+        weights = 0.5 * np.linalg.solve(hess, jac.T)[1]
+        err = np.max(np.abs(weights - ref)) / np.max(np.abs(ref))
+        assert bool(err >= 1.5e-2) is bad, (curvature, err)
+
+
+def test_a3_psi_equals_the_population_gateaux_derivative_on_the_gamma_world() -> None:
+    """a3: ``psi`` against the numerical Gateaux derivative of ``T(F) = (1/2) b*(F)/mu(F)``.
+
+    Reference (MA-1 3.1, rebuilt under ``make_rng``): column j has the law ``m_j G_j/med(G_j)`` with
+    ``G_j ~ Gamma(kappa_j)``, so the medians are the pilot's; contamination at a state x:
+    ``median_j(eps) = Q_j((1/2 - eps 1{x_j < m_j})/(1 - eps))`` (exact ``gamma.ppf``),
+    ``mu(eps) = (1 - eps) mu + eps v_x``; central difference h = 1e-5 of the tight fit
+    (``tight_reference``). The analytic ``psi`` uses the true densities ``g_j = q f(q)`` of
+    ``log X_j`` at its median. Tolerance 1e-8 of max|psi|: truncation 2.15e-9 (MA-1), round-off 1e-10.
+    """
+    rng = rng_for("a3")
+    medians, mu = PILOT_MEDIANS, PILOT_MU
+    q = sps.gamma.ppf(0.5, KAPPA)
+    g_true = q * sps.gamma.pdf(q, KAPPA)
+    theta = tool_fit(medians)
+    weights = rd.h1a_fit_weights(SIZES, medians, theta)["A"]
+    ratio = 0.5 * theta[1] / mu
+    rows = gamma_columns(rng, medians, 25)
+    inv = mu * rng.gamma(19.0, size=25) / 19.0
+    psi = rd.h1a_psi(rows, inv, medians, mu, weights, g_true, ratio)
+    h = 1e-5
+
+    def functional(eps: float, x: np.ndarray, v: float) -> float:
+        p = (0.5 - eps * (x < medians)) / (1.0 - eps)
+        contaminated = medians * sps.gamma.ppf(p, KAPPA) / q
+        th = tight_reference(np.log(contaminated), theta)
+        return 0.5 * th[1] / ((1 - eps) * mu + eps * v)
+
+    numeric = np.array([(functional(h, rows[i], inv[i]) - functional(-h, rows[i], inv[i])) / (2 * h)
+                        for i in range(25)])
+    assert np.max(np.abs(numeric - psi)) <= 1e-8 * np.max(np.abs(psi))
+
+
+def test_a4_hand_case_with_one_tie_at_the_median() -> None:
+    """a4: seven states (odd, so a state equals each column median), given A, g, R, mu: ``psi``
+    equals the formula written out in loops, 1e-12 relative.
+
+    Reference: ``psi_i = (sum_j A_j s_ij/g_j - R (v_i - mu))/mu`` with ``s = +1/2`` above the
+    column median, ``-1/2`` below and 0 at it (the tie of an odd sample). Column 0 is
+    (7, 1, 4, 2, 6, 3, 5): median 4, attained by state 2.
+    """
+    sq = np.array([[7, 1, 3, 9, 2], [1, 2, 8, 8, 3], [4, 3, 1, 7, 4], [2, 4, 2, 6, 5],
+                   [6, 5, 7, 5, 6], [3, 6, 6, 4, 7], [5, 7, 5, 3, 1]], dtype=float)
+    inv = np.array([0.40, 0.50, 0.45, 0.60, 0.35, 0.55, 0.50])
+    weights = np.array([0.3, -0.2, 0.1, 0.25, -0.45])
+    density = np.array([0.5, 0.8, 0.4, 0.6, 0.7])
+    medians = np.median(sq, axis=0)
+    ratio, mu = 0.9, inv.mean()
+    psi = rd.h1a_psi(sq, inv, medians, mu, weights, density, ratio)
+    for i in range(7):
+        total = 0.0
+        for j in range(5):
+            s = 0.5 if sq[i, j] > medians[j] else (-0.5 if sq[i, j] < medians[j] else 0.0)
+            total += weights[j] * s / density[j]
+        assert psi[i] == pytest.approx((total - ratio * (inv[i] - mu)) / mu, rel=1e-12)
+    assert sq[2, 0] == medians[0]  # the tie that scores 0
+
+
+def test_a6_every_not_computable_condition_is_triggered_and_named() -> None:
+    """a6: exponent at a bound, a refit that differs, ``lambda_min <= 0``, ``cond > 1e8``, a zero
+    density spread and too few states each raise ``NotComputable`` naming the reason.
+
+    Reference: constructed inputs whose violation is asserted first (the Hessian eigenvalues and
+    condition number are computed in the test with numpy). The refit condition injects a production
+    fit 1e-3 away from the minimiser (the tolerance is 4e-5 of the interval scale 0.5, i.e. 2e-5).
+    """
+    rng = rng_for("a6")
+    rows = gamma_columns(rng, PILOT_MEDIANS, 60)
+    inv = PILOT_MU * rng.gamma(19.0, size=60) / 19.0
+    ok = rd.h1a_cell(rows, inv, SIZES, 0.5, 0)
+    assert ok["refit_diff"] < 4e-5 * 0.5
+    with pytest.raises(rd.NotComputable, match="exponent at a bound"):
+        rd.h1a_cell(rows, inv, SIZES, 0.5, 1)
+    at_bound = lambda sizes, medians: np.array([0.0, 0.01, -10.0])  # noqa: E731
+    with pytest.raises(rd.NotComputable, match="exponent at a bound"):
+        rd.h1a_cell(rows, inv, SIZES, 0.5, 0, production=at_bound)
+    off = lambda sizes, medians: rd.production_fit(sizes, medians) + np.array([0.0, 2e-3, 0.0])  # noqa: E731
+    with pytest.raises(rd.NotComputable, match=r"refit differs: \|b\*/2 - fitted_inverse_dim\| = 0.001"):
+        rd.h1a_cell(rows, inv, SIZES, 0.5, 0, production=off)
+    log_n = np.log(SIZES)
+    theta = np.array([0.0, 1.0, 0.0])
+    y = model_log(log_n, theta) + np.array([0.0, 0.0, 5.0, 0.0, 0.0])
+    assert np.linalg.eigvalsh(rd.h1a_hessian(log_n, y, theta))[0] < 0
+    with pytest.raises(rd.NotComputable, match="not positive definite"):
+        rd.h1a_fit_weights(SIZES, np.exp(y), theta)
+    theta = np.array([0.0, 0.3, -14.0])  # p = 1 - 1e-6: the floor column of J nearly vanishes
+    hess = rd.h1a_hessian(log_n, model_log(log_n, theta), theta)
+    assert np.linalg.eigvalsh(hess)[0] > 0 and np.linalg.cond(hess) > 1e8
+    with pytest.raises(rd.NotComputable, match="ill conditioned"):
+        rd.h1a_fit_weights(SIZES, np.exp(model_log(log_n, theta)), theta)
+    theta = np.array([0.0, 0.3, -50.0])  # p = 1 everywhere: the floor is not identified at all
+    with pytest.raises(rd.NotComputable, match="not positive definite|ill conditioned"):
+        rd.h1a_fit_weights(SIZES, np.exp(model_log(log_n, theta)), theta)
+    with pytest.raises(rd.NotComputable, match="spread of a column is zero"):
+        rd.sbg_density(np.zeros(30))
+    with pytest.raises(rd.NotComputable, match="too few"):
+        rd.sbg_density(np.arange(7.0))
+    assert rd.HALL_SHEATHER == pytest.approx(0.97157, abs=5e-6)
+    h = rd.HALL_SHEATHER * 300 ** (-1 / 3)
+    z = sps.norm.ppf(1 - 0.025)  # 1.96: the constant is z^(2/3) (1.5 phi(0)^2)^(1/3)
+    assert rd.HALL_SHEATHER == pytest.approx(z ** (2 / 3) * (1.5 * sps.norm.pdf(0) ** 2) ** (1 / 3),
+                                             rel=1e-4)
+    assert 0 < 0.5 - h
+
+
+def test_a6_end_to_end_a_flagged_cell_is_not_computable_and_the_rest_runs(tmp_path, capsys) -> None:
+    """The leaf ``n_exponent_at_bound.point = 1`` of one rho makes that cell "not computable"
+    (named, listed in the summary by name), the other rho and H1c still run, exit 2."""
+    d, res, _ = build_world(rng_for("world"))
+    res["systems"]["lorenz63"]["H1a"]["by_noise"]["0.02"]["n_exponent_at_bound"]["point"] = 1
+    code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "50", "--permutations", "20",
+                    "--json", str(tmp_path / "j.json")])
+    out = capsys.readouterr().out
+    assert "not computable: lorenz63 H1a rho=0.02: exponent at a bound" in out
+    data = json.loads((tmp_path / "j.json").read_text())
+    assert "H1a rho=0.01" in data["lorenz63"]["D1"] and "H1a rho=0.02" not in data["lorenz63"]["D1"]
+    assert "H1c PLP" in data["lorenz63"]["D1"]
+    assert "not computable by name: lorenz63 H1a rho=0.02." in out and code == 2
+
+
+def test_a7_reproduction_mismatches_are_defects_and_the_series_is_not_used(tmp_path, capsys) -> None:
+    """a7: the leaves ``median_seed_by_n_lib`` (bitwise), ``inverse_dim_reference``,
+    ``fitted_inverse_dim`` (through the production fit, bitwise) and the H1c median are recomputed from
+    the dump: a one-ulp change of the median or of the fit is a MISMATCH (exit 1) and that cell's
+    series is dropped; the unperturbed world is all MATCH (full-run test).
+
+    Reference: ``np.nextafter`` on the leaves the test built by the production ``_fit_seed_law``.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    h1a = res["systems"]["lorenz63"]["H1a"]["by_noise"]["0.01"]
+    h1a["fitted_inverse_dim"] = float(np.nextafter(h1a["fitted_inverse_dim"], 1.0))
+    res["systems"]["lorenz63"]["H1c"]["CP"]["median_ratio"] = float(
+        np.nextafter(res["systems"]["lorenz63"]["H1c"]["CP"]["median_ratio"], 5.0))
+    json_path = tmp_path / "j.json"
+    code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "50", "--permutations", "20",
+                    "--json", str(json_path)])
+    out = capsys.readouterr().out
+    # the fitted_inverse_dim leaf (the ratio leaf is untouched, so it still matches) and the CP median
+    assert code == 1 and out.count(": MISMATCH") == 2
+    names = set(json.loads(json_path.read_text())["lorenz63"]["D1"])
+    assert "H1a rho=0.01" not in names and "H1a rho=0.02" in names and "H1c PLP" in names
+
+
+def test_a8_h1c_sign_type_hand_case_on_the_compacted_eligible_array() -> None:
+    """a8: eleven eligible finite ratios (odd) with a three-fold tie at the median, three ineligible
+    states between them: the series is the compacted rank score, exact.
+
+    Reference: by hand. Kept values in time order (2, 4, 9, 4, 1, 6, 4, 8, 3, 5, 7): sorted 1, 2, 3, 4, 4,
+    4, 5, 6, 7, 8, 9, median 4 (the 6th). Score ``1{r < 4} + 1/2 1{r = 4} - 1/2``: (+.5, 0, -.5, 0,
+    +.5, -.5, 0, -.5, +.5, -.5, -.5). The leaves (median 4, 11 kept, 3 ineligible) are MATCH.
+    """
+    kept = np.array([2.0, 4.0, 9.0, 4.0, 1.0, 6.0, 4.0, 8.0, 3.0, 5.0, 7.0])
+    ratio = np.full(14, np.nan)
+    eligible = np.zeros(14, bool)
+    positions = [0, 1, 3, 4, 5, 7, 8, 9, 10, 12, 13]
+    ratio[positions] = kept
+    eligible[positions] = True
+    d = {f"h1c/{name}/{k}": v for name in ("PLP", "CP") for k, v in (("ratio", ratio), ("eligible", eligible))}
+    leaf = {"median_ratio": 4.0, "n_states": 11, "n_ineligible_states": 3, "n_excluded_nonfinite": 0}
+    rep = rd.Report()
+    ctx = rd.Context("s", rd.Dump(d, "mem"), {"H1c": {"PLP": leaf, "CP": leaf}}, {}, rep, 1, 2, 2)
+    out = rd.series_h1c(ctx)
+    expect = np.array([0.5, 0.0, -0.5, 0.0, 0.5, -0.5, 0.0, -0.5, 0.5, -0.5, -0.5])
+    assert [s.name for s in out] == ["H1c PLP", "H1c CP"] and not out[0].primary
+    assert np.array_equal(out[0].values, expect) and out[0].domain == 11 and out[0].n == 11
+    assert not rep.defects and not rep.incomplete
+    ten = np.full(14, np.nan)
+    ten[:9] = np.arange(9.0)
+    d["h1c/PLP/ratio"], d["h1c/PLP/eligible"] = ten, np.isfinite(ten)
+    rep = rd.Report()
+    ctx = rd.Context("s", rd.Dump(d, "mem"), {"H1c": {"PLP": leaf, "CP": leaf}}, {}, rep, 1, 2, 2)
+    got = rd.series_h1c(ctx)
+    assert [s.name for s in got] == ["H1c CP"]
+    assert any("H1c PLP" in line and "9 eligible finite ratios" in line for line in rep.incomplete)
+
+
+def test_a9_the_predicted_rates_for_24_series_are_0_993_and_0_91_and_the_acf_rate_0_11() -> None:
+    """a9: the run-level D2 line prints N and ``1 - prod(1 - r_i)`` for the 24 series of F3:
+    0.993 for the pilot set (12 at n = 500, 6 at 300 and 6 H1a at the nominal sweep size 300) and
+    0.91 for the full set (24 at n = 1000); the D1 line's predicted P(some |acf(1)| above its
+    threshold) is about 0.11 at the pilot (0.064 for the 18, M4.2).
+
+    Reference: the products by hand from the per-series rates 0.164, 0.210, 0.094. H1a is looked up at
+    ``n_rate`` (its nominal size), not at its compacted length.
+    """
+    def log_of(spec: list[tuple[int, int | None]]) -> rd.Report:
+        rep = rd.Report()
+        for k, (n, n_rate) in enumerate(spec):
+            rep.series_log.append({"system": "s", "name": f"series {k}", "n": n, "n_rate": n_rate,
+                                   "primary": True, "acf1": 0.0, "within": True, "fires": False})
+        rd.run_level_lines(rep)
+        return rep
+
+    pilot = log_of([(500, None)] * 12 + [(300, None)] * 6 + [(297, 300)] * 6)
+    rate = pilot.data["run_level"]["predicted_at_least_one"]
+    assert rate == pytest.approx(1 - 0.836**12 * 0.79**12, rel=1e-12) and round(rate, 3) == 0.993
+    assert "for these 24 series 0.993" in "\n".join(pilot.lines)
+    assert pilot.data["run_level"]["predicted_acf_any"] == pytest.approx(0.11, abs=0.01)
+    eighteen = log_of([(500, None)] * 12 + [(300, None)] * 6)
+    assert eighteen.data["run_level"]["predicted_acf_any"] == pytest.approx(0.064, abs=0.005)
+    full = log_of([(1000, None)] * 24)
+    assert round(full.data["run_level"]["predicted_at_least_one"], 2) == 0.91
+
+
+def test_h1a_h1c_are_named_when_the_dump_is_schema_1_without_their_groups(tmp_path, capsys) -> None:
+    """A dump without the ``h1a/`` and ``h1c/`` groups (schema /1): both criteria are "not computable"
+    by name in the summary with the E1 sentence, exit 2; everything else runs."""
+    d, res, _ = build_world(rng_for("world"))
+    d = {k: v for k, v in d.items() if not k.startswith(("h1a/", "h1c/"))}
+    code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "50", "--permutations", "20"])
+    out = capsys.readouterr().out
+    summary = out[out.index("Summary"):]
+    assert "not computable by name: lorenz63 H1a, lorenz63 H1c." in summary
+    assert "cannot say whether the phi = 0 or the phi = 0.3 coverage applies" in summary
+    assert "array 'h1a/noise_levels' is not in" in out and "array 'h1c/PLP/ratio' is not in" in out
+    assert code == 2 and "D3 log-SD" in out
+
+
+def test_h1a_h1c_coverage_labels() -> None:
+    """The D1 reading of H1a and H1c says "coverage not tabulated" with the phi = 0 reading only
+    (amendment 6 F1, F2); C3's case value 0.19 is not borrowed (no case value, no interpolation)."""
+    for name, text in (("H1a", "coverage not tabulated (no WU-0006 case for H1a); phi = 0 reading only"),
+                       ("H1c", "coverage not tabulated; phi = 0 reading only")):
+        reading, cov = rd.acf_reading(name, 0.1, 500)
+        assert cov is None and reading.endswith(text) and "no case value" in reading
+        assert rd.CASE_VALUE.get(name) is None
