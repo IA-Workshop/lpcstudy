@@ -1,0 +1,14 @@
+{
+  "schema": "lpcstudy.run-meta/1",
+  "preset": "full",
+  "seed_id": "DEV-2",
+  "start_utc": "2026-10-17T16:43:12Z",
+  "end_utc": "2026-10-17T21:27:03Z",
+  "device": "cpu",
+  "wall_seconds": 17031,
+  "exit_code": 0,
+  "seed_flag": "--seed-id DEV-2",
+  "lpc_threads": 8,
+  "command": "timeout --kill-after=300 12h /home/brianm/projects/physics/chaos/lpcstudy-wt/run/r3r6-c9bb981/.venv/bin/python -m lpcstudy --preset full --out /home/brianm/projects/physics/chaos/lpcstudy-wt/run/r3r6-c9bb981/runs/r6-cpu-dev2 --seed-id DEV-2",
+  "pid": 2524506
+}
