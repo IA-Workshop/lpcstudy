@@ -1,0 +1,160 @@
+# Levenberg-Marquardt iteration doubling of the PLP estimator, pilot preset, DEV-0 (WU-0005.6), version 2
+
+**DEVELOPMENT (DEV-0): conditional on one realization; not a hypothesis test; nothing here is promoted.**
+
+Status: version 2 of the report for the owner (decision O5), written by claude-sonnet-5-5, 2026-10-17. It replaces the wording of
+`docs/study/lm_doubling_dev0_report.md` (version 1, sha256 `a4b2b0fd02711171a432c1ddf532cb7b5da19679c3895ea92dec6b22e0567273`, left
+unchanged) after the independent report check (`docs/agent/records/work/WU-0005.6-report-check.md`, findings R1 and R4 to R9), the
+applied-mathematician's reading of rule R (`docs/agent/notes/2026-10-14-math-wu0005-6-rule-r-reading.md`) and DEF-0027 and DEF-0028.
+Placement: this file is `docs/agent/notes/2026-10-17-lm-doubling-dev0-report-v2.md`; the developer role may not write `docs/study/`, so the
+coordinator moves it to `docs/study/lm_doubling_dev0_report_v2.md` (content unchanged).
+
+## 0. What changed relative to version 1
+
+- **Class of one part.** Chua H3c is class **U** here (plan-faithful reading of rule R, see section 2); version 1 and the tool give X. The counts are
+  **N 5 / X 6 / U 7** (version 1: 5 / 7 / 6); Chua N 1 / X 2 / U 3 (version 1: 1 / 3 / 2). **No other class changes and no number changes.**
+  The LM-row flag (yes iff class N) is unchanged: yes for 5 of 18 parts.
+- The statement about endpoint noise is corrected (section 3).
+- The size of every U part gives both d1 hw and d2 hw; the size of an X part whose ratio condition fails is d1 hw, not S (section 5).
+- Section 2 states the structural-switch condition and the precedence the tool applies.
+- Option 2 of O5 is stated with the same costs as DEF-0027, and the three options with their pros and cons equally (section 7).
+- The M7 membership counts and the single-digit counts behind the Rossler r_A values are given (section 3).
+- Stale paths and status are corrected (section 8).
+
+## 1. Question
+
+The PLP state estimator runs a fixed 15 Levenberg-Marquardt iterations (v3 section 4). The budget table lists the iterative
+error of every primary quantity of interest (QoI) as "not estimated" (DEC-0024). This study measures the change of each
+QoI when the iteration count is doubled, 15 to 30 and 30 to 60, on common inputs, and asks whether the 15-iteration
+error is below 10% of the sampling half-width (strict, `budget.below_tenth`).
+
+## 2. Setup and definitions
+
+- Code: develop commit `e29cb16929b5a1e15ec02e005dc6904869804cae` (gate pass at `083f594`: unit 1202, integration 14),
+  a clean detached worktree (`git status` empty) used for the three arms and the probe. Tool: `tools/lm_doubling.py`
+  (WU-0005.6b), decision rule R of the Mathematics check (it replaced the plan's D1 to D3).
+- Run: preset `pilot`, seed id DEV-0 (20261005), CPU, `LPC_THREADS=8`, `tools/run_preset.sh` with
+  `--estimator-refine-steps 15 | 30 | 60`, jax and jaxlib 0.11.2, one preset at a time, Intel Core i9-14900K.
+- Wall times: arm 15, 5343 s (2026-10-14T11:18:58Z to 12:48:01Z); arm 30, 9578 s (12:48:04Z to 15:27:42Z; 1.8 times arm 15); arm 60, 18184 s
+  (15:28:14Z to 20:31:18Z; 3.4 times arm 15); Part A probe, 19673 s. The machine was shared with other lanes, so these times are not a cost benchmark.
+- Part A (per estimate): every PLP input of the five QoIs (core cell, all three splits, oracle and evaluation draws; the test rows
+  0 to 299 of the noise-sweep cells at rho = 0.5%, 2%, 5%) re-estimated at 15, 30, 60 and 120 iterations in the pipeline's chunks.
+- Statistics: for each QoI part and system, with hw = half-width of the 15-iteration interval, d1 = largest of |change of the point,
+  lower end, upper end| from 15 to 30 divided by hw, d2 likewise from 30 to 60, S = d1 + 2 d2, and the tail ratio r_A of Part A
+  (rule R: max of F(60 to 120)/F(30 to 60) and T(60 to 120)/T(30 to 60), where F counts estimates that move by more than 0.1 rho nu(30)
+  and T sums their moves; r_A = 0 if F(60 to 120) = 0).
+- Classes of rule R (Mathematics check):
+  - **N** (negligible, LM-row flag "yes"): the part verdict is the same at 15, 30 and 60; d2 <= d1/2; r_A <= 1/2; S < 0.1 (strict).
+  - **X** (not negligible): the verdict differs among the arms, or d1 >= 0.1, or (d2 <= d1/2 and r_A <= 1/2 and S >= 0.1).
+  - **U** (not certified): "every other case, including the structural switches of M7". A structural switch (M7) is the H2a(ii) "one" part existing at
+    some arms only, a change of A5's chosen number of regimes K, or an infinite bound. Changes of membership counts (eligible states, zero set)
+    are not structural switches; they stay inside d1 as iterative error (M7).
+  - The size S hw is an estimate only under the hypothesis H-geo (each doubling after 60 at least halves the QoI change). Where a ratio
+    condition fails, the lower estimate is d1 hw (monotone convergence), and U parts have no supported size: d1 hw and d2 hw are given.
+- **Precedence of a structural switch (a reading that is not decided here).** Rule R makes U "every other case, including the structural switches". Both
+  that sentence and M7 ("the switches make the part class U") hold only if a switch rules out N and every X bullet, so the plan-faithful order
+  puts U before X. The tool (`classify`) lets a switch block only N and the third X bullet, so it returns X for a switch part with d1 >= 0.1 or a verdict
+  change. This is a deviation of the tool from the plan (DEF-0028); it was recorded in the unit Log before any output but was not adopted by the author of
+  rule R. This report states the **plan-faithful class as the primary reading and the tool's class as a secondary reading**. It affects one part
+  (Chua H3c) and no flag (the flag is "yes" iff class N, and no N part has a switch). The owner decides whether the tool or the plan text is amended;
+  the applied-mathematician's opinion is that order A is defensible on the merits (bullets 1 and 2 do not rely on H-geo) but is not the pre-registered rule.
+
+## 3. Result: 18 parts, N 5, X 6, U 7 (tool: N 5, X 7, U 6)
+
+LM-row flag ("below 10% of the sampling half-width": yes iff class N): **yes for 5 of 18 parts, no for 13**, under either reading.
+
+| system | QoI part | class (plan-faithful) | class in the tool | LM-row flag | d1 (sets) | d2 (sets) | S = d1 + 2 d2 | size in QoI units | r_A | S x sqrt(n_full/n) | endpoint-limited |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| chua | H2a(i) | X | same | no | 0.116 (hi) | 0.000163 (lo) | 0.117 | S hw = 0.00606 (estimate under H-geo) | 0.25 | 0.165 | yes |
+| chua | H2a(ii) interior | U | same | no | 0.0204 (pt) | 0.0434 (lo) | 0.107 | d1 hw = 0.00269, d2 hw = 0.00572; tail not supported | 0.25 | 0.151 | no |
+| chua | H2a(ii) zero | U | same | no | 0.0471 (pt) | 0.043 (hi) | 0.133 | d1 hw = 0.00472, d2 hw = 0.00431; tail not supported | 0.25 | 0.188 | yes |
+| chua | H2b(i) | X | same | no | 0.108 (pt) | 0.0759 (lo) | 0.26 | >= d1 hw = 0.0103 (monotone convergence) | 0.403 | 0.474 | no |
+| chua | H2b(ii) | N | same | yes | 0.00605 (pt) | 0.00139 (lo) | 0.00884 | S hw = 0.000323 (estimate under H-geo) | 0.205 | 0.0161 | no |
+| chua | H3c | U | X | no | 0.182 (lo) | 0.000918 (lo) | 0.184 | d1 hw = 0.0549, d2 hw = 0.000277; tail not supported | 0.246 | 0.26 | no |
+| lorenz63 | H2a(i) | X | same | no | 0.182 (hi) | 0.0958 (hi) | 0.373 | >= d1 hw = 0.00763 (monotone convergence) | 0.411 | 0.528 | yes |
+| lorenz63 | H2a(ii) interior | U | same | no | 0.0301 (pt) | 0.0154 (hi) | 0.061 | d1 hw = 0.00349, d2 hw = 0.00178; tail not supported | 0.411 | 0.0862 | yes |
+| lorenz63 | H2a(ii) zero | N | same | yes | 0.0711 (lo) | 0.00316 (hi) | 0.0775 | S hw = 0.00726 (estimate under H-geo) | 0.411 | 0.11 | no |
+| lorenz63 | H2b(i) | X | same | no | 0.156 (hi) | 0.00788 (pt) | 0.172 | S hw = 0.0145 (estimate under H-geo) | 0.401 | 0.313 | no |
+| lorenz63 | H2b(ii) | X | same | no | 0.115 (hi) | 0.00686 (hi) | 0.128 | S hw = 0.0056 (estimate under H-geo) | 0.41 | 0.234 | yes |
+| lorenz63 | H3c | X | same | no | 0.305 (hi) | 0.151 (hi) | 0.607 | S hw = 0.195 (estimate under H-geo) | 0.434 | 0.859 | no |
+| rossler | H2a(i) | U | same | no | 0.0088 (hi) | 0.0088 (hi) | 0.0264 | d1 hw = 0.000395, d2 hw = 0.000395; tail not supported | 0 | 0.0373 | yes |
+| rossler | H2a(ii) interior | N | same | yes | 0.0118 (hi) | 0.00097 (hi) | 0.0137 | S hw = 0.00169 (estimate under H-geo) | 0 | 0.0194 | no |
+| rossler | H2a(ii) zero | N | same | yes | 4.79e-05 (pt) | 7.17e-06 (pt) | 6.22e-05 | S hw = 7.89e-06 (estimate under H-geo) | 0 | 8.8e-05 | no |
+| rossler | H2b(i) | U | same | no | 0 (pt) | 0 (pt) | 0 | d1 hw = 0, d2 hw = 0; tail not supported | 0.571 | 0 | no |
+| rossler | H2b(ii) | N | same | yes | 7.58e-05 (lo) | 2.63e-05 (pt) | 0.000128 | S hw = 5.69e-06 (estimate under H-geo) | 0 | 0.000234 | yes |
+| rossler | H3c | U | same | no | 3.32e-05 (lo) | 3.7e-05 (lo) | 0.000107 | d1 hw = 2.4e-06, d2 hw = 2.68e-06; tail not supported | 0.49 | 0.000151 | no |
+
+Class counts per system (plan-faithful): lorenz63 N 1 / X 4 / U 1; rossler N 3 / X 0 / U 3; chua N 1 / X 2 / U 3.
+
+Notes on specific rows:
+
+- lorenz63 H3c: the verdict differs among the arms (pass at 15, inconclusive at 30, pass at 60), which alone makes it class X.
+- chua H3c: A5's chosen K switches discretely, 8 at 15 and 5 at 30 and 60. This is an M7 structural switch, so the part is **U** (plan-faithful; sizes d1 hw = 0.0549, d2 hw = 0.00028,
+  tail not supported); the tool's X (d1 = 0.18 >= 0.1) is the secondary reading. An H-geo estimate is not meaningful across a discrete switch, so no S hw is given.
+- **Endpoints and class N (corrected statement).** d1, d2 and S are maxima over {point, lower end, upper end}. Using the bootstrap endpoints can only raise d1, d2 and S relative to the
+  point alone, so the endpoints can never produce N through S < 0.1 and never remove an X that the point alone gives through d1 >= 0.1 (the guarantee of M2).
+  The ratio condition d2 <= d1/2 compares maxima that may come from different components, so the endpoints can move a part in either direction through it. Of the 7
+  endpoint-limited parts (the class from the point alone differs), 6 move away from N and 1 toward it: toward X through d1: chua H2a(i) (N to X), lorenz63 H2b(ii) (N to X), lorenz63 H2a(i) (U to X);
+  toward U through the ratio: chua H2a(ii) zero, lorenz63 H2a(ii) interior, rossler H2a(i) (each N to U); toward N through the ratio: rossler H2b(ii) (U to N: the lower-end change raises d1 to 7.6e-5, so that
+  d2 = 2.6e-5 <= d1/2; on the point alone d2 is 0.93 of d1). Relative to infinitely many resamples, endpoint Monte Carlo noise (B = 500) raises d1, d2 and S in expectation but not in every realization. No floor was applied.
+- Sensitivity of two N parts: rossler H2b(ii) and chua H2b(ii) are N although one component's own ratio d2/d1 exceeds 1/2 (the test uses the maxima). For rossler H2b(ii) suppose the point kept
+  its ratio 0.93 at every later doubling: the bound on the error at 15 is 3.9e-4 hw against 0.1, and r_A = 0. The class N stands; this is a sensitivity reading, not a reclassification.
+- rossler H2b(i) is U only because r_A = 0.571 exceeds 1/2 (d1 = d2 = 0: the QoI does not move). The ratio rests on single-digit counts: F(30 to 60) = 9 and F(60 to 120) = 4 (ratio 0.44), T 2.63 and 1.50 (ratio 0.571).
+  Other rossler tail values: H3c F 7 to 2 (r_A = 0.490, from the T ratio 1.91 to 0.94); H2a and H2b(ii) F 2 to 0, so r_A = 0.
+- rossler: 3 to 28 estimates per Part A group had a replaced state or nu at some level and are left out of the per-estimate ratios (counted in the probe file); lorenz63 and chua had none.
+- Part A, share of estimates that move by more than 0.1 rho nu(30) from one doubling to the next (all groups pooled): lorenz63 2.3% (15 to 30), 1.2% (30 to 60), 0.52% (60 to 120); rossler 0.024%, 0.003%, 0.0013%; chua 0.34%, 0.082%, 0.032%.
+- Estimates with c/rho^2 above the chi-square 0.999 quantile (core test split, 100000 estimates, at 15, 30, 60, 120 iterations): lorenz63 2916, 2299, 2072, 2042; rossler 106, 106, 106, 106 (not converging: the wrong-basin or misfit group); chua 405, 330, 282, 276. No estimate crossed from below to above at any doubling.
+- Membership counts (M7; they move with the iteration count and are part of d1, not switches):
+
+| count (arms 15 / 30 / 60) | lorenz63 | rossler | chua |
+| --- | --- | --- | --- |
+| H2a(i) eligible states | 327 / 332 / 333 | 463 / 463 / 463 | 314 / 314 / 314 |
+| w* = 0 states | 155 / 154 / 154 | 137 / 137 / 137 | 137 / 136 / 136 |
+| w* = 1 states | 15 / 14 / 14 | 2 / 2 / 2 | 6 / 6 / 6 |
+| H2a(ii) interior part n | 330 / 332 / 332 | 361 / 361 / 361 | 357 / 358 / 358 |
+| H2b(i) constant states | 23 / 23 / 23 | 21 / 21 / 21 | 13 / 14 / 14 |
+| H2b(ii) zero-difference states | 49 / 48 / 48 | 38 / 38 / 38 | 40 / 39 / 39 |
+| A5 chosen K | 8 / 8 / 8 | 3 / 3 / 3 | 8 / 5 / 5 |
+
+## 4. Evidence that the comparison is paired and exact
+
+- C0 (leaves that cannot read a PLP output, 35 patterns with a producer line each) bitwise equal across every pair of arms: 0 violations, over 6360, 6559 and 4745 differing leaves for the pairs 15-30, 15-60 and 30-60. All 35 patterns match at least one leaf (no coverage gap), including the robustness patterns.
+- P0: the probe's pooled `lm_summary` and counts equal the stored ones exactly, at the 15, 30 and 60 arms, for all three systems (core oracle and evaluation kinds, and the sweep cells). Part A and the arms share commit, preset, seed id, CPU, `LPC_THREADS`, `XLA_FLAGS`, jax and jaxlib; the probe recorded each arm's start and end time.
+- P1 (the 30-iteration run starts with the 15-iteration run, so the cost never rises and the accepted count never falls): 1404 exact comparisons of the stored `lm` summaries, 0 violations; per estimate, 0 violations in every group and doubling.
+- Smoke checks before the pilot (K3): the flag at 15 and an absent flag give bitwise identical results (4555 leaves, provenance and wall-clock excluded).
+- Review: independent review rounds 1 and 2 of the tool and the knob, and the independent check of this report against its data (every number, class, count, side reading and hash correct), are in `docs/agent/records/work/`.
+
+## 5. Limits
+
+- One realization (DEV-0), one trajectory, one trained network per noise level; the numbers say nothing about between-realization variability.
+- Pilot sizes (test 500, sweep 300, M = 200, evaluation draws 2) and B = 500 resamples; the full run has test 1000, sweep 1000 and B = 2000.
+- The transfer column S x sqrt(n_full/n) is reported, never applied: a systematic iterative change does not shrink with n while the half-width does, so relative to hw it grows like sqrt(n). It rests on that scaling and on H-geo; a full-run 30/60 twin would remove the projection (open question O4).
+- H-geo (each doubling after 60 at least halves the QoI change) cannot be verified from three levels; r_A (60 to 120 against 30 to 60, per estimate) is the supporting check.
+- Part A covers the PLP inputs listed above; the V3 and V4 checks and the robustness variants were not re-estimated at the doubled budgets.
+- Sizes: S hw is an estimate under H-geo when both ratio conditions hold (N, and X by its third bullet). In a class X part whose ratio condition (d2 <= d1/2 or r_A <= 1/2) fails, the lower estimate is **d1 hw** under monotone convergence (rule R), not S hw. U parts have no supported size; both d1 hw and d2 hw are given.
+- The classes describe the size of a change under doubling, not a defect of the design.
+
+## 6. What is not concluded
+
+- No hypothesis (H1 to H3) is tested, and no verdict is given or changed here; the verdict changes quoted are those of the doubled runs on DEV-0.
+- No statement about the confirmatory run, no promotion, no bound on the error of the full-size run.
+- No claim that the 15-iteration design is wrong or right.
+- No choice between the plan-faithful and the tool's order for a structural switch (section 2), and no choice among the options below.
+
+## 7. Options for the owner (O5), stated without a recommendation
+
+Measured: the iterative error is not shown negligible (class X or U) for 13 of 18 parts; the owner can:
+
+1. **Adopt a convention:** "PLP is the fixed 15-iteration Levenberg-Marquardt estimator" (like LPC.NV.1 for the discretization), so the estimand is defined with 15 iterations (v3 section 4 wording).
+   Pros: no new run, no number of the study moves, the existing reference stays valid. Cons: the budget's iterative row reports the measured changes as sizes of the estimand, with "no" flags for 13 of 18 parts; the estimand then depends on an algorithm setting rather than the converged maximum-likelihood estimate.
+2. **Raise the design value** (30 or 60 iterations; a v3 change).
+   Pros: the estimand is closer to the converged estimate; the measured change 30 to 60 (d2) is smaller than 15 to 30 (d1) in 15 of the 18 parts (equal, both 0, in rossler H2b(i); larger in chua H2a(ii) interior and rossler H3c). Cons: it needs a new reference run and costs run time (the measured pilot walls were 1.8 times at 30 and 3.4 times at 60 on a shared machine, not a benchmark); every PLP number moves; the new value has its own tail to measure. This is the same statement as DEF-0027.
+3. **Report and flag only:** keep 15 iterations, print the measured row with the "no" flags, state the limitation.
+   Pros: no change of design, run or number. Cons: the iterative error stays unquantified in the confirmatory sense for the 13 parts, and readers of the primary results carry that limitation.
+
+Related open items: the budget row text for WU-0008 (O6); the transfer of these DEV-0 numbers to the confirmatory run (O4); the order of a structural switch (DEF-0028).
+
+## 8. Files
+
+Run directory (not tracked): `lpcstudy-wt/run/lm-post/runs/dev/wu0005-6/` with `k15`, `k30`, `k60` (each `pilot/results.json`), `probe-pilot/pilot/probe_pilot.json` (and `.npz`), `pilot-compare.txt` and `pilot-compare.json`. The sha256 values of these files and of version 1 are in
+`docs/agent/records/results-manifest.md`; version 2 has its own line there.
