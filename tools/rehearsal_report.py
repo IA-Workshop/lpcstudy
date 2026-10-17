@@ -121,11 +121,12 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import json
 import math
 import sys
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -137,10 +138,19 @@ if str(ROOT) not in sys.path:
 
 from lpcstudy.config import PRESETS  # noqa: E402  (after the path line; no jax import)
 
-EXIT_MISMATCH = 1
-EXIT_INCOMPLETE = 2
-SCHEMAS = ("lpcstudy.states/1", "lpcstudy.states/2")
-PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
+common = sys.modules.get("rehearsal_common")
+if common is None:  # the shared code of the two rehearsal tools (WU-0003.10), loaded by path
+    _SPEC = importlib.util.spec_from_file_location("rehearsal_common",
+                                                   Path(__file__).with_name("rehearsal_common.py"))
+    assert _SPEC is not None and _SPEC.loader is not None
+    common = importlib.util.module_from_spec(_SPEC)
+    sys.modules["rehearsal_common"] = common
+    _SPEC.loader.exec_module(common)
+
+EXIT_MISMATCH = common.EXIT_MISMATCH
+EXIT_INCOMPLETE = common.EXIT_INCOMPLETE
+SCHEMAS = common.SCHEMAS
+PRIMARY_LEVEL = common.PRIMARY_LEVEL
 SECONDARY_LEVEL = 0.95
 B_FACTOR = {"primary": 1.014, "secondary": 1.007}
 """E hw(B = 2000) / E hw(B = 500) at 1 - 0.05/3 and at 95% (M3, ``m3_bfactor.log``)."""
@@ -178,124 +188,16 @@ SLACK = 0.005
 
 
 # --------------------------------------------------------------------------------------------
-# errors and the report
+# errors and the report (shared with the diagnostics: tools/rehearsal_common.py)
 # --------------------------------------------------------------------------------------------
-class NotComputable(Exception):
-    """A quantity cannot be formed from the data given (never replaced by a number)."""
-
-
-class Missing(NotComputable):
-    """A leaf or array that the projection needs is not in the file."""
-
-
-class Refused(NotComputable):
-    """The run is refused (a seed id that is not a development seed, or disagreeing ids)."""
-
-
-@dataclass
-class Report:
-    """Lines, the "not computable" and mismatch lists, and the numbers (for ``--json``)."""
-
-    lines: list[str] = field(default_factory=list)
-    incomplete: list[str] = field(default_factory=list)
-    defects: list[str] = field(default_factory=list)
-    data: dict = field(default_factory=dict)
-
-    def say(self, text: str = "") -> None:
-        """Add a line."""
-        self.lines.append(text)
-
-    def nc(self, where: str, why: str) -> None:
-        """Record and print a quantity that cannot be computed (counts toward exit 2)."""
-        line = f"not computable: {where}: {why}"
-        self.incomplete.append(line)
-        self.lines.append("  " + line)
-
-    def internal(self, where: str, exc: Exception) -> None:
-        """Record and print an unexpected exception (never lost, never read as a MISMATCH)."""
-        import traceback
-        frame = traceback.extract_tb(exc.__traceback__)[-1]
-        line = (f"INTERNAL ERROR: {where}: {type(exc).__name__}: {exc} "
-                f"(at {Path(frame.filename).name}:{frame.lineno} in {frame.name})")
-        self.incomplete.append(line)
-        self.lines.append("  " + line)
-
-    def defect(self, text: str) -> None:
-        """Record and print a MISMATCH."""
-        self.defects.append(text)
-        self.lines.append("  MISMATCH: " + text)
-
-    def exit_code(self) -> int:
-        """1 on a mismatch, else 2 on anything not computable, else 0."""
-        return EXIT_MISMATCH if self.defects else (EXIT_INCOMPLETE if self.incomplete else 0)
-
-
-def attempt(rep: Report, where: str, fn: Callable, *args, **kwargs):
-    """Call ``fn``; a ``NotComputable`` is recorded under ``where`` and ``None`` is returned.
-
-    Any other exception is recorded as an INTERNAL ERROR (exit 2) and also returns ``None``, so
-    the rest of the report is still computed; a ``Refused`` is never caught.
-    """
-    try:
-        return fn(*args, **kwargs)
-    except Refused:
-        raise
-    except NotComputable as exc:
-        rep.nc(where, str(exc))
-        return None
-    except Exception as exc:  # noqa: BLE001  (unexpected: reported, exit 2)
-        rep.internal(where, exc)
-        return None
-
-
-class Dump:
-    """One system's ``states/<system>.npz`` (or a dict of the same keys, for tests)."""
-
-    def __init__(self, arrays, source: str) -> None:
-        self._arrays = arrays
-        self.source = source
-
-    @classmethod
-    def load(cls, path: Path) -> Dump:
-        """Open an archive (never with pickles)."""
-        return cls(np.load(path, allow_pickle=False), str(path))
-
-    def close(self) -> None:
-        """Close the archive (a dict has nothing to close)."""
-        if hasattr(self._arrays, "close"):
-            self._arrays.close()
-
-    def has(self, key: str) -> bool:
-        """Whether the key is present."""
-        return key in self._arrays
-
-    def __getitem__(self, key: str) -> np.ndarray:
-        if key not in self._arrays:
-            raise Missing(f"array {key!r} is not in {self.source}")
-        return np.asarray(self._arrays[key])
-
-    def scalar(self, key: str):
-        """A 0-d array as a Python scalar."""
-        return self[key].item()
-
-
-def dig(tree: dict, *path: str):
-    """A leaf of the results tree; ``Missing`` if any key is absent or the leaf is None."""
-    node = tree
-    for key in path:
-        if not isinstance(node, dict) or key not in node:
-            raise Missing(f"results leaf {'/'.join(path)} is absent")
-        node = node[key]
-    if node is None:
-        raise Missing(f"results leaf {'/'.join(path)} is null")
-    return node
-
-
-def fmt(x: float | None, digits: int = 4) -> str:
-    """A number for a report line; None prints as ``n/a``."""
-    if x is None:
-        return "n/a"
-    return f"{x:.{digits}g}"
+NotComputable = common.NotComputable
+Missing = common.Missing
+Refused = common.Refused
+Report = common.Report
+attempt = common.attempt
+Dump = common.Dump
+dig = common.dig
+fmt = common.fmt
 
 
 # --------------------------------------------------------------------------------------------
@@ -691,58 +593,11 @@ def prediction_for(label: str) -> tuple[str, float | None, float | None] | None:
 # --------------------------------------------------------------------------------------------
 # seeds and files
 # --------------------------------------------------------------------------------------------
-def is_dev_id(seed_id: object) -> bool:
-    """Whether a recorded seed id is a development id ``DEV-n``."""
-    return isinstance(seed_id, str) and seed_id.startswith("DEV-") and seed_id[4:].isdigit()
-
-
-def run_seed_id(results: dict) -> str:
-    """The run's seed id: ``config.seed_id`` and ``provenance.seed_id`` must both be present, agree
-    and be ``DEV-n``, and a recorded ``provenance.seed_kind`` must be ``development``.
-
-    Raises
-    ------
-    Refused
-        Otherwise.
-    """
-    cfg, prov = results.get("config"), results.get("provenance")
-    if not isinstance(cfg, dict) or not isinstance(prov, dict):
-        raise Refused("refused: results.json has no config block or no provenance block")
-    ids = {"config.seed_id": cfg.get("seed_id"), "provenance.seed_id": prov.get("seed_id")}
-    for where, value in ids.items():
-        if not is_dev_id(value):
-            raise Refused(f"refused: {where} is {value!r}, not a development seed id DEV-n")
-    if ids["config.seed_id"] != ids["provenance.seed_id"]:
-        raise Refused(f"refused: the recorded seed ids disagree: {ids}")
-    if prov.get("seed_kind") != "development":
-        raise Refused(f"refused: provenance.seed_kind is {prov.get('seed_kind')!r}, not "
-                      "'development'")
-    return str(ids["config.seed_id"])
-
-
-def make_label(seed_id: str | None) -> str:
-    """The DEVELOPMENT label with the seed id the run recorded."""
-    return f"DEVELOPMENT ({seed_id}): conditional on one realization; not a hypothesis test"
-
-
-def find_results(path: Path) -> Path:
-    """The ``results.json`` of a run (a file, or the directory that holds it)."""
-    target = path / "results.json" if path.is_dir() else path
-    if not target.is_file():
-        raise NotComputable(f"no results.json at {path}")
-    return target
-
-
-def load_results(path: Path) -> tuple[Path, dict, str]:
-    """Read a run: the file, the parsed tree and its (validated) development seed id."""
-    target = find_results(path)
-    try:
-        results = json.loads(target.read_text())
-    except (OSError, ValueError) as exc:
-        raise NotComputable(f"{target} is unreadable: {exc}") from exc
-    if not isinstance(results, dict):
-        raise NotComputable(f"{target} does not hold a JSON object")
-    return target, results, run_seed_id(results)
+is_dev_id = common.is_dev_id
+run_seed_id = common.run_seed_id
+make_label = common.make_label
+find_results = common.find_results
+load_results = common.load_results
 
 
 # --------------------------------------------------------------------------------------------
@@ -1347,20 +1202,7 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     return rep
 
 
-def _json_ready(obj):
-    if isinstance(obj, dict):
-        return {str(k): _json_ready(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_json_ready(v) for v in obj]
-    if isinstance(obj, np.ndarray):
-        return _json_ready(obj.tolist())
-    if isinstance(obj, (np.floating, float)):
-        return None if not math.isfinite(float(obj)) else float(obj)
-    if isinstance(obj, np.integer):
-        return int(obj)
-    if isinstance(obj, np.bool_):
-        return bool(obj)
-    return obj
+_json_ready = common.json_ready
 
 
 def main(argv: list[str] | None = None) -> int:
