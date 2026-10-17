@@ -955,6 +955,9 @@ class Context:
     seed: int
     resamples: int
     permutations: int
+    stack: dict | None = None
+    """``compare_stack`` of the analysis stack against the run's provenance (None: no comparison,
+    read as a different stack)."""
 
     @property
     def lt(self) -> int:
@@ -1219,6 +1222,113 @@ def series_h1b(ctx: Context) -> list[Series]:
 
 
 # --------------------------------------------------------------------------------------------
+# the analysis stack against the run's provenance (plan amendment 10, J2)
+# --------------------------------------------------------------------------------------------
+STACK_ENV = ("OPENBLAS_CORETYPE", "NPY_DISABLE_CPU_FEATURES")
+
+
+def stack_record() -> dict:
+    """The stack fields of this process, from the same ``lpcstudy.provenance`` functions the run used."""
+    import os
+    import platform
+
+    from lpcstudy import provenance as pv  # imports jax: needed only for this record
+    return {"python": platform.python_version(), "packages": pv._package_versions(),
+            "cpu": pv.cpu_record(), "blas": pv.blas_record(), "numpy_simd": pv.simd_record(),
+            "env": {name: os.environ.get(name) for name in pv.ENV_NAMES}}
+
+
+def _usable(block: object, *path: str) -> tuple[object, bool]:
+    """A provenance field and whether it is usable: present, not null, and its block has no error."""
+    node = block
+    for key in path:
+        if not isinstance(node, dict) or key not in node:
+            return None, False
+        node = node[key]
+    return node, node is not None
+
+
+def _stack_fields(prov: dict) -> dict[str, tuple[object, bool]]:
+    """The compared fields of one provenance block: ``{name: (value, usable)}``."""
+    out: dict[str, tuple[object, bool]] = {}
+    out["python"] = _usable(prov, "python")
+    for pkg in ("numpy", "scipy"):
+        out[f"packages.{pkg}"] = _usable(prov, "packages", pkg)
+    cpu_ok = isinstance(prov.get("cpu"), dict) and prov["cpu"].get("error") is None
+    for key in ("model", "isa"):
+        value, ok = _usable(prov, "cpu", key)
+        out[f"cpu.{key}"] = (tuple(value) if isinstance(value, list) else value, ok and cpu_ok)
+    blas = prov.get("blas")
+    libs = blas.get("libraries") if isinstance(blas, dict) else None
+    blas_ok = (isinstance(blas, dict) and blas.get("error") is None and isinstance(libs, list)
+               and len(libs) > 0 and all(isinstance(e, dict) and e.get("error") is None for e in libs))
+    out["blas.libraries"] = (tuple((e.get("library"), e.get("corename")) for e in libs)
+                             if isinstance(libs, list) else None, blas_ok)
+    simd = prov.get("numpy_simd")
+    found = simd.get("found") if isinstance(simd, dict) else None
+    out["numpy_simd.found"] = (tuple(found) if isinstance(found, list) else None,
+                               isinstance(simd, dict) and simd.get("error") is None
+                               and isinstance(found, list))
+    env = prov.get("env")
+    for name in STACK_ENV:  # an unset variable is recorded as null: present and null is a value
+        present = isinstance(env, dict) and name in env
+        out[f"env.{name}"] = (env.get(name) if present else None, present)
+    return out
+
+
+def compare_stack(run_prov: dict, own: dict) -> dict:
+    """Compare the analysis stack with the run's provenance field by field (amendment 10, J2).
+
+    A field that is missing, null, or recorded with a non-null ``error`` on either side counts as
+    different (an environment variable recorded as null is a value: unset). Returns ``{"same":
+    bool, "rows": [(field, run value, own value, status)]}`` with status ``same``, ``different``
+    or ``unusable``.
+    """
+    a, b = _stack_fields(run_prov), _stack_fields(own)
+    rows = []
+    for name in a:
+        (va, ok_a), (vb, ok_b) = a[name], b[name]
+        status = "unusable" if not (ok_a and ok_b) else ("same" if va == vb else "different")
+        rows.append((name, va, vb, status))
+    return {"same": all(r[3] == "same" for r in rows), "rows": rows}
+
+
+def fit_rule(mine: float, leaf: float, same_stack: bool, scale: float) -> str:
+    """The three branches for a fit-derived leaf: ``match``, ``mismatch`` or ``needs_stack``.
+
+    Same stack: bitwise. Different stack: within ``4e-5 scale`` (the a-priori bound for a pair of
+    correct fits, the constant of ``REFIT_TOLERANCE``) the bitwise reproduction cannot be judged
+    (``needs_stack``: never a pass); beyond it a MISMATCH. The bound is inclusive.
+    """
+    if same_stack:
+        return "match" if _bits(float(mine)) == _bits(float(leaf)) else "mismatch"
+    return "needs_stack" if abs(float(mine) - float(leaf)) <= REFIT_TOLERANCE * scale else "mismatch"
+
+
+def check_fit(ctx: Context, label: str, mine: float, path: tuple[str, ...], scale: float) -> None:
+    """Reproduce a leaf that comes from the production fit, by ``fit_rule`` (J2)."""
+    try:
+        leaf = float(dig(ctx.res, *path))
+    except Missing as exc:
+        ctx.rep.nc(f"{ctx.system} {label}: reproduction check", str(exc))
+        return
+    same = bool(ctx.stack and ctx.stack.get("same"))
+    verdict = fit_rule(mine, leaf, same, scale)
+    diff = abs(mine - leaf)
+    stack_text = "same stack: bitwise" if same else (
+        f"different stack: bound {REFIT_TOLERANCE:g} x {scale:.4g} = {REFIT_TOLERANCE * scale:.3g}")
+    ctx.rep.say(f"  check {label}: dump {mine:.12g} vs results {leaf:.12g} (|diff| {diff:.2e}; "
+                f"{stack_text}): "
+                + {"match": "MATCH", "mismatch": "MISMATCH",
+                   "needs_stack": "NOT COMPUTABLE (bitwise reproduction needs the run's stack)"}[verdict])
+    if verdict == "mismatch":
+        ctx.rep.defects.append(f"{ctx.system} {label}: dump {mine!r} vs results {leaf!r}")
+    elif verdict == "needs_stack":
+        ctx.rep.nc(f"{ctx.system} {label}", f"bitwise reproduction needs the run's stack (|diff| "
+                   f"{diff:.2e} is within {REFIT_TOLERANCE:g} x {scale:.4g})")
+
+
+# --------------------------------------------------------------------------------------------
 # H1a and H1c (row .8c; plan amendment 6 F1, F2; MA-1)
 # --------------------------------------------------------------------------------------------
 def production_model(log_n: np.ndarray, log_c2: float, exponent: float, log_f2: float) -> np.ndarray:
@@ -1437,13 +1547,15 @@ def _h1a_one(ctx: Context, g: str, sq: np.ndarray, inverse: np.ndarray, sizes: n
         raise NotComputable(f"ci_inverse_dim not finite and non-zero: {ci}")
     flag = int(dig(ctx.res, "H1a", "by_noise", g, "n_exponent_at_bound", "point"))
     cell = h1a_cell(sq, inverse, sizes, ci_scale, flag)
-    check(ctx, f"H1a rho={g} fitted_inverse_dim (production fit)", cell["fitted"],
-          ("H1a", "by_noise", g, "fitted_inverse_dim"), 0.0)
-    check(ctx, f"H1a rho={g} ratio", cell["ratio"], ("H1a", "by_noise", g, "ratio"), 0.0)
+    check_fit(ctx, f"H1a rho={g} fitted_inverse_dim (production fit)", cell["fitted"],
+              ("H1a", "by_noise", g, "fitted_inverse_dim"), ci_scale)
+    rci = dig(ctx.res, "H1a", "by_noise", g, "ratio_ci")
+    ratio_scale = max(abs(float(rci[0])), abs(float(rci[1])))
+    check_fit(ctx, f"H1a rho={g} ratio", cell["ratio"], ("H1a", "by_noise", g, "ratio"),
+              ratio_scale if math.isfinite(ratio_scale) and ratio_scale > 0 else ci_scale)
     psi, n = cell["psi"], len(cell["psi"])
     se_iid = float(np.std(psi, ddof=1)) / math.sqrt(n)
     se_mbb = math.sqrt(block_variance(psi, 5) / n)
-    rci = dig(ctx.res, "H1a", "by_noise", g, "ratio_ci")
     ref = (float(rci[1]) - float(rci[0])) / 3.92
     ctx.rep.say(f"  H1a rho={g}: cond(H) {cell['cond']:.3g}, lambda_min {cell['lambda_min']:.3g}, "
                 f"refit difference {cell['refit_diff']:.2g}; information: SE_iid of psi {se_iid:.4f}, "
@@ -2451,6 +2563,17 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     rep.say(f"run: {path}; preset {cfg.get('name')}; commit {prov.get('commit', 'not recorded')}")
     rep.data["label"] = make_label(seed_id)
     rep.data["options"] = options
+    stack = attempt(rep, "analysis stack", lambda: compare_stack(prov, stack_record()))
+    if stack is None:
+        stack = {"same": False, "rows": []}
+    rep.say("Analysis stack against the run's provenance (a7): "
+            + ("SAME stack (fit-derived leaves are reproduced bitwise)" if stack["same"] else
+               "DIFFERENT stack (fit-derived leaves: within 4e-5 s is not computable, beyond is a "
+               "MISMATCH)"))
+    for name, run_value, own_value, status in stack["rows"]:
+        rep.say(f"  {name}: run {run_value!r}; here {own_value!r}: {status}")
+    rep.data["stack"] = {"same": stack["same"], "rows": [list(r[:1]) + [str(r[1]), str(r[2]), r[3]]
+                                                           for r in stack["rows"]]}
     for name, why in OUTSIDE_SCHEMA:
         rep.nc(f"{name} (all systems)", why)
         rep.uncomputed.append((f"{name} (all systems)", False))
@@ -2475,7 +2598,7 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
                 rep.nc(f"{system} (D1 to D6)", f"schema {schema!r} is not one of {SCHEMAS}")
                 continue
             ctx = Context(system, dump, results["systems"][system], cfg, rep, seed, resamples,
-                          permutations)
+                          permutations, stack)
             check_provenance(ctx, seed_id)
             section_d1_d2(ctx)
             for name, section in (("D3", section_d3), ("D4", section_d4), ("D5", section_d5),

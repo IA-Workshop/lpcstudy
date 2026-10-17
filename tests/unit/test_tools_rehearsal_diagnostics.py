@@ -29,6 +29,7 @@ a perturbed leaf exit 1. Each test is under 5 s (n = 80 states, 100 resamples, 5
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 import math
@@ -51,6 +52,9 @@ sys.modules["rehearsal_diagnostics"] = rd
 _SPEC.loader.exec_module(rd)
 
 SEED = 20261030
+STACK = rd.stack_record()
+"""The stack fields of this process: the world's provenance carries them, so a run through ``main``
+is on the same stack (amendment 10, J2)."""
 
 
 def rng_for(label: str) -> np.random.Generator:
@@ -950,7 +954,8 @@ def build_results(d: dict) -> dict:
             "spearman": float(sps.spearmanr(proxy[keep], truth[keep]).statistic),
             "n_excluded_nonfinite": int((~keep).sum())}
     return {"config": dict(CFG),
-            "provenance": {"seed_id": "DEV-1", "seed_kind": "development", "commit": "synthetic"},
+            "provenance": {"seed_id": "DEV-1", "seed_kind": "development", "commit": "synthetic",
+                           **copy.deepcopy(STACK)},
             "systems": {"lorenz63": sysd}}
 
 
@@ -2702,3 +2707,132 @@ def test_r25_sbg_density_returns_the_density_within_the_predicted_bias() -> None
     finally:
         rd.HALL_SHEATHER = original
     assert abs(slipped + (math.pi / 3) * h**2) > bound
+
+
+# ------------------------------------------------------------------------------------------ amendment 10, J2
+def h1a_scale(res: dict, g: str = "0.01") -> float:
+    """``s = max(|lo|, |hi|)`` of ``ci_inverse_dim`` of the world's H1a cell."""
+    lo, hi = res["systems"]["lorenz63"]["H1a"]["by_noise"][g]["ci_inverse_dim"]
+    return max(abs(lo), abs(hi))
+
+
+def run_world(tmp_path: Path, res: dict, d: dict, capsys) -> tuple[int, str]:
+    code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "50", "--permutations", "20"])
+    return code, capsys.readouterr().out
+
+
+def test_j2_same_stack_is_bitwise_and_one_ulp_is_a_mismatch(tmp_path, capsys) -> None:
+    """Branch 1: the provenance is copied from the tool's own process; a leaf equal to the refit
+    passes ("SAME stack" header, MATCH), a leaf one ulp off is a MISMATCH, exit 1.
+
+    Reference: the stack record of this process; ``np.nextafter`` on the leaf.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    code, out = run_world(tmp_path, res, d, capsys)
+    assert "SAME stack (fit-derived leaves are reproduced bitwise)" in out
+    assert "fitted_inverse_dim (production fit): dump" in out and "NOT COMPUTABLE" not in out
+    assert code == 2  # the V4 line of the 12-state world, nothing about the fit
+    leaf = res["systems"]["lorenz63"]["H1a"]["by_noise"]["0.01"]["fitted_inverse_dim"]
+    res["systems"]["lorenz63"]["H1a"]["by_noise"]["0.01"]["fitted_inverse_dim"] = float(np.nextafter(leaf, 1.0))
+    code, out = run_world(tmp_path / "b", res, d, capsys)
+    assert code == 1 and out.count(": MISMATCH") == 1
+
+
+def test_j2_different_stack_within_the_bound_is_not_computable_and_beyond_is_a_mismatch(
+        tmp_path, capsys) -> None:
+    """Branches 2 and 3: with ``packages.scipy`` edited, a leaf off by 2e-5 s is "not computable:
+    bitwise reproduction needs the run's stack" (exit 2, never 0, no MISMATCH), off by 8e-5 s a
+    MISMATCH (exit 1). The series stays (anchored by the tight refit, itself within the bound).
+
+    Reference: the plan's three-branch table with ``s = max(|lo|, |hi|)`` of ``ci_inverse_dim``.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    res["provenance"]["packages"]["scipy"] = "0.0.0"
+    scale = h1a_scale(res)
+    cell = res["systems"]["lorenz63"]["H1a"]["by_noise"]["0.01"]
+    exact = cell["fitted_inverse_dim"]
+    cell["fitted_inverse_dim"] = exact + 2e-5 * scale
+    code, out = run_world(tmp_path, res, d, capsys)
+    assert "DIFFERENT stack" in out and "packages.scipy: run '0.0.0'" in out
+    assert "bitwise reproduction needs the run's stack" in out and ": MISMATCH" not in out
+    assert code == 2 and "H1a rho=0.01" in out
+    cell["fitted_inverse_dim"] = exact + 8e-5 * scale
+    code, out = run_world(tmp_path / "b", res, d, capsys)
+    assert code == 1 and out.count(": MISMATCH") == 1  # the fitted leaf; the ratio leaf is within
+
+
+def test_j2_a_missing_or_errored_field_counts_as_a_different_stack(tmp_path, capsys) -> None:
+    """Branch 4: with ``cpu.model`` absent, or ``blas.error`` non-null, a leaf one ulp off follows
+    branch 2 (not computable, exit 2), not branch 1 (MISMATCH).
+
+    Reference: the plan's acceptance case 4.
+    """
+    for edit in (lambda p: p["cpu"].pop("model"), lambda p: p["blas"].update(error="probe failed")):
+        d, res, _ = build_world(rng_for("world"))
+        edit(res["provenance"])
+        cell = res["systems"]["lorenz63"]["H1a"]["by_noise"]["0.01"]
+        cell["fitted_inverse_dim"] = float(np.nextafter(cell["fitted_inverse_dim"], 1.0))
+        code, out = run_world(tmp_path / str(id(edit)), res, d, capsys)
+        assert "DIFFERENT stack" in out and "unusable" in out
+        assert code == 2 and ": MISMATCH" not in out
+        assert "bitwise reproduction needs the run's stack" in out
+
+
+def test_j2_the_bound_is_inclusive_and_the_next_float_is_beyond() -> None:
+    """Branch 5: exactly ``4e-5 s`` is within, the next float above it is beyond; on the same stack
+    any difference is a mismatch and an equal value matches.
+
+    Reference: the definition (``fit_rule``); ``np.nextafter``.
+    """
+    scale = 0.37
+    bound = 4e-5 * scale
+    assert rd.fit_rule(0.0, bound, False, scale) == "needs_stack"
+    assert rd.fit_rule(0.0, float(np.nextafter(bound, 1.0)), False, scale) == "mismatch"
+    assert rd.fit_rule(bound, 0.0, False, scale) == "needs_stack"
+    assert rd.fit_rule(0.25, 0.25, False, scale) == "needs_stack"  # never a pass on another stack
+    assert rd.fit_rule(0.25, 0.25, True, scale) == "match"
+    assert rd.fit_rule(0.25, float(np.nextafter(0.25, 1.0)), True, scale) == "mismatch"
+    assert rd.fit_rule(0.0, -0.0, True, scale) == "mismatch"  # bit patterns
+
+
+def test_j2_compare_stack_field_by_field() -> None:
+    """Each compared field of the provenance, edited alone, makes the stack different; a missing or
+    null field or a non-null error is "unusable" (also different); an environment variable recorded as
+    null is a value (unset on both sides: same), a missing key is unusable.
+
+    Reference: the plan's field list (python, numpy, scipy, cpu model and isa, blas libraries, numpy
+    simd, ``OPENBLAS_CORETYPE``, ``NPY_DISABLE_CPU_FEATURES``).
+    """
+    own = copy.deepcopy(STACK)
+    assert rd.compare_stack(copy.deepcopy(STACK), own)["same"] is True
+    edits = {
+        "python": lambda p: p.update(python="3.0.0"),
+        "packages.numpy": lambda p: p["packages"].update(numpy="0"),
+        "packages.scipy": lambda p: p["packages"].update(scipy="0"),
+        "cpu.model": lambda p: p["cpu"].update(model="other"),
+        "cpu.isa": lambda p: p["cpu"].update(isa=["avx"]),
+        "blas.libraries": lambda p: p["blas"]["libraries"][0].update(corename="Zen"),
+        "numpy_simd.found": lambda p: p["numpy_simd"].update(found=["X86_V2"]),
+        "env.OPENBLAS_CORETYPE": lambda p: p["env"].update(OPENBLAS_CORETYPE="Sandybridge"),
+        "env.NPY_DISABLE_CPU_FEATURES": lambda p: p["env"].update(NPY_DISABLE_CPU_FEATURES="AVX2"),
+    }
+    for field, edit in edits.items():
+        prov = copy.deepcopy(STACK)
+        edit(prov)
+        result = rd.compare_stack(prov, own)
+        status = {r[0]: r[3] for r in result["rows"]}
+        assert result["same"] is False and status[field] == "different", field
+    unusable = {
+        "python": lambda p: p.pop("python"),
+        "packages.scipy": lambda p: p["packages"].update(scipy=None),
+        "cpu.isa": lambda p: p["cpu"].update(error="no /proc/cpuinfo"),
+        "blas.libraries": lambda p: p["blas"]["libraries"][0].update(error="dlopen failed"),
+        "numpy_simd.found": lambda p: p["numpy_simd"].update(error="probe failed"),
+        "env.OPENBLAS_CORETYPE": lambda p: p["env"].pop("OPENBLAS_CORETYPE"),
+    }
+    for field, edit in unusable.items():
+        prov = copy.deepcopy(STACK)
+        edit(prov)
+        result = rd.compare_stack(prov, own)
+        status = {r[0]: r[3] for r in result["rows"]}
+        assert result["same"] is False and status[field] == "unusable", field
