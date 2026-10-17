@@ -216,3 +216,11 @@ R0 ran at develop e3b2645 (record `docs/agent/records/work/WU-0003-R0.md` on bra
 - **GPU speed (C6, smoke size only):** 4.0 times slower than CPU (698 against 175 s); the context build 55, 68, 83 s against 2.0, 1.4, 2.0 s. No conclusion for the pilot.
 - **Referral (OF-2):** all six V1 leaves differ between GPU and CPU by 3.5e-10 to 1.5e-8 absolute, above the 1e-12 of item 11, which says refer before R3. In a TD pair the two contexts differ, so V1 is computed on different trajectories and the comparison is not like for like. The main session therefore holds R3 (CPU pilot on DEV-1) and does not rule on the applicability of item 11 or on its replacement (about 1e-9, wider). Please rule: (a) item 11 applies only to pairs with equal contexts (T0 to T2), so R3 may run; (b) it applies as written, with the replacement bound; (c) other. R1 and R2 (GPU) proceed under the working defaults.
 - Smoke validation gates printed 'FAILED, provisional' on several smoke runs, with different flags on GPU and CPU; read as smoke size plus different trajectories, not a finding (details in the record).
+
+## 26. Owner answers of 2026-10-17 given through the question tool (recorded by the main session; not ledger entries)
+
+The owner answered four questions (asked in the session on 2026-10-17):
+- **OF-2:** 'Equal contexts only': the V1 1e-12 rule of item 11 applies only to pairs whose context digests are equal (tiers T0 to T2); GPU-against-CPU pairs (TD) are judged by the TD statistic. R3 may run.
+- **R5 and R6:** both authorized (full preset on DEV-2, GPU with dump on; and on the CPU with LPC_THREADS=8).
+- **DEF-0026:** 'Offline V6/V4 check' only: run the V6 and V4 gate checks on DEV-1 to DEV-4 (about 10 s per system for V6) to test the estimates. Not chosen: pre-registering the response to a sealed-run gate failure, evaluating the outcome-free gate checks first, a risk-register-only entry.
+- **OQ-R9:** 'Fix as defaults': seed 20261018, 1000 permutations and 2000 resamples are the pre-registered diagnostic defaults; the first default-options report per run is the record; any other option is labelled non-default and is not the record.
