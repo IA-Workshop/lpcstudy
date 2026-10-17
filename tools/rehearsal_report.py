@@ -103,8 +103,9 @@ computed (its projected p prints as the bound ``p_full < 1e-300``); ``None`` (an
 log-rank variance: production writes it for both) is "not computable" (counted) and the reading "not
 determined" (it enters the Holm step as 1.0, as in production).
 
-A dump that does not reproduce its results leaf is never used: that row falls back to the range
-(MISMATCH, exit 1).
+A dump with any defect (a provenance mismatch, an unreadable input, a failed reproduction check) is
+not used: it supplies no information value to any row of its system, and every kappa_E row of that
+system uses the range (MISMATCH, exit 1, for a mismatch).
 
 Exit codes (plan amendments 7, G2, and 8, H1): 0 iff every row is computed (the 18 criteria, V7, every
 H3a pair with a p-value; a range-governed kappa_E row is a computed row) and every reproduction check
@@ -870,6 +871,10 @@ def verify_dump(view: DumpView, specs: Sequence[Spec]) -> None:
             view.rep.nc(f"{view.system} {spec.label} dump check", str(exc))
             view.fail(f"{spec.label}: {exc}")
             continue
+        except Exception as exc:  # noqa: BLE001  (an unexpected input: counted, the dump is unused)
+            view.rep.internal(f"{view.system} {spec.label} dump check", exc)
+            view.fail(f"{spec.label}: {type(exc).__name__}: {exc}")
+            continue
         if not ok:
             view.fail(f"{spec.label} does not reproduce its results leaf")
 
@@ -968,7 +973,7 @@ def project_row(spec: Spec, system: str, tree: dict, cfg: dict, view: DumpView |
     """Everything the report says about one criterion of one system (``NotComputable`` if none).
 
     kappa_E: the pre-registered range governs, printed as FALLBACK (a computed row, amendment 8
-    H1); the point estimate from a dump that reproduces its leaf is only information and never
+    H1); the point estimate from a dump without any defect is only information and never
     enters ``x_lo``, ``x_hi`` or any number of the row.
     """
     where = f"{system} {spec.label}"
@@ -1269,11 +1274,15 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     all_systems = list(results.get("systems", {}))
     chosen = [s for s in all_systems if systems is None or s in systems]
     # R11: every requested system (all of config.core_systems unless restricted) must be present
+    core: list[str] = []
     try:
-        core = [str(c) for c in dig(cfg, "core_systems")]
+        raw_core = dig(cfg, "core_systems")
+        if (not isinstance(raw_core, (list, tuple)) or not raw_core
+                or not all(isinstance(c, str) and c for c in raw_core)):
+            raise NotComputable(f"{raw_core!r} is not a non-empty list of system names")
+        core = list(raw_core)
     except NotComputable as exc:
         rep.nc("config core_systems", f"{exc}; the systems that must be present are unknown")
-        core = []
     for wanted in (list(systems) if systems else core):
         if wanted not in all_systems:
             rep.nc(f"system {wanted}", "not in results.json" + ("" if systems else

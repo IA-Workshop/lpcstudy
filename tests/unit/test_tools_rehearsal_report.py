@@ -1159,3 +1159,65 @@ def test_summary_range_follows_the_run_configuration(tmp_path: Path, capsys) -> 
     assert "0.7071" not in summary
     code, out, _ = run_world(tmp_path / "pilot", capsys)
     assert "kappa_E: the range [0.7071, 1] governs 12 of 12 parts" in out
+
+
+# ------------------------------------------------------------------------------------------ R14 to R16
+@pytest.mark.parametrize("bad", [[], "abc", 5, [""], None])
+def test_malformed_core_systems_is_one_counted_item(tmp_path: Path, capsys, bad) -> None:
+    """R14: only a non-empty list of non-empty names is accepted. Anything else is one "not
+    computable" item (exit 2), never "nothing required" (exit 0 with chua missing), never read
+    letter by letter, never a crash."""
+    def edit(res: dict) -> None:
+        res["config"]["core_systems"] = bad
+        del res["systems"]["chua"]
+    code, out, _ = run_world(tmp_path, capsys, mutate=edit)
+    assert code == 2, out
+    open_lines = [line for line in out.splitlines() if line.startswith("  not computable")]
+    assert len(open_lines) == 1 and "config core_systems" in open_lines[0], open_lines
+    assert "INTERNAL ERROR" not in out and "Summary" in out
+
+
+def break_rossler_dump(tmp_path: Path, how: str) -> Path:
+    """A world whose Rossler dump has an input that raises an unexpected exception."""
+    tmp_path.mkdir(exist_ok=True)
+    run = write_run(tmp_path / "run")
+    file = run / "states" / "rossler.npz"
+    with np.load(file) as archive:
+        arrays = {key: archive[key] for key in archive.files}
+    if how == "ref_index":
+        arrays["core/ref_index"] = np.array(9)
+    else:
+        arrays["core/state_mse/A5"] = arrays["core/state_mse/A5"][:, 2]  # 1-D, not (n, k)
+    np.savez(file, **arrays)
+    return run
+
+
+@pytest.mark.parametrize("how", ["ref_index", "one_dimensional"])
+def test_an_unexpected_dump_exception_is_counted_and_the_report_is_complete(
+        tmp_path: Path, capsys, how: str) -> None:
+    """R15: an out-of-range ``core/ref_index`` or a 1-D ``state_mse`` makes `verify_dump` raise
+    IndexError: caught per spec, recorded as an INTERNAL ERROR item, the Rossler dump marked
+    failed (no information from it); the other systems, H3a and the summary are still printed."""
+    run = break_rossler_dump(tmp_path, how)
+    json_out = tmp_path / "o.json"
+    code = rr.main([str(run), "--json", str(json_out)])
+    out = capsys.readouterr().out
+    data = json.loads(json_out.read_text())
+    assert code == 2, out
+    assert "INTERNAL ERROR: rossler" in out and "INTERNAL ERROR: run" not in out
+    assert "=== lorenz63" in out and "=== chua" in out and "Summary" in out
+    assert set(data["h3a"]) == set(SYSTEMS)
+    assert all(row["kappa"] is None for row in data["rows"]["rossler"])
+    for system in ("lorenz63", "chua"):
+        assert sum(row["kappa"] is not None for row in data["rows"][system]) == 4
+    assert "point kappa shown as information for 8 " in out
+
+
+def test_mismatch_elsewhere_still_wins_over_an_internal_error(tmp_path: Path, capsys) -> None:
+    """R15: with a broken Rossler dump and a failing H3c leaf (chua among others), exit 1."""
+    run = break_rossler_dump(tmp_path, "ref_index")
+    res = json.loads((run / "results.json").read_text())
+    res["systems"]["chua"]["H3c"]["A5_over_A4_mse"] *= 1.0 + 1e-6
+    (run / "results.json").write_text(json.dumps(res))
+    assert rr.main([str(run)]) == 1
+    capsys.readouterr()

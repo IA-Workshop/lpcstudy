@@ -637,6 +637,18 @@ Written before the fix-round run. No bound, seed, R or tolerance changes; f2 unt
 - **R13.** The rows carry their own `kappa_range`; the summary formats it (`[0.5000, 1]` at E = 1, `[0.7071, 1]` at the pilot). Test: `test_summary_range_follows_the_run_configuration`.
 - Self-check of the diff: no `clip`, `nan_to_num`, `np.where`, `default_rng`, `random.` or `PRNGKey`; the new `except NotComputable` in `verify_dump` records an item and marks the dump failed (nothing replaced); no tolerance changed.
 
+### WU-0003.3a fix round 6 (developer claude-sonnet-5-5, 2026-10-17; read of 559f2fd `WU-0003.3a-review-round4.md` 3b90434, R14 to R16, all low)
+
+Written before the fix-round run. No bound, seed, R or tolerance changes; the slow file untouched.
+
+**Changes.** R14: `config.core_systems` is accepted only as a non-empty list or tuple of non-empty strings; anything else (`[]`, a string, an int, `None`, `['']`) is one counted "not computable" item ("config core_systems") and nothing is silently required; no crash. R15: `verify_dump` also catches any other exception per spec (not `Refused`, which is raised only by `open_dump`), records it with `rep.internal` as a counted item and marks the dump failed, so the other systems and the summary are still printed (exit 2, or 1 with a MISMATCH). R16: the module docstring and the `project_row` docstring say that a dump with any defect (provenance, input or reproduction) supplies nothing to any row of its system.
+
+**Tests (with the change).** R14: `[]` with chua deleted, `'abc'`, `5`, `['']` and `None` each give exit 2 and one item. R15: an out-of-range `core/ref_index` and a 1-D `state_mse/A5` in the Rossler dump give exit 2 (INTERNAL ERROR counted), all three systems reported, the summary printed, Rossler information 0; with a MISMATCH in another system the exit is 1.
+
+**§4.9 checklist.** 1. Change set: `tools/rehearsal_report.py`, `tests/unit/test_tools_rehearsal_report.py`, this file, `queue.md`, the review file. 2. Radius: `tests/unit/test_tools_rehearsal_report.py` only (by hand and `tools/test_impact.py`); no `lpcstudy/` change. 3. Already run on this code: no. 4. CPU. 5. `LPC_THREADS` 4, 300 s. 6. No preset or GPU job. 7. `-q --tb=short -rfE`. 8. `tools/run_tests.sh unit tests/unit/test_tools_rehearsal_report.py` once; `--lf` for failures only.
+
+**Results (fix round 6).** `tools/run_tests.sh unit tests/unit/test_tools_rehearsal_report.py`, run once: `77 passed in 2.67s` (no failure, no `--lf`; 8 new cases; no expected value edited; afterwards only a no-op statement of a test was removed). The slow file is untouched. R14: `core_systems` is accepted only as a non-empty list or tuple of non-empty strings, else one counted item (tests: `[]` with chua deleted, `'abc'`, `5`, `['']`, `None`). R15: `verify_dump` catches any other exception per spec (not `Refused`), records `rep.internal`, marks the dump failed (tests: `core/ref_index` = 9 and a 1-D `state_mse/A5` in the Rossler dump: exit 2, all three systems, H3a and the summary printed, information 8 of 12; with a MISMATCH in chua, exit 1). R16: both docstrings say that a dump with any defect supplies nothing to any row of its system. Self-check: no `clip`, `nan_to_num`, `np.where`, `default_rng`, `random.` or `PRNGKey`; the new `except Exception` records a counted INTERNAL ERROR and marks the dump failed; no tolerance changed.
+
 ## Review
 
 ## Audit
