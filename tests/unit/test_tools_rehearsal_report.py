@@ -55,12 +55,6 @@ SEED = 20261031
 SYSTEMS = ("lorenz63", "rossler", "chua")
 
 
-@pytest.fixture
-def point_policy(monkeypatch):
-    """The ``"point"`` kappa policy: the c7d6e41 behaviour that the exit-0 condition of G2 describes."""
-    monkeypatch.setattr(rr, "KAPPA_POLICY", "point")
-
-
 def rng_for(label: str) -> np.random.Generator:
     """A generator from ``make_rng`` (the project's only source of randomness)."""
     return make_rng(SEED, "test_rehearsal_report", label)
@@ -215,21 +209,22 @@ def test_ratios_to_v3_equal_the_note_table(tmp_path: Path) -> None:
 
 
 def test_pilot_fixture_report_is_complete_but_for_kappa(tmp_path: Path, capsys) -> None:
-    """Without a dump the range is used and shown (FALLBACK), exit 2, nothing else open.
+    """Without a dump the range is used and shown (FALLBACK, a computed row), exit 2 for the dump.
 
     Reference: the arithmetic of the plan (12 kappa_E parts: H2c x2, H2d, H3c over 3 systems; one
-    "no dump" line per system and one "range governs" line per part, G2: a FALLBACK is counted).
-    Findings ("v3 precision not reproduced") never change the exit code, and no MISMATCH arises.
+    "no dump" not-computable line per system, amendment 8 H1: the range-governed rows themselves
+    count as computed). Findings ("v3 precision not reproduced") never change the exit code, and no MISMATCH arises.
     """
     code = rr.main([str(FIXTURES / "p0_pilot.json"), "--states", str(tmp_path / "none")])
     out = capsys.readouterr().out
     assert code == 2
     assert out.splitlines()[0] == "DEVELOPMENT (DEV-0): conditional on one realization; not a hypothesis test"
     assert out.count("(FALLBACK)") == 12
-    # three systems without a dump, twelve parts with the range governing, plus the closing count
-    assert out.count("not computable: ") == 3 + 12 + 1
-    assert "not computable: 15 item(s)" in out
-    assert "kappa_E: point estimate from the dump governs for 0 of 12 parts; range fallback for 12" in out
+    # three systems without a dump, plus the closing count
+    assert out.count("not computable: ") == 3 + 1
+    assert "not computable: 3 item(s)" in out
+    assert "kappa_E: the range [0.7071, 1] governs 12 of 12 parts" in out
+    assert "point kappa shown as information for 0" in out
     assert "MISMATCH" not in out
     assert "v3 precision not reproduced" in out
 
@@ -495,62 +490,63 @@ def run_world(tmp_path: Path, capsys, **kwargs) -> tuple[int, str, dict]:
     return code, capsys.readouterr().out, json.loads(json_out.read_text())
 
 
-def test_complete_pilot_with_dump_exits_zero_when_the_point_estimate_governs(
-        tmp_path: Path, capsys, point_policy) -> None:
-    """G2: every row computed (18 criteria, V7, every H3a pair), every reproduction check passed,
-    kappa_E a point estimate from a reproducing dump: exit 0, nothing open, no FALLBACK.
+def test_complete_pilot_with_dump_exits_zero_with_range_governed_rows(tmp_path: Path,
+                                                                     capsys) -> None:
+    """Amendment 8 H1: every row computed (18 criteria, V7, every H3a pair), every reproduction
+    check passed, the 12 H2c, H2d and H3c rows range-governed (FALLBACK, labelled, counted as
+    computed): exit 0, nothing "not computable", the summary says 12 are range-governed.
 
-    Reference: ``kappa_by_hand`` (loops from the definitions of V_i and the influence series,
-    rel 1e-10, see the module docstring). The projected half-widths use the point kappa at both
-    ends (lo = hi).
+    Reference: the note's ranges as closed forms (0.504-0.712 for H2c and H2d, 0.507-0.717 for
+    H3c) and ``kappa_by_hand`` (loops, rel 1e-10) for the information-only point kappa.
     """
     code, out, data = run_world(tmp_path, capsys)
     assert code == 0, out
-    assert "not computable" not in out and "FALLBACK" not in out
-    assert "MISMATCH" not in out and out.count("MATCH") >= 12
-    assert "kappa_E: point estimate from the dump governs for 12 of 12" in out
+    assert "not computable" not in out and "MISMATCH" not in out and out.count("MATCH") >= 12
+    assert out.count("(FALLBACK)") == 12
+    assert out.count("kappa_E point estimator biased (R2): range governs") == 12
+    assert "kappa_E: the range [0.7071, 1] governs 12 of 12 parts" in out
+    assert "point kappa shown as information for 12 (not an estimator of kappa_E)" in out
+    assert out.count("is information only, not an estimator of kappa_E") == 12
     expect = {"H2c A4-A2": ("diff", "A4", "A2"), "H2c A4-A1": ("diff", "A4", "A1"),
               "H2d": ("ratio", "A4", "A3"), "H3c": ("ratio", "A5", "A4")}
     for system in SYSTEMS:
         rows = {r["label"]: r for r in data["rows"][system]}
         assert len(rows) == 23 and set(data["h3a"]) == set(SYSTEMS)
         for label, (kind, first, second) in expect.items():
-            want = kappa_by_hand(system, kind, first, second)
             row = rows[label]
-            assert row["kappa"]["kappa"] == pytest.approx(want, rel=1e-10), (system, label)
-            assert row["f_lo"] == row["f_hi"]
-            assert row["f_lo"] == pytest.approx(
-                math.sqrt(0.5) * rr.b_factor("primary" if label == "H3c" else "secondary", 500, 2000)
-                * want, rel=1e-10)
+            level = 1.014 if label == "H3c" else 1.007
+            assert row["kappa_governs"] == "range"
+            assert row["f_lo"] == pytest.approx(math.sqrt(0.5) * level * math.sqrt(0.5), rel=1e-12)
+            assert row["f_hi"] == pytest.approx(math.sqrt(0.5) * level, rel=1e-12)
+            assert row["kappa"]["kappa"] == pytest.approx(
+                kappa_by_hand(system, kind, first, second), rel=1e-10), (system, label)
 
 
-def test_default_policy_range_governs_and_exit_is_two(tmp_path: Path, capsys) -> None:
-    """R2 working default (a): with a reproducing dump the range [0.7071, 1] still governs the
-    H2c, H2d and H3c projections (0.504-0.712 and 0.507-0.717), the point kappa is information
-    only, labelled biased, and G2 counts the FALLBACK: exit 2, with exactly the 12 parts open.
+def test_the_point_kappa_never_enters_a_projection(tmp_path: Path, capsys, monkeypatch) -> None:
+    """Amendment 8 H3 (mutation): replacing the point kappa by an absurd value changes only the
+    information (``kappa`` block and the note text), not one projected number.
 
-    Reference: the note's ranges (closed forms) and ``kappa_by_hand`` for the information value.
+    Every other field of every row (factors, half-widths, relative half-widths, readings, rates)
+    is compared as serialized JSON text: byte-identical.
     """
-    code, out, data = run_world(tmp_path, capsys)
-    assert code == 2
-    open_lines = [line for line in out.splitlines() if line.startswith("  not computable")]
-    assert len(open_lines) == 12 and all("range governs (R2" in line for line in open_lines)
-    assert out.count("(FALLBACK)") == 12 and out.count("kappa_E point estimator biased (R2): range governs") == 12
-    assert "MISMATCH" not in out and "exit 0 is unreachable while the range governs" in out
-    for system in SYSTEMS:
-        for row in data["rows"][system]:
-            if row["label"].startswith(("H2c", "H2d")):
-                assert row["f_lo"] == pytest.approx(math.sqrt(0.5) * 1.007 * math.sqrt(0.5), rel=1e-12)
-                assert row["f_hi"] == pytest.approx(math.sqrt(0.5) * 1.007, rel=1e-12)
-                assert row["kappa_governs"] == "range"
-            if row["label"] == "H3c":
-                assert row["f_lo"] == pytest.approx(math.sqrt(0.5) * 1.014 * math.sqrt(0.5), rel=1e-12)
-                assert row["f_hi"] == pytest.approx(math.sqrt(0.5) * 1.014, rel=1e-12)
-                assert row["kappa"]["kappa"] == pytest.approx(
-                    kappa_by_hand(system, "ratio", "A5", "A4"), rel=1e-10)
+    _, _, base = run_world(tmp_path / "a", capsys)
+    monkeypatch.setattr(rr, "kappa_estimate", lambda *args, **kwargs: (0.123456, 7.0, 9.0))
+    code, _, mutated = run_world(tmp_path / "b", capsys)
+    assert code == 0
+
+    def projected(data: dict) -> str:
+        return json.dumps({s: [{k: v for k, v in row.items() if k not in ("kappa", "note")}
+                               for row in rows] for s, rows in data["rows"].items()},
+                          sort_keys=True)
+
+    assert projected(base) == projected(mutated)
+    changed = [row["kappa"]["kappa"] for rows in mutated["rows"].values() for row in rows
+               if row["kappa"] is not None]
+    assert len(changed) == 12 and set(changed) == {0.123456}
+    assert base["rows"]["rossler"] != mutated["rows"]["rossler"]  # the information did change
 
 
-def test_best_single_a0_uses_cp_alone(tmp_path: Path, capsys, point_policy) -> None:
+def test_best_single_a0_uses_cp_alone(tmp_path: Path, capsys) -> None:
     """With ``best_single = A0`` the second H2c row is A4 - A0 and V is E_C (weight 1)."""
     code, out, data = run_world(tmp_path, capsys, best="A0")
     assert code == 0, out
@@ -560,8 +556,7 @@ def test_best_single_a0_uses_cp_alone(tmp_path: Path, capsys, point_policy) -> N
         kappa_by_hand("rossler", "diff", "A4", "A0"), rel=1e-10)
 
 
-def test_dump_that_disagrees_with_the_results_is_a_mismatch(tmp_path: Path, capsys,
-                                                            point_policy) -> None:
+def test_dump_that_disagrees_with_the_results_is_a_mismatch(tmp_path: Path, capsys) -> None:
     """The H3c leaf off by a relative 1e-6 (the allowed 1e-12): MISMATCH, exit 1 (1 beats 2)."""
     run = write_run(tmp_path / "run", scale_h3c=1.0 + 1e-6)
     code = rr.main([str(run)])
@@ -569,16 +564,16 @@ def test_dump_that_disagrees_with_the_results_is_a_mismatch(tmp_path: Path, caps
     assert code == 1
     assert "MISMATCH: 3 item(s) (listed above)" in out
     assert out.count("  MISMATCH: ") == 3 and out.count("H3c ratio: dump") == 6  # check line + defect
-    # R1: the mismatching dump does not supply kappa_E for H3c: the range, FALLBACK, not counted
-    assert out.count("(FALLBACK)") == 3
+    # R1: the mismatching dump is not used for H3c (no information value either); all 12 rows are
+    # range-governed (FALLBACK) in any case
+    assert out.count("(FALLBACK)") == 12
     assert out.count("the dump does not reproduce the results leaf") == 3
-    assert "kappa_E: point estimate from the dump governs for 9 of 12 parts; range fallback for 3" in out
+    assert "point kappa shown as information for 9 (not an estimator of kappa_E)" in out
     h3c = [line for line in out.splitlines() if line.startswith("  H3c ")]
     assert len(h3c) == 3 and all("0.507-0.717" in line for line in h3c)
 
 
-def test_mismatch_beats_not_computable_and_nothing_is_skipped(tmp_path: Path, capsys,
-                                                              point_policy) -> None:
+def test_mismatch_beats_not_computable_and_nothing_is_skipped(tmp_path: Path, capsys) -> None:
     """G2 precedence: a MISMATCH together with a H3a pair of p_raw None and a missing V7 block is
     still exit 1; without the mismatch the same run is exit 2."""
     def edit(res: dict) -> None:
@@ -594,16 +589,18 @@ def test_mismatch_beats_not_computable_and_nothing_is_skipped(tmp_path: Path, ca
 
 
 @pytest.mark.parametrize(("scale", "code"), [(1.0 + 5e-13, 0), (1.0 + 2e-12, 1)])
-def test_reproduction_bound_passes_at_half_and_fails_at_twice(tmp_path: Path, capsys, scale, code,
-                                                              point_policy) -> None:
+def test_reproduction_bound_passes_at_half_and_fails_at_twice(tmp_path: Path, capsys, scale, code
+                                                              ) -> None:
     """The dump-to-results bound ``1e-12 |leaf|``: passes at 0.5x of it, fails at 2x.
 
-    A pass is a complete run (exit 0, no MISMATCH, no FALLBACK); a failure exits 1.
+    A pass is a complete run (exit 0, no MISMATCH, information for all 12 parts); a failure exits 1
+    and the failing dump gives no information value (9 of 12).
     """
     run = write_run(tmp_path / "run", scale_h3c=scale)
     assert rr.main([str(run)]) == code
     out = capsys.readouterr().out
-    assert ("MISMATCH" in out) == (code == 1) and ("(FALLBACK)" in out) == (code == 1)
+    assert ("MISMATCH" in out) == (code == 1)
+    assert f"point kappa shown as information for {9 if code == 1 else 12} " in out
 
 
 def test_level_disagreement_is_a_mismatch(tmp_path: Path, capsys) -> None:
@@ -795,7 +792,7 @@ def test_missing_block_length_is_not_computable_not_a_default(tmp_path: Path, ca
     out = capsys.readouterr().out
     assert code == 2
     assert out.count("results leaf bootstrap_block is absent") == 12
-    assert out.count("(FALLBACK)") == 12 and "range fallback for 12" in out
+    assert out.count("(FALLBACK)") == 12 and "point kappa shown as information for 0 " in out
 
 
 def test_v7_rows_are_projected_like_the_sweep_criteria() -> None:
@@ -1062,11 +1059,11 @@ def test_h2a_ii_governing_readings_on_p0_p1_against_the_log(name: str, tmp_path:
 
 
 # ------------------------------------------------------------------------------------------ R7: policy
-@pytest.mark.parametrize("bad", ["Range", "points", "", None, "RANGE ", 0])
+@pytest.mark.parametrize("bad", ["Range", "points", "point", "", None, "RANGE ", 0])
 def test_unknown_kappa_policy_is_refused_not_reported(tmp_path: Path, capsys, monkeypatch, bad
                                                       ) -> None:
-    """R7 (PRIME.4): any value outside {"range", "point"} gives exit 2, a stderr line naming the
-    value, and no report: a typo must not print FALLBACK rows with nothing counted (exit 0)."""
+    """R7 (PRIME.4): any value outside {"range"} gives exit 2, a stderr line naming the value, and
+    no report. ``"point"`` is refused too (amendment 8 H3: the branch is removed)."""
     monkeypatch.setattr(rr, "KAPPA_POLICY", bad)
     tmp_path.mkdir(exist_ok=True)
     run = write_run(tmp_path / "run")
@@ -1078,11 +1075,8 @@ def test_unknown_kappa_policy_is_refused_not_reported(tmp_path: Path, capsys, mo
         rr.run(run)
 
 
-@pytest.mark.parametrize(("policy", "code"), [("range", 2), ("point", 0)])
-def test_policy_is_recorded_in_the_json(tmp_path: Path, capsys, monkeypatch, policy, code) -> None:
-    """R7: the governing rule is in the machine-readable output; exit 2 under the range (G2
-    counts the FALLBACK), 0 under the point estimate on a complete run."""
-    monkeypatch.setattr(rr, "KAPPA_POLICY", policy)
+def test_policy_is_recorded_in_the_json(tmp_path: Path, capsys) -> None:
+    """R7: the governing rule is in the machine-readable output (exit 0 on a complete run)."""
     got, out, data = run_world(tmp_path, capsys)
-    assert got == code, out
-    assert data["kappa_policy"] == policy
+    assert got == 0, out
+    assert data["kappa_policy"] == "range" and rr.KAPPA_POLICIES == ("range",)

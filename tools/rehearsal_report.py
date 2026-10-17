@@ -30,16 +30,20 @@ M3, with the reference script ``2026-10-14-math-wu0003-scripts/m3_projection.py`
   other pair is "not computable";
 * **kappa_E,** for the criteria on evaluation-draw MSEs (H2c, H2d, H3c; E 2 to 4). **The range
   ``[sqrt(E_run/E_full), 1]`` ([0.7071, 1]; 0.504-0.712 for H2c and H2d, 0.507-0.717 for H3c)
-  governs** (module constant ``KAPPA_POLICY = "range"``; note
+  governs** (``KAPPA_POLICY = "range"``, the only admitted value; note
   ``2026-10-14-math-wu0003-3a-kappa.md``, review R2: the point estimator below is biased, sign
   undetermined, +0.003 to +0.135 in the mathematician's worlds, and no unbiased estimator exists
   from the present dump). The row is printed ``FALLBACK`` with "kappa_E point estimator biased
-  (R2): range governs", and, as plan amendment 7 G2 counts a FALLBACK, it is listed as "not
-  computable": **exit 0 is unreachable under this policy** until the owner chooses (a) the range as
-  final or (b) a dump with ``core/cp_err_href`` and ``core/plp_err_href`` and the half-split
-  estimator. With ``KAPPA_POLICY = "point"`` the point estimate governs (the exit-0 path of G2). The
-  point estimate ``kappa = sqrt((V_s + V_d E_run/E_full) / (V_s + V_d))`` from the dump is printed as
-  information, after the dump has reproduced its results leaf. ``V_i(w) =
+  (R2): range governs"; **plan amendment 8, H1 (owner flag OF-H1): a range-governed row counts as a
+  computed row** for the exit code, and the summary says how many rows are range-governed. No code
+  path computes a projection from the point estimate (amendment 8, H3). The point estimate
+  ``kappa = sqrt((V_s + V_d E_run/E_full) / (V_s + V_d))`` from the dump is printed as information
+  only, "not an estimator of kappa_E", after the dump has reproduced its results leaf; a dump that
+  fails that check is not used for anything (MISMATCH, exit 1). Effect on reading (ii) below
+  (amendment 8, H2): against a point estimate at kappa_E = 1 the band is wider on the low side by
+  the factor 0.7071 (against any point estimate kappa-hat by kappa-hat/0.7071), the high side is
+  unchanged, and reading (i), which uses sqrt(n_run/n_full) alone, is not affected; "not
+  reproduced" is reported if either reading says outside. ``V_i(w) =
   w^2 E_C + (1 - w)^2 E_P + 2 w (1 - w) C`` (A0: w = 1, A1: w = 0; the dumped weight of every
   evaluation draw otherwise, averaged over the draws) is the draw-free per-state MSE. ``V_s`` is
   the long-run variance of the influence series computed with ``V_i`` in place of the evaluation
@@ -102,13 +106,14 @@ determined" (it enters the Holm step as 1.0, as in production).
 A dump that does not reproduce its results leaf is never used: that row falls back to the range
 (MISMATCH, exit 1).
 
-Exit codes (plan amendment 7, G2): 0 iff every row is computed (the 18 criteria, V7, every H3a pair
-with a p-value), every reproduction check passes and kappa_E is a point estimate from a reproducing
-dump (no FALLBACK); 1 at least one MISMATCH (a dump that does not reproduce the results leaf it
-belongs to, an interval level that disagrees with the table; it takes precedence); 2 unreadable input,
-a usage error, a refused run, an internal error, or at least one "not computable" including a
-FALLBACK, a ``None`` H3a pair, or a run without a dump (the report is still printed in full). P0 and
-P1, which have no dump, exit 2.
+Exit codes (plan amendments 7, G2, and 8, H1): 0 iff every row is computed (the 18 criteria, V7, every
+H3a pair with a p-value; a range-governed kappa_E row is a computed row) and every reproduction check
+passes; 1 at least one MISMATCH (a dump that does not reproduce the results leaf it belongs to, an
+interval level that disagrees with the table; it takes precedence); 2 unreadable input, a usage
+error, a refused run, an internal error, or at least one "not computable": a missing leaf or block, a
+``None`` H3a pair, a run without a dump, or a dump that fails its reproduction check (not used). The
+report is still printed in full. P0 and P1, which have no dump, exit 2; a complete run with dumps
+exits 0.
 """
 
 from __future__ import annotations
@@ -158,13 +163,13 @@ MARGIN_V3 = 0.01
 i.e. the margin ``m = 0.1 - hw_full`` is about 0.01. The band [0.67, 1.5] applies to this margin
 (plan amendment 7, G3): "not reproduced" iff ``m < 0.0067`` or ``m > 0.015``."""
 KAPPA_POLICY = "range"
-"""Which kappa_E governs the H2c, H2d and H3c projections. ``"range"`` (the working default, note
-``2026-10-14-math-wu0003-3a-kappa.md``, R2): the pre-registered range [sqrt(E_run/E_full), 1]; the
-tool's point estimate is printed as information only (it is biased, sign undetermined). ``"point"``:
-the point estimate governs when the dump reproduces its leaves (the c7d6e41 behaviour; what the
-G2 exit-0 condition describes). The owner's choice (a) or (b) of the note replaces this constant."""
-KAPPA_POLICIES = ("range", "point")
-"""The two admitted values of ``KAPPA_POLICY``; ``run`` refuses any other (exit 2)."""
+"""Which kappa_E governs the H2c, H2d and H3c projections: the pre-registered range
+[sqrt(E_run/E_full), 1] (note ``2026-10-14-math-wu0003-3a-kappa.md``, R2; plan amendment 8, H1).
+The point estimate is information only. The owner's choice (b) (a half-split estimator from a dump
+with ``core/cp_err_href`` and ``core/plp_err_href``) would replace this constant."""
+KAPPA_POLICIES = ("range",)
+"""The admitted values of ``KAPPA_POLICY``; ``run`` refuses any other (exit 2), ``"point"`` included
+(amendment 8, H3: no path computes a projection from the point estimate)."""
 H3A_TINY = 1e-300
 """A log-rank p below this has no finite chi-square in float64: chi2 is a lower bound."""
 SLACK = 0.005
@@ -916,11 +921,9 @@ def project_row(spec: Spec, system: str, tree: dict, cfg: dict, view: DumpView |
                 rep: Report, full) -> dict:
     """Everything the report says about one criterion of one system (``NotComputable`` if none).
 
-    kappa_E: with ``KAPPA_POLICY == "range"`` (the default, R2) the pre-registered range governs,
-    printed as FALLBACK and recorded as "not computable" (plan amendment 7, G2 counts a FALLBACK),
-    and the point estimate from the dump (after its reproduction check) is only information. With
-    ``"point"`` the point estimate governs when the dump reproduces its leaf; otherwise the range is
-    used, printed as a fallback and recorded as "not computable" (exit 2).
+    kappa_E: the pre-registered range governs, printed as FALLBACK (a computed row, amendment 8
+    H1); the point estimate from a dump that reproduces its leaf is only information and never
+    enters ``x_lo``, ``x_hi`` or any number of the row.
     """
     where = f"{system} {spec.label}"
     block = dig(tree, *spec.path)
@@ -959,27 +962,19 @@ def project_row(spec: Spec, system: str, tree: dict, cfg: dict, view: DumpView |
                           spec, e_full)
             if got is not None:
                 kappa_info = got
-                if KAPPA_POLICY == "point":
-                    x_lo = x_hi = got["kappa"]
-                    note = (f"kappa_E {got['kappa']:.4f} from the dump (V_s {got['V_s']:.3g}, "
-                            f"V_d {got['V_d']:.3g})")
-                else:
-                    note += (f" -- kappa_E point estimator biased (R2): range governs; point "
-                             f"kappa {got['kappa']:.4f} is information only, biased")
-        elif KAPPA_POLICY == "range":
+                note += (f" -- kappa_E point estimator biased (R2): range governs; point kappa "
+                         f"{got['kappa']:.4f} is information only, not an estimator of kappa_E")
+            else:
+                note += " -- kappa_E point estimator biased (R2): range governs"
+        else:
             note += " -- kappa_E point estimator biased (R2): range governs; no dump"
-        if KAPPA_POLICY == "range":
-            rep.nc(f"{where} kappa_E", "range governs (R2: the point estimator is biased, sign "
-                   "undetermined; working default (a)); amendment 7 G2 counts a FALLBACK")
-        # with no dump at all, open_dump has recorded the one "not computable" line of the system
+        # a missing or unusable dump is a "not computable" item of its own (open_dump or attempt)
     f_lo, f_hi = fn * fb * x_lo, fn * fb * x_hi
     row = {"label": spec.label, "system": system, "hw_run": hw, "estimate": estimate,
            "n_run": n_run, "n_full": n_full, "f_n": fn, "f_b": fb, "f_lo": f_lo, "f_hi": f_hi,
            "hw_lo": hw * f_lo, "hw_hi": hw * f_hi, "nominal": hw * fn, "note": note,
            "kappa": kappa_info, "level": level_of(spec),
-           "kappa_governs": ("point" if kappa_info is not None and KAPPA_POLICY == "point"
-                             else ("range" if spec.extra == "kappa" and e_run != e_full
-                                   else "n/a"))}
+           "kappa_governs": "range" if spec.extra == "kappa" and e_run != e_full else "n/a"}
     if spec.ratio and estimate is not None:
         r_hat = estimate + spec.ratio_offset
         if r_hat == 0.0 or not math.isfinite(r_hat):
@@ -1157,11 +1152,11 @@ def summary_lines(rep: Report, observed: bool) -> list[str]:
         if not r["prediction"]["within"]:
             out.append(f"    outside (finding): {r['system']} {r['label']}: {r['prediction']['text']}")
     kappa_rows = [r for r in rows if r["label"].startswith(("H2c", "H2d", "H3c"))]
-    point = sum(r["kappa_governs"] == "point" for r in kappa_rows)
+    governed = sum(r["kappa_governs"] == "range" for r in kappa_rows)
     info = sum(r["kappa"] is not None for r in kappa_rows)
-    out.append(f"  kappa_E: point estimate from the dump governs for {point} of {len(kappa_rows)} "
-               f"parts; range fallback for {len(kappa_rows) - point} (KAPPA_POLICY "
-               f"{KAPPA_POLICY!r}; point kappa shown for {info})")
+    out.append(f"  kappa_E: the range [0.7071, 1] governs {governed} of {len(kappa_rows)} parts "
+               f"(FALLBACK rows, counted as computed; KAPPA_POLICY {KAPPA_POLICY!r}); point kappa "
+               f"shown as information for {info} (not an estimator of kappa_E)")
     expected = sum(r["false_trigger"] for r in rows)
     out.append(f"  predicted false triggers of the band over the {len(rows)} parts: {expected:.2f} "
                "(sum of the per-part rates)")
@@ -1179,9 +1174,6 @@ def summary_lines(rep: Report, observed: bool) -> list[str]:
         out.append(f"  H3a {system} (conditional on K_pilot = {got['chosen_K']}): pass reachable at "
                    f"full size: {got['reading']} (largest projected Holm p "
                    f"{got['largest_holm_full']:.3g}, bar {got['alpha']:g})")
-    if KAPPA_POLICY == "range" and kappa_rows:
-        out.append("  exit 0 is unreachable while the range governs kappa_E (amendment 7 G2 "
-                   "counts a FALLBACK): owner choice (a) or (b) of the R2 note")
     return out
 
 
