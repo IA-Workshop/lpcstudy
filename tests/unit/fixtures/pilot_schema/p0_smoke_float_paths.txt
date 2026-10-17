@@ -1,0 +1,990 @@
+# DEVELOPMENT (DEV-0): paths only, no values. WU-0003.9b. See extract_paths.py for the format.
+# columns: shape TAB chain tag before WU-0003.9b (empty: untagged)
+# source p0-1b20db9/runs/dev/p0/pilot/results.json: sha256 e161131af743c97af233d0e5f5272c1e9ad3c0bc80f6b59de2c735887c40e5fc
+# source run/wu0003-7c-tip/runs/wu0003-7c-tip/smoke/results.json: sha256 ecb702e79935ddbeb1ea74ece1a8a0e3cc0ef21b70460a458c6c0ba507b6e6ea
+config/burn_in_lyapunov	
+config/core_noise	
+config/eval_horizons_lyapunov/[]	
+config/horizon_max_lyapunov	
+config/library_sweep_noises/[]	
+config/linear_regime_rms	
+config/misspec_levels/[]	
+config/noise_levels/[]	
+config/perturbation_scales/[]	
+config/primary_threshold	
+config/reference_horizon_lyapunov	
+config/theiler_lyapunov	
+config/thinning_factor	
+config/threshold_noise_factor	
+config/thresholds/[]	
+estimators/('chua', 7, 5, 0.005)/val_loss_by_width/128	network
+estimators/('chua', 7, 5, 0.005)/val_loss_by_width/64	network
+estimators/('chua', 7, 5, 0.01)/val_loss_by_width/128	network
+estimators/('chua', 7, 5, 0.01)/val_loss_by_width/64	network
+estimators/('chua', 7, 5, 0.02)/val_loss_by_width/128	network
+estimators/('chua', 7, 5, 0.02)/val_loss_by_width/64	network
+estimators/('chua', 7, 5, 0.05)/val_loss_by_width/128	network
+estimators/('chua', 7, 5, 0.05)/val_loss_by_width/64	network
+estimators/('lorenz63', 10, 3, 0.01)/val_loss_by_width/128	network
+estimators/('lorenz63', 10, 3, 0.01)/val_loss_by_width/64	network
+estimators/('lorenz63', 5, 5, 0.01)/val_loss_by_width/128	network
+estimators/('lorenz63', 5, 5, 0.01)/val_loss_by_width/64	network
+estimators/('lorenz63', 7, 5, 0.005)/val_loss_by_width/128	network
+estimators/('lorenz63', 7, 5, 0.005)/val_loss_by_width/64	network
+estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/128	network
+estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/32	network
+estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/64	network
+estimators/('lorenz63', 7, 5, 0.02)/val_loss_by_width/128	network
+estimators/('lorenz63', 7, 5, 0.02)/val_loss_by_width/32	network
+estimators/('lorenz63', 7, 5, 0.02)/val_loss_by_width/64	network
+estimators/('lorenz63', 7, 5, 0.05)/val_loss_by_width/128	network
+estimators/('lorenz63', 7, 5, 0.05)/val_loss_by_width/64	network
+estimators/('rossler', 10, 3, 0.01)/val_loss_by_width/128	network
+estimators/('rossler', 10, 3, 0.01)/val_loss_by_width/64	network
+estimators/('rossler', 5, 3, 0.01)/val_loss_by_width/128	network
+estimators/('rossler', 5, 3, 0.01)/val_loss_by_width/64	network
+estimators/('rossler', 7, 3, 0.005)/val_loss_by_width/128	network
+estimators/('rossler', 7, 3, 0.005)/val_loss_by_width/64	network
+estimators/('rossler', 7, 3, 0.01)/val_loss_by_width/128	network
+estimators/('rossler', 7, 3, 0.01)/val_loss_by_width/64	network
+estimators/('rossler', 7, 3, 0.02)/val_loss_by_width/128	network
+estimators/('rossler', 7, 3, 0.02)/val_loss_by_width/64	network
+estimators/('rossler', 7, 3, 0.05)/val_loss_by_width/128	network
+estimators/('rossler', 7, 3, 0.05)/val_loss_by_width/64	network
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/check/noise	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_no_decrease	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_iterations	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_residual	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/eval/noise	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/eval/p95_residual	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_no_decrease	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_iterations	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_residual	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/noise	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/p95_residual	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/fraction_late_progress	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/fraction_no_decrease	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/median_iterations	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/median_residual	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/noise	
+handling/robustness/<sys>/cells/D=10|rho=0.01|n_lib=10000|core/lm/p95_residual	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/check/noise	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_no_decrease	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_iterations	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_residual	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/noise	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/p95_residual	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_no_decrease	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_iterations	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_residual	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/noise	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/p95_residual	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/fraction_late_progress	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/fraction_no_decrease	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/median_iterations	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/median_residual	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/noise	
+handling/robustness/<sys>/cells/D=5|rho=0.01|n_lib=10000|core/lm/p95_residual	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/check/noise	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_no_decrease	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_iterations	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_residual	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/noise	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/p95_residual	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_no_decrease	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_iterations	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_residual	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/noise	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/p95_residual	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/fraction_late_progress	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/fraction_no_decrease	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/median_iterations	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/median_residual	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/noise	
+handling/robustness/<sys>/cells/k=5|rho=0.01|n_lib=10000|core/lm/p95_residual	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/check/noise	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_no_decrease	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_iterations	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_residual	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/eval/noise	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/eval/p95_residual	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_no_decrease	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_iterations	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_residual	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/noise	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/p95_residual	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/fraction_late_progress	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/fraction_no_decrease	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/median_iterations	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/median_residual	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/noise	
+handling/robustness/<sys>/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/p95_residual	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/check/noise	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_no_decrease	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_iterations	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_residual	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/eval/noise	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/eval/p95_residual	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_no_decrease	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_iterations	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_residual	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/noise	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/p95_residual	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/fraction_late_progress	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/fraction_no_decrease	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/median_iterations	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/median_residual	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/noise	
+handling/robustness/<sys>/cells/misspec=0.1|rho=0.01|n_lib=10000|core/lm/p95_residual	
+robustness/<sys>/D=10/A4_over_A3	network
+robustness/<sys>/D=10/A4_vs_A2_relative	network
+robustness/<sys>/D=10/A5_regret_ratio	network
+robustness/<sys>/D=10/H1b/CP/ci/[]	cp
+robustness/<sys>/D=10/H1b/CP/slope	cp
+robustness/<sys>/D=10/H1b/PLP/ci/[]	network
+robustness/<sys>/D=10/H1b/PLP/slope	network
+robustness/<sys>/D=10/H1b/threshold/[]	
+robustness/<sys>/D=10/H2a_median_range	network
+robustness/<sys>/D=10/H2a_partial_corr_interior	
+robustness/<sys>/D=10/H2a_partial_corr_zero	
+robustness/<sys>/D=10/mse_href/A*	network
+robustness/<sys>/D=10/mse_href/A0	network
+robustness/<sys>/D=10/mse_href/A1	network
+robustness/<sys>/D=10/mse_href/A2	network
+robustness/<sys>/D=10/mse_href/A3	network
+robustness/<sys>/D=10/mse_href/A4	network
+robustness/<sys>/D=10/mse_href/A4o	network
+robustness/<sys>/D=10/mse_href/A5	network
+robustness/<sys>/D=5/A4_over_A3	network
+robustness/<sys>/D=5/A4_vs_A2_relative	network
+robustness/<sys>/D=5/A5_regret_ratio	network
+robustness/<sys>/D=5/H1b/CP/ci/[]	cp
+robustness/<sys>/D=5/H1b/CP/slope	cp
+robustness/<sys>/D=5/H1b/PLP/ci/[]	network
+robustness/<sys>/D=5/H1b/PLP/slope	network
+robustness/<sys>/D=5/H1b/threshold/[]	
+robustness/<sys>/D=5/H2a_median_range	network
+robustness/<sys>/D=5/H2a_partial_corr_interior	
+robustness/<sys>/D=5/H2a_partial_corr_zero	
+robustness/<sys>/D=5/mse_href/A*	network
+robustness/<sys>/D=5/mse_href/A0	network
+robustness/<sys>/D=5/mse_href/A1	network
+robustness/<sys>/D=5/mse_href/A2	network
+robustness/<sys>/D=5/mse_href/A3	network
+robustness/<sys>/D=5/mse_href/A4	network
+robustness/<sys>/D=5/mse_href/A4o	network
+robustness/<sys>/D=5/mse_href/A5	network
+robustness/<sys>/Lambda_fin(eps=1rho)/H2a_partial_corr_interior_fin	
+robustness/<sys>/Lambda_fin(eps=1rho)/H2a_partial_corr_zero_fin	
+robustness/<sys>/Lambda_fin(eps=1rho)/ci_interior/[]	
+robustness/<sys>/Lambda_fin(eps=1rho)/ci_zero/[]	
+robustness/<sys>/Lambda_fin(eps=1rho)/corr_fin_vs_linear	oracle
+robustness/<sys>/Lambda_fin(eps=1rho)/scale_times_rho	
+robustness/<sys>/Lambda_fin(eps=3rho)/H2a_partial_corr_interior_fin	
+robustness/<sys>/Lambda_fin(eps=3rho)/H2a_partial_corr_zero_fin	
+robustness/<sys>/Lambda_fin(eps=3rho)/ci_interior/[]	
+robustness/<sys>/Lambda_fin(eps=3rho)/ci_zero/[]	
+robustness/<sys>/Lambda_fin(eps=3rho)/corr_fin_vs_linear	oracle
+robustness/<sys>/Lambda_fin(eps=3rho)/scale_times_rho	
+robustness/<sys>/base/A4_over_A3	network
+robustness/<sys>/base/A4_vs_A2_relative	network
+robustness/<sys>/base/A5_regret_ratio	network
+robustness/<sys>/base/H1b/CP/ci/[]	cp
+robustness/<sys>/base/H1b/CP/slope	cp
+robustness/<sys>/base/H1b/PLP/ci/[]	network
+robustness/<sys>/base/H1b/PLP/slope	network
+robustness/<sys>/base/H1b/threshold/[]	
+robustness/<sys>/base/H2a_median_range	network
+robustness/<sys>/base/H2a_partial_corr_interior	
+robustness/<sys>/base/H2a_partial_corr_zero	
+robustness/<sys>/base/mse_href/A*	network
+robustness/<sys>/base/mse_href/A0	network
+robustness/<sys>/base/mse_href/A1	network
+robustness/<sys>/base/mse_href/A2	network
+robustness/<sys>/base/mse_href/A3	network
+robustness/<sys>/base/mse_href/A4	network
+robustness/<sys>/base/mse_href/A4o	network
+robustness/<sys>/base/mse_href/A5	network
+robustness/<sys>/k=5/A4_over_A3	network
+robustness/<sys>/k=5/A4_vs_A2_relative	network
+robustness/<sys>/k=5/A5_regret_ratio	network
+robustness/<sys>/k=5/H1b/CP/ci/[]	cp
+robustness/<sys>/k=5/H1b/CP/slope	cp
+robustness/<sys>/k=5/H1b/PLP/ci/[]	network
+robustness/<sys>/k=5/H1b/PLP/slope	network
+robustness/<sys>/k=5/H1b/threshold/[]	
+robustness/<sys>/k=5/H2a_median_range	network
+robustness/<sys>/k=5/H2a_partial_corr_interior	
+robustness/<sys>/k=5/H2a_partial_corr_zero	
+robustness/<sys>/k=5/mse_href/A*	network
+robustness/<sys>/k=5/mse_href/A0	network
+robustness/<sys>/k=5/mse_href/A1	network
+robustness/<sys>/k=5/mse_href/A2	network
+robustness/<sys>/k=5/mse_href/A3	network
+robustness/<sys>/k=5/mse_href/A4	network
+robustness/<sys>/k=5/mse_href/A4o	network
+robustness/<sys>/k=5/mse_href/A5	network
+robustness/<sys>/misspec=0.05/A4_over_A3	network
+robustness/<sys>/misspec=0.05/A4_vs_A2_relative	network
+robustness/<sys>/misspec=0.05/A5_regret_ratio	network
+robustness/<sys>/misspec=0.05/H1b/CP/ci/[]	cp
+robustness/<sys>/misspec=0.05/H1b/CP/slope	cp
+robustness/<sys>/misspec=0.05/H1b/PLP/ci/[]	network
+robustness/<sys>/misspec=0.05/H1b/PLP/slope	network
+robustness/<sys>/misspec=0.05/H1b/threshold/[]	
+robustness/<sys>/misspec=0.05/H2a_median_range	network
+robustness/<sys>/misspec=0.05/H2a_partial_corr_interior	
+robustness/<sys>/misspec=0.05/H2a_partial_corr_zero	
+robustness/<sys>/misspec=0.05/mse_href/A*	network
+robustness/<sys>/misspec=0.05/mse_href/A0	network
+robustness/<sys>/misspec=0.05/mse_href/A1	network
+robustness/<sys>/misspec=0.05/mse_href/A2	network
+robustness/<sys>/misspec=0.05/mse_href/A3	network
+robustness/<sys>/misspec=0.05/mse_href/A4	network
+robustness/<sys>/misspec=0.05/mse_href/A4o	network
+robustness/<sys>/misspec=0.05/mse_href/A5	network
+robustness/<sys>/misspec=0.1/A4_over_A3	network
+robustness/<sys>/misspec=0.1/A4_vs_A2_relative	network
+robustness/<sys>/misspec=0.1/A5_regret_ratio	network
+robustness/<sys>/misspec=0.1/H1b/CP/ci/[]	cp
+robustness/<sys>/misspec=0.1/H1b/CP/slope	cp
+robustness/<sys>/misspec=0.1/H1b/PLP/ci/[]	network
+robustness/<sys>/misspec=0.1/H1b/PLP/slope	network
+robustness/<sys>/misspec=0.1/H1b/threshold/[]	
+robustness/<sys>/misspec=0.1/H2a_median_range	network
+robustness/<sys>/misspec=0.1/H2a_partial_corr_interior	
+robustness/<sys>/misspec=0.1/H2a_partial_corr_zero	
+robustness/<sys>/misspec=0.1/mse_href/A*	network
+robustness/<sys>/misspec=0.1/mse_href/A0	network
+robustness/<sys>/misspec=0.1/mse_href/A1	network
+robustness/<sys>/misspec=0.1/mse_href/A2	network
+robustness/<sys>/misspec=0.1/mse_href/A3	network
+robustness/<sys>/misspec=0.1/mse_href/A4	network
+robustness/<sys>/misspec=0.1/mse_href/A4o	network
+robustness/<sys>/misspec=0.1/mse_href/A5	network
+systems/<sys>/H1a/band/[]	
+systems/<sys>/H1a/by_noise/0.01/ci_inverse_dim/[]	cp
+systems/<sys>/H1a/by_noise/0.01/fitted_inverse_dim	cp
+systems/<sys>/H1a/by_noise/0.01/floor_rms	cp
+systems/<sys>/H1a/by_noise/0.01/median_seed_by_n_lib/1000	cp
+systems/<sys>/H1a/by_noise/0.01/median_seed_by_n_lib/10000	cp
+systems/<sys>/H1a/by_noise/0.01/median_seed_by_n_lib/100000	cp
+systems/<sys>/H1a/by_noise/0.01/median_seed_by_n_lib/3162	cp
+systems/<sys>/H1a/by_noise/0.01/median_seed_by_n_lib/31623	cp
+systems/<sys>/H1a/by_noise/0.01/ratio	
+systems/<sys>/H1a/by_noise/0.01/ratio_ci/[]	
+systems/<sys>/H1a/by_noise/0.02/ci_inverse_dim/[]	cp
+systems/<sys>/H1a/by_noise/0.02/fitted_inverse_dim	cp
+systems/<sys>/H1a/by_noise/0.02/floor_rms	cp
+systems/<sys>/H1a/by_noise/0.02/median_seed_by_n_lib/1000	cp
+systems/<sys>/H1a/by_noise/0.02/median_seed_by_n_lib/10000	cp
+systems/<sys>/H1a/by_noise/0.02/median_seed_by_n_lib/100000	cp
+systems/<sys>/H1a/by_noise/0.02/median_seed_by_n_lib/3162	cp
+systems/<sys>/H1a/by_noise/0.02/median_seed_by_n_lib/31623	cp
+systems/<sys>/H1a/by_noise/0.02/ratio	
+systems/<sys>/H1a/by_noise/0.02/ratio_ci/[]	
+systems/<sys>/H1a/inverse_dim_reference	cp
+systems/<sys>/H1a/level	
+systems/<sys>/H1b/CP/ci/[]	cp
+systems/<sys>/H1b/CP/slope	cp
+systems/<sys>/H1b/PLP/ci/[]	network
+systems/<sys>/H1b/PLP/slope	network
+systems/<sys>/H1b/threshold/[]	
+systems/<sys>/H1c/CP/ci/[]	cp
+systems/<sys>/H1c/CP/median_ratio	cp
+systems/<sys>/H1c/PLP/ci/[]	network
+systems/<sys>/H1c/PLP/median_ratio	network
+systems/<sys>/H1c/threshold/[]	
+systems/<sys>/H1c/thresholds/[]	
+systems/<sys>/H1d/estimation_seed_vs_cramer_rao	network
+systems/<sys>/H1d/level	
+systems/<sys>/H1d/rows/analog_seed/interval/[]	
+systems/<sys>/H1d/rows/analog_seed/spearman	network
+systems/<sys>/H1d/rows/estimation_seed/interval/[]	
+systems/<sys>/H1d/rows/estimation_seed/spearman	network
+systems/<sys>/H1d/rows/growth/interval/[]	
+systems/<sys>/H1d/rows/growth/spearman	network
+systems/<sys>/H1d/rows/nhat/interval/[]	
+systems/<sys>/H1d/rows/nhat/spearman	network
+systems/<sys>/H1d/threshold	
+systems/<sys>/H2a/ci_mc_se/[]	
+systems/<sys>/H2a/complete_case/median_range	
+systems/<sys>/H2a/complete_case/range_ci/[]	
+systems/<sys>/H2a/median_range	network
+systems/<sys>/H2a/median_range_unrestricted	network
+systems/<sys>/H2a/part_ii/interior/ci/[]	
+systems/<sys>/H2a/part_ii/interior/ci_mc_se/[]	
+systems/<sys>/H2a/part_ii/interior/partial_corr	
+systems/<sys>/H2a/part_ii/one/ci/[]	
+systems/<sys>/H2a/part_ii/one/partial_corr	
+systems/<sys>/H2a/part_ii/zero/ci/[]	
+systems/<sys>/H2a/part_ii/zero/ci_mc_se/[]	
+systems/<sys>/H2a/part_ii/zero/partial_corr	
+systems/<sys>/H2a/range_by_span/1-2-4/median	
+systems/<sys>/H2a/range_by_span/1-2/median	
+systems/<sys>/H2a/range_ci/[]	
+systems/<sys>/H2a/short_horizon_range_median	network
+systems/<sys>/H2a/unconditional_spearman_w_lambda	network
+systems/<sys>/H2b/library_change/ci/[]	
+systems/<sys>/H2b/library_change/ci_mc_se/[]	
+systems/<sys>/H2b/library_change/level	
+systems/<sys>/H2b/library_change/mean_change	
+systems/<sys>/H2b/library_change/rho	
+systems/<sys>/H2b/library_change_reported/0.02/ci/[]	
+systems/<sys>/H2b/library_change_reported/0.02/level	
+systems/<sys>/H2b/library_change_reported/0.02/mean_change	
+systems/<sys>/H2b/library_curves/0.01/1000/level	
+systems/<sys>/H2b/library_curves/0.01/1000/mean	
+systems/<sys>/H2b/library_curves/0.01/1000/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/1000/median	
+systems/<sys>/H2b/library_curves/0.01/1000/median_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/10000/level	
+systems/<sys>/H2b/library_curves/0.01/10000/mean	
+systems/<sys>/H2b/library_curves/0.01/10000/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/10000/median	
+systems/<sys>/H2b/library_curves/0.01/10000/median_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/100000/level	
+systems/<sys>/H2b/library_curves/0.01/100000/mean	
+systems/<sys>/H2b/library_curves/0.01/100000/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/100000/median	
+systems/<sys>/H2b/library_curves/0.01/100000/median_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/3162/level	
+systems/<sys>/H2b/library_curves/0.01/3162/mean	
+systems/<sys>/H2b/library_curves/0.01/3162/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/3162/median	
+systems/<sys>/H2b/library_curves/0.01/3162/median_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/31623/level	
+systems/<sys>/H2b/library_curves/0.01/31623/mean	
+systems/<sys>/H2b/library_curves/0.01/31623/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/31623/median	
+systems/<sys>/H2b/library_curves/0.01/31623/median_ci/[]	
+systems/<sys>/H2b/library_curves/0.02/1000/level	
+systems/<sys>/H2b/library_curves/0.02/1000/mean	
+systems/<sys>/H2b/library_curves/0.02/1000/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.02/1000/median	
+systems/<sys>/H2b/library_curves/0.02/1000/median_ci/[]	
+systems/<sys>/H2b/library_curves/0.02/10000/level	
+systems/<sys>/H2b/library_curves/0.02/10000/mean	
+systems/<sys>/H2b/library_curves/0.02/10000/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.02/10000/median	
+systems/<sys>/H2b/library_curves/0.02/10000/median_ci/[]	
+systems/<sys>/H2b/library_curves/0.02/100000/level	
+systems/<sys>/H2b/library_curves/0.02/100000/mean	
+systems/<sys>/H2b/library_curves/0.02/100000/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.02/100000/median	
+systems/<sys>/H2b/library_curves/0.02/100000/median_ci/[]	
+systems/<sys>/H2b/library_curves/0.02/3162/level	
+systems/<sys>/H2b/library_curves/0.02/3162/mean	
+systems/<sys>/H2b/library_curves/0.02/3162/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.02/3162/median	
+systems/<sys>/H2b/library_curves/0.02/3162/median_ci/[]	
+systems/<sys>/H2b/library_curves/0.02/31623/level	
+systems/<sys>/H2b/library_curves/0.02/31623/mean	
+systems/<sys>/H2b/library_curves/0.02/31623/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.02/31623/median	
+systems/<sys>/H2b/library_curves/0.02/31623/median_ci/[]	
+systems/<sys>/H2b/noise/ci/[]	network
+systems/<sys>/H2b/noise/ci_mc_se/[]	
+systems/<sys>/H2b/noise/mean_state_spearman	network
+systems/<sys>/H2b/noise/median_w_by_noise/0.005	network
+systems/<sys>/H2b/noise/median_w_by_noise/0.01	network
+systems/<sys>/H2b/noise/median_w_by_noise/0.02	network
+systems/<sys>/H2b/noise/median_w_by_noise/0.05	network
+systems/<sys>/H2c/A4_minus_A0/ci/[]	
+systems/<sys>/H2c/A4_minus_A0/mean	
+systems/<sys>/H2c/A4_minus_A0/relative	
+systems/<sys>/H2c/A4_minus_A1/ci/[]	network
+systems/<sys>/H2c/A4_minus_A1/mean	network
+systems/<sys>/H2c/A4_minus_A1/relative	network
+systems/<sys>/H2c/A4_minus_A2/ci/[]	network
+systems/<sys>/H2c/A4_minus_A2/mean	network
+systems/<sys>/H2c/A4_minus_A2/relative	network
+systems/<sys>/H2c/A4o_minus_A2/ci/[]	
+systems/<sys>/H2c/A4o_minus_A2/level	
+systems/<sys>/H2c/A4o_minus_A2/mean	
+systems/<sys>/H2c/A4o_minus_A2/relative	
+systems/<sys>/H2c/calibration_mse/A0	
+systems/<sys>/H2c/calibration_mse/A1	
+systems/<sys>/H2d/ci/[]	network
+systems/<sys>/H2d/in_distribution_excess	network
+systems/<sys>/H2e/by_noise/0.01/ci/[]	
+systems/<sys>/H2e/by_noise/0.01/level	
+systems/<sys>/H2e/by_noise/0.01/median_change	
+systems/<sys>/H2e/by_noise/0.02/ci/[]	
+systems/<sys>/H2e/by_noise/0.02/level	
+systems/<sys>/H2e/by_noise/0.02/median_change	
+systems/<sys>/H2e/corr_curve/0.01/1000	
+systems/<sys>/H2e/corr_curve/0.01/10000	
+systems/<sys>/H2e/corr_curve/0.01/100000	
+systems/<sys>/H2e/corr_curve/0.01/3162	
+systems/<sys>/H2e/corr_curve/0.01/31623	
+systems/<sys>/H2e/corr_curve/0.02/1000	
+systems/<sys>/H2e/corr_curve/0.02/10000	
+systems/<sys>/H2e/corr_curve/0.02/100000	
+systems/<sys>/H2e/corr_curve/0.02/3162	
+systems/<sys>/H2e/corr_curve/0.02/31623	
+systems/<sys>/H3a/iqr_lt/[]	
+systems/<sys>/H3a/iqr_lt_mean	network
+systems/<sys>/H3a/logrank_p_holm/[]	network
+systems/<sys>/H3a/logrank_p_raw/[]	
+systems/<sys>/H3b/D/ci/[]	
+systems/<sys>/H3b/D/level	
+systems/<sys>/H3b/D/value	
+systems/<sys>/H3b/horizon_tree_importance/lambda_tilde	network
+systems/<sys>/H3b/horizon_tree_importance/log_eps_tilde	network
+systems/<sys>/H3b/horizon_tree_importance/log_noise_sens	network
+systems/<sys>/H3b/horizon_tree_importance/log_nu_tilde	network
+systems/<sys>/H3b/stability	
+systems/<sys>/H3b/weight_lambda/band/[]	
+systems/<sys>/H3b/weight_lambda/ci/[]	
+systems/<sys>/H3b/weight_lambda/importance	
+systems/<sys>/H3b/weight_lambda/level	
+systems/<sys>/H3b/weight_tree_importance/lambda_tilde	network
+systems/<sys>/H3b/weight_tree_importance/log_eps_tilde	network
+systems/<sys>/H3b/weight_tree_importance/log_noise_sens	network
+systems/<sys>/H3b/weight_tree_importance/log_nu_tilde	network
+systems/<sys>/H3c/A5_over_A4_mse	network
+systems/<sys>/H3c/ci/[]	
+systems/<sys>/H3c/ci_mc_se/[]	
+systems/<sys>/H3c/level	
+systems/<sys>/H3c/threshold	
+systems/<sys>/Q-N/deployable/log_horizon/ci/[]	network
+systems/<sys>/Q-N/deployable/log_horizon/delta_r2	network
+systems/<sys>/Q-N/deployable/log_horizon/r2_four	network
+systems/<sys>/Q-N/deployable/log_horizon/r2_three	network
+systems/<sys>/Q-N/deployable/logit_w_interior/ci/[]	
+systems/<sys>/Q-N/deployable/logit_w_interior/delta_r2	
+systems/<sys>/Q-N/deployable/logit_w_interior/r2_four	
+systems/<sys>/Q-N/deployable/logit_w_interior/r2_three	
+systems/<sys>/Q-N/deployable/noise_sens_r2_from_three	network
+systems/<sys>/Q-N/deployable/w_zero_indicator/ci/[]	
+systems/<sys>/Q-N/deployable/w_zero_indicator/delta_r2	
+systems/<sys>/Q-N/deployable/w_zero_indicator/r2_four	
+systems/<sys>/Q-N/deployable/w_zero_indicator/r2_three	
+systems/<sys>/Q-N/oracle/log_horizon/ci/[]	network
+systems/<sys>/Q-N/oracle/log_horizon/delta_r2	network
+systems/<sys>/Q-N/oracle/log_horizon/r2_four	network
+systems/<sys>/Q-N/oracle/log_horizon/r2_three	network
+systems/<sys>/Q-N/oracle/logit_w_interior/ci/[]	
+systems/<sys>/Q-N/oracle/logit_w_interior/delta_r2	
+systems/<sys>/Q-N/oracle/logit_w_interior/r2_four	
+systems/<sys>/Q-N/oracle/logit_w_interior/r2_three	
+systems/<sys>/Q-N/oracle/noise_sens_r2_from_three	network
+systems/<sys>/Q-N/oracle/w_zero_indicator/ci/[]	
+systems/<sys>/Q-N/oracle/w_zero_indicator/delta_r2	
+systems/<sys>/Q-N/oracle/w_zero_indicator/r2_four	
+systems/<sys>/Q-N/oracle/w_zero_indicator/r2_three	
+systems/<sys>/V7/ci/[]	network
+systems/<sys>/V7/efficiency_ci_by_noise/0.005/[]	
+systems/<sys>/V7/efficiency_ci_by_noise/0.01/[]	
+systems/<sys>/V7/efficiency_ci_by_noise/0.02/[]	
+systems/<sys>/V7/efficiency_ci_by_noise/0.05/[]	
+systems/<sys>/V7/efficiency_median_by_noise/0.005	network
+systems/<sys>/V7/efficiency_median_by_noise/0.01	network
+systems/<sys>/V7/efficiency_median_by_noise/0.02	network
+systems/<sys>/V7/efficiency_median_by_noise/0.05	network
+systems/<sys>/V7/median_slope	network
+systems/<sys>/V7/threshold/[]	
+systems/<sys>/clip_sensitivity/by_hypothesis/H1b/parts/PLP/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H1b/parts/PLP/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/interior/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/interior/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/one/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/one/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/zero/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/zero/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2b/parts/library_change/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2b/parts/library_change/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2b/parts/noise/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2b/parts/noise/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A0/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A0/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A1/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A1/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A2/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A2/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2d/parts/A4_over_A3/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2d/parts/A4_over_A3/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2e/parts/0.01/delta_bound	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2e/parts/0.01/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2e/parts/0.02/delta_bound	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2e/parts/0.02/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H3c/parts/A5_over_A4/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H3c/parts/A5_over_A4/ratio	
+systems/<sys>/clip_sensitivity/clip_level	
+systems/<sys>/clip_sensitivity/perturbed_level	
+systems/<sys>/clip_sensitivity/share_test/A0	
+systems/<sys>/clip_sensitivity/share_test/A1	
+systems/<sys>/clip_sensitivity/share_test/A2	
+systems/<sys>/clip_sensitivity/share_test/A3	
+systems/<sys>/clip_sensitivity/share_test/A4	
+systems/<sys>/clip_sensitivity/share_test/A5	
+systems/<sys>/clip_sensitivity/weight_shift/A2	
+systems/<sys>/clip_sensitivity/weight_shift/A5_max	
+systems/<sys>/context/interval	dynamics
+systems/<sys>/context/lambda_max	dynamics
+systems/<sys>/context/lyapunov_orbit_max_abs	dynamics
+systems/<sys>/context/obs_scale	dynamics
+systems/<sys>/context/start_state/estimator/[]	dynamics
+systems/<sys>/context/start_state/main/[]	dynamics
+systems/<sys>/context/trajectory_max_abs/estimator	dynamics
+systems/<sys>/context/trajectory_max_abs/main	dynamics
+systems/<sys>/context/trajectory_max_abs/statistics	dynamics
+systems/<sys>/fitted/analog_proxy/floor	network
+systems/<sys>/fitted/analog_proxy/slope	network
+systems/<sys>/fitted/estimation_proxy/floor	network
+systems/<sys>/fitted/estimation_proxy/slope	network
+systems/<sys>/fitted/nu_cap	network
+systems/<sys>/fitted/regime_horizons_km_lyapunov/12/[]	
+systems/<sys>/fitted/regime_horizons_km_lyapunov/2/[]	
+systems/<sys>/fitted/regime_horizons_km_lyapunov/3/[]	
+systems/<sys>/fitted/regime_horizons_km_lyapunov/4/[]	
+systems/<sys>/fitted/regime_horizons_km_lyapunov/5/[]	
+systems/<sys>/fitted/regime_horizons_km_lyapunov/6/[]	
+systems/<sys>/fitted/regime_horizons_km_lyapunov/8/[]	
+systems/<sys>/fitted/regime_weights_href/12/[]	
+systems/<sys>/fitted/regime_weights_href/2/[]	
+systems/<sys>/fitted/regime_weights_href/3/[]	
+systems/<sys>/fitted/regime_weights_href/4/[]	
+systems/<sys>/fitted/regime_weights_href/5/[]	
+systems/<sys>/fitted/regime_weights_href/6/[]	
+systems/<sys>/fitted/regime_weights_href/8/[]	
+systems/<sys>/gain_bound/fraction_within_bound	network
+systems/<sys>/gain_bound/max_gain_lyapunov	network
+systems/<sys>/gain_bound/median_gain_lyapunov	network
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/fraction_above_chi2	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/fraction_late_progress	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/fraction_no_decrease	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/median_iterations	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/median_residual	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/p95_residual	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/fraction_late_progress	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/median_iterations	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/median_residual	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/noise	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/p95_residual	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/fraction_above_chi2	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/fraction_late_progress	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/fraction_no_decrease	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/median_iterations	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/median_residual	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/p95_residual	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/V4-convergence/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/V4-convergence/lm/fraction_late_progress	
+systems/<sys>/handling/cells/V4-convergence/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/V4-convergence/lm/median_iterations	
+systems/<sys>/handling/cells/V4-convergence/lm/median_residual	
+systems/<sys>/handling/cells/V4-convergence/lm/noise	
+systems/<sys>/handling/cells/V4-convergence/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.005|n_lib=10000|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=100000|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=31623|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=3162|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=100000|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=1000|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=31623|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=3162|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.05|n_lib=10000|sweep/lm/p95_residual	
+systems/<sys>/km_curves/A*/[]	network
+systems/<sys>/km_curves/A0/[]	cp
+systems/<sys>/km_curves/A1/[]	network
+systems/<sys>/km_curves/A2/[]	network
+systems/<sys>/km_curves/A3/[]	network
+systems/<sys>/km_curves/A4/[]	network
+systems/<sys>/km_curves/A4o/[]	network
+systems/<sys>/km_curves/A5/[]	
+systems/<sys>/oracle_recovery/A4_vs_A4o	network
+systems/<sys>/oracle_recovery/A4_vs_Astar	network
+systems/<sys>/oracle_recovery/A5_vs_Astar	
+systems/<sys>/oracle_recovery/mse_at_href/A*	network
+systems/<sys>/oracle_recovery/mse_at_href/A0	cp
+systems/<sys>/oracle_recovery/mse_at_href/A1	network
+systems/<sys>/oracle_recovery/mse_at_href/A2	network
+systems/<sys>/oracle_recovery/mse_at_href/A3	network
+systems/<sys>/oracle_recovery/mse_at_href/A4	network
+systems/<sys>/oracle_recovery/mse_at_href/A4o	network
+systems/<sys>/oracle_recovery/mse_at_href/A5	
+systems/<sys>/regime_curve/regret_ratio_by_K/12	network
+systems/<sys>/regime_curve/regret_ratio_by_K/2	network
+systems/<sys>/regime_curve/regret_ratio_by_K/3	network
+systems/<sys>/regime_curve/regret_ratio_by_K/4	network
+systems/<sys>/regime_curve/regret_ratio_by_K/5	network
+systems/<sys>/regime_curve/regret_ratio_by_K/6	network
+systems/<sys>/regime_curve/regret_ratio_by_K/8	network
+systems/<sys>/scores/A*/agreement_href	network
+systems/<sys>/scores/A*/km_median_lyapunov	network
+systems/<sys>/scores/A*/mse/0.25LT	network
+systems/<sys>/scores/A*/mse/0.5LT	network
+systems/<sys>/scores/A*/mse/1LT	network
+systems/<sys>/scores/A*/mse/2LT	network
+systems/<sys>/scores/A*/mse/4LT	network
+systems/<sys>/scores/A*/mse_href	network
+systems/<sys>/scores/A*/regret/0.25LT	
+systems/<sys>/scores/A*/regret/0.5LT	
+systems/<sys>/scores/A*/regret/1LT	
+systems/<sys>/scores/A*/regret/2LT	
+systems/<sys>/scores/A*/regret/4LT	
+systems/<sys>/scores/A*/rmst_lyapunov	network
+systems/<sys>/scores/A0/agreement_href	network
+systems/<sys>/scores/A0/km_median_lyapunov	cp
+systems/<sys>/scores/A0/mse/0.25LT	cp
+systems/<sys>/scores/A0/mse/0.5LT	cp
+systems/<sys>/scores/A0/mse/1LT	cp
+systems/<sys>/scores/A0/mse/2LT	cp
+systems/<sys>/scores/A0/mse/4LT	cp
+systems/<sys>/scores/A0/mse_href	cp
+systems/<sys>/scores/A0/regret/0.25LT	network
+systems/<sys>/scores/A0/regret/0.5LT	network
+systems/<sys>/scores/A0/regret/1LT	network
+systems/<sys>/scores/A0/regret/2LT	network
+systems/<sys>/scores/A0/regret/4LT	network
+systems/<sys>/scores/A0/rmst_lyapunov	cp
+systems/<sys>/scores/A1/agreement_href	network
+systems/<sys>/scores/A1/km_median_lyapunov	network
+systems/<sys>/scores/A1/mse/0.25LT	network
+systems/<sys>/scores/A1/mse/0.5LT	network
+systems/<sys>/scores/A1/mse/1LT	network
+systems/<sys>/scores/A1/mse/2LT	network
+systems/<sys>/scores/A1/mse/4LT	network
+systems/<sys>/scores/A1/mse_href	network
+systems/<sys>/scores/A1/regret/0.25LT	network
+systems/<sys>/scores/A1/regret/0.5LT	network
+systems/<sys>/scores/A1/regret/1LT	network
+systems/<sys>/scores/A1/regret/2LT	network
+systems/<sys>/scores/A1/regret/4LT	network
+systems/<sys>/scores/A1/rmst_lyapunov	network
+systems/<sys>/scores/A2/agreement_href	network
+systems/<sys>/scores/A2/km_median_lyapunov	network
+systems/<sys>/scores/A2/mse/0.25LT	network
+systems/<sys>/scores/A2/mse/0.5LT	network
+systems/<sys>/scores/A2/mse/1LT	network
+systems/<sys>/scores/A2/mse/2LT	network
+systems/<sys>/scores/A2/mse/4LT	network
+systems/<sys>/scores/A2/mse_href	network
+systems/<sys>/scores/A2/regret/0.25LT	network
+systems/<sys>/scores/A2/regret/0.5LT	network
+systems/<sys>/scores/A2/regret/1LT	network
+systems/<sys>/scores/A2/regret/2LT	network
+systems/<sys>/scores/A2/regret/4LT	network
+systems/<sys>/scores/A2/rmst_lyapunov	network
+systems/<sys>/scores/A3/agreement_href	network
+systems/<sys>/scores/A3/km_median_lyapunov	network
+systems/<sys>/scores/A3/mse/0.25LT	network
+systems/<sys>/scores/A3/mse/0.5LT	network
+systems/<sys>/scores/A3/mse/1LT	network
+systems/<sys>/scores/A3/mse/2LT	network
+systems/<sys>/scores/A3/mse/4LT	network
+systems/<sys>/scores/A3/mse_href	network
+systems/<sys>/scores/A3/regret/0.25LT	network
+systems/<sys>/scores/A3/regret/0.5LT	network
+systems/<sys>/scores/A3/regret/1LT	network
+systems/<sys>/scores/A3/regret/2LT	network
+systems/<sys>/scores/A3/regret/4LT	network
+systems/<sys>/scores/A3/rmst_lyapunov	network
+systems/<sys>/scores/A4/agreement_href	network
+systems/<sys>/scores/A4/km_median_lyapunov	network
+systems/<sys>/scores/A4/mse/0.25LT	network
+systems/<sys>/scores/A4/mse/0.5LT	network
+systems/<sys>/scores/A4/mse/1LT	network
+systems/<sys>/scores/A4/mse/2LT	network
+systems/<sys>/scores/A4/mse/4LT	network
+systems/<sys>/scores/A4/mse_href	network
+systems/<sys>/scores/A4/regret/0.25LT	network
+systems/<sys>/scores/A4/regret/0.5LT	network
+systems/<sys>/scores/A4/regret/1LT	network
+systems/<sys>/scores/A4/regret/2LT	network
+systems/<sys>/scores/A4/regret/4LT	network
+systems/<sys>/scores/A4/rmst_lyapunov	network
+systems/<sys>/scores/A4o/agreement_href	network
+systems/<sys>/scores/A4o/km_median_lyapunov	network
+systems/<sys>/scores/A4o/mse/0.25LT	network
+systems/<sys>/scores/A4o/mse/0.5LT	network
+systems/<sys>/scores/A4o/mse/1LT	network
+systems/<sys>/scores/A4o/mse/2LT	network
+systems/<sys>/scores/A4o/mse/4LT	network
+systems/<sys>/scores/A4o/mse_href	network
+systems/<sys>/scores/A4o/regret/0.25LT	network
+systems/<sys>/scores/A4o/regret/0.5LT	network
+systems/<sys>/scores/A4o/regret/1LT	network
+systems/<sys>/scores/A4o/regret/2LT	network
+systems/<sys>/scores/A4o/regret/4LT	network
+systems/<sys>/scores/A4o/rmst_lyapunov	network
+systems/<sys>/scores/A5/agreement_href	
+systems/<sys>/scores/A5/km_median_lyapunov	
+systems/<sys>/scores/A5/mse/0.25LT	
+systems/<sys>/scores/A5/mse/0.5LT	
+systems/<sys>/scores/A5/mse/1LT	
+systems/<sys>/scores/A5/mse/2LT	
+systems/<sys>/scores/A5/mse/4LT	
+systems/<sys>/scores/A5/mse_href	
+systems/<sys>/scores/A5/regret/0.25LT	
+systems/<sys>/scores/A5/regret/0.5LT	
+systems/<sys>/scores/A5/regret/1LT	
+systems/<sys>/scores/A5/regret/2LT	
+systems/<sys>/scores/A5/regret/4LT	
+systems/<sys>/scores/A5/rmst_lyapunov	
+systems/<sys>/validation/convergence/10/mean_abs_dev_from_max	network
+systems/<sys>/validation/convergence/10/median_half_width	network
+systems/<sys>/validation/convergence/200/mean_abs_dev_from_max	network
+systems/<sys>/validation/convergence/200/median_half_width	network
+systems/<sys>/validation/convergence/30/mean_abs_dev_from_max	network
+systems/<sys>/validation/convergence/30/median_half_width	network
+systems/<sys>/validation/convergence/50/mean_abs_dev_from_max	network
+systems/<sys>/validation/convergence/50/median_half_width	network
+systems/<sys>/validation/convergence/800/mean_abs_dev_from_max	network
+systems/<sys>/validation/convergence/800/median_half_width	network
+systems/<sys>/validation/cp_median_vpt_lyapunov	cp
+systems/<sys>/validation/crlb_ratio_max	fixture
+systems/<sys>/validation/crlb_ratio_median	fixture
+systems/<sys>/validation/crlb_ratio_min	fixture
+systems/<sys>/validation/delay_jacobian_rel_err	fixture
+systems/<sys>/validation/estimators/('chua', 7, 5, 0.01)/val_loss_by_width/128	network
+systems/<sys>/validation/estimators/('chua', 7, 5, 0.01)/val_loss_by_width/64	network
+systems/<sys>/validation/estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/128	network
+systems/<sys>/validation/estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/32	network
+systems/<sys>/validation/estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/64	network
+systems/<sys>/validation/estimators/('rossler', 7, 3, 0.01)/val_loss_by_width/128	network
+systems/<sys>/validation/estimators/('rossler', 7, 3, 0.01)/val_loss_by_width/64	network
+systems/<sys>/validation/gain_rel_err	fixture
+systems/<sys>/validation/integrator_max_dev_sigma	fixture
+systems/<sys>/validation/km_max_abs_dev	fixture
+systems/<sys>/verification/P2c/cell/noise	
+systems/<sys>/verification/P2c/fraction_switching_draws	
+systems/<sys>/verification/P2c/fraction_violations	
+systems/<sys>/verification/P2c/noise_second_moment/se	
+systems/<sys>/verification/P2c/noise_second_moment/value	
+systems/<sys>/verification/P2c/population/sum_ratio_inf	
+systems/<sys>/verification/P2c/population/z_B	
+systems/<sys>/verification/P2c/tightness/N_over_sqrt_B/max	
+systems/<sys>/verification/P2c/tightness/N_over_sqrt_B/median	
+systems/<sys>/verification/P2c/tightness/N_over_sqrt_B/p90	
+systems/<sys>/verification/P2c/tightness/median_A_over_Bsw	
+systems/<sys>/verification/P2c/tightness/median_Bsw_over_B	
+systems/<sys>/verification/P2c/tightness/median_N2_over_A	
+systems/<sys>/verification/P2c/tolerances/kappa	
+systems/<sys>/verification/P2c/tolerances/tau_N_max	
+systems/<sys>/weight_profile/median/[]	network
+systems/<sys>/weight_profile/q25/[]	network
+systems/<sys>/weight_profile/q75/[]	network

@@ -4,7 +4,7 @@
 Usage::
 
     python3 -I tools/compare_runs.py REF NEW [--tol-other X] [--show N] [--all]
-        [--allow-not-computed] [--td-only]
+        [--allow-not-computed] [--td-only] [--tags]
 
 ``REF`` and ``NEW`` are ``results.json`` files, or run directories that contain one. The tool is
 read-only on both and writes nothing but its report to standard output. It reads statistics and
@@ -98,23 +98,36 @@ makes it an O3 finding that is not adopted silently. An exceedance is a listed f
 
 Readings that the plan leaves open (strict where possible; the looser owner readings are marked)
 ------------------------------------------------------------------------------------------------
-* The leaf-to-chain map is ``compare_pilot``'s rule table. **A leaf without a chain tag is treated as
-  network chain (class rules, 1e-4), which is the looser choice** (the strict choice, 1e-12, would fail
-  the many QoI leaves that the table leaves untagged: 111 differing leaves on the S3 pair). The count
-  is printed, nothing is silent; this is an owner reading. The report prints a census: the number of
-  differing untagged float leaves that fall through to the class rules, and the untagged float leaves of
-  the reference run by block (information, never a failure).
-* The cp 1e-12 rule also applies to ``H1a`` ``inverse_dim_reference`` and ``median_seed_by_n_lib/*``, which
-  the table leaves untagged (strict). The four H1a fit outputs that fail the cp rule on a platform pair
-  (``fitted_inverse_dim``, ``ci_inverse_dim``, ``floor_rms``) are tolerance-stopped fits; the mathematician
-  proposes class (a) or (g) for them (OF-7, a loosening, **not adopted**: working default cp 1e-12). A
-  pointer to ``docs/agent/notes/2026-10-14-math-wu0003-9-q1.md`` is printed beside those three leaves
-  (``fitted_inverse_dim``, ``ci_inverse_dim/[0|1]``, ``floor_rms``) when they fail the cp rule; the exit
-  code is unchanged.
+* The leaf-to-chain map is ``compare_pilot``'s rule table, completed by the override table ``TAGS`` of this
+  tool (WU-0003.9b, plan amendment 3 C4; needs owner review before freeze). **Every float leaf of the pilot schema has a
+  chain tag, and an untagged float leaf is NOT COMPUTABLE** (exit 2 in every tier, also when it is equal in both runs
+  or on one side only, and ``--allow-not-computed`` does not waive it; a failure elsewhere still gives exit 1). The
+  old default, "untagged = network chain, class rules, 1e-4", never decides a tolerance. The tag is the
+  most-downstream module a leaf depends on, derived from the production code, with a one-line reason that cites the
+  producing function; ``fixture`` (a constant or a configuration echo) and ``cp`` are network-independent; ``network``
+  is every leaf that reads a trained estimator or the PLP forecast or something built from them, and any leaf whose
+  independence cannot be shown from the code (the looser class). The report prints, per run, the number of float leaves
+  tagged by the table, tightened, by an override and untagged, and the reason of every override that tagged a differing leaf;
+  ``--tags`` prints the whole override table. The pin is the test on the committed path shapes of P1, P0 and the smoke
+  preset (``tests/unit/fixtures/pilot_schema``).
+* The H1a ``ratio`` and ``ratio_ci`` are cp by dependence and meet the strict cp 1e-12, like the four sibling
+  outputs of the tolerance-stopped ``curve_fit`` (``fitted_inverse_dim``, ``ci_inverse_dim``, ``floor_rms``, whose
+  cp tag is in ``compare_pilot``'s table). The mathematician proposes the A6 QoI rule (class (a) or (g)) for all of
+  them (OF-7, a loosening, **not adopted**; it now covers ``ratio`` and ``ratio_ci`` too: the working default fails
+  every T2 pair on up to 42 H1a leaves per pilot, 3 systems x 2 rho x 7, with correct code). A pointer to
+  ``docs/agent/notes/2026-10-14-math-wu0003-9-q1.md`` is printed beside these five leaves (``fitted_inverse_dim``,
+  ``ratio``, ``ci_inverse_dim/[0|1]``, ``ratio_ci/[0|1]``, ``floor_rms``) when they fail the cp rule; the exit code is
+  unchanged. The cp 1e-12 rule also applies to ``H1a`` ``inverse_dim_reference`` and ``median_seed_by_n_lib/*`` (direct
+  arithmetic; the adopted tightening of Q1.4).
+* ``TIGHTENINGS`` may replace a ``network`` chain of ``compare_pilot``'s table by a network-independent one where the
+  code shows no estimator dependence, never the reverse (``H1d/rows/nhat/spearman``, review R2); ``compare_pilot`` is
+  not edited. The scope of a clip, nu-cap or replacement count follows the chain, so it never reaches a
+  network-independent leaf.
 * A ``cov_digest`` difference alone is undetermined (see above); a ``None`` system never opens a scope.
-* **Looser owner readings:** an untagged leaf is network chain (above); the whole-system scope of a clip,
-  nu-cap or replacement count (reading 9, above); and the listing of the integers of a K-shaped block when
-  K differs (``follows_k``: listed, no licence), which is the "list with no licence" option of OF-1.
+* **Looser owner readings:** the whole-system scope of a clip, nu-cap or replacement count (reading 9, above);
+  the ``network`` tag of every leaf whose independence
+  of the estimator cannot be shown (above); and the listing of the integers of a K-shaped block when K differs
+  (``follows_k``: listed, no licence), which is the "list with no licence" option of OF-1.
 * ``fraction_above_chi2`` and ``fraction_late_progress`` have no T2/T3 tolerance in A6: class (c)
   applies (T1: ``1e-8 |ref|``); the two-proportion band is printed beside them.
 * The per-estimate LM check and the order-statistic bands need arrays of the per-state dump
@@ -124,8 +137,8 @@ Readings that the plan leaves open (strict where possible; the looser owner read
 * A pair is "T0" only if host, device and threads are all equal; any other equal-digest pair is T1.
 
 Exit codes: 0 pass; 1 a tolerance, verdict or TD failure (a ``DEF`` line for a verdict); 2 tier
-undetermined, an unreadable input, a usage error, a TD part that cannot be computed, or a required
-check that is NOT COMPUTED (unless ``--allow-not-computed``). ``--td-only`` computes the TD
+undetermined, an unreadable input, a usage error, a TD part that cannot be computed, a float leaf with no
+chain tag (never waived), or a required check that is NOT COMPUTED (unless ``--allow-not-computed``). ``--td-only`` computes the TD
 statistic of the two files without tier selection or leaf comparison (for runs that predate the
 selecting leaves).
 """
@@ -152,7 +165,7 @@ if cp is None or not hasattr(cp, "TABLE"):
     sys.modules["compare_pilot"] = cp
     _SPEC.loader.exec_module(cp)
 
-OF7_POINTER = ("OF-7 (proposed, not adopted): the H1a fit outputs are tolerance-stopped, see "
+OF7_POINTER = ("OF-7 (proposed, not adopted): the H1a fit outputs (also ratio and ratio_ci) are tolerance-stopped, see "
                "docs/agent/notes/2026-10-14-math-wu0003-9-q1.md; cp 1e-12 kept as the working default")
 LABEL = "DEVELOPMENT: comparison of two runs, not a hypothesis test"
 REVIEW = ("needs owner review before freeze (tolerance and verdict-comparison code; "
@@ -668,27 +681,249 @@ def kind_of(a: object, b: object) -> str:
     return {bool: "bool", int: "int", float: "float", str: "str", type(None): "none"}.get(type(a), "other")
 
 
+# ----------------------------------------------------------------------------------- chain tags (C4)
+def _tags(chain: str, patterns: str, reason: str) -> list[cp.Rule]:
+    """Expand braces and build the override rows of one pattern group."""
+    return [cp.Rule(pattern, "unchanged", reason=reason, chain=chain)
+            for text in patterns.split() for pattern in cp._expand(text)]
+
+
+LM_NAMES = "fraction_above_chi2,fraction_late_progress,fraction_no_decrease,median_iterations,median_residual,p95_residual"
+CONSTANT = "constant, not computed from data: "
+NETWORK_W = ("w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP "
+             "forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)")
+
+
+def _build_tags() -> list[cp.Rule]:
+    """The override table (WU-0003.9b, plan amendment 3 C4; needs owner review before freeze).
+
+    Every float leaf of the pilot schema that ``compare_pilot``'s table leaves without a chain gets a row here,
+    with the producing function as its reason. The chain is the most-downstream module the leaf depends on, derived
+    from the production code: ``cp`` and ``fixture`` (a constant echoed from the configuration or a module constant)
+    are network-independent; ``network`` is every leaf that reads a trained estimator, the PLP forecast or a quantity
+    built from them (w*, the fitted proxies and regimes, the LM refinement), and the leaves whose independence of
+    them cannot be shown from the code. Two patterns must not match one leaf: ``tag_of`` raises at lookup (a test
+    checks every leaf of the fixtures), and a leaf that is tagged in ``compare_pilot``'s table never reaches this one.
+    """
+    S = "systems/*"
+    out: list[cp.Rule] = []
+    add = out.extend
+    add(_tags("fixture", "config/**",
+              "run configuration echoed from config.py:StudyConfig, not computed; compare_runs.py:decide compares "
+              "it for identity and any difference fails"))
+    # ---- constants -----------------------------------------------------------------------------------------
+    add(_tags("fixture", f"{S}/H1a/band/[] {S}/H1a/level",
+              CONSTANT + "analysis.py:h1a_library_scaling writes H1A_BAND and H1_LEVEL"))
+    add(_tags("fixture", f"{S}/H1b/threshold/[] robustness/*/*/H1b/threshold/[]",
+              CONSTANT + "analysis.py:h1b_seed_amplifier writes H1B_BAND"))
+    add(_tags("fixture", f"{S}/H1c/threshold/[]", CONSTANT + "analysis.py:h1c_horizon_law writes H1C_BAND"))
+    add(_tags("fixture", f"{S}/H1c/thresholds/[]",
+              CONSTANT + "analysis.py:h1c_horizon_law writes config.py:admissible_thresholds, a function of the "
+              "configuration and the noise level"))
+    add(_tags("fixture", f"{S}/H1d/level {S}/H1d/threshold",
+              CONSTANT + "analysis.py:h1d_correlations writes H1_LEVEL and H1D_BAND[0]"))
+    add(_tags("fixture", f"{S}/V7/threshold/[]", CONSTANT + "analysis.py:v7_efficiency writes the band [0.9, 1.1]"))
+    add(_tags("fixture", f"{S}/H2b/library_change/{{level,rho}}",
+              CONSTANT + "analysis.py:h2b_knob_response writes PRIMARY_LEVEL and config.core_noise"))
+    add(_tags("fixture", f"{S}/H2b/library_change_reported/*/level {S}/H2b/library_curves/*/*/level",
+              CONSTANT + "analysis.py:h2b_knob_response writes the literal level 0.95"))
+    add(_tags("fixture", f"{S}/H2c/A4o_minus_A2/level",
+              CONSTANT + "analysis.py:h2c_state_dependence writes the literal level 0.95"))
+    add(_tags("fixture", f"{S}/H2e/by_noise/*/level",
+              CONSTANT + "analysis.py:h2e_noise_matching passes the literal level 0.95 to _paired_change"))
+    add(_tags("fixture", f"{S}/H3b/D/level {S}/H3b/weight_lambda/level {S}/H3b/weight_lambda/band/[]",
+              CONSTANT + "analysis.py:h3b_importances writes the literal level 0.95 and the band [0, 0.2]"))
+    add(_tags("fixture", f"{S}/H3c/level {S}/H3c/threshold",
+              CONSTANT + "analysis.py:h3c_ratio writes PRIMARY_LEVEL and H3C_BOUND"))
+    add(_tags("fixture", f"{S}/clip_sensitivity/{{clip_level,perturbed_level}}",
+              CONSTANT + "clip_sensitivity.py:_block writes ERROR_CLIP and PERTURBED_LEVEL"))
+    add(_tags("fixture", "robustness/*/*/scale_times_rho",
+              CONSTANT + "experiments.py:_perturbation_scale_variant echoes the configured perturbation scale"))
+    add(_tags("fixture", f"{S}/handling/cells/*/lm/noise {S}/handling/cells/*/lm/by_kind/*/noise "
+              "handling/robustness/*/cells/*/lm/noise handling/robustness/*/cells/*/lm/by_kind/*/noise",
+              CONSTANT + "estimation.py:lm_summary echoes the noise level of the cell (config.py)"))
+    add(_tags("fixture", f"{S}/verification/P2c/cell/noise {S}/verification/P2c/tolerances/kappa",
+              CONSTANT + "experiments.py:p2c_verification echoes the cell noise; validation.py:p2_bound_summary "
+              "writes P2C_KAPPA"))
+    # ---- cp chain --------------------------------------------------------------------------------------------
+    add(_tags("cp", f"{S}/H1a/inverse_dim_reference {S}/H1a/by_noise/*/median_seed_by_n_lib/*",
+              "analysis.py:h1a_library_scaling: direct arithmetic (a median, a mean of log ratios) on the CP seed "
+              "errors (ensemble.py:forecast_draws analog_seed: analog retrieval against the true states, no estimator) "
+              "and on the oracle local dimension (oracle.py:local_dimension_counted); adopted tightening of note "
+              "2026-10-14-math-wu0003-9-q1 section Q1.4"))
+    add(_tags("cp", f"{S}/H1a/by_noise/*/ratio {S}/H1a/by_noise/*/ratio_ci/[]",
+              "analysis.py:_median_fit_stats via h1a_library_scaling: depends on the CP seed errors and the oracle local "
+              "dimension only (cp). It is an output of the tolerance-stopped curve_fit, like the four sibling fit leaves, "
+              "so cp 1e-12 may fail on correct code at a T2 pair: OF-7 (not adopted; working default cp 1e-12 with the "
+              "pointer to note 2026-10-14-math-wu0003-9-q1, which also covers these two leaves)"))
+    add(_tags("cp", f"{S}/H1d/rows/nhat/interval/[]",
+              "analysis.py:h1d_proxies: the pair (nhat, N) is ev.noise_sens against moments.noise_sens, both from analog "
+              "retrieval on the noisy library (ensemble.py:evaluation_draws, ensemble_moments, retrieval_spread): no "
+              "estimator and no PLP; the bootstrap is analysis.py:h1d_correlations. The sibling rows/nhat/spearman is "
+              "tagged network in compare_pilot (looser than this leaf)"))
+    add(_tags("cp", f"{S}/H2c/calibration_mse/A0",
+              "analysis.py:h2c_state_dependence: mean of evals.cp_err**2 at H_ref on the calibration split "
+              "(ensemble.py:forecast_draws cp_err: analog retrieval, no estimator)"))
+    add(_tags("cp", f"{S}/verification/P2c/{{fraction_switching_draws,fraction_violations,population/*,"
+              "noise_second_moment/*,tightness/*,tightness/N_over_sqrt_B/*,tolerances/tau_N_max}",
+              "validation.py:p2_bound_summary on the terms of p2_bound_terms: the analog library, the clean queries and "
+              "the noise draws only (experiments.py:p2c_verification), no estimator and no PLP"))
+    # ---- network chain -----------------------------------------------------------------------------------------
+    lm = ("estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted "
+          "(ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)")
+    add(_tags("network", f"{S}/handling/cells/*/lm/{{{LM_NAMES}}} {S}/handling/cells/*/lm/by_kind/*/{{{LM_NAMES}}} "
+              f"handling/robustness/*/cells/*/lm/{{{LM_NAMES}}} handling/robustness/*/cells/*/lm/by_kind/*/{{{LM_NAMES}}}", lm))
+    add(_tags("network", f"{S}/V7/efficiency_ci_by_noise/*/[]",
+              "analysis.py:v7_efficiency: bootstrap of the median efficiency of the PLP estimation seed "
+              "(moments.est_seed: the psi state estimate)"))
+    add(_tags("network", f"{S}/H1d/rows/{{analog_seed,estimation_seed,growth}}/interval/[]",
+              "analysis.py:h1d_proxies: the proxies come from allocation.py:ProfileProxies.fit on the estimated nu and "
+              "the model growth at the estimated state (ensemble.py:evaluation_draws est_nu, growth_proxy)"))
+    add(_tags("network", f"{S}/Q-N/{{deployable,oracle}}/{{logit_w_interior,w_zero_indicator}}/{{ci/[],delta_r2,r2_four,r2_three}}",
+              "analysis.py:qn_profile_block: the targets are " + NETWORK_W + ", also for the oracle profile"))
+    add(_tags("network", f"{S}/H2a/{{ci_mc_se/[],range_ci/[],complete_case/median_range,complete_case/range_ci/[],"
+              "range_by_span/*/median,part_ii/*/ci/[],part_ii/*/ci_mc_se/[],part_ii/*/partial_corr}",
+              "analysis.py:h2a_initial_segments and h2a_part_ii: " + NETWORK_W + ", and the PLP seed est_seed "
+              "(ci_mc_se: statistics.py:endpoint_mc_error of the same bootstrap values)"))
+    add(_tags("network", f"{S}/H2b/noise/ci_mc_se/[] {S}/H2b/library_change/{{ci/[],ci_mc_se/[],mean_change}} "
+              f"{S}/H2b/library_change_reported/*/{{ci/[],mean_change}} "
+              f"{S}/H2b/library_curves/*/*/{{mean,median,mean_ci/[],median_ci/[]}}",
+              "analysis.py:h2b_knob_response: " + NETWORK_W))
+    add(_tags("network", f"{S}/H2c/A4o_minus_A2/{{ci/[],mean,relative}} {S}/H2c/calibration_mse/A1 "
+              f"{S}/H2c/re:A4_minus_(?!A1$|A2$)\\w+/{{ci/[],mean,relative}}",
+              "analysis.py:h2c_state_dependence: per-state MSE at H_ref of A4 and A4o (closed-form weights from the "
+              "fitted proxies and from est_seed) against A2 or a single forecaster (pipeline.py:score_rules); "
+              "calibration_mse/A1 is the mean of evals.plp_err**2 (PLP)"))
+    add(_tags("network", f"{S}/H2e/by_noise/*/{{ci/[],median_change}} {S}/H2e/corr_curve/*/*",
+              "analysis.py:h2e_noise_matching: the CP-PLP error correlation over the oracle draws "
+              "(ensemble.py:draw_correlation of cp_err and plp_err)"))
+    add(_tags("network", f"{S}/H3a/{{iqr_lt/[],logrank_p_raw/[]}}",
+              "analysis.py:h3a_logrank: regimes of the deployable profile (allocation.py:RegimeMap.assign, fitted by "
+              "pipeline.py:fit_rules), realized horizons of A5 and the horizon target of the oracle hybrid "
+              "(allocation.py:state_horizon_target)"))
+    add(_tags("network", f"{S}/H3b/D/{{ci/[],value}} {S}/H3b/stability {S}/H3b/weight_lambda/{{ci/[],importance}}",
+              "analysis.py:h3b_importances: trees fitted on the deployable profile (proxies from the estimated nu) "
+              "with targets w* and the oracle-hybrid horizon"))
+    add(_tags("network", f"{S}/H3c/{{ci/[],ci_mc_se/[]}}",
+              "analysis.py:h3c_ratio: ratio of the per-state MSE of A5 over A4 (pipeline.py:score_rules, PLP errors)"))
+    add(_tags("network", f"{S}/clip_sensitivity/by_hypothesis/*/parts/*/{{delta,delta_bound,ratio}} "
+              f"{S}/clip_sensitivity/share_test/* {S}/clip_sensitivity/weight_shift/{{A2,A5_max}}",
+              "clip_sensitivity.py:_compute: the verdict statistics re-evaluated with every clipped PLP error at H_ref "
+              "moved to twice the clip (ensemble.py:clip_errors, plp_err)"))
+    add(_tags("network", f"{S}/fitted/{{regime_weights_href,regime_horizons_km_lyapunov}}/*/[]",
+              "experiments.py:fitted_record from pipeline.py:fit_rules and allocation.py:calibrate_regimes: regime "
+              "weights and Kaplan-Meier horizons from the calibration moments and draws (PLP)"))
+    add(_tags("network", f"{S}/km_curves/A5/[] {S}/oracle_recovery/{{A5_vs_Astar,mse_at_href/A5}} "
+              f"{S}/scores/A5/{{agreement_href,km_median_lyapunov,mse_href,rmst_lyapunov,mse/*,regret/*}}",
+              "pipeline.py:score_rules for A5: regime weights from fit_rules, err = w cp_err + (1 - w) plp_err"))
+    add(_tags("network", f"{S}/scores/A\\*/regret/*",
+              "pipeline.py:score_rules: oracle.py:excess_mse(moments, w*) with w* from the PLP moments; it is 0.0 by "
+              "construction, which either class meets only with d = 0, so the network class loosens nothing"))
+    add(_tags("network", "robustness/*/*/{H2a_partial_corr_zero,H2a_partial_corr_interior,H2a_partial_corr_zero_fin,"
+              "H2a_partial_corr_interior_fin,ci_zero/[],ci_interior/[]}",
+              "experiments.py:_variant_summary and _perturbation_scale_variant: analysis.py:h2a_part_ii on w* and the "
+              "PLP seed (" + NETWORK_W + ")"))
+    return out
+
+
+TAGS = cp.Table(_build_tags())
+TAG_CHAINS = frozenset({"fixture", "dynamics", "cp", "oracle", "network"})
+UNTAGGED_RULE = "untagged: NOT COMPUTABLE"
+
+
+def tag_of(path: Path_) -> cp.Rule | None:
+    """The override row of a leaf, or ``None`` (an overlap of two rows is a defect and raises)."""
+    found = TAGS.matches(path)
+    if len(found) > 1:
+        raise ToolError(f"{len(found)} override rows match {'/'.join(path)}: " + "; ".join(t.pattern for t in found))
+    return found[0] if found else None
+
+
+def _build_tightenings() -> list[cp.Rule]:
+    """The tightening-only overrides (fix round 1, review R2; needs owner review before freeze).
+
+    A row here replaces a ``network`` chain of ``compare_pilot``'s table by a network-independent one for the
+    leaves where the code shows no estimator dependence. It never replaces a network-independent chain and
+    never gives a looser one (``chain_source`` applies it only to a table chain ``network``, and a test checks that
+    every row names a network-independent chain). ``compare_pilot`` is not edited: its table carries the rules of
+    the v1 regression.
+    """
+    return _tags("cp", "systems/*/H1d/rows/nhat/spearman",
+                 "analysis.py:h1d_proxies: the pair (nhat, N) is ev.noise_sens against moments.noise_sens, both from analog "
+                 "retrieval on the noisy library (ensemble.py:evaluation_draws, ensemble_moments, retrieval_spread): no "
+                 "estimator and no PLP, like its interval rows/nhat/interval (finding of review R2; compare_pilot's "
+                 "table says network, which is looser than the code shows)")
+
+
+TIGHTENINGS = cp.Table(_build_tightenings())
+
+
+def chain_source(path: Path_) -> tuple[str, str, str]:
+    """``(chain, source, reason)`` of a leaf: ``compare_pilot``'s table first, then the override table.
+
+    ``source`` is ``"table"``, ``"tightening"`` (a table chain ``network`` replaced by a network-independent
+    one), ``"override"`` or ``""`` (untagged: the chain and the reason are empty).
+    """
+    found = cp.TABLE.matches(path)
+    if len(found) > 1:                     # two table rules for one leaf is a defect of the table, never a tag
+        raise ToolError(cp.Table.explain(path, found))
+    if found and found[0].chain:
+        tight = TIGHTENINGS.matches(path)
+        if tight and found[0].chain == "network":
+            return tight[0].chain, "tightening", tight[0].reason
+        return found[0].chain, "table", found[0].reason
+    tag = tag_of(path)
+    return (tag.chain, "override", tag.reason) if tag else ("", "", "")
+
+
 def chain_of(path: Path_) -> str:
-    """The chain tag of ``compare_pilot``'s rule table for a leaf (``''`` if untagged or unmatched)."""
-    try:
-        return cp.TABLE.classify(path).chain
-    except cp.ToolError:
-        return ""
+    """The chain tag of a leaf (``''`` if it is untagged): ``compare_pilot``'s table, tightened, else the overrides."""
+    return chain_source(path)[0]
 
 
-def h1a_cp_leaf(path: Path_) -> bool:
-    """The untagged outputs of the H1a fit that are cp-chain by construction (``inverse_dim_reference``,
-    ``median_seed_by_n_lib/*``): the strict cp 1e-12 rule applies (mathematician's note, Q1 follow-up)."""
-    return "H1a" in path and (path[-1] == "inverse_dim_reference" or "median_seed_by_n_lib" in path)
+def untagged_leaves(flat: dict[Path_, object]) -> list[Path_]:
+    """The float leaves of a run that no table tags: NOT COMPUTABLE (C4), sorted."""
+    return sorted(path for path, value in flat.items() if is_float(value) and not chain_of(path))
 
 
 def untagged_census(flat: dict[Path_, object]) -> dict[str, int]:
-    """Float leaves without a chain tag in ``compare_pilot``'s table, by block (Q9 gap; information only)."""
+    """The untagged float leaves of a run by block (``{}`` when the schema is complete, as C4 requires)."""
     out: dict[str, int] = defaultdict(int)
-    for path, value in flat.items():
-        if is_float(value) and path[0] != "config" and not chain_of(path):
-            out[loc(path)[1]] += 1
+    for path in untagged_leaves(flat):
+        out[loc(path)[1]] += 1
     return dict(sorted(out.items()))
+
+
+def source_counts(flat: dict[Path_, object]) -> dict[str, int]:
+    """Float leaves of a run by the source of their chain tag: ``table``, ``tightening``, ``override``, ``untagged``."""
+    out = {"table": 0, "tightening": 0, "override": 0, "untagged": 0}
+    for path, value in flat.items():
+        if is_float(value):
+            out[chain_source(path)[1] or "untagged"] += 1
+    return out
+
+
+def tag_lines(flats: dict[str, dict[Path_, object]]) -> list[str]:
+    """The whole override table with the number of float leaves each row tags in each run, and its reason."""
+    counts: dict[str, dict[str, int]] = {}
+    for name, flat in flats.items():
+        counts[name] = defaultdict(int)
+        for path, value in flat.items():
+            if is_float(value) and chain_source(path)[1] == "override":
+                tag = tag_of(path)
+                assert tag is not None
+                counts[name][tag.pattern] += 1
+    out = [f"chain tags assigned by override ({len(TAGS.rules)} patterns; the rest come from compare_pilot's rule table):"]
+    for tag in TAGS.rules:
+        out.append(f"  {tag.pattern}: chain {tag.chain}, float leaves "
+                   + ", ".join(f"{counts[n][tag.pattern]} {n}" for n in flats))
+        out.append(f"      reason: {tag.reason}")
+    out.append(f"chain tags tightened over compare_pilot's table ({len(TIGHTENINGS.rules)} patterns; network to a "
+               "network-independent chain, never the reverse):")
+    for tag in TIGHTENINGS.rules:
+        out.append(f"  {tag.pattern}: chain {tag.chain}")
+        out.append(f"      reason: {tag.reason}")
+    return out
 
 
 def lm_name(path: Path_) -> str | None:
@@ -715,7 +950,9 @@ class Comparison:
     untagged: int
     exit_code: int
     reasons: list[str]
-    census: dict[str, int] = field(default_factory=dict)    # untagged float leaves by block (whole run)
+    census: dict[str, int] = field(default_factory=dict)    # untagged float leaves by block (REF)
+    untagged_leaves: list[Path_] = field(default_factory=list)   # untagged float leaves of either run (C4)
+    flats: dict[str, dict[Path_, object]] = field(default_factory=dict)   # the flattened runs, for the tag report
 
 
 def compare_leaves(ref_tree: dict, new_tree: dict, tier: Tier, tol_other: float = TOL_O3) -> tuple:
@@ -764,7 +1001,8 @@ def decide_one_sided(row: Row, scopes: list, tier: Tier) -> None:
 def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> int:
     """Fill ``row.cls``, ``rel``, ``tol``, ``rule``, ``outcome`` for one differing leaf.
 
-    Returns 1 if the leaf has no chain tag in ``compare_pilot``'s rule table (counted, not hidden).
+    Returns 1 if the leaf has no chain tag in ``compare_pilot``'s rule table or the override table: it is NOT
+    COMPUTED and nothing is decided for it (counted, not hidden).
     """
     path, a, b, kind = row.path, row.ref, row.new, row.kind
     name = path[-1]
@@ -827,11 +1065,12 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
         return 0
     # float leaves ------------------------------------------------------------------------------------------
     interval = interval_of(ref, path)
+    if not chain_of(path):                        # C4: no tag, so no tolerance is decided (the default is retired)
+        row.rule, row.outcome = UNTAGGED_RULE, "NOT COMPUTED"
+        row.note = "float leaf with no chain tag in compare_pilot's table or the override table"
+        row.for_10x = True
+        return 1
     chain = chain_of(path)
-    untagged = 0                                  # 1 only if an untagged leaf falls through to the class rules
-    if not chain and h1a_cp_leaf(path):
-        chain = "cp"                              # strict: cp rule on the untagged H1a fit outputs (round 2)
-        row.note = "cp 1e-12 applied: untagged in compare_pilot's table"
     lm = lm_name(path)
     row.for_10x = True
     if lm == "median_iterations":
@@ -865,16 +1104,14 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
     elif row.cls == "a":
         row.rule, row.tol = "QoI / interval endpoint", TOL_QOI
         row.outcome = "pass" if row.metric <= row.tol else "FAIL"
-        untagged = 0 if chain else 1
     else:
         row.rule, row.tol = "class (b) to (g)", tol_other
         row.outcome = "pass" if row.metric <= row.tol else "FINDING"
-        untagged = 0 if chain else 1
     if (row.outcome == "FAIL" and row.rule == "cp chain relative" and "H1a" in path and "by_noise" in path
-            and (name in ("fitted_inverse_dim", "floor_rms")
-                 or (path[-2] == "ci_inverse_dim" and name in ("[0]", "[1]")))):
+            and (name in ("fitted_inverse_dim", "floor_rms", "ratio")
+                 or (path[-2] in ("ci_inverse_dim", "ratio_ci") and name in ("[0]", "[1]")))):
         row.note = (row.note + "; " if row.note else "") + OF7_POINTER
-    return untagged
+    return 0
 
 
 def lm_rules(tier: Tier, path: Path_) -> str:
@@ -1040,10 +1277,13 @@ def compare_trees(ref_tree: dict, new_tree: dict, tol_other: float = TOL_O3,
     flat_ref, flat_new = flatten(ref_tree), flatten(new_tree)
     excluded = {"ref": excluded_counts(ref_tree), "new": excluded_counts(new_tree)}
     reasons: list[str] = []
+    unc = sorted(set(untagged_leaves(flat_ref)) | set(untagged_leaves(flat_new)))   # C4: NOT COMPUTABLE
+    flats = {"REF": flat_ref, "NEW": flat_new}
     if tier.name == "undetermined":
         return Comparison(tier, len(flat_ref), len(flat_new), 0, 0, [], [], excluded, [], {}, None, [],
                           0, EXIT_UNDETERMINED,
-                          ["tier undetermined: " + "; ".join(tier.missing) + " (no T0 to T3 tolerance applied)"])
+                          ["tier undetermined: " + "; ".join(tier.missing) + " (no T0 to T3 tolerance applied)"],
+                          untagged_census(flat_ref), unc, flats)
     rows, one_sided, n_equal, scopes, untagged = compare_leaves(ref_tree, new_tree, tier, tol_other)
     td = td_statistic(ref_tree, new_tree) if tier.name == "TD" else None
     not_computed: list[str] = []
@@ -1074,12 +1314,19 @@ def compare_trees(ref_tree: dict, new_tree: dict, tol_other: float = TOL_O3,
         if td["n_error"] or td["no_systems"]:
             code = code if code == EXIT_FAIL else EXIT_UNDETERMINED
             reasons.append(f"TD: {td['n_error']} parts cannot be computed")
+    if unc:
+        by_block = defaultdict(int)
+        for path in unc:
+            by_block[loc(path)[1]] += 1
+        reasons.append(f"{len(unc)} float leaves have no chain tag: NOT COMPUTABLE ("
+                       + ", ".join(f"{b} {n}" for b, n in sorted(by_block.items())) + f"; first {show_path(unc[0])})")
+        code = code if code == EXIT_FAIL else EXIT_UNDETERMINED           # never waived by --allow-not-computed
     if code == EXIT_OK and not_computed and not allow_not_computed:
         code = EXIT_UNDETERMINED
         reasons.append(f"{len(not_computed)} required checks NOT COMPUTED")
     return Comparison(tier, len(flat_ref), len(flat_new), len(set(flat_ref) & set(flat_new)), n_equal, rows,
                       one_sided, excluded, scopes, declared, td, not_computed, untagged, code, reasons,
-                      untagged_census(flat_ref))
+                      untagged_census(flat_ref), unc, flats)
 
 
 def load(path: Path) -> dict:
@@ -1100,8 +1347,36 @@ def show_path(path: Path_) -> str:
     return "/".join(path)
 
 
-def render(cmp: Comparison, ref_path: str, new_path: str, show: int = 20, every: bool = False) -> list[str]:
-    """The text report."""
+def tag_summary(cmp: Comparison) -> list[str]:
+    """The report lines on the chain tags (C4): the count per source and run, the untagged leaves by block, and the
+    reason of every override that tagged a differing leaf."""
+    parts = []
+    for name, flat in cmp.flats.items():
+        c = source_counts(flat)
+        parts.append(f"{name}: compare_pilot table {c['table']}, tightened {c['tightening']}, "
+                     f"override {c['override']}, untagged {c['untagged']}")
+    out = ["chain tags of the float leaves (config included; untagged leaves are NOT COMPUTABLE, exit 2): "
+           + "; ".join(parts)]
+    if cmp.untagged_leaves:
+        out.append("  untagged by block (REF): " + (", ".join(f"{b} {n}" for b, n in cmp.census.items()) or "none")
+                   + f"; differing untagged leaves not computed: {cmp.untagged}; first: "
+                   + ", ".join(show_path(q) for q in cmp.untagged_leaves[:5]))
+    used: dict[str, list[Row]] = defaultdict(list)
+    for r in cmp.rows:
+        if r.kind != "float":                 # only a float leaf needs a chain (a non-float ambiguity must not abort)
+            continue
+        chain, source, reason = chain_source(r.path)
+        if source in ("override", "tightening"):
+            used[f"{source} {(tag_of(r.path) or TIGHTENINGS.matches(r.path)[0]).pattern}"].append(r)
+    for key in sorted(used):
+        chain, _, reason = chain_source(used[key][0].path)
+        out.append(f"  {key}: chain {chain}, {len(used[key])} differing leaves; reason: {reason}")
+    return out
+
+
+def render(cmp: Comparison, ref_path: str, new_path: str, show: int = 20, every: bool = False,
+           tags: bool = False) -> list[str]:
+    """The text report (``tags``: also the whole override table with its reasons)."""
     out = [LABEL, f"NOTE: {REVIEW}", f"REF: {ref_path}", f"NEW: {new_path}"]
     tier = cmp.tier
     out.append(f"tier: {tier.name}" + (f" ({'; '.join(tier.reasons)})" if tier.reasons else ""))
@@ -1125,12 +1400,11 @@ def render(cmp: Comparison, ref_path: str, new_path: str, show: int = 20, every:
     for side in ("ref", "new"):
         out.append(f"excluded ({side}): provenance {cmp.excluded[side]['provenance']} leaves, "
                    f"timing {cmp.excluded[side]['timing']} leaves")
+    out += tag_summary(cmp)
+    if tags:
+        out += tag_lines(cmp.flats)
     if tier.name == "undetermined":
         return out + [f"RESULT: UNDETERMINED (exit {cmp.exit_code}): " + "; ".join(cmp.reasons)]
-    out.append("census (information, not a failure): differing float leaves with no chain tag that fall through to "
-               f"the class rules, i.e. the looser network treatment: {cmp.untagged}; untagged float leaves of the "
-               f"reference run by block: {sum(cmp.census.values())} ("
-               + ", ".join(f"{b} {n}" for b, n in cmp.census.items()) + ")")
     if any(OF7_POINTER in r.note for r in cmp.rows):
         out.append("pointer: " + OF7_POINTER)
     if cmp.scopes:
@@ -1219,6 +1493,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--all", action="store_true", help="list every difference and every evidence row")
     ap.add_argument("--allow-not-computed", action="store_true")
     ap.add_argument("--td-only", action="store_true")
+    ap.add_argument("--tags", action="store_true",
+                    help="also print the override table of chain tags with the leaf counts and the reasons")
     try:
         args = ap.parse_args(argv)
     except SystemExit as exc:
@@ -1234,7 +1510,7 @@ def main(argv: list[str] | None = None) -> int:
             lines, code = run_td_only(ref_tree, new_tree, str(args.ref), str(args.new))
         else:
             cmp = compare_trees(ref_tree, new_tree, args.tol_other, args.allow_not_computed)
-            lines, code = render(cmp, str(args.ref), str(args.new), args.show, args.all), cmp.exit_code
+            lines, code = render(cmp, str(args.ref), str(args.new), args.show, args.all, args.tags), cmp.exit_code
     except ToolError as exc:
         print(f"compare_runs: error: {exc}", file=sys.stderr)
         return EXIT_UNDETERMINED
