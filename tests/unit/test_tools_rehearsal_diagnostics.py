@@ -286,6 +286,13 @@ def test_acf_readings_and_the_e2_coverage_rule_by_hand() -> None:
     assert text.startswith("phi = 0.3 rows realistic") and "both readings hold" in text
     assert cov["beyond"] and cov["bound95"] == 0.9389
     assert rd.coverage_at("H1d", 0.045)["cov95"] == pytest.approx(0.9470 + (0.9439 - 0.9470) * 0.5)
+    # amendment 9, I1: H1d at 98.3% has cov0.3 (0.9800) > cov0 (0.9794): the anchor is cov0, so the
+    # printed coverage is 0.9794 throughout and "<= 0.9794" above the case value
+    for lag in (0.0, 0.03, 0.09):
+        assert rd.coverage_at("H1d", lag)["cov983"] == 0.9794
+    assert rd.coverage_at("H1d", 0.2)["bound983"] == 0.9794 and rd.coverage_at("H1d", 0.2)["beyond"]
+    assert "coverage <= 0.9439 (95%) / 0.9794 (98.3%) (beyond the tabulated stress)" in \
+        rd.acf_reading("H1d", 0.2, 500)[0]
     for name in ("Q-N", "H1b", "H1c"):
         text, cov = rd.acf_reading(name, 0.05, 500)
         assert cov is None and "coverage not tabulated" in text
@@ -635,6 +642,7 @@ REF = 2
 RHOS = [0.005, 0.01, 0.02, 0.05]
 LIB = [1000, 3162, 10000, 31623, 100000]
 CFG = {"name": "pilot", "steps_per_lyapunov": LT, "core_noise": 0.01, "core_library": 10000,
+       "library_sizes": LIB,
        "noise_levels": RHOS, "library_sweep_noises": [0.01, 0.02], "linear_regime_rms": 0.5,
        "n_test": N, "n_test_sweep": NS, "bootstrap_resamples": 500, "bootstrap_block": 5,
        "seed_id": "DEV-1"}
@@ -2368,3 +2376,201 @@ def test_h1a_h1c_coverage_labels() -> None:
         reading, cov = rd.acf_reading(name, 0.1, 500)
         assert cov is None and reading.endswith(text) and "no case value" in reading
         assert rd.CASE_VALUE.get(name) is None
+
+
+# ------------------------------------------------------------------------------------------ fix round 3
+def c4_run(cells: dict, cfg: dict | None = None) -> rd.Report:
+    rep = rd.Report()
+    rd.section_c4(rep, "lorenz63", {"handling": {"cells": cells}}, dict(CFG if cfg is None else cfg))
+    return rep
+
+
+def test_r17_a_required_kind_without_estimates_is_not_computable() -> None:
+    """The oracle kind of every target cell and the eval kind of the core cell are required: an
+    absent or zero ``n_estimates`` is "not computable" (exit 2); the eval kind of the sweep cells is
+    skipped in one stated line.
+
+    Reference: the finding's three probes (core oracle 0, core eval 0, core oracle key deleted).
+    """
+    core = "base|rho=0.01|n_lib=10000|core"
+    for kind, change, word in (("oracle", 0, "is 0"), ("eval", 0, "is 0"), ("oracle", None, "absent")):
+        cells = lm_cells()
+        if change is None:
+            del cells[core]["lm"]["by_kind"][kind]["n_estimates"]
+        else:
+            cells[core]["lm"]["by_kind"][kind]["n_estimates"] = change
+        rep = c4_run(cells)
+        assert rep.exit_code() == 2, kind
+        assert any(f"{core} {kind}" in line and word in line and "required kind" in line
+                   for line in rep.incomplete), (kind, rep.incomplete)
+    cells = lm_cells()
+    cells["base|rho=0.05|n_lib=10000|sweep"]["lm"]["by_kind"]["oracle"]["n_estimates"] = 0
+    assert any("base|rho=0.05|n_lib=10000|sweep oracle" in line for line in c4_run(cells).incomplete)
+    rep = c4_run(lm_cells())
+    assert not rep.incomplete and rep.exit_code() == 0
+    assert "eval kind of the 3 sweep cell(s): not part of the design" in "\n".join(rep.lines)
+
+
+def test_r18_expected_library_sweep_cells_are_derived_from_the_configuration() -> None:
+    """Every ``library_sweep_noises`` x ``library_sizes`` cell (the core cell excepted) must exist
+    with an ``lm`` summary: each absent one is "not computable", also when the group shrinks to a
+    single cell; a rho with a single library size by design is stated, not skipped.
+
+    Reference: the finding's probes (delete the n_lib = 31623 cell; delete the ``lm`` of three of the
+    five rho = 0.02 cells; a group reduced to one cell).
+    """
+    cells = lm_cells()
+    del cells["base|rho=0.02|n_lib=31623|sweep"]
+    rep = c4_run(cells)
+    assert rep.exit_code() == 2
+    assert any("expected cell base|rho=0.02|n_lib=31623|sweep is absent" in x for x in rep.incomplete)
+    cells = lm_cells()
+    for n in (1000, 3162, 100000):
+        del cells[f"base|rho=0.02|n_lib={n}|sweep"]["lm"]
+    rep = c4_run(cells)
+    assert sum("has no lm summary" in x for x in rep.incomplete) == 3
+    cells = lm_cells()
+    for n in (1000, 3162, 31623):
+        del cells[f"base|rho=0.01|n_lib={n}|sweep"]
+    rep = c4_run(cells)  # rho = 0.01 is left with one cell (100000): three absences, no silence
+    assert sum("rho=0.01" in x and "is absent" in x for x in rep.incomplete) == 3
+    assert rep.exit_code() == 2
+    small = {**CFG, "library_sizes": [1000, 10000], "library_sweep_noises": [0.01],
+             "noise_levels": [0.01]}
+    cells = {"base|rho=0.01|n_lib=10000|core": lm_cell(0.01, 280000, 2800),
+             "base|rho=0.01|n_lib=1000|sweep": lm_cell(0.01, 60000)}
+    rep = c4_run(cells, small)
+    assert not rep.incomplete and rep.exit_code() == 0
+    assert "N_lib check (rho=0.01): one library size by design, nothing to compare" in "\n".join(rep.lines)
+    assert not c4_run(lm_cells()).incomplete
+
+
+def test_r19_the_d2_owner_flag_does_not_read_clean_over_gaps_and_carries_the_option_flag(
+        monkeypatch) -> None:
+    """The per-system flag: a bare "no reading fired" only when every primary series and the
+    permutation null were computed; over gaps it says "among the computed readings; not computed: ...";
+    with nothing computed, "not determined"; always the non-default-option flag.
+
+    Reference: the finding's probes. The readings are made quiet by patching the three triggers, so
+    the wording is what is tested.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    monkeypatch.setattr(rd, "variance_summary", lambda v, _f=rd.variance_summary: {**_f(v), "fires": False})
+    real_beta = rd.beta_reading
+    monkeypatch.setattr(rd, "beta_reading", lambda lags, n: {**real_beta(lags, n), "fires": False})
+    monkeypatch.setattr(rd, "_permutation_reading", lambda ctx, prim: {"fires": False, "n_series": len(prim)})
+
+    def flag(dump: dict, seed: int = rd.TOOL_SEED) -> str:
+        rep = rd.Report()
+        ctx = rd.Context("lorenz63", rd.Dump(dump, "mem"), res["systems"]["lorenz63"], dict(CFG),
+                         rep, seed, rd.DEFAULT_RESAMPLES, rd.DEFAULT_PERMUTATIONS)
+        rd.section_d1_d2(ctx)
+        return [line for line in rep.lines if "D2 owner flag" in line][0]
+
+    assert flag(d).endswith("lorenz63: no reading fired")
+    assert flag(d, seed=5).endswith("no reading fired [non-default option: seed 5]")
+    gap = {k: v for k, v in d.items() if k != "core/state_mse/A5"}  # H3c cannot be built
+    assert "no reading fired among the computed readings; not computed: lorenz63 H3c" in flag(gap)
+    nothing = flag({})
+    assert "not determined (no D2 reading was computed)" in nothing and "no reading fired" not in nothing
+    monkeypatch.setattr(rd, "_permutation_reading", lambda ctx, prim: (_ for _ in ()).throw(
+        rd.NotComputable("simulated")))
+    assert "not computed: lorenz63 permutation null" in flag(d)
+
+
+def test_r20_the_chi2_relation_exists_only_for_a_share_below_one_half() -> None:
+    """``chi2_relation`` needs ``0.5/(1 - share) < 1``, i.e. ``f - 0.001 < 0.5``: f = 0.501, 0.6 and
+    1.5 are "not computable" (never NaN, never a FINDING); just below the limit it is defined.
+
+    Reference: the quantile's domain. At the cell level an oracle ``fraction_above_chi2`` of 0.6
+    gives a band FINDING and a "not computable" relation line, with no ``nan`` in the report.
+    """
+    for f in (0.501, 0.6, 1.5):
+        with pytest.raises(rd.NotComputable, match="exists only for a share below 1/2"):
+            rd.chi2_relation(3.4, f, 1000)
+    rel = rd.chi2_relation(3.4, 0.4995, 1000)
+    assert math.isfinite(rel["predicted"]) and math.isfinite(rel["z"])
+    cells = lm_cells()
+    cells["base|rho=0.05|n_lib=10000|sweep"]["lm"]["by_kind"]["oracle"]["fraction_above_chi2"] = 0.6
+    rep = c4_run(cells)
+    text = "\n".join(rep.lines)
+    assert "nan" not in text.lower()
+    assert any("relation" in x and "exists only for a share below 1/2" in x for x in rep.incomplete)
+    assert any("fraction_above_chi2 0.6 outside" in x for x in rep.findings) and rep.exit_code() == 2
+
+
+# ------------------------------------------------------------------------------------------ amendment 9
+def test_i1_the_printed_coverage_never_rises_with_the_lag_and_only_h1d_983_changes() -> None:
+    """I1: for every criterion and both levels the coverage is non-increasing in the lag-1, from
+    cov0 at l <= 0 to the anchor ``min(cov0, cov0.3)`` at the case value and beyond; only H1d at
+    98.3% has an anchor that differs from the table's cov0.3.
+
+    Reference: the WU-0006 table in amendment 5 E2 (read here as numbers) and the monotonicity
+    premise of E2. A grid of lags from -0.1 to 0.6; exact equality at the anchors.
+    """
+    table = rd.COVERAGE
+    changed = []
+    for name, ((c0_95, c0_98), (c3_95, c3_98)) in table.items():
+        case = rd.CASE_VALUE[name]
+        grid = np.linspace(-0.1, 0.6, 71)
+        for level, c0, c3 in (("cov95", c0_95, c3_95), ("cov983", c0_98, c3_98)):
+            values = [rd.coverage_at(name, lag)[level] for lag in grid]
+            assert all(b <= a + 1e-15 for a, b in zip(values, values[1:])), (name, level)
+            assert values[0] == c0 and values[-1] == min(c0, c3)
+            if c3 > c0:
+                changed.append((name, level))
+            assert rd.coverage_at(name, case)[level] == pytest.approx(min(c0, c3), abs=1e-15)
+    assert changed == [("H1d", "cov983")]
+
+
+def test_i2_the_one_part_takes_c7_and_is_primary_and_the_indicator_parts_say_so(tmp_path, capsys) -> None:
+    """I2: the zero and "one" parts print "C7 borrowed (indicator part)" and the C7 coverage; the
+    interior part does not; a triggered "one" part is a primary series.
+
+    Reference: the world's w* has more than 5% at 1 (the run prints an "H2a(ii) one" series, as
+    ``build_world`` also puts its leaf in the results); C7 is 0.9443/0.9794 -> 0.9389/0.9762 with case
+    value 0.09, so an acf1 of 0.045 prints 0.94160 / 0.97780 (half way).
+    """
+    d, res, _ = build_world(rng_for("world"))
+    json_path = tmp_path / "o.json"
+    rd.main([str(write_run(tmp_path, d, res)), "--resamples", "50", "--permutations", "20",
+             "--json", str(json_path)])
+    out = capsys.readouterr().out
+    lines = out.splitlines()
+    readings = {}
+    for i, line in enumerate(lines):
+        for part in ("zero", "one", "interior"):
+            if line.startswith(f"  H2a(ii) {part} ") and "domain=" in line:
+                readings[part] = lines[i + 1]
+    assert set(readings) == {"zero", "one", "interior"}
+    assert "C7 borrowed (indicator part)" in readings["zero"] and "C7 borrowed (indicator part)" in readings["one"]
+    assert "C7 borrowed" not in readings["interior"]
+    data = json.loads(json_path.read_text())["lorenz63"]["D1"]
+    assert data["H2a(ii) one"]["primary"] is True
+    cov = rd.coverage_at("H2a(ii)", 0.045)
+    assert (cov["cov95"], cov["cov983"]) == (pytest.approx(0.9416), pytest.approx(0.9778))
+
+
+def test_i2_the_27_series_rates_are_0_996_pilot_0_93_full_and_0_116_acf() -> None:
+    """With the three "one" parts triggered N = 27: the tool prints N and ``1 - prod(1 - r_i)``.
+
+    Reference: the products by hand from r = 0.164 (n = 500), 0.210 (300), 0.094 (1000): pilot
+    15 series at 500, 6 at 300 (H2b) and 6 H1a at the nominal 300: 1 - 0.836^15 x 0.79^12 = 0.996; full 27
+    at 1000: 1 - 0.906^27 = 0.93; the acf rate at the pilot is about 0.116 (amendment 9).
+    """
+    def log_of(spec) -> rd.Report:
+        rep = rd.Report()
+        for k, (n, n_rate) in enumerate(spec):
+            rep.series_log.append({"system": "s", "name": f"series {k}", "n": n, "n_rate": n_rate,
+                                   "primary": True, "acf1": 0.0, "within": True, "fires": False})
+        rd.run_level_lines(rep)
+        return rep
+
+    pilot = log_of([(500, None)] * 15 + [(300, None)] * 6 + [(297, 300)] * 6)
+    rate = pilot.data["run_level"]["predicted_at_least_one"]
+    assert rate == pytest.approx(1 - 0.836**15 * 0.79**12, rel=1e-12) and round(rate, 3) == 0.996
+    assert "for these 27 series 0.996" in "\n".join(pilot.lines)
+    assert pilot.data["run_level"]["predicted_acf_any"] == pytest.approx(0.116, abs=0.004)
+    full = log_of([(1000, None)] * 27)
+    assert round(full.data["run_level"]["predicted_at_least_one"], 2) == 0.93
+    assert full.data["run_level"]["predicted_acf_any"] == pytest.approx(0.016, abs=0.004)

@@ -26,8 +26,9 @@ What it computes (plan amendment 2, B1 item 7 as amended; mathematics check
   1 to 10 and the readings of the rule: ``|acf(1)| <= 0.15`` (n <= 500) or ``0.11`` (n > 500)
   means the phi = 0 rows apply; ``acf(1)`` at least the case value (0.30 H2b(i), H2b(ii), H2c;
   0.19 H2a(i), H2e; 0.16 H3c, H2d; 0.09 H2a(ii), H1d) means the phi = 0.3 rows are realistic and
-  governs. The coverage (95% and 1 - 0.05/3) is ``cov0 + (cov0.3 - cov0) min(1, max(0, l/l_c))``
-  from the WU-0006 table, interpolated from l = 0 (plan amendment 5, E2), "at most cov0.3 (beyond
+  governs. The coverage (95% and 1 - 0.05/3) is ``cov0 + (cov0.3* - cov0) min(1, max(0, l/l_c))``
+  from the WU-0006 table with the anchor ``cov0.3* = min(cov0, cov0.3)`` (amendment 9, I1),
+  interpolated from l = 0 (plan amendment 5, E2), "at most cov0.3* (beyond
   the tabulated stress)" above the case value, and "coverage not tabulated" for Q-N and H1b.
 * **D2.** ``V*(b) = b * var(means of the n - b + 1 overlapping blocks of length b)`` (the exact
   moving-block variance, no bootstrap noise) and the ratios ``V*(10)/V*(5)``, ``V*(20)/V*(5)``;
@@ -590,16 +591,18 @@ def acf_threshold(n: int) -> float:
 
 
 def coverage_at(criterion: str, lag1: float) -> dict | None:
-    """The D1 coverage rule (plan amendment 5, E2), or None where no coverage is tabulated.
+    """The D1 coverage rule (plan amendments 5 E2 and 9 I1), or None where none is tabulated.
 
-    ``cov(l) = cov0 + (cov0.3 - cov0) min(1, max(0, l / l_c))`` at 95% and at 1 - 0.05/3, from
-    ``l = 0`` (not from the threshold: lower at every ``l`` in (0, l_c), the stricter choice).
-    Above the case value ``l_c`` there is no extrapolation: the coverage is "at most cov0.3".
+    ``cov(l) = cov0 + (cov0.3* - cov0) min(1, max(0, l / l_c))`` at 95% and at 1 - 0.05/3, from
+    ``l = 0`` (not from the threshold), with the anchor ``cov0.3* = min(cov0, cov0.3)`` so that the
+    printed coverage never rises with ``l`` (only H1d at 98.3% has ``cov0.3 > cov0``). Above the
+    case value ``l_c`` there is no extrapolation: the coverage is "at most cov0.3*".
     """
     case, table = CASE_VALUE.get(criterion), COVERAGE.get(criterion)
     if case is None or table is None:
         return None
     (c0_95, c0_98), (c3_95, c3_98) = table
+    c3_95, c3_98 = min(c0_95, c3_95), min(c0_98, c3_98)  # amendment 9, I1: never above cov0
     frac = min(1.0, max(0.0, lag1 / case))
     return {"fraction": frac, "beyond": bool(lag1 > case),
             "cov95": c0_95 + (c3_95 - c0_95) * frac, "cov983": c0_98 + (c3_98 - c0_98) * frac,
@@ -1489,6 +1492,8 @@ def section_d1_d2(ctx: Context) -> list[Series]:
             rep.uncomputed.append((f"{ctx.system} {s.name}", s.primary))
             continue
         text, cov = acf_reading(s.criterion, float(lags[0]), s.n)
+        if s.criterion == "H2a(ii)" and s.part in ("zero", "one"):
+            text += "; C7 borrowed (indicator part)"
         rep.say(f"  {s.name:28s} n={s.n:5d} domain={s.domain:5d} {'P' if s.primary else '-'} "
                 + " ".join(f"{a:+.3f}" for a in lags))
         rep.say(f"      reading: {text}; P(|acf1| > {acf_threshold(s.n):g} | no dependence) "
@@ -1554,9 +1559,22 @@ def section_d1_d2(ctx: Context) -> list[Series]:
     rep.data.setdefault(ctx.system, {})["D2_permutation"] = perm
     any_fire = bool(fires or beta_fires or (perm and perm["fires"]))
     rep.data.setdefault(ctx.system, {})["D2_design_question"] = any_fire
-    rep.say("  D2 owner flag, " + ctx.system + ": "
-            + ("block length 5 is a design question (a reading fired; which reading governs is "
-               "OF-3, the owner's)" if any_fire else "no reading fired"))
+    gaps = [name for name, primary in rep.uncomputed
+            if primary and name.startswith(ctx.system + " ")]
+    if perm is None:
+        gaps.append(f"{ctx.system} permutation null")
+    if any_fire:
+        text = ("block length 5 is a design question (a reading fired; which reading governs is "
+                "OF-3, the owner's)" + (f"; not computed: {', '.join(gaps)}" if gaps else ""))
+    elif not prim:
+        text = "not determined (no D2 reading was computed)" + (
+            f"; not computed: {', '.join(gaps)}" if gaps else "")
+    elif gaps:
+        text = f"no reading fired among the computed readings; not computed: {', '.join(gaps)}"
+    else:
+        text = "no reading fired"
+    rep.data[ctx.system]["D2_owner_flag"] = text
+    rep.say("  D2 owner flag, " + ctx.system + ": " + text + ctx.option_flag("d2"))
     return series
 
 
@@ -2051,8 +2069,10 @@ def chi2_relation(median_over_rho2: float, f_above: float, n: int, dof: int = 4)
     ``SE_iid = sqrt(0.25/n)/chi2.pdf(Q, dof)`` (note M6; a share ``f - 0.001`` lies above the law)."""
     from scipy.stats import chi2
     pi = f_above - CHI2_REFERENCE_TAIL
-    if not pi < 1.0:
-        raise NotComputable(f"fraction_above_chi2 {f_above} leaves no mass for the relation")
+    if not pi < 0.5:
+        raise NotComputable(f"fraction_above_chi2 {f_above} gives a share {pi:.3g} above the law: "
+                            "the relation's quantile 0.5/(1 - share) exists only for a share "
+                            "below 1/2")
     predicted = float(chi2.ppf(0.5 / (1.0 - pi), dof))
     se = math.sqrt(0.25 / n) / float(chi2.pdf(predicted, dof))
     diff = median_over_rho2 - predicted
@@ -2110,6 +2130,32 @@ def nlib_exact_check(cells: dict) -> tuple[list[str], list[str]]:
     return checked, defects
 
 
+def nlib_expected_cells(cells: dict, cfg: dict) -> tuple[list[str], list[str]]:
+    """The library-sweep cells that the configuration promises and the results lack (R18).
+
+    The expected cells are ``base|rho=<g>|n_lib=<n>|sweep`` for ``library_sweep_noises`` x
+    ``library_sizes``, except ``(core noise, core library)``, which is the core cell (it pools three
+    splits and the eval draws, so it is not compared). Returns ``(absent, by_design)``: a sentence per
+    expected cell that is missing or has no ``lm`` summary, and the rho values that have fewer than
+    two expected library sizes (nothing to compare, stated rather than skipped).
+    """
+    core_noise, core_library = float(dig(cfg, "core_noise")), int(dig(cfg, "core_library"))
+    sizes = [int(n) for n in dig(cfg, "library_sizes")]
+    absent, by_design = [], []
+    for rho in dig(cfg, "library_sweep_noises"):
+        rho = float(rho)
+        wanted = [n for n in sizes if not (rho == core_noise and n == core_library)]
+        if len(wanted) < 2:
+            by_design.append(f"rho={rho:g}")
+        for n in wanted:
+            key = f"base|rho={rho:g}|n_lib={n}|sweep"
+            if key not in cells:
+                absent.append(f"expected cell {key} is absent")
+            elif "lm" not in cells[key]:
+                absent.append(f"expected cell {key} has no lm summary")
+    return absent, by_design
+
+
 def section_c4(rep: Report, system: str, sysres: dict, cfg: dict) -> None:
     """C4: the LM readings of one system against the M6 bands, the chi-square relation, and the
     N_lib bitwise check. Findings (outside a band or the relation) are reported, never a failure."""
@@ -2122,7 +2168,7 @@ def section_c4(rep: Report, system: str, sysres: dict, cfg: dict) -> None:
         (f"base|rho={float(r):g}|n_lib={library}|sweep", float(r))
         for r in dig(cfg, "noise_levels") if float(r) != core_noise]
     out: dict = {"cells": {}, "findings": [], "nlib": {}}
-    n_find = 0
+    n_find, skipped_eval = 0, 0
     for key, rho in targets:
         if key not in cells or "lm" not in cells[key]:
             rep.nc(f"{system} C4 {key}", "the cell or its lm summary is absent")
@@ -2138,7 +2184,14 @@ def section_c4(rep: Report, system: str, sysres: dict, cfg: dict) -> None:
                 rep.nc(f"{system} C4 {key} {kind}", "no by_kind summary")
                 continue
             n = lm.get("n_estimates")
+            required = kind == "oracle" or key.endswith("|core")
             if not n:
+                if required:
+                    rep.nc(f"{system} C4 {key} {kind}",
+                           "n_estimates is " + ("absent" if n is None else "0")
+                           + ": a required kind has no estimates")
+                else:
+                    skipped_eval += 1
                 continue
             missing = [k for k in ("median_residual", "fraction_above_chi2",
                                    "fraction_late_progress", "fraction_no_decrease",
@@ -2150,9 +2203,18 @@ def section_c4(rep: Report, system: str, sysres: dict, cfg: dict) -> None:
             n_find += res["n_findings"]
             out["cells"][f"{key}/{kind}"] = res
     out["n_findings"] = n_find
+    if skipped_eval:
+        rep.say(f"  eval kind of the {skipped_eval} sweep cell(s): not part of the design "
+                "(n_estimates 0), skipped")
     checked, defects = nlib_exact_check(cells)
-    out["nlib"] = {"groups": checked, "defects": defects}
-    if not checked:
+    absent, by_design = attempt(rep, f"{system} C4 N_lib check", nlib_expected_cells, cells, cfg) \
+        or ([], [])
+    for text in absent:
+        rep.nc(f"{system} C4 N_lib check", text)
+    for text in by_design:
+        rep.say(f"  N_lib check ({text}): one library size by design, nothing to compare")
+    out["nlib"] = {"groups": checked, "defects": defects, "absent": absent}
+    if not checked and not by_design and not absent:
         rep.nc(f"{system} C4 N_lib check", "no library-sweep cells with an lm summary")
     for text in checked:
         rep.say(f"  N_lib check ({text}): lm summaries bitwise "
@@ -2189,12 +2251,18 @@ def _c4_cell(rep: Report, system: str, key: str, kind: str, lm: dict, band: dict
         lines.append(f"      {name} {value:.5g} vs {how}: {'in band' if ok else 'FINDING (outside)'}")
         if not ok:
             findings.append(f"{system} {key} {kind} {name} {value:.5g} outside {how}")
-    rel = chi2_relation(median_c, float(lm["fraction_above_chi2"]), n, int(lm["gof_dof"]))
-    lines.append(f"      relation: median c/rho^2 {median_c:.4f} vs Q {rel['predicted']:.4f} "
-                 f"(SE_iid {rel['se_iid']:.4f}, z {rel['z']:+.2f}): "
-                 + ("within 4 SE" if rel["ok"] else "FINDING (outside 4 SE)"))
-    if not rel["ok"]:
-        findings.append(f"{system} {key} {kind} median c/rho^2 {median_c:.4f} vs {rel['predicted']:.4f}")
+    rel = None
+    try:
+        rel = chi2_relation(median_c, float(lm["fraction_above_chi2"]), n, int(lm["gof_dof"]))
+    except NotComputable as exc:
+        rep.nc(f"{system} C4 {key} {kind} relation", str(exc))
+    if rel is not None:
+        lines.append(f"      relation: median c/rho^2 {median_c:.4f} vs Q {rel['predicted']:.4f} "
+                     f"(SE_iid {rel['se_iid']:.4f}, z {rel['z']:+.2f}): "
+                     + ("within 4 SE" if rel["ok"] else "FINDING (outside 4 SE)"))
+        if not rel["ok"]:
+            findings.append(f"{system} {key} {kind} median c/rho^2 {median_c:.4f} vs "
+                            f"{rel['predicted']:.4f}")
     rep.say(f"  {key} [{kind}] n={n}, median c/rho^2 {median_c:.4f}")
     for line in lines:
         rep.say(line)
