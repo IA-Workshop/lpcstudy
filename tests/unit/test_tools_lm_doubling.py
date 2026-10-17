@@ -219,6 +219,60 @@ def test_k5_infinite_endpoint_or_bad_half_width_is_u_without_exception() -> None
                        tail=0.0, structural=("K differs",)).cls == "U"
 
 
+def test_def0028_r1_infinite_bound_is_found_whatever_components_are_classified() -> None:
+    """M7's infinite bound is a property of the part: U for the full and the point-only call.
+
+    Reference: M7 and rule R by hand, hw = 1 (interval [-1, 1] at the 15 arm), tail 0.
+    (a) lo = -inf at the 30 arm, verdict changed, pt 0 throughout: the point-only call would be
+        X (first bullet) without the bound; both calls U.
+    (b) pt 0, 1/32, 3/64 (d1 = 1/32, d2 = 1/64, S = 1/16, ratio exactly 1/2: class N on the point
+        alone, dyadic and exact) with hi = +inf at the 60 arm and equal verdicts: both U.
+    (c) lo = -inf at the 15 arm itself (hw infinite): both U.
+    (d) an infinite POINT with finite bounds is not a bound (M7 says bound): no 'infinite bound'
+        reason; U if the verdicts agree, X if they differ (the hw <= 0 / NaN rule).
+    Exact comparisons only (classes and strings); no numerical tolerance is involved.
+    """
+    for comps in (lm.COMPONENTS, ("pt",)):
+        a = lm.classify(arms3(est(0.0), est(0.0, lo=-math.inf, verdict="inconclusive"), est(0.0)),
+                        tail=0.0, components=comps)
+        assert (a.cls, a.flag) == ("U", "no")
+        assert any(r.startswith("infinite bound (M7) at the 30 arm") for r in a.reasons)
+        b = lm.classify(arms3(est(0.0), est(0.03125), est(0.046875, hi=math.inf)), tail=0.0,
+                        components=comps)
+        assert (b.cls, b.flag) == ("U", "no")
+        assert any(r.startswith("infinite bound (M7) at the 60 arm") for r in b.reasons)
+        c = lm.classify(arms3(est(0.0, lo=-math.inf), est(0.0), est(0.0)), tail=0.0,
+                        components=comps)
+        assert (c.cls, c.flag) == ("U", "no")
+        assert any(r.startswith("infinite bound (M7) at the 15 arm") for r in c.reasons)
+    point_inf = lm.classify(arms3(est(0.0), est(math.inf), est(0.0)), tail=0.0)
+    assert point_inf.cls == "U" and not any("infinite bound" in r for r in point_inf.reasons)
+    flipped = lm.classify(arms3(est(0.0), est(math.inf, verdict="inconclusive"), est(0.0)),
+                          tail=0.0)
+    assert flipped.cls == "X" and not any("infinite bound" in r for r in flipped.reasons)
+    # without the bound the point-only part of (b) is N, so the detection is what makes it U
+    assert lm.classify(arms3(est(0.0), est(0.03125), est(0.046875)), tail=0.0,
+                       components=("pt",)).cls == "N"
+
+
+def test_def0028_r1_infinite_bound_is_not_labelled_endpoint_limited() -> None:
+    """build_comparison: a part with an infinite upper end at the 60 arm is U in both calls.
+
+    Reference: the dyadic case (b) above, by hand. Points 1.0, 1.015625, 1.0234375 with hw = 0.5
+    (arm 15 interval [0.5, 1.5]) give increments 1/64 and 1/128 in absolute terms, i.e. d1 = 1/32,
+    d2 = 1/64 in hw units, S = 1/16, ratio exactly 1/2, tail 0: class N on the point alone. Both
+    calls must give U, so ``class_point_only`` is U and ``endpoint_limited`` is None (before this
+    fix: N and a spurious label). Exact comparisons; no tolerance.
+    """
+    arms = {15: results_with_h3c(est(1.0, 0.5, 1.5)), 30: results_with_h3c(est(1.015625, 0.5, 1.5)),
+            60: results_with_h3c(est(1.0234375, 0.5, math.inf))}
+    row = lm.build_comparison(arms, probe=probe_with_tail(0.0))["qoi"]["lorenz63"]["H3c"]["all"]
+    assert row["classification"]["cls"] == "U" and row["class_point_only"] == "U"
+    assert row["endpoint_limited"] is None
+    assert any(r.startswith("infinite bound (M7) at the 60 arm")
+               for r in row["classification"]["reasons"])
+
+
 def test_k5_missing_part_or_arm_is_u_and_never_an_exception() -> None:
     """A part absent (None, or without its interval) at one arm gives U; no exception."""
     assert lm.classify({15: est(0.0), 30: est(0.0), 60: None}, tail=0.0).cls == "U"

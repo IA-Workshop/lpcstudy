@@ -18,7 +18,7 @@ Placement: this file is `docs/agent/notes/2026-10-17-lm-doubling-dev0-report-v3.
   X bullet (S >= 0.1 with both ratio conditions), so a part with a switch and d1 >= 0.1 or a changed verdict was X (DEF-0028). The same change makes an **infinite bound**
   (the third switch of M7) U even when the verdicts differ; that case does not occur on DEV-0. A half-width that is not positive or a NaN value is not a listed switch and
   keeps its earlier class (U, or X if the verdicts differ).
-- **Effect on DEV-0 (offline re-run of `compare`; 620 output lines, 4 differ, all in one part).** Chua H3c: **X -> U** (K of A5: 8, 5, 5; d1 = 0.1821 >= 0.1 and S = 0.1839,
+- **Effect on DEV-0 (offline re-run of `compare`; in the 620-line text output one line differs, the Chua H3c row (class, size, reasons); in the JSON five values of that one part differ: `cls` X -> U, `class_point_only` X -> U, `size_kind`, `size`, and one added reason; the re-run after fix round 1 of the tool, which adds the infinite-bound reason, is byte-identical).** Chua H3c: **X -> U** (K of A5: 8, 5, 5; d1 = 0.1821 >= 0.1 and S = 0.1839,
   which the tool formerly turned into X with an "estimate under H-geo" size of S hw = 0.0554; the size is now d1 hw = 0.0549, d2 hw = 0.00028, tail not supported). The counts
   are **N 5 / X 6 / U 7** (version 1 and the earlier tool: 5 / 7 / 6); Chua N 1 / X 2 / U 3. **No other part and no number changes.**
   **The LM-row flag (yes iff class N) is unchanged: yes for 5 of 18 parts, no for 13.**
@@ -125,7 +125,7 @@ Notes on specific rows:
 - P0: the probe's pooled `lm_summary` and counts equal the stored ones exactly, at the 15, 30 and 60 arms, for all three systems (core oracle and evaluation kinds, and the sweep cells). Part A and the arms share commit, preset, seed id, CPU, `LPC_THREADS`, `XLA_FLAGS`, jax and jaxlib; the probe recorded each arm's start and end time.
 - P1 (the 30-iteration run starts with the 15-iteration run, so the cost never rises and the accepted count never falls): 1404 exact comparisons of the stored `lm` summaries, 0 violations; per estimate, 0 violations in every group and doubling.
 - Smoke checks before the pilot (K3): the flag at 15 and an absent flag give bitwise identical results (4555 leaves, provenance and wall-clock excluded).
-- Review: independent review rounds 1 and 2 of the tool and the knob, and the independent check of this report against its data (every number, class, count, side reading and hash correct), are in `docs/agent/records/work/`.
+- Review: independent review rounds 1 and 2 of the tool and the knob, and the independent checks of versions 1 and 2 against their data (every number, class, count, side reading and hash correct), are in `docs/agent/records/work/`. Version 3 has had one independent review, `docs/agent/records/work/WU-0005.6-rule-r-order-review.md` (R1 to R3, corrected here and in the tool); it is not a re-check of every number of this report against its data beyond the offline re-run described in section 0.
 
 ## 5. Limits
 
