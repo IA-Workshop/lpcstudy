@@ -902,7 +902,7 @@ def test_h3a_tiny_p_is_a_lower_bound_and_counted_computed(p_raw: float) -> None:
     got = rr.h3a_projection(p_raw, 2.0)
     assert got["computed"] and got["lower_bound"]
     assert erfc_p(got["chi2_pilot"]) == pytest.approx(1e-300, rel=1e-6)
-    assert got["chi2_full"] == 2.0 * got["chi2_pilot"] and got["p_full"] <= 1e-300
+    assert got["chi2_full"] == 2.0 * got["chi2_pilot"] and got["p_full"] == 1e-300 and got["p_full_bound"] is True
 
 
 def test_h3a_none_is_not_computed() -> None:
@@ -985,8 +985,13 @@ def test_h3a_tiny_and_none_pairs_in_the_report(tmp_path: Path, capsys) -> None:
     code = rr.main([str(path), "--states", str(tmp_path / "none")])
     out = capsys.readouterr().out
     assert code == 2
-    assert "chi2 >= " in out and "p_full <= " in out
-    assert "not computable: rossler H3a pair (1, 0): zero log-rank variance" in out
+    assert "chi2 >= " in out
+    # R9: the valid strict bound, never "<= 0" (sf underflows to 0.0 at chi2_full about 2750)
+    assert "p_full < 1e-300, Holm < " in out and "p_full <= " not in out
+    # R8: production writes None for an empty regime as well as for zero log-rank variance
+    assert ("not computable: rossler H3a pair (1, 0): p_raw is None (empty regime or zero "
+            "log-rank variance)") in out
+    assert "pair (1, 0): p_raw None (empty regime or zero log-rank variance): not computable" in out
     assert "H3a rossler (conditional on K_pilot = 3): pass reachable at full size: not determined" in out
 
 
@@ -1054,3 +1059,30 @@ def test_h2a_ii_governing_readings_on_p0_p1_against_the_log(name: str, tmp_path:
             fires = margin < 0.0067 or margin > 0.015
             row = mine[(label, system)]
             assert row["reading_i"] is fires and row["reading_ii"] is fires, (name, label, system)
+
+
+# ------------------------------------------------------------------------------------------ R7: policy
+@pytest.mark.parametrize("bad", ["Range", "points", "", None, "RANGE ", 0])
+def test_unknown_kappa_policy_is_refused_not_reported(tmp_path: Path, capsys, monkeypatch, bad
+                                                      ) -> None:
+    """R7 (PRIME.4): any value outside {"range", "point"} gives exit 2, a stderr line naming the
+    value, and no report: a typo must not print FALLBACK rows with nothing counted (exit 0)."""
+    monkeypatch.setattr(rr, "KAPPA_POLICY", bad)
+    tmp_path.mkdir(exist_ok=True)
+    run = write_run(tmp_path / "run")
+    assert rr.main([str(run)]) == 2
+    captured = capsys.readouterr()
+    assert "unknown KAPPA_POLICY" in captured.err and repr(bad) in captured.err
+    assert captured.out == ""
+    with pytest.raises(rr.NotComputable, match="unknown KAPPA_POLICY"):
+        rr.run(run)
+
+
+@pytest.mark.parametrize(("policy", "code"), [("range", 2), ("point", 0)])
+def test_policy_is_recorded_in_the_json(tmp_path: Path, capsys, monkeypatch, policy, code) -> None:
+    """R7: the governing rule is in the machine-readable output; exit 2 under the range (G2
+    counts the FALLBACK), 0 under the point estimate on a complete run."""
+    monkeypatch.setattr(rr, "KAPPA_POLICY", policy)
+    got, out, data = run_world(tmp_path, capsys)
+    assert got == code, out
+    assert data["kappa_policy"] == policy

@@ -95,7 +95,8 @@ log-rank test, so ``chi2_pilot = chi2.isf(logrank_p_raw, 1)`` exactly; ``chi2_fu
 n_test_run) chi2_pilot`` (2x), ``p_full = chi2.sf``, Holm over the run's pairs on ``p_full``, and
 "pass reachable at full size" iff every projected Holm-adjusted p is below ``H3A_ALPHA``, read from
 ``lpcstudy/analysis.py``. A ``p_raw`` below 1e-300 prints ``chi2 >= isf(1e-300, 1)`` and counts as
-computed; ``None`` (zero log-rank variance) is "not computable" (counted) and the reading "not
+computed (its projected p prints as the bound ``p_full < 1e-300``); ``None`` (an empty regime or zero
+log-rank variance: production writes it for both) is "not computable" (counted) and the reading "not
 determined" (it enters the Holm step as 1.0, as in production).
 
 A dump that does not reproduce its results leaf is never used: that row falls back to the range
@@ -162,6 +163,8 @@ KAPPA_POLICY = "range"
 tool's point estimate is printed as information only (it is biased, sign undetermined). ``"point"``:
 the point estimate governs when the dump reproduces its leaves (the c7d6e41 behaviour; what the
 G2 exit-0 condition describes). The owner's choice (a) or (b) of the note replaces this constant."""
+KAPPA_POLICIES = ("range", "point")
+"""The two admitted values of ``KAPPA_POLICY``; ``run`` refuses any other (exit 2)."""
 H3A_TINY = 1e-300
 """A log-rank p below this has no finite chi-square in float64: chi2 is a lower bound."""
 SLACK = 0.005
@@ -485,7 +488,8 @@ def h3a_projection(p_raw: float | None, factor: float) -> dict:
     ``chi2_pilot = chi2.isf(p_raw, 1)`` (exact for a 1-df log-rank test), ``chi2_full = factor x
     chi2_pilot``, ``p_full = chi2.sf(chi2_full, 1)``. A ``p_raw`` below ``H3A_TINY`` gives the lower
     bound ``chi2 >= chi2.isf(H3A_TINY, 1)`` (an exact inequality; the pair counts as computed and
-    its projected p, an upper bound, is below every bar). ``None`` (zero log-rank variance) gives
+    its projected p is reported as the strict upper bound ``H3A_TINY``, below every bar). ``None`` (an
+    empty regime or zero log-rank variance) gives
     ``computed = False``.
 
     Raises
@@ -497,15 +501,18 @@ def h3a_projection(p_raw: float | None, factor: float) -> dict:
         raise NotComputable(f"H3a size factor {factor} is not positive")
     if p_raw is None:
         return {"computed": False, "p_raw": None, "chi2_pilot": None, "lower_bound": False,
-                "chi2_full": None, "p_full": None}
+                "chi2_full": None, "p_full": None, "p_full_bound": False}
     p = float(p_raw)
     if not (0.0 <= p <= 1.0):
         raise NotComputable(f"log-rank p {p_raw!r} is not in [0, 1]")
     lower = p < H3A_TINY
     chi_pilot = float(sps.chi2.isf(H3A_TINY if lower else p, 1))
     chi_full = factor * chi_pilot
+    # for a lower-bound pair sf underflows to 0.0, a false inequality as a "<= 0": report the valid
+    # strict bound instead (the factor is at least 1 and sf is decreasing)
+    p_full = H3A_TINY if lower else float(sps.chi2.sf(chi_full, 1))
     return {"computed": True, "p_raw": p, "chi2_pilot": chi_pilot, "lower_bound": lower,
-            "chi2_full": chi_full, "p_full": float(sps.chi2.sf(chi_full, 1))}
+            "chi2_full": chi_full, "p_full": p_full, "p_full_bound": lower}
 
 
 def h3a_system(tree: dict, cfg: dict, full) -> dict:
@@ -1109,13 +1116,14 @@ def format_h3a(system: str, got: dict) -> list[str]:
              f"(analysis.H3A_ALPHA)"]
     for e in got["entries"]:
         if not e["computed"]:
-            lines.append(f"      pair {tuple(e['pair'])}: p_raw None (zero log-rank variance): not "
-                         "computable")
+            lines.append(f"      pair {tuple(e['pair'])}: p_raw None (empty regime or zero log-rank "
+                         "variance): not computable")
             continue
         bound = ">= " if e["lower_bound"] else ""
         lines.append(f"      pair {tuple(e['pair'])}: p_raw {e['p_raw']:.4g}, chi2 {bound}"
                      f"{e['chi2_pilot']:.4g} -> {bound}{e['chi2_full']:.4g}, p_full "
-                     f"{'<= ' if e['lower_bound'] else ''}{e['p_full']:.4g}, Holm {e['holm_full']:.4g}")
+                     f"{'< ' if e['lower_bound'] else ''}{e['p_full']:.4g}, Holm "
+                     f"{'< ' if e['lower_bound'] else ''}{e['holm_full']:.4g}")
     lines.append(f"      pass reachable at full size: {got['reading']} (largest projected "
                  f"Holm-adjusted p {got['largest_holm_full']:.3g}), conditional on K_pilot")
     return lines
@@ -1188,6 +1196,9 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     Refused
         If a recorded seed id is not a development id or the recorded ids disagree.
     """
+    if KAPPA_POLICY not in KAPPA_POLICIES:
+        raise NotComputable(f"unknown KAPPA_POLICY {KAPPA_POLICY!r}: expected one of "
+                            f"{KAPPA_POLICIES}; refusing to report with an uncounted fallback")
     path, results, seed_id = load_results(results_path)
     cfg = results["config"]
     obs_results, obs_seed = None, None
@@ -1212,6 +1223,7 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
                                 f"{obs_results['config'].get('name')!r}, not 'full'")
     rep.data["label"] = make_label(seed_id)
     rep.data["rows"] = {}
+    rep.data["kappa_policy"] = KAPPA_POLICY
     rep.data["h3a"] = {}
     all_systems = list(results.get("systems", {}))
     chosen = [s for s in all_systems if systems is None or s in systems]
@@ -1255,7 +1267,8 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
                 for entry in got["entries"]:
                     if not entry["computed"]:
                         rep.nc(f"{system} H3a pair {tuple(entry['pair'])}",
-                               "zero log-rank variance (p_raw is None): chi2 not computable")
+                               "p_raw is None (empty regime or zero log-rank variance): chi2 not "
+                               "computable")
         finally:
             if view is not None:
                 view.dump.close()

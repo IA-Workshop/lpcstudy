@@ -588,6 +588,18 @@ Written before the fix-round run. No bound, seed, R or tolerance changes; f2 (G5
 5. **H3a Holm with a `None` pair** uses 1.0, as production does; the reading is "not determined" regardless.
 6. **H2a(ii) pre-registered prediction** (governing reading fires on most parts) is shown in the summary only; there is no per-part prediction row.
 
+### WU-0003.3a fix round 3 (developer claude-sonnet-5-5, 2026-10-17; review `WU-0003.3a-review-round2.md` 680aace, R7 to R9; the owner lifted the limits for one narrow round, owner note section 24)
+
+Written before the fix-round run. R10 (the exit-0 rule under working default (a), and the fate of the `"point"` branch) is left to the planner and owner. No bound, seed, R or tolerance changes; the slow file is untouched.
+
+**Changes.** R7: `run` validates `KAPPA_POLICY` against `("range", "point")` before anything is read; any other value (`"Range"`, `"points"`, `""`, `None`) raises `NotComputable("unknown KAPPA_POLICY ...")`, so `main` exits 2 with a stderr line and no report; the policy is recorded in `--json` (`kappa_policy`). R8: the `None` H3a pair is worded "empty regime or zero log-rank variance" in the report line, the "not computable" reason and the docstrings (production writes `None` for both, `analysis.py` around line 1926). R9: a lower-bound pair stores and prints the valid bound `p_full < 1e-300` (instead of `sf` underflowing to `p_full <= 0`), its Holm value is the bound's (also printed with `<`), and `p_full_bound` is true in the JSON.
+
+**Tests (written with the change).** R7: four bad values give exit 2 with "unknown KAPPA_POLICY" on stderr and empty stdout; the JSON of a run under each valid value carries the policy. R8: the line and the reason name both causes. R9: the lower-bound line reads `p_full < 1e-300`, never `<= 0`, and the stored value is 1e-300.
+
+**§4.9 checklist.** 1. Change set: `tools/rehearsal_report.py`, `tests/unit/test_tools_rehearsal_report.py`, this file, the review file (answers). 2. Radius: `tests/unit/test_tools_rehearsal_report.py` only (by hand, 4.2, and `tools/test_impact.py --base wu/0003-rehearsal --explain`); no `lpcstudy/` change. 3. Already run on this code: no. 4. CPU. 5. `LPC_THREADS` 4, 300 s (the file takes about 2 s). 6. No preset or GPU job. 7. `-q --tb=short -rfE`. 8. `tools/run_tests.sh unit tests/unit/test_tools_rehearsal_report.py` once; `--lf` for failures only.
+
+**Results (fix round 3).** Unit radius, run once: `tools/run_tests.sh unit tests/unit/test_tools_rehearsal_report.py`: `63 passed in 2.33s` (no failure, no `--lf`; 8 new cases: six bad policy values, two recorded policies). Self-check of the diff: no `clip`, `nan_to_num`, `np.where`, `default_rng`, `random.` or `PRNGKey`; the only new raise is the policy refusal (exit 2, nothing printed but the stderr line); no tolerance changed (the one assertion edited, `p_full <= 1e-300`, became the exact `p_full == 1e-300` plus the bound flag). R10 untouched. The slow file is unchanged.
+
 ## Review
 
 ## Audit
