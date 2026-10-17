@@ -1,0 +1,17 @@
+ref: sizes [1000, 10000] medians^2 [0.026399053811352116, 0.002923554939292521]
+  reproduced 1/d = np.float64(0.5487318354156423)  leaf = 0.5487318354156423  equal: True
+  reproduced floor_rms = np.float64(0.02974951750765582)  leaf = 0.02974951750765582
+  params [3.9124832924538415, 1.0974636708312846, -7.029884730704143]
+  least_squares: status 1 (`gtol` termination condition is satisfied.); nfev 23; cost 2.490e-28; optimality 1.401e-12; x equal to curve_fit: True
+new: sizes [1000, 10000] medians^2 [0.02639905381135207, 0.002923554939292473]
+  reproduced 1/d = np.float64(0.5487318806234804)  leaf = 0.5487318791353117  equal: False
+  reproduced floor_rms = np.float64(0.02974952525992113)  leaf = 0.029749525004729264
+  params [3.9124838989448154, 1.0974637612469609, -7.029884209535066]
+  least_squares: status 1 (`gtol` termination condition is satisfied.); nfev 23; cost 2.281e-28; optimality 1.298e-12; x equal to curve_fit: True
+relative change of params (new vs ref): [1.5501432940468443e-07, 8.23860312486102e-08, 7.413621953082215e-08]
+relative change of inputs (medians^2): [1.708501020441948e-15, 1.6465767689662634e-14]
+Jacobian singular values: [9.341432660661166, 0.2564951929259608]  rows: 2
+null direction (log_c2, 2/d, log_f2): [0.7536382820119458, 0.11235239772502614, 0.6476158418472487]
+  2/d fixed at 0.987717: exact fit cost 9.86e-32, floor_rms 0.015224
+  2/d fixed at 1.097464: exact fit cost 0.00e+00, floor_rms 0.029750
+  2/d fixed at 1.207210: exact fit cost 9.86e-32, floor_rms 0.037018
