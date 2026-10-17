@@ -581,3 +581,118 @@ def test_k2_background_pilot_carries_the_flag_and_the_tally(fake: FakeRoot) -> N
     (call,) = cli_calls(fake)
     assert call["argv"][-2:] == ["--estimator-refine-steps", "60"]
     assert fake.tally_calls() == [["check", "--hours", "0"]]
+
+
+# ------------------------------------------------ WU-0003.11: --states-dump (bare flag)
+# Reference: the plan of WU-0003.11 and the CLI contract of ``lpcstudy/__main__.py`` (a
+# ``store_true`` flag): the wrapper passes the bare flag once, unchanged, and refuses a repeat or an
+# argument before the lock. The expected argv lists are written by hand from the wrapper's
+# documented order (``--systems S...`` first, then the pass-through arguments as given).
+# Tolerance: none; argv lists, exit codes and counts are compared for equality.
+@pytest.mark.parametrize("args", [
+    pytest.param(["--states-dump", "--states-dump"], id="twice"),
+    pytest.param(["--states-dump", "--skip-robustness", "--states-dump"], id="twice-apart"),
+    pytest.param(["--states-dump", "1"], id="digit-argument"),
+    pytest.param(["--states-dump", "x"], id="word-argument"),
+    pytest.param(["--states-dump", "true"], id="boolean-argument"),
+    pytest.param(["--states-dump", ""], id="empty-argument"),
+    pytest.param(["--states-dump", "-1"], id="dash-argument"),
+    pytest.param(["--states-dump=1"], id="equals-argument"),
+    pytest.param(["--states-dump=", "--skip-robustness"], id="equals-empty"),
+    pytest.param(["--systems", "lorenz63", "--states-dump", "lorenz63"], id="system-name-after"),
+])
+def test_dump_repeat_or_argument_is_refused_before_the_lock(fake: FakeRoot, args: list[str]) -> None:
+    """A repeated flag or a flag with an argument gives 64 with one line, even with the lock held.
+
+    A pilot would exit 75 with the lock held if the check came after the lock; 64 shows it comes
+    first. No fake is called, no meta file or runs directory is created.
+    """
+    with open(fake.lock, "w") as holder:
+        fcntl.flock(holder, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        done = fake.run("run_preset.sh", "pilot", "DEV-1", "runs/dev/DEV-1", *args)
+    assert done.returncode == 64, (done.stdout, done.stderr)
+    assert len(done.stderr.strip().splitlines()) == 1 and "--states-dump" in done.stderr
+    assert fake.calls() == [] and fake.timeout_calls() == [] and fake.tally_calls() == []
+    assert not list(fake.root.rglob("run.meta.json*")) and not (fake.root / "runs").exists()
+
+
+def test_dump_flag_reaches_the_cli_and_the_meta(fake: FakeRoot) -> None:
+    """The bare flag reaches the CLI argv once, in its given place, and the meta ``command`` shows it."""
+    done = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/DEV-2", "--states-dump",
+                    "--estimator-refine-steps", "30", "--systems", "lorenz63", "--skip-robustness")
+    assert done.returncode == 0, done.stderr
+    (call,) = cli_calls(fake)
+    expected = ["--systems", "lorenz63", "--states-dump", "--estimator-refine-steps", "30",
+                "--skip-robustness"]
+    assert call["argv"][call["argv"].index("--systems"):] == expected
+    assert call["argv"].count("--states-dump") == 1
+    meta = json.loads(meta_path(fake, "smoke", "DEV-2").read_text())
+    words = meta["command"].split()
+    assert words.count("--states-dump") == 1 and words[-len(expected):] == expected
+
+
+def test_dump_flag_as_the_last_argument_and_before_another_option(fake: FakeRoot) -> None:
+    """The flag is bare at the end of the line and before ``--device``; neither takes it as a value."""
+    last = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/a", "--states-dump")
+    assert last.returncode == 0, last.stderr
+    before = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/b", "--states-dump", "--device", "cpu")
+    assert before.returncode == 0, before.stderr
+    first, second = cli_calls(fake)
+    assert first["argv"][-1] == "--states-dump" and second["argv"][-1] == "--states-dump"
+    assert first["argv"].count("--states-dump") == second["argv"].count("--states-dump") == 1
+
+
+def test_dump_absent_flag_leaves_the_argv_as_before(fake: FakeRoot) -> None:
+    """Without the flag the CLI argv and the meta ``command`` have no mention of it."""
+    done = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/DEV-2")
+    assert done.returncode == 0, done.stderr
+    (call,) = cli_calls(fake)
+    assert "--states-dump" not in call["argv"]
+    assert "--states-dump" not in json.loads(meta_path(fake, "smoke", "DEV-2").read_text())["command"]
+
+
+def test_dump_flag_changes_only_the_argv_by_the_flag(fake: FakeRoot) -> None:
+    """With and without the flag the two runs differ by the flag alone (no other behaviour change).
+
+    The out-dir is the one expected difference (two runs cannot share a meta file) and is masked.
+    The environment variables that the wrapper sets and the timeout call are compared whole.
+    """
+    plain = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/plain", "--skip-robustness")
+    dumped = fake.run("run_preset.sh", "smoke", "DEV-2", "runs/dev/dumped", "--skip-robustness",
+                      "--states-dump")
+    assert plain.returncode == dumped.returncode == 0, (plain.stderr, dumped.stderr)
+    first, second = cli_calls(fake)
+
+    def masked(call: dict, name: str) -> list[str]:
+        return [word.replace(name, "OUT") for word in call["argv"] if word != "--states-dump"]
+
+    assert masked(second, "dumped") == masked(first, "plain")
+    keys = ("JAX_PLATFORMS", "XLA_PYTHON_CLIENT_PREALLOCATE", "OMP_NUM_THREADS", "PJRT_NPROC")
+    assert {k: first["env"].get(k) for k in keys} == {k: second["env"].get(k) for k in keys}
+    one, two = [c for c in fake.timeout_calls() if "--preset" in c]  # not the ``--help`` probe
+    assert [w.replace("plain", "OUT") for w in one] == [
+        w.replace("dumped", "OUT") for w in two if w != "--states-dump"]
+
+
+def test_dump_flag_with_the_confirmatory_flag_is_still_refused(fake: FakeRoot) -> None:
+    """The sealed-run scan still refuses it first: 64, its own message, one line, nothing started.
+
+    The message check ("owner-only", the text of the scan in the wrapper) is what tells the scan
+    from the catch-all "unexpected argument" refusal, which also gives 64 and one line (LPC.PC.7).
+    """
+    done = fake.run("run_preset.sh", "smoke", "DEV-1", "runs/dev/DEV-1", "--states-dump",
+                    "--confirmatory")
+    assert done.returncode == 64, (done.stdout, done.stderr)
+    assert "owner-only" in done.stderr and "unexpected argument" not in done.stderr
+    assert len(done.stderr.strip().splitlines()) == 1
+    assert fake.calls() == [] and not list(fake.root.rglob("run.meta.json*"))
+
+
+def test_dump_background_pilot_carries_the_flag_and_the_tally(fake: FakeRoot) -> None:
+    """A CPU pilot with the flag passes it to the child, after the lock and the tally."""
+    _, pid = start_pilot(fake, "--device", "cpu", "--states-dump")
+    assert wait_until(lambda: not alive(pid))
+    (call,) = cli_calls(fake)
+    assert call["argv"][-1] == "--states-dump" and call["argv"].count("--states-dump") == 1
+    assert fake.tally_calls() == [["check", "--hours", "0"]]
+    assert "--states-dump" in json.loads(meta_path(fake, "pilot").read_text())["command"].split()

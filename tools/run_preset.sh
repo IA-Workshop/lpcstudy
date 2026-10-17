@@ -3,6 +3,7 @@
 #
 # Usage: tools/run_preset.sh <preset> <seed-id> <out-dir> [--device cpu|gpu]
 #                            [--systems S...] [--skip-robustness] [--estimator-refine-steps N]
+#                            [--states-dump]
 #
 #   preset   smoke | pilot | full
 #   seed-id  a DEV-n id listed in seeds/development_seeds.json (never a raw integer)
@@ -16,6 +17,11 @@
 # N is a canonical decimal integer from 1 to 999 (no sign, no leading zero), given once, else the
 # wrapper refuses before the lock. The CLI itself refuses it with the confirmatory flag, which this
 # wrapper never accepts. The meta file records it in "command".
+# --states-dump (WU-0003.7b, WU-0003.11: the per-state dump of the rehearsal runs R1 and R5) is a
+# bare flag, given once and passed to the CLI unchanged; with an argument (--states-dump X, or
+# --states-dump=X) or given twice the wrapper refuses before the lock. The CLI itself refuses it with
+# the confirmatory flag (which this wrapper never accepts) and with --report-only (which this wrapper
+# never passes). The meta file records it in "command". Nothing else changes with it.
 #
 # Device: cpu for smoke, gpu for pilot and full (JAX_PLATFORMS cpu or cuda); thread variables
 # are set from LPC_THREADS (1..99, default 4), as are PJRT_NPROC and NPROC (the XLA CPU thread
@@ -133,7 +139,7 @@ for arg in "$@"; do
     [[ "$lower" != *confirmatory* ]] || refuse "an argument names the confirmatory path, which is owner-only (LPC.PC.7)"
 done
 
-[ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-robustness] [--estimator-refine-steps N]"
+[ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-robustness] [--estimator-refine-steps N] [--states-dump]"
 preset="$1"
 seed="$2"
 out_arg="$3"
@@ -143,6 +149,7 @@ device=""
 systems=()
 passthrough=()
 refine_given=0
+dump_given=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --device)
@@ -171,6 +178,15 @@ while [ "$#" -gt 0 ]; do
             passthrough+=("$1" "$2")
             shift 2
             ;;
+        --states-dump)
+            [ "$dump_given" = 0 ] || refuse "--states-dump is given twice"
+            dump_given=1
+            shift
+            # A bare flag: a following word that is not another option is an argument (refused).
+            [ "$#" -eq 0 ] || [[ "$1" == --* ]] || refuse "--states-dump takes no argument"
+            passthrough+=(--states-dump)
+            ;;
+        --states-dump=*) refuse "--states-dump takes no argument" ;;
         *) refuse "unexpected argument ${1@Q}" ;;
     esac
 done
