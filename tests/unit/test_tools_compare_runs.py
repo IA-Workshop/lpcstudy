@@ -869,26 +869,34 @@ def test_cp_rule_applies_to_the_untagged_h1a_leaves(tier: str, path: str, value:
 
 
 def test_failures_of_the_h1a_fit_keep_the_cp_rule_and_print_the_of7_pointer_with_an_unchanged_exit() -> None:
-    """Round 2, item 1: the four H1a fit leaves that fail the cp rule on a platform pair (here 1e-7 relative, as on
-    the S3 pair) still FAIL (exit 1, nothing loosened) and carry the OF-7 pointer; the report prints it once. A
-    failure outside ``H1a/by_noise`` carries none; a pass carries none."""
+    """Round 2, item 1, extended by WU-0003.9b fix round 1 (review R1): the H1a fit leaves that fail the cp rule on a
+    platform pair (here 1e-7 relative, as on the S3 pair) still FAIL (exit 1, nothing loosened) and carry the OF-7
+    pointer; the report prints it once. The leaves are ``fitted_inverse_dim``, ``floor_rms``, ``ci_inverse_dim`` and,
+    since this round, ``ratio`` and ``ratio_ci`` (the same ``curve_fit``). A failure outside ``H1a/by_noise`` carries
+    none; a pass carries none."""
     ref, new = tier_pair("T2")
     for tree in (ref, new):
         with_h1a(tree)
-    for leaf, value in (("fitted_inverse_dim", 0.55), ("floor_rms", 0.03)):
+    for leaf, value in (("fitted_inverse_dim", 0.55), ("floor_rms", 0.03), ("ratio", 1.09)):
         edit(new, f"{H1A}/{leaf}", value * (1 + 1e-7))
     edit(new, f"{H1A}/ci_inverse_dim/[0]", 0.48 * (1 + 1e-7))
+    edit(new, f"{H1A}/ratio_ci/[0]", 0.96 * (1 + 1e-7))
+    edit(new, f"{H1A}/ci_inverse_dim/[1]", 0.65 * (1 + 1e-7))
+    edit(new, f"{H1A}/ratio_ci/[1]", 1.3 * (1 + 1e-7))
     res = run(ref, new)
-    for leaf in ("fitted_inverse_dim", "floor_rms", "ci_inverse_dim/[0]"):
+    # seven leaves per (system, rho) carry the pointer: 3 systems x 2 rho x 7 = 42 per pilot T2 pair (the OF-7 row
+    # of plan amendment 3 C6 said 24 before ratio and ratio_ci joined)
+    assert sum(cr.OF7_POINTER in r.note for r in res.rows) == 7
+    for leaf in ("fitted_inverse_dim", "floor_rms", "ci_inverse_dim/[0]", "ratio", "ratio_ci/[0]"):
         r = row(res, f"{H1A}/{leaf}")
         assert r.outcome == "FAIL" and cr.OF7_POINTER in r.note and "2026-10-14-math-wu0003-9-q1.md" in r.note
     assert res.exit_code == 1
     text = "\n".join(cr.render(res, "a", "b"))
     assert text.count("pointer: " + cr.OF7_POINTER) == 1
-    for leaf, value in (("median_seed_by_n_lib/1000", 0.16), ("ratio", 1.09)):          # R15: not OF-7 leaves
+    for leaf, value in (("median_seed_by_n_lib/1000", 0.16),):                  # R15: not an OF-7 leaf
         edit(new, f"{H1A}/{leaf}", value * (1 + 1e-3))
     res = run(ref, new)
-    for leaf in ("median_seed_by_n_lib/1000", "ratio"):
+    for leaf in ("median_seed_by_n_lib/1000",):
         r = row(res, f"{H1A}/{leaf}")
         assert r.outcome == "FAIL" and cr.OF7_POINTER not in r.note, leaf
     ref, new = tier_pair("T2", **{f"{S}__H1b__CP__slope": 2.0 * (1 + 1e-7)})
@@ -999,6 +1007,32 @@ def test_a_differing_clip_count_does_not_replace_the_cp_rule_of_the_h1a_fit_leav
     edit(new, f"{S}/H1a/n_states", 79)                     # block-local count of H1a: licenses its interval leaves
     res = run(ref, new)
     assert row(res, f"{H1A}/ci_inverse_dim/[0]").outcome == "pass"
+
+
+@pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
+def test_a_differing_clip_count_does_not_license_the_h1a_ratio_and_its_interval(tier: str) -> None:
+    """Review R1 of WU-0003.9b, the R17 analogue for ``ratio`` and ``ratio_ci``: they are cp-dependent, so a
+    whole-system clip count (a PLP count) must not let them pass at 0.1 hw. Reference: the plan's numbers by hand.
+    ``ratio`` 1.09 -> 1.10 and ``ratio_ci/[1]`` 1.30 -> 1.31 are 0.01, far above 1e-12 |ref| and also above
+    1e-4 s = 1.3e-4: they FAIL with no count, and still FAIL with the cell ``error_clips`` +1 (the whole-system
+    scope), while the network-chain H3c estimate moved by 0.5 x 0.1 hw passes with it. A count of the block itself
+    (``H1a/n_states``) licenses them, as A6 says."""
+    ref, new = tier_pair(tier)
+    for tree in (ref, new):
+        with_h1a(tree)
+    edit(new, f"{H1A}/ratio", 1.10)
+    edit(new, f"{H1A}/ratio_ci/[1]", 1.31)
+    for counts in (0, 1):
+        edit(new, f"{CELL}/counts/error_clips", counts)
+        edit(new, f"{S}/H3c/A5_over_A4_mse", 0.915)
+        res = run(ref, new)
+        assert row(res, f"{H1A}/ratio").outcome == "FAIL" and row(res, f"{H1A}/ratio_ci/[1]").outcome == "FAIL", counts
+        assert row(res, f"{H1A}/ratio").rule == "cp chain relative"
+        assert (row(res, f"{S}/H3c/A5_over_A4_mse").outcome == "pass") == bool(counts)
+    edit(new, f"{CELL}/counts/error_clips", 0)
+    edit(new, f"{S}/H1a/n_states", 79)
+    res = run(ref, new)
+    assert row(res, f"{H1A}/ratio").outcome == "pass" and row(res, f"{H1A}/ratio_ci/[1]").outcome == "pass"
 
 
 # ---------------------------------------------------------------------------------- d3: 10x rule
@@ -1514,14 +1548,39 @@ def test_no_float_leaf_of_the_pilot_schema_is_untagged(name: str) -> None:
     assert untagged == []
 
 
+# the one documented change of an existing chain (review R2): a tightening, network to cp
+DOCUMENTED_TIGHTENINGS = {"systems/<sys>/H1d/rows/nhat/spearman": ("network", "cp")}
+
+
 @pytest.mark.parametrize("name", FIXTURE_FILES)
-def test_regression_every_previously_tagged_leaf_keeps_its_chain(name: str) -> None:
+def test_regression_every_previously_tagged_leaf_keeps_its_chain_but_the_documented_tightening(name: str) -> None:
     """C4 (t2), a regression guard: the chain each leaf had before this unit (column 2, written by
     ``extract_paths.py`` from ``compare_pilot``'s unchanged table and the one H1a override) is the chain it has
-    now. The assertion message lists every difference."""
-    changed = [(shape, before, cr.chain_of(concrete(shape)))
-               for shape, before in ALL_SHAPES[name].items() if before and cr.chain_of(concrete(shape)) != before]
-    assert changed == [], "\n".join(f"{s}: {a} -> {b}" for s, a, b in changed)
+    now, with one exception, a finding of the review resolved stricter (R2): ``H1d/rows/nhat/spearman``, network in
+    the table but cp by the code, is tightened by ``TIGHTENINGS``. The assertion message lists every difference; a
+    change must be that documented tightening and must go to a network-independent chain."""
+    changed = {shape: (before, cr.chain_of(concrete(shape)))
+               for shape, before in ALL_SHAPES[name].items() if before and cr.chain_of(concrete(shape)) != before}
+    assert changed == {s: v for s, v in DOCUMENTED_TIGHTENINGS.items() if s in ALL_SHAPES[name]}, changed
+    assert all(new in cr.cp.NETWORK_INDEPENDENT and old == "network" for old, new in changed.values())
+
+
+def test_the_nhat_spearman_is_tightened_to_cp_and_meets_the_chain_tolerance() -> None:
+    """Review R2: ``H1d/rows/nhat/spearman`` (a point estimate with the interval ``interval``) is cp 1e-12 relative,
+    like its interval; the other H1d rows stay network. Reference: the plan's 1e-12 by hand; 0.5 x passes and 2 x
+    fails, in T1, T2 and T3. ``compare_pilot``'s table is unchanged (it still says network)."""
+    leaf = ("systems", "lorenz63", "H1d", "rows", "nhat", "spearman")
+    assert cr.chain_source(leaf)[:2] == ("cp", "tightening")
+    assert cr.cp.TABLE.classify(leaf).chain == "network"
+    assert cr.chain_of(("systems", "lorenz63", "H1d", "rows", "growth", "spearman")) == "network"
+    for tier in ("T1", "T2", "T3"):
+        for factor, outcome in ((0.5, "pass"), (2.0, "FAIL")):
+            ref, new = tier_pair(tier)
+            for tree in (ref, new):
+                block_leaf(tree, "H1d", {"rows": {"nhat": {"spearman": 0.5, "interval": [0.4, 0.6]}}})
+            edit(new, f"{S}/H1d/rows/nhat/spearman", 0.5 + factor * 1e-12 * 0.5)
+            r = row(run(ref, new), f"{S}/H1d/rows/nhat/spearman")
+            assert r.outcome == outcome and r.rule == "cp chain relative" and r.tol == 1e-12, (tier, factor)
 
 
 @pytest.mark.parametrize("name", FIXTURE_FILES)
@@ -1557,15 +1616,15 @@ def test_every_override_matches_a_leaf_of_the_fixtures_and_names_no_index_or_sys
 
 def test_every_override_has_a_known_chain_a_reason_that_cites_its_source_and_a_known_tolerance() -> None:
     """Each override carries a printed reason that cites the producing function (``file.py:function``) or says
-    that the leaf is a run configuration or a constant, a chain from the known set, and a tolerance mode."""
+    that the leaf is a run configuration or a constant, and a chain from the known set. The tightening rows name a
+    network-independent chain only (they may tighten a table chain, never loosen it)."""
     assert len(cr.TAGS.rules) > 40
     for tag in cr.TAGS.rules:
         assert tag.chain in OVERRIDE_CHAINS, tag.pattern
-        assert tag.tolerance in ("chain", "class"), tag.pattern
         assert re.search(r"\w+\.py:\w+", tag.reason) or tag.reason.startswith("run configuration"), tag.pattern
         assert len(tag.reason) > 25, tag.pattern
-        if tag.tolerance == "class":
-            assert tag.chain in cr.cp.NETWORK_INDEPENDENT and "tolerance-stopped" in tag.reason, tag.pattern
+    for tag in cr.TIGHTENINGS.rules:
+        assert tag.chain in cr.cp.NETWORK_INDEPENDENT and re.search(r"\w+\.py:\w+", tag.reason), tag.pattern
 
 
 def test_the_chain_of_a_leaf_is_the_table_chain_then_the_override() -> None:
@@ -1577,6 +1636,7 @@ def test_the_chain_of_a_leaf_is_the_table_chain_then_the_override() -> None:
              (("systems", "lorenz63", "verification", "P2c", "fraction_violations"), "cp", "override"),
              (("systems", "lorenz63", "H3c", "level"), "fixture", "override"),
              (("config", "core_noise"), "fixture", "override"),
+             (("systems", "lorenz63", "H1d", "rows", "nhat", "spearman"), "cp", "tightening"),
              (("systems", "lorenz63", "novel_block", "x"), "", "")]
     for path, chain, source in cases:
         got_chain, got_source, reason = cr.chain_source(path)
@@ -1614,7 +1674,7 @@ def test_an_untagged_float_leaf_is_not_computable_in_every_tier_even_when_equal(
     for tree in (td_ref, td_new):
         edit(tree, f"{S}/novel_block", {"x": 1.0})
     res = run(td_ref, td_new)
-    assert res.tier.name == "TD" and res.exit_code in (1, 2) and res.untagged_leaves
+    assert res.tier.name == "TD" and res.exit_code == 2 and res.untagged_leaves
 
 
 def test_a_config_float_is_tagged_and_still_compared_exactly() -> None:
@@ -1664,25 +1724,21 @@ def test_an_override_chain_meets_the_chain_tolerance(tier: str, name: str) -> No
 
 
 @pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
-def test_the_h1a_ratio_is_cp_by_dependence_and_keeps_the_class_a_rule(tier: str) -> None:
-    """``ratio`` and ``ratio_ci`` depend on the cp chain only (the table's tag is ``cp``), but they are outputs of
-    the tolerance-stopped ``curve_fit`` (note 2026-10-14-math-wu0003-9-q1 sections Q1.1 and Q1.3), for which the
-    1e-12 premise of N1 fails: they stay under the A6 QoI rule 1e-4 s, as before WU-0003.9b (s = max(|lo|, |hi|) of
-    ``ratio_ci`` = 1.3 here). Reference: the plan's number by hand; 0.5 x passes and 2 x fails."""
+def test_the_h1a_ratio_is_cp_and_meets_the_strict_chain_tolerance_with_the_of7_pointer(tier: str) -> None:
+    """Review R1 of WU-0003.9b: ``ratio`` and ``ratio_ci`` depend on the cp chain only and meet cp 1e-12 relative, the
+    working default of the four sibling outputs of the same tolerance-stopped ``curve_fit`` (OF-7 not adopted; the
+    A6 QoI rule 1e-4 s is the owner's alternative, not applied). Reference: the plan's 1e-12 by hand
+    (``ratio`` 1.09, ``ratio_ci/[1]`` 1.3); 0.5 x passes and 2 x fails, and a failure carries the OF-7 pointer."""
     assert cr.chain_of(("systems", "lorenz63", "H1a", "by_noise", "0.01", "ratio")) == "cp"
-    for factor, outcome in ((0.5, "pass"), (2.0, "FAIL")):
-        low = tier_pair(tier)
-        for tree in low:
-            with_h1a(tree)
-        edit(low[1], f"{H1A}/ratio", 1.09 + factor * 1e-4 * 1.3)
-        r = row(run(*low), f"{H1A}/ratio")
-        assert r.outcome == outcome and r.rule == "QoI / interval endpoint" and r.tol == 1e-4
-        low = tier_pair(tier)
-        for tree in low:
-            with_h1a(tree)
-        edit(low[1], f"{H1A}/ratio_ci/[1]", 1.3 + factor * 1e-4 * 1.3)
-        r = row(run(*low), f"{H1A}/ratio_ci/[1]")
-        assert r.outcome == outcome and r.rule == "QoI / interval endpoint"
+    for leaf, value in (("ratio", 1.09), ("ratio_ci/[1]", 1.3)):
+        for factor, outcome in ((0.5, "pass"), (2.0, "FAIL")):
+            pair = tier_pair(tier)
+            for tree in pair:
+                with_h1a(tree)
+            edit(pair[1], f"{H1A}/{leaf}", value + factor * 1e-12 * value)
+            r = row(run(*pair), f"{H1A}/{leaf}")
+            assert r.outcome == outcome and r.rule == "cp chain relative" and r.tol == 1e-12, (leaf, factor)
+            assert (cr.OF7_POINTER in r.note) == (outcome == "FAIL")
 
 
 # ---- the whole real schema, with made-up values

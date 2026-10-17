@@ -107,23 +107,25 @@ Readings that the plan leaves open (strict where possible; the looser owner read
   producing function; ``fixture`` (a constant or a configuration echo) and ``cp`` are network-independent; ``network``
   is every leaf that reads a trained estimator or the PLP forecast or something built from them, and any leaf whose
   independence cannot be shown from the code (the looser class). The report prints, per run, the number of float leaves
-  tagged by the table, by an override and untagged, and the reason of every override that tagged a differing leaf;
+  tagged by the table, tightened, by an override and untagged, and the reason of every override that tagged a differing leaf;
   ``--tags`` prints the whole override table. The pin is the test on the committed path shapes of P1, P0 and the smoke
   preset (``tests/unit/fixtures/pilot_schema``).
-* An override may carry ``tolerance="class"``: the leaf depends on the cp chain only, but is the output of a
-  tolerance-stopped iterative solver, for which the 1e-12 premise of N1 (direct arithmetic) fails, so the class rules
-  apply, as they did before it was tagged. This is the case of the H1a ``ratio`` and ``ratio_ci`` (the fit of
-  ``curve_fit``); the note 2026-10-14-math-wu0003-9-q1 sections Q1.1 and Q1.3 give the bound. The cp 1e-12 rule also
-  applies to ``H1a`` ``inverse_dim_reference`` and ``median_seed_by_n_lib/*`` (direct arithmetic; the adopted
-  tightening of Q1.4). The four H1a fit outputs that fail the cp rule on a platform pair
-  (``fitted_inverse_dim``, ``ci_inverse_dim``, ``floor_rms``) are tolerance-stopped fits whose tag is cp in
-  ``compare_pilot``'s table; the mathematician proposes class (a) or (g) for them (OF-7, a loosening, **not adopted**:
-  working default cp 1e-12). A pointer to ``docs/agent/notes/2026-10-14-math-wu0003-9-q1.md`` is printed beside those
-  three leaves (``fitted_inverse_dim``, ``ci_inverse_dim/[0|1]``, ``floor_rms``) when they fail the cp rule; the exit
-  code is unchanged.
+* The H1a ``ratio`` and ``ratio_ci`` are cp by dependence and meet the strict cp 1e-12, like the four sibling
+  outputs of the tolerance-stopped ``curve_fit`` (``fitted_inverse_dim``, ``ci_inverse_dim``, ``floor_rms``, whose
+  cp tag is in ``compare_pilot``'s table). The mathematician proposes the A6 QoI rule (class (a) or (g)) for all of
+  them (OF-7, a loosening, **not adopted**; it now covers ``ratio`` and ``ratio_ci`` too: the working default fails
+  every T2 pair on up to 42 H1a leaves per pilot, 3 systems x 2 rho x 7, with correct code). A pointer to
+  ``docs/agent/notes/2026-10-14-math-wu0003-9-q1.md`` is printed beside these five leaves (``fitted_inverse_dim``,
+  ``ratio``, ``ci_inverse_dim/[0|1]``, ``ratio_ci/[0|1]``, ``floor_rms``) when they fail the cp rule; the exit code is
+  unchanged. The cp 1e-12 rule also applies to ``H1a`` ``inverse_dim_reference`` and ``median_seed_by_n_lib/*`` (direct
+  arithmetic; the adopted tightening of Q1.4).
+* ``TIGHTENINGS`` may replace a ``network`` chain of ``compare_pilot``'s table by a network-independent one where the
+  code shows no estimator dependence, never the reverse (``H1d/rows/nhat/spearman``, review R2); ``compare_pilot`` is
+  not edited. The scope of a clip, nu-cap or replacement count follows the chain, so it never reaches a
+  network-independent leaf.
 * A ``cov_digest`` difference alone is undetermined (see above); a ``None`` system never opens a scope.
 * **Looser owner readings:** the whole-system scope of a clip, nu-cap or replacement count (reading 9, above);
-  the class rules for the H1a ``ratio`` and ``ratio_ci`` (above); the ``network`` tag of every leaf whose independence
+  the ``network`` tag of every leaf whose independence
   of the estimator cannot be shown (above); and the listing of the integers of a K-shaped block when K differs
   (``follows_k``: listed, no licence), which is the "list with no licence" option of OF-1.
 * ``fraction_above_chi2`` and ``fraction_late_progress`` have no T2/T3 tolerance in A6: class (c)
@@ -163,7 +165,7 @@ if cp is None or not hasattr(cp, "TABLE"):
     sys.modules["compare_pilot"] = cp
     _SPEC.loader.exec_module(cp)
 
-OF7_POINTER = ("OF-7 (proposed, not adopted): the H1a fit outputs are tolerance-stopped, see "
+OF7_POINTER = ("OF-7 (proposed, not adopted): the H1a fit outputs (also ratio and ratio_ci) are tolerance-stopped, see "
                "docs/agent/notes/2026-10-14-math-wu0003-9-q1.md; cp 1e-12 kept as the working default")
 LABEL = "DEVELOPMENT: comparison of two runs, not a hypothesis test"
 REVIEW = ("needs owner review before freeze (tolerance and verdict-comparison code; "
@@ -680,26 +682,9 @@ def kind_of(a: object, b: object) -> str:
 
 
 # ----------------------------------------------------------------------------------- chain tags (C4)
-@dataclass(frozen=True)
-class Tag(cp.Rule):
-    """One override row: the chain of the float leaves that ``compare_pilot``'s table leaves untagged.
-
-    Attributes
-    ----------
-    tolerance : str
-        ``"chain"``: the tolerance follows the chain (a network-independent chain meets 1e-12 relative,
-        the network chain the class rules). ``"class"``: the chain is the true dependence, but the leaf is
-        the output of a tolerance-stopped iterative solver, for which the 1e-12 premise of N1 (forward-stable
-        direct arithmetic) fails, so the class rules (A6 QoI rule, classes (b) to (g)) apply, as they did
-        before the leaf was tagged. The reason says why.
-    """
-
-    tolerance: str = "chain"
-
-
-def _tags(chain: str, patterns: str, reason: str, tolerance: str = "chain") -> list[Tag]:
+def _tags(chain: str, patterns: str, reason: str) -> list[cp.Rule]:
     """Expand braces and build the override rows of one pattern group."""
-    return [Tag(pattern, "unchanged", reason=reason, chain=chain, tolerance=tolerance)
+    return [cp.Rule(pattern, "unchanged", reason=reason, chain=chain)
             for text in patterns.split() for pattern in cp._expand(text)]
 
 
@@ -709,7 +694,7 @@ NETWORK_W = ("w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cros
              "forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)")
 
 
-def _build_tags() -> list[Tag]:
+def _build_tags() -> list[cp.Rule]:
     """The override table (WU-0003.9b, plan amendment 3 C4; needs owner review before freeze).
 
     Every float leaf of the pilot schema that ``compare_pilot``'s table leaves without a chain gets a row here,
@@ -717,11 +702,11 @@ def _build_tags() -> list[Tag]:
     from the production code: ``cp`` and ``fixture`` (a constant echoed from the configuration or a module constant)
     are network-independent; ``network`` is every leaf that reads a trained estimator, the PLP forecast or a quantity
     built from them (w*, the fitted proxies and regimes, the LM refinement), and the leaves whose independence of
-    them cannot be shown from the code. A pattern may not overlap another (the table raises), and a leaf that is
-    tagged in ``compare_pilot``'s table never reaches this one.
+    them cannot be shown from the code. Two patterns must not match one leaf: ``tag_of`` raises at lookup (a test
+    checks every leaf of the fixtures), and a leaf that is tagged in ``compare_pilot``'s table never reaches this one.
     """
     S = "systems/*"
-    out: list[Tag] = []
+    out: list[cp.Rule] = []
     add = out.extend
     add(_tags("fixture", "config/**",
               "run configuration echoed from config.py:StudyConfig, not computed; compare_runs.py:decide compares "
@@ -768,9 +753,9 @@ def _build_tags() -> list[Tag]:
               "2026-10-14-math-wu0003-9-q1 section Q1.4"))
     add(_tags("cp", f"{S}/H1a/by_noise/*/ratio {S}/H1a/by_noise/*/ratio_ci/[]",
               "analysis.py:_median_fit_stats via h1a_library_scaling: depends on the CP seed errors and the oracle local "
-              "dimension only (cp), but is an output of the tolerance-stopped curve_fit (ftol 1e-8, 2-point Jacobian), "
-              "for which the 1e-12 premise of N1 fails; the A6 QoI rule applies (note 2026-10-14-math-wu0003-9-q1 "
-              "sections Q1.1 and Q1.3)", tolerance="class"))
+              "dimension only (cp). It is an output of the tolerance-stopped curve_fit, like the four sibling fit leaves, "
+              "so cp 1e-12 may fail on correct code at a T2 pair: OF-7 (not adopted; working default cp 1e-12 with the "
+              "pointer to note 2026-10-14-math-wu0003-9-q1, which also covers these two leaves)"))
     add(_tags("cp", f"{S}/H1d/rows/nhat/interval/[]",
               "analysis.py:h1d_proxies: the pair (nhat, N) is ev.noise_sens against moments.noise_sens, both from analog "
               "retrieval on the noisy library (ensemble.py:evaluation_draws, ensemble_moments, retrieval_spread): no "
@@ -846,39 +831,54 @@ TAG_CHAINS = frozenset({"fixture", "dynamics", "cp", "oracle", "network"})
 UNTAGGED_RULE = "untagged: NOT COMPUTABLE"
 
 
-def tag_of(path: Path_) -> Tag | None:
+def tag_of(path: Path_) -> cp.Rule | None:
     """The override row of a leaf, or ``None`` (an overlap of two rows is a defect and raises)."""
     found = TAGS.matches(path)
     if len(found) > 1:
         raise ToolError(f"{len(found)} override rows match {'/'.join(path)}: " + "; ".join(t.pattern for t in found))
-    return found[0] if found else None  # type: ignore[return-value]
+    return found[0] if found else None
+
+
+def _build_tightenings() -> list[cp.Rule]:
+    """The tightening-only overrides (fix round 1, review R2; needs owner review before freeze).
+
+    A row here replaces a ``network`` chain of ``compare_pilot``'s table by a network-independent one for the
+    leaves where the code shows no estimator dependence. It never replaces a network-independent chain and
+    never gives a looser one (``chain_source`` applies it only to a table chain ``network``, and a test checks that
+    every row names a network-independent chain). ``compare_pilot`` is not edited: its table carries the rules of
+    the v1 regression.
+    """
+    return _tags("cp", "systems/*/H1d/rows/nhat/spearman",
+                 "analysis.py:h1d_proxies: the pair (nhat, N) is ev.noise_sens against moments.noise_sens, both from analog "
+                 "retrieval on the noisy library (ensemble.py:evaluation_draws, ensemble_moments, retrieval_spread): no "
+                 "estimator and no PLP, like its interval rows/nhat/interval (finding of review R2; compare_pilot's "
+                 "table says network, which is looser than the code shows)")
+
+
+TIGHTENINGS = cp.Table(_build_tightenings())
 
 
 def chain_source(path: Path_) -> tuple[str, str, str]:
     """``(chain, source, reason)`` of a leaf: ``compare_pilot``'s table first, then the override table.
 
-    ``source`` is ``"table"``, ``"override"`` or ``""`` (untagged: the chain and the reason are empty).
+    ``source`` is ``"table"``, ``"tightening"`` (a table chain ``network`` replaced by a network-independent
+    one), ``"override"`` or ``""`` (untagged: the chain and the reason are empty).
     """
     found = cp.TABLE.matches(path)
     if len(found) > 1:                     # two table rules for one leaf is a defect of the table, never a tag
         raise ToolError(cp.Table.explain(path, found))
     if found and found[0].chain:
+        tight = TIGHTENINGS.matches(path)
+        if tight and found[0].chain == "network":
+            return tight[0].chain, "tightening", tight[0].reason
         return found[0].chain, "table", found[0].reason
     tag = tag_of(path)
     return (tag.chain, "override", tag.reason) if tag else ("", "", "")
 
 
 def chain_of(path: Path_) -> str:
-    """The chain tag of a leaf (``''`` if it is untagged): ``compare_pilot``'s table, else the override table."""
+    """The chain tag of a leaf (``''`` if it is untagged): ``compare_pilot``'s table, tightened, else the overrides."""
     return chain_source(path)[0]
-
-
-def tolerance_chain(path: Path_) -> str:
-    """The chain whose tolerance rule applies to a leaf: its chain, but ``network`` for an override whose
-    ``tolerance`` is ``"class"`` (a tolerance-stopped solver output keeps the class rules)."""
-    chain, source, _ = chain_source(path)
-    tag = tag_of(path) if source == "override" else None
-    return "network" if tag is not None and tag.tolerance == "class" else chain
 
 
 def untagged_leaves(flat: dict[Path_, object]) -> list[Path_]:
@@ -895,8 +895,8 @@ def untagged_census(flat: dict[Path_, object]) -> dict[str, int]:
 
 
 def source_counts(flat: dict[Path_, object]) -> dict[str, int]:
-    """Float leaves of a run by the source of their chain tag: ``table``, ``override``, ``untagged``."""
-    out = {"table": 0, "override": 0, "untagged": 0}
+    """Float leaves of a run by the source of their chain tag: ``table``, ``tightening``, ``override``, ``untagged``."""
+    out = {"table": 0, "tightening": 0, "override": 0, "untagged": 0}
     for path, value in flat.items():
         if is_float(value):
             out[chain_source(path)[1] or "untagged"] += 1
@@ -915,8 +915,13 @@ def tag_lines(flats: dict[str, dict[Path_, object]]) -> list[str]:
                 counts[name][tag.pattern] += 1
     out = [f"chain tags assigned by override ({len(TAGS.rules)} patterns; the rest come from compare_pilot's rule table):"]
     for tag in TAGS.rules:
-        out.append(f"  {tag.pattern}: chain {tag.chain}" + (", class rules" if tag.tolerance == "class" else "")
-                   + ", float leaves " + ", ".join(f"{counts[n][tag.pattern]} {n}" for n in flats))
+        out.append(f"  {tag.pattern}: chain {tag.chain}, float leaves "
+                   + ", ".join(f"{counts[n][tag.pattern]} {n}" for n in flats))
+        out.append(f"      reason: {tag.reason}")
+    out.append(f"chain tags tightened over compare_pilot's table ({len(TIGHTENINGS.rules)} patterns; network to a "
+               "network-independent chain, never the reverse):")
+    for tag in TIGHTENINGS.rules:
+        out.append(f"  {tag.pattern}: chain {tag.chain}")
         out.append(f"      reason: {tag.reason}")
     return out
 
@@ -1065,7 +1070,7 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
         row.note = "float leaf with no chain tag in compare_pilot's table or the override table"
         row.for_10x = True
         return 1
-    chain = tolerance_chain(path)                 # the chain, or network for a solver-limited override
+    chain = chain_of(path)
     lm = lm_name(path)
     row.for_10x = True
     if lm == "median_iterations":
@@ -1103,8 +1108,8 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
         row.rule, row.tol = "class (b) to (g)", tol_other
         row.outcome = "pass" if row.metric <= row.tol else "FINDING"
     if (row.outcome == "FAIL" and row.rule == "cp chain relative" and "H1a" in path and "by_noise" in path
-            and (name in ("fitted_inverse_dim", "floor_rms")
-                 or (path[-2] == "ci_inverse_dim" and name in ("[0]", "[1]")))):
+            and (name in ("fitted_inverse_dim", "floor_rms", "ratio")
+                 or (path[-2] in ("ci_inverse_dim", "ratio_ci") and name in ("[0]", "[1]")))):
         row.note = (row.note + "; " if row.note else "") + OF7_POINTER
     return 0
 
@@ -1348,7 +1353,8 @@ def tag_summary(cmp: Comparison) -> list[str]:
     parts = []
     for name, flat in cmp.flats.items():
         c = source_counts(flat)
-        parts.append(f"{name}: compare_pilot table {c['table']}, override {c['override']}, untagged {c['untagged']}")
+        parts.append(f"{name}: compare_pilot table {c['table']}, tightened {c['tightening']}, "
+                     f"override {c['override']}, untagged {c['untagged']}")
     out = ["chain tags of the float leaves (config included; untagged leaves are NOT COMPUTABLE, exit 2): "
            + "; ".join(parts)]
     if cmp.untagged_leaves:
@@ -1357,14 +1363,14 @@ def tag_summary(cmp: Comparison) -> list[str]:
                    + ", ".join(show_path(q) for q in cmp.untagged_leaves[:5]))
     used: dict[str, list[Row]] = defaultdict(list)
     for r in cmp.rows:
-        tag = tag_of(r.path) if chain_source(r.path)[1] == "override" else None
-        if tag is not None:
-            used[tag.pattern].append(r)
-    for pattern in sorted(used):
-        tag = tag_of(used[pattern][0].path)
-        assert tag is not None
-        out.append(f"  override {pattern}: chain {tag.chain}" + (", class rules" if tag.tolerance == "class" else "")
-                   + f", {len(used[pattern])} differing leaves; reason: {tag.reason}")
+        if r.kind != "float":                 # only a float leaf needs a chain (a non-float ambiguity must not abort)
+            continue
+        chain, source, reason = chain_source(r.path)
+        if source in ("override", "tightening"):
+            used[f"{source} {(tag_of(r.path) or TIGHTENINGS.matches(r.path)[0]).pattern}"].append(r)
+    for key in sorted(used):
+        chain, _, reason = chain_source(used[key][0].path)
+        out.append(f"  {key}: chain {chain}, {len(used[key])} differing leaves; reason: {reason}")
     return out
 
 
