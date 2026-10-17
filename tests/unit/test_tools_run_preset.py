@@ -675,10 +675,15 @@ def test_dump_flag_changes_only_the_argv_by_the_flag(fake: FakeRoot) -> None:
 
 
 def test_dump_flag_with_the_confirmatory_flag_is_still_refused(fake: FakeRoot) -> None:
-    """The sealed-run guard stays first: 64, one line, nothing started (LPC.PC.7)."""
+    """The sealed-run scan still refuses it first: 64, its own message, one line, nothing started.
+
+    The message check ("owner-only", the text of the scan in the wrapper) is what tells the scan
+    from the catch-all "unexpected argument" refusal, which also gives 64 and one line (LPC.PC.7).
+    """
     done = fake.run("run_preset.sh", "smoke", "DEV-1", "runs/dev/DEV-1", "--states-dump",
                     "--confirmatory")
     assert done.returncode == 64, (done.stdout, done.stderr)
+    assert "owner-only" in done.stderr and "unexpected argument" not in done.stderr
     assert len(done.stderr.strip().splitlines()) == 1
     assert fake.calls() == [] and not list(fake.root.rglob("run.meta.json*"))
 
