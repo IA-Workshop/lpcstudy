@@ -270,13 +270,22 @@ def classify(ests: Mapping[int, Est | None], tail: float | None, *,
     ``hw = (hi15 - lo15)/2``; ``d1 = max |D1x|``, ``d2 = max |D2x|``, ``S = d1 + 2 d2``. The Part A
     tail ratio ``tail`` (``r_A``) is given, or ``None`` if there is no Part A.
 
+    The order is that of the plan (DEF-0028, owner ruling of 2026-10-17): rule R makes U "every
+    other case, including the structural switches of M7", and M7 makes a structural switch give
+    class U, so a structural switch is checked **before** every X bullet.
+
+    * **U first** (flag no): a structural switch of M7: a non-empty ``structural``, or an infinite
+      lower or upper end at any arm (M7: "an infinite bound at any arm"; found whatever
+      ``components`` are classified, with its own reason). It rules out N and every X bullet,
+      whatever the verdicts, ``d1`` or ``S``; the reasons of the bullets that would have fired are
+      kept in ``reasons``. A part that is not estimated at an arm is U as well.
     * **N** (flag yes): the verdict is the same at 15, 30 and 60, ``d2 <= d1/2``, ``r_A <= 1/2``,
       ``S < 0.1`` (strict, ``strict_flag``), and no structural switch.
-    * **X** (flag no): the verdicts differ among the arms, or ``d1 >= 0.1``, or (``d2 <= d1/2``,
-      ``r_A <= 1/2``, ``S >= 0.1`` and no structural switch).
-    * **U** (flag no): every other case: a part that is not estimated at an arm, a non-finite
-      endpoint or ``hw <= 0`` or non-finite (nothing can be computed, unless the verdicts differ,
-      which is X), a tail that is not supported, a structural switch, or no 60 arm.
+    * **X** (flag no): no structural switch, and the verdicts differ among the arms, or
+      ``d1 >= 0.1``, or (``d2 <= d1/2``, ``r_A <= 1/2`` and ``S >= 0.1``).
+    * **U** (flag no): every other case: a tail that is not supported, no 60 arm, and a half-width
+      that is not positive, a NaN, or an infinite point estimate with finite bounds (none is a
+      switch listed in M7: U, or X if the verdicts differ).
 
     Parameters
     ----------
@@ -288,7 +297,8 @@ def classify(ests: Mapping[int, Est | None], tail: float | None, *,
     components : Sequence[str], optional
         Components entering ``d1`` and ``d2`` (``("pt",)`` for the endpoint-limited test).
     structural : Sequence[str], optional
-        Structural switches (M7) found for this part; they block N and the third bullet of X.
+        Structural switches (M7) found for this part; any one makes the part class U, before the
+        X bullets.
 
     Returns
     -------
@@ -314,15 +324,22 @@ def classify(ests: Mapping[int, Est | None], tail: float | None, *,
         reasons.append("the verdict differs among the arms: " + " / ".join(
             f"{k}: {ests[k].verdict}" for k in arms))
     reasons.extend(structural)
+    # M7: an infinite bound (lo or hi) at any arm is a property of the part, found whatever the
+    # components classified (the point-only call must agree); an infinite point is not a bound
+    bounds = [f"infinite bound (M7) at the {k} arm: lo = {ests[k].lo}, hi = {ests[k].hi}"
+              for k in arms
+              if any(b is not None and math.isinf(b) for b in (ests[k].lo, ests[k].hi))]
+    reasons.extend(bounds)
+    structural = [*structural, *bounds]
     e15 = ests[15]
     width = None if e15.lo is None or e15.hi is None else (e15.hi - e15.lo) / 2.0
     values = [ests[k].value(c) for k in arms for c in components]
     computable = (width is not None and math.isfinite(width) and width > 0.0
                   and all(math.isfinite(v) for v in values))
     if not computable:
-        reasons.append("not computable: an endpoint is infinite or the half-width is not positive")
-        return Classification("U" if verdict_same else "X", "no", hw=width,
-                              verdict_same=verdict_same, reasons=tuple(reasons))
+        reasons.append("not computable: the half-width is not positive or a value is not finite")
+        return Classification("U" if verdict_same or structural else "X", "no",
+                              hw=width, verdict_same=verdict_same, reasons=tuple(reasons))
     r1 = {c: (ests[30].value(c) - e15.value(c)) / width for c in components}
     d1, sets1 = _largest(r1)
     r2: dict = {}
@@ -350,12 +367,15 @@ def classify(ests: Mapping[int, Est | None], tail: float | None, *,
     if verdict_same and supported and small and not structural:
         return Classification("N", "yes", size_kind="estimate", size=s * width, reasons=(),
                               **common)
-    third = supported and not small and not structural
+    third = supported and not small
+    if d1 >= TOLERANCE:
+        reasons.append(f"d1 = {d1:.4g} is at least 0.1")
+    if third:
+        reasons.append(f"S = {s:.4g} is not below 0.1")
+    if structural:   # M7, before every X bullet (DEF-0028): the reasons above stay as information
+        return Classification("U", "no", size_kind="unsupported", size=d1 * width,
+                              reasons=tuple(reasons), **common)
     if not verdict_same or d1 >= TOLERANCE or third:
-        if d1 >= TOLERANCE:
-            reasons.append(f"d1 = {d1:.4g} is at least 0.1")
-        if third:
-            reasons.append(f"S = {s:.4g} is not below 0.1")
         kind, size = ("estimate", s * width) if supported else ("lower", d1 * width)
         return Classification("X", "no", size_kind=kind, size=size, reasons=tuple(reasons),
                               **common)
@@ -622,7 +642,10 @@ def _stored_choice(results: Mapping, system: str) -> object:
 
 def _structural(system: str, qoi: str, label: str, arms: Mapping[int, Mapping],
                 parts: Mapping[int, Mapping[str, Est] | None]) -> list[str]:
-    """Structural switches (M7) that apply to one part: they make the class not N."""
+    """Structural switches (M7) that apply to one part: they make the class U (before any X bullet).
+
+    The infinite bound of M7 is found inside ``classify`` (it needs only the arms' ends).
+    """
     out = []
     if qoi == "H2a(ii)":
         present = {k: (p is not None and label in p) for k, p in parts.items()}
