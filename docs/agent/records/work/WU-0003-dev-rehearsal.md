@@ -881,6 +881,17 @@ Row .8c of amendment 6 (F1 to F3; acceptance a1 to a9): the H1a and H1c influenc
 - **Reading and labels:** H1a is "coverage not tabulated (no WU-0006 case for H1a); phi = 0 reading only" with acf, beta_5 and D2 as for every series, and information lines SE_iid and SE_MBB5 of psi against `(hi - lo)/3.92` of `ratio_ci`; H1c is "coverage not tabulated; phi = 0 reading only". C3's 0.19 is not borrowed. A dump without the `h1a/` and `h1c/` groups (schema /1) makes both "not computable" by name in the summary (exit 2).
 - **Open points (stricter reading chosen):** (1) a bitwise `fitted_inverse_dim` reproduction through scipy's `curve_fit` assumes the analysis host has the same scipy as the run host; another version or BLAS can flip it to a MISMATCH on correct code (a7 asks for bitwise). (2) H1a series enter the permutation reading as primary series over their compacted positions. (3) The H1a refit tolerance uses `ci_inverse_dim`, a marginal interval reported by the study, as MA-1 says.
 
+### WU-0003.8 fix round 3 (developer claude-sonnet-5-5, 2026-10-17; re-review `WU-0003.8-review-round3.md`, 669e930; tip before this round f30d6b9)
+
+R17 to R20 are code and test fixes; R21 is a planner ruling (no code change). The first six lines of the round-2 `§4.9` governance note stand (disclosed earlier).
+
+**§4.9 checklist (written before the first invocation of this round).**
+1. Change set: `tools/rehearsal_diagnostics.py`, `tests/unit/test_tools_rehearsal_diagnostics.py`, this file, `WU-0003.8-review-round3.md` (answers). 2. Radius: `tests/unit/test_tools_rehearsal_diagnostics.py` once after the code change (`--lf` for failures only); the slow file is not rerun (what it covers is untouched). 3. Already run on this code: no. 4. `JAX_PLATFORMS=cpu`. 5. `LPC_THREADS` 4, 300 s. 6. No preset or GPU job. 7. `-q --tb=short -rfE`. 8. `tools/run_tests.sh unit tests/unit/test_tools_rehearsal_diagnostics.py`.
+
+**Plan.** R17: in `section_c4` the oracle kind of every target cell and the eval kind of the core cell are required: an absent or zero `n_estimates` is "not computable"; only the eval kind of sweep cells is skipped, with one line. R18: the expected N_lib cells are derived from `library_sweep_noises` x `library_sizes` (the core cell at the core noise and library excluded: it pools three splits); each absent cell or `lm` is "not computable"; a group is compared only when at least two cells are present, and a group that has fewer than two expected members by design (smoke) says so. R19: the per-system D2 owner flag says "no reading fired among the computed readings; not computed: ..." (or "not determined") over gaps, and carries the non-default-option flag. R20: `chi2_relation` is defined for a share below 1/2 (probability `0.5/(1 - pi) < 1`); otherwise "not computable", not a FINDING.
+
+**Correction note (R21 (a); append-only).** The fix-round-2 entry calls the H1d 98.3% row "one stricter-reading note". That is wrong: the WU-0006 table has cov0.3 (0.9800) above cov0 (0.9794) for C6, so the plan's rule (E2) prints a coverage that rises with the lag-1 and, above the case value, an upper bound above the phi = 0 value; it is the looser direction. It is applied as written pending a planner ruling (take min(cov0, cov0.3) as the anchor, or record the 6e-4 as Monte Carlo noise, SE 0.0014 each). R21 (b): the H2a(ii) "one" part is read with C7 through the criterion key until the planner rules (C7 for "one", or "coverage not tabulated"). No code change.
+
 ## Review
 
 ## Audit
