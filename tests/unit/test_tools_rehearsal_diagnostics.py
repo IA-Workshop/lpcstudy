@@ -741,6 +741,58 @@ def r2(y, f):
     return 1.0 - np.sum((y - f) ** 2) / np.sum((y - y.mean()) ** 2)
 
 
+def chi2_4_cdf(x: float) -> float:
+    """The chi-square CDF with 4 degrees of freedom in closed form: ``1 - exp(-x/2) (1 + x/2)``."""
+    return 1.0 - math.exp(-x / 2.0) * (1.0 + x / 2.0)
+
+
+def chi2_4_ppf(p: float) -> float:
+    """Its quantile by bisection on the closed-form CDF (independent of scipy)."""
+    lo, hi = 0.0, 200.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if chi2_4_cdf(mid) < p else (lo, mid)
+    return 0.5 * (lo + hi)
+
+
+def chi2_4_pdf(x: float) -> float:
+    """``x exp(-x/2)/4``."""
+    return x * math.exp(-x / 2.0) / 4.0
+
+
+def lm_block(rho: float, n: int, above: float, late: float, iters: float = 7.0,
+             nodec: float = 0.0) -> dict:
+    """An ``lm`` summary block in the production schema whose median is exactly the chi-square
+    relation's prediction for ``above`` (so the relation check has z = 0)."""
+    q = chi2_4_ppf(0.5 / (1.0 - (above - 0.001)))
+    return {"n_estimates": n, "noise": rho, "gof_dof": 4, "median_residual": q * rho**2,
+            "p95_residual": 9.49 * rho**2, "median_iterations": iters, "fraction_no_decrease": nodec,
+            "nonfinite_residuals": 0, "fraction_late_progress": late, "fraction_above_chi2": above}
+
+
+def lm_cell(rho: float, n_oracle: int, n_eval: int = 0, system: str = "lorenz63") -> dict:
+    """A cell with in-band values (the middle of the pilot band) and, for the core, an eval kind."""
+    band = rd.LM_BANDS[system][rho]
+    above, late = sum(band["above"]) / 2, sum(band["late"]) / 2
+    empty = {"n_estimates": 0, "noise": rho, "gof_dof": 4, "median_residual": None,
+             "p95_residual": None, "median_iterations": None, "fraction_no_decrease": None,
+             "nonfinite_residuals": 0, "fraction_late_progress": None, "fraction_above_chi2": None}
+    oracle = lm_block(rho, n_oracle, above, late)
+    ev = lm_block(rho, n_eval, above, late) if n_eval else dict(empty)
+    return {"lm": {**oracle, "by_kind": {"oracle": oracle, "eval": ev, "check": dict(empty)}}}
+
+
+def lm_cells() -> dict:
+    """The cells of the world: the core, the noise sweep at the core library, the library sweeps."""
+    cells = {"base|rho=0.01|n_lib=10000|core": lm_cell(0.01, 280000, 2800)}
+    for rho in (0.005, 0.02, 0.05):
+        cells[f"base|rho={rho:g}|n_lib=10000|sweep"] = lm_cell(rho, 60000)
+    for rho in (0.01, 0.02):
+        for n_lib in (1000, 3162, 31623, 100000):
+            cells[f"base|rho={rho:g}|n_lib={n_lib}|sweep"] = lm_cell(rho, 60000)
+    return cells
+
+
 def build_results(d: dict) -> dict:
     """The results leaves that the tool recomputes, by independent routes (see ``build_world``)."""
     sysd: dict = {}
@@ -816,6 +868,7 @@ def build_results(d: dict) -> dict:
     sysd["H1b"] = {"PLP": {"slope": float(np.polyfit(x[keep], y[keep], 1)[0]),
                            "n_excluded_nonfinite": int((~keep).sum()),
                            "n_floored": int((e_p[:, REF][keep] < 1e-12).sum())}}
+    sysd["handling"] = {"cells": lm_cells()}
     sysd["H1d"] = {"rows": {}}
     for name, col, oracle in rd.H1D_ROWS:
         proxy, truth = d["core/profile"][:, 0, col], d[f"core/{oracle}"]
@@ -1767,3 +1820,165 @@ def test_r16_a_reading_needs_fewer_failed_resamples_than_the_production_threshol
         rd.budget_reading(ctx, 0.01, 0.002, 5, ("H2a", "range_ci"), "n_test", "d5")
     with pytest.raises(rd.NotComputable, match="not available"):
         rd.budget_reading(ctx, 0.01, 0.002, None, ("H2a", "range_ci"), "n_test", "d5")
+
+
+# ------------------------------------------------------------------------------------------ row .8b
+def test_e1_band_table_equals_the_note_entry_by_entry_and_the_full_ends() -> None:
+    """e1: ``LM_BANDS`` is the table of note section M6 (pilot, oracle kind), transcribed.
+
+    Reference: the note itself, parsed here from its markdown table (system, rho, the two fraction
+    intervals, the no-decrease upper end, the iteration range). The full-preset bands: upper ends
+    as the pilot, lower ends 0.0005 and 0, iterations at most pilot + 1. Other presets, systems and
+    rho are "not computable".
+    """
+    import re
+    note = (ROOT / "docs" / "agent" / "notes" / "2026-10-14-math-wu0003.md").read_text()
+    section = note[note.index("**Pilot bands**"):note.index("**Readings.**", note.index("**Pilot bands**"))]
+    names = {"Lorenz-63": "lorenz63", "Rössler": "rossler", "Chua": "chua"}
+    rows = re.findall(r"^\| (Lorenz-63|Rössler|Chua) \| ([0-9.]+)%[^|]*\| \[([0-9.]+), ([0-9.]+)\] "
+                      r"\| \[([0-9.]+), ([0-9.]+)\] \| ≤ ([0-9.e-]+)[^|]*\| (\d)–(\d) \|$",
+                      section, re.M)
+    assert len(rows) == 12
+    seen = set()
+    for system, rho, a_lo, a_hi, l_lo, l_hi, nodec, i_lo, i_hi in rows:
+        band = rd.LM_BANDS[names[system]][float(rho) / 100.0]
+        assert band == {"above": (float(a_lo), float(a_hi)), "late": (float(l_lo), float(l_hi)),
+                        "nodec": float(nodec), "iters": (int(i_lo), int(i_hi))}
+        seen.add((names[system], float(rho) / 100.0))
+    assert seen == {(sy, r) for sy in rd.LM_BANDS for r in rd.LM_BANDS[sy]}
+    full = rd.lm_band_for("rossler", 0.02, "full")
+    assert full == {"above": (0.0005, 0.0027), "late": (0.0, 0.0065), "nodec": 6.7e-4,
+                    "iters": (0.0, 10)}
+    assert rd.lm_band_for("chua", 0.05, "pilot") == rd.LM_BANDS["chua"][0.05]
+    for bad in (("lorenz63", 0.03, "pilot"), ("lorenz96", 0.01, "pilot"), ("lorenz63", 0.01, "smoke")):
+        with pytest.raises(rd.NotComputable):
+            rd.lm_band_for(*bad)
+
+
+def test_e1_poisson_interval_matches_an_independent_pmf_sum() -> None:
+    """e1: the eval kind's 99% Poisson interval ``[ppf(0.005, n lo), ppf(0.995, n hi)]``.
+
+    Reference: the smallest k with ``cdf(k) >= p`` from the pmf summed with ``lgamma`` here (not
+    scipy); the hand case mean 4 (n = 1000, lo = hi = 0.004) is [0, 10] (cdf(0) = 0.0183 > 0.005;
+    cdf(9) = 0.9919 < 0.995 <= cdf(10) = 0.9972). A band whose lower end is 0 has lower count 0.
+    """
+    def ppf(p: float, mean: float) -> int:
+        total = 0.0
+        for k in range(1000):
+            total += math.exp(-mean + k * math.log(mean) - math.lgamma(k + 1))
+            if total >= p:
+                return k
+        raise AssertionError
+
+    assert rd.poisson_count_interval(1000, 0.004, 0.004) == (0.0, 10.0)
+    for n, lo, hi in ((2800, 0.0099, 0.041), (4000, 0.0005, 0.0023), (2800, 0.0, 0.0001)):
+        low, high = rd.poisson_count_interval(n, lo, hi)
+        assert high == ppf(0.995, n * hi)
+        assert low == (0.0 if lo == 0 else ppf(0.005, n * lo))
+
+
+def test_e2_chi2_relation_matches_closed_forms_and_passes_at_half_the_band_fails_at_double() -> None:
+    """e2: ``Q = chi2.ppf(0.5/(1 - (f - 0.001)))`` and ``SE_iid = sqrt(0.25/n)/chi2.pdf(Q)``.
+
+    Reference: the chi-square law with 4 dof in closed form (CDF ``1 - e^(-x/2)(1 + x/2)``, pdf
+    ``(x/4) e^(-x/2)``, quantile by bisection), to 1e-12 relative. With the median at the prediction
+    plus 0.5 x (4 SE) the check passes; at plus 2 x (4 SE) it fails; the sign does not matter.
+    """
+    for f, n in ((0.0237, 280000), (0.0005, 60000), (0.0225, 2800)):
+        q = chi2_4_ppf(0.5 / (1.0 - (f - 0.001)))
+        se = math.sqrt(0.25 / n) / chi2_4_pdf(q)
+        rel = rd.chi2_relation(q, f, n)
+        assert rel["predicted"] == pytest.approx(q, rel=1e-12) and rel["se_iid"] == pytest.approx(se, rel=1e-12)
+        assert rel["ok"] and abs(rel["z"]) < 1e-9
+        for factor, ok in ((0.5, True), (2.0, False)):
+            for sign in (1, -1):
+                assert rd.chi2_relation(q + sign * factor * 4 * se, f, n)["ok"] is ok
+    assert math.sqrt(0.25 / 280000) / chi2_4_pdf(chi2_4_ppf(0.5 / (1 - 0.0227))) * 4 == pytest.approx(
+        0.025, abs=0.002)  # the note's "0.025" for the core oracle
+    with pytest.raises(rd.NotComputable):
+        rd.chi2_relation(3.4, 1.5, 100)
+
+
+def test_e3_nlib_summaries_must_be_bitwise_equal_and_one_ulp_is_a_defect(tmp_path, capsys) -> None:
+    """e3: the library-sweep cells at one rho have bitwise equal ``lm`` summaries.
+
+    Reference: construction (the world's cells are copies of one block per rho). A change of one ulp
+    (``np.nextafter``) of ``median_residual`` of one cell, or of a nested ``by_kind`` leaf, is a DEFECT
+    line naming rho, the sizes and the leaf, and exit 1 even through ``main``; 0.0 against -0.0 also
+    differs; the core cell (other composition) is not compared.
+    """
+    cells = lm_cells()
+    checked, defects = rd.nlib_exact_check(cells)
+    assert len(checked) == 2 and not defects
+    one_ulp = float(np.nextafter(cells["base|rho=0.02|n_lib=3162|sweep"]["lm"]["median_residual"], 1.0))
+    cells["base|rho=0.02|n_lib=3162|sweep"]["lm"]["median_residual"] = one_ulp
+    _, defects = rd.nlib_exact_check(cells)
+    assert len(defects) == 1 and "rho=0.02" in defects[0] and "median_residual" in defects[0]
+    assert "n_lib 1000 and 3162" in defects[0]
+    cells = lm_cells()
+    kind = cells["base|rho=0.01|n_lib=100000|sweep"]["lm"]["by_kind"]["oracle"]
+    kind["fraction_no_decrease"] = -0.0
+    _, defects = rd.nlib_exact_check(cells)
+    assert len(defects) == 1 and "fraction_no_decrease" in defects[0]
+    cells = lm_cells()
+    cells["base|rho=0.01|n_lib=10000|core"]["lm"]["median_residual"] *= 2  # not compared
+    assert rd.nlib_exact_check(cells)[1] == []
+    d, res, _ = build_world(rng_for("world"))
+    res["systems"]["lorenz63"]["handling"]["cells"]["base|rho=0.02|n_lib=3162|sweep"]["lm"][
+        "median_residual"] = one_ulp
+    code = rd.main([str(write_run(tmp_path, d, res)), "--resamples", "50", "--permutations", "20"])
+    assert "DEFECT: lorenz63 C4 N_lib: rho=0.02" in capsys.readouterr().out and code == 1
+
+
+def test_e4_a_value_outside_its_band_is_a_finding_and_a_missing_input_is_not_computable() -> None:
+    """e4: outside a band or the relation is a FINDING (information, exit 0 for the section alone);
+    a missing input is "not computable" (exit 2).
+
+    Reference: the world's in-band cells give no finding (and the relation z = 0). Oracle
+    ``fraction_above_chi2`` of 0.3 at rho = 1% (band [0.011, 0.047]) is a finding, as is a median
+    off the relation by 3 x (4 SE) / 4 ... exactly: median + 2 x (4 SE). The eval kind uses the
+    Poisson interval: a count just inside passes and one beyond fails. A full-preset run takes the
+    full ends. Missing leaves, a missing cell, the smoke preset and a null median are not computable.
+    """
+    sysres = {"handling": {"cells": lm_cells()}}
+    cfg = dict(CFG)
+    rep = rd.Report()
+    rd.section_c4(rep, "lorenz63", sysres, cfg)
+    assert not rep.findings and not rep.incomplete and rep.exit_code() == 0
+    assert "N_lib check (rho=0.01: n_lib 1000, 3162, 31623, 100000): lm summaries bitwise equal" in "\n".join(rep.lines)
+    cells = lm_cells()
+    core = cells["base|rho=0.01|n_lib=10000|core"]["lm"]["by_kind"]
+    core["oracle"]["fraction_above_chi2"] = 0.3
+    n = core["eval"]["n_estimates"]
+    above_hi = rd.poisson_count_interval(n, 0.011, 0.047)[1]
+    late_hi = rd.poisson_count_interval(n, 0.012, 0.049)[1]
+    core["eval"]["fraction_late_progress"] = (late_hi + 1) / n  # one beyond the interval
+    core["eval"]["fraction_above_chi2"] = above_hi / n          # exactly on the interval's end
+    rep = rd.Report()
+    rd.section_c4(rep, "lorenz63", {"handling": {"cells": cells}}, cfg)
+    text = "\n".join(rep.lines)
+    assert rep.exit_code() == 0 and not rep.incomplete and not rep.defects
+    assert any("oracle fraction_above_chi2 0.3 outside" in f for f in rep.findings)
+    assert any("eval fraction_late_progress" in f for f in rep.findings)
+    assert not any("eval fraction_above_chi2" in f for f in rep.findings)
+    assert "FINDING (outside)" in text and "count" in text
+    full = rd.Report()
+    rd.section_c4(full, "lorenz63", sysres, {**cfg, "name": "full"})
+    assert not full.incomplete  # in-band values are also in the full band
+    for broken in ("no cell", "null median", "no lm", "smoke"):
+        cells = lm_cells()
+        c = dict(cfg)
+        if broken == "no cell":
+            del cells["base|rho=0.02|n_lib=10000|sweep"]
+        elif broken == "null median":
+            cells["base|rho=0.01|n_lib=10000|core"]["lm"]["by_kind"]["oracle"]["median_residual"] = None
+        elif broken == "no lm":
+            del cells["base|rho=0.05|n_lib=10000|sweep"]["lm"]
+        else:
+            c["name"] = "smoke"
+        rep = rd.Report()
+        rd.section_c4(rep, "lorenz63", {"handling": {"cells": cells}}, c)
+        assert rep.incomplete and rep.exit_code() == 2, broken
+    rep = rd.Report()
+    attempt_result = rd.attempt(rep, "x", rd.section_c4, rep, "lorenz63", {}, cfg)
+    assert attempt_result is None and "handling/cells" in rep.incomplete[0]

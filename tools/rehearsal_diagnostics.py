@@ -189,6 +189,8 @@ class Report:
     incomplete: list[str] = field(default_factory=list)
     defects: list[str] = field(default_factory=list)
     data: dict = field(default_factory=dict)
+    findings: list[str] = field(default_factory=list)
+    """Readings outside a band (C4): information, no effect on the exit code."""
     uncomputed: list[tuple[str, bool]] = field(default_factory=list)
     """``(name, primary)`` of every series or criterion that was not computed (R13, plan E1)."""
     series_log: list[dict] = field(default_factory=list)
@@ -213,10 +215,10 @@ class Report:
         self.incomplete.append(line)
         self.lines.append("  " + line)
 
-    def defect(self, text: str) -> None:
-        """Record and print a MISMATCH."""
+    def defect(self, text: str, label: str = "MISMATCH") -> None:
+        """Record and print a MISMATCH (or a DEFECT: the N_lib check of C4)."""
         self.defects.append(text)
-        self.lines.append("  MISMATCH: " + text)
+        self.lines.append(f"  {label}: " + text)
 
     def exit_code(self) -> int:
         """1 on a mismatch, else 2 on anything not computable, else 0."""
@@ -1714,6 +1716,228 @@ def section_d6(ctx: Context) -> None:
 
 
 # --------------------------------------------------------------------------------------------
+# C4: the Levenberg-Marquardt readings (row .8b; B1 item 9; note section M6)
+# --------------------------------------------------------------------------------------------
+def _band(above, late, nodec, iters) -> dict:
+    return {"above": above, "late": late, "nodec": nodec, "iters": iters}
+
+
+LM_BANDS: dict[str, dict[float, dict]] = {
+    "lorenz63": {
+        0.005: _band((0.0099, 0.041), (0.011, 0.043), 1e-4, (6, 8)),
+        0.01: _band((0.011, 0.047), (0.012, 0.049), 1e-4, (6, 8)),
+        0.02: _band((0.015, 0.066), (0.017, 0.070), 1e-4, (7, 9)),
+        0.05: _band((0.019, 0.092), (0.024, 0.105), 1e-4, (7, 9))},
+    "rossler": {
+        0.005: _band((0.0004, 0.0023), (0.0005, 0.0034), 1e-4, (6, 8)),
+        0.01: _band((0.0005, 0.0021), (0.0009, 0.0045), 1e-4, (7, 9)),
+        0.02: _band((0.0006, 0.0027), (0.0014, 0.0065), 6.7e-4, (7, 9)),
+        0.05: _band((0.0006, 0.0031), (0.0035, 0.014), 1.3e-3, (7, 9))},
+    "chua": {
+        0.005: _band((0.0017, 0.016), (0.0042, 0.021), 1e-4, (5, 7)),
+        0.01: _band((0.0012, 0.0093), (0.0047, 0.019), 1e-4, (5, 7)),
+        0.02: _band((0.0027, 0.013), (0.0097, 0.044), 1e-4, (5, 7)),
+        0.05: _band((0.0059, 0.029), (0.026, 0.113), 1e-4, (5, 7))}}
+"""Pilot bands of the oracle kind by system and rho (note M6, "Pilot bands"): ``fraction_above_chi2``
+and ``fraction_late_progress`` as ``(lo, hi)``, ``fraction_no_decrease`` as an upper end, and
+``median_iterations`` as ``(lo, hi)``."""
+CHI2_REFERENCE_TAIL = 0.001
+"""The chi-square tail beyond ``fraction_above_chi2``'s threshold under the reference law."""
+POISSON_LEVEL = 0.99
+
+
+def lm_band_for(system: str, rho: float, preset: str) -> dict:
+    """The band of a system and rho for a pilot or a full-preset run (M6; B1 item 9).
+
+    Full preset: upper ends as the pilot; lower ends 0.0005 (``fraction_above_chi2``) and 0
+    (``fraction_late_progress``); ``median_iterations`` at most pilot + 1 (no lower end).
+
+    Raises
+    ------
+    NotComputable
+        For a preset other than ``pilot`` and ``full``, or a system or rho without a band.
+    """
+    if preset not in ("pilot", "full"):
+        raise NotComputable(f"the C4 bands are defined for the pilot and full presets, not {preset!r}")
+    row = LM_BANDS.get(system, {}).get(float(rho))
+    if row is None:
+        raise NotComputable(f"no C4 band for system {system!r} at rho {rho:g}")
+    if preset == "pilot":
+        return {k: v for k, v in row.items()}
+    return {"above": (0.0005, row["above"][1]), "late": (0.0, row["late"][1]),
+            "nodec": row["nodec"], "iters": (0.0, row["iters"][1] + 1)}
+
+
+def poisson_count_interval(n: int, lo: float, hi: float, level: float = POISSON_LEVEL
+                           ) -> tuple[float, float]:
+    """The 99% Poisson interval of a count whose fraction lies in ``[lo, hi]`` of ``n``.
+
+    ``[ppf((1 - level)/2, n lo), ppf((1 + level)/2, n hi)]`` (``0`` when ``lo`` is 0).
+    """
+    from scipy.stats import poisson
+    low = 0.0 if lo <= 0 else float(poisson.ppf((1.0 - level) / 2.0, n * lo))
+    return low, float(poisson.ppf((1.0 + level) / 2.0, n * hi))
+
+
+def chi2_relation(median_over_rho2: float, f_above: float, n: int, dof: int = 4) -> dict:
+    """``|median c/rho^2 - Q| <= 4 SE_iid`` with ``Q = chi2.ppf(0.5/(1 - (f - 0.001)), dof)`` and
+    ``SE_iid = sqrt(0.25/n)/chi2.pdf(Q, dof)`` (note M6; a share ``f - 0.001`` lies above the law)."""
+    from scipy.stats import chi2
+    pi = f_above - CHI2_REFERENCE_TAIL
+    if not pi < 1.0:
+        raise NotComputable(f"fraction_above_chi2 {f_above} leaves no mass for the relation")
+    predicted = float(chi2.ppf(0.5 / (1.0 - pi), dof))
+    se = math.sqrt(0.25 / n) / float(chi2.pdf(predicted, dof))
+    diff = median_over_rho2 - predicted
+    return {"predicted": predicted, "se_iid": se, "diff": diff, "z": diff / se,
+            "ok": bool(abs(diff) <= 4.0 * se)}
+
+
+def _bits(x: object) -> object:
+    """A float as its IEEE bit pattern (so 0.0 and -0.0 differ and NaN equals NaN)."""
+    import struct
+    return struct.pack(">d", x) if isinstance(x, float) else x
+
+
+def lm_leaves(node: object, prefix: str = "") -> dict[str, object]:
+    """Flatten an ``lm`` summary to ``{path: leaf}`` with floats as bit patterns."""
+    if isinstance(node, dict):
+        out: dict[str, object] = {}
+        for key, value in node.items():
+            out.update(lm_leaves(value, f"{prefix}/{key}"))
+        return out
+    return {prefix: _bits(node)}
+
+
+def nlib_exact_check(cells: dict) -> tuple[list[str], list[str]]:
+    """The library-sweep cells at one rho have bitwise equal ``lm`` summaries across N_lib.
+
+    The LM reads the observation, not the library, so these cells (``base|rho=<g>|n_lib=<n>|sweep``)
+    must agree exactly. Returns ``(checked groups, defects)``; a defect names the rho, the two
+    sizes and the first differing path.
+    """
+    import re
+    groups: dict[str, list[tuple[int, dict]]] = {}
+    for key, cell in cells.items():
+        m = re.fullmatch(r"base\|rho=([^|]+)\|n_lib=(\d+)\|sweep", key)
+        if m and isinstance(cell, dict) and "lm" in cell:
+            groups.setdefault(m.group(1), []).append((int(m.group(2)), cell["lm"]))
+    checked, defects = [], []
+    for rho, members in sorted(groups.items()):
+        if len(members) < 2:
+            continue  # a single library size has nothing to be compared with
+        members.sort(key=lambda item: item[0])
+        ref_n, ref = members[0]
+        ref_leaves = lm_leaves(ref)
+        checked.append(f"rho={rho}: n_lib {', '.join(str(n) for n, _ in members)}")
+        for n, lm in members[1:]:
+            leaves = lm_leaves(lm)
+            if leaves.keys() != ref_leaves.keys():
+                defects.append(f"rho={rho}: the lm summary of n_lib {n} has other keys than n_lib "
+                               f"{ref_n}")
+                continue
+            for path, value in leaves.items():
+                if value != ref_leaves[path]:
+                    defects.append(f"rho={rho}: lm{path} differs between n_lib {ref_n} and {n}")
+                    break
+    return checked, defects
+
+
+def section_c4(rep: Report, system: str, sysres: dict, cfg: dict) -> None:
+    """C4: the LM readings of one system against the M6 bands, the chi-square relation, and the
+    N_lib bitwise check. Findings (outside a band or the relation) are reported, never a failure."""
+    rep.say(f"C4 Levenberg-Marquardt readings, {system} (bands of note M6; a value outside is a "
+            "FINDING, not a failure)")
+    preset = cfg.get("name")
+    cells = dig(sysres, "handling", "cells")
+    core_noise, library = float(dig(cfg, "core_noise")), int(dig(cfg, "core_library"))
+    targets = [(f"base|rho={core_noise:g}|n_lib={library}|core", core_noise)] + [
+        (f"base|rho={float(r):g}|n_lib={library}|sweep", float(r))
+        for r in dig(cfg, "noise_levels") if float(r) != core_noise]
+    out: dict = {"cells": {}, "findings": [], "nlib": {}}
+    n_find = 0
+    for key, rho in targets:
+        if key not in cells or "lm" not in cells[key]:
+            rep.nc(f"{system} C4 {key}", "the cell or its lm summary is absent")
+            continue
+        try:
+            band = lm_band_for(system, rho, preset)
+        except NotComputable as exc:
+            rep.nc(f"{system} C4 {key}", str(exc))
+            continue
+        for kind in ("oracle", "eval"):
+            lm = cells[key]["lm"].get("by_kind", {}).get(kind)
+            if lm is None:
+                rep.nc(f"{system} C4 {key} {kind}", "no by_kind summary")
+                continue
+            n = lm.get("n_estimates")
+            if not n:
+                continue
+            missing = [k for k in ("median_residual", "fraction_above_chi2",
+                                   "fraction_late_progress", "fraction_no_decrease",
+                                   "median_iterations", "noise", "gof_dof") if lm.get(k) is None]
+            if missing:
+                rep.nc(f"{system} C4 {key} {kind}", f"lm leaves null or absent: {', '.join(missing)}")
+                continue
+            res = _c4_cell(rep, system, key, kind, lm, band)
+            n_find += res["n_findings"]
+            out["cells"][f"{key}/{kind}"] = res
+    out["n_findings"] = n_find
+    checked, defects = nlib_exact_check(cells)
+    out["nlib"] = {"groups": checked, "defects": defects}
+    if not checked:
+        rep.nc(f"{system} C4 N_lib check", "no library-sweep cells with an lm summary")
+    for text in checked:
+        rep.say(f"  N_lib check ({text}): lm summaries bitwise "
+                + ("equal" if not any(d.startswith(text.split(":")[0]) for d in defects)
+                   else "DIFFER"))
+    for text in defects:
+        rep.defect(f"{system} C4 N_lib: {text} (the LM does not read the library)", label="DEFECT")
+    rep.say(f"  {n_find} finding(s) in the bands and the relation (information; exit code unaffected)")
+    rep.data.setdefault(system, {})["C4"] = out
+
+
+def _c4_cell(rep: Report, system: str, key: str, kind: str, lm: dict, band: dict) -> dict:
+    n, rho = int(lm["n_estimates"]), float(lm["noise"])
+    median_c = float(lm["median_residual"]) / rho**2
+    rows = {"fraction_above_chi2": ("above", float(lm["fraction_above_chi2"])),
+            "fraction_late_progress": ("late", float(lm["fraction_late_progress"])),
+            "fraction_no_decrease": ("nodec", float(lm["fraction_no_decrease"])),
+            "median_iterations": ("iters", float(lm["median_iterations"]))}
+    findings, lines = [], []
+    for name, (bkey, value) in rows.items():
+        b = band[bkey]
+        if bkey == "nodec":
+            lo, hi = 0.0, float(b)
+        else:
+            lo, hi = float(b[0]), float(b[1])
+        how = f"[{lo:g}, {hi:g}]"
+        if kind == "eval" and bkey != "iters":
+            c_lo, c_hi = poisson_count_interval(n, lo, hi)
+            count = round(value * n)
+            ok = c_lo <= count <= c_hi
+            how += f" -> count {count} in 99% Poisson [{c_lo:g}, {c_hi:g}] of {n}"
+        else:
+            ok = lo <= value <= hi
+        lines.append(f"      {name} {value:.5g} vs {how}: {'in band' if ok else 'FINDING (outside)'}")
+        if not ok:
+            findings.append(f"{system} {key} {kind} {name} {value:.5g} outside {how}")
+    rel = chi2_relation(median_c, float(lm["fraction_above_chi2"]), n, int(lm["gof_dof"]))
+    lines.append(f"      relation: median c/rho^2 {median_c:.4f} vs Q {rel['predicted']:.4f} "
+                 f"(SE_iid {rel['se_iid']:.4f}, z {rel['z']:+.2f}): "
+                 + ("within 4 SE" if rel["ok"] else "FINDING (outside 4 SE)"))
+    if not rel["ok"]:
+        findings.append(f"{system} {key} {kind} median c/rho^2 {median_c:.4f} vs {rel['predicted']:.4f}")
+    rep.say(f"  {key} [{kind}] n={n}, median c/rho^2 {median_c:.4f}")
+    for line in lines:
+        rep.say(line)
+    for text in findings:
+        rep.findings.append(text)
+    return {"n": n, "median_c_over_rho2": median_c, "relation": rel, "findings": findings,
+            "n_findings": len(findings)}
+
+
+# --------------------------------------------------------------------------------------------
 # driver
 # --------------------------------------------------------------------------------------------
 def run_level_lines(rep: Report) -> None:
@@ -1881,6 +2105,7 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     for system in chosen:
         rep.say("")
         rep.say(f"=== {system} ===")
+        attempt(rep, f"{system} C4", section_c4, rep, system, results["systems"][system], cfg)
         file = folder / f"{system}.npz"
         if not file.is_file():
             rep.nc(f"{system} (D1 to D6)", f"{file} not found (run without --states-dump?)")
@@ -1918,6 +2143,9 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
         rep.say(f"  not computable by name: {by_name}. Without them the rehearsal cannot say "
                 "whether the phi = 0 or the phi = 0.3 coverage applies to the H1a interval (nor to "
                 "H1c's); D1 and D2 say nothing about those intervals.")
+    if rep.findings:
+        rep.say(f"  C4 findings: {len(rep.findings)} reading(s) outside a band or the relation "
+                "(information for the owner; not a failure)")
     if rep.defects:
         rep.say(f"  MISMATCH: {len(rep.defects)} item(s) (listed above)")
     if not options["default"]:
