@@ -1,0 +1,4 @@
+R1: max V*(20)/V*(5) 1.370 (chua|H1a rho=0.01); P(null max >=) 0.433
+R1: max acf(1) +0.131 (lorenz63|H1a rho=0.01); P(null max >=) 0.160
+R5: max V*(20)/V*(5) 1.339 (lorenz63|H1a rho=0.01); P(null max >=) 0.072
+R5: max acf(1) +0.115 (lorenz63|H1a rho=0.01); P(null max >=) 0.018
