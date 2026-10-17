@@ -254,29 +254,44 @@ def test_c5_trigamma_identity_and_the_e_to_four_projection() -> None:
 
 
 # ------------------------------------------------------------------------------------------ readings
-def test_acf_readings_by_hand() -> None:
-    """The C9 reading: thresholds 0.15 (n <= 500) and 0.11, the case values, the weight between.
+def test_acf_readings_and_the_e2_coverage_rule_by_hand() -> None:
+    """The C9 reading (thresholds 0.15 for n <= 500 and 0.11, the case values) and the E2 coverage.
 
-    Reference: the rule of amendment 2, B1 item 7.D1 applied by hand. H3c (case 0.16) at n = 500:
-    0.10 and 0.13 are within the 0.15 threshold (phi = 0 rows apply); 0.16 is realistic; 0.155 lies
-    between, with weight (0.155 - 0.15)/(0.16 - 0.15) = 0.5. At n = 1000 the threshold is 0.11, so
-    0.13 is between (weight (0.13 - 0.11)/(0.16 - 0.11) = 0.4). H2a(ii) (case 0.09) at 0.10: both
-    readings hold and phi = 0.3 governs. A series with no case value gets only the phi = 0 reading;
-    acf1 = -0.2 gets neither. The false-trigger rate is ``2 norm.sf(thr sqrt(n))`` from scipy's
-    normal tail (independent of the ``erfc`` form in the tool); tolerance 1e-12 (two evaluations of
-    the same tail).
+    Reference: amendment 5 E2 and B1 7.D1 applied by hand. H3c (case 0.16, table 0.9402/0.9772 at
+    phi = 0 and 0.9265/0.9715 at phi = 0.3): acf1 0.10 and 0.13 are within the 0.15 threshold (phi = 0
+    rows apply), 0.16 is realistic. The coverage is ``cov0 + (cov0.3 - cov0) l/l_c`` from l = 0: at
+    l = 0.08 (half the case value) 0.9402 - 0.5 x 0.0137 = 0.93335 and 0.9772 - 0.5 x 0.0057 =
+    0.97435; at l = 0 or below it is cov0 (clamped); at l = 0.16 it is cov0.3; above (0.20) it is
+    "<= cov0.3 (beyond the tabulated stress)" with no extrapolation. H2a(ii) (case 0.09) at 0.10:
+    both readings hold, phi = 0.3 governs, and 0.10 is beyond the case value. H1d is tabulated (case
+    0.09, C6). Q-N and H1b: "coverage not tabulated", phi = 0 reading only. acf1 = -0.2 gets neither
+    reading. The false-trigger rate is ``2 norm.sf(thr sqrt(n))`` (scipy's tail, independent of the
+    tool's ``erfc``). Tolerance 1e-12.
     """
     assert rd.acf_reading("H3c", 0.10, 500)[0].startswith("phi = 0 rows apply")
     assert rd.acf_reading("H3c", 0.16, 500)[0].startswith("phi = 0.3 rows realistic")
     assert rd.acf_reading("H3c", 0.13, 500)[0].startswith("phi = 0 rows apply")
-    text, weight = rd.acf_reading("H3c", 0.155, 500)
-    assert weight == pytest.approx(0.5, abs=1e-12) and text.startswith("between")
-    assert rd.acf_reading("H3c", 0.13, 1000)[1] == pytest.approx(0.4, abs=1e-12)
-    text, weight = rd.acf_reading("H2a(ii)", 0.10, 500)
+    text, cov = rd.acf_reading("H3c", 0.08, 500)
+    assert cov["cov95"] == pytest.approx(0.9402 + (0.9265 - 0.9402) * 0.5, abs=1e-12)
+    assert cov["cov983"] == pytest.approx(0.9772 + (0.9715 - 0.9772) * 0.5, abs=1e-12)
+    assert "coverage 0.9334 (95%) / 0.9744 (98.3%)" in text and "interpolated from l = 0" in text
+    assert rd.coverage_at("H3c", 0.0)["cov95"] == 0.9402
+    assert rd.coverage_at("H3c", -0.3)["cov983"] == 0.9772 and not rd.coverage_at("H3c", -0.3)["beyond"]
+    at_case = rd.coverage_at("H3c", 0.16)
+    assert at_case["cov95"] == pytest.approx(0.9265, abs=1e-12) and not at_case["beyond"]
+    text, cov = rd.acf_reading("H3c", 0.20, 500)
+    assert cov["beyond"] and "coverage <= 0.9265 (95%) / 0.9715 (98.3%) (beyond the tabulated stress)" in text
+    text, cov = rd.acf_reading("H2a(ii)", 0.10, 500)
     assert text.startswith("phi = 0.3 rows realistic") and "both readings hold" in text
-    assert weight is None
+    assert cov["beyond"] and cov["bound95"] == 0.9389
+    assert rd.coverage_at("H1d", 0.045)["cov95"] == pytest.approx(0.9470 + (0.9439 - 0.9470) * 0.5)
+    for name in ("Q-N", "H1b", "H1c"):
+        text, cov = rd.acf_reading(name, 0.05, 500)
+        assert cov is None and "coverage not tabulated" in text
     assert "no case value" in rd.acf_reading("Q-N", 0.05, 500)[0]
     assert rd.acf_reading("H2b(i)", -0.2, 500)[0].startswith("acf1 below")
+    assert set(rd.COVERAGE) == {"H2a(i)", "H2a(ii)", "H2b(i)", "H2b(ii)", "H3c", "H2c", "H2d",
+                                "H2e", "H1d"}
     for n, thr in ((300, 0.15), (500, 0.15), (1000, 0.11)):
         assert rd.lag_zero_false_trigger(n) == pytest.approx(2 * sps.norm.sf(thr * math.sqrt(n)),
                                                              rel=1e-12)
@@ -594,19 +609,19 @@ def test_full_halfwidth_projection_and_observed() -> None:
 
 
 def test_c7_near_clip_share_and_the_split_half_mean_bias_on_a_constructed_set() -> None:
-    """f_b and the Richardson bias of a mean change decided by hand.
+    """The E6 near-bound rule and the Richardson bias of a mean change decided by hand.
 
-    Reference: five states with u = (0.05, 0.5, 0.97, 0.3, -0.2) and s = (0.02, 0.1, 0.02, 0.1, 0.05):
-    within 2 s of a bound means u - 2 s <= 0 or u + 2 s >= 1: state 0: 0.05 - 0.04 = 0.01 > 0,
-    0.09 < 1: no; state 1: 0.3, 0.7: no; state 2: 0.97 + 0.04 = 1.01 >= 1: yes; state 3: 0.1, 0.5: no;
-    state 4: -0.2 - 0.1 <= 0: yes. So f_b = 2/5 = 0.4. The bias: mean paired changes of the halves
-    0.30 and 0.20 and of the 200 draws 0.20 give Delta_sh = 0.25 - 0.20 = 0.05 and B =
-    0.05/(sqrt 2 - 1) = 0.1207107 (dyadic apart from the constant). Tolerance 1e-12.
+    Reference: five states with u = (0.05, 0.5, 0.97, 0.3, -0.2) and s = (0.02, 0.1, 0.02, 0.1, 0.05).
+    Near a bound means min(|u|, |1 - u|) <= 2 s: state 0: min(0.05, 0.95) = 0.05 <= 0.04? no;
+    state 1: 0.5 <= 0.2? no; state 2: min(0.97, 0.03) = 0.03 <= 0.04: yes; state 3: 0.3 <= 0.2? no;
+    state 4: min(0.2, 1.2) = 0.2 <= 0.1? no (u far outside [0, 1]: its clipped weight does not move).
+    So f_b = 1/5. The bias: mean paired changes of the halves 0.30 and 0.20 and of the 200 draws 0.20
+    give Delta_sh = 0.25 - 0.20 = 0.05 and B = 0.05/(sqrt 2 - 1). Tolerance 1e-12.
     """
     u = np.array([0.05, 0.5, 0.97, 0.3, -0.2])
     s = np.array([0.02, 0.1, 0.02, 0.1, 0.05])
     near = rd.near_clip(u, s)
-    assert near.tolist() == [False, False, True, False, True] and near.mean() == 0.4
+    assert near.tolist() == [False, False, True, False, False] and near.mean() == 0.2
     shift = rd.split_half_shift(0.30, 0.20, 0.20)
     assert shift == pytest.approx(0.05, abs=1e-15)
     assert rd.RICHARDSON * shift == pytest.approx(0.05 / (math.sqrt(2) - 1), rel=1e-12)
@@ -846,7 +861,9 @@ def test_a_full_run_on_a_consistent_world_reproduces_every_leaf_and_lists_h1a_h1
     assert "MISMATCH" not in out and "INTERNAL ERROR" not in out, out
     nc = [line.strip() for line in out.splitlines() if line.strip().startswith("not computable:")
           and "items" not in line and "item(s)" not in line]
-    assert [line.split(":")[1].strip() for line in nc] == ["H1a (all systems)", "H1c (all systems)"]
+    assert [line.split(":")[1].strip() for line in nc] == [
+        "H1a (all systems)", "H1c (all systems)",
+        "lorenz63 D5 pilot-equivalent V4"]  # E5: the world has 12 V4 states, not 40
     assert out.count(": MATCH") >= 28  # 20 earlier leaves, H1d: 4 rho + 4 exclusion counts
     assert code == 2
     data = json.loads(json_path.read_text())
@@ -862,6 +879,11 @@ def test_a_full_run_on_a_consistent_world_reproduces_every_leaf_and_lists_h1a_h1
                                "default": False}
     assert "NON-DEFAULT OPTIONS" in out and "owner question" in out and "not allowed" in out
     assert data["run_level"]["n_series"] == len(data["lorenz63"]["D1"])
+    summary = out[out.index("Summary"):]
+    assert "not computable by name: H1a, H1c." in summary
+    assert "H1a, H1c. Without them the rehearsal cannot say whether the phi = 0 or the phi = 0.3 " \
+        "coverage applies to the H1a interval" in summary
+    assert "NON-DEFAULT OPTION: seed 20261018, resamples 100, permutations 50" in summary
 
 
 def test_a_perturbed_results_leaf_is_a_mismatch_with_exit_1(tmp_path, capsys) -> None:
@@ -1001,9 +1023,14 @@ def test_every_recorded_seed_id_must_be_present_agree_and_be_a_development_id(
 def test_a_wrong_schema_is_not_computable(tmp_path, capsys) -> None:
     """A dump with another schema version is refused for that system (never read as 1)."""
     d, res, _ = build_world(rng_for("world"))
-    d["meta/schema"] = np.array("lpcstudy.states/2")
+    d["meta/schema"] = np.array("lpcstudy.states/3")
     assert rd.main([str(write_run(tmp_path, d, res))]) == 2
-    assert "schema 'lpcstudy.states/2' is not 'lpcstudy.states/1'" in capsys.readouterr().out
+    assert "schema 'lpcstudy.states/3' is not one of ('lpcstudy.states/1', 'lpcstudy.states/2')" \
+        in capsys.readouterr().out
+    d["meta/schema"] = np.array("lpcstudy.states/2")  # /2 keeps every /1 key: accepted
+    assert rd.main([str(write_run(tmp_path / "b", d, res)), "--resamples", "50",
+                    "--permutations", "20"]) == 2
+    assert "is not one of" not in capsys.readouterr().out
 
 
 def test_check_matches_within_the_relative_tolerance_and_needs_equality_at_zero() -> None:
@@ -1448,8 +1475,10 @@ def test_r7_run_level_lines_reproduce_the_plans_probabilities() -> None:
     assert pilot.data["run_level"]["predicted_at_least_one"] == pytest.approx(
         1 - 0.836**12 * 0.79**6, rel=1e-12)
     text = "\n".join(pilot.lines)
-    assert "D2: the A5 rule fires on 1 of 18 primary series; at least one fired: yes" in text
-    assert "18 of 19 series" in text and "NOT every series is within: s other (+0.500)" in text
+    assert "D2: the A5 rule fired on 1 of the 18 computed primary series (at least one fired: yes)" \
+        in text
+    assert "18 of 19 computed series" in text
+    assert "NOT every computed series is within: s other (+0.500)" in text
     full = log_of([1000] * 18, [False] * 18, [True] * 18)
     assert round(full.data["run_level"]["predicted_at_least_one"], 2) == 0.83
     assert "at least one fired: no" in "\n".join(full.lines)
@@ -1459,6 +1488,42 @@ def test_r7_run_level_lines_reproduce_the_plans_probabilities() -> None:
     empty = rd.Report()
     rd.run_level_lines(empty)
     assert empty.incomplete and "no series had an autocorrelation" in empty.incomplete[0]
+
+
+def test_r13_run_level_lines_do_not_read_favourably_over_gaps() -> None:
+    """With series not computed, the run-level D1 and D2 sentences are about the computed ones only,
+    name the gaps, and never say "none fired" over an empty set.
+
+    Reference: the finding's probe. One computed primary series within its threshold and not
+    firing, plus an H2b(i) series and H1a not computed: D1 says "of the computed series only"
+    style (the phi = 0 rows apply "to these computed series only") and names both gaps; D2 names
+    the uncomputed primary. With no primary series computed, D2 is "not computable" ("0 of 0") and
+    makes no statement.
+    """
+    rep = rd.Report()
+    rep.series_log.append({"system": "s", "name": "H3c", "n": 500, "primary": True, "acf1": 0.0,
+                           "within": True, "fires": False})
+    rep.uncomputed += [("s H2b(i)", True), ("H1a (all systems)", False)]
+    rd.run_level_lines(rep)
+    text = "\n".join(rep.lines)
+    assert "to these computed series only" in text and "every series is within" not in text
+    assert "not computed, so not read here: s H2b(i), H1a (all systems)" in text
+    assert "(at least one fired: no; primary series not computed: s H2b(i))" in text
+    assert not rep.incomplete
+    clean = rd.Report()
+    clean.series_log.append({"system": "s", "name": "H3c", "n": 500, "primary": True, "acf1": 0.0,
+                             "within": True, "fires": False})
+    rd.run_level_lines(clean)
+    assert "every one of the 1 computed series is within (the phi = 0 rows apply to these series " \
+        "only)" in "\n".join(clean.lines)
+    bare = rd.Report()
+    bare.series_log.append({"system": "s", "name": "H2c A4-A2", "n": 500, "primary": False,
+                            "acf1": 0.0, "within": True, "fires": None})
+    bare.uncomputed.append(("s H3c", True))
+    rd.run_level_lines(bare)
+    assert any("run-level D2: 0 of 0 primary series were computed" in line for line in bare.incomplete)
+    assert "no statement (no primary series computed)" in "\n".join(bare.lines)
+    assert "none fired" not in "\n".join(bare.lines)
 
 
 def test_r9_default_options_are_not_flagged_and_the_notice_is_always_printed(tmp_path, capsys) -> None:
@@ -1478,22 +1543,227 @@ def test_r9_default_options_are_not_flagged_and_the_notice_is_always_printed(tmp
         "seed": 20261018, "resamples": 2000, "permutations": 1000, "default": True}
 
 
-def test_r10_f_b_bins_and_their_edges_by_hand() -> None:
-    """``f_b`` overall and by weight bin on ten constructed states, every edge hit.
+def test_r10_e6_f_b_bins_pooled_s_and_the_wu0008_bound_by_hand() -> None:
+    """E6: ``f_b`` per bin and per cell with ``s_i`` and with the pooled ``s_bin``, the larger
+    governing, the near rule ``min(|u|, |1 - u|) <= 2 s``, and the WU-0008 bound, on ten states that
+    hit every bin and every edge.
 
-    Reference: by hand. (w, u, s): 0 is (0.0, -0.3, 0.05) near (u - 2s <= 0); 1 is (0.0, 0.0, 0) near;
-    2 is (0.05, 0.05, 0.01) not near (0.03 > 0); 3 is (0.1, 0.1, 0.04) not near and in [0.1, 0.9]
-    (closed edge); 4 is (0.5, 0.5, 0.3) near (-0.1 <= 0); 5 is (0.9, 0.9, 0.04) not near (0.98 < 1),
-    in [0.1, 0.9] (closed edge); 6 is (0.95, 0.95, 0.03) near (1.01 >= 1); 7 is (1.0, 1.2, 0.01) near;
-    8 is (1.0, 1.0, 0) near (u + 0 >= 1); 9 has an undefined optimum (excluded, counted). Bins:
-    w = 0: 2 states, f_b 1; (0, 0.1): 1, 0; [0.1, 0.9]: 3 (states 3, 4, 5), 1/3; (0.9, 1): 1, 1;
-    w = 1: 2, 1. Overall 6 near of 9 defined = 2/3. Exact (the comparisons are of floats that are
-    sums of two decimals: checked at the edges by the rounding noted in the tool: 0.1 - 0.08 > 0).
+    Reference: by hand. (w, u, s): 0 (0.0, -0.3, 0.05): 0.3 <= 0.1? no; 1 (0.0, 0.0, 0): 0 <= 0
+    yes; 2 (0.05, 0.05, 0.01): 0.05 <= 0.02 no; 3 (0.1, 0.1, 0.04): 0.1 <= 0.08 no (and in the
+    closed bin [0.1, 0.9]); 4 (0.5, 0.5, 0.3): 0.5 <= 0.6 yes; 5 (0.9, 0.9, 0.04): min(0.9, 0.1) =
+    0.1 <= 0.08 no (closed edge); 6 (0.95, 0.95, 0.03): 0.05 <= 0.06 yes; 7 (1.0, 1.2, 0.01):
+    min(1.2, 0.2) = 0.2 <= 0.02 no; 8 (1.0, 1.0, 0): 0 <= 0 yes; 9 undefined (excluded, counted).
+    With s_i: near = {1, 4, 6, 8}, f_b = 4/9. Pooled s_bin = sqrt(mean s^2): w = 0: sqrt(0.00125);
+    (0, 0.1): 0.01; [0.1, 0.9] (states 3, 4, 5): sqrt(0.0932/3) = 0.17626; (0.9, 1): 0.03; w = 1:
+    sqrt(0.00005). With s_bin the near states are {1, 3, 5, 6, 8}: f_b = 5/9, which governs. Bins
+    (n, f with s_i, f with s_bin): w=0 (2, 1/2, 1/2); 0<w<0.1 (1, 0, 0); 0.1<=w<=0.9 (3, 1/3, 2/3);
+    0.9<w<1 (1, 1, 1); w=1 (2, 1/2, 1/2). Bound 0.40 (1/9) sum_near s: with s_i (0 + 0.3 + 0.03 + 0)
+    = 0.4 x 0.33/9; with s_bin (0.035355 + 0.17626 + 0.17626 + 0.03 + 0.0070711) = 0.4 x 0.42494/9; the
+    larger is reported. Tolerance 1e-12 (a few operations).
     """
     w = np.array([0.0, 0.0, 0.05, 0.1, 0.5, 0.9, 0.95, 1.0, 1.0, 0.3])
     u = np.array([-0.3, 0.0, 0.05, 0.1, 0.5, 0.9, 0.95, 1.2, 1.0, np.nan])
     s = np.array([0.05, 0.0, 0.01, 0.04, 0.3, 0.04, 0.03, 0.01, 0.0, 0.0])
     out = rd.f_b_by_bin(w, u, u - s, u + s)
-    assert out["n_undefined"] == 1 and out["n_defined"] == 9 and out["f_b"] == pytest.approx(6 / 9)
-    assert out["bins"] == {"w=0": (2, 1.0), "0<w<0.1": (1, 0.0), "0.1<=w<=0.9": (3, 1 / 3),
-                           "0.9<w<1": (1, 1.0), "w=1": (2, 1.0)}
+    assert out["n_undefined"] == 1 and out["n_defined"] == 9
+    assert out["f_b_state"] == pytest.approx(4 / 9) and out["f_b_pooled"] == pytest.approx(5 / 9)
+    assert out["f_b"] == pytest.approx(5 / 9) and out["governs"] == "s_bin"
+    s_bin = {"w=0": math.sqrt(0.00125), "0<w<0.1": 0.01, "0.1<=w<=0.9": math.sqrt(0.0932 / 3),
+             "0.9<w<1": 0.03, "w=1": math.sqrt(0.00005)}
+    expect = {"w=0": (2, 1 / 2, 1 / 2), "0<w<0.1": (1, 0.0, 0.0), "0.1<=w<=0.9": (3, 1 / 3, 2 / 3),
+              "0.9<w<1": (1, 1.0, 1.0), "w=1": (2, 1 / 2, 1 / 2)}
+    for label, (n, f_state, f_pool) in expect.items():
+        row = out["bins"][label]
+        assert row["n"] == n and row["s_bin"] == pytest.approx(s_bin[label], rel=1e-12)
+        assert row["f_b_state"] == pytest.approx(f_state) and row["f_b_pooled"] == pytest.approx(f_pool)
+        assert row["f_b"] == pytest.approx(max(f_state, f_pool))
+    bound_state = 0.40 * (0.0 + 0.3 + 0.03 + 0.0) / 9
+    bound_pool = 0.40 * (s_bin["w=0"] + 2 * s_bin["0.1<=w<=0.9"] + 0.03 + s_bin["w=1"]) / 9
+    assert out["bound_state"] == pytest.approx(bound_state, rel=1e-12)
+    assert out["bound_pooled"] == pytest.approx(bound_pool, rel=1e-12)
+    assert out["bound"] == pytest.approx(max(bound_state, bound_pool), rel=1e-12)
+    with pytest.raises(rd.NotComputable, match="no state"):
+        rd.f_b_by_bin(w[:1], np.array([np.nan]), np.array([0.0]), np.array([0.0]))
+
+
+def test_e6_the_paired_bound_is_the_sum_of_the_two_cells_without_cancellation() -> None:
+    """Section D6 prints the paired bound as the sum of the two cells' bounds.
+
+    Reference: the two cells of the constructed D6 world of ``test_d6_...`` have f_b = 0 and bound 0
+    (u = 0.25 and 0.5 are far from a bound relative to s), so the paired bound is 0 = 0 + 0; a cell
+    with a near state adds its bound (hand: u = 0.01, s = 0.02: near, bound 0.40 x 0.02 / n).
+    """
+    n = 10
+    d: dict[str, np.ndarray] = {}
+    for n_lib, e_p in ((1000, 1.0), (10000, 1.0)):
+        g = f"sweep/rho=0.01|n_lib={n_lib}"
+        e_c, c = np.full(n, 2.0), np.full(n, 0.5)
+        d[f"{g}/E_C"], d[f"{g}/E_P"], d[f"{g}/C"] = e_c, np.full(n, e_p), c
+        for tag, dc in (("A", 0.1), ("B", -0.1)):
+            d[f"{g}/E_C_{tag}"], d[f"{g}/E_P_{tag}"], d[f"{g}/C_{tag}"] = e_c, np.full(n, e_p), c + dc
+        d[f"{g}/w_star_href"] = np.clip((e_p - c) / (2.0 + e_p - 2.0 * c), 0.0, 1.0)
+    # a state of the 10^4 cell near the bound: C = E_P - 0.01 c-wise gives u = 0.01/c
+    g = "sweep/rho=0.01|n_lib=10000"
+    for tag in ("", "_A", "_B"):
+        d[f"{g}/C{tag}"][0] = 0.99 + (0.01 if tag == "_A" else (-0.01 if tag == "_B" else 0.0))
+    d[f"{g}/w_star_href"][0] = np.clip((1.0 - 0.99) / (2.0 + 1.0 - 2.0 * 0.99), 0.0, 1.0)
+    rep = rd.Report()
+    cfg = {"core_noise": 0.01, "bootstrap_block": 5, "name": "pilot", "n_test_sweep": 300,
+           "bootstrap_resamples": 500}
+    res = {"H2b": {"library_change": {"mean_change": 0.0, "ci": [0.0, 0.1]}}}
+    rd.section_d6(rd.Context("s", rd.Dump(d, "mem"), res, cfg, rep, 3, 20, 10))
+    fb = rep.data["s"]["D6"]["f_b"]
+    assert fb[1000]["bound"] == 0.0
+    # state 0: u = (1 - 0.99)/(2 + 1 - 1.98) = 0.01/1.02; halves C = 1.0 and 0.98: u_A = 0/..., 
+    u_full = 0.01 / 1.02
+    u_a = (1.0 - 1.0) / (3.0 - 2.0)
+    u_b = (1.0 - 0.98) / (3.0 - 1.96)
+    s0 = abs(u_a - u_b) / 2
+    assert min(abs(u_full), abs(1 - u_full)) <= 2 * s0  # near, by hand
+    assert fb[10000]["bound_state"] >= 0.40 * s0 / 10 * (1 - 1e-12)
+    assert rep.data["s"]["D6"]["bound_paired"] == pytest.approx(fb[1000]["bound"] + fb[10000]["bound"],
+                                                                rel=1e-12)
+
+
+# ------------------------------------------------------------------------------------------ fix round 2
+def v4_dump(n_v4: int) -> dict:
+    """A V4 block of ``n_v4`` states (all eligible at 1, 2 and 4 LT) with known half-widths."""
+    rng = rng_for(f"v4-{n_v4}")
+    w_hat = rng.uniform(0.2, 0.8, (3, n_v4, 3))
+    return {"core/horizons": HORIZONS, "core/E_C": np.full((n_v4, 5), 0.01),
+            "core/E_P": np.full((n_v4, 5), 0.01), "v4/M": np.array([50, 200, 800]),
+            "v4/horizons": np.array([30, 60, 120]), "v4/w_hat": w_hat,
+            "v4/signed_dev": w_hat - w_hat[2][None], "v4/half_width": rng.uniform(0.01, 0.05, (3, n_v4, 3)),
+            "v4/extra_href_equal": np.array(True), "v4/extra_href_diff": np.array(0)}
+
+
+def test_e5_pilot_equivalent_v4_is_the_median_of_the_first_40_states_or_not_computable() -> None:
+    """E5: with 45 V4 states the first-40 value equals ``np.median`` of the first 40 per-state
+    half-widths exactly (and differs from the all-states value); with 39 it is "not computable" and
+    the label says nothing about 40; the all-states value is always printed.
+
+    Reference: ``np.median`` on the arrays the test put in (exact: the same floats).
+    """
+    for n_v4, has_40 in ((45, True), (39, False)):
+        d = v4_dump(n_v4)
+        rep = rd.Report()
+        ctx = rd.Context("s", rd.Dump(d, "mem"), {}, {"linear_regime_rms": 0.5}, rep, 1, 10, 10)
+        out = rd._d5_v4(ctx)
+        text = "\n".join(rep.lines)
+        for i, m in enumerate((50, 200, 800)):
+            row = out["median_half_width"][m]
+            assert row["all"] == float(np.median(d["v4/half_width"][i, :, 0]))
+            if has_40:
+                assert row["first_40"] == float(np.median(d["v4/half_width"][i, :40, 0]))
+                assert row["first_40"] != row["all"]
+            else:
+                assert row["first_40"] is None
+        assert ("pilot-equivalent V4 (median over the first 40 V4 states" in text) is has_40
+        assert any("D5 pilot-equivalent V4: only 39 V4 states" in line for line in rep.incomplete) \
+            is (not has_40)
+        assert f"over all {n_v4} V4 states" in text and "first 40, the pilot" not in text
+
+
+def test_e8_non_default_options_are_flagged_beside_each_affected_reading(tmp_path, capsys) -> None:
+    """E8: with a non-default seed, resamples or permutations the D2 permutation line, the D5 and D6
+    SE and reading lines, and the summary say "non-default option"; the default report has none.
+
+    Reference: the contract of amendment 5 E8 (the seed affects D2, D5 and D6; resamples D5 and D6;
+    permutations D2). A changed permutations count alone flags D2 and not D5/D6.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    rd.main([str(write_run(tmp_path, d, res)), "--seed", "5", "--resamples", "100",
+             "--permutations", "50"])
+    out = capsys.readouterr().out
+    lines = out.splitlines()
+
+    def flagged(prefix: str) -> list[str]:
+        return [ln for ln in lines if prefix in ln or ln.startswith(prefix)]
+
+    for prefix in ("pooled mean log V*(10)/V*(5)", "  Delta_sh", "  reading: "):
+        got = [ln for ln in lines if ln.startswith(prefix)] or flagged(prefix)
+        assert got and all("[non-default option: seed 5" in ln for ln in got), prefix
+    assert any("resamples 100" in ln for ln in flagged("  Delta_sh"))
+    assert "NON-DEFAULT OPTION: seed 5, resamples 100, permutations 50" in out
+    ctx = rd.Context("s", rd.Dump({}, "mem"), {}, {}, rd.Report(), rd.TOOL_SEED, 2000, 50)
+    assert ctx.option_flag("d2") == " [non-default option: permutations 50]"
+    assert ctx.option_flag("d5") == "" and ctx.option_flag("d6") == ""
+    ctx = rd.Context("s", rd.Dump({}, "mem"), {}, {}, rd.Report(), rd.TOOL_SEED, 100, 1000)
+    assert ctx.option_flag("d5") == " [non-default option: resamples 100]"
+    assert ctx.option_flag("d2") == ""
+
+
+def test_r14_a_failed_json_write_exits_2_with_a_message_and_keeps_the_mismatch_code(
+        tmp_path, capsys) -> None:
+    """R14: ``--json`` into a folder that does not exist prints one stderr line and does not crash
+    (a traceback would exit 1, the MISMATCH code); the report is already on stdout; exit 2 for a run
+    without mismatch, 1 if there is one.
+
+    Reference: the finding's probe.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    bad = tmp_path / "missing" / "out.json"
+    code = rd.main([str(write_run(tmp_path / "a", d, res)), "--resamples", "50",
+                    "--permutations", "20", "--json", str(bad)])
+    captured = capsys.readouterr()
+    assert code == 2 and "cannot write" in captured.err and "FileNotFoundError" in captured.err
+    assert "Run level (all systems)" in captured.out
+    res["systems"]["lorenz63"]["H3c"]["A5_over_A4_mse"] *= 1.001
+    code = rd.main([str(write_run(tmp_path / "b", d, res)), "--resamples", "50",
+                    "--permutations", "20", "--json", str(bad)])
+    assert code == 1 and "cannot write" in capsys.readouterr().err
+
+
+def test_r15_the_q_n_scale_does_not_collapse_when_both_r2_are_near_zero() -> None:
+    """A no-skill target (F3 = the mean of y plus small noise, R^2 about -3e-5): the old scale ``max(|R^2_3|,
+    |R^2_4|)`` false-mismatches some correct cases, the tool's scale (``max`` of those and
+    ``SS_3/SST``, ``SS_4/SST``, the sizes of the terms) none.
+
+    Reference: 200 probes (n = 500, ``make_rng``): production's ``(1 - SS_4/SST) - (1 - SS_3/SST)``
+    against the tool's ``psi_delta_r2`` value, bound ``1e-12 max(|leaf|, scale)``. The mutation test of
+    ``test_r4_...`` (7e-11, 1e-9, 1%) still detects with this scale, since the floor stays about 1e-12
+    absolute.
+    """
+    rng = rng_for("r15")
+    old_fail = new_fail = 0
+    for _ in range(200):
+        y = rng.standard_normal(500)
+        f3 = y.mean() + 0.005 * rng.standard_normal(500)
+        f4 = f3 + 0.003 * rng.standard_normal(500)
+        mine = rd.psi_delta_r2(y, f3, f4)[1]
+        sst = np.sum((y - y.mean()) ** 2)
+        ss3, ss4 = np.sum((y - f3) ** 2) / sst, np.sum((y - f4) ** 2) / sst
+        leaf = (1 - ss4) - (1 - ss3)
+        old = max(abs(1 - ss3), abs(1 - ss4))
+        new = max(old, ss3, ss4)
+        old_fail += abs(mine - leaf) > 1e-12 * max(abs(leaf), old)
+        new_fail += abs(mine - leaf) > 1e-12 * max(abs(leaf), new)
+    assert new_fail == 0 and old_fail >= 1
+
+
+def test_r16_a_reading_needs_fewer_failed_resamples_than_the_production_threshold() -> None:
+    """The D5/D6 reading is "not computable" once the failed resamples reach the count at which the
+    production interval at 1 - 0.05/3 is infinite: 5 of 500, 17 of 2000.
+
+    Reference: ``lpcstudy.statistics.percentile_interval`` itself (an independent implementation of
+    the threshold): with F failures among B values its bounds are infinite iff F reaches the
+    tool's ``failure_threshold(B)``; hand values 5 and 17. A reading with one fewer failure is made.
+    """
+    from lpcstudy.statistics import percentile_interval
+    assert rd.failure_threshold(500) == 5 and rd.failure_threshold(2000) == 17
+    for b in (500, 2000):
+        thr = rd.failure_threshold(b)
+        for failed, infinite in ((thr - 1, False), (thr, True)):
+            values = np.arange(float(b))
+            values[:failed] = np.nan
+            lo, hi, n_failed = percentile_interval(values, rd.PRIMARY_LEVEL)
+            assert n_failed == failed and (not math.isfinite(lo)) is infinite
+    cfg = {"name": "pilot", "n_test": 500, "bootstrap_resamples": 500}
+    res = {"H2a": {"range_ci": [0.1, 0.3]}}
+    ctx = rd.Context("s", rd.Dump({}, "mem"), res, cfg, rd.Report(), rd.TOOL_SEED, 500, 10)
+    got = rd.budget_reading(ctx, 0.01, 0.002, 4, ("H2a", "range_ci"), "n_test", "d5")
+    assert got["reading"] in ("below 10%", "not below 10%", "not determined")
+    with pytest.raises(rd.NotComputable, match="5 of 500 bootstrap resamples failed"):
+        rd.budget_reading(ctx, 0.01, 0.002, 5, ("H2a", "range_ci"), "n_test", "d5")
+    with pytest.raises(rd.NotComputable, match="not available"):
+        rd.budget_reading(ctx, 0.01, 0.002, None, ("H2a", "range_ci"), "n_test", "d5")

@@ -25,9 +25,10 @@ What it computes (plan amendment 2, B1 item 7 as amended; mathematics check
   through the per-state Spearman) and of the Q-N gain ``Delta R^2``. Its autocorrelation at lags
   1 to 10 and the readings of the rule: ``|acf(1)| <= 0.15`` (n <= 500) or ``0.11`` (n > 500)
   means the phi = 0 rows apply; ``acf(1)`` at least the case value (0.30 H2b(i), H2b(ii), H2c;
-  0.19 H2a(i), H2e; 0.16 H3c, H2d; 0.09 H2a(ii)) means the phi = 0.3 rows are realistic and
-  governs; in between the weight toward the phi = 0.3 rows is printed (the plan gives no coverage
-  table, so a coverage is not interpolated here).
+  0.19 H2a(i), H2e; 0.16 H3c, H2d; 0.09 H2a(ii), H1d) means the phi = 0.3 rows are realistic and
+  governs. The coverage (95% and 1 - 0.05/3) is ``cov0 + (cov0.3 - cov0) min(1, max(0, l/l_c))``
+  from the WU-0006 table, interpolated from l = 0 (plan amendment 5, E2), "at most cov0.3 (beyond
+  the tabulated stress)" above the case value, and "coverage not tabulated" for Q-N and H1b.
 * **D2.** ``V*(b) = b * var(means of the n - b + 1 overlapping blocks of length b)`` (the exact
   moving-block variance, no bootstrap noise) and the ratios ``V*(10)/V*(5)``, ``V*(20)/V*(5)``;
   the A5 rule (above 1.1 or above 1.15 on a primary series) with its predicted trigger rate under
@@ -105,6 +106,23 @@ from lpcstudy.statistics import block_resample_indices  # noqa: E402
 EXIT_MISMATCH = 1
 EXIT_INCOMPLETE = 2
 SCHEMA = "lpcstudy.states/1"
+SCHEMAS = ("lpcstudy.states/1", "lpcstudy.states/2")
+"""Accepted schema versions: ``/2`` adds the ``h1a/`` and ``h1c/`` groups and keeps every key of
+``/1`` (the keys this tool reads are the same)."""
+DEFAULT_RESAMPLES, DEFAULT_PERMUTATIONS = 2000, 1000
+COVERAGE = {
+    "H2a(i)": ((0.9448, 0.9807), (0.9292, 0.9732)),
+    "H2a(ii)": ((0.9443, 0.9794), (0.9389, 0.9762)),
+    "H2b(i)": ((0.9444, 0.9806), (0.9230, 0.9682)),
+    "H2b(ii)": ((0.9444, 0.9806), (0.9230, 0.9682)),
+    "H3c": ((0.9402, 0.9772), (0.9265, 0.9715)),
+    "H2c": ((0.9395, 0.9774), (0.9282, 0.9706)),
+    "H2d": ((0.9383, 0.9766), (0.9275, 0.9691)),
+    "H2e": ((0.9427, 0.9782), (0.9311, 0.9736)),
+    "H1d": ((0.9470, 0.9794), (0.9439, 0.9800)),
+}
+"""WU-0006 reference coverage at pilot n, ``((phi = 0 at 95%, at 1 - 0.05/3), (phi = 0.3 at 95%, at
+1 - 0.05/3))`` per criterion (plan amendment 5, E2: cases C3, C7, C8, C4, C2, C5, C9, C6)."""
 TOOL_SEED = 20261018
 """Default seed of the tool's own bootstrap and permutations (a literal scratch seed)."""
 LAGS = 10
@@ -112,7 +130,7 @@ BLOCKS = (5, 10, 20)
 ACF_SMALL, ACF_LARGE = 0.15, 0.11
 """``|acf(1)|`` thresholds for n <= 500 and n > 500 (M4: 3.4 SE at n = 500 and at n = 1000)."""
 CASE_VALUE = {"H2b(i)": 0.30, "H2b(ii)": 0.30, "H2c": 0.30, "H2a(i)": 0.19, "H2e": 0.19,
-              "H3c": 0.16, "H2d": 0.16, "H2a(ii)": 0.09}
+              "H3c": 0.16, "H2d": 0.16, "H2a(ii)": 0.09, "H1d": 0.09}
 """Lag-1 of the influence series at a latent phi = 0.3, by criterion (M4.2, WU-0006 M2)."""
 RATIO_RULE = (1.1, 1.15)
 BETA_STRESS = 0.8685
@@ -134,8 +152,12 @@ H2B_LIBRARY = (1_000, 10_000)
 H2E_LIBRARY = (1_000, 100_000)
 QN_TARGETS = ("logit_w_interior", "w_zero_indicator", "log_horizon")
 RULES_LOGSD = ("A1", "A2", "A3", "A4", "A5")
-OUTSIDE_SCHEMA = ("H1a", "H1c")
-"""Criteria whose arrays are not in ``lpcstudy.states/1``; each is "not computable" (exit 2)."""
+OUTSIDE_SCHEMA = (
+    ("H1a", "no influence series yet (MA-1; row .8c)"),
+    ("H1c", "no influence series yet (row .8c; its per-state ratios are in schema /2)"))
+"""Criteria without a series in this tool (plan amendment 5, E1; amendment 6 assigns them to row
+.8c): each is "not computable" by name (exit 2) and is named in the summary."""
+PRIMARY_CRITERIA = ("H2a(i)", "H2a(ii)", "H2b(i)", "H2b(ii)", "H3c")
 H1D_ROWS = (("analog_seed", 0, "eps_s"), ("estimation_seed", 1, "delta"),
             ("growth", 2, "Lambda_bar"), ("nhat", 3, "N"))
 """H1d pairs: name, column of ``core/profile`` (a strictly increasing transform of the proxy of the
@@ -167,6 +189,8 @@ class Report:
     incomplete: list[str] = field(default_factory=list)
     defects: list[str] = field(default_factory=list)
     data: dict = field(default_factory=dict)
+    uncomputed: list[tuple[str, bool]] = field(default_factory=list)
+    """``(name, primary)`` of every series or criterion that was not computed (R13, plan E1)."""
     series_log: list[dict] = field(default_factory=list)
     """One entry per series with an acf (and its A5 trigger), for the run-level D1/D2 lines (R7)."""
 
@@ -547,26 +571,52 @@ def acf_threshold(n: int) -> float:
     return ACF_SMALL if n <= 500 else ACF_LARGE
 
 
-def acf_reading(criterion: str, lag1: float, n: int) -> tuple[str, float | None]:
-    """The C9 reading of ``acf(1)`` and, between the readings, the weight toward phi = 0.3.
+def coverage_at(criterion: str, lag1: float) -> dict | None:
+    """The D1 coverage rule (plan amendment 5, E2), or None where no coverage is tabulated.
 
-    Returns ``(text, weight)``; ``weight`` is None unless the lag-1 lies strictly between the
-    threshold and the case value.
+    ``cov(l) = cov0 + (cov0.3 - cov0) min(1, max(0, l / l_c))`` at 95% and at 1 - 0.05/3, from
+    ``l = 0`` (not from the threshold: lower at every ``l`` in (0, l_c), the stricter choice).
+    Above the case value ``l_c`` there is no extrapolation: the coverage is "at most cov0.3".
+    """
+    case, table = CASE_VALUE.get(criterion), COVERAGE.get(criterion)
+    if case is None or table is None:
+        return None
+    (c0_95, c0_98), (c3_95, c3_98) = table
+    frac = min(1.0, max(0.0, lag1 / case))
+    return {"fraction": frac, "beyond": bool(lag1 > case),
+            "cov95": c0_95 + (c3_95 - c0_95) * frac, "cov983": c0_98 + (c3_98 - c0_98) * frac,
+            "bound95": c3_95, "bound983": c3_98}
+
+
+def acf_reading(criterion: str, lag1: float, n: int) -> tuple[str, dict | None]:
+    """The C9 reading of ``acf(1)`` with the E2 coverage (95% and 1 - 0.05/3).
+
+    Returns ``(text, coverage)`` where ``coverage`` is ``coverage_at`` (None: "coverage not
+    tabulated", the phi = 0 reading only).
     """
     thr = acf_threshold(n)
     case = CASE_VALUE.get(criterion)
+    cov = coverage_at(criterion, lag1)
+    if cov is None:
+        cov_text = "coverage not tabulated"
+    elif cov["beyond"]:
+        cov_text = (f"coverage <= {cov['bound95']:.4f} (95%) / {cov['bound983']:.4f} (98.3%) "
+                    "(beyond the tabulated stress)")
+    else:
+        cov_text = (f"coverage {cov['cov95']:.4f} (95%) / {cov['cov983']:.4f} (98.3%) "
+                    f"(interpolated from l = 0 to the case value {case:g})")
     if case is not None and lag1 >= case:
         both = " (both readings hold; the phi = 0.3 reading governs)" if abs(lag1) <= thr else ""
-        return f"phi = 0.3 rows realistic (acf1 >= {case:g}){both}", None
-    if abs(lag1) <= thr:
+        text = f"phi = 0.3 rows realistic (acf1 >= {case:g}){both}"
+    elif abs(lag1) <= thr:
         extra = "" if case is not None else " (no case value for the phi = 0.3 reading)"
-        return f"phi = 0 rows apply (|acf1| <= {thr:g}){extra}", None
-    if lag1 > thr:
-        if case is None:
-            return f"acf1 above {thr:g}; no case value defined", None
-        weight = (lag1 - thr) / (case - thr)
-        return f"between the readings (weight {weight:.2f} toward the phi = 0.3 rows)", weight
-    return f"acf1 below -{thr:g}: neither reading applies (negative dependence, reported)", None
+        text = f"phi = 0 rows apply (|acf1| <= {thr:g}){extra}"
+    elif lag1 > thr:
+        text = (f"acf1 above {thr:g}; no case value defined" if case is None else
+                f"between the readings (acf1 {lag1:.3f} of the case value {case:g})")
+    else:
+        text = f"acf1 below -{thr:g}: neither reading applies (negative dependence, reported)"
+    return f"{text}; {cov_text}", cov
 
 
 def lag_zero_false_trigger(n: int) -> float:
@@ -734,8 +784,12 @@ def v4_order(m_small: float, m_mid: float, ratio: float = 4.0) -> tuple[float | 
 
 
 def near_clip(u_full: np.ndarray, half_sd: np.ndarray, factor: float = 2.0) -> np.ndarray:
-    """States whose unclipped optimum is within ``factor * s`` of a clip bound (0 or 1)."""
-    return (u_full - factor * half_sd <= 0.0) | (u_full + factor * half_sd >= 1.0)
+    """States near a clip bound: ``min(|u|, |1 - u|) <= factor * s`` (plan amendment 5, E6).
+
+    A state whose unclipped optimum lies far outside [0, 1] (``u = -0.3`` with a small ``s``) is
+    not near: its clipped weight does not move with the draw noise.
+    """
+    return np.minimum(np.abs(u_full), np.abs(1.0 - u_full)) <= factor * half_sd
 
 
 def logit(w: np.ndarray) -> np.ndarray:
@@ -893,6 +947,21 @@ class Context:
         """``make_rng(seed, system, label)`` (imported on use: the package module needs jax)."""
         from lpcstudy.data import make_rng
         return make_rng(self.seed, self.system, label)
+
+    def option_flag(self, kind: str) -> str:
+        """" [non-default option: ...]" for a reading that an option changes (plan amendment 5, E8).
+
+        The seed affects every bootstrap and permutation reading, ``--resamples`` the D5 and D6
+        ones, ``--permutations`` the D2 one.
+        """
+        changed = []
+        if self.seed != TOOL_SEED:
+            changed.append(f"seed {self.seed}")
+        if kind in ("d5", "d6") and self.resamples != DEFAULT_RESAMPLES:
+            changed.append(f"resamples {self.resamples}")
+        if kind == "d2" and self.permutations != DEFAULT_PERMUTATIONS:
+            changed.append(f"permutations {self.permutations}")
+        return f" [non-default option: {', '.join(changed)}]" if changed else ""
 
     def group(self, rho: float, n_lib: int) -> str:
         """The sweep group prefix of a cell."""
@@ -1061,8 +1130,11 @@ def series_qn(ctx: Context) -> list[Series]:
                 continue
             yd = y[dom]
             sst = float(np.sum((yd - yd.mean()) ** 2))
-            r2_size = max(abs(1.0 - float(np.sum((yd - p3[dom]) ** 2)) / sst),
-                          abs(1.0 - float(np.sum((yd - p4[dom]) ** 2)) / sst))
+            ss3, ss4 = (float(np.sum((yd - p[dom]) ** 2)) / sst for p in (p3, p4))
+            # the terms of R^2_4 - R^2_3 = (1 - ss4) - (1 - ss3) are ss3 and ss4 (fractions of
+            # SST) and 1: their round-off is of the size ss/SST even when both R^2 are near 0
+            # (R15); the scale is the largest of them
+            r2_size = max(abs(1.0 - ss3), abs(1.0 - ss4), ss3, ss4)
             check(ctx, f"Q-N {kind} {target} delta R^2", delta,
                   ("Q-N", kind, target, "delta_r2"), 1e-12, scale=r2_size)
             out.append(Series(ctx.system, "Q-N", f"{kind} {target}", psi, False, int(dom.sum())))
@@ -1136,6 +1208,8 @@ def section_d1_d2(ctx: Context) -> list[Series]:
         got = attempt(rep, f"{ctx.system} {name} series", builder, ctx)
         if got:
             series.extend(got)
+        else:
+            rep.uncomputed.append((f"{ctx.system} {name}", name in PRIMARY_CRITERIA))
     rep.say(f"D1 influence series and autocorrelation, {ctx.system} "
             f"(P = primary; lags 1 to {LAGS}; rule 0.15 for n <= 500, 0.11 above)")
     rows: dict = {}
@@ -1144,14 +1218,15 @@ def section_d1_d2(ctx: Context) -> list[Series]:
             lags = acf(s.values)
         except NotComputable as exc:
             rep.nc(f"{ctx.system} {s.name} acf", str(exc))
+            rep.uncomputed.append((f"{ctx.system} {s.name}", s.primary))
             continue
-        text, weight = acf_reading(s.criterion, float(lags[0]), s.n)
+        text, cov = acf_reading(s.criterion, float(lags[0]), s.n)
         rep.say(f"  {s.name:28s} n={s.n:5d} domain={s.domain:5d} {'P' if s.primary else '-'} "
                 + " ".join(f"{a:+.3f}" for a in lags))
         rep.say(f"      reading: {text}; P(|acf1| > {acf_threshold(s.n):g} | no dependence) "
                 f"= {lag_zero_false_trigger(s.n):.4f}")
         rows[s.name] = {"n": s.n, "domain": s.domain, "primary": s.primary, "acf": lags.tolist(),
-                        "reading": text, "weight_toward_phi03": weight}
+                        "reading": text, "coverage": cov}
         rep.series_log.append({"system": ctx.system, "name": s.name, "n": s.n,
                                "primary": s.primary, "acf1": float(lags[0]),
                                "within": bool(abs(lags[0]) <= acf_threshold(s.n)), "fires": None})
@@ -1172,6 +1247,7 @@ def section_d1_d2(ctx: Context) -> list[Series]:
             summary = variance_summary(s.values)
         except NotComputable as exc:
             rep.nc(f"{ctx.system} {s.name} V*", str(exc))
+            rep.uncomputed.append((f"{ctx.system} {s.name} (D2)", s.primary))
             continue
         lags = np.array(rows[s.name]["acf"])
         beta = beta_reading(lags, s.n)
@@ -1231,7 +1307,8 @@ def _permutation_reading(ctx: Context, primaries: list[Series]) -> dict:
     fires = bool(obs > q99)
     rep.say(f"  pooled mean log V*(10)/V*(5) over {len(usable)} primary series: {obs:+.4f}; "
             f"permutation null ({len(null)} permutations, seed {ctx.seed}) 0.99 quantile "
-            f"{q99:+.4f}, one-sided p {p:.4f}: {'DESIGN QUESTION' if fires else 'no'}")
+            f"{q99:+.4f}, one-sided p {p:.4f}: {'DESIGN QUESTION' if fires else 'no'}"
+            + ctx.option_flag("d2"))
     return {"observed": obs, "q99": q99, "p": p, "fires": fires, "n_series": len(usable)}
 
 
@@ -1361,18 +1438,38 @@ def section_d5(ctx: Context) -> None:
     rep.data.setdefault(ctx.system, {})["D5"] = out
 
 
-def budget_reading(ctx: Context, bias: float, se: float | None, ci_path: tuple[str, ...],
-                   size_key: str) -> dict:
+PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
+
+
+def failure_threshold(n_boot: int, level: float = PRIMARY_LEVEL) -> int:
+    """Failed resamples from which the production interval at ``level`` is infinite.
+
+    ``floor((B - 1) a) + 1`` with ``a = (1 - level)/2`` (``statistics.percentile_interval``): 5 of
+    500 and 17 of 2000 at 1 - 0.05/3. A bootstrap SE with that many failures is not used for a
+    reading either: the resampling distribution it comes from is no longer the one whose interval
+    the criterion itself would still call usable.
+    """
+    return int(math.floor((n_boot - 1) * (1.0 - level) / 2.0)) + 1
+
+
+def budget_reading(ctx: Context, bias: float, se: float | None, failed: int | None,
+                   ci_path: tuple[str, ...], size_key: str, kind: str) -> dict:
     """The three-way reading of a finite-M bias against ``0.1 hw_full`` (D5 and D6).
 
     Raises
     ------
     NotComputable
-        If the SE is not available or the interval of the criterion is absent or not finite (an
-        interval at ``(-inf, inf)`` from failed resamples must never read "below 10%", R1).
+        If the SE is not available, the failed resamples reach ``failure_threshold`` (R16), or the
+        interval of the criterion is absent or not finite (an interval at ``(-inf, inf)`` from
+        failed resamples must never read "below 10%", R1).
     """
-    if se is None:
+    if se is None or failed is None:
         raise NotComputable("the bootstrap SE is not available, so there is no reading")
+    limit_failed = failure_threshold(ctx.resamples)
+    if failed >= limit_failed:
+        raise NotComputable(f"{failed} of {ctx.resamples} bootstrap resamples failed (the "
+                            f"production interval is infinite from {limit_failed}); the SE is "
+                            "not used for a reading")
     ci = dig(ctx.res, *ci_path)
     lo, hi = float(ci[0]), float(ci[1])
     if not (math.isfinite(lo) and math.isfinite(hi)):
@@ -1387,7 +1484,8 @@ def budget_reading(ctx: Context, bias: float, se: float | None, ci_path: tuple[s
             else "stays 'not below 10%' (PF-5: 'not determined' is treated as not below)")
     ctx.rep.say(f"  hw (pilot or run) {hw:.5f}; hw_full {hw_full:.5f} ({how}); "
                 f"0.1 hw_full {limit:.5f}")
-    ctx.rep.say(f"  reading: {reading}; point reading |B| {point} 0.1 hw_full; budget row 1 {row1}")
+    ctx.rep.say(f"  reading: {reading}; point reading |B| {point} 0.1 hw_full; budget row 1 {row1}"
+                + ctx.option_flag(kind))
     return {"hw": hw, "hw_full": hw_full, "hw_full_how": how, "limit": limit, "reading": reading,
             "point_reading": point}
 
@@ -1416,10 +1514,10 @@ def _d5_primary(ctx: Context, r_full, r_a, r_b, eligible) -> dict:
     se, failed = boot if boot is not None else (None, None)
     rep.say(f"  Delta_sh {shift:+.5f}; B(200) order 1/2 {bias:+.5f}; order 1 {shift:+.5f}; "
             f"SE {fmt(se, 4)} ({failed} failed of {ctx.resamples} resamples, block {block}, "
-            f"seed {ctx.seed})")
+            f"seed {ctx.seed})" + ctx.option_flag("d5"))
     out.update(se=se, n_failed=failed)
-    got = attempt(rep, f"{ctx.system} D5 reading", budget_reading, ctx, bias, se,
-                  ("H2a", "range_ci"), "n_test")
+    got = attempt(rep, f"{ctx.system} D5 reading", budget_reading, ctx, bias, se, failed,
+                  ("H2a", "range_ci"), "n_test", "d5")
     if got is not None:
         out.update(got)
     return out
@@ -1456,14 +1554,21 @@ def _d5_v4(ctx: Context) -> dict:
     out["signed_mean_dev_href"] = dev_mean
     rep.say("    signed mean of w_M - w_ref at H_ref by M: "
             + ", ".join(f"M={m}: {v:+.5f}" for m, v in dev_mean.items()))
-    first = min(n_v4, 40)
+    has_40 = n_v4 >= 40
     for i, m in enumerate(levels):
         hw_all = float(np.median(half[order[i], :, 0]))
-        hw_first = float(np.median(half[order[i], :first, 0]))
+        hw_first = float(np.median(half[order[i], :40, 0])) if has_40 else None
         out["median_half_width"][int(m)] = {"all": hw_all, "first_40": hw_first}
-    rep.say("    median half-width at H_ref (all V4 states; first 40, the pilot-equivalent V4): "
-            + ", ".join(f"M={m}: {out['median_half_width'][int(m)]['all']:.5f} "
-                        f"({out['median_half_width'][int(m)]['first_40']:.5f})" for m in levels))
+    rep.say(f"    median half-width at H_ref over all {n_v4} V4 states: "
+            + ", ".join(f"M={m}: {out['median_half_width'][int(m)]['all']:.5f}" for m in levels))
+    if has_40:
+        rep.say("    pilot-equivalent V4 (median over the first 40 V4 states; never pooled with a "
+                "pilot V4): "
+                + ", ".join(f"M={m}: {out['median_half_width'][int(m)]['first_40']:.5f}"
+                            for m in levels))
+    else:
+        rep.nc(f"{ctx.system} D5 pilot-equivalent V4",
+               f"only {n_v4} V4 states; the median over the first 40 needs 40")
     if len(levels) < 3:
         rep.nc(f"{ctx.system} D5 V4 order", f"{len(levels)} draw counts; the check needs three")
         return out
@@ -1489,20 +1594,45 @@ def weight_bin_mask(w: np.ndarray, lo: float, hi: float, lo_closed: bool, hi_clo
 
 
 def f_b_by_bin(w: np.ndarray, u: np.ndarray, u_a: np.ndarray, u_b: np.ndarray) -> dict:
-    """``f_b``: the share of states within 2 s of a clip bound, overall and by weight bin.
+    """``f_b`` and the WU-0008 bound of one cell (plan amendment 5, E6).
 
-    ``u`` is the unclipped optimum of the 200 draws, ``s = |u_A - u_B|/2`` from the halves, ``w``
-    the clipped weight that sets the bin. States with an undefined (NaN) optimum are excluded from
-    every share and counted (``n_undefined``).
+    ``u`` is the unclipped optimum of the 200 draws, ``s_i = |u_A - u_B|/2`` from the halves and
+    ``w`` the clipped weight that sets the bin (five bins). A state is near a bound if
+    ``min(|u|, |1 - u|) <= 2 s``. Two forms are computed, per bin and per cell: with each state's
+    own ``s_i``, and with the pooled ``s_bin = sqrt(mean(s_i^2))`` of the state's bin; **the larger
+    ``f_b`` governs**. The bound ``|bias| <= 0.40 (1/n) sum_near s`` (``n`` the states with a
+    defined ``u`` and ``s``, the smaller and so stricter denominator) is computed for both forms
+    and the larger is reported (``s_bin`` in the pooled form). States with an undefined (NaN)
+    optimum are excluded from every share and counted (``n_undefined``).
     """
     ok = np.isfinite(u) & np.isfinite(u_a) & np.isfinite(u_b)
-    half_sd = np.where(ok, np.abs(u_a - u_b) / 2.0, 0.0)
-    near = ok & near_clip(np.where(ok, u, 0.5), half_sd)
-    out: dict = {"n_undefined": int((~ok).sum()), "n_defined": int(ok.sum()),
-                 "f_b": float(near[ok].mean()) if ok.any() else None, "bins": {}}
+    s_i = np.where(ok, np.abs(u_a - u_b) / 2.0, 0.0)
+    u_ok = np.where(ok, u, 0.5)
+    near_state = ok & near_clip(u_ok, s_i)
+    s_pool = np.zeros(len(w))
+    out: dict = {"n_undefined": int((~ok).sum()), "n_defined": int(ok.sum()), "bins": {}}
     for label, lo, hi, lo_closed, hi_closed in WEIGHT_BINS:
         sel = ok & weight_bin_mask(w, lo, hi, lo_closed, hi_closed)
-        out["bins"][label] = (int(sel.sum()), float(near[sel].mean()) if sel.any() else None)
+        row: dict = {"n": int(sel.sum()), "s_bin": None, "f_b_state": None, "f_b_pooled": None,
+                     "f_b": None, "governs": None}
+        if sel.any():
+            s_bin = float(np.sqrt(np.mean(s_i[sel] ** 2)))
+            s_pool[sel] = s_bin
+            f_state = float(near_state[sel].mean())
+            f_pool = float(near_clip(u_ok[sel], s_bin).mean())
+            row.update(s_bin=s_bin, f_b_state=f_state, f_b_pooled=f_pool,
+                       f_b=max(f_state, f_pool), governs="s_bin" if f_pool > f_state else "s_i")
+        out["bins"][label] = row
+    if not ok.any():
+        raise NotComputable("no state has a defined unclipped optimum")
+    near_pool = ok & near_clip(u_ok, s_pool)
+    f_state, f_pool = float(near_state[ok].mean()), float(near_pool[ok].mean())
+    n = int(ok.sum())
+    bound_state = 0.40 * float(s_i[near_state].sum()) / n
+    bound_pool = 0.40 * float(s_pool[near_pool].sum()) / n
+    out.update(f_b_state=f_state, f_b_pooled=f_pool, f_b=max(f_state, f_pool),
+               governs="s_bin" if f_pool > f_state else "s_i", bound_state=bound_state,
+               bound_pooled=bound_pool, bound=max(bound_state, bound_pool))
     return out
 
 
@@ -1552,9 +1682,10 @@ def section_d6(ctx: Context) -> None:
     se, failed = boot if boot is not None else (None, None)
     out.update(se=se, n_failed=failed)
     rep.say(f"  {n} sweep states; Delta_sh {shift:+.5f}; B order 1/2 {bias:+.5f}; order 1 {shift:+.5f};"
-            f" SE {fmt(se, 4)} ({failed} failed of {ctx.resamples}, block {block}, seed {ctx.seed})")
-    got = attempt(rep, f"{ctx.system} D6 reading", budget_reading, ctx, bias, se,
-                  ("H2b", "library_change", "ci"), "n_test_sweep")
+            f" SE {fmt(se, 4)} ({failed} failed of {ctx.resamples}, block {block}, seed {ctx.seed})"
+            + ctx.option_flag("d6"))
+    got = attempt(rep, f"{ctx.system} D6 reading", budget_reading, ctx, bias, se, failed,
+                  ("H2b", "library_change", "ci"), "n_test_sweep", "d6")
     if got is not None:
         out.update(got)
     fb: dict = {}
@@ -1565,10 +1696,21 @@ def section_d6(ctx: Context) -> None:
         if row is None:
             continue
         fb[n_lib] = row
-        rep.say(f"  n_lib {n_lib}: f_b {fmt(row['f_b'], 3)} ({row['n_undefined']} states with an "
-                "undefined half optimum); by w bin (count, f_b): "
-                + ", ".join(f"[{k}] {v[0]}, {fmt(v[1], 3)}" for k, v in row["bins"].items()))
+        rep.say(f"  n_lib {n_lib}: f_b {row['f_b']:.3f} (s_i {row['f_b_state']:.3f}, s_bin "
+                f"{row['f_b_pooled']:.3f}; {row['governs']} governs; {row['n_undefined']} states "
+                f"with an undefined half optimum); |bias| <= 0.40 (1/n) sum_near s = "
+                f"{row['bound']:.5f}")
+        rep.say("      by w bin (n, s_bin, f_b with s_i, with s_bin): "
+                + "; ".join(f"[{k}] {v['n']}, {fmt(v['s_bin'], 3)}, {fmt(v['f_b_state'], 3)}, "
+                            f"{fmt(v['f_b_pooled'], 3)}" for k, v in row["bins"].items()))
     out["f_b"] = fb
+    if len(fb) == len(H2B_LIBRARY):
+        paired = sum(fb[n_lib]["bound"] for n_lib in H2B_LIBRARY)
+        out["bound_paired"] = paired
+        rep.say(f"  WU-0008 bound for the paired change: {paired:.5f} = the sum of the two cells' "
+                "bounds (no cancellation credited)")
+    else:
+        rep.nc(f"{ctx.system} D6 paired bound", "a cell's f_b is not computable")
 
 
 # --------------------------------------------------------------------------------------------
@@ -1579,21 +1721,29 @@ def run_level_lines(rep: Report) -> None:
 
     The predicted probability of at least one A5 trigger under no dependence is
     ``1 - prod(1 - r_i)`` over the primary series with the tabulated per-series rates (n = 300, 500,
-    1000); it is 0.97 for the pilot's 18 primaries and 0.83 for the full preset's.
+    1000); it is 0.97 for the pilot's 18 primaries and 0.83 for the full preset's. Every sentence is
+    about the **computed** series only: whatever was not computed is named, and no sentence reads
+    "every series" or "none fired" over a set that has gaps (R13).
     """
     log = rep.series_log
     rep.say("Run level (all systems)")
+    gaps = [name for name, _ in rep.uncomputed]
+    gaps_primary = [name for name, primary in rep.uncomputed if primary]
+    gap_text = ("; not computed, so not read here: " + ", ".join(gaps)) if gaps else ""
     if not log:
-        rep.nc("run-level D1 and D2", "no series had an autocorrelation")
+        rep.nc("run-level D1 and D2", "no series had an autocorrelation" + gap_text)
+        rep.data["run_level"] = {"n_series": 0, "uncomputed": gaps}
         return
     within = [e for e in log if e["within"]]
     prim = [e for e in log if e["primary"]]
     prim_within = [e for e in prim if e["within"]]
     outside = [f"{e['system']} {e['name']} ({e['acf1']:+.3f})" for e in log if not e["within"]]
-    rep.say(f"  D1: |acf(1)| within its threshold for {len(within)} of {len(log)} series "
+    scope = "computed series" if gaps else "series"
+    rep.say(f"  D1: |acf(1)| within its threshold for {len(within)} of {len(log)} computed series "
             f"({len(prim_within)} of {len(prim)} primary): "
-            + ("every series is within: the phi = 0 rows apply" if not outside else
-               "NOT every series is within: " + "; ".join(outside)))
+            + (f"every one of the {len(log)} computed series is within (the phi = 0 rows apply to "
+               f"these {scope} only)" if not outside else
+               "NOT every computed series is within: " + "; ".join(outside)) + gap_text)
     fired = [e for e in prim if e["fires"]]
     known = [e for e in prim if e["fires"] is not None]
     rates = [UNION_NULL.get(e["n"]) for e in known]
@@ -1602,13 +1752,21 @@ def run_level_lines(rep: Report) -> None:
         pred_text = f"{predicted:.3f}"
     else:
         predicted, pred_text = None, "not tabulated for these n"
-    rep.say(f"  D2: the A5 rule fires on {len(fired)} of {len(known)} primary series; at least one "
-            f"fired: {'yes' if fired else 'no'}; predicted P(at least one) under no dependence "
-            f"{pred_text} (0.97 pilot, 0.83 full for the plan's 18 primaries)")
+    if not known:
+        rep.nc("run-level D2", "0 of 0 primary series were computed; no statement on the A5 rule"
+               + gap_text)
+        verdict_text = "no statement (no primary series computed)"
+    else:
+        verdict_text = (f"the A5 rule fired on {len(fired)} of the {len(known)} computed primary "
+                        f"series (at least one fired: {'yes' if fired else 'no'}"
+                        + (f"; primary series not computed: {', '.join(gaps_primary)})"
+                           if gaps_primary else ")"))
+    rep.say(f"  D2: {verdict_text}; predicted P(at least one) under no dependence for these "
+            f"{len(known)} series {pred_text} (0.97 pilot, 0.83 full for the plan's 18 primaries)")
     rep.data["run_level"] = {"n_series": len(log), "n_within": len(within), "n_primary": len(prim),
                              "n_primary_within": len(prim_within), "n_fired": len(fired),
                              "n_primary_known": len(known), "predicted_at_least_one": predicted,
-                             "at_least_one_fired": bool(fired)}
+                             "at_least_one_fired": bool(fired), "uncomputed": gaps}
 
 
 def check_provenance(ctx: Context, seed_id: str) -> None:
@@ -1697,7 +1855,8 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     folder = states_dir if states_dir is not None else path.parent / "states"
     rep = rep if rep is not None else Report()
     options = {"seed": seed, "resamples": resamples, "permutations": permutations,
-               "default": bool((seed, resamples, permutations) == (TOOL_SEED, 2000, 1000))}
+               "default": bool((seed, resamples, permutations)
+                               == (TOOL_SEED, DEFAULT_RESAMPLES, DEFAULT_PERMUTATIONS))}
     rep.say(make_label(seed_id))
     rep.say("rehearsal_diagnostics (WU-0003.8): D1 to D6; needs owner review before freeze "
             "(statistics feeding the block-length and M decisions)")
@@ -1711,9 +1870,9 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     rep.say(f"run: {path}; preset {cfg.get('name')}; commit {prov.get('commit', 'not recorded')}")
     rep.data["label"] = make_label(seed_id)
     rep.data["options"] = options
-    for name in OUTSIDE_SCHEMA:
-        rep.nc(f"{name} (all systems)", f"its arrays are not in schema {SCHEMA}; no influence "
-               "series or diagnostic")
+    for name, why in OUTSIDE_SCHEMA:
+        rep.nc(f"{name} (all systems)", why)
+        rep.uncomputed.append((f"{name} (all systems)", False))
     all_systems = list(results.get("systems", {}))
     chosen = [s for s in all_systems if systems is None or s in systems]
     for wanted in systems or ():
@@ -1730,8 +1889,8 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
         try:
             dump = Dump.load(file)
             schema = dump.scalar("meta/schema")
-            if schema != SCHEMA:
-                rep.nc(f"{system} (D1 to D6)", f"schema {schema!r} is not {SCHEMA!r}")
+            if schema not in SCHEMAS:
+                rep.nc(f"{system} (D1 to D6)", f"schema {schema!r} is not one of {SCHEMAS}")
                 continue
             ctx = Context(system, dump, results["systems"][system], cfg, rep, seed, resamples,
                           permutations)
@@ -1752,10 +1911,20 @@ def run(results_path: Path, states_dir: Path | None = None, systems: Sequence[st
     rep.say("")
     run_level_lines(rep)
     rep.say("")
+    rep.say("Summary")
     if rep.incomplete:
-        rep.say(f"not computable: {len(rep.incomplete)} item(s) (listed above); never skipped")
+        rep.say(f"  not computable: {len(rep.incomplete)} item(s) (listed above); never skipped")
+        by_name = ", ".join(name for name, _ in OUTSIDE_SCHEMA)
+        rep.say(f"  not computable by name: {by_name}. Without them the rehearsal cannot say "
+                "whether the phi = 0 or the phi = 0.3 coverage applies to the H1a interval (nor to "
+                "H1c's); D1 and D2 say nothing about those intervals.")
     if rep.defects:
-        rep.say(f"MISMATCH: {len(rep.defects)} item(s) (listed above)")
+        rep.say(f"  MISMATCH: {len(rep.defects)} item(s) (listed above)")
+    if not options["default"]:
+        rep.say(f"  NON-DEFAULT OPTION: seed {seed}, resamples {resamples}, permutations "
+                f"{permutations} (defaults {TOOL_SEED}, {DEFAULT_RESAMPLES}, "
+                f"{DEFAULT_PERMUTATIONS}); this report is not the rehearsal record (plan "
+                "amendment 5, E8)")
     return rep
 
 
@@ -1802,9 +1971,15 @@ def main(argv: list[str] | None = None) -> int:
         rep.internal("run", exc)
         rep.say("INTERNAL ERROR: the report above is partial; exit 2")
     print("\n".join(rep.lines))
+    code = rep.exit_code()
     if args.json is not None:
-        args.json.write_text(json.dumps(_json_ready(rep.data), indent=1))
-    return rep.exit_code()
+        try:
+            args.json.write_text(json.dumps(_json_ready(rep.data), indent=1))
+        except (OSError, TypeError, ValueError) as exc:  # R14: not the MISMATCH code
+            print(f"rehearsal_diagnostics: error: cannot write {args.json}: "
+                  f"{type(exc).__name__}: {exc}", file=sys.stderr)
+            code = code if code == EXIT_MISMATCH else EXIT_INCOMPLETE
+    return code
 
 
 if __name__ == "__main__":
