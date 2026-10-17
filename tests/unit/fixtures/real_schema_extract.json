@@ -1,0 +1,423 @@
+{
+ "_source": "DEVELOPMENT (DEV-0): extract of the real results.json of the WU-0002.14 S3 smoke (759d47b, default kernel): the handling subtree of lorenz63 (one cell), the top-level handling block, and the clip_sensitivity block (three hypotheses). Schema fixture for tests; not a hypothesis test.",
+ "system_handling": {
+  "schema": "lpcstudy.handling/2",
+  "cells": {
+   "V3-cp-horizon": {
+    "counts": {
+     "invariant_mean_replacements": 0,
+     "nu_replacements": 0,
+     "error_clips": 0,
+     "error_clips_cp": 0,
+     "error_clips_plp": 0,
+     "error_clips_nonfinite": 0,
+     "error_clips_plp_href": 0,
+     "error_clips_nonfinite_href": 0,
+     "gain_replacements": 0,
+     "gain_floor": 0,
+     "zero_variance_corr": 0,
+     "zero_variance_corr_cp": 0,
+     "zero_variance_corr_plp": 0,
+     "curvature_floor": 0,
+     "decisive_floor": 0,
+     "lm_nonfinite_cost": 0,
+     "lm_nonfinite_jacobian": 0
+    },
+    "by_kind": {
+     "oracle": {
+      "counts": {
+       "invariant_mean_replacements": 0,
+       "nu_replacements": 0,
+       "error_clips": 0,
+       "error_clips_cp": 0,
+       "error_clips_plp": 0,
+       "error_clips_nonfinite": 0,
+       "error_clips_plp_href": 0,
+       "error_clips_nonfinite_href": 0,
+       "gain_replacements": 0,
+       "gain_floor": 0,
+       "zero_variance_corr": 0,
+       "zero_variance_corr_cp": 0,
+       "zero_variance_corr_plp": 0,
+       "curvature_floor": 0,
+       "decisive_floor": 0,
+       "lm_nonfinite_cost": 0,
+       "lm_nonfinite_jacobian": 0
+      },
+      "denominators": {
+       "estimates": 0,
+       "error_entries": 0,
+       "href_draws": 0,
+       "eval_draws": 0,
+       "moment_entries": 0,
+       "states": 0
+      }
+     },
+     "eval": {
+      "counts": {
+       "invariant_mean_replacements": 0,
+       "nu_replacements": 0,
+       "error_clips": 0,
+       "error_clips_cp": 0,
+       "error_clips_plp": 0,
+       "error_clips_nonfinite": 0,
+       "error_clips_plp_href": 0,
+       "error_clips_nonfinite_href": 0,
+       "gain_replacements": 0,
+       "gain_floor": 0,
+       "zero_variance_corr": 0,
+       "zero_variance_corr_cp": 0,
+       "zero_variance_corr_plp": 0,
+       "curvature_floor": 0,
+       "decisive_floor": 0,
+       "lm_nonfinite_cost": 0,
+       "lm_nonfinite_jacobian": 0
+      },
+      "denominators": {
+       "estimates": 0,
+       "error_entries": 0,
+       "href_draws": 0,
+       "eval_draws": 0,
+       "moment_entries": 0,
+       "states": 0
+      }
+     },
+     "check": {
+      "counts": {
+       "invariant_mean_replacements": 0,
+       "nu_replacements": 0,
+       "error_clips": 0,
+       "error_clips_cp": 0,
+       "error_clips_plp": 0,
+       "error_clips_nonfinite": 0,
+       "error_clips_plp_href": 0,
+       "error_clips_nonfinite_href": 0,
+       "gain_replacements": 0,
+       "gain_floor": 0,
+       "zero_variance_corr": 0,
+       "zero_variance_corr_cp": 0,
+       "zero_variance_corr_plp": 0,
+       "curvature_floor": 0,
+       "decisive_floor": 0,
+       "lm_nonfinite_cost": 0,
+       "lm_nonfinite_jacobian": 0
+      },
+      "denominators": {
+       "estimates": 80,
+       "error_entries": 19200,
+       "href_draws": 80,
+       "eval_draws": 0,
+       "moment_entries": 0,
+       "states": 80
+      }
+     }
+    },
+    "denominators": {
+     "estimates": 80,
+     "error_entries": 19200,
+     "href_draws": 80,
+     "eval_draws": 0,
+     "moment_entries": 0,
+     "states": 80
+    },
+    "lm": {
+     "n_estimates": 80,
+     "noise": 0.01,
+     "gof_dof": 4,
+     "median_residual": 0.0005680151174211805,
+     "p95_residual": 10.304462737469493,
+     "median_iterations": 8.0,
+     "fraction_no_decrease": 0.0,
+     "nonfinite_residuals": 0,
+     "fraction_late_progress": 0.325,
+     "fraction_above_chi2": 0.325,
+     "by_kind": {
+      "oracle": {
+       "n_estimates": 0,
+       "noise": 0.01,
+       "gof_dof": 4,
+       "median_residual": null,
+       "p95_residual": null,
+       "median_iterations": null,
+       "fraction_no_decrease": null,
+       "nonfinite_residuals": 0,
+       "fraction_late_progress": null,
+       "fraction_above_chi2": null
+      },
+      "eval": {
+       "n_estimates": 0,
+       "noise": 0.01,
+       "gof_dof": 4,
+       "median_residual": null,
+       "p95_residual": null,
+       "median_iterations": null,
+       "fraction_no_decrease": null,
+       "nonfinite_residuals": 0,
+       "fraction_late_progress": null,
+       "fraction_above_chi2": null
+      },
+      "check": {
+       "n_estimates": 80,
+       "noise": 0.01,
+       "gof_dof": 4,
+       "median_residual": 0.0005680151174211805,
+       "p95_residual": 10.304462737469493,
+       "median_iterations": 8.0,
+       "fraction_no_decrease": 0.0,
+       "nonfinite_residuals": 0,
+       "fraction_late_progress": 0.325,
+       "fraction_above_chi2": 0.325
+      }
+     }
+    }
+   }
+  },
+  "oracles": {
+   "construction": {
+    "counts": {
+     "local_dim_zero_distance": 0,
+     "oracle_gain_floor": 0,
+     "oracle_nonfinite": 0
+    },
+    "denominators": {
+     "states": 120
+    }
+   },
+   "calibration": {
+    "counts": {
+     "local_dim_zero_distance": 0,
+     "oracle_gain_floor": 0,
+     "oracle_nonfinite": 0
+    },
+    "denominators": {
+     "states": 60
+    }
+   },
+   "test": {
+    "counts": {
+     "local_dim_zero_distance": 0,
+     "oracle_gain_floor": 0,
+     "oracle_nonfinite": 0
+    },
+    "denominators": {
+     "states": 80
+    }
+   }
+  },
+  "fitting": {
+   "counts": {
+    "empty_regime_fallback": 0,
+    "empty_regime_fallback_chosen": 0,
+    "pooled_curvature_floor": 0,
+    "regime_target_constant": 0
+   },
+   "empty_regime_fallback_by_K": {
+    "2": 0,
+    "3": 0,
+    "4": 0
+   },
+   "denominators": {
+    "regimes": 9,
+    "chosen_regimes": 3,
+    "pools": 2400,
+    "targets": 2
+   }
+  },
+  "result_counts": {
+   "H1a/n_excluded_nonfinite": 0,
+   "H2b/noise/n_constant_states": 15,
+   "gain_bound/n_screened_out/negative_covariance": 25,
+   "H3a/n_km_not_reached": 0,
+   "H3c/n_failed_resamples": 0
+  },
+  "totals": {
+   "invariant_mean_replacements": 0,
+   "nu_replacements": 0,
+   "error_clips": 0,
+   "error_clips_cp": 0,
+   "error_clips_plp": 0,
+   "error_clips_nonfinite": 0,
+   "error_clips_plp_href": 0,
+   "error_clips_nonfinite_href": 0,
+   "gain_replacements": 0,
+   "gain_floor": 0,
+   "zero_variance_corr": 22330,
+   "zero_variance_corr_cp": 22330,
+   "zero_variance_corr_plp": 0,
+   "curvature_floor": 0,
+   "decisive_floor": 0,
+   "lm_nonfinite_cost": 0,
+   "lm_nonfinite_jacobian": 0,
+   "local_dim_zero_distance": 0,
+   "oracle_gain_floor": 0,
+   "oracle_nonfinite": 0,
+   "nu_cap_clips": 12,
+   "closed_form_floor_a4": 0,
+   "closed_form_floor_a4o": 0,
+   "empty_regime_fallback": 0,
+   "empty_regime_fallback_chosen": 0,
+   "pooled_curvature_floor": 0,
+   "regime_target_constant": 0
+  }
+ },
+ "top_handling": {
+  "schema": "lpcstudy.handling/2",
+  "totals": {
+   "invariant_mean_replacements": 0,
+   "nu_replacements": 0,
+   "error_clips": 0,
+   "error_clips_cp": 0,
+   "error_clips_plp": 0,
+   "error_clips_nonfinite": 0,
+   "error_clips_plp_href": 0,
+   "error_clips_nonfinite_href": 0,
+   "gain_replacements": 0,
+   "gain_floor": 0,
+   "zero_variance_corr": 22330,
+   "zero_variance_corr_cp": 22330,
+   "zero_variance_corr_plp": 0,
+   "curvature_floor": 0,
+   "decisive_floor": 0,
+   "lm_nonfinite_cost": 0,
+   "lm_nonfinite_jacobian": 0,
+   "local_dim_zero_distance": 0,
+   "oracle_gain_floor": 0,
+   "oracle_nonfinite": 0,
+   "nu_cap_clips": 12,
+   "closed_form_floor_a4": 0,
+   "closed_form_floor_a4o": 0,
+   "empty_regime_fallback": 0,
+   "empty_regime_fallback_chosen": 0,
+   "pooled_curvature_floor": 0,
+   "regime_target_constant": 0
+  },
+  "robustness": {},
+  "failed_variants": 0
+ },
+ "by_system_lorenz63": {
+  "invariant_mean_replacements": 0,
+  "nu_replacements": 0,
+  "error_clips": 0,
+  "error_clips_cp": 0,
+  "error_clips_plp": 0,
+  "error_clips_nonfinite": 0,
+  "error_clips_plp_href": 0,
+  "error_clips_nonfinite_href": 0,
+  "gain_replacements": 0,
+  "gain_floor": 0,
+  "zero_variance_corr": 22330,
+  "zero_variance_corr_cp": 22330,
+  "zero_variance_corr_plp": 0,
+  "curvature_floor": 0,
+  "decisive_floor": 0,
+  "lm_nonfinite_cost": 0,
+  "lm_nonfinite_jacobian": 0,
+  "local_dim_zero_distance": 0,
+  "oracle_gain_floor": 0,
+  "oracle_nonfinite": 0,
+  "nu_cap_clips": 12,
+  "closed_form_floor_a4": 0,
+  "closed_form_floor_a4o": 0,
+  "empty_regime_fallback": 0,
+  "empty_regime_fallback_chosen": 0,
+  "pooled_curvature_floor": 0,
+  "regime_target_constant": 0
+ },
+ "clip_sensitivity": {
+  "clip_level": 10.0,
+  "perturbed_level": 20.0,
+  "status": "computed",
+  "reason": null,
+  "href_clipped_draws": {
+   "construction_oracle": 0,
+   "calibration_oracle": 0,
+   "calibration_eval": 0,
+   "test_oracle": 0,
+   "test_eval": 0
+  },
+  "held_fixed_entries": 0,
+  "test_eval_clipped_entries": 0,
+  "weight_shift": {
+   "A2": 0.0,
+   "A5_max": 0.0
+  },
+  "share_test": {
+   "A0": 0.0,
+   "A1": 0.0,
+   "A2": 0.0,
+   "A3": 0.0,
+   "A4": 0.0,
+   "A5": 0.0
+  },
+  "by_hypothesis": {
+   "H3c": {
+    "parts": {
+     "A5_over_A4": {
+      "status": "computed",
+      "reason": null,
+      "delta": 0.0,
+      "ratio": 0.0,
+      "flag": false,
+      "verdict_2L": "pass",
+      "n_clipped_inputs": 0
+     }
+    },
+    "flag": false
+   },
+   "H2c": {
+    "parts": {
+     "A4_minus_A2": {
+      "status": "computed",
+      "reason": null,
+      "delta": 0.0,
+      "ratio": 0.0,
+      "flag": false,
+      "verdict_2L": "fail",
+      "n_clipped_inputs": 0
+     },
+     "A4_minus_A0": {
+      "status": "computed",
+      "reason": null,
+      "delta": 0.0,
+      "ratio": 0.0,
+      "flag": false,
+      "verdict_2L": "fail",
+      "n_clipped_inputs": 0
+     }
+    },
+    "flag": false,
+    "best_single_2L": "A0"
+   },
+   "H2e": {
+    "parts": {
+     "0.01": {
+      "status": "not_computed",
+      "reason": "the verdict itself is not computed (missing cell(s): rho=0.01 n_lib=100000)",
+      "delta_bound": null,
+      "ratio": null,
+      "flag": null,
+      "n_clipped_inputs": 0
+     },
+     "0.02": {
+      "status": "not_computed",
+      "reason": "the verdict itself is not computed (missing cell(s): rho=0.02 n_lib=1000, rho=0.02 n_lib=100000)",
+      "delta_bound": null,
+      "ratio": null,
+      "flag": null,
+      "n_clipped_inputs": 0
+     }
+    },
+    "flag": null
+   }
+  },
+  "affected_states": {
+   "Q-N": 0,
+   "H3b": 0
+  },
+  "invariance": {
+   "H1c": "exact",
+   "H2a_i": "exact",
+   "H3a": "exact"
+  }
+ }
+}
