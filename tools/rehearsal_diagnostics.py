@@ -1171,6 +1171,66 @@ def series_qn(ctx: Context) -> list[Series]:
     return out
 
 
+def spearman_tiebreak_interval(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
+    """The range of Spearman(x, y) over all ways of breaking the ties of ``x``.
+
+    The extreme orders sort each tied group of ``x`` by ``y``, ascending for the maximum and
+    descending for the minimum (the rearrangement inequality: the correlation of the ranks is
+    largest when equal ``x`` are ordered like ``y``). The ties of ``y`` are real and keep mid-ranks.
+    """
+    out = []
+    for sign in (-1.0, 1.0):
+        order = np.lexsort((sign * y, x))
+        ranks = np.empty(len(x))
+        ranks[order] = np.arange(len(x))
+        out.append(float(sps.spearmanr(ranks, y).statistic))
+    return min(out), max(out)
+
+
+def h1d_reproduction(rho: float, leaf: float, interval: tuple[float, float] | None,
+                     allowed: float) -> str:
+    """``match`` (``|rho - leaf| <= allowed``), ``tie_bound`` (differs, but the stored column has
+    ties and the leaf lies inside the tie-break interval) or ``mismatch``."""
+    if abs(rho - leaf) <= allowed:
+        return "match"
+    if interval is not None and interval[0] <= leaf <= interval[1]:
+        return "tie_bound"
+    return "mismatch"
+
+
+def check_spearman_ties(ctx: Context, label: str, rho: float, proxy: np.ndarray, truth: np.ndarray,
+                        path: tuple[str, ...], scale: float) -> None:
+    """The H1d reproduction check with the tie rule of the R1 finding (fix round 5).
+
+    A profile transform such as ``log(N-hat + c)`` can create ties that the raw array of production
+    does not have, so the stored column cannot reproduce the leaf exactly. If the exact comparison
+    fails and the stored column has ties, the leaf is compared with the Spearman interval over all
+    tie-breaks: inside is "not computable exactly" (exit 2, never a pass), outside a MISMATCH. With
+    no ties the comparison is exact as before.
+    """
+    try:
+        leaf = float(dig(ctx.res, *path))
+    except Missing as exc:
+        ctx.rep.nc(f"{ctx.system} {label}: reproduction check", str(exc))
+        return
+    allowed = 1e-12 * max(abs(leaf), scale)
+    interval = None
+    if abs(rho - leaf) > allowed and len(np.unique(proxy)) < len(proxy):
+        interval = spearman_tiebreak_interval(proxy, truth)
+    verdict = h1d_reproduction(rho, leaf, interval, allowed)
+    diff = abs(rho - leaf)
+    tail = {"match": "MATCH", "mismatch": "MISMATCH",
+            "tie_bound": "NOT COMPUTABLE EXACTLY (the transform created ties)"}[verdict]
+    bound = f"; tie-break interval [{interval[0]:.9f}, {interval[1]:.9f}]" if interval else ""
+    ctx.rep.say(f"  check {label}: dump {rho:.12g} vs results {leaf:.12g} (|diff| {diff:.2e}, "
+                f"allowed {allowed:.2e}{bound}): {tail}")
+    if verdict == "mismatch":
+        ctx.rep.defects.append(f"{ctx.system} {label}: dump {rho!r} vs results {leaf!r}")
+    elif verdict == "tie_bound":
+        ctx.rep.nc(f"{ctx.system} {label}", f"not computable exactly: the transform created ties; "
+                   f"leaf within [{interval[0]:.9f}, {interval[1]:.9f}] (dump {rho:.9f}, leaf {leaf:.9f})")
+
+
 def series_h1d(ctx: Context) -> list[Series]:
     """H1d: Spearman of each deployable proxy (first evaluation draw) with its oracle.
 
@@ -1194,8 +1254,8 @@ def series_h1d(ctx: Context) -> list[Series]:
             ctx.rep.nc(f"{ctx.system} H1d {name}", str(exc))
             ctx.rep.uncomputed.append((f"{ctx.system} H1d {name}", False))
             continue
-        check(ctx, f"H1d {name} Spearman", rho, ("H1d", "rows", name, "spearman"), 1e-12,
-              scale=1.0 / math.sqrt(int(keep.sum())))
+        check_spearman_ties(ctx, f"H1d {name} Spearman", rho, proxy[keep], truth[keep],
+                            ("H1d", "rows", name, "spearman"), scale=1.0 / math.sqrt(int(keep.sum())))
         check(ctx, f"H1d {name} states excluded as non-finite", float((~keep).sum()),
               ("H1d", "rows", name, "n_excluded_nonfinite"), 0.0)
         out.append(Series(ctx.system, "H1d", name, psi, False, int(keep.sum())))
