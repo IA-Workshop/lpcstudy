@@ -1131,6 +1131,12 @@ R22 to R25 and R27 are code, test and record fixes. **R26** (the three-branch `f
 
 **Plan.** R22: every builder that reports a failed part as "not computable" also records it in `rep.uncomputed` (H2a(ii) parts: primary; H2c rules and `best_single`, Q-N targets, H1d pairs: non-primary), so the D2 owner flag and the run-level lines name the gap; the run-level D2 line prints "k computed of m expected". R23: the acf-rate assertions compare with the hand product `1 - prod(1 - 2 norm.sf(thr sqrt(n)))` to 1e-12 relative (no tabulated figure in an assertion). R24: `inverse_dim_reference` at `gamma_n`; the shared H1a checks run after `before` is taken, and when one fails both H1a series are withdrawn. R25: a value test of `sbg_density` (exact-quantile normal sample, closed-form difference quotient, the `(pi/3) h^2` bias; a bandwidth or factor slip must fail).
 
+**Fix round 4, R22 to R25 results.** The full radius ran once after the code change: `1 failed, 79 passed` (the figure test used the compacted H1a length 297 where the planner's 0.1175 is at the nominal 300; the assertion now lists the nominal sizes for the recorded figures, while the tool's own value is checked against the hand product at its actual lengths); `--lf`: `1 passed`. R22 fixed (H2a(ii) parts, H2c rules and `best_single`, Q-N targets and H1d pairs are recorded in `rep.uncomputed`; the run-level D2 line says "k computed of m expected"); R23 fixed (the acf rates are asserted against the hand product of `2 norm.sf` terms to 1e-12, plus the planner's 4-digit figures 0.1175, 0.0135, 0.0090, 0.0120); R24 fixed (`gamma_n` for `inverse_dim_reference`; the shared H1a checks run after `before`, and a failure withdraws both series); R25 fixed (value test of `sbg_density`: closed-form quotient, `(pi/3) h^2` bias, a doubled bandwidth and a dropped factor 2 fail).
+
+**Amendment 10 landed** (`1b15e0c`); merged as its own command (clean). J1 (the corrected acf figures) is covered by the R23 tests. **J2 (R26)** is the next step of this round: the stack comparison against `provenance` and the three-branch rule for `fitted_inverse_dim`.
+
+**§4.9 checklist for J2 (before its invocation).** 1. Change set: `tools/rehearsal_diagnostics.py`, `tests/unit/test_tools_rehearsal_diagnostics.py`, this file. 2. Radius: `tests/unit/test_tools_rehearsal_diagnostics.py` once after the code change (`--lf` for failures only); slow file not rerun. 3. Already run on this code: no. 4. to 8. as above.
+
 ## Review
 
 ## Audit
