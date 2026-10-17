@@ -823,7 +823,7 @@ def test_fitted_record_keeps_the_existing_leaves_and_adds_the_integer_and_digest
 
 
 # ------------------------------------------------ V4 arrays for the state dump (WU-0003.7b)
-def _v4_world(monkeypatch, tmp_path, perturb=None, clips=None, nan=False):
+def _v4_world(monkeypatch, tmp_path, perturb=None, clips=None, nan=False, signed_zero=False):
     """Two real ``Study`` objects (dump off and on), the same stubbed ``forecast_draws``.
 
     The planned errors at horizon ``h`` for global row i and draw j are ``cp0[i, j] (1 + h / 100)``
@@ -850,6 +850,8 @@ def _v4_world(monkeypatch, tmp_path, perturb=None, clips=None, nan=False):
         plp = plp0[rows][:, :, None] + 0.1 * h / 30.0
         if perturb is not None and len(h) == 3:
             plp[:, :, 0] += perturb
+        if signed_zero and rows[0] == 0:  # global state 0, draw 0: 0 with the other sign in the
+            plp[0, 0, 0] = -0.0 if len(h) == 3 else 0.0  # three-horizon call
         return cp, plp
 
     def fake(setup, library, split, rows, unit_noise, horizons, reference_horizon=None):
@@ -966,12 +968,14 @@ def test_convergence_check_dump_flags_a_second_call_whose_href_column_differs(
     assert len(lines) == 1 and "300 of 600 entries" in lines[0]
 
 
-def test_convergence_check_dump_treats_an_identical_nan_as_equal(monkeypatch, tmp_path, caplog) -> None:
-    """A NaN error present in both calls is not a mismatch (R5): ``extra_href_equal`` stays True, no warning.
+def test_convergence_check_dump_treats_an_identical_nan_as_unequal(
+        monkeypatch, tmp_path, caplog) -> None:
+    """Strict comparison (amendment 4, D3): a NaN counts as unequal even when both calls have it.
 
-    Reference: the stub puts the same NaN PLP entry in the production and the second forecast, so
-    a bitwise comparison with NaN equal to NaN finds 0 differing entries; ``np.array_equal``
-    without ``equal_nan`` would call it a mismatch. Exact.
+    Reference: the plan text of D3 ("a NaN counts as unequal"). The stub puts the same NaN PLP
+    entry in the production and the second forecast: ``extra_href_equal`` is False,
+    ``extra_href_diff`` is 1 (one entry of the 600) and one WARNING says so. (Round 1 had adopted
+    the looser reading, NaN equal to NaN; round 2 withdrew it, R9 of the re-review.) Exact.
     """
     import logging
 
@@ -981,8 +985,29 @@ def test_convergence_check_dump_treats_an_identical_nan_as_equal(monkeypatch, tm
     with caplog.at_level(logging.WARNING, logger="lpcstudy"):
         experiments.convergence_check(on, cell)
     v4 = on.dump._v4["lorenz63"]
-    assert bool(v4["extra_href_equal"]) is True and int(v4["extra_href_diff"]) == 0
-    assert not [r for r in caplog.records if "H_ref errors of the second" in r.getMessage()]
+    assert bool(v4["extra_href_equal"]) is False and int(v4["extra_href_diff"]) == 1
+    lines = [r.getMessage() for r in caplog.records if "H_ref errors of the second" in r.getMessage()]
+    assert len(lines) == 1 and "1 of 600 entries" in lines[0] and "NaN counts as different" in lines[0]
+
+
+def test_convergence_check_dump_compares_bit_patterns_so_signed_zeros_differ(
+        monkeypatch, tmp_path, caplog) -> None:
+    """``+0.0`` in production and ``-0.0`` in the second call is a mismatch (the comparison is bitwise).
+
+    Reference: the plan text of D3 ("bitwise") and IEEE 754: the two zeros are ``==`` but have
+    different bit patterns. The stub gives one PLP entry the value 0 with the sign + in the
+    production call and - in the three-horizon call: one differing entry, one WARNING. Exact.
+    """
+    import logging
+
+    from lpcstudy import experiments
+
+    (_, on), cell, _, _ = _v4_world(monkeypatch, tmp_path, signed_zero=True)
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        experiments.convergence_check(on, cell)
+    v4 = on.dump._v4["lorenz63"]
+    assert bool(v4["extra_href_equal"]) is False and int(v4["extra_href_diff"]) == 1
+    assert len([r for r in caplog.records if "H_ref errors of the second" in r.getMessage()]) == 1
 
 
 def test_convergence_check_dump_counts_and_logs_the_clips_of_its_second_forecast(

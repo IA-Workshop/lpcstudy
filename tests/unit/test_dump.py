@@ -162,8 +162,22 @@ def _world():
     dump.record_v4("lorenz63", {"M": np.array([2, 4]), "horizons": np.array([30, 60, 120]),
                                 "w_hat": rng.random((2, 5, 3))})
     dump.record_qn("lorenz63", "oracle", {"x_test": rng.random((N, 4))})
+    dump.record_extra("lorenz63", EXTRA)
     return dump, core, rules, weights, scores, noise_cells, library_cells, core_halves, \
         {"core_view": core_view, **{k: v for k, v in sweep.items()}}
+
+
+EXTRA = {  # the schema /2 groups, as `run_system` hands them over (WU-0003.7c)
+    "h1c/thresholds": np.array([0.1, 0.2, 0.3, 0.5]),
+    "h1c/PLP/ratio": np.array([1.0, np.nan, 0.9, np.inf]),
+    "h1c/PLP/eligible": np.array([True, False, True, True]),
+    "h1c/CP/ratio": np.array([1.5, np.nan, np.nan, 1.1]),
+    "h1c/CP/eligible": np.array([True, False, False, True]),
+    "h1a/noise_levels": np.array([0.01, 0.02]), "h1a/n_lib": np.array([1000.0, 10000.0]),
+    "h1a/local_dim": np.array([2.0, np.nan, 2.5]), "h1a/inverse_dim": np.array([0.4, np.nan, 0.3]),
+    "h1a/rho=0.01/seed_sq": np.array([[1.0, 0.5], [2.0, 1.0], [3.0, 1.5]]),
+    "h1a/rho=0.02/seed_sq": np.array([[1.5, 0.7], [2.5, 1.2], [3.5, 1.7]]),
+}
 
 
 def oracle_w(e_c: np.ndarray, e_p: np.ndarray, cross: np.ndarray) -> np.ndarray:
@@ -187,7 +201,7 @@ def test_collect_dumps_every_core_array_as_the_hand_formula_says() -> None:
     dump, core, rules, weights, scores, noise_cells, library_cells, halves, _ = _world()
     arrays = dump.collect("lorenz63", core, rules, weights, scores, noise_cells, library_cells, CFG)
     m, ev = core.splits["test"].moments, core.splits["test"].evals
-    assert str(arrays["meta/schema"]) == SCHEMA == "lpcstudy.states/1"
+    assert str(arrays["meta/schema"]) == SCHEMA == "lpcstudy.states/2"
     assert arrays["core/horizons"].tolist() == HORIZONS.tolist() and \
         int(arrays["core/ref_index"]) == 2
     assert arrays["meta/draw_counters"].tolist() == list(DRAW_COUNTERS)
@@ -238,6 +252,9 @@ def test_collect_dumps_every_core_array_as_the_hand_formula_says() -> None:
     assert arrays["handling/test/oracle_clip_entries"].tolist() == [1, 2, 0]
     assert arrays["handling/test/eval_clip_entries"].tolist() == [4, 0, 1]
     assert arrays["handling/calibration/eval_clip_entries"].tolist() == [7, 7, 7]
+    for key, value in EXTRA.items():  # schema /2: stored as given, with the dtype kept
+        assert np.array_equal(arrays[key], value, equal_nan=value.dtype.kind == "f"), key
+        assert arrays[key].dtype == value.dtype and not np.shares_memory(arrays[key], value), key
     assert arrays["lm/test/oracle_late"].dtype == bool
     assert arrays["lm/test/oracle_accepted"].dtype == np.int64
     assert arrays["lm/construction/oracle_residual"].shape == (5, M)
@@ -302,8 +319,11 @@ def test_collect_and_write_round_trip_and_the_schema_is_documented(tmp_path: Pat
         assert sorted(loaded.files) == sorted(arrays)
         for key in arrays:
             assert loaded[key].dtype == arrays[key].dtype and \
-                np.array_equal(loaded[key], arrays[key]), key
+                loaded[key].shape == arrays[key].shape and \
+                loaded[key].tobytes() == arrays[key].tobytes(), key  # bitwise: NaN arrays too
     assert arrays["v4/w_hat"].shape == (2, 5, 3) and arrays["qn/oracle/x_test"].shape == (N, 4)
+    # R10: no key is also the "/" prefix of another (a tree built from the keys must not collide)
+    assert not any(other.startswith(key + "/") for key in arrays for other in arrays)
     skip = set(weights) | {"qn", "sweep", "construction", "calibration", "test"}
     text = dump_module.__doc__
     for key in arrays:
@@ -374,3 +394,30 @@ def test_the_a5_leaf_arrays_follow_the_chosen_k_not_another_fitted_k() -> None:
         assert np.array_equal(arrays["core/a5_leaf"], hand(test_growth, split))
         assert np.array_equal(arrays["core/a5_leaf_calibration"], hand(cal_growth, split))
         assert not np.array_equal(arrays["core/a5_leaf_calibration"], hand(cal_growth, other))
+
+
+def test_record_extra_refuses_keys_outside_h1a_h1c_and_a_key_recorded_twice() -> None:
+    """``record_extra`` takes only ``h1a/`` and ``h1c/`` keys, once each; a refusal records nothing (R2).
+
+    Reference: the contract (a key of schema /1 is never silently replaced, PRIME.4), decided by
+    hand: a ``core/`` key, a ``meta/`` key, a ``qn/`` key and a bare name are refused with
+    ``ValueError`` naming the key; an ``h1c/`` key given twice, in one call or two, is refused; a
+    call that mixes a good key and a bad one records neither (so the system has no pending record
+    and ``collect`` still raises ``KeyError`` for the missing extras, not a half-filled dict).
+    Exact.
+    """
+    dump = StateDump()
+    for bad in ("core/E_C", "meta/schema", "qn/oracle/x_test", "h1c", "h1a"):
+        with pytest.raises(ValueError, match="record_extra takes keys"):
+            dump.record_extra("lorenz63", {bad: np.zeros(2)})
+    with pytest.raises(ValueError, match="record_extra takes keys"):
+        dump.record_extra("lorenz63", {"h1c/thresholds": np.zeros(2), "core/w_star": np.zeros(2)})
+    assert "lorenz63" not in dump._extra
+    dump.record_extra("lorenz63", {"h1c/thresholds": np.array([0.1, 0.2])})
+    with pytest.raises(ValueError, match="already recorded"):
+        dump.record_extra("lorenz63", {"h1c/thresholds": np.array([9.0])})
+    with pytest.raises(ValueError, match="already recorded"):
+        dump.record_extra("lorenz63", {"h1a/n_lib": np.zeros(1), "h1c/thresholds": np.zeros(1)})
+    assert list(dump._extra["lorenz63"]) == ["h1c/thresholds"]
+    assert dump._extra["lorenz63"]["h1c/thresholds"].tolist() == [0.1, 0.2]
+    dump.record_extra("rossler", {"h1c/thresholds": np.zeros(1)})  # another system: its own record

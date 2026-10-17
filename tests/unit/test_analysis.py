@@ -2502,6 +2502,113 @@ def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_with
     assert out["n_states"] == 40 and out["n_failed_resamples"] == 0
 
 
+def test_h1c_horizon_law_capture_holds_the_per_state_ratios_and_reproduces_the_leaves() -> None:
+    """``capture`` (the dump's hook) gets the per-state ratios; ``h1c_ratio_block`` on them is the leaf.
+
+    Reference: the stub world of the test above, decided by hand. States 0..59 are good and
+    eligible; then a zero-range state, two censored states with two events and two states with
+    growth <= 0 are ineligible; the last state has infinite growth, so its ratio is inf and it is
+    eligible. (i) ``eligible`` is that mask, ``ratio`` is NaN exactly where it is False and the
+    ratio of the good states is 1 to 1e-12 (the tolerance of the test above: a few operations of
+    order 1); ``thresholds`` is [0.1, 0.2, 0.3, 0.5]. (ii) The returned block is the same with and
+    without ``capture`` (JSON text). (iii) **Dump-fidelity check** (reference: the production
+    statistic itself; not an independent verification of H1c): ``h1c_ratio_block`` applied to
+    ``ratio[eligible]`` equals the PLP and CP leaves, bitwise (same function, same array, same
+    generator label), apart from ``n_ineligible_states``. The independent parts are the hand-built
+    mask and NaN placement and the ratio 1 to 1e-12. Exact except the 1e-12 above.
+    """
+    import json
+
+    from lpcstudy.analysis import h1c_horizon_law, h1c_ratio_block
+
+    thetas = np.log([0.1, 0.2, 0.3, 0.5])
+    slope = lambda row: np.polyfit(thetas, row, 1)[0]
+    plp_row, cp_row = np.array([10, 14, 17, 21]), np.array([6, 12, 16, 24])
+    shifts = np.arange(60) % 5
+    constant, censored = np.array([12, 12, 12, 12]), np.array([10, 14, 0, 0])
+    plp = [plp_row + s for s in shifts] + [constant, censored, censored] + [plp_row] * 3
+    cp = [cp_row + s for s in shifts] + [constant, censored, censored] + [cp_row] * 3
+    growth = [1.0 / slope(plp_row)] * 60 + [1.0, 1.0, 1.0, 0.0, -0.1, np.inf]
+    cell = _horizon_stub({"PLP": np.array(plp), "CP": np.array(cp)}, np.array(growth))
+    plain = h1c_horizon_law(cell, CONFIG)
+    capture: dict = {}
+    out = h1c_horizon_law(cell, CONFIG, capture=capture)
+    assert json.dumps(out, sort_keys=True) == json.dumps(plain, sort_keys=True)
+    assert capture["thresholds"].tolist() == [0.1, 0.2, 0.3, 0.5]
+    assert set(capture) == {"thresholds", "PLP/ratio", "PLP/eligible", "CP/ratio", "CP/eligible"}
+    want = np.array([True] * 60 + [False] * 5 + [True])
+    for name in ("PLP", "CP"):
+        eligible, ratio = capture[f"{name}/eligible"], capture[f"{name}/ratio"]
+        assert eligible.dtype == bool and ratio.dtype == np.float64 and ratio.shape == (66,)
+        assert np.array_equal(eligible, want)
+        assert np.isnan(ratio[~eligible]).all() and np.isinf(ratio[65])  # the eligible inf state
+        again = h1c_ratio_block(ratio[eligible], CONFIG, SYSTEM, with_verdict=name == "PLP")
+        leaf = {k: v for k, v in out[name].items() if k != "n_ineligible_states"}
+        assert json.dumps(again, sort_keys=True) == json.dumps(leaf, sort_keys=True)
+    assert np.allclose(capture["PLP/ratio"][:60], 1.0, rtol=0.0, atol=1e-12)
+
+
+def test_h1a_library_scaling_capture_holds_the_seed_errors_and_reproduces_the_statistics() -> None:
+    """``capture`` gets the squared seed errors, the sizes, the levels and the inverse dimension.
+
+    Reference: the synthetic world of the H1a tests (two noise levels, 300 states, the five
+    library sizes, the Gamma law of the local dimension, fixed ``default_rng``), the
+    squared seed errors written into the cells by the helper (``analog_seed = sqrt(sq)``; the
+    dumped array is ``analog_seed ** 2`` as production forms it, so it is compared to that, not to
+    ``sq``). (i) The returned block is the same with and without ``capture`` (JSON text).
+    (ii) ``inverse_dim`` equals ``18 / (19 local_dim)`` (the formula of the Levina-Bickel
+    correction, ``(k - 2) / ((k - 1) local_dim)`` at k = 20, written here). (iii) The medians and
+    the reference of the leaf are reproduced from the dumped arrays by the production formulas:
+    **Dump-fidelity check** (reference: the production statistic itself; not an independent
+    verification of H1a; the independent parts are the formula ``18 / (19 local_dim)`` and the
+    hand-written filter, median and mean): ``sqrt(median(seed_sq[keep], 0))`` equals ``median_seed_by_n_lib`` and ``mean(inverse_dim[keep])``
+    equals ``inverse_dim_reference``, bitwise, with ``keep`` the states where every ``seed_sq`` and
+    ``inverse_dim`` is finite (one state is made non-finite to exercise the filter); the fit
+    statistics ``ratio`` and ``fitted_inverse_dim`` equal ``_median_fit_stats`` on the dumped
+    arrays with the production generator label, bitwise. Exact.
+    """
+    import json
+
+    from lpcstudy.analysis import _median_fit_stats, h1a_library_scaling
+    from lpcstudy.statistics import bootstrap_values
+
+    rng = np.random.default_rng(11031)
+    local = _gamma_local_dim(rng, 300, D_TRUE)
+    local[7] = np.nan  # one excluded state
+    sq = {0.01: _seed_sq(rng, 300, floor_index=1), 0.02: _seed_sq(rng, 300, floor_index=2)}
+    cells = _fake_cells(sq, local)
+    config = _config()
+    plain = h1a_library_scaling(cells, config)
+    capture: dict = {}
+    out = h1a_library_scaling(cells, config, capture=capture)
+    assert json.dumps(out, sort_keys=True) == json.dumps(plain, sort_keys=True)
+    assert set(capture) == {"noise_levels", "n_lib", "local_dim", "inverse_dim",
+                            "rho=0.01/seed_sq", "rho=0.02/seed_sq"}
+    assert capture["noise_levels"].tolist() == [0.01, 0.02] and np.array_equal(capture["n_lib"], SIZES)
+    assert np.array_equal(capture["local_dim"], local, equal_nan=True)
+    assert np.array_equal(capture["inverse_dim"], 18.0 / (19.0 * local), equal_nan=True)
+    for rho in (0.01, 0.02):
+        want = np.column_stack([cells[(rho, int(n))].splits["test"].moments.analog_seed ** 2
+                                for n in SIZES])
+        assert np.array_equal(capture[f"rho={rho:g}/seed_sq"], want)
+    keep = np.isfinite(capture["inverse_dim"])
+    for rho in (0.01, 0.02):
+        keep &= np.isfinite(capture[f"rho={rho:g}/seed_sq"]).all(axis=1)
+    assert keep.sum() == 299 and out["n_states"] == 299
+    assert float(capture["inverse_dim"][keep].mean()) == out["inverse_dim_reference"]
+    for rho in (0.01, 0.02):
+        leaf = out["by_noise"][f"{rho:g}"]
+        kept = capture[f"rho={rho:g}/seed_sq"][keep]
+        medians = np.median(kept, axis=0)
+        assert {str(int(n)): float(np.sqrt(v)) for n, v in zip(SIZES, medians)} == \
+            leaf["median_seed_by_n_lib"]
+        point, _ = bootstrap_values(
+            lambda idx: _median_fit_stats(kept, capture["inverse_dim"][keep], SIZES, idx),
+            int(keep.sum()), config.bootstrap_resamples, config.bootstrap_block,
+            make_rng(config.seed, "lorenz63", "bootstrap", "H1a", f"{rho:g}"))
+        assert float(point[0]) == leaf["ratio"] and float(point[1]) == leaf["fitted_inverse_dim"]
+
+
 def _h2c_stub_scores(d_a2: np.ndarray, d_best: np.ndarray) -> dict[str, RuleScores]:
     """Scores for 60 states with A4 - A2 = d_a2 and A4 - A0 = d_best exactly (small integers)."""
     n = len(d_a2)
@@ -3303,6 +3410,50 @@ def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(monkeypa
     an.qn_noise_redundancy(cell, SimpleNamespace(proxies=None), CONFIG)
     fresh = make_rng(CONFIG.seed, SYSTEM, "bootstrap", "Q-N").bit_generator.state
     assert states == [fresh, fresh]
+
+
+def test_qn_noise_redundancy_records_the_dump_keys_without_a_key_that_is_also_a_prefix(
+        monkeypatch) -> None:
+    """With a dump, ``qn_noise_redundancy`` records ``x_test``, ``w_star`` and ``log_t`` per kind (R6, R10).
+
+    Reference: the schema of ``lpcstudy/dump.py`` (written by hand in the test): per kind
+    (``oracle``, ``deployable``) the keys ``x_test``, ``w_star``, ``log_t`` and, per target
+    (``logit_w_interior``, ``w_zero_indicator``, ``log_horizon``), ``pred3``, ``pred4``, ``y``,
+    ``domain``. ``qn_profile_block`` is a stub that fills ``capture`` with those target keys, so
+    only the wiring of ``qn_noise_redundancy`` is under test. The key set is exact, and no key is
+    also the ``/`` prefix of another (a tree built from the keys must not collide: R6 renamed the
+    input ``log_horizon`` to ``log_t`` because it was also the folder of the target's keys), so
+    reverting the rename fails here. Exact.
+    """
+    from lpcstudy import allocation
+    from lpcstudy import analysis as an
+    from lpcstudy.dump import StateDump
+
+    n = 8
+    targets = ("logit_w_interior", "w_zero_indicator", "log_horizon")
+
+    def stub(*args, capture=None, **kwargs):
+        capture.update({f"{t}/{k}": np.zeros(n) for t in targets
+                        for k in ("pred3", "pred4", "y", "domain")})
+        return {}
+
+    monkeypatch.setattr(an, "qn_profile_block", stub)
+    monkeypatch.setattr(an, "_oracle_profile", lambda cell, split, config: np.zeros((n, 4)))
+    monkeypatch.setattr(an, "deployable_profile", lambda ev, proxies, noise, lt: np.zeros((n, 1, 4)))
+    monkeypatch.setattr(an, "oracle_weight", lambda m: np.full((n, CONFIG.reference_horizon), 0.5))
+    monkeypatch.setattr(allocation, "state_horizon_target", lambda m, noise, thr: np.ones(n))
+    split = SimpleNamespace(moments=None, evals=None)
+    cell = SimpleNamespace(system=SYSTEM, noise=0.01,
+                           splits={s: split for s in ("construction", "calibration", "test")})
+    dump = StateDump()
+    an.qn_noise_redundancy(cell, SimpleNamespace(proxies=None), CONFIG, dump=dump)
+    keys = set(dump._qn[SYSTEM])
+    expected = {f"{kind}/{name}" for kind in ("oracle", "deployable")
+                for name in ("x_test", "w_star", "log_t",
+                             *(f"{t}/{k}" for t in targets
+                               for k in ("pred3", "pred4", "y", "domain")))}
+    assert keys == expected
+    assert not any(other.startswith(key + "/") for key in keys for other in keys)
 
 
 def test_qn_profile_block_capture_holds_the_predictions_and_changes_nothing() -> None:

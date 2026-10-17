@@ -15,6 +15,9 @@ index sets, so no random number is drawn). With the flag off, ``Study.dump`` is 
 line of this module runs. With it on, ``results.json`` is bitwise the same except one provenance
 leaf, ``provenance.states_dump``.
 
+Schema version. ``/2`` adds the ``h1c/`` and ``h1a/`` groups (WU-0003.7c); every key of ``/1`` keeps
+its name and meaning.
+
 File format. A NumPy ``.npz`` archive (uncompressed, ``allow_pickle`` never needed). Keys are
 ``/``-separated. Dtypes: float64, int64, bool, or a unicode string. Shapes below use ``n`` for the
 test states of the system in time order (``n_test``), ``E`` evaluation draws, ``M`` oracle draws,
@@ -81,12 +84,26 @@ test states of the system in time order (``n_test``), ``E`` evaluation draws, ``
     draws, signed; ``w_ref`` (``(nV, 3)``): the estimate from all the draws. The ``H_ref`` column
     comes from the production forecast; the other two from a second forecast of the same states and
     draws, whose ``H_ref`` column is compared bitwise with the production one
-    (``extra_href_equal``, bool; ``extra_href_diff``, the number of differing entries, a NaN equal
-    to a NaN) and whose handling is counted in ``extra_handled`` (int64 ``(nV, 8)``) and
+    (``extra_href_equal``, bool; ``extra_href_diff``, the number of entries that differ in their
+    bit patterns or are NaN: the comparison is strict) and whose handling is counted in ``extra_handled`` (int64 ``(nV, 8)``) and
     ``extra_clip_entries`` (int64 ``(3,)``, over all three horizons, names
     ``extra_clip_entry_names``).
     The median over states of ``half_width[m, :, 0]`` is the leaf ``validation/convergence/<M>/
     median_half_width`` and the mean of ``abs(signed_dev[m, :, 0])`` is ``mean_abs_dev_from_max``.
+
+``h1c/`` (schema /2; H1c, the test states in time order, ``nT`` the admissible thresholds)
+    ``thresholds`` (``(nT,)``). For ``PLP`` and ``CP``: ``<name>/ratio`` (``(n,)``: the per-state
+    ratio ``Lambda_bar x slope`` of every state, NaN where the state is not eligible) and
+    ``<name>/eligible`` (bool ``(n,)``). The ratios of the eligible states, in order, are the
+    array that ``analysis.h1c_ratio_block`` receives; its median and interval are the H1c leaves.
+
+``h1a/`` (schema /2; H1a, the test-sweep states, ``nS`` of them, ``nL`` library sizes)
+    ``noise_levels`` (float64 ``(nR,)``) and ``n_lib`` (float64 ``(nL,)``): the sorted levels and
+    sizes; ``local_dim`` and ``inverse_dim`` (``(nS,)``): the Levina-Bickel local dimension and
+    its inverse (``S / (k - 1)``), before the finite filter; ``rho=<g>/seed_sq`` (``(nS, nL)``, one
+    per level): the squared analog seed errors of the library cells, before the filter. The
+    production keeps the states where every ``seed_sq`` and ``inverse_dim`` is finite; the medians,
+    the reference ``mean(inverse_dim)`` and the fit statistics of the H1a leaves follow from these.
 
 ``qn/<oracle|deployable>/`` (Q-N, the test states in time order)
     ``x_test`` (``(n, 4)``): the profile of the kind (the first evaluation draw for the deployable
@@ -110,8 +127,11 @@ from .data import SPLITS
 from .ensemble import DRAW_COUNTERS, ENTRY_COUNTERS
 from .oracle import oracle_weight
 
-SCHEMA = "lpcstudy.states/1"
+SCHEMA = "lpcstudy.states/2"
 """Schema version key (``meta/schema``). A change of any key or shape below changes the version."""
+
+EXTRA_GROUPS: tuple[str, ...] = ("h1a/", "h1c/")
+"""The key prefixes that ``StateDump.record_extra`` accepts (the groups added in schema /2)."""
 
 V4_MULTIPLES: tuple[int, ...] = (2, 4)
 """Lyapunov times of the V4 arrays beyond ``H_ref`` (``H_ref`` itself is the first column)."""
@@ -155,13 +175,15 @@ class StateDump:
 
     The run feeds it from four places: ``Study.run_cell`` (``record_halves``),
     ``convergence_check`` (``record_v4``), ``qn_noise_redundancy`` (``record_qn``) and
-    ``run_system`` (``collect`` and ``write``). It never returns anything to the study.
+    ``run_system`` (``record_extra`` for the H1a and H1c arrays of schema /2, then ``collect`` and
+    ``write``). It never returns anything to the study.
     """
 
     def __init__(self) -> None:
         self._halves: dict[tuple, dict[str, np.ndarray]] = {}
         self._v4: dict[str, dict[str, np.ndarray]] = {}
         self._qn: dict[str, dict[str, np.ndarray]] = {}
+        self._extra: dict[str, dict[str, np.ndarray]] = {}
 
     def record_halves(self, system: str, noise: float, library_size: int, core: bool,
                       horizons: np.ndarray, halves: dict[str, np.ndarray]) -> None:
@@ -187,6 +209,25 @@ class StateDump:
     def record_v4(self, system: str, arrays: dict[str, np.ndarray]) -> None:
         """Store the V4 arrays of a system (keys of the ``v4/`` group, without the prefix)."""
         self._v4[system] = {k: clean(f"v4/{k}", v) for k, v in arrays.items()}
+
+    def record_extra(self, system: str, arrays: dict[str, np.ndarray]) -> None:
+        """Store arrays under their full keys (the ``h1a/`` and ``h1c/`` groups of schema /2).
+
+        Only these two groups may be added this way, and a key can be recorded once: a key of
+        schema ``/1`` (or any other) is never silently replaced (PRIME.4).
+
+        Raises
+        ------
+        ValueError
+            If a key is outside ``h1a/`` and ``h1c/``, or is already recorded for the system.
+        """
+        recorded = self._extra.get(system, {})
+        for key in arrays:
+            if not key.startswith(EXTRA_GROUPS):
+                raise ValueError(f"record_extra takes keys under {EXTRA_GROUPS}, got {key!r}")
+            if key in recorded:
+                raise ValueError(f"record_extra: {key!r} is already recorded for {system}")
+        self._extra.setdefault(system, {}).update({k: clean(k, v) for k, v in arrays.items()})
 
     def record_qn(self, system: str, kind: str, arrays: dict[str, np.ndarray]) -> None:
         """Store the Q-N arrays of one profile kind (keys of ``qn/<kind>/``, without it)."""
@@ -236,7 +277,13 @@ class StateDump:
         Raises
         ------
         KeyError
-            If a half-draw record, the V4 arrays or the Q-N arrays of the system are missing.
+            If a half-draw record, the V4 arrays, the Q-N arrays or the extra (``h1a/`` and
+            ``h1c/``) arrays of the system are missing.
+        ValueError
+            If the core horizons are not 1..H_max, or the per-state MSE of a rule at ``H_ref``
+            differs from the score the verdicts use.
+        TypeError
+            If an array is not float64, int, bool or str (``clean``).
         """
         test = core.splits["test"]
         m, ev, oracles = test.moments, test.evals, core.oracles["test"]
@@ -338,6 +385,8 @@ class StateDump:
             put(f"v4/{name}", value)
         for name, value in self._qn.pop(system).items():
             put(f"qn/{name}", value)
+        for name, value in self._extra.pop(system).items():
+            put(name, value)
         for key in [k for k in self._halves if k[0] == system]:
             del self._halves[key]
         return out

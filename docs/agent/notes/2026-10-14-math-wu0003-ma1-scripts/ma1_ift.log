@@ -1,0 +1,44 @@
+p0 lorenz63 0.01  |r| max 5.171e-02  cond(H) 7.44e+03  IFT vs FD 6.3e-11  GN-only vs IFT 4.41e-02  prod-FD vs IFT 5.8e-04
+p0 lorenz63 0.02  |r| max 3.033e-02  cond(H) 9.20e+03  IFT vs FD 1.3e-10  GN-only vs IFT 6.21e-02  prod-FD vs IFT 8.5e-04
+p0 rossler  0.01  |r| max 8.067e-02  cond(H) 8.66e+03  IFT vs FD 5.1e-11  GN-only vs IFT 7.08e-02  prod-FD vs IFT 2.6e-03
+p0 rossler  0.02  |r| max 1.856e-02  cond(H) 1.02e+04  IFT vs FD 1.4e-10  GN-only vs IFT 1.55e-02  prod-FD vs IFT 1.3e-03
+p0 chua     0.01  |r| max 1.982e-02  cond(H) 7.90e+03  IFT vs FD 8.7e-11  GN-only vs IFT 2.40e-02  prod-FD vs IFT 5.4e-04
+p0 chua     0.02  |r| max 4.715e-02  cond(H) 1.03e+04  IFT vs FD 1.9e-10  GN-only vs IFT 6.13e-02  prod-FD vs IFT 6.4e-04
+p1 lorenz63 0.01  |r| max 1.147e-01  cond(H) 9.04e+03  IFT vs FD 3.6e-11  GN-only vs IFT 1.74e-02  prod-FD vs IFT 1.8e-03
+p1 lorenz63 0.02  |r| max 4.556e-02  cond(H) 8.81e+03  IFT vs FD 8.9e-11  GN-only vs IFT 2.67e-02  prod-FD vs IFT 1.2e-03
+p1 rossler  0.01  |r| max 6.072e-02  cond(H) 7.37e+03  IFT vs FD 9.0e-11  GN-only vs IFT 2.06e-02  prod-FD vs IFT 1.3e-03
+p1 rossler  0.02  |r| max 1.034e-01  cond(H) 1.34e+04  IFT vs FD 3.8e-10  GN-only vs IFT 2.36e-01  prod-FD vs IFT 2.3e-03
+p1 chua     0.01  |r| max 4.068e-02  cond(H) 7.58e+03  IFT vs FD 5.3e-11  GN-only vs IFT 4.18e-02  prod-FD vs IFT 2.8e-04
+p1 chua     0.02  |r| max 7.451e-02  cond(H) 1.10e+04  IFT vs FD 2.9e-10  GN-only vs IFT 8.73e-02  prod-FD vs IFT 3.7e-03
+
+== max over 12 cells of |. - IFT| / max|IFT| for d(1/d)/dy:
+  central differences of the tight fit (h = 1e-5): 3.80e-10
+  Gauss-Newton form (J^T J)^-1 J^T (no residual curvature): 2.36e-01
+  central differences of the production fit (h = 1e-5): 3.71e-03
+
+== case value l_c (fit part, latent phi = 0.3), exchangeable latent correlation c^2:
+  p0 lorenz63 0.01 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p0 lorenz63 0.01 kappa g : min 0.0972 at c^2 = 0.95; c^2 = 0: 0.1940; c^2 = 0.49: 0.1543
+  p0 lorenz63 0.02 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p0 lorenz63 0.02 kappa g : min 0.0634 at c^2 = 0.98; c^2 = 0: 0.1940; c^2 = 0.49: 0.1505
+  p0 rossler  0.01 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p0 rossler  0.01 kappa g : min 0.1001 at c^2 = 0.95; c^2 = 0: 0.1940; c^2 = 0.49: 0.1548
+  p0 rossler  0.02 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p0 rossler  0.02 kappa g : min 0.0710 at c^2 = 0.97; c^2 = 0: 0.1940; c^2 = 0.49: 0.1511
+  p0 chua     0.01 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p0 chua     0.01 kappa g : min 0.0877 at c^2 = 0.96; c^2 = 0: 0.1940; c^2 = 0.49: 0.1529
+  p0 chua     0.02 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p0 chua     0.02 kappa g : min 0.0702 at c^2 = 0.97; c^2 = 0: 0.1940; c^2 = 0.49: 0.1510
+  p1 lorenz63 0.01 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p1 lorenz63 0.01 kappa g : min 0.1094 at c^2 = 0.94; c^2 = 0: 0.1940; c^2 = 0.49: 0.1565
+  p1 lorenz63 0.02 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p1 lorenz63 0.02 kappa g : min 0.0748 at c^2 = 0.97; c^2 = 0: 0.1940; c^2 = 0.49: 0.1515
+  p1 rossler  0.01 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p1 rossler  0.01 kappa g : min 0.0875 at c^2 = 0.96; c^2 = 0: 0.1940; c^2 = 0.49: 0.1529
+  p1 rossler  0.02 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p1 rossler  0.02 kappa g : min 0.0360 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1490
+  p1 chua     0.01 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p1 chua     0.01 kappa g : min 0.0922 at c^2 = 0.96; c^2 = 0: 0.1940; c^2 = 0.49: 0.1535
+  p1 chua     0.02 equal g : min 0.0222 at c^2 = 0.99; c^2 = 0: 0.1940; c^2 = 0.49: 0.1484
+  p1 chua     0.02 kappa g : min 0.0589 at c^2 = 0.98; c^2 = 0: 0.1940; c^2 = 0.49: 0.1501
+  overall min 0.0222; (2/pi) arcsin(0.3) = 0.1940
