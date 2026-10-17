@@ -385,6 +385,39 @@ The WU-0003.8 and WU-0003.9 review items need nothing beyond amendments 3 and 5.
 
 **Affected checks:** none for this amendment (documentation only). G1 and G2 are .3a work: the radius is `tests/unit/test_tools_rehearsal_report.py`.
 
+### Plan amendment 8 (2026-10-17, planner claude-opus-5-5)
+
+**Basis:**
+- R10 of the .3a round-2 review (`WU-0003.3a-review-round2.md`, on `wu/0003-3a-report`);
+- the mathematician's κ_E note `2026-10-14-math-wu0003-3a-kappa.md`, OF-R2 options (a) and (b).
+
+Earlier amendments stay in force except where an item below says otherwise. This amendment is fixed before any R-run.
+
+| # | Decision | Relation | Strictness |
+| --- | --- | --- | --- |
+| H1 | **The G2 clause for `KAPPA_POLICY = "range"`** (working default (a) of OF-R2; **owner flag OF-H1**). The κ_E note shows the present point estimator is biased (−0.07 to +0.135 in κ) and that no unbiased estimator exists from schema `/2`. So for H2c, H2d and H3c the pre-registered range [√(E_run/E_full), 1] = [0.7071, 1] governs, as B1 item 6 provides ("the range only if not estimable"). Under this policy, a range-governed row is printed as FALLBACK with the label **"kappa_E point estimator biased (R2): range governs"**. It **counts as a computed row** for the exit code, and the summary states how many rows are range-governed. The point κ̂ may be printed only as information, labelled "not an estimator of κ_E", and never enters a projection. **Every other rule of G2 is unchanged:** any MISMATCH exits 1; any other uncomputable row (a missing dump, a dump that fails reproduction, a `None` H3a pair, a missing leaf) exits 2. A dump that fails its reproduction check still gives exit 1 and is not used for anything. `KAPPA_POLICY` is validated against {"range", "point"}, and any other value is refused with exit 2 (R7, done). | Refines G2 of amendment 7. | G2 required a point κ_E for exit 0. Under (a) exit 0 is reachable with the range, which is a change of the exit rule: flagged for the owner, who may choose (b) instead. No projection number is loosened. |
+| H2 | **The effect on C7 reading (ii)** (PF-4). With the range governing, the H2c, H2d and H3c projections are the κ_E range [0.7071, 1]. Reading (ii) reports "outside" only below 0.67·(the projection at κ_E = 0.7071) or above 1.5·(the projection at κ_E = 1). So **the band is wider on the low side** by the factor 0.7071 against a point estimate at κ_E = 1, and by κ̂/0.7071 against any point estimate κ̂. The high side is unchanged. Reading (i) (amendment-1 form, √(n_p/n_f) alone) is not affected, and PF-4's default still reports "not reproduced" if either reading says outside. So the stricter reading (i) still applies on the low side. | Consequence of H1 for B1 item 6. | No threshold changes. The low-side widening is the PF-4 effect, offset by reading (i). |
+| H3 | **The fate of the `"point"` branch.** Until the owner rules on OF-R2, it stays a test-only branch: settable only by a source edit or a test monkeypatch, and visible in the summary and in `--json` (`kappa_policy`). **If (a) is final:** it is removed in the **.3a final round** (before .3a closes, which G6 requires anyway). Acceptance: (i) no code path computes a projection from κ̂; `KAPPA_POLICY` is removed or reduced to {"range"}. (ii) A mutation test shows that setting κ̂ to an absurd value leaves every projected number byte-identical. (iii) The exit-0 test runs with range-governed rows. (iv) The tests of the removed branch are deleted with the branch, and no remaining expected value is edited. Radius: `tests/unit/test_tools_rehearsal_report.py`. **If (b) is chosen:** the "point" branch is not the switch for it. (b) brings a dump sub-task (`core/cp_err_href`, `core/plp_err_href`), and the half-split κ̂ with its jackknife range then replaces the branch in a .3a follow-up, with acceptance set by the mathematician's §4. | Ruling on review R10's open question 2. | Removes a biased path. |
+
+**H4. Working defaults in force at R0 to R4.** These hold until the owner rules, so R0 to R4 can proceed under the standing LPC.AUTH.3. **R5 and R6 still need the owner's go-ahead** (A4, O2); no default authorizes them.
+
+| Open owner question (blocks R1) | Working default in force |
+| --- | --- |
+| OQ-R9: diagnostic seed and options (E8) | Seed 20261018, 1000 permutations, 2000 resamples. The first default-option report per run is the record; any other value is labelled "non-default option" and is not the record. |
+| OF-6 / P-2: predicted gate failures (B1 item 12) | Pre-registered as written: P(at least one V6 failure over DEV-1 and DEV-2) ≈ 8.8% (12.9% if R3 is TD); P(at least one V4 failure) ≈ 50–71%. A failure is reported, never fixed. The owner may strike the predictions; that does not change C1. |
+| C6-R6: the scope of R1 against R2/R3 (C3) | Option (A): R2 and R3 run **without** `--skip-robustness`, with the same flags as R1. |
+| C4: untagged float leaves | **Requirement, not a default.** Every float leaf is tagged or overridden, the pinning test is green, and an untagged leaf is NOT COMPUTED (exit 2). R1 does not start until this is met. |
+| OF-R2: the κ_E policy (G6, H1) | (a): the range governs for H2c, H2d and H3c, with the label of H1. |
+| PF-1 to PF-5 (B4) | The stricter readings of B4: PF-1, the TD routing with per-leaf differences listed; PF-2, the min of the LM bounds; PF-3, O3 on both classes; PF-4, both C7 readings with either triggering; PF-5, "not determined" treated as "not below 10%". |
+| OF-F3: the series count (F3) | 24 series (the 18 primaries plus H1a). Predicted rates: 0.11 and 0.993 at the pilot, 0.014 and 0.91 at full. The tool prints N and its rate. |
+
+**All other open owner questions** take the working default stated where they are raised: O1 to O8, OF-1 to OF-5, OF-7, P-1, Q6 to Q9, C6-R5, C6-H, F4, OF-G3 and OF-G6. **R4** runs under the standing authority, as amendment 1's O2 recommends, unless the owner declines it.
+
+**Owner flag added:**
+- **OF-H1:** under (a), range-governed rows count as computed for the exit code (H1). The alternative is (b), with a new dump sub-task before R1.
+
+**Affected checks:** none for this amendment (documentation only).
+
 ## Log
 
 ### WU-0003.7a (developer claude-sonnet-5-5, 2026-10-14; branch `wu/0003-rehearsal`, from `dcc4ff2`)
