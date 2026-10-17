@@ -1,0 +1,4 @@
+exit code: 2
+--- stdout ---
+--- stderr ---
+rehearsal_report: error: refused: the dump of lorenz63 records seed id 'DEV-9' but the run records 'DEV-0' (all recorded ids must agree and be DEV-n)

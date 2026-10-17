@@ -1,0 +1,153 @@
+{
+ "label": "DEVELOPMENT (DEV-1): conditional on one realization; not a hypothesis test",
+ "options": {
+  "seed": 20261018,
+  "resamples": 2000,
+  "permutations": 1000,
+  "default": true
+ },
+ "stack": {
+  "same": true,
+  "rows": [
+   [
+    "python",
+    "<value>",
+    "<value>",
+    "same"
+   ],
+   [
+    "packages.numpy",
+    "<value>",
+    "<value>",
+    "same"
+   ],
+   [
+    "packages.scipy",
+    "<value>",
+    "<value>",
+    "same"
+   ],
+   [
+    "cpu.model",
+    "<value>",
+    "<value>",
+    "same"
+   ],
+   [
+    "cpu.isa",
+    "<value>",
+    "<value>",
+    "same"
+   ],
+   [
+    "blas.libraries",
+    "<value>",
+    "<value>",
+    "same"
+   ],
+   [
+    "numpy_simd.found",
+    "<value>",
+    "<value>",
+    "same"
+   ],
+   [
+    "env.OPENBLAS_CORETYPE",
+    "<value>",
+    "<value>",
+    "same"
+   ],
+   [
+    "env.NPY_DISABLE_CPU_FEATURES",
+    "<value>",
+    "<value>",
+    "same"
+   ]
+  ]
+ },
+ "lorenz63": {
+  "C4": {
+   "cells": {
+    "base|rho=0.01|n_lib=10000|core/oracle": {
+     "n": 280000,
+     "median_c_over_rho2": 3.449511057485296,
+     "relation": {
+      "predicted": 3.4495110574852976,
+      "se_iid": 0.006148161221124159,
+      "diff": -1.7763568394002505e-15,
+      "z": -2.889248956740033e-13,
+      "ok": true
+     },
+     "findings": [],
+     "n_findings": 0
+    },
+    "base|rho=0.01|n_lib=10000|core/eval": {
+     "n": 2800,
+     "median_c_over_rho2": 3.449511057485296,
+     "relation": {
+      "predicted": 3.4495110574852976,
+      "se_iid": 0.06148161221124159,
+      "diff": -1.7763568394002505e-15,
+      "z": -2.889248956740033e-14,
+      "ok": true
+     },
+     "findings": [],
+     "n_findings": 0
+    },
+    "base|rho=0.005|n_lib=10000|sweep/oracle": {
+     "n": 60000,
+     "median_c_over_rho2": 3.437346883308807,
+     "relation": {
+      "predicted": 3.4373468833088086,
+      "se_iid": 0.013247727941710271,
+      "diff": -1.3322676295501878e-15,
+      "z": -1.0056574496488288e-13,
+      "ok": true
+     },
+     "findings": [],
+     "n_findings": 0
+    },
+    "base|rho=0.02|n_lib=10000|sweep/oracle": {
+     "n": 60000,
+     "median_c_over_rho2": 3.489755232458334,
+     "relation": {
+      "predicted": 3.489755232458335,
+      "se_iid": 0.013395228418628776,
+      "diff": -8.881784197001252e-16,
+      "z": -6.6305582252329e-14,
+      "ok": true
+     },
+     "findings": [],
+     "n_findings": 0
+    },
+    "base|rho=0.05|n_lib=10000|sweep/oracle": {
+     "n": 60000,
+     "median_c_over_rho2": 3.5442681936445037,
+     "relation": {
+      "predicted": 3.544268193644506,
+      "se_iid": 0.013553637079716898,
+      "diff": -2.220446049250313e-15,
+      "z": -1.6382658294526894e-13,
+      "ok": true
+     },
+     "findings": [],
+     "n_findings": 0
+    }
+   },
+   "findings": [],
+   "nlib": {
+    "groups": [
+     "rho=0.01: n_lib 1000, 3162, 31623, 100000",
+     "rho=0.02: n_lib 1000, 3162, 10000, 31623, 100000"
+    ],
+    "defects": [],
+    "absent": []
+   },
+   "n_findings": 0
+  }
+ },
+ "run_level": {
+  "n_series": 0,
+  "uncomputed": []
+ }
+}
