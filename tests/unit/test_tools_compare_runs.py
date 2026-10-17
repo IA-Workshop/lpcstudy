@@ -839,7 +839,7 @@ def with_h1a(tree: dict, **leaves: object) -> dict:
     block = {"by_noise": {"0.01": {"fitted_inverse_dim": 0.55, "ci_inverse_dim": [0.48, 0.65], "floor_rms": 0.03,
                                    "ratio": 1.09, "ratio_ci": [0.96, 1.3],
                                    "median_seed_by_n_lib": {"1000": 0.16, "10000": 0.14}}},
-             "inverse_dim_reference": 0.6, "verdict": "inconclusive"}
+             "inverse_dim_reference": 0.6, "n_states": 80, "verdict": "inconclusive"}
     tree["systems"]["lorenz63"]["H1a"] = block
     for path, value in leaves.items():
         edit(tree, path.replace("__", "/"), value)
@@ -884,6 +884,12 @@ def test_failures_of_the_h1a_fit_keep_the_cp_rule_and_print_the_of7_pointer_with
     assert res.exit_code == 1
     text = "\n".join(cr.render(res, "a", "b"))
     assert text.count("pointer: " + cr.OF7_POINTER) == 1
+    for leaf, value in (("median_seed_by_n_lib/1000", 0.16), ("ratio", 1.09)):          # R15: not OF-7 leaves
+        edit(new, f"{H1A}/{leaf}", value * (1 + 1e-3))
+    res = run(ref, new)
+    for leaf in ("median_seed_by_n_lib/1000", "ratio"):
+        r = row(res, f"{H1A}/{leaf}")
+        assert r.outcome == "FAIL" and cr.OF7_POINTER not in r.note, leaf
     ref, new = tier_pair("T2", **{f"{S}__H1b__CP__slope": 2.0 * (1 + 1e-7)})
     res = run(ref, new)
     assert row(res, f"{S}/H1b/CP/slope").outcome == "FAIL" and cr.OF7_POINTER not in row(res, f"{S}/H1b/CP/slope").note
@@ -905,6 +911,82 @@ def test_untagged_census_counts_hand_known_leaves_and_the_report_prints_it() -> 
     text = "\n".join(cr.render(res, "a", "b"))
     assert "census (information, not a failure)" in text and "H2e 1" in text
     assert run(ref, new).exit_code == res.exit_code
+
+
+# ---- round 3: robustness K scope (R14) and the cp rule against the whole-system clip scope (R17)
+def with_robustness(tree: dict) -> dict:
+    """Two robustness variants shaped like the real ``robustness/<s>/<variant>/`` (own ``chosen_K`` and an H3c)."""
+    tree["robustness"]["lorenz63"].update({v: {"chosen_K": 3, "H3c": {"A5_over_A4_mse": 0.9, "ci": [0.6, 1.2]}}
+                                           for v in ("base", "misspec=0.1")})
+    return tree
+
+
+def robustness_case(tier: str, **edits: object) -> "cr.Comparison":
+    """Both trees get the variants; the main H3c estimate moves by 0.5 x 0.1 hw (= 0.015); ``edits`` apply to new."""
+    ref, new = tier_pair(tier)
+    for tree in (ref, new):
+        with_robustness(tree)
+    edit(new, f"{S}/H3c/A5_over_A4_mse", 0.915)
+    for path, value in edits.items():
+        edit(new, path.replace("__", "/"), value)
+    return run(ref, new)
+
+
+@pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
+def test_a_robustness_k_reaches_its_own_variant_only(tier: str) -> None:
+    """R14: a K difference at ``robustness/<s>/<variant>/chosen_K`` must not open the K blocks of the main system.
+
+    Reference: the probe of the review on the real P1 schema. Control: without any count the main H3c move
+    (0.5 x 0.1 hw) fails; with the main ``fitted/chosen_K`` bumped it passes (K reaches H3c); with only the
+    variant's K bumped it fails again, and a main ``H3a`` integer that differs is exact, not listed. The variant's
+    own interval leaf is licensed by its own K (0.1 hw) and the other variant's is not."""
+    h3c = f"{S}/H3c/A5_over_A4_mse"
+    variant_k = "robustness/lorenz63/misspec=0.1/chosen_K"
+    assert row(robustness_case(tier), h3c).outcome == "FAIL"
+    assert row(robustness_case(tier, **{f"{S}__fitted__chosen_K": 4}), h3c).outcome == "pass"
+    res = robustness_case(tier, **{variant_k.replace("/", "__"): 4})
+    assert row(res, variant_k).outcome == "listed" and row(res, h3c).outcome == "FAIL" and res.exit_code == 1
+    res = robustness_case(tier, **{variant_k.replace("/", "__"): 4, f"{S}__H3a__n_per_regime__[0]": 31})
+    assert row(res, f"{S}/H3a/n_per_regime/[0]").outcome == "FAIL"
+    own, other = "robustness/lorenz63/misspec=0.1/H3c/A5_over_A4_mse", "robustness/lorenz63/base/H3c/A5_over_A4_mse"
+    res = robustness_case(tier, **{variant_k.replace("/", "__"): 4, own.replace("/", "__"): 0.915,
+                                   other.replace("/", "__"): 0.915})
+    assert row(res, own).outcome == "pass" and row(res, other).outcome == "FAIL"
+
+
+def test_a_main_system_k_one_sided_shape_is_not_excused_by_a_robustness_k() -> None:
+    """The one-sided rule uses the same scope: a longer main ``H3a`` list is excused by the main K, not by a
+    variant's K."""
+    path = f"{S}/H3a/logrank_p_raw/[2]"
+    res = robustness_case("T1", **{"robustness__lorenz63__misspec=0.1__chosen_K": 4, "systems__lorenz63__H3a__logrank_p_raw": [0.01, 0.2, 0.3]})
+    assert row(res, path).outcome == "FAIL"
+    res = robustness_case("T1", **{f"{S}__fitted__chosen_K": 4, "systems__lorenz63__H3a__logrank_p_raw": [0.01, 0.2, 0.3]})
+    assert row(res, path).outcome == "listed"
+
+
+@pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
+def test_a_differing_clip_count_does_not_replace_the_cp_rule_of_the_h1a_fit_leaves(tier: str) -> None:
+    """R17: the whole-system scope of a clip count must not let a cp-chain leaf pass at 0.1 hw (that replaced the
+    OF-7 working default, cp 1e-12). With rossler-style cell ``error_clips`` +1, the H1a fit outputs moved by 1e-7
+    relative still FAIL, while the network-chain H3c estimate passes at 0.5 x 0.1 hw. A state count of the H1a
+    block itself (block-local) still licenses them, as A6 says: the strictness is only against the system-wide
+    scope."""
+    ref, new = tier_pair(tier)
+    for tree in (ref, new):
+        with_h1a(tree)
+    edit(new, f"{CELL}/counts/error_clips", 1)
+    edit(new, f"{S}/H3c/A5_over_A4_mse", 0.915)
+    for leaf, value in (("fitted_inverse_dim", 0.55), ("floor_rms", 0.03)):
+        edit(new, f"{H1A}/{leaf}", value * (1 + 1e-7))
+    edit(new, f"{H1A}/ci_inverse_dim/[0]", 0.48 * (1 + 1e-7))
+    res = run(ref, new)
+    assert row(res, f"{S}/H3c/A5_over_A4_mse").outcome == "pass"
+    for leaf in ("fitted_inverse_dim", "floor_rms", "ci_inverse_dim/[0]"):
+        assert row(res, f"{H1A}/{leaf}").outcome == "FAIL", leaf
+    edit(new, f"{CELL}/counts/error_clips", 0)
+    edit(new, f"{S}/H1a/n_states", 79)                     # block-local count of H1a: licenses its interval leaves
+    res = run(ref, new)
+    assert row(res, f"{H1A}/ci_inverse_dim/[0]").outcome == "pass"
 
 
 # ---------------------------------------------------------------------------------- d3: 10x rule

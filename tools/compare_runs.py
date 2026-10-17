@@ -14,7 +14,8 @@ module. The report is labelled DEVELOPMENT.
 
 **Needs owner review before freeze** (tolerance and verdict-comparison code, CSQ2 use in WU-0016;
 plan A10, B2 row .9). Every tolerance below is quoted from the plan, never chosen here; where the
-plan is silent the strict reading is applied and printed (see "Readings that the plan leaves open").
+plan is silent the strict reading is applied where possible, and the looser owner readings are marked (see
+"Readings that the plan leaves open").
 
 Tier selection (A6, amended by B1 item 1; mechanical, from the digests)
 -----------------------------------------------------------------------
@@ -53,12 +54,17 @@ Tolerances applied to a pair (A6 and B1 items 2 to 5)
   T1 rules (strict default; the kind-to-chain map is a question for the mathematician).
 * **In T1 to T3:** a leaf with an interval, in a result block where a discrete count of A6's list
   differs, is allowed ``|d| <= 0.1 hw`` instead of its tolerance (hw of the reference interval). The
-  list is exactly A6's, unchanged by B1 item 3 (``licensing_kind``): K (``chosen_K``, ``realized_K``),
+  list is A6's, as matched by name (``licensing_kind``; B1 item 3 leaves it unchanged): K (``chosen_K``, ``realized_K``),
   ``best_single``, ``n_states`` and the state denominators, and clip, nu-cap and replacement counts
-  (``error_clips*``, ``nu_cap_clips``, ``*_replacements``). The scope is per system and causal: a
-  ``n_states`` or ``best_single`` reaches its own block; K reaches ``fitted``, ``H3a``, ``H3c`` and
-  ``regime_curve``; a clip, nu-cap or replacement count under ``systems/<s>/handling`` reaches system
-  ``s`` only. The top-level ``handling`` block (``totals``, ``by_system``, ``robustness``), a per-system
+  (``error_clips*``, ``nu_cap_clips``, ``*_replacements``). Other clip counts and state counts by meaning
+  (``*_clipped_*``, ``n_clipped_inputs``, the ``n_*_states`` family, ``evaluation/denominators/test_states``)
+  are not matched and fail exactly: an owner question (Q7). The scope is per system: a ``n_states`` or
+  ``best_single`` reaches its own block; K reaches ``fitted``, ``H3a``, ``H3c`` and ``regime_curve``, and a K
+  under ``robustness/<s>/<variant>`` reaches that variant only; a clip, nu-cap or replacement count under
+  ``systems/<s>/handling`` reaches the whole of system ``s`` (owner reading 9: looser than "result block",
+  and not causal), except the leaves of the network-independent chains (``cp``, ``oracle``, ``dynamics``,
+  ``fixture``), which it does not reach (round 3: a differing clip count must not replace the cp 1e-12 rule,
+  OF-7 working default, of that system's leaves). The top-level ``handling`` block (``totals``, ``by_system``, ``robustness``), a per-system
   ``totals`` mirror and a state denominator open no scope (the per-system source of a sum carries
   it). Any other differing integer is exact (a failure), including the other ``handling`` counters, LM
   ``n_estimates``, non-finite, warning, fallback and failed-resample counts; only integers inside a
@@ -90,8 +96,8 @@ printed as information (a pair that passes at half its tolerance would otherwise
 ceiling) until R1 and R2 declare one, never above 1e-4: a larger value is refused (exit 2), because A6
 makes it an O3 finding that is not adopted silently. An exceedance is a listed finding.
 
-Readings that the plan leaves open (strict reading applied; owner questions)
-----------------------------------------------------------------------------
+Readings that the plan leaves open (strict where possible; the looser owner readings are marked)
+------------------------------------------------------------------------------------------------
 * The leaf-to-chain map is ``compare_pilot``'s rule table. **A leaf without a chain tag is treated as
   network chain (class rules, 1e-4), which is the looser choice** (the strict choice, 1e-12, would fail
   the many QoI leaves that the table leaves untagged: 111 differing leaves on the S3 pair). The count
@@ -102,9 +108,13 @@ Readings that the plan leaves open (strict reading applied; owner questions)
   the table leaves untagged (strict). The four H1a fit outputs that fail the cp rule on a platform pair
   (``fitted_inverse_dim``, ``ci_inverse_dim``, ``floor_rms``) are tolerance-stopped fits; the mathematician
   proposes class (a) or (g) for them (OF-7, a loosening, **not adopted**: working default cp 1e-12). A
-  pointer to ``docs/agent/notes/2026-10-14-math-wu0003-9-q1.md`` is printed beside any failure under
-  ``H1a/by_noise``; the exit code is unchanged.
+  pointer to ``docs/agent/notes/2026-10-14-math-wu0003-9-q1.md`` is printed beside those three leaves
+  (``fitted_inverse_dim``, ``ci_inverse_dim/[0|1]``, ``floor_rms``) when they fail the cp rule; the exit
+  code is unchanged.
 * A ``cov_digest`` difference alone is undetermined (see above); a ``None`` system never opens a scope.
+* **Looser owner readings:** an untagged leaf is network chain (above); the whole-system scope of a clip,
+  nu-cap or replacement count (reading 9, above); and the listing of the integers of a K-shaped block when
+  K differs (``follows_k``: listed, no licence), which is the "list with no licence" option of OF-1.
 * ``fraction_above_chi2`` and ``fraction_late_progress`` have no T2/T3 tolerance in A6: class (c)
   applies (T1: ``1e-8 |ref|``); the two-proportion band is printed beside them.
 * The per-estimate LM check and the order-statistic bands need arrays of the per-state dump
@@ -530,7 +540,18 @@ def count_scope(path: Path_, kind: str) -> tuple[str, str] | None:
         return (system, "*") if lk == "clip" else None
     if lk == "clip":
         return None
-    return (system, "K") if lk == "K" else (system, block)
+    if lk == "K":
+        # R14: a K of a robustness variant reaches that variant only, never the K blocks of the main system
+        return (system, "K") if path[0] == "systems" else (system, scope_block(path))
+    return (system, scope_block(path))
+
+
+def scope_block(path: Path_) -> str:
+    """The block a scope refers to: ``loc``'s block, but one scope per robustness variant
+    (``robustness/<variant>``), so a count of one variant does not reach another variant or the main system."""
+    if path[0] == "robustness" and len(path) > 2:
+        return f"robustness/{path[2]}"
+    return loc(path)[1]
 
 
 def in_scope(scopes: list[tuple[str, str]], path: Path_, star: bool = True) -> bool:
@@ -539,7 +560,8 @@ def in_scope(scopes: list[tuple[str, str]], path: Path_, star: bool = True) -> b
     ``star=False`` leaves out the whole-system scope of clip counts (used for one-sided leaves: only the
     shape that follows a count of its own block or K is excused).
     """
-    system, block = loc(path)
+    system, _ = loc(path)
+    block = scope_block(path)
     if system is None:
         return False
     for s_sys, s_block in scopes:
@@ -816,7 +838,7 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
         row.cls, row.rule, row.tol, row.for_10x = "lm", "median_iterations within 1", TOL_LM_ITERATIONS, False
         row.metric = abs(a - b)
         row.outcome = "pass" if row.metric <= row.tol else "FAIL"
-    elif in_scope(scopes, path) and interval is not None:
+    elif in_scope(scopes, path, star=chain not in cp.NETWORK_INDEPENDENT) and interval is not None:
         hw = 0.5 * (interval[1] - interval[0])
         row.rule, row.tol, row.for_10x = "discrete scope: 0.1 hw", HW_FRACTION * hw, False
         row.metric = abs(a - b)
@@ -848,7 +870,9 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
         row.rule, row.tol = "class (b) to (g)", tol_other
         row.outcome = "pass" if row.metric <= row.tol else "FINDING"
         untagged = 0 if chain else 1
-    if row.outcome == "FAIL" and "H1a" in path and "by_noise" in path:
+    if (row.outcome == "FAIL" and row.rule == "cp chain relative" and "H1a" in path and "by_noise" in path
+            and (name in ("fitted_inverse_dim", "floor_rms")
+                 or (path[-2] == "ci_inverse_dim" and name in ("[0]", "[1]")))):
         row.note = (row.note + "; " if row.note else "") + OF7_POINTER
     return untagged
 

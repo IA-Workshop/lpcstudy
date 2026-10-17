@@ -350,6 +350,32 @@ Needs owner review before freeze. Only stricter or informational changes; no tol
 
 **Results of fix round 2.** Radius, run once: `tools/run_tests.sh unit tests/unit/test_tools_compare_runs.py`: `224 passed in 3.10s` (211 + 2 of round 1, plus 11 new cases: 9 for the untagged H1a leaves x T1, T2, T3, one for the pointer, one for the census). Self-check: no clip, `nan_to_num` or `where(`; no new `try`/`except`; no RNG; no tolerance changed. Evidence run on the scratch copy of the S3 pair (T2): `median_seed_by_n_lib/*` (3 leaves, max 8.2e-15) pass the cp rule, the four H1a fit leaves still fail (1e-12 kept) with the pointer printed once, exit 1 as before; census line: 84 differing untagged float leaves fall through to the class rules, 533 untagged float leaves in the reference run (H1a 9, H1b 2, H1c 6, H1d 10, H2a 16, H2b 19, ...).
 
+#### WU-0003.9 fix round 3 (developer claude-sonnet-5-5, 2026-10-17; basis: `WU-0003.9-review-round2.md`, 8414273; findings R14 to R17; the owner lifted limits and the main session allowed one narrow round)
+
+Needs owner review before freeze. Only stricter changes, labels and records; nothing loosened. The branch merge of `wu/0003-rehearsal` is not part of this round.
+
+- **R14 (blocker):** a K under `robustness/<s>/<variant>/` opens the scope of that variant only (`scope_block` gives one block per variant); it no longer opens `fitted`, `H3a`, `H3c`, `regime_curve` of the main system, no longer lists or excuses main integers or one-sided leaves there. The block-local counts (`n_states`, `best_single`) of a robustness variant likewise reach their own variant instead of the whole `robustness` block (stricter than before).
+- **R15:** the OF-7 pointer is attached only to `fitted_inverse_dim`, `ci_inverse_dim/[0|1]` and `floor_rms` under `H1a/by_noise/*`, when they fail the cp rule.
+- **R16:** docstring: the list is "A6's, as matched by name"; Q7 below is posed as a class. No code change.
+- **R17:** labels corrected (header "strict where possible; looser owner readings marked"; the whole-system clip scope is "owner reading 9, looser than result block, not causal"; `follows_k` is a looser owner reading). **Bypass of the OF-7 default:** a differing clip count of a system used to let that system's cp-chain leaves (the H1a fit leaves among them) pass at 0.1 hw, because the scope was tested before the chain rules. Fix, narrower than "chain rules first": the whole-system (`*`) scope no longer reaches leaves of the network-independent chains (`cp`, `oracle`, `dynamics`, `fixture`); a block-local count (an `n_states` of the same block) still licenses them, as A6 says. A full "chain first" reorder would make a cp statistic fail whenever its own block's state count legitimately differs, which is a false failure on correct code and not what A6 says; if the owner wants the full reorder it is one condition. Tested.
+
+**Owner questions recorded here (they were only in the review answers or the round-2 review).**
+- **Q7 (class, with the mathematician):** which integers are A6 clip or state counts and which are exact. By name the tool matches `error_clips*`, `nu_cap_clips`, `*_replacements`, `n_states`, `denominators/states`, `chosen_K`, `realized_K`, `best_single*`. These fail exactly although they are counts by meaning: `clip_sensitivity/test_eval_clipped_entries`, `clip_sensitivity/href_clipped_draws/*`, `clip_sensitivity/by_hypothesis/*/parts/*/n_clipped_inputs`, `handling/cells/*/evaluation/denominators/test_states`, the `n_*_states` family (`n_eligible_states`, `n_ratio_states`, `n_total_states`, `n_excluded_states`, `n_constant_states`), the threshold counts (`n_floored`, `n_w_zero`, `n_w_one`, `n_exponent_at_bound/*`, `n_covariance_warnings/*`) and `gain_bound/n_screened_out/*`. The `*_eval` clip counts follow the network, so they can differ on a correct T2 or T3 pair.
+- **Q8:** a `cov_digest` difference alone is undetermined (exit 2). **Q9:** untagged leaves are network chain (the looser default).
+- **Reading 9 (whole-system clip scope), `follows_k` listing:** looser owner readings; with OF-7 and the robustness `n_states` granularity (a robustness `n_states` licenses its variant only after this round).
+
+**§4.9 checklist (before the first invocation of this round; code and tests are written, nothing has run on them).**
+1. Change set (`git diff --name-only ed0cc05...HEAD` plus `git status --porcelain`): `tools/compare_runs.py`, `tests/unit/test_tools_compare_runs.py`, this file, and `WU-0003.9-review-round2.md` (answers).
+2. Radius, `python3 tools/test_impact.py --base 9039bf5 --explain`: rule "`tools/<t>.py` -> `tests/unit/test_tools_<t>.py`". Unit set: `tests/unit/test_tools_compare_runs.py`, once after this code change (`--lf` on failures only). Smaller than the whole suite; no gate.
+3. Already run: not on this code (round 2: `224 passed`).
+4. Device: `JAX_PLATFORMS=cpu` (wrapper), no JAX import.
+5. Threads and time: `LPC_THREADS` 4; wrapper timeout 300 s; the file took 3 s.
+6. Contention: no preset or GPU job is started here.
+7. Output: `-q --tb=short -rfE`.
+8. Command: `tools/run_tests.sh unit tests/unit/test_tools_compare_runs.py`.
+
+**Results of fix round 3.** Radius, run once: `tools/run_tests.sh unit tests/unit/test_tools_compare_runs.py`: `231 passed in 2.88s` (224 + 7 new cases: R14 x 3 tiers, the one-sided case, R17 x 3 tiers; R15 extends an existing test). No failure, no `--lf`. Probe, not a test run: the R14 probe on the previous tool (ed0cc05) gives `pass` ("discrete scope: 0.1 hw") for the main H3c move when only `robustness/lorenz63/misspec=0.1/chosen_K` is bumped, and FAIL on the new code, so the test discriminates. Self-check: no clip, `nan_to_num`, `where(`, new `try`/`except`, RNG; no tolerance changed.
+
 ## Review
 
 ## Audit
