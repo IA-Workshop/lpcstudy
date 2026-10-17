@@ -1,0 +1,14 @@
+DEVELOPMENT: comparison of two runs, not a hypothesis test
+NOTE: needs owner review before freeze (tolerance and verdict-comparison code; CSQ2 use in WU-0016)
+REF: runs/r1-gpu-dev1/pilot
+NEW: runs/r2-gpu-dev1/pilot
+tier: T0
+leaves: REF 20533, NEW 20533, union 20533, common 20533, equal 20533, different 0, one-sided 0
+excluded (ref): provenance 149 leaves, timing 23 leaves
+excluded (new): provenance 147 leaves, timing 23 leaves
+chain tags of the float leaves (config included; untagged leaves are NOT COMPUTABLE, exit 2): REF: compare_pilot table 8127, tightened 3, override 2841, untagged 0; NEW: compare_pilot table 8127, tightened 3, override 2841, untagged 0
+differences by rule (every FAIL, FINDING and DEF is listed; a pass group lists its first 20):
+10x rule (ROADMAP; classes per note M2):
+  class (a): 0 leaves, max rel 0 -> declared bitwise on the same device type
+  class (b) to (g): 0 leaves, max rel 0 -> declared bitwise on the same device type
+RESULT: PASS (exit 0)
