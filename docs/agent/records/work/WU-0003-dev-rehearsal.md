@@ -418,6 +418,21 @@ Earlier amendments stay in force except where an item below says otherwise. This
 
 **Affected checks:** none for this amendment (documentation only).
 
+### Plan amendment 9 (2026-10-17, planner claude-opus-5-5)
+
+**Basis:** R21 of the .8 round-3 review (`WU-0003.8-review-round3.md`, on `wu/0003-8-diagnostics`) and the developer's open question Q4 (.8 Log). Earlier amendments stay in force except where an item below says otherwise. This amendment is fixed before any R-run.
+
+| # | Decision | Relation | Strictness |
+| --- | --- | --- | --- |
+| I1 | **The E2 anchor** (R21(a); **owner flag OF-I1**). For every criterion and level, the φ = 0.3 anchor is cov₀.₃\* = min(cov₀, cov₀.₃). The rule becomes cov(ℓ̂) = cov₀ + (cov₀.₃\* − cov₀)·min(1, max(0, ℓ̂/ℓ_c)), and above ℓ_c the tool prints "≤ cov₀.₃\*". The printed coverage is then non-increasing in ℓ̂ for every row, which is the premise E2 stated. **Effect:** only one cell of the E2 table has cov₀.₃ > cov₀: **H1d (C6) at 98.3%**, with 0.9794 against 0.9800 (a difference of 6e-4, inside the MC SE of 0.0014). That row now prints 0.9794 at every ℓ̂, and "≤ 0.9794" above ℓ_c. Every other row is unchanged, including H1d at 95% (0.9470 → 0.9439). The gap is not recorded as MC noise: that would leave a rising coverage in print. | Refines E2. Its claim "a lower coverage at every ℓ̂ in (0, ℓ_c)" now holds with "not higher" in place of "lower". | Stricter (one cell). Owner flag, because a pre-registered printed number changes. |
+| I2 | **The H2a(ii) "one" part** (R21(b), Q4; **owner flag OF-I2**). When the "one" part is triggered (more than 5% of states at w = 1), it takes the H2a(ii) coverage row C7: 0.9443/0.9794 → 0.9389/0.9762, with I1's anchor. Its case value is ℓ_c = 0.09. Both other parts (zero and interior) also use C7, so C7 is the stricter of the two parts' rows, trivially. C7's ℓ_c of 0.09 is the smallest case value in E2, and with E2's rule a smaller ℓ_c gives the largest stress fraction, so this is the conservative borrowing. C7 is a continuous interior case and is borrowed for the indicator parts. The tool prints "C7 borrowed (indicator part)" beside the zero and "one" readings. **Count:** a triggered "one" part is a primary series and is counted. N = 24 + (the number of systems whose "one" part is triggered), at most 27 at the pilot. The tool prints N and 1 − ∏(1 − r_i) for that N (F3, a9). At N = 27 the predicted rates are 0.116 (acf) and 0.996 (D2) at the pilot, and 0.016 and 0.93 at full. | Rules on Q4 and extends E2 and F3. | Stricter: more series and a conservative row. Owner flag: the borrowing for indicator parts (the alternative is "coverage not tabulated"), and the count. |
+
+**Owner flags added:**
+- **OF-I1:** the min anchor of I1. The working default is I1.
+- **OF-I2:** C7 for the "one" part, and the count of triggered "one" parts in N. The working default is I2.
+
+The developer appends the R21 Log correction: the H1d 98.3% row was the looser direction, applied as written until this ruling. The code changes under I1 and I2 are .8 work, with radius `tests/unit/test_tools_rehearsal_diagnostics.py`. **Affected checks** for this amendment: none (documentation only).
+
 ## Log
 
 ### WU-0003.7a (developer claude-sonnet-5-5, 2026-10-14; branch `wu/0003-rehearsal`, from `dcc4ff2`)
