@@ -50,6 +50,46 @@ def test_smoke_preset_writes_outputs_and_gate_flag(tmp_path: Path) -> None:
     assert_handling(results)
     assert_lm_rows(results, (out_dir / "RESULTS.md").read_text().splitlines())
     assert_clip_sensitivity(results, (out_dir / "RESULTS.md").read_text().splitlines())
+    assert_wu0003_7a_leaves(results)
+
+
+def assert_wu0003_7a_leaves(results: dict) -> None:
+    """WU-0003.7a on the smoke: the new bitwise-neutral leaves are present, typed and JSON-clean.
+
+    Reference: the plan (B2 row .7a): per system ``context.main_digest`` and ``estimator_digest``,
+    ``fitted.<proxy>.nfev`` and ``status`` of both proxy fits, ``fitted.a5_leaf_digest`` and
+    ``fitted.allocator_digest``; and ``weights_digest`` in every entry of ``estimators`` (top level
+    and ``validation.estimators``). A digest is 64 lowercase hexadecimal characters; ``nfev`` is a
+    positive int and ``status`` one of the documented ``least_squares`` statuses (-1 to 4). The
+    values are checked against independent recomputations in the unit tests, so only the
+    schema is asserted here, and that the four per-system digests are pairwise different (a constant
+    would pass the schema). Exact.
+
+    The two estimator blocks do not hold the same keys: ``systems.<s>.validation.estimators`` is a
+    snapshot taken in ``run_system`` after the core cell and before the noise sweep, so an
+    estimator trained later (the 0.02 noise level at smoke) is only in the top-level
+    ``estimators``. Where a key is in both, the entries are the same object, so the digests agree.
+    (WU-0003.7a review R1.)
+    """
+    digest = re.compile(r"[0-9a-f]{64}")
+    for name, system in results["systems"].items():
+        seen: set[str] = set()
+        for leaf in ("main_digest", "estimator_digest"):
+            seen.add(system["context"][leaf])
+            assert digest.fullmatch(system["context"][leaf]), (name, leaf)
+        for proxy in ("analog_proxy", "estimation_proxy"):
+            fit = system["fitted"][proxy]
+            assert type(fit["nfev"]) is int and fit["nfev"] >= 1, (name, proxy)
+            assert type(fit["status"]) is int and fit["status"] in range(-1, 5), (name, proxy)
+        for leaf in ("a5_leaf_digest", "allocator_digest"):
+            seen.add(system["fitted"][leaf])
+            assert digest.fullmatch(system["fitted"][leaf]), (name, leaf)
+        logs = [results["estimators"], system["validation"]["estimators"]]
+        for log in logs:
+            assert log, name
+            for key, entry in log.items():
+                assert digest.fullmatch(entry["weights_digest"]), (name, key)
+        assert len(seen) == 4, name
 
 
 def assert_clip_sensitivity(results: dict, report_lines: list[str]) -> None:

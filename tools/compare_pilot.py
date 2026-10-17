@@ -540,6 +540,12 @@ def _build_rules() -> list[Rule]:
                "WU-0002.14", "DEF-0017", "seed-drawn start states of the main and estimator "
                "trajectories (index into the statistics orbit; the raw start state)",
                chain="dynamics"))
+    # WU-0003.7a (needs owner review before freeze): two trajectory digests in ``context``. They are
+    # new, bitwise-neutral leaves: no old value exists, and no existing leaf changes.
+    add(_rules("new", f"{S}/context/{{main_digest,estimator_digest}}", "WU-0003.7a",
+               "B1 item 1, B2 .7a", "SHA-256 of the post-burn-in main and estimator trajectories "
+               "(float64, C order): selects the reproducibility tier of a cross-device comparison",
+               chain="dynamics"))
     add(_rules("unchanged", f"{S}/validation/{{delay_jacobian_rel_err,gain_rel_err,"
                "integrator_max_dev_sigma,km_max_abs_dev}", chain="fixture", item="R2 (V1, V2, V5, V6)",
                reason="fixed-seed or deterministic fixtures"))
@@ -571,6 +577,18 @@ def _build_rules() -> list[Rule]:
                reason=("both proxies are fitted on the estimated nu (analog_f = distance * "
                        "min(nu_hat, nu_cap), allocation.py:123): network chain, so the plan's "
                        "CP-chain remark does not hold for this leaf")))
+    # WU-0003.7a (needs owner review before freeze): the integer outcome of the two tolerance-stopped
+    # proxy fits, the digest of the A5 leaf index (calibration, then test) and of the A3 allocator
+    # weights, and the weight digest of every trained estimator. New, bitwise-neutral leaves.
+    add(_rules("new", f"{S}/fitted/{{analog_proxy,estimation_proxy}}/{{nfev,status}}", "WU-0003.7a",
+               "B1 item 3, B2 .7a", "integer outcome (nfev, status) of the proxy least_squares fit: "
+               "locates a flipped stopping test upstream of H2c, H2d and H3c", chain="network"))
+    add(_rules("new", f"{S}/fitted/{{a5_leaf_digest,allocator_digest}}", "WU-0003.7a",
+               "B1 item 3, B2 .7a", "SHA-256 of the A5 leaf index (int64) of the calibration and test "
+               "states, and of the allocator weights (provenance)", chain="network"))
+    add(_rules("new", f"estimators/{kept}/weights_digest {S}/validation/estimators/*/weights_digest",
+               "WU-0003.7a", "B2 .7a, O7", "SHA-256 of the trained estimator weights (provenance)",
+               chain="network"))
     add(_rules("unchanged", f"{S}/fitted/nu_cap", chain="network", item="R2",
                reason="the nu cap is unchanged"))
     add(_rules("changed", f"{S}/fitted/chosen_K", "WU-0002.3", "D-13 (DEF-0003)",

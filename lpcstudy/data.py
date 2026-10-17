@@ -29,6 +29,7 @@ import numpy as np
 
 from .config import StudyConfig
 from .embedding import autocorrelation_time, delay_vectors, select_delay
+from .provenance import array_digest
 from .systems import SYSTEMS, OrbitDivergence, SystemSpec, checked_bound, guard_orbit, \
     lyapunov_guarded, make_flow_step, simulate_trajectory
 
@@ -214,7 +215,11 @@ class SystemContext:
         ``lyapunov_orbit_max_abs`` and ``trajectory_max_abs`` with the keys ``statistics``,
         ``main`` and ``estimator``, each ``max |x|`` of that orbit, burn-in included; and the
         start states of WU-0002.14: ``start_index`` and ``start_state`` with the keys ``main``
-        and ``estimator``, the raw start before the burn-in).
+        and ``estimator``, the raw start before the burn-in; and, since WU-0003.7a,
+        ``main_digest`` and ``estimator_digest``: the SHA-256 of the post-burn-in main and
+        estimator trajectories, float64, C order, see ``provenance.array_digest``. They decide
+        whether two runs followed the same trajectory (the tier of a cross-device comparison) and
+        are results leaves through ``context_record``).
     """
 
     spec: SystemSpec
@@ -466,5 +471,6 @@ def build_context(system: str, config: StudyConfig, cache_dir: Path,
                                      "estimator": est_max},
               "start_index": {"main": starts.main_index, "estimator": starts.estimator_index},
               "start_state": {"main": [float(v) for v in starts.main_state],
-                              "estimator": [float(v) for v in starts.estimator_state]}},
+                              "estimator": [float(v) for v in starts.estimator_state]},
+              "main_digest": array_digest(main), "estimator_digest": array_digest(est_traj)},
     )

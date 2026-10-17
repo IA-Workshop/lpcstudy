@@ -696,3 +696,65 @@ def test_analog_query_is_bitwise_independent_of_workers(monkeypatch, threads: st
     ref_dist, ref_pos = tree.query(queries, k=5, workers=1)
     assert distances.tobytes() == ref_dist.tobytes()
     assert indices.tobytes() == (np.arange(3000) + 7)[ref_pos].tobytes()
+
+
+# ------------------------------------------------ half-draw moments for the state dump (WU-0003.7b)
+@pytest.mark.parametrize("n_draws, sizes", [(6, [3, 3]), (7, [3, 4])])
+@pytest.mark.parametrize("chunk_traj", [6, 10**6])
+def test_ensemble_moments_half_out_holds_the_half_draw_moments_and_changes_nothing(
+        monkeypatch, n_draws: int, sizes: list[int], chunk_traj: int) -> None:
+    """``half_out`` gets the second moments of draws ``[0, M // 2)`` and ``[M // 2, M)``; moments unchanged.
+
+    Reference: brute force on the planned errors that the stubbed ``forecast_draws`` returns:
+    ``mean(cp[:, :h]**2)`` and the other five by direct slicing, written here. (i) The moments
+    returned with ``half_out`` equal those returned without it, bitwise (the dump is read-only).
+    (ii) The half arrays equal the brute force to ``rtol = 1e-14``: each is a mean of at most 4
+    products, so the round-off is below gamma_4 = 4.4e-16 relative to the sum of absolute terms,
+    and the brute force sums the same terms in the same order (a factor of 20 of margin). (iii) For
+    even M the average of the halves is the full moment to ``1e-13`` times the mean absolute term
+    (b4 of the plan: gamma_M ~ M u, here M = 6; the plan's value 1e-13 at M = 200 has margin 4.5).
+    (iv) ``n_draws`` holds the two sizes (floor and the rest). (v) ``abs_cross`` is ``mean |cp * plp|``
+    over all the draws, the exact scale that the dump hands to b4 (R3 of the review).
+    """
+    from types import SimpleNamespace
+
+    from lpcstudy.ensemble import ensemble_moments
+
+    n_states, n_hor, dim = 7, 3, 2
+    handled, entries = _planned_tables(n_states, n_draws)
+    cp, plp = _stubbed_forecasts(monkeypatch, handled, entries, n_draws, n_hor, dim)
+    setup, noise = SimpleNamespace(noise=0.01), np.zeros((n_states, n_draws, dim))
+    kwargs = dict(chunk_traj=chunk_traj, reference_horizon=2)
+    plain = ensemble_moments(setup, None, "test", noise, np.arange(1, n_hor + 1), **kwargs)
+    half: dict = {}
+    with_half = ensemble_moments(setup, None, "test", noise, np.arange(1, n_hor + 1),
+                                 half_out=half, **kwargs)
+    for name in ("mean_cp", "mean_plp", "sq_cp", "sq_plp", "cross", "analog_seed", "est_seed",
+                 "noise_sens", "err_corr", "handled", "lm_residual"):
+        assert getattr(with_half, name).tobytes() == getattr(plain, name).tobytes(), name
+    h = n_draws // 2
+    assert half["n_draws"].tolist() == sizes and half["n_draws"].dtype == np.int64
+    for tag, part in (("A", slice(0, h)), ("B", slice(h, None))):
+        for stem, brute in (("sq_cp", cp[:, part] ** 2), ("sq_plp", plp[:, part] ** 2),
+                            ("cross", cp[:, part] * plp[:, part])):
+            np.testing.assert_allclose(half[f"{stem}_{tag}"], brute.mean(axis=1), rtol=1e-14,
+                                       atol=0.0)
+    np.testing.assert_allclose(half["abs_cross"], np.abs(cp * plp).mean(axis=1), rtol=1e-14, atol=0.0)
+    if n_draws % 2 == 0:
+        for stem, brute in (("sq_cp", cp**2), ("sq_plp", plp**2), ("cross", cp * plp)):
+            scale = np.abs(brute).mean(axis=1)  # the exact mean absolute term (R3: also dumped)
+            diff = np.abs(0.5 * (half[f"{stem}_A"] + half[f"{stem}_B"]) - getattr(plain, stem))
+            assert np.all(diff <= 1e-13 * scale)
+
+
+def test_ensemble_moments_half_out_needs_two_draws(monkeypatch) -> None:
+    """One oracle draw cannot be split: ``half_out`` raises ``ValueError`` (nothing is invented)."""
+    from types import SimpleNamespace
+
+    from lpcstudy.ensemble import ensemble_moments
+
+    handled, entries = _planned_tables(3, 1)
+    _stubbed_forecasts(monkeypatch, handled, entries, 1, 2, 2)
+    with pytest.raises(ValueError, match="at least two oracle draws"):
+        ensemble_moments(SimpleNamespace(noise=0.01), None, "test", np.zeros((3, 1, 2)),
+                         np.arange(1, 3), half_out={})

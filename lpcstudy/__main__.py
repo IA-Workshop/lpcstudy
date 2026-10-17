@@ -14,6 +14,7 @@ from pathlib import Path
 
 from . import provenance
 from .config import PRESETS
+from .dump import StateDump
 from .experiments import run_handling, run_robustness, run_system
 from .pipeline import Study
 from .report import make_figures, save_json, verdicts, write_markdown
@@ -45,7 +46,38 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Levenberg-Marquardt iterations of the PLP estimator, an integer of "
                              "from 1 to 999 (WU-0005.6: iteration-doubling study; default: the "
                              "preset's value, 15). Not accepted with the confirmatory flag.")
+    parser.add_argument("--states-dump", action="store_true",
+                        help="Also write the per-state arrays of each core system to "
+                             "<out>/<preset>/states/<system>.npz (WU-0003.7b; the schema is in "
+                             "the docstring of lpcstudy/dump.py). Not accepted with the "
+                             "confirmatory flag or --report-only. Results are bitwise the same "
+                             "except one provenance leaf.")
     return parser
+
+
+def choose_states_dump(args: argparse.Namespace) -> bool:
+    """Return whether the state dump was requested, or raise if the request is not allowed.
+
+    Refused together with the confirmatory flag: whether a sealed run may carry a dump is an open
+    owner decision (O6), and until then the sealed run writes none. Refused with ``--report-only``,
+    which recomputes nothing the dump could hold (a silently ignored flag would let a caller believe
+    a dump exists). This runs before the seed is chosen, so a refused request has not read the
+    sealed seed. Needs owner review before freeze (LPC.PC.11): it sits beside the seed guard.
+
+    Raises
+    ------
+    SeedRefusal
+        If the flag is given with the confirmatory flag or with ``--report-only``.
+    """
+    if not args.states_dump:
+        return False
+    if args.confirmatory:
+        raise SeedRefusal("--states-dump is not accepted with the confirmatory flag (the sealed "
+                          "run writes no state dump until the owner decides)")
+    if args.report_only:
+        raise SeedRefusal("--states-dump is not accepted with --report-only (nothing is "
+                          "recomputed, so there is no dump to write)")
+    return True
 
 
 def choose_refine_steps(args: argparse.Namespace) -> int | None:
@@ -123,6 +155,7 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     args, extras = parser.parse_known_args(argv)
     try:
         refine_steps = choose_refine_steps(args)  # before the seed: a sealed request stops here
+        states_dump = choose_states_dump(args)  # the same: refused before the seed is read
         seed_id, seed = choose_seed(args, extras, registry_path, ledger_path)
     except SeedRefusal as refusal:
         print(f"lpcstudy: refused (LPC.PC.7): {refusal.reason}", file=sys.stderr)
@@ -138,6 +171,8 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
         clock = provenance.RunClock()
         block = provenance.collect(config, seed_id, sys.argv[1:] if argv is None else argv,
                                    clock)
+        if states_dump:  # the one added leaf of a dump run (absent otherwise: 0 added)
+            block["states_dump"] = True
     out_dir.mkdir(parents=True, exist_ok=True)
     if args.report_only:
         results = json.loads((out_dir / "results.json").read_text())
@@ -179,6 +214,8 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
                     "block: %s", len(probe_issues), "; ".join(probe_issues))
     start = time.time()
     study = Study(config, out_dir)
+    if states_dump:
+        study.dump = StateDump()
     results: dict = {"config": provenance.config_record(config), "systems": {},
                      "provenance": block}
     for system in config.core_systems:

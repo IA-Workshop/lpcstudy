@@ -1,0 +1,102 @@
+chi2_4 median 3.3567, 0.999 quantile 18.4668
+system    cell                             kind   run     med   pred (o-p)/se   above    late    nodec it
+chua      rho=0.005|n_lib=10000            oracle P0   3.363  3.379    -1.17  0.0078  0.0105 0.00e+00 6.0
+chua      rho=0.005|n_lib=10000            oracle P1   3.375  3.365     0.78  0.0035  0.0084 0.00e+00 6.0
+chua      rho=0.01|n_lib=1000              oracle P0   3.357  3.370    -1.02  0.0053  0.0115 0.00e+00 6.0
+chua      rho=0.01|n_lib=1000              oracle P1   3.372  3.363     0.75  0.0029  0.0132 0.00e+00 6.0
+chua      rho=0.01|n_lib=10000 core        eval   P0   3.406  3.368     0.63  0.0046  0.0107 0.00e+00 6.0
+chua      rho=0.01|n_lib=10000 core        eval   P1   3.384  3.359     0.42  0.0018  0.0071 0.00e+00 6.0
+chua      rho=0.01|n_lib=10000 core        oracle P0   3.365  3.368    -0.60  0.0047  0.0095 0.00e+00 6.0
+chua      rho=0.01|n_lib=10000 core        oracle P1   3.360  3.361    -0.14  0.0023  0.0097 0.00e+00 6.0
+chua      rho=0.01|n_lib=100000            oracle P0   3.357  3.370    -1.02  0.0053  0.0115 0.00e+00 6.0
+chua      rho=0.01|n_lib=100000            oracle P1   3.372  3.363     0.75  0.0029  0.0132 0.00e+00 6.0
+chua      rho=0.01|n_lib=3162              oracle P0   3.357  3.370    -1.02  0.0053  0.0115 0.00e+00 6.0
+chua      rho=0.01|n_lib=3162              oracle P1   3.372  3.363     0.75  0.0029  0.0132 0.00e+00 6.0
+chua      rho=0.01|n_lib=31623             oracle P0   3.357  3.370    -1.02  0.0053  0.0115 0.00e+00 6.0
+chua      rho=0.01|n_lib=31623             oracle P1   3.372  3.363     0.75  0.0029  0.0132 0.00e+00 6.0
+chua      rho=0.02|n_lib=1000              oracle P0   3.354  3.371    -1.31  0.0053  0.0194 0.00e+00 6.0
+chua      rho=0.02|n_lib=1000              oracle P1   3.383  3.374     0.72  0.0063  0.0222 0.00e+00 6.0
+chua      rho=0.02|n_lib=10000             oracle P0   3.354  3.371    -1.31  0.0053  0.0194 0.00e+00 6.0
+chua      rho=0.02|n_lib=10000             oracle P1   3.383  3.374     0.72  0.0063  0.0222 0.00e+00 6.0
+chua      rho=0.02|n_lib=100000            oracle P0   3.354  3.371    -1.31  0.0053  0.0194 0.00e+00 6.0
+chua      rho=0.02|n_lib=100000            oracle P1   3.383  3.374     0.72  0.0063  0.0222 0.00e+00 6.0
+chua      rho=0.02|n_lib=3162              oracle P0   3.354  3.371    -1.31  0.0053  0.0194 0.00e+00 6.0
+chua      rho=0.02|n_lib=3162              oracle P1   3.383  3.374     0.72  0.0063  0.0222 0.00e+00 6.0
+chua      rho=0.02|n_lib=31623             oracle P0   3.354  3.371    -1.31  0.0053  0.0194 0.00e+00 6.0
+chua      rho=0.02|n_lib=31623             oracle P1   3.383  3.374     0.72  0.0063  0.0222 0.00e+00 6.0
+chua      rho=0.05|n_lib=10000             oracle P0   3.374  3.400    -1.97  0.0144  0.0517 0.00e+00 6.0
+chua      rho=0.05|n_lib=10000             oracle P1   3.388  3.391    -0.28  0.0117  0.0563 0.00e+00 6.0
+lorenz63  rho=0.005|n_lib=10000            oracle P0   3.432  3.421     0.86  0.0207  0.0213 0.00e+00 7.0
+lorenz63  rho=0.005|n_lib=10000            oracle P1   3.423  3.418     0.38  0.0197  0.0216 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=1000              oracle P0   3.432  3.421     0.79  0.0207  0.0273 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=1000              oracle P1   3.458  3.448     0.75  0.0284  0.0245 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=10000 core        eval   P0   3.433  3.437    -0.06  0.0254  0.0250 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=10000 core        eval   P1   3.370  3.427    -0.94  0.0225  0.0239 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=10000 core        oracle P0   3.437  3.427     1.67  0.0224  0.0243 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=10000 core        oracle P1   3.438  3.431     1.00  0.0237  0.0245 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=100000            oracle P0   3.432  3.421     0.79  0.0207  0.0273 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=100000            oracle P1   3.458  3.448     0.75  0.0284  0.0245 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=3162              oracle P0   3.432  3.421     0.79  0.0207  0.0273 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=3162              oracle P1   3.458  3.448     0.75  0.0284  0.0245 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=31623             oracle P0   3.432  3.421     0.79  0.0207  0.0273 0.00e+00 7.0
+lorenz63  rho=0.01|n_lib=31623             oracle P1   3.458  3.448     0.75  0.0284  0.0245 0.00e+00 7.0
+lorenz63  rho=0.02|n_lib=1000              oracle P0   3.460  3.455     0.35  0.0306  0.0345 0.00e+00 8.0
+lorenz63  rho=0.02|n_lib=1000              oracle P1   3.471  3.463     0.63  0.0329  0.0351 0.00e+00 8.0
+lorenz63  rho=0.02|n_lib=10000             oracle P0   3.460  3.455     0.35  0.0306  0.0345 0.00e+00 8.0
+lorenz63  rho=0.02|n_lib=10000             oracle P1   3.471  3.463     0.63  0.0329  0.0351 0.00e+00 8.0
+lorenz63  rho=0.02|n_lib=100000            oracle P0   3.460  3.455     0.35  0.0306  0.0345 0.00e+00 8.0
+lorenz63  rho=0.02|n_lib=100000            oracle P1   3.471  3.463     0.63  0.0329  0.0351 0.00e+00 8.0
+lorenz63  rho=0.02|n_lib=3162              oracle P0   3.460  3.455     0.35  0.0306  0.0345 0.00e+00 8.0
+lorenz63  rho=0.02|n_lib=3162              oracle P1   3.471  3.463     0.63  0.0329  0.0351 0.00e+00 8.0
+lorenz63  rho=0.02|n_lib=31623             oracle P0   3.460  3.455     0.35  0.0306  0.0345 0.00e+00 8.0
+lorenz63  rho=0.02|n_lib=31623             oracle P1   3.471  3.463     0.63  0.0329  0.0351 0.00e+00 8.0
+lorenz63  rho=0.05|n_lib=10000             oracle P0   3.484  3.481     0.23  0.0380  0.0482 0.00e+00 8.0
+lorenz63  rho=0.05|n_lib=10000             oracle P1   3.520  3.509     0.81  0.0459  0.0524 0.00e+00 8.0
+rossler   rho=0.005|n_lib=10000            oracle P0   3.349  3.357    -0.57  0.0009  0.0009 0.00e+00 7.0
+rossler   rho=0.005|n_lib=10000            oracle P1   3.340  3.357    -1.31  0.0011  0.0017 0.00e+00 7.0
+rossler   rho=0.01|n_lib=1000              oracle P0   3.350  3.357    -0.54  0.0009  0.0018 3.33e-05 8.0
+rossler   rho=0.01|n_lib=1000              oracle P1   3.341  3.357    -1.28  0.0012  0.0023 5.00e-05 8.0
+rossler   rho=0.01|n_lib=10000 core        eval   P0   3.451  3.357     1.56  0.0011  0.0025 0.00e+00 8.0
+rossler   rho=0.01|n_lib=10000 core        eval   P1   3.407  3.357     0.83  0.0007  0.0021 0.00e+00 8.0
+rossler   rho=0.01|n_lib=10000 core        oracle P0   3.342  3.357    -2.37  0.0009  0.0018 2.50e-05 8.0
+rossler   rho=0.01|n_lib=10000 core        oracle P1   3.346  3.357    -1.84  0.0010  0.0022 1.79e-05 8.0
+rossler   rho=0.01|n_lib=100000            oracle P0   3.350  3.357    -0.54  0.0009  0.0018 3.33e-05 8.0
+rossler   rho=0.01|n_lib=100000            oracle P1   3.341  3.357    -1.28  0.0012  0.0023 5.00e-05 8.0
+rossler   rho=0.01|n_lib=3162              oracle P0   3.350  3.357    -0.54  0.0009  0.0018 3.33e-05 8.0
+rossler   rho=0.01|n_lib=3162              oracle P1   3.341  3.357    -1.28  0.0012  0.0023 5.00e-05 8.0
+rossler   rho=0.01|n_lib=31623             oracle P0   3.350  3.357    -0.54  0.0009  0.0018 3.33e-05 8.0
+rossler   rho=0.01|n_lib=31623             oracle P1   3.341  3.357    -1.28  0.0012  0.0023 5.00e-05 8.0
+rossler   rho=0.02|n_lib=1000              oracle P0   3.351  3.357    -0.51  0.0012  0.0032 3.33e-04 8.0
+rossler   rho=0.02|n_lib=1000              oracle P1   3.342  3.358    -1.19  0.0014  0.0028 2.67e-04 8.0
+rossler   rho=0.02|n_lib=10000             oracle P0   3.351  3.357    -0.51  0.0012  0.0032 3.33e-04 8.0
+rossler   rho=0.02|n_lib=10000             oracle P1   3.342  3.358    -1.19  0.0014  0.0028 2.67e-04 8.0
+rossler   rho=0.02|n_lib=100000            oracle P0   3.351  3.357    -0.51  0.0012  0.0032 3.33e-04 8.0
+rossler   rho=0.02|n_lib=100000            oracle P1   3.342  3.358    -1.19  0.0014  0.0028 2.67e-04 8.0
+rossler   rho=0.02|n_lib=3162              oracle P0   3.351  3.357    -0.51  0.0012  0.0032 3.33e-04 8.0
+rossler   rho=0.02|n_lib=3162              oracle P1   3.342  3.358    -1.19  0.0014  0.0028 2.67e-04 8.0
+rossler   rho=0.02|n_lib=31623             oracle P0   3.351  3.357    -0.51  0.0012  0.0032 3.33e-04 8.0
+rossler   rho=0.02|n_lib=31623             oracle P1   3.342  3.358    -1.19  0.0014  0.0028 2.67e-04 8.0
+rossler   rho=0.05|n_lib=10000             oracle P0   3.351  3.358    -0.57  0.0015  0.0071 6.67e-04 8.0
+rossler   rho=0.05|n_lib=10000             oracle P1   3.340  3.357    -1.32  0.0012  0.0070 1.17e-04 8.0
+largest |median - prediction| = 0.094
+
+Predicted pilot bands (C4), oracle kind; [min/2, 2 max] of P0/P1; pooled per-run log-SD below
+chua      rho=0.005|n_lib=10000        above [0.0017, 0.0157]  late [0.0042, 0.0210]  no_decrease <= 1.0e-04  median_iterations 5..7
+chua      rho=0.01|n_lib=10000 core    above [0.0012, 0.0093]  late [0.0047, 0.0193]  no_decrease <= 1.0e-04  median_iterations 5..7
+chua      rho=0.01|n_lib=100000        above [0.0014, 0.0106]  late [0.0057, 0.0264]  no_decrease <= 1.0e-04  median_iterations 5..7
+chua      rho=0.02|n_lib=10000         above [0.0027, 0.0127]  late [0.0097, 0.0444]  no_decrease <= 1.0e-04  median_iterations 5..7
+chua      rho=0.02|n_lib=100000        above [0.0027, 0.0127]  late [0.0097, 0.0444]  no_decrease <= 1.0e-04  median_iterations 5..7
+chua      rho=0.05|n_lib=10000         above [0.0059, 0.0288]  late [0.0259, 0.1126]  no_decrease <= 1.0e-04  median_iterations 5..7
+lorenz63  rho=0.005|n_lib=10000        above [0.0099, 0.0413]  late [0.0106, 0.0432]  no_decrease <= 1.0e-04  median_iterations 6..8
+lorenz63  rho=0.01|n_lib=10000 core    above [0.0112, 0.0474]  late [0.0122, 0.0490]  no_decrease <= 1.0e-04  median_iterations 6..8
+lorenz63  rho=0.01|n_lib=100000        above [0.0103, 0.0569]  late [0.0123, 0.0545]  no_decrease <= 1.0e-04  median_iterations 6..8
+lorenz63  rho=0.02|n_lib=10000         above [0.0153, 0.0657]  late [0.0173, 0.0703]  no_decrease <= 1.0e-04  median_iterations 7..9
+lorenz63  rho=0.02|n_lib=100000        above [0.0153, 0.0657]  late [0.0173, 0.0703]  no_decrease <= 1.0e-04  median_iterations 7..9
+lorenz63  rho=0.05|n_lib=10000         above [0.0190, 0.0919]  late [0.0241, 0.1048]  no_decrease <= 1.0e-04  median_iterations 7..9
+rossler   rho=0.005|n_lib=10000        above [0.0004, 0.0023]  late [0.0005, 0.0034]  no_decrease <= 1.0e-04  median_iterations 6..8
+rossler   rho=0.01|n_lib=10000 core    above [0.0005, 0.0021]  late [0.0009, 0.0045]  no_decrease <= 1.0e-04  median_iterations 7..9
+rossler   rho=0.01|n_lib=100000        above [0.0005, 0.0023]  late [0.0009, 0.0046]  no_decrease <= 1.0e-04  median_iterations 7..9
+rossler   rho=0.02|n_lib=10000         above [0.0006, 0.0027]  late [0.0014, 0.0065]  no_decrease <= 6.7e-04  median_iterations 7..9
+rossler   rho=0.02|n_lib=100000        above [0.0006, 0.0027]  late [0.0014, 0.0065]  no_decrease <= 6.7e-04  median_iterations 7..9
+rossler   rho=0.05|n_lib=10000         above [0.0006, 0.0031]  late [0.0035, 0.0142]  no_decrease <= 1.3e-03  median_iterations 7..9
+pooled per-run log-SD of the fractions: 0.192 over 36 log ratios; new run vs geometric mean of two: SD 0.235, 3 SD = factor 2.02

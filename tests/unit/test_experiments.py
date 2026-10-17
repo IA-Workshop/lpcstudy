@@ -13,7 +13,7 @@ import pytest
 
 from lpcstudy.config import SMOKE
 from lpcstudy.ensemble import EvaluationDraws
-from lpcstudy.experiments import _sweep_subset, context_record
+from lpcstudy.experiments import _sweep_subset, context_record, fitted_record
 from lpcstudy.pipeline import Cell, SplitData
 from unit_helpers import _moments_from_draws
 
@@ -727,3 +727,310 @@ def test_lambda_fin_variant_shares_the_h2a_two_part_generator_and_the_directions
     fresh = make_rng(config.seed, "lorenz63", "finite-growth").bit_generator.state
     assert received == [fresh, fresh]
     assert make_rng(config.seed, "rossler", "finite-growth").bit_generator.state != fresh
+
+
+def test_fitted_record_keeps_the_existing_leaves_and_adds_the_integer_and_digest_leaves() -> None:
+    """WU-0003.7a (a2, a3, a4): ``fitted_record`` is the old ``fitted`` block plus ``nfev`` and
+    ``status`` of both proxies, ``a5_leaf_digest`` and ``allocator_digest``, in that order.
+
+    Reference: a hand-built world. (i) The A5 tree is a manufactured stump on the profile
+    coordinate ``Lambda_hat / lambda_max`` (= ``growth_proxy * steps_per_lyapunov``): fitted on
+    the two points 0 and 1 with the other three coordinates constant, its one split is 0.5, so by
+    hand a coordinate <= 0.5 is node 1 and a coordinate above is node 2. The growth values are
+    0.0, 0.01 (0.3), 0.02 (0.6) and 0.04 (1.2), far from the split, and the leaf of every
+    (state, draw) is decided by hand; the digest is ``hashlib.sha256`` of those leaves packed as
+    little-endian int64 with ``struct``, calibration first and test second, C order. (ii) The
+    allocator digest is ``hashlib.sha256`` of the allocator network's weight and bias values
+    (binary64, row-major) packed with ``struct``. (iii) The integer leaves are the typed values
+    11, 2, 5, 1. (iv) The existing leaves are the hand values of the fields they read. A decoy map under a second K,
+    split at 0.1, must not be hashed while K = 2 is chosen, and is when K = 3 is. Moving one
+    calibration state across the split changes ``a5_leaf_digest`` and nothing else. Exact.
+    """
+    from lpcstudy.allocation import ProfileProxies, RegimeMap, SeedProxy
+    from lpcstudy.networks import TrainedNetwork
+    from sklearn.tree import DecisionTreeRegressor
+
+    cfg, lt = SMOKE, SMOKE.steps_per_lyapunov
+    assert lt == 30 and cfg.reference_horizon == 30
+
+    def draws(growth: np.ndarray) -> EvaluationDraws:
+        n, e = growth.shape
+        zeros = np.zeros((n, e, 3))
+        return EvaluationDraws(
+            horizons=np.arange(1, 4), cp_err=zeros, plp_err=zeros, verify_noise=zeros,
+            distance=np.full((n, e), 0.02), est_nu=np.ones((n, e)), growth_proxy=growth,
+            gain_proxy=zeros, inputs=np.zeros((n, e, 1)), noise_sens=np.zeros((n, e)))
+
+    cal_growth = np.array([[0.0, 0.01], [0.02, 0.04], [0.01, 0.01]])
+    test_growth = np.array([[0.04, 0.0], [0.02, 0.01]])
+    core = SimpleNamespace(noise=0.01, splits={
+        "calibration": SimpleNamespace(evals=draws(cal_growth)),
+        "test": SimpleNamespace(evals=draws(test_growth))})
+    fit = np.zeros((2, 4))
+    fit[:, 2] = [0.0, 1.0]
+    tree = DecisionTreeRegressor(max_leaf_nodes=2, random_state=0).fit(fit, [0.0, 1.0])
+    leaf_ids = np.nonzero(tree.tree_.children_left == -1)[0]
+    assert tree.tree_.feature[0] == 2 and tree.tree_.threshold[0] == 0.5
+    regime_map = RegimeMap(tree=tree, leaf_ids=leaf_ids, weights=np.full((2, 30), 0.25),
+                           horizons_km=np.array([60.0, 90.0]))
+    # R2 of the review: a decoy map under another K, split at 0.1 instead of 0.5 (fitted on 0 and
+    # 0.2), so that hashing any other K than ``chosen_regimes`` gives a different digest
+    fit_decoy = np.zeros((2, 4))
+    fit_decoy[:, 2] = [0.0, 0.2]
+    decoy_tree = DecisionTreeRegressor(max_leaf_nodes=2, random_state=0).fit(fit_decoy, [0.0, 1.0])
+    assert decoy_tree.tree_.feature[0] == 2 and decoy_tree.tree_.threshold[0] == pytest.approx(0.1)
+    decoy_map = RegimeMap(tree=decoy_tree, leaf_ids=np.nonzero(decoy_tree.tree_.children_left == -1)[0],
+                          weights=np.full((2, 30), 0.75), horizons_km=np.array([30.0, 30.0]))
+    params = [(np.array([[0.1, 0.2], [0.3, 0.4]]), np.array([0.5, -0.5])),
+              (np.array([[1.0], [2.0]]), np.array([1e-7]))]
+    network = TrainedNetwork(params=params, in_mean=np.zeros(2), in_scale=np.ones(2),
+                             out_mean=np.zeros(1), out_scale=np.ones(1), val_loss=0.0, width=2)
+    rules = SimpleNamespace(
+        proxies=ProfileProxies(SeedProxy(1.0, 2.0, nfev=11, status=2),
+                               SeedProxy(0.5, 0.25, nfev=5, status=1), nu_cap=7.5),
+        predictor=SimpleNamespace(network=network), regimes={2: regime_map, 3: decoy_map},
+        chosen_regimes=2)
+
+    def hand_leaves(*growths: np.ndarray, split: float = 0.5) -> str:
+        leaves = [1 if g * lt <= split else 2 for growth in growths for g in growth.ravel()]
+        return hashlib.sha256(struct.pack("<%dq" % len(leaves), *leaves)).hexdigest()
+
+    values = [v for w, b in params for a in (w, b) for v in a.ravel().tolist()]
+    record = fitted_record(core, rules, cfg)
+    assert list(record) == ["analog_proxy", "estimation_proxy", "nu_cap", "chosen_K",
+                            "regime_weights_href", "regime_horizons_km_lyapunov",
+                            "a5_leaf_digest", "allocator_digest"]
+    assert record["analog_proxy"] == {"slope": 1.0, "floor": 2.0, "nfev": 11, "status": 2}
+    assert record["estimation_proxy"] == {"slope": 0.5, "floor": 0.25, "nfev": 5, "status": 1}
+    assert record["nu_cap"] == 7.5 and record["chosen_K"] == 2
+    assert record["regime_weights_href"] == {"2": [0.25, 0.25], "3": [0.75, 0.75]}
+    assert record["regime_horizons_km_lyapunov"] == {"2": [2.0, 3.0], "3": [1.0, 1.0]}
+    assert record["a5_leaf_digest"] == hand_leaves(cal_growth, test_growth)
+    assert record["allocator_digest"] == hashlib.sha256(
+        struct.pack("<%dd" % len(values), *values)).hexdigest()
+    moved = cal_growth.copy()
+    moved[2, 0] = 0.04  # was 0.01: node 1 becomes node 2
+    core.splits["calibration"].evals = draws(moved)
+    again = fitted_record(core, rules, cfg)
+    assert again["a5_leaf_digest"] == hand_leaves(moved, test_growth) != record["a5_leaf_digest"]
+    assert {k: v for k, v in again.items() if k != "a5_leaf_digest"} == \
+        {k: v for k, v in record.items() if k != "a5_leaf_digest"}
+    # the digest follows the chosen K: the decoy's digest is different, and choosing K = 3 gives it
+    assert hand_leaves(cal_growth, test_growth, split=0.1) != record["a5_leaf_digest"]
+    rules.chosen_regimes = 3
+    assert fitted_record(core, rules, cfg)["a5_leaf_digest"] == \
+        hand_leaves(moved, test_growth, split=0.1)
+
+
+# ------------------------------------------------ V4 arrays for the state dump (WU-0003.7b)
+def _v4_world(monkeypatch, tmp_path, perturb=None, clips=None, nan=False, signed_zero=False):
+    """Two real ``Study`` objects (dump off and on), the same stubbed ``forecast_draws``.
+
+    The planned errors at horizon ``h`` for global row i and draw j are ``cp0[i, j] (1 + h / 100)``
+    (CP) and ``plp0[i, j] + 0.1 h / 30`` (PLP), so a column's value does not depend on which other
+    horizons were requested. ``perturb`` (a function of the horizon list) may add to the PLP error
+    of the first column when three horizons are requested (a broken second call); ``clips`` may
+    set the entry counts of that call.
+    """
+    from lpcstudy import experiments
+    from lpcstudy.dump import StateDump
+    from lpcstudy.ensemble import DRAW_COUNTERS, DrawBatch
+    from lpcstudy.pipeline import Study
+
+    n_states, n_draws = SMOKE.convergence_states, max(SMOKE.convergence_draws)
+    rng = np.random.default_rng(4107)
+    cp0, plp0 = rng.standard_normal((n_states, n_draws)), rng.standard_normal((n_states, n_draws))
+    if nan:  # an unclipped NaN PLP error in both calls (the same entry)
+        plp0[0, 0] = np.nan
+    calls: list[list[int]] = []
+
+    def errors(rows, horizons):
+        h = np.asarray(horizons, dtype=float)
+        cp = cp0[rows][:, :, None] * (1.0 + h / 100.0)
+        plp = plp0[rows][:, :, None] + 0.1 * h / 30.0
+        if perturb is not None and len(h) == 3:
+            plp[:, :, 0] += perturb
+        if signed_zero and rows[0] == 0:  # global state 0, draw 0: 0 with the other sign in the
+            plp[0, 0, 0] = -0.0 if len(h) == 3 else 0.0  # three-horizon call
+        return cp, plp
+
+    def fake(setup, library, split, rows, unit_noise, horizons, reference_horizon=None):
+        calls.append([int(h) for h in horizons])
+        cp, plp = errors(rows, horizons)
+        entries = {"error_clips_cp": 0, "error_clips_plp": 0, "error_clips_nonfinite": 0}
+        if clips is not None and len(horizons) == 3:
+            entries.update(clips)
+        ones = np.ones((len(rows), n_draws))
+        return DrawBatch(
+            cp_err=cp, plp_err=plp, analog_seed_sq=None, est_seed_sq=None, distance=None,
+            inputs=None, est_states=None, est_nu=None, analog_vecs=None,
+            handled=np.ones((len(rows), len(DRAW_COUNTERS)), dtype=np.int64),
+            clip_entries=entries, lm_residual=ones, lm_accepted=ones.astype(int),
+            lm_late=ones.astype(int))
+
+    monkeypatch.setattr(experiments, "forecast_draws", fake)
+    monkeypatch.setattr(experiments.AnalogLibrary, "build", classmethod(lambda cls, *a, **k: None))
+    studies = []
+    for name in ("off", "on"):
+        study = Study(SMOKE, tmp_path / name)
+        study.unit_noise = lambda *a, **k: np.zeros((n_states + 5, n_draws, 7))
+        studies.append(study)
+    studies[1].dump = StateDump()
+    cell = SimpleNamespace(system="lorenz63", label="base", noise=0.01, library_size=10_000,
+                           ctx=SimpleNamespace(embed_dim=7, spec=SimpleNamespace(dim=3)), setup=None)
+    return studies, cell, calls, errors
+
+
+def _ref_weight(c: np.ndarray, p: np.ndarray) -> np.ndarray:
+    """The V4 weight written from its definition: ``clip(E[p (p - c)] / E[(c - p)^2], 0, 1)``."""
+    return np.clip(np.mean(p * (p - c), axis=-1) / np.maximum(np.mean((c - p) ** 2, axis=-1),
+                                                              1e-300), 0, 1)
+
+
+def test_convergence_check_with_the_dump_gives_the_same_leaves_and_the_v4_arrays(
+        monkeypatch, tmp_path) -> None:
+    """Dump on: the V4 result and its handling record equal dump off bitwise; the arrays are the V4 values.
+
+    Reference: formulas written in the test. The planned errors (see ``_v4_world``) give the weight
+    ``clip(E[p (p - c)] / E[(c - p)^2], 0, 1)`` from the first ``M`` draws, per state and horizon
+    (1, 2, 4 LT = 30, 60, 120 steps); the signed deviation is that minus the weight from all
+    draws; the half-width is half the distance between the 97.5 and 2.5 percentiles of 200
+    bootstrap weights, whose index sets the test draws again from an independent
+    ``np.random.default_rng([seed, crc32(label)])`` in the production order (one
+    ``integers(0, M, (200, M))`` per ``M``). Tolerances: the leaves and the record, bitwise (the
+    dump changes nothing: the production code path is the same); ``w_hat``, ``signed_dev``
+    and ``half_width`` to ``rtol = 1e-13`` (each is a mean of at most 30 products, gamma_30 =
+    3.3e-15, and a percentile of such values: a factor of 30 of margin); the b5 pair (the median
+    of the ``H_ref`` half-widths and the mean absolute deviation, against the leaves) bitwise,
+    since the leaves are computed from the same arrays. Also: the production call asked for
+    ``H_ref`` only, the dump's second call for 30, 60 and 120 (and only with the dump on);
+    ``extra_href_equal`` is True; no random number is drawn that the dump-off run does not draw
+    (the leaves are equal).
+    """
+    import zlib
+
+    from lpcstudy import experiments
+
+    (off, on), cell, calls, errors = _v4_world(monkeypatch, tmp_path)
+    out_off = experiments.convergence_check(off, cell)
+    n_off = len(calls)
+    assert all(c == [30] for c in calls)
+    out_on = experiments.convergence_check(on, cell)
+    assert out_on == out_off and off._records == on._records
+    assert {tuple(c) for c in calls[n_off:]} == {(30,), (30, 60, 120)}
+    v4 = on.dump._v4["lorenz63"]
+    n_states, n_draws = SMOKE.convergence_states, max(SMOKE.convergence_draws)
+    assert v4["M"].tolist() == list(SMOKE.convergence_draws) and \
+        v4["horizons"].tolist() == [30, 60, 120] and bool(v4["extra_href_equal"])
+    cp, plp = errors(np.arange(n_states), [30, 60, 120])
+    ref = np.stack([_ref_weight(cp[:, :, j], plp[:, :, j]) for j in range(3)], axis=1)
+    assert v4["w_ref"].shape == (n_states, 3)
+    np.testing.assert_allclose(v4["w_ref"], ref, rtol=1e-13, atol=0.0)
+    label = b"lorenz63|V4-convergence"
+    rng = np.random.default_rng([SMOKE.seed, zlib.crc32(label)])
+    for mi, m in enumerate(SMOKE.convergence_draws):
+        base = np.stack([_ref_weight(cp[:, :m, j], plp[:, :m, j]) for j in range(3)], axis=1)
+        idx = rng.integers(0, m, (200, m))
+        for j in range(3):
+            boots = np.stack([_ref_weight(cp[:, i, j], plp[:, i, j]) for i in idx])
+            half = 0.5 * (np.percentile(boots, 97.5, axis=0) - np.percentile(boots, 2.5, axis=0))
+            np.testing.assert_allclose(v4["half_width"][mi, :, j], half, rtol=1e-13, atol=0.0)
+        np.testing.assert_allclose(v4["w_hat"][mi], base, rtol=1e-13, atol=0.0)
+        np.testing.assert_allclose(v4["signed_dev"][mi], base - ref, rtol=0.0, atol=1e-13)
+        leaf = out_on[str(m)]
+        assert float(np.median(v4["half_width"][mi, :, 0])) == leaf["median_half_width"]
+        assert float(np.mean(np.abs(v4["signed_dev"][mi, :, 0]))) == leaf["mean_abs_dev_from_max"]
+    assert v4["extra_handled"].shape == (n_states, 8) and v4["extra_clip_entries"].tolist() == [0, 0, 0]
+    assert v4["extra_clip_entry_names"].tolist() == ["error_clips_cp", "error_clips_plp",
+                                                     "error_clips_nonfinite"]
+
+
+def test_convergence_check_dump_flags_a_second_call_whose_href_column_differs(
+        monkeypatch, tmp_path, caplog) -> None:
+    """A broken second forecast is not silent: ``extra_href_equal`` is False; the production leaves are unchanged.
+
+    Reference: the stub adds 1e-9 to the ``H_ref`` PLP column of the three-horizon call only. The
+    bitwise comparison with the production column must then be False (a defect of the dump would
+    show as a difference, never as a pass), the V4 leaves still equal the dump-off ones, and one
+    WARNING line names the number of differing entries: all 10 x 30 PLP entries (R5 of the review).
+    """
+    import logging
+
+    from lpcstudy import experiments
+
+    (off, on), cell, _, _ = _v4_world(monkeypatch, tmp_path, perturb=1e-9)
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        out_on = experiments.convergence_check(on, cell)
+    assert out_on == experiments.convergence_check(off, cell)
+    v4 = on.dump._v4["lorenz63"]
+    assert bool(v4["extra_href_equal"]) is False and int(v4["extra_href_diff"]) == 300
+    lines = [r.getMessage() for r in caplog.records if "H_ref errors of the second" in r.getMessage()]
+    assert len(lines) == 1 and "300 of 600 entries" in lines[0]
+
+
+def test_convergence_check_dump_treats_an_identical_nan_as_unequal(
+        monkeypatch, tmp_path, caplog) -> None:
+    """Strict comparison (amendment 4, D3): a NaN counts as unequal even when both calls have it.
+
+    Reference: the plan text of D3 ("a NaN counts as unequal"). The stub puts the same NaN PLP
+    entry in the production and the second forecast: ``extra_href_equal`` is False,
+    ``extra_href_diff`` is 1 (one entry of the 600) and one WARNING says so. (Round 1 had adopted
+    the looser reading, NaN equal to NaN; round 2 withdrew it, R9 of the re-review.) Exact.
+    """
+    import logging
+
+    from lpcstudy import experiments
+
+    (_, on), cell, _, _ = _v4_world(monkeypatch, tmp_path, nan=True)
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        experiments.convergence_check(on, cell)
+    v4 = on.dump._v4["lorenz63"]
+    assert bool(v4["extra_href_equal"]) is False and int(v4["extra_href_diff"]) == 1
+    lines = [r.getMessage() for r in caplog.records if "H_ref errors of the second" in r.getMessage()]
+    assert len(lines) == 1 and "1 of 600 entries" in lines[0] and "NaN counts as different" in lines[0]
+
+
+def test_convergence_check_dump_compares_bit_patterns_so_signed_zeros_differ(
+        monkeypatch, tmp_path, caplog) -> None:
+    """``+0.0`` in production and ``-0.0`` in the second call is a mismatch (the comparison is bitwise).
+
+    Reference: the plan text of D3 ("bitwise") and IEEE 754: the two zeros are ``==`` but have
+    different bit patterns. The stub gives one PLP entry the value 0 with the sign + in the
+    production call and - in the three-horizon call: one differing entry, one WARNING. Exact.
+    """
+    import logging
+
+    from lpcstudy import experiments
+
+    (_, on), cell, _, _ = _v4_world(monkeypatch, tmp_path, signed_zero=True)
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        experiments.convergence_check(on, cell)
+    v4 = on.dump._v4["lorenz63"]
+    assert bool(v4["extra_href_equal"]) is False and int(v4["extra_href_diff"]) == 1
+    assert len([r for r in caplog.records if "H_ref errors of the second" in r.getMessage()]) == 1
+
+
+def test_convergence_check_dump_counts_and_logs_the_clips_of_its_second_forecast(
+        monkeypatch, tmp_path, caplog) -> None:
+    """The clipped entries of the dump-only forecasts are counted in the dump and logged once; ``handling`` is unchanged.
+
+    Reference: the stub reports 3 CP clips and 2 non-finite entries per batch of the three-horizon
+    call (two batches of five states), so the totals are [6, 0, 4]; one WARNING line from the
+    ``lpcstudy`` logger names V4 and ``states/lorenz63.npz``; the handling record of the dump-on
+    study equals the dump-off one (the run did not use these forecasts). Exact.
+    """
+    import logging
+
+    from lpcstudy import experiments
+
+    (off, on), cell, _, _ = _v4_world(monkeypatch, tmp_path,
+                                      clips={"error_clips_cp": 3, "error_clips_nonfinite": 2})
+    experiments.convergence_check(off, cell)
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        experiments.convergence_check(on, cell)
+    assert on.dump._v4["lorenz63"]["extra_clip_entries"].tolist() == [6, 0, 4]
+    lines = [r.getMessage() for r in caplog.records if "V4 dump forecasts" in r.getMessage()]
+    assert len(lines) == 1 and "states/lorenz63.npz" in lines[0]
+    # R4: the line says what it counts: all three horizons (H_ref, 2 and 4 LT) of 10 x 30 draws
+    assert "H_ref, 2 and 4 LT" in lines[0] and " of 900;" in lines[0]
+    assert off._records == on._records

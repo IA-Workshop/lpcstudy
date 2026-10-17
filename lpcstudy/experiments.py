@@ -22,6 +22,7 @@ from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, make_rng
 from .dynamics import make_finite_growth
+from .dump import StateDump, entry_names, v4_arrays
 from .embedding import delay_vectors
 from .ensemble import CORRELATION_FIELDS, DRAW_COLUMN, DRAW_COUNTERS, ENTRY_COUNTERS, \
     AnalogLibrary, forecast_draws
@@ -98,6 +99,20 @@ def convergence_check(study: Study, cell: Cell) -> dict:
         for name in ENTRY_COUNTERS:
             clipped[name] += batch.clip_entries[name]
     cp, plp = np.concatenate(cp), np.concatenate(plp)
+    extra = None if study.dump is None else _v4_extra_forecasts(
+        study, cell, library, noise, n, cp, plp, cfg)
+    if extra is not None and extra["clip_entries"].any():  # counted in the dump; never silent
+        # the second call covers three horizons (H_ref, 2 and 4 LT), so its totals and the
+        # denominator are over all three; an H_ref clip is also in the production handling
+        LOG.warning("%s V4 dump forecasts (H_ref, 2 and 4 LT): clipped entries %s of %d; counted "
+                    "in states/%s.npz only, not in handling", cell.system,
+                    dict(zip(ENTRY_COUNTERS, extra["clip_entries"].tolist())),
+                    cp.size * len(extra["horizons"]), cell.system)
+    if extra is not None and extra["href_diff"]:  # the dump's 2 and 4 LT columns are suspect
+        LOG.warning("%s V4 dump: the H_ref errors of the second forecast differ from production "
+                    "in %d of %d entries (bit patterns; a NaN counts as different); the 2 and 4 "
+                    "LT arrays come from that second forecast", cell.system, extra["href_diff"],
+                    cp.size * 2)
     study.record_cell(cell.system, cell.label, "V4-convergence",
                       check_record(handled, clipped, n, noise.shape[1], 1, cell.noise,
                                    ctx.embed_dim - ctx.spec.dim,
@@ -116,17 +131,109 @@ def convergence_check(study: Study, cell: Cell) -> dict:
     rng = make_rng(cfg.seed, cell.system, "V4-convergence")
     reference = weight(cp, plp)
     out = {}
+    v4: dict[str, list] = {"w_hat": [], "half_width": [], "signed_dev": []}
     for m_draws in cfg.convergence_draws:
         base = weight(cp[:, :m_draws], plp[:, :m_draws])
-        boots = np.stack([weight(cp[:, idx], plp[:, idx]) for idx in
-                          rng.integers(0, m_draws, (200, m_draws))])
+        resamples = rng.integers(0, m_draws, (200, m_draws))
+        boots = np.stack([weight(cp[:, idx], plp[:, idx]) for idx in resamples])
         half = 0.5 * (np.percentile(boots, 97.5, axis=0) - np.percentile(boots, 2.5, axis=0))
         out[str(m_draws)] = {"median_half_width": float(np.median(half)),
                              "mean_abs_dev_from_max": float(np.mean(np.abs(base - reference)))}
+        if study.dump is not None and extra is not None:
+            # the dump's copies, and the same quantities at 2 and 4 LT from the second forecast,
+            # with the production resample indices (no new draw)
+            later = []
+            for j in range(extra["cp"].shape[0]):
+                c, p = extra["cp"][j], extra["plp"][j]
+                later_base = weight(c[:, :m_draws], p[:, :m_draws])
+                later_boots = np.stack([weight(c[:, idx], p[:, idx]) for idx in resamples])
+                later_half = 0.5 * (np.percentile(later_boots, 97.5, axis=0)
+                                    - np.percentile(later_boots, 2.5, axis=0))
+                later.append((later_base, later_half, later_base - weight(c, p)))
+            v4["w_hat"].append(np.column_stack([base, *[t[0] for t in later]]))
+            v4["half_width"].append(np.column_stack([half, *[t[1] for t in later]]))
+            v4["signed_dev"].append(np.column_stack([base - reference, *[t[2] for t in later]]))
+    if study.dump is not None and extra is not None:
+        study.dump.record_v4(cell.system, {
+            "M": np.array(cfg.convergence_draws), "horizons": extra["horizons"],
+            **{k: np.stack(v) for k, v in v4.items()},
+            "w_ref": np.column_stack([reference, *[weight(extra["cp"][j], extra["plp"][j])
+                                                   for j in range(extra["cp"].shape[0])]]),
+            "extra_href_equal": extra["href_equal"], "extra_href_diff": extra["href_diff"],
+            "extra_handled": extra["handled"],
+            "extra_clip_entries": extra["clip_entries"],
+            "extra_clip_entry_names": entry_names()})
     used = out.get(str(cfg.n_oracle_draws))
     out["used_M"] = cfg.n_oracle_draws
     out["pass"] = bool(used is not None and used["median_half_width"] <= 0.05)
     return out
+
+
+def _v4_extra_forecasts(study: Study, cell: Cell, library: AnalogLibrary, noise: np.ndarray,
+                        n: int, cp_ref: np.ndarray, plp_ref: np.ndarray, cfg: StudyConfig) -> dict:
+    """The V4 forecasts at ``H_ref``, 2 and 4 LT, for the state dump only (WU-0003.7b).
+
+    The same states, the same noise and the same estimator as ``convergence_check``, in one more
+    ``forecast_draws`` call per batch of five states. It draws no random number (the noise array is
+    given). Its ``H_ref`` column is compared with the production one strictly (``href_equal``: bit
+    patterns, so ``+0.0`` and ``-0.0`` differ, and a NaN counts as different, even when both calls
+    have the same NaN; amendment 4, D3); the
+    production column, not this one, feeds the ``H_ref`` results. The clipped entries and the
+    handling counts of the call are summed and returned (the caller writes them to the dump and a
+    nonzero clip count to the run log, PRIME.4), though nothing of it enters ``handling``: the run
+    does not use these forecasts.
+
+    Parameters
+    ----------
+    study : Study
+        Unused except for its place in the call chain (kept for symmetry with the caller).
+    cell : Cell
+        The core cell.
+    library : AnalogLibrary
+        The core library.
+    noise : np.ndarray
+        The convergence noise ``(>= n, M, D)``.
+    n : int
+        Number of states.
+    cp_ref, plp_ref : np.ndarray
+        The production errors at ``H_ref``, ``(n, M)``.
+    cfg : StudyConfig
+        Configuration.
+
+    Returns
+    -------
+    dict
+        ``cp`` and ``plp`` (``(2, n, M)``: the errors at 2 and 4 LT), ``horizons`` (all three,
+        steps), ``href_equal`` (bool) and ``href_diff`` (the number of entries of the two ``H_ref``
+        arrays, CP and PLP, that differ in their bit patterns or are NaN), ``handled`` (int64
+        ``(n, 8)``) and ``clip_entries`` (int64 ``(3,)``: the totals over all three horizons,
+        ``H_ref`` included).
+    """
+    del study
+    horizons, _ = v4_arrays(cfg)
+    cp, plp, href_cp, href_plp = [], [], [], []
+    handled = np.zeros((n, len(DRAW_COUNTERS)), dtype=np.int64)
+    entries = dict.fromkeys(ENTRY_COUNTERS, 0)
+    for start in range(0, n, 5):
+        rows = np.arange(start, min(n, start + 5))
+        batch = forecast_draws(cell.setup, library, "test", rows, noise[rows], horizons,
+                               cfg.reference_horizon)
+        href_cp.append(batch.cp_err[:, :, 0])
+        href_plp.append(batch.plp_err[:, :, 0])
+        cp.append(np.moveaxis(batch.cp_err[:, :, 1:], -1, 0))
+        plp.append(np.moveaxis(batch.plp_err[:, :, 1:], -1, 0))
+        handled[rows] = batch.handled
+        for name in ENTRY_COUNTERS:
+            entries[name] += batch.clip_entries[name]
+    differ = 0  # strict (amendment 4, D3): bit patterns, so +0.0 and -0.0 differ, and a NaN differs
+    for second, first in ((np.concatenate(href_cp), cp_ref), (np.concatenate(href_plp), plp_ref)):
+        bits = lambda a: np.ascontiguousarray(a, dtype=np.float64).view(np.uint64)
+        differ += int(np.count_nonzero((bits(second) != bits(first)) | np.isnan(second)
+                                       | np.isnan(first)))
+    return {"cp": np.concatenate(cp, axis=1), "plp": np.concatenate(plp, axis=1),
+            "horizons": horizons, "href_equal": differ == 0, "href_diff": differ,
+            "handled": handled,
+            "clip_entries": np.array([entries[k] for k in ENTRY_COUNTERS])}
 
 
 def _evaluate(cell: Cell, rules: FittedRules, config: StudyConfig, split: str = "test"):
@@ -422,6 +529,48 @@ def context_record(ctx: SystemContext) -> dict:
             "unwhiten_digest": array_digest(ctx.unwhiten)}
 
 
+def fitted_record(core: Cell, rules: FittedRules, cfg: StudyConfig) -> dict:
+    """The ``fitted`` block of a system: the fitted rules and the provenance of their fits.
+
+    The first six entries are the long-standing ones (unchanged, bitwise). WU-0003.7a adds, after
+    them and with no random draw, four leaves that exist so that two runs can be compared and a
+    difference located (``docs/agent/notes/2026-10-14-math-wu0003.md``, M1; needs owner review before
+    freeze): ``nfev`` and ``status`` inside each proxy entry (the ``least_squares`` outcome, which
+    shows where a tolerance-stopped fit ended); ``a5_leaf_digest`` (the A5 tree's leaf id of every
+    (state, draw) of the calibration and then the test split, int64, SHA-256 of the C-order bytes,
+    from the profiles that production assigns); and ``allocator_digest`` (the SHA-256 of the A3
+    allocator network's weights, see ``TrainedNetwork.weights_digest``).
+
+    Parameters
+    ----------
+    core : Cell
+        The core cell (its calibration and test evaluation draws and its noise level).
+    rules : FittedRules
+        The rules fitted on it.
+    cfg : StudyConfig
+        Configuration (``reference_horizon``, ``steps_per_lyapunov``).
+
+    Returns
+    -------
+    dict
+        JSON-serializable ``fitted`` block.
+    """
+    profiles = [deployable_profile(core.splits[split].evals, rules.proxies, core.noise,
+                                   cfg.steps_per_lyapunov) for split in ("calibration", "test")]
+    return {"analog_proxy": vars(rules.proxies.analog),
+            "estimation_proxy": vars(rules.proxies.estimation),
+            "nu_cap": rules.proxies.nu_cap,
+            "chosen_K": rules.chosen_regimes,
+            "regime_weights_href": {
+                str(k): r.weights[:, cfg.reference_horizon - 1].tolist()
+                for k, r in rules.regimes.items()},
+            "regime_horizons_km_lyapunov": {
+                str(k): (r.horizons_km / cfg.steps_per_lyapunov).tolist()
+                for k, r in rules.regimes.items()},
+            "a5_leaf_digest": rules.regimes[rules.chosen_regimes].leaf_digest(*profiles),
+            "allocator_digest": rules.predictor.network.weights_digest()}
+
+
 def run_system(study: Study, system: str) -> dict:
     """Stages (ii)-(iv) for one core system.
 
@@ -466,16 +615,7 @@ def run_system(study: Study, system: str) -> dict:
     rules = fit_rules([core], cfg)
     study.record_rules(system, core, rules)
     weights, scores = _evaluate(core, rules, cfg)
-    res["fitted"] = {"analog_proxy": vars(rules.proxies.analog),
-                     "estimation_proxy": vars(rules.proxies.estimation),
-                     "nu_cap": rules.proxies.nu_cap,
-                     "chosen_K": rules.chosen_regimes,
-                     "regime_weights_href": {
-                         str(k): r.weights[:, cfg.reference_horizon - 1].tolist()
-                         for k, r in rules.regimes.items()},
-                     "regime_horizons_km_lyapunov": {
-                         str(k): (r.horizons_km / cfg.steps_per_lyapunov).tolist()
-                         for k, r in rules.regimes.items()}}
+    res["fitted"] = fitted_record(core, rules, cfg)
     res["scores"] = an.summarize_scores(scores, core.horizons, cfg)
     res["km_curves"] = an.km_curves(scores, cfg.horizon_max)
     res["weight_profile"] = an.weight_profiles(core, cfg)
@@ -507,11 +647,16 @@ def run_system(study: Study, system: str) -> dict:
         LOG.warning("%s: VALIDATION GATE FAILED %s; results are flagged as provisional",
                     system, res["validation"]["gate"])
     LOG.info("%s validation gate: %s", system, res["validation"]["gate"])
-    res["H1a"] = an.h1a_library_scaling(library_cells, cfg)
+    h1a_capture: dict | None = None if study.dump is None else {}
+    res["H1a"] = an.h1a_library_scaling(library_cells, cfg, capture=h1a_capture)
     res["H1b"] = an.h1b_seed_amplifier(core, cfg)
-    res["H1c"] = an.h1c_horizon_law(core, cfg)
+    h1c_capture: dict | None = None if study.dump is None else {}
+    res["H1c"] = an.h1c_horizon_law(core, cfg, capture=h1c_capture)
+    if study.dump is not None:  # copies, for the dump only (WU-0003.7c)
+        study.dump.record_extra(system, {**{f"h1a/{k}": v for k, v in h1a_capture.items()},
+                                         **{f"h1c/{k}": v for k, v in h1c_capture.items()}})
     res["H1d"] = an.h1d_proxies(core, rules, cfg)
-    res["Q-N"] = an.qn_noise_redundancy(core, rules, cfg)
+    res["Q-N"] = an.qn_noise_redundancy(core, rules, cfg, dump=study.dump)
     res["H2a"] = an.h2a_separation(core, cfg)
     res["H2b"] = an.h2b_knob_response(noise_cells, library_cells, cfg)
     res["H2c"] = an.h2c_state_dependence(scores, core.splits["calibration"], cfg, system)
@@ -528,6 +673,12 @@ def run_system(study: Study, system: str) -> dict:
     clip_sensitivity.log_flags(system, res["clip_sensitivity"])
     res["handling"] = study.system_handling(system, collect_result_counts(res))
     log_handling(system, res["handling"])
+    if study.dump is not None:  # opt-in, read-only (WU-0003.7b); nothing below reads it
+        arrays = study.dump.collect(system, core, rules, weights, scores, noise_cells,
+                                    library_cells, cfg)
+        path = study.out_dir / "states" / f"{system}.npz"
+        size = StateDump.write(path, arrays)
+        LOG.info("%s state dump: %d arrays, %d bytes, %s", system, len(arrays), size, path)
     res["seconds"] = time.time() - t0
     study.core_cells[system] = core
     study.fitted[system] = rules

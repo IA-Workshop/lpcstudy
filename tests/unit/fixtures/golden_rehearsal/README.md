@@ -1,0 +1,49 @@
+# Golden outputs of the two rehearsal tools (WU-0003.10, plan amendment 7 G4, h1)
+
+These files are the complete outputs (text report, `--json` file, exit code and stderr) of
+`tools/rehearsal_report.py` and `tools/rehearsal_diagnostics.py` on fixed inputs, recorded **before**
+`tools/rehearsal_common.py` existed. After the shared code moved into that module, the outputs are
+byte-identical (`test_golden_outputs_are_byte_identical` in
+`tests/unit/test_tools_rehearsal_common.py`). They are **regression guards** (the tool compared with
+its own earlier output), not evidence that a number is right: correctness is tested in the two tool
+test files against independent references.
+
+## How they were produced
+
+```
+python tests/unit/golden_rehearsal.py tests/unit/fixtures/golden_rehearsal
+```
+
+with the tools exactly as at commit `d63677d` (branch `wu/0003-rehearsal`, "Merge WU-0003.8 (.8, .8b,
+.8c)"; `tools/` was unchanged in the commit that added these files, on branch `wu/0003-10-common`),
+development seed ids only, JAX on the CPU. Run twice: the two folders were identical (the tools are
+deterministic: the diagnostics draw only through `make_rng` with its default tool seed 20261018, here
+with `--resamples 100 --permutations 50`).
+
+## The cases
+
+| Files | Tool | Input | Exit |
+| --- | --- | --- | --- |
+| `report_p0_pilot`, `report_p1_pilot` | report | the committed fixtures `fixtures/rehearsal_report/p0_pilot.json`, `p1_pilot.json` (no dump) | 2 |
+| `report_world` | report | the synthetic run of `test_tools_rehearsal_report.write_run` (three synthetic dumps) | 0 |
+| `report_world_best_a0` | report | the same with `best_single = A0` | 0 |
+| `report_world_h3c_mismatch` | report | the same with the H3c leaf off by a relative 1e-6 | 1 |
+| `report_world_refused_dump` | report | the same with a dump of seed id `DEV-9` (refused, stderr only) | 2 |
+| `report_world_observed` | report | the world read against `observed_file(...)` of the report tests (`--observed`) | 0 |
+| `diagnostics_p0_pilot`, `diagnostics_p1_pilot` | diagnostics | the same two fixtures (no dump) | 2 |
+| `diagnostics_world` | diagnostics | `build_world(rng_for("world"))` of the diagnostics tests, same stack | 2 |
+| `diagnostics_world_mismatch` | diagnostics | the H3c leaf off by 1e-6 and `core/Lambda_bar` removed | 1 |
+| `diagnostics_world_missing` | diagnostics | `core/E_C_A` and `core/w_star_B` removed | 2 |
+| `diagnostics_world_other_stack` | diagnostics | `packages.scipy` edited and a fit leaf off by 2e-5 s | 2 |
+| `diagnostics_world_no_dump` | diagnostics | the results alone, no `states/` folder | 2 |
+
+## Normalisation (so that the files hold on another machine)
+
+The temporary directory of a run is written `<TMP>` and the repository root `<ROOT>`. In the
+diagnostics, the analysis-stack lines (python, numpy, scipy, CPU model and ISA, BLAS, SIMD,
+environment) keep their status (`same`, `different`, `unusable`) and have their values replaced by
+`<values>` (in the JSON, by `<value>`), because those values describe the machine. Everything else
+is the tool's own text. The numbers are those of this machine's BLAS; on another stack the last
+digits may differ and the golden test would then fail: that is a measured difference of the
+stack, to be examined and recorded, never a reason to edit a golden file silently. A golden file
+is rewritten only to record a deliberate change of output, with the reason in the unit `## Log`.

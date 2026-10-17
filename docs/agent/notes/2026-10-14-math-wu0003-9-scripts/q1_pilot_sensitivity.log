@@ -1,0 +1,32 @@
+p0 lorenz63 0.01  leaf 1/d 0.521264896623 repro 0.521264897270 | status 2 nfev  7 sv [0.147, 12.5] | stop err 1/d 1.49e-08 s, floor 1.61e-08 | linear ulp 1/d 4.8e-14 s | ulp-exp max 1/d 8.66e-09 s, floor 6.89e-09, path flips 0/200
+p0 lorenz63 0.02  leaf 1/d 0.569793261299 repro 0.569793261299 | status 2 nfev  8 sv [0.0962, 8.98] | stop err 1/d 3.12e-08 s, floor 1.39e-08 | linear ulp 1/d 6.3e-14 s | ulp-exp max 1/d 1.14e-08 s, floor 3.96e-09, path flips 0/200
+p0 rossler  0.01  leaf 1/d 0.404048923322 repro 0.404048908157 | status 2 nfev  7 sv [0.132, 12.7] | stop err 1/d 2.62e-07 s, floor 3.29e-07 | linear ulp 1/d 6.0e-14 s | ulp-exp max 1/d 7.00e-08 s, floor 6.64e-08, path flips 0/200
+p0 rossler  0.02  leaf 1/d 0.389286188980 repro 0.389286188980 | status 2 nfev  7 sv [0.0863, 8.8] | stop err 1/d 5.16e-09 s, floor 1.82e-09 | linear ulp 1/d 1.0e-13 s | ulp-exp max 1/d 3.11e-08 s, floor 1.25e-08, path flips 0/200
+p0 chua     0.01  leaf 1/d 0.501579620541 repro 0.501579620541 | status 2 nfev  6 sv [0.126, 11.1] | stop err 1/d 2.66e-08 s, floor 1.97e-08 | linear ulp 1/d 5.9e-14 s | ulp-exp max 1/d 5.97e-09 s, floor 3.39e-09, path flips 0/200
+p0 chua     0.02  leaf 1/d 0.416600568039 repro 0.416600568039 | status 2 nfev  8 sv [0.0916, 9.06] | stop err 1/d 2.51e-08 s, floor 1.27e-08 | linear ulp 1/d 9.9e-14 s | ulp-exp max 1/d 3.75e-08 s, floor 1.45e-08, path flips 0/200
+p1 lorenz63 0.01  leaf 1/d 0.435357264041 repro 0.435357255180 | status 2 nfev  6 sv [0.155, 14.8] | stop err 1/d 3.92e-08 s, floor 7.22e-08 | linear ulp 1/d 4.6e-14 s | ulp-exp max 1/d 3.20e-08 s, floor 4.90e-08, path flips 0/200
+p1 lorenz63 0.02  leaf 1/d 0.478913677360 repro 0.478913672456 | status 2 nfev  6 sv [0.104, 9.71] | stop err 1/d 6.23e-08 s, floor 3.90e-08 | linear ulp 1/d 6.8e-14 s | ulp-exp max 1/d 2.29e-08 s, floor 1.04e-08, path flips 0/200
+p1 rossler  0.01  leaf 1/d 0.555658466809 repro 0.555658466809 | status 2 nfev  6 sv [0.131, 11.1] | stop err 1/d 5.68e-08 s, floor 4.93e-08 | linear ulp 1/d 5.0e-14 s | ulp-exp max 1/d 2.35e-08 s, floor 1.25e-08, path flips 0/200
+p1 rossler  0.02  leaf 1/d 0.582068812799 repro 0.582068792803 | status 2 nfev 10 sv [0.0729, 7.49] | stop err 1/d 2.38e-06 s, floor 6.75e-07 | linear ulp 1/d 1.1e-13 s | ulp-exp max 1/d 1.09e-07 s, floor 2.60e-08, path flips 0/200
+p1 chua     0.01  leaf 1/d 0.487381204509 repro 0.487381204139 | status 2 nfev  6 sv [0.128, 11.4] | stop err 1/d 7.23e-08 s, floor 5.94e-08 | linear ulp 1/d 5.6e-14 s | ulp-exp max 1/d 1.01e-08 s, floor 6.08e-09, path flips 0/200
+p1 chua     0.02  leaf 1/d 0.429761927181 repro 0.429761927181 | status 2 nfev  8 sv [0.0803, 8.14] | stop err 1/d 1.42e-07 s, floor 5.98e-08 | linear ulp 1/d 9.7e-14 s | ulp-exp max 1/d 6.64e-08 s, floor 2.38e-08, path flips 0/200
+
+== point: 12 fits; status counts {2: 12}
+  e_inv     median 4.80e-08  max 2.38e-06
+  e_floor   median 4.42e-08  max 6.75e-07
+  lin_inv   median 6.15e-14  max 1.06e-13
+  lin_floor median 4.41e-14  max 8.63e-14
+  ulp_inv   median 2.73e-08  max 1.09e-07
+  ulp_floor median 1.25e-08  max 6.64e-08
+  sv_min min 0.0729; path flips 0 of 2400
+  at a bound (2/d within 1e-6 of 0.01 or 10, or log f2 <= -59): 0
+
+== resample: 480 fits; status counts {2: 475, 1: 5}
+  e_inv     median 1.21e-07  max 1.16e-05
+  e_floor   median 9.44e-08  max 3.16e-06
+  lin_inv   median 6.09e-14  max 1.53e-13
+  lin_floor median 4.43e-14  max 1.50e-13
+  ulp_inv   median 2.67e-08  max 2.01e-07
+  ulp_floor median 1.31e-08  max 1.44e-07
+  sv_min min 0.0619; path flips 134 of 9600
+  at a bound (2/d within 1e-6 of 0.01 or 10, or log f2 <= -59): 0

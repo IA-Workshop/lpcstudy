@@ -20,6 +20,7 @@ from .ensemble import EnsembleMoments, EvaluationDraws
 from .networks import TrainedNetwork, train_mlp
 from .oracle import characteristic_horizon, curvature, excess_mse, hybrid_mse, \
     oracle_weight, realized_horizon
+from .provenance import index_digest
 from .statistics import kaplan_meier
 
 RULE_LABELS: dict[str, str] = {
@@ -57,10 +58,18 @@ class SeedProxy:
     logarithm of the NNLS start is an initial guess, and the ``1e-300`` inside the residual's
     logarithm cannot bind, because every design row is positive (the floor columns are
     ``rho^2 nu^2 > 0`` and ``rho^2 > 0``).
+
+    ``nfev`` and ``status`` are the number of function evaluations and the termination status of
+    the ``least_squares`` call (scipy's ``OptimizeResult``; 1 to 4 stop on a tolerance, 0 on the
+    evaluation limit). They record where the tolerance-stopped fit ended (WU-0003.7a: a flipped
+    stopping test moves a coefficient by up to about ``sqrt(ftol)``), change no coefficient, and
+    are ``None`` for a hand-built proxy that was not fitted.
     """
 
     slope: float
     floor: float
+    nfev: int | None = None
+    status: int | None = None
 
     @classmethod
     def fit(cls, feature_sq: np.ndarray, floor_sq: np.ndarray, seed_sq: np.ndarray
@@ -92,7 +101,8 @@ class SeedProxy:
 
         sol = least_squares(residual, start, loss="soft_l1")
         slope, floor = np.exp(sol.x)
-        return cls(slope=float(slope), floor=float(floor))
+        return cls(slope=float(slope), floor=float(floor), nfev=int(sol.nfev),
+                   status=int(sol.status))
 
     def predict(self, feature: np.ndarray, floor_scale: np.ndarray | float) -> np.ndarray:
         """Return the seed estimate."""
@@ -407,6 +417,29 @@ class RegimeMap:
         """Regime index for profiles ``(..., 3)``."""
         leaves = self.tree.apply(profile.reshape(-1, profile.shape[-1]))
         return np.searchsorted(self.leaf_ids, leaves).reshape(profile.shape[:-1])
+
+    def leaf_digest(self, *profiles: np.ndarray) -> str:
+        """SHA-256 of the int64 tree leaf id of every (state, draw) of the given profile arrays.
+
+        The leaf ids are ``tree.apply`` of each array (``(n, E, p)`` flattened to ``(n E, p)``,
+        C order), concatenated in the order given and hashed by
+        :func:`lpcstudy.provenance.index_digest`. A change of one state's leaf, or of the order of
+        the arrays, changes the digest. It reads the fitted tree only: no random number, no
+        change to the tree or the profiles (WU-0003.7a; the A5 leaf membership of the calibration
+        and test states).
+
+        Parameters
+        ----------
+        *profiles : np.ndarray
+            Profile arrays ``(n, E, p)``, for example the calibration and then the test profiles.
+
+        Returns
+        -------
+        str
+            64 lowercase hexadecimal characters.
+        """
+        leaves = [self.tree.apply(p.reshape(-1, p.shape[-1])) for p in profiles]
+        return index_digest(np.concatenate(leaves))
 
 
 def fit_regime_tree(profile: np.ndarray, w_target: np.ndarray, log_t_target: np.ndarray,

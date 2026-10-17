@@ -711,3 +711,33 @@ def test_simd_record_follows_a_disabled_dispatch_level_r3() -> None:
         pytest.skip(f"host lacks x86-64-v3 features {sorted(v3 - flags)}: the positive arm "
                     "(X86_V3 present by default) cannot be checked here (R6)")
     assert "X86_V3" in found()
+
+
+# --- WU-0003.7a: the integer-index digest (A5 leaf membership) ------------------------------
+
+
+def test_index_digest_is_sha256_of_little_endian_int64_bytes_and_refuses_other_dtypes() -> None:
+    """``index_digest`` is the SHA-256 of the row-major little-endian int64 bytes (WU-0003.7a, a4).
+
+    Reference: ``hashlib.sha256(struct.pack("<%dq", ...))``, written here with ``struct`` (not
+    numpy ``tobytes``). Values include a negative, a value above 2**32 and zero. A signed
+    narrower integer widens losslessly to the same digest; a big-endian copy and a Fortran-ordered
+    2-D array give the digest of the logical C-order sequence; the transpose differs. A float, an
+    unsigned or a boolean array raises ``TypeError`` (PRIME.4: nothing is converted silently).
+    Exact (a digest is a deterministic function of the bytes; no tolerance).
+    """
+    values = [0, 1, -1, 2**40 + 3, 7, 7]
+    expected = hashlib.sha256(struct.pack("<%dq" % len(values), *values)).hexdigest()
+    flat = np.array(values, dtype=np.int64)
+    assert provenance.index_digest(flat) == expected
+    assert re.fullmatch(r"[0-9a-f]{64}", expected)
+    assert provenance.index_digest(flat.astype(">i8")) == expected
+    small = [0, 1, -1, 5, 7, 7]
+    small_ref = hashlib.sha256(struct.pack("<%dq" % len(small), *small)).hexdigest()
+    assert provenance.index_digest(np.array(small, dtype=np.int32)) == small_ref
+    matrix = flat.reshape(2, 3)
+    assert provenance.index_digest(np.asfortranarray(matrix)) == expected
+    assert provenance.index_digest(matrix.T) != expected
+    for bad in (np.array([1.0]), np.array([1], dtype=np.uint64), np.array([True])):
+        with pytest.raises(TypeError, match="index_digest"):
+            provenance.index_digest(bad)

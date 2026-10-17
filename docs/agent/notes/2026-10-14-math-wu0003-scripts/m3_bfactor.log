@@ -1,0 +1,4 @@
+normal        level 0.9500: B=500: E hw/true 0.9906, sd 0.0413; B=2000: E hw/true 0.9978, sd 0.0213; ratio E(2000)/E(500) = 1.0073
+normal        level 0.9833: B=500: E hw/true 0.9810, sd 0.0492; B=2000: E hw/true 0.9949, sd 0.0259; ratio E(2000)/E(500) = 1.0142
+lognormal0.5  level 0.9500: B=500: E hw/true 0.9899, sd 0.0675; B=2000: E hw/true 0.9973, sd 0.0348; ratio E(2000)/E(500) = 1.0075
+lognormal0.5  level 0.9833: B=500: E hw/true 0.9768, sd 0.0923; B=2000: E hw/true 0.9932, sd 0.0477; ratio E(2000)/E(500) = 1.0168

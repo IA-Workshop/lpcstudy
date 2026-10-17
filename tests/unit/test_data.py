@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import hashlib
 import inspect
 import json
 import math
@@ -442,7 +443,9 @@ def test_build_context_refuses_a_failing_trajectory(monkeypatch, tmp_path) -> No
 
 def test_build_context_meta_has_the_four_new_leaves() -> None:
     """G8: ``ctx.meta`` gains ``lyapunov_orbit_max_abs`` and ``trajectory_max_abs`` (and, since
-    WU-0002.14, ``start_index`` and ``start_state``: 2 + 6 leaves, checked in the last block).
+    WU-0002.14, ``start_index`` and ``start_state``: 2 + 6 leaves, checked in the last block; since
+    WU-0003.7a, the two trajectory digests ``main_digest`` and ``estimator_digest``, whose values are
+    checked in ``test_build_context_trajectory_digests_...``).
 
     Reference: the literal key lists of the plan (4 leaves per system: the exponent orbit and
     the three trajectories). Tolerance: none for the key sets and types. Values are Python
@@ -461,7 +464,7 @@ def test_build_context_meta_has_the_four_new_leaves() -> None:
     assert set(meta) == {"lambda_max", "interval", "delay", "ami_delay", "embed_dim", "acf_time",
                          "spacing", "obs_scale", "trajectory_len", "library_len", "theiler",
                          "lyapunov_orbit_max_abs", "trajectory_max_abs", "start_index",
-                         "start_state"}
+                         "start_state", "main_digest", "estimator_digest"}
     assert set(meta["trajectory_max_abs"]) == {"statistics", "main", "estimator"}
     leaves = [meta["lyapunov_orbit_max_abs"], *meta["trajectory_max_abs"].values()]
     assert all(type(v) is float and 1.0 <= v <= 40.0 for v in leaves), leaves
@@ -730,6 +733,39 @@ def test_build_context_starts_are_drawn_burned_in_and_recorded(smoke_context) ->
         assert full[burn].tobytes() == burned.tobytes(), name
         assert first.tobytes() == burned.tobytes(), name
     assert ctx.meta["trajectory_max_abs"]["main"] == float(np.max(np.abs(main_full[:, 0])))
+
+
+def test_build_context_trajectory_digests_equal_sha256_of_the_simulated_post_burn_in_orbits(
+        smoke_context) -> None:
+    """WU-0003.7a (a2): ``main_digest`` and ``estimator_digest`` are the SHA-256 of the post-burn-in
+    main and estimator trajectories, float64, C order.
+
+    Reference: the trajectories that ``simulate_trajectory`` returned to ``build_context`` (recorded
+    by the spy of ``smoke_context``, in call order statistics, main, estimator), cut at the burn-in
+    in the test, and ``hashlib.sha256`` of their values packed with ``struct`` (little-endian
+    binary64, row-major), written here and not through numpy ``tobytes`` or ``array_digest``. The
+    main orbit is also ``ctx.eval_states`` (the digest of the stored array equals it). Not equal:
+    the digest of the main orbit with its burn-in, the other trajectory and the statistics orbit
+    (so the burn-in cut is load-bearing). Exact (a digest is a deterministic function of the
+    bytes; no tolerance).
+    """
+    ctx, recorded = smoke_context
+    burn = int(SMOKE.burn_in_lyapunov * SMOKE.steps_per_lyapunov)
+    stats_full, main_full, est_full = recorded
+
+    def reference(orbit: np.ndarray) -> str:
+        assert orbit.dtype == np.float64 and orbit.ndim == 2
+        values = orbit.ravel().tolist()
+        return hashlib.sha256(struct.pack("<%dd" % len(values), *values)).hexdigest()
+
+    main_ref, est_ref = reference(main_full[burn:]), reference(est_full[burn:])
+    assert ctx.meta["main_digest"] == main_ref == reference(ctx.eval_states)
+    assert ctx.meta["estimator_digest"] == est_ref
+    others = {reference(main_full), reference(est_full), reference(stats_full[burn:])}
+    assert len({main_ref, est_ref} | others) == 5
+    assert all(re.fullmatch(r"[0-9a-f]{64}", ctx.meta[k]) for k in ("main_digest",
+                                                                      "estimator_digest"))
+    json.dumps(ctx.meta, allow_nan=False)
 
 
 def test_the_start_does_not_depend_on_the_embedding_dimension(tmp_path) -> None:

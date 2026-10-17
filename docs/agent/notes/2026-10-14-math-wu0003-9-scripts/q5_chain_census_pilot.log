@@ -1,0 +1,6 @@
+(untagged)   float leaves  2849  differing on pair    0  | H1a:60, H1b:6, H1c:18, H1d:30, H2a:57, H2b:249, H2c:21, H2e:54, H3a:35, H3b:33, H3c:18, Q-N:60, V7:30, clip_sensitivity:96, config:28, fitted:240, handling:690, km_curves:720, oracle_recovery:6, robustness:296, scores:57, verification:45
+cp           float leaves   828  differing on pair    0  | H1a:24, H1b:9, H1c:9, km_curves:720, oracle_recovery:3, robustness:36, scores:24, validation:3
+dynamics     float leaves    39  differing on pair    0  | context:39
+fixture      float leaves    21  differing on pair    0  | validation:21
+network      float leaves  7242  differing on pair    0  | H1b:9, H1c:9, H1d:15, H2a:12, H2b:21, H2c:24, H2d:9, H3a:19, H3b:24, H3c:3, Q-N:36, V7:21, estimators:32, fitted:15, gain_bound:9, km_curves:4320, oracle_recovery:24, regime_curve:21, robustness:180, scores:255, validation:24, weight_profile:2160
+oracle       float leaves     4  differing on pair    0  | robustness:4

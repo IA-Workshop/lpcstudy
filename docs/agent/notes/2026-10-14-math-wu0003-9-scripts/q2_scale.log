@@ -1,0 +1,7 @@
+ratio                |d| 8.6911e-08  s 1.304254  |d|/s 6.6637e-08  |d|/|ref| 7.9674e-08
+ratio_ci[0]          |d| 3.8289e-07  s 1.304254  |d|/s 2.9357e-07  |d|/|ref| 3.9712e-07
+ratio_ci[1]          |d| 2.0858e-09  s 1.304254  |d|/s 1.5992e-09  |d|/|ref| 1.5992e-09
+fitted_inverse_dim   |d| 4.3720e-08  s 0.646918  |d|/s 6.7581e-08  |d|/|ref| 7.9674e-08
+ci_inverse_dim[0]    |d| 1.8968e-07  s 0.646918  |d|/s 2.9321e-07  |d|/|ref| 3.9364e-07
+ci_inverse_dim[1]    |d| 4.7397e-09  s 0.646918  |d|/s 7.3266e-09  |d|/|ref| 7.3266e-09
+floor_rms            |d| 7.4971e-09  class (g) |d|/|ref| 2.5201e-07

@@ -1,0 +1,18 @@
+c=0.0 sep=0.2: true bias of median range at M=200: 0.0002 (mean per-state 0.0059); F1-type bound 0.8636*h = 0.0287
+   n_V4=40: D200 mean 0.0035 sd 0.0038; med mean 0.0012 sd 0.0118; rich mean 0.0077 sd 0.0054 (undetermined 0.61); cons mean 0.0069 sd 0.0075
+   n_V4=100: D200 mean 0.0035 sd 0.0023; med mean 0.0012 sd 0.0085; rich mean 0.0066 sd 0.0042 (undetermined 0.40); cons mean 0.0070 sd 0.0045
+c=0.0 sep=0.6: true bias of median range at M=200: 0.0396 (mean per-state 0.0168); F1-type bound 0.8636*h = 0.0288
+   n_V4=40: D200 mean 0.0085 sd 0.0036; med mean 0.0186 sd 0.0085; rich mean 0.0146 sd 0.0080 (undetermined 0.29); cons mean 0.0171 sd 0.0072
+   n_V4=100: D200 mean 0.0086 sd 0.0022; med mean 0.0191 sd 0.0051; rich mean 0.0161 sd 0.0067 (undetermined 0.16); cons mean 0.0173 sd 0.0045
+c=0.5 sep=0.2: true bias of median range at M=200: -0.0017 (mean per-state 0.0031); F1-type bound 0.8636*h = 0.0288
+   n_V4=40: D200 mean 0.0018 sd 0.0029; med mean -0.0002 sd 0.0097; rich mean 0.0048 sd 0.0035 (undetermined 0.71); cons mean 0.0036 sd 0.0057
+   n_V4=100: D200 mean 0.0018 sd 0.0018; med mean -0.0003 sd 0.0072; rich mean 0.0039 sd 0.0027 (undetermined 0.57); cons mean 0.0037 sd 0.0035
+c=0.5 sep=0.6: true bias of median range at M=200: 0.0290 (mean per-state 0.0113); F1-type bound 0.8636*h = 0.0288
+   n_V4=40: D200 mean 0.0057 sd 0.0027; med mean 0.0138 sd 0.0070; rich mean 0.0097 sd 0.0056 (undetermined 0.35); cons mean 0.0114 sd 0.0055
+   n_V4=100: D200 mean 0.0058 sd 0.0017; med mean 0.0142 sd 0.0042; rich mean 0.0104 sd 0.0046 (undetermined 0.22); cons mean 0.0115 sd 0.0034
+c=0.9 sep=0.2: true bias of median range at M=200: -0.0026 (mean per-state -0.0003); F1-type bound 0.8636*h = 0.0288
+   n_V4=40: D200 mean -0.0001 sd 0.0017; med mean -0.0011 sd 0.0061; rich mean 0.0019 sd 0.0014 (undetermined 0.89); cons mean -0.0001 sd 0.0033
+   n_V4=100: D200 mean -0.0001 sd 0.0010; med mean -0.0013 sd 0.0049; rich mean 0.0012 sd 0.0011 (undetermined 0.89); cons mean -0.0002 sd 0.0020
+c=0.9 sep=0.6: true bias of median range at M=200: 0.0137 (mean per-state 0.0042); F1-type bound 0.8636*h = 0.0288
+   n_V4=40: D200 mean 0.0022 sd 0.0014; med mean 0.0066 sd 0.0043; rich mean 0.0039 sd 0.0025 (undetermined 0.50); cons mean 0.0043 sd 0.0029
+   n_V4=100: D200 mean 0.0021 sd 0.0009; med mean 0.0068 sd 0.0024; rich mean 0.0036 sd 0.0019 (undetermined 0.36); cons mean 0.0042 sd 0.0018
