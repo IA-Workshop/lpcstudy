@@ -9,7 +9,23 @@
  | E. Freeze | WU-0004: checklist, pre-freeze audit, owner reviews, full suite, v3 SHA-256, CONF-1 commitment, freeze transaction | D | Freeze ledger entry; tag | The freeze itself |
  | F. Confirmatory run and regeneration | WU-0015 confirmatory run; WU-0016 regeneration by another actor (QA.9) | E | Both runs recorded in the manifest; agreement within the declared tolerance | Per-action authorizations (LPC.AUTH.6) |
  | G. Reporting and promotion | WU-0017 v3 report and figures; WU-0018 pre-promotion audit and promotion; WU-0019 close-out | F | Promotion ledger entry; retention done | Promotion; governance review (LPC.PC.25) |
-@@ -132,7 +132,7 @@
+@@ -95,6 +95,7 @@
+ | WU-0002.11 | DEF-0001 counters: per cell and per run, counts of invariant-mean replacements, error clips at 10 σ_x (CP, PLP, non-finite), regime-count fallback, zero-variance correlations, written to `results.json` under `handling` and to `run.log` | developer | WU-0002.1 | CSQ3 | §M15 item 11 (WU-0002 plan); DEF-0001; LPC.PC.21d; NVVUQ.11 | `test_ensemble`, `test_estimation` (new), `test_allocation`, `test_analysis`; smoke | M |
+ | WU-0002.12 | DEV-0 regression against the pilot: pilot preset on CPU on DEV-0, `tools/compare_pilot.py` against `docs/study/pilot_results_v1.json`, table of changed statistics with old value, new value and reason | developer | WU-0002.1–.11, WU-0012.2 | CSQ3 | WU-0002 acceptance; LPC.PC.12; manifest row "Pilot v1" | pilot preset (CPU, LPC.AUTH.3) | M |
+ | WU-0002.13 | Independent review of each sub-task (fresh reviewer per sub-task or per group of three); queue the owner checkpoint for verdict and statistics code | reviewer; human owner | each sub-task | CSQ3 | LPC.PC.11 | per review | M |
++| WU-0002.15 | Gain-bound screen (concordance D-21(b), (c); DEC-0016 O2): add to `analysis.gain_horizon_bound` the subset of states with raw C = E[e_C e_P] ≥ 0 at every horizon (P1(c), (d)), its fraction within ln 2/(2Λ̄) + 1 step, and the per-screen counts (growth ≤ 0, censored, raw C < 0 at some horizon); keep the v1 screen's numbers; no bar; remove `GAIN_BOUND_PENDING` | applied-mathematician (horizon range of the screen), developer | WU-0002.9 | CSQ3 | §M11 row H2e; v3 §2 (after RQ3); DEF-0005 | `test_analysis`, `test_identifiers`, `test_report`; smoke | S |
+ 
+ **Definition of done and acceptance criteria, phase B.**
+ 
+@@ -119,6 +120,7 @@
+ | WU-0002.11 | Every DEF-0001 case counted and reported; nothing silent | Unit: injecting one non-finite estimate increments `handling.invariant_mean_replacements` by 1; one error of 20 σ_x increments `handling.error_clips`; a regime map with an empty leaf increments `handling.regime_count_fallback`; each nonzero counter writes one `run.log` line. Smoke `results.json` has the `handling` block for every cell with every counter present (zero allowed). Reviewer greps for `np.clip`, `nan_to_num`, `np.where(np.isfinite` and confirms each site is counted. |
+ | WU-0002.12 | Comparison table in the WU-0002 log and in `docs/study/dev_regression_dev0.md` labeled `DEVELOPMENT (DEV-0): not a hypothesis test` | Every quantity recorded in `pilot_results_v1.json` that the unit does not intend to change agrees bitwise, or within 10⁻¹² relative where a summation order changed: the `context` block (λ_max, τ_d, τ_ac, spacing, obs_scale), the `validation` numbers V1–V6, the fitted proxy coefficients, the rule `scores`, and the unchanged hypothesis statistics. (The pilot JSON holds summaries only, not per-state oracle moments or w*; those are compared only through the summaries they feed.) Every changed statistic is listed with old and new value and the §M15 item that changed it. **Risk R1 applies:** the pilot was produced on different hardware and is not under version control; if the `context` floats differ beyond 10⁻¹² relative, the run is not bitwise reproducible here for reasons unrelated to the code. The fallback criterion, to be fixed by the owner before this run, is: integer context quantities (τ_d, τ_ac, spacing) identical; λ_max within the Benettin sampling error stated by the applied-mathematician; each unchanged pilot statistic inside the pilot's own 95% interval where one exists; the V1–V6 checks passing at their §M10 criteria. The run is CPU-only (bitwise identity is expected on CPU only, LPC.PC.18) and goes through `tools/run_preset.sh` with `LPC_THREADS=8`. |
+ | WU-0002.13 | `## Review` per sub-task; owner checkpoint queued | As WU-0001.6. Verdict and statistics code (WU-0002.3 to .9) is marked "needs owner review before freeze". |
++| WU-0002.15 | Subset and counts in `results.json` and `RESULTS.md`; no pending marker | Unit, hand-built moments (independent reference: arrays written in the test): a state with raw C < 0 at exactly one horizon and centered covariance ≥ 0 is out of the subset and counted once; the subset fraction equals the hand count ratio exactly (dyadic case, e.g. 3/8); the bound equals ln 2/(2Λ̄) + 1 step computed by NumPy in the test to 1e-15 relative; no `pass`, `threshold` or `verdict` key; `identifiers.ROWS` has no `pending` entry and `test_identifiers` pins it. Integration: a DEV-0 smoke differs from the pre-change smoke only by added `gain_bound` leaves (leafdiff: 0 changed, 0 removed). Marked "needs owner review before freeze" (statistics code). |
+ 
+ ### Phase C. NVVUQ verification
+ 
+@@ -132,7 +134,7 @@
  | WU-0005.6 | Review; status lines proposed for `NVVUQ-instantiation-LPC.md` (as a note and `proposal` ledger entry; agents do not edit governance) | reviewer; planner | WU-0005.1–.5 | CSQ3 | LPC.PC.11; GOV.49 | per review | S |
  | WU-0006.1 | Simulation harness under `tests/slow/`: synthetic dependent data (AR(1) with lag-1 autocorrelation 0 and 0.3), fixed seeds from `make_rng`, replication count R with the Monte Carlo error stated in each test | applied-mathematician (design), developer | WU-0002.5, WU-0002.7, WU-0002.8 | CSQ3 | NVVUQ.7; row "Statistical procedures"; `.claude/rules/tests.md` | `tests/slow/test_coverage_bootstrap.py` | M |
  | WU-0006.2 | Coverage of the moving-block bootstrap intervals for mean, median, Spearman, partial correlation, paired change and MSE ratio at pilot sample sizes (500 test states, 300 sweep states) and at both levels (95%, 1 − 0.05/3) | developer | WU-0006.1 | CSQ3 | NVVUQ.7, NVVUQ.16 | as above (slow) | M |
@@ -18,7 +34,7 @@
  | WU-0006.4 | Review by the applied-mathematician of the Monte Carlo error statements, then independent review; owner checkpoint | applied-mathematician; reviewer; human owner | WU-0006.2, .3 | CSQ3 | LPC.PC.11 ("code that computes a statistic") | per review | S |
  | WU-0007.1 | Researcher retrieves published λ_max and parameter sets for Lorenz-63, Rössler and Chua (piecewise-linear diode) with integrator, step and conditions | researcher | — | CSQ3 | NVVUQ.13(a), VV.2; row "Validation" | none | S |
  | WU-0007.2 | Test: the code's Benettin estimate against the confirmed published value per system | applied-mathematician (tolerance), developer | WU-0007.1 | CSQ3 | NVVUQ.13 | `test_systems` (slow if over 5 s) | S |
-@@ -155,7 +155,7 @@
+@@ -155,7 +157,7 @@
  | WU-0005.6 | `## Review` filled; note with proposed status lines | Each of the five instantiation rows gets a proposed `met` line with the test name as evidence. |
  | WU-0006.1 | Harness reusable by .2 and .3 | Each test states R and the Monte Carlo standard error `sqrt(p(1 − p)/R)` for a coverage p in its docstring; data generation uses `make_rng(seed, "wu0006", <name>)`; runtime of the whole `tests/slow/` directory under 30 min on CPU with `LPC_THREADS=4`. |
  | WU-0006.2 | Coverage results recorded in the unit file and the tests pass | R = 1000 replications per statistic, level and dependence setting. Acceptance: empirical coverage ≥ nominal − 3·sqrt(nominal(1 − nominal)/R), that is ≥ 0.929 at 95% and ≥ 0.971 at 98.3%. Undercoverage below that bound fails the test and opens a DEF; it is never tuned away. Truth values: the population quantity of the generating process (for the median and Spearman, computed analytically or from 10⁷ draws, stated in the test). The paired change and MSE ratio use paired AR(1) series with a known mean difference and ratio. |
@@ -27,7 +43,7 @@
  | WU-0006.4 | Reviews recorded | The applied-mathematician's section confirms each Monte Carlo error statement; the reviewer confirms no R, level or bound changed after a result was seen (compares the plan's numbers with the tests'). Marked "needs owner review before freeze". |
  | WU-0007.1 | `docs/agent/notes/<date>-research-lyapunov.md` with one row per system | Each row: value, source with DOI or URL, status `confirmed`, quote, integrator and step conditions, date. Values from memory are labeled `unconfirmed (memory)` and not used. At most 50 pages for the unit (LPC.AUTH.2). |
  | WU-0007.2 | Test passes or a DEF records the discrepancy | The code's `estimate_lyapunov` at the configured interval agrees with the confirmed value within 3% relative (Benettin estimates over 2×10⁵ steps carry a standard error near 1%; the applied-mathematician confirms or tightens before execution). A larger discrepancy is reported with the step size as the suspected cause (LPC.NV.1) and is not tuned away. The Methods v2 §M2 values (0.905, 0.0719, 0.431) are compared with the confirmed values in the note. |
-@@ -172,8 +172,8 @@
+@@ -172,8 +174,8 @@
  | --- | --- | --- | --- | --- | --- | --- | --- |
  | WU-0003.1 | GPU environment check: CUDA device visible, x64 on, `XLA_PYTHON_CLIENT_PREALLOCATE=false` honored, smoke preset on GPU through the wrapper | developer | WU-0009.2, WU-0012.2 | CSQ3 | LPC.PC.18, LPC.AUTH.3 | smoke (gpu) | S |
  | WU-0003.2 | Pilot preset on DEV-1 on the GPU, in the background through `tools/run_preset.sh` | developer (dispatch), main session (polling) | WU-0002.13, WU-0003.1, WU-0005.4, WU-0008.3 | CSQ3 | WU-0003 plan item 1; NVVUQ.20 | pilot (gpu) | M (mostly wall-clock) |
@@ -38,7 +54,7 @@
  | WU-0003.5 | Optional full preset on DEV-2 within 12 h; wall-clock and peak memory recorded against the LPC.PC.22 budget | human owner (authorizes), developer | WU-0003.2 | CSQ3 | WU-0003 plan item 2; LPC.PC.22; LPC.AUTH.3 | full (gpu) | M (wall-clock) |
  | WU-0003.6 | Owner checkpoint: sample-size decision and tolerance declaration recorded in `decisions.md` | human owner | WU-0003.3, WU-0003.4 | CSQ3 | LPC.PC.5, LPC.PC.18, NVVUQ.12, NVVUQ.20 | none | S |
  
-@@ -183,8 +183,8 @@
+@@ -183,8 +185,8 @@
  | --- | --- | --- |
  | WU-0003.1 | Smoke on GPU passes the gate; `nvidia-smi` shows memory use well below the card's total during the run | `results.json` provenance says device is a CUDA GPU and x64 is true; memory used, read from `nvidia-smi` at 30 s, is less than half the card's total (preallocation off); the run holds the GPU lock. |
  | WU-0003.2 | Run completes; gate passes on all three systems, or the failure is reported | `run.meta.json` shows exit 0 and a wall-clock under 12 h; the log is polled, not streamed; the output path, wall-clock and peak memory are logged in WU-0003; GPU-hours tally updated. The report header reads `DEVELOPMENT (DEV-1): not a hypothesis test`. |
@@ -49,7 +65,7 @@
  | WU-0003.5 | Wall-clock recorded | Under 12 h, or the run is stopped at 12 h by the wrapper and the shortfall is referred (LPC.PC.22: optimization only against a measured shortfall). |
  | WU-0003.6 | Decision entries exist | `DEC-nnnn` for the sample size and `DEC-nnnn` for the reproducibility tolerance, by the owner. |
  
-@@ -207,16 +207,17 @@
+@@ -207,16 +209,17 @@
  
  | Id | Title | Owner | Depends on | Class | Serves | Radius | Effort |
  | --- | --- | --- | --- | --- | --- | --- | --- |

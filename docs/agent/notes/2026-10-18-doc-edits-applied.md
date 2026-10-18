@@ -8,10 +8,10 @@ Prepared 2026-10-18 on branch `wu/def0005-doc-patches` (from `develop` bbccf56) 
 | --- | --- | --- | --- | --- | --- |
 | Proposal and methods v3 | 25 | 23 (V21 partly: 6 of its 10 bullets) | 1 (V20), plus 4 U bullets of V21 | 1 (V8, U1 option A) | 0 |
 | Methods v2 (and decision log) | 28 (1 body edit, 26 log rows, DL-1) | 28 | 0 | 0 | 0 |
-| ROADMAP | 10 | 9 | 0 | 0 | 1 (P9, U1 option A) |
-| **Total** | **63** | **60** | **1 (+4 bullets)** | **1** | **1** |
+| ROADMAP | 10 | 10 | 0 | 0 | 0 |
+| **Total** | **63** | **61** | **1 (+4 bullets)** | **1** | **0** |
 
-Every old text was required to match exactly once in the copy. All did, except P9's anchor (section 5). One old text needed context to be unique (V18, below), and one draft old text elided its middle with `...` (P2, below). The Methods v2 amendment log is append-only here: the copy adds the header paragraph and 26 rows after the M14 table and changes one line in the body (M2, the draft's M-body). Nothing else in the three documents changed (`diff` of copy against live file shows only the draft's lines).
+Every old text was required to match exactly once in the copy. All did, after P9's placement was decided (section 5). One old text needed context to be unique (V18, below), and one draft old text elided its middle with `...` (P2, below). The Methods v2 amendment log is append-only here: the copy adds the header paragraph and 26 rows after the M14 table and changes one line in the body (M2, the draft's M-body). Nothing else in the three documents changed (`diff` of copy against live file shows only the draft's lines).
 
 ## 2. Files
 
@@ -47,21 +47,9 @@ The new value is the SHA-256 the v3 export will have **only if the Claude Doc, a
 
 ## 5. Failed, skipped and conditional items
 
-**FAILED**
+**FAILED**: none. P9 first failed (the draft's anchor "after WU-0002.14" does not exist: the live ROADMAP has no WU-0002.14 row) and was then placed by the main session's decision.
 
-- **P9 (ROADMAP, U1 option A).** The draft inserts the new row "after WU-0002.14 in the Phase B task table" and after it in the definition-of-done table. The live ROADMAP has **no WU-0002.14 row** (the last WU-0002 rows are WU-0002.13, lines 97 and 121; WU-0002.14 exists only as a unit file). The old text `| WU-0002.14 |` occurs 0 times, so nothing was guessed and P9 is not in `roadmap.patch`. This is the one U edit the order asked for, so it is **not yet opened**. Marked, as ordered: *opened under the owner's step-1 order on the main session's recommendation; the owner may rule it out.* Methods v2 log row 26 (applied) already refers to WU-0002.15, so that reference dangles until the row is placed. The text to paste, after the WU-0002.13 row of each table (closest anchor) or wherever the owner places WU-0002.14, is:
-
-Task table:
-
-```
-| WU-0002.15 | Gain-bound screen (concordance D-21(b), (c); DEC-0016 O2): add to `analysis.gain_horizon_bound` the subset of states with raw C = E[e_C e_P] ≥ 0 at every horizon (P1(c), (d)), its fraction within ln 2/(2Λ̄) + 1 step, and the per-screen counts (growth ≤ 0, censored, raw C < 0 at some horizon); keep the v1 screen's numbers; no bar; remove `GAIN_BOUND_PENDING` | applied-mathematician (horizon range of the screen), developer | WU-0002.9 | CSQ3 | §M11 row H2e; v3 §2 (after RQ3); DEF-0005 | `test_analysis`, `test_identifiers`, `test_report`; smoke | S |
-```
-
-Definition-of-done table:
-
-```
-| WU-0002.15 | Subset and counts in `results.json` and `RESULTS.md`; no pending marker | Unit, hand-built moments (independent reference: arrays written in the test): a state with raw C < 0 at exactly one horizon and centered covariance ≥ 0 is out of the subset and counted once; the subset fraction equals the hand count ratio exactly (dyadic case, e.g. 3/8); the bound equals ln 2/(2Λ̄) + 1 step computed by NumPy in the test to 1e-15 relative; no `pass`, `threshold` or `verdict` key; `identifiers.ROWS` has no `pending` entry and `test_identifiers` pins it. Integration: a DEV-0 smoke differs from the pre-change smoke only by added `gain_bound` leaves (leafdiff: 0 changed, 0 removed). Marked "needs owner review before freeze" (statistics code). |
-```
+**P9 (ROADMAP, U1 option A) is APPLIED at the main session's placement**: the WU-0002.15 task row after the WU-0002.13 task row (ROADMAP.md line 97) and its definition-of-done row after the WU-0002.13 definition row (line 121). Mark, as ordered: *opened under the owner's step-1 order on the main session's recommendation; the owner may rule it out.* Methods v2 log row 26 refers to WU-0002.15, which now exists in the ROADMAP. If the owner places WU-0002.14 in the ROADMAP later, the order of the two rows may be revisited.
 
 **SKIPPED** (class U other than U1, as ordered)
 
@@ -87,7 +75,7 @@ Definition-of-done table:
 
 ## 6. Verification
 
-A script re-read the copies and the live files and checked, for every APPLIED edit part, that the new text is present in the copy and that the old text is absent (for the insertions, whose anchor text stays, that the anchor is in the live file and the added text follows it). Counts: v3 29 parts in 24 edit items, all new text present, no old text left; Methods v2 2 parts (body edit and the table block) plus the 26 rows individually, all present; decision log 1 part; ROADMAP 14 parts in 9 edit items. 0 problems. Separately, every line of new text was compared with the draft note: all are verbatim in it except the lines that are composed from the draft's instructions (V18's anchored bullet, the Methods row 26 option A text, P1's radius and definition-of-done cells, P2's title cell with its unchanged owner and depends cells).
+A script re-read the copies and the live files and checked, for every APPLIED edit part, that the new text is present in the copy and that the old text is absent (for the insertions, whose anchor text stays, that the anchor is in the live file and the added text follows it). Counts: v3 29 parts in 24 edit items, all new text present, no old text left; Methods v2 2 parts (body edit and the table block) plus the 26 rows individually, all present; decision log 1 part; ROADMAP 16 parts in 10 edit items. 0 problems. Separately, every line of new text was compared with the draft note: all are verbatim in it except the lines that are composed from the draft's instructions (V18's anchored bullet, the Methods row 26 option A text, P1's radius and definition-of-done cells, P2's title cell with its unchanged owner and depends cells).
 
 ## 7. Edit table
 
@@ -149,7 +137,7 @@ Class as in the draft: R required, R/U required with open wording, N nice to hav
 | M14b row 23 | Methods v2 | N | APPLIED | log row appended |
 | M14b row 24 | Methods v2 | R/U | APPLIED | log row appended; wording depends on U4 (applied as drafted) |
 | M14b row 25 | Methods v2 | N | APPLIED | log row appended |
-| M14b row 26 | Methods v2 | U1 | APPLIED | log row appended; Option A text only (U1). The 'owner ruling (pending)' wording of the draft is kept. Refers to WU-0002.15, which is not yet in the ROADMAP (see P9) |
+| M14b row 26 | Methods v2 | U1 | APPLIED | log row appended; Option A text only (U1). The 'owner ruling (pending)' wording of the draft is kept. Refers to WU-0002.15, which P9 now inserts in the ROADMAP |
 | DL-1 | decision log | R | APPLIED | section appended at the end of docs/study/decision_log_lpc.md (D7, D8) |
 | P1 | ROADMAP | R/U | APPLIED | wording depends on open point U6 (applied as drafted). Radius cell and the definition-of-done cell are the two further parts the draft describes in words |
 | P2 | ROADMAP | R | APPLIED | the draft's old text for the definition-of-done row elides the middle with '...'; the old text applied is the live row from the quoted start to the quoted end (middle taken from the live file). Title/owner/depends cells edited as one part, Owner and Serves cells otherwise unchanged |
@@ -159,5 +147,5 @@ Class as in the draft: R required, R/U required with open wording, N nice to hav
 | P6 | ROADMAP | R/U | APPLIED | new row inserted directly after the WU-0015.2 row; order and mandatory status depend on open point U4 (Y7 a, b, d) (applied as drafted) |
 | P7 | ROADMAP | R | APPLIED |  |
 | P8 | ROADMAP | R | APPLIED |  |
-| P9 | ROADMAP | U1 | FAILED | anchor not found: old text occurs 0 times: '| WU-0002.14 |'. Closest anchor: the WU-0002.13 rows (ROADMAP.md lines 97 and 121), the last WU-0002 rows in the live ROADMAP. U1 option A is therefore NOT in the patch; ready-to-paste rows are in section 5 |
+| P9 | ROADMAP | U1 | APPLIED | U1 option A: WU-0002.15 task row inserted after the WU-0002.13 task row (line 97) and its definition-of-done row after the WU-0002.13 definition row (line 121), placement decided by the main session (the draft anchored it after WU-0002.14, which the live ROADMAP does not have). Opened under the owner's step-1 order on the main session's recommendation; the owner may rule it out |
 | P10 | ROADMAP | R | APPLIED |  |
