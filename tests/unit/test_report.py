@@ -1272,3 +1272,63 @@ def test_h3a_section_refuses_a_block_with_only_one_of_the_two_lists() -> None:
                        "pairs": pairs}}
         with pytest.raises(ValueError, match="pairs are inconsistent"):
             report.h3a_regime_lines({"systems": {"lorenz63": bad}}, ["lorenz63"])
+
+
+# ---------------------------------------------------------------------------------------------
+# WU-0004f: skipped_variants and the clip-sensitivity counters in the Handling section.
+# (A delimited block.)
+# ---------------------------------------------------------------------------------------------
+def _handling_section_for(tmp_path: Path, run_extra: dict, counts: dict) -> list[str]:
+    """The ``## Handling`` lines of a hand-built results dict (one system, one block of counts)."""
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    system["handling"] = {"schema": "lpcstudy.handling/2", "cells": {}, "oracles": {},
+                          "fitting": {}, "result_counts": counts, "totals": {}}
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    results["handling"] = {"schema": "lpcstudy.handling/2", "totals": {}, "by_system": {},
+                           "robustness": {}, "failed_variants": 0, **run_extra}
+    write_markdown(results, config, tmp_path / "H.md")
+    lines = (tmp_path / "H.md").read_text().splitlines()
+    return lines[lines.index("## Handling (DEF-0001: nothing silent)"):]
+
+
+def test_handling_section_prints_skipped_variants_and_older_results_say_so_a7(
+        tmp_path: Path) -> None:
+    """A7 (WU-0004f): the section states the ``skipped_variants`` count, never an exception.
+
+    Reference: the lines written out by hand. With the key (3): the exact line next to the
+    ``failed_variants`` line, which is unchanged. Without it (results written before WU-0004f): one
+    line saying it is not recorded, and no number. Exact strings.
+    """
+    section = _handling_section_for(tmp_path, {"skipped_variants": 3}, {})
+    assert "Robustness variants that raised (`failed_variants`): 0." in section
+    assert "Robustness variants not run (`skipped_variants`): 3." in section
+    assert section.index("Robustness variants not run (`skipped_variants`): 3.") == \
+        section.index("Robustness variants that raised (`failed_variants`): 0.") + 1
+    zero = _handling_section_for(tmp_path, {"skipped_variants": 0}, {})
+    assert "Robustness variants not run (`skipped_variants`): 0." in zero
+    older = _handling_section_for(tmp_path, {}, {})
+    assert ("Robustness variants not run (`skipped_variants`): not recorded in these results "
+            "(written before WU-0004f).") in older
+
+
+def test_handling_section_labels_the_clip_sensitivity_sentinels_a7(tmp_path: Path) -> None:
+    """A7 (WU-0004f): the clip-sensitivity counters are listed when nonzero, as sentinels.
+
+    Reference: hand rows. ``n_floored`` of the H1b part and ``n_floored_2L`` (floors that should not
+    bind) and ``n_caught_exceptions`` (an exception in a report-only block is a defect) are labelled;
+    a zero count is not listed. Exact table rows.
+    """
+    base = "clip_sensitivity/by_hypothesis/H1b/parts/PLP"
+    counts = {f"{base}/n_floored": 2, f"{base}/n_floored_2L": 1,
+              "clip_sensitivity/n_caught_exceptions": 3, "H1b/PLP/n_floored": 0}
+    section = _handling_section_for(tmp_path, {"skipped_variants": 0}, counts)
+    assert f"| `{base}/n_floored` (sentinel) | 2 |" in section
+    assert f"| `{base}/n_floored_2L` (sentinel) | 1 |" in section
+    assert "| `clip_sensitivity/n_caught_exceptions` (sentinel) | 3 |" in section
+    assert not any("H1b/PLP/n_floored`" in line and "clip" not in line for line in section)
+    assert report.SENTINEL_RESULT_PATHS == {
+        "H1b/PLP/n_floored", f"{base}/n_floored", f"{base}/n_floored_2L",
+        "clip_sensitivity/n_caught_exceptions"}
+# ------------------------------------------------------------ end of the WU-0004f block

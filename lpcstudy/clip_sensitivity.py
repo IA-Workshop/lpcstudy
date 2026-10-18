@@ -40,6 +40,11 @@ H3a through "no clipped test evaluation entry").
 
 A quantity that cannot be computed is reported ``status = "not_computed"`` with a ``reason``, never
 as a False flag.
+
+Counted, not silent (DEF-0001, WU-0004f). The 1e-12 floor of the H1b regression is counted in the
+part entry (``n_floored``, ``n_floored_2L``; see ``h1b_part`` for what is proved about it), and every
+exception that the report-only block swallows is counted in ``n_caught_exceptions`` of the block.
+Both are mirrored in ``handling.result_counts``.
 """
 
 from __future__ import annotations
@@ -110,6 +115,14 @@ def perturb_moments(moments: EnsembleMoments, column: int, n_draws: int,
     fields and ``kept`` are NOT updated**: the result is for ``oracle_weight``, ``curvature``,
     ``global_weight`` and ``regime_weight``, which read the three second moments only. The input is
     not modified, and a state with no clipped draw gets ``+ 0.0`` (bitwise unchanged).
+
+    The ``1e-300`` floors of ``oracle_weight``, ``global_weight`` and ``regime_weight`` that run on
+    these perturbed moments are not counted here, by this argument (DEF-0001, WU-0004f O-2). The
+    curvature is ``c = E sq_cp - 2 E cross + E sq_plp``, and with the CP sentinel at 0 (checked by
+    ``_block``: CP never clips, so ``|e_C| <= L`` and ``|chi| <= L q / M``) the perturbation changes it by
+    ``c' - c = 3 L^2 q / M - 2 L chi >= L^2 q / M >= 0``; with ``q = 0`` it is bitwise unchanged. So a
+    floor binds under P2 only where it already binds in the original, and those are counted by
+    ``curvature_floor`` and ``pooled_curvature_floor``.
 
     Parameters
     ----------
@@ -330,12 +343,24 @@ def _hypothesis(parts: dict[str, dict], **extra: object) -> dict:
 
 
 # ----------------------------------------------- recomputation of the tier-A verdict statistics
+def _counted(entry: dict, n_failed: int | None, **more: int) -> dict:
+    """``entry`` plus the counts of the P2 recomputation it would otherwise drop (DEF-0001, WU-0004f).
+
+    ``n_failed_resamples`` is the number of non-finite bootstrap resamples of the recomputed
+    statistic (placed at the unfavourable tail of the interval, as in the verdict code; ``None`` if
+    the recomputation did not report one); ``more`` adds further int counts (``n_constant_states``).
+    Additive keys only: no existing key of ``entry`` changes.
+    """
+    return {**entry, "n_failed_resamples": None if n_failed is None else int(n_failed), **more}
+
+
 def h3c_part(original: dict, a5_2: np.ndarray, a4_2: np.ndarray, config: StudyConfig,
              system: str, n_clipped: int) -> dict:
     """H3c under P2: ``an.h3c_ratio`` on the perturbed per-state MSEs (same generator labels)."""
     out = an.h3c_ratio(a5_2, a4_2, config, system)
-    return part_entry(original["A5_over_A4_mse"], original["ci"], original["verdict"],
-                      out["A5_over_A4_mse"], out["ci"], out["verdict"], n_clipped)
+    return _counted(part_entry(original["A5_over_A4_mse"], original["ci"], original["verdict"],
+                               out["A5_over_A4_mse"], out["ci"], out["verdict"], n_clipped),
+                    out["n_failed_resamples"])
 
 
 def h2d_part(original: dict, a3_2: np.ndarray, a4_2: np.ndarray, config: StudyConfig,
@@ -344,8 +369,9 @@ def h2d_part(original: dict, a3_2: np.ndarray, a4_2: np.ndarray, config: StudyCo
     out = an.h2d_empirical_comparison({"A3": SimpleNamespace(state_mse_ref=a3_2),
                                        "A4": SimpleNamespace(state_mse_ref=a4_2)}, config,
                                       system)
-    return part_entry(original["in_distribution_excess"], original["ci"], original["verdict"],
-                      out["in_distribution_excess"], out["ci"], out["verdict"], n_clipped)
+    return _counted(part_entry(original["in_distribution_excess"], original["ci"],
+                               original["verdict"], out["in_distribution_excess"], out["ci"],
+                               out["verdict"], n_clipped), out["n_failed_resamples"])
 
 
 def h2c_parts(original: dict, mse_2: dict[str, np.ndarray], calibration_2: SimpleNamespace,
@@ -384,8 +410,9 @@ def h2c_parts(original: dict, mse_2: dict[str, np.ndarray], calibration_2: Simpl
         old = original[name]
         if name == "A4_minus_A2" or best_2 == best:
             new = out[name]
-            parts[name] = part_entry(old["mean"], old["ci"], old["verdict"], new["mean"], new["ci"],
-                                     new["verdict"], n_clipped[name])
+            parts[name] = _counted(part_entry(old["mean"], old["ci"], old["verdict"], new["mean"],
+                                              new["ci"], new["verdict"], n_clipped[name]),
+                                   new["n_failed_resamples"])
         else:
             parts[name] = {"status": "computed", "reason": "best single changes at 2L",
                            "delta": None, "ratio": None, "flag": True, "verdict_2L": None,
@@ -403,23 +430,44 @@ def h1b_part(original: dict, sq_plp: np.ndarray, sq_plp_2: np.ndarray, gain: np.
     ``analysis.h1b_seed_amplifier``'s PLP regression (floor 0): ``y = 0.5 ln max(E e_P^2, 1e-12)``.
     ``x`` does not depend on the errors. If the set of finite regression states changes, the part is
     not computed.
+
+    The floor is counted, not silent (DEF-0001, WU-0004f; row N4 of the inventory is the original's
+    counterpart): the entry carries ``n_floored`` (regression states of the original with
+    ``E e_P^2 < 1e-12``; the same expression and the same inputs as ``H1b.PLP.n_floored``, so the
+    two are equal) and ``n_floored_2L`` (the same states, under P2), also when the part is not
+    computed. Two facts hold by construction. (i) Under P2 ``sq_plp_2 = sq_plp + 3 L^2 q / M`` with
+    ``q >= 0`` (``perturb_moments``), so ``sq_plp_2 >= sq_plp`` (the sum of a float and a non-negative
+    float is not below the float) and ``n_floored_2L <= n_floored``: the floor can bind under P2 only
+    where it binds in the original. (ii) A state with ``q >= 1`` has ``sq_plp_2 >= 3 L^2 / M``, above
+    1e-12 for every ``M <= 3e14``, so under P2 the floor binds only on states with no clipped draw.
+    Where the floor does not bind, ``np.maximum`` returns its first argument unchanged. That it does
+    not bind at all is not proved: it is the sentinel ``n_floored`` (it should read 0), reported.
+
+    Returns
+    -------
+    dict
+        ``part_entry`` or ``not_computed`` output, plus the two integer counts ``n_floored`` and
+        ``n_floored_2L``.
     """
     x_all = np.log(gain * seed_err / np.sqrt(dim))
     keep = np.isfinite(x_all) & np.isfinite(0.5 * np.log(np.maximum(sq_plp, 1e-12)))
     y_2 = 0.5 * np.log(np.maximum(sq_plp_2, 1e-12))
+    floored = {"n_floored": int((sq_plp < 1e-12)[keep].sum()),  # the floor binds in the original
+               "n_floored_2L": int((sq_plp_2 < 1e-12)[keep].sum())}  # ... and under P2
     if not np.array_equal(keep, np.isfinite(x_all) & np.isfinite(y_2)):
-        return not_computed("regression states change at 20 sigma_x", n_clipped)
+        return {**not_computed("regression states change at 20 sigma_x", n_clipped), **floored}
     x, y = x_all[keep], y_2[keep]
     if len(x) == 0:
-        return not_computed("no regression state", n_clipped)
+        return {**not_computed("no regression state", n_clipped), **floored}
     boot = block_bootstrap_counted(lambda idx: ols_slope(x[idx], y[idx]), len(x),
                                    config.bootstrap_resamples, config.bootstrap_block,
                                    make_rng(config.seed, system, "bootstrap", "H1b"), an.H1_LEVEL)
     verdict_2, _ = criterion_verdict(boot.estimate, boot.lower, boot.upper, an.H1B_BAND,
                                      n_states=len(x))
     plp = original["PLP"]
-    return part_entry(plp["slope"], plp["ci"], original["verdict"], boot.estimate,
-                      [boot.lower, boot.upper], verdict_2, n_clipped)
+    return {**_counted(part_entry(plp["slope"], plp["ci"], original["verdict"], boot.estimate,
+                                  [boot.lower, boot.upper], verdict_2, n_clipped), boot.n_failed),
+            **floored}
 
 
 def h2a_parts(original: dict, w_ref_2: np.ndarray, growth_scaled: np.ndarray, seeds: np.ndarray,
@@ -438,8 +486,9 @@ def h2a_parts(original: dict, w_ref_2: np.ndarray, growth_scaled: np.ndarray, se
     for name, old in original["part_ii"].items():
         new = out["part_ii"].get(name)
         parts[name] = not_computed("part absent at 20 sigma_x", n_clipped) if new is None else \
-            part_entry(old["partial_corr"], old["ci"], old["verdict"], new["partial_corr"],
-                       new["ci"], new["verdict"], n_clipped)
+            _counted(part_entry(old["partial_corr"], old["ci"], old["verdict"],
+                                new["partial_corr"], new["ci"], new["verdict"], n_clipped),
+                     new["n_failed_resamples"])
     return _hypothesis(parts, parts_2L=list(out["part_ii"]),
                        extra_flag=set(out["part_ii"]) != set(original["part_ii"]))
 
@@ -451,15 +500,16 @@ def h2b_noise_part(original: dict, w_by_noise_2: np.ndarray, levels: np.ndarray,
     The statistic, the generator ``make_rng(config.seed, system, "bootstrap", "H2b-noise")``, the level ``1 - 0.05/3`` and the verdict rule
     are those of ``analysis.h2b_knob_response``.
     """
-    rho_corr, _ = an._per_state_spearman_counted(levels, w_by_noise_2)
+    rho_corr, n_constant = an._per_state_spearman_counted(levels, w_by_noise_2)
     point, values = bootstrap_values(lambda idx: float(np.mean(rho_corr[idx])), len(rho_corr),
                                      config.bootstrap_resamples, config.bootstrap_block,
                                      make_rng(config.seed, system, "bootstrap", "H2b-noise"))
-    lower, upper, _ = percentile_interval(values, an.PRIMARY_LEVEL)
+    lower, upper, n_failed = percentile_interval(values, an.PRIMARY_LEVEL)
     verdict_2, _ = criterion_verdict(float(point), lower, upper, (0.0, np.inf), (False, True),
                                      n_states=len(rho_corr))
-    return part_entry(original["mean_state_spearman"], original["ci"], original["verdict"],
-                      float(point), [lower, upper], verdict_2, n_clipped)
+    return _counted(part_entry(original["mean_state_spearman"], original["ci"],
+                               original["verdict"], float(point), [lower, upper], verdict_2,
+                               n_clipped), n_failed, n_constant_states=int(n_constant))
 
 
 def h2b_library_part(original: dict, low_2: np.ndarray, high_2: np.ndarray, rho: float,
@@ -469,8 +519,9 @@ def h2b_library_part(original: dict, low_2: np.ndarray, high_2: np.ndarray, rho:
                                              (system, "h2b-library-change", f"{rho:g}"),
                                              "mean_change",
                                              mc_error=True)
-    return part_entry(original["mean_change"], original["ci"], original["verdict"],
-                      fields["mean_change"], fields["ci"], verdict_2, n_clipped)
+    return _counted(part_entry(original["mean_change"], original["ci"], original["verdict"],
+                               fields["mean_change"], fields["ci"], verdict_2, n_clipped),
+                    fields["n_failed_resamples"])
 
 
 # ------------------------------------------------------------------------------ orchestration
@@ -559,33 +610,54 @@ def clip_sensitivity_block(cell, rules, weights: dict[str, np.ndarray], scores: 
         (per rule, the share of the pooled squared error on the test draws whose PLP error is clipped:
         a descriptor of where the error sits, for A0 the CP squared-error share; only its change under
         P2 is 0, Amendment 1 A1.4), ``weight_shift``, ``by_hypothesis`` (per criterion ``parts`` and
-        ``flag``), ``invariance`` and ``affected_states``. Nothing here changes a verdict or marks a
-        result provisional (OD6); the recomputation consumes no randomness. This is a report-only
-        block: **any** exception inside it is caught and recorded (``status = "not_computed"``,
-        ``reason = "error: <repr>"``, ``LOG.exception``), so that a defect here can never end a run and
-        lose the verdicts (the pattern of ``run_robustness``).
+        ``flag``), ``invariance``, ``affected_states`` and ``n_caught_exceptions``. Nothing here
+        changes a verdict or marks a result provisional (OD6); the recomputation consumes no
+        randomness. This is a report-only block: **any** exception inside it is caught and recorded
+        (``status = "not_computed"``, ``reason = "error: <repr>"``, ``LOG.exception``), so that a
+        defect here can never end a run and lose the verdicts (the pattern of ``run_robustness``).
+        **Every swallowed exception is counted** (DEF-0001, WU-0004f): ``n_caught_exceptions`` is the
+        number of exceptions the three broad ``except`` clauses of this module caught while building
+        the block (one per failed criterion in ``_guarded``, one for the whole block here, one for a
+        failed listing of the parts in ``_failed``); it is present and 0 when nothing was caught. A
+        refusal that carries its own reason (arrays absent, a CP clip, a baseline not reproduced) is
+        not an exception and is not counted; its ``reason`` says it. It is a sentinel (should be 0).
     """
+    caught: list[str] = []
     try:
-        return _block(cell, rules, weights, scores, noise_cells, library_cells, results, config)
+        return _block(cell, rules, weights, scores, noise_cells, library_cells, results, config,
+                      caught)
     except Exception as exc:  # noqa: BLE001 - report-only block: recorded and logged, never fatal
         LOG.exception("clip sensitivity: block not computed: %r", exc)
-        return _failed(results, f"error: {exc!r}")
+        caught.append(repr(exc))
+        return _failed(results, f"error: {exc!r}", len(caught))
 
 
-def _failed(results: dict, reason: str) -> dict:
-    """A block that was not computed: every part ``not_computed`` with ``reason`` (never False)."""
+def _failed(results: dict, reason: str, n_caught: int = 0) -> dict:
+    """A block that was not computed: every part ``not_computed`` with ``reason`` (never False).
+
+    ``n_caught`` is the number of exceptions already swallowed on the way here; a failure to list
+    the parts adds one (and is logged: it was silent before WU-0004f).
+    """
     try:
         by_hypothesis = _all_not_computed(results, reason)
-    except Exception:  # noqa: BLE001 - malformed results: no parts to list, the reason stays
+    except Exception as exc:  # noqa: BLE001 - malformed results: no parts to list, the reason stays
+        LOG.exception("clip sensitivity: the parts of the failed block could not be listed: %r", exc)
         by_hypothesis = {}
+        n_caught += 1
     return {"clip_level": ERROR_CLIP, "perturbed_level": PERTURBED_LEVEL,
             "status": "not_computed", "reason": reason, "by_hypothesis": by_hypothesis,
             "invariance": dict.fromkeys(("H1c", "H2a_i", "H3a"), INVARIANCE_NOT_COMPUTED),
-            "affected_states": {"Q-N": None, "H3b": None}}
+            "affected_states": {"Q-N": None, "H3b": None}, "n_caught_exceptions": int(n_caught)}
 
 
-def _block(cell, rules, weights, scores, noise_cells, library_cells, results, config) -> dict:
-    """The body of ``clip_sensitivity_block`` (which catches whatever it raises)."""
+def _block(cell, rules, weights, scores, noise_cells, library_cells, results, config,
+           caught: list[str] | None = None) -> dict:
+    """The body of ``clip_sensitivity_block`` (which catches whatever it raises).
+
+    ``caught`` collects the repr of every exception swallowed while building the block (it belongs to
+    the caller, so a later failure of the whole block keeps the count).
+    """
+    caught = [] if caught is None else caught
     out: dict = {"clip_level": ERROR_CLIP, "perturbed_level": PERTURBED_LEVEL,
                  "status": "computed", "reason": None}
     con, cal, test = (cell.splits[s] for s in ("construction", "calibration", "test"))
@@ -603,27 +675,42 @@ def _block(cell, rules, weights, scores, noise_cells, library_cells, results, co
         if n_cp:
             reason = f"CP clip sentinel nonzero ({n_cp} entries)"
     if reason is not None:
-        return _failed(results, reason)
+        return _failed(results, reason, len(caught))
     try:
         out.update(_compute(cell, rules, weights, scores, noise_cells, library_cells, results, config,
-                            sweeps))
+                            sweeps, caught))
     except _BaselineMismatch as exc:
-        return _failed(results, str(exc))
+        return _failed(results, str(exc), len(caught))
+    out["n_caught_exceptions"] = len(caught)
     return out
 
 
-def _guarded(names: list[str], build, tier_b: bool = False) -> dict:
-    """``build()`` or, if it raises, every part not computed with the error (logged, never silent)."""
+def _guarded(names: list[str], build, tier_b: bool = False, caught: list[str] | None = None
+             ) -> dict:
+    """``build()`` or, if it raises, every part not computed with the error (logged, counted).
+
+    The repr of the exception is appended to ``caught`` (the block's ``n_caught_exceptions``).
+    """
     try:
         return build()
     except Exception as exc:  # noqa: BLE001 - a flag that cannot be computed is reported, not fatal
         LOG.exception("clip sensitivity: %s", exc)
+        if caught is not None:
+            caught.append(repr(exc))
         return _hypothesis({n: not_computed(f"error: {exc!r}", bound=tier_b) for n in names})
 
 
-def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, config, sweeps
-             ) -> dict:
-    """The body of ``clip_sensitivity_block`` once the inputs are known to carry the arrays."""
+def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, config, sweeps,
+             caught: list[str] | None = None) -> dict:
+    """The body of ``clip_sensitivity_block`` once the inputs are known to carry the arrays.
+
+    ``caught`` receives the repr of each criterion whose builder raised (see ``_guarded``).
+    """
+    caught = [] if caught is None else caught
+
+    def guard(names: list[str], build, tier_b: bool = False) -> dict:
+        return _guarded(names, build, tier_b, caught)
+
     ref, m_draws, lt = config.reference_horizon, config.n_oracle_draws, config.steps_per_lyapunov
     con, cal, test = (cell.splits[s] for s in ("construction", "calibration", "test"))
     names = _part_names(results)
@@ -696,12 +783,12 @@ def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, 
     by_hypothesis: dict = {}
     n_test_eval = href["test_eval"]
     if "H3c" in names:
-        by_hypothesis["H3c"] = _guarded(names["H3c"], lambda: _hypothesis({"A5_over_A4": h3c_part(
+        by_hypothesis["H3c"] = guard(names["H3c"], lambda: _hypothesis({"A5_over_A4": h3c_part(
             results["H3c"], mse_2["A5"], mse_2["A4"], config, cell.system,
             n_test_eval + href["calibration_oracle"]
             + empty_used * href["construction_oracle"])}))
     if "H2d" in names:
-        by_hypothesis["H2d"] = _guarded(names["H2d"], lambda: _hypothesis({"A4_over_A3": h2d_part(
+        by_hypothesis["H2d"] = guard(names["H2d"], lambda: _hypothesis({"A4_over_A3": h2d_part(
             results["H2d"], mse_2["A3"], mse_2["A4"], config, cell.system, n_test_eval)}))
     if "H2c" in names:
         def build_h2c() -> dict:
@@ -714,11 +801,11 @@ def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, 
             counts = {"A4_minus_A2": shared + href["construction_oracle"],
                       names["H2c"][1]: shared}
             return h2c_parts(results["H2c"], mse_2, calibration_2, config, cell.system, counts)
-        by_hypothesis["H2c"] = _guarded(names["H2c"], build_h2c)
+        by_hypothesis["H2c"] = guard(names["H2c"], build_h2c)
     m_test = test.moments
     wcol = m_test.at(ref)
     if "H1b" in names:
-        by_hypothesis["H1b"] = _guarded(names["H1b"], lambda: _hypothesis({"PLP": h1b_part(
+        by_hypothesis["H1b"] = guard(names["H1b"], lambda: _hypothesis({"PLP": h1b_part(
             results["H1b"], m_test.sq_plp[:, wcol], test_2.sq_plp[:, wcol],
             cell.oracles["test"].gains[:, ref - 1], m_test.est_seed, cell.ctx.spec.dim, config,
             cell.system, href["test_oracle"])}))
@@ -729,12 +816,12 @@ def _compute(cell, rules, weights, scores, noise_cells, library_cells, results, 
             return h2a_parts(results["H2a"], oracle_weight(test_2)[:, wcol],
                              cell.oracles["test"].growth * lt, seeds, config, cell.system,
                              href["test_oracle"])
-        by_hypothesis["H2a"] = _guarded(names["H2a"], build_h2a)
+        by_hypothesis["H2a"] = guard(names["H2a"], build_h2a)
     if "H2b" in names:
-        by_hypothesis["H2b"] = _guarded(names["H2b"], lambda: _h2b(
+        by_hypothesis["H2b"] = guard(names["H2b"], lambda: _h2b(
             results["H2b"], noise_cells, library_cells, config, m_draws))
     if "H2e" in names:
-        by_hypothesis["H2e"] = _guarded(names["H2e"], lambda: _h2e(
+        by_hypothesis["H2e"] = guard(names["H2e"], lambda: _h2e(
             results["H2e"], library_cells, config), tier_b=True)
     out["by_hypothesis"] = by_hypothesis
 
