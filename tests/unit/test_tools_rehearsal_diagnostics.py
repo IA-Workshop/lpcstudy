@@ -2949,3 +2949,324 @@ def test_h1d_a_transform_that_creates_ties_is_not_computable_inside_the_interval
     res2["H1d"]["rows"]["nhat"]["spearman"] += 1e-6
     rep = run_h1d(d2, res2)
     assert rep.exit_code() == 1 and "H1d nhat Spearman" in rep.defects[0]
+
+
+# ------------------------------------------------------------------------------------------ WU-0003.8d (OF-3 and the block-sensitive label)
+STEP = np.concatenate([np.ones(20), -np.ones(20)])
+"""n = 40, +1 for 20 states then -1 for 20: V*(5) and V*(10) in closed form (hand-worked below)."""
+STEP_V5, STEP_V10 = 164.0 / 36.0, 244.0 / 31.0
+"""Hand count. Mean 0. b = 5: 36 windows; 16 all-plus (mean 1), 16 all-minus (-1) and the four
+transitional ones with means +-0.6, +-0.2: sum of squares 32 + 2 (0.36 + 0.04) = 32.8, V* = 5 x
+32.8/36. b = 10: 31 windows; 11 + 11 with mean +-1 and nine transitional ones with means
+0.8, 0.6, 0.4, 0.2, 0, -0.2, ...: 22 + 2.4 = 24.4, V* = 10 x 24.4/31."""
+STEP_FACTOR = math.sqrt(STEP_V10 / STEP_V5)
+"""sqrt(8784/5084) = 1.31445..."""
+
+
+def step_context(tree: dict) -> rd.Context:
+    return rd.Context("lorenz63", rd.Dump({}, "mem"), tree, dict(CFG), rd.Report(), rd.TOOL_SEED,
+                      rd.DEFAULT_RESAMPLES, rd.DEFAULT_PERMUTATIONS)
+
+
+F = STEP_FACTOR
+SENSITIVITY_CASES = [
+    # (criterion, part, results tree as production writes it, n_states, recorded verdict,
+    #  hand-worked widened interval, widened verdict)
+    ("H3c", "", {"H3c": {"A5_over_A4_mse": 1.0, "ci": [0.9, 1.04], "verdict": "pass"}}, 100,
+     "pass", (1.0 - 0.1 * F, 1.0 + 0.04 * F), "inconclusive"),   # hi 1.05258 > 1.05 (upper < 1.05)
+    ("H3c", "", {"H3c": {"A5_over_A4_mse": 1.0, "ci": [0.9, 1.035], "verdict": "pass"}}, 100,
+     "pass", (1.0 - 0.1 * F, 1.0 + 0.035 * F), "pass"),          # hi 1.04601 < 1.05
+    ("H3c", "", {"H3c": {"A5_over_A4_mse": 1.2, "ci": [1.06, 1.4], "verdict": "fail"}}, 100,
+     "fail", (1.2 - 0.14 * F, 1.2 + 0.2 * F), "inconclusive"),   # lo 1.01598 < 1.05: fail -> inconclusive
+    ("H3c", "", {"H3c": {"A5_over_A4_mse": 1.0, "ci": [0.9, 1.04], "verdict": "inconclusive"}}, 30,
+     "inconclusive", (1.0 - 0.1 * F, 1.0 + 0.04 * F), "inconclusive"),  # n_states < 50: never changes
+    ("H2a(i)", "", {"H2a": {"median_range": 0.08, "range_ci": [0.06, 0.097],
+                            "part_i_verdict": "pass"}}, 100,
+     "pass", (0.08 - 0.02 * F, 0.08 + 0.017 * F), "inconclusive"),  # hi 0.10234 >= 0.1
+    ("H2a(ii)", "zero", {"H2a": {"part_ii": {"zero": {"partial_corr": 0.0, "ci": [-0.08, 0.08],
+                                                       "verdict": "pass"}}}}, 100,
+     "pass", (-0.08 * F, 0.08 * F), "inconclusive"),             # +-0.10516 leaves (-0.1, 0.1)
+    ("H2a(ii)", "interior", {"H2a": {"part_ii": {"interior": {"partial_corr": 0.0, "ci": [-0.1, 0.1],
+                                                              "verdict": "inconclusive"}}}}, 100,
+     "inconclusive", (-0.1 * F, 0.1 * F), "inconclusive"),       # the band is open: (-0.1, 0.1) is not inside
+    ("H2b(i)", "", {"H2b": {"noise": {"mean_state_spearman": 0.2, "ci": [0.04, 0.3],
+                                      "verdict": "pass"}}}, 100,
+     "pass", (0.2 - 0.16 * F, 0.2 + 0.1 * F), "inconclusive"),   # lo -0.01031 <= 0
+    ("H2b(ii)", "", {"H2b": {"library_change": {"mean_change": 0.2, "ci": [0.1, 0.3],
+                                                "verdict": "pass"}}}, 100,
+     "pass", (0.2 - 0.1 * F, 0.2 + 0.1 * F), "pass"),            # lo 0.06856 > 0
+    ("H1a", "rho=0.02", {"H1a": {"by_noise": {"0.02": {"ratio": 1.0, "ratio_ci": [0.8, 1.2],
+                                                        "verdict": "pass"}}}}, 100,
+     "pass", (1.0 - 0.2 * F, 1.0 + 0.2 * F), "inconclusive"),    # lo 0.73711 < 0.75
+    ("H1a", "rho=0.01", {"H1a": {"by_noise": {"0.01": {"ratio": 1.0, "ratio_ci": [0.75, 1.25],
+                                                        "verdict": "pass"}}}}, 100,
+     "pass", (1.0 - 0.25 * F, 1.0 + 0.25 * F), "inconclusive"),  # the band is closed: [0.75, 1.25] passes
+]
+
+
+def test_wu0003_8d_hand_worked_block_variances_of_the_step_series() -> None:
+    """The closed-form V*(5) and V*(10) of the +1/-1 step series (counted by hand above) equal the
+    tool's ``block_variance``; the widening factor is sqrt(8784/5084).
+
+    Reference: the window counts in ``STEP_V5``'s docstring (rational numbers). Tolerance 1e-12
+    relative: 36 or 31 window means summed, round-off about 1e-15.
+    """
+    assert rd.block_variance(STEP, 5) == pytest.approx(STEP_V5, rel=1e-12)
+    assert rd.block_variance(STEP, 10) == pytest.approx(STEP_V10, rel=1e-12)
+    assert STEP_FACTOR == pytest.approx(1.3144, abs=1e-4)
+
+
+def test_wu0003_8d_widen_interval_is_the_hand_formula() -> None:
+    """Each side is scaled about the point: (1 - 2 x 0.3, 1 + 2 x 0.5) = (0.4, 2.0); factor 1 is the identity.
+
+    Reference: hand arithmetic; exact in float64 (two operations per bound), tolerance 1e-15.
+    """
+    lo, hi = rd.widen_interval(1.0, 0.7, 1.5, 2.0)
+    assert (lo, hi) == (pytest.approx(0.4, abs=1e-15), pytest.approx(2.0, abs=1e-15))
+    assert rd.widen_interval(1.0, 0.7, 1.5, 1.0) == (pytest.approx(0.7, abs=1e-15),
+                                                     pytest.approx(1.5, abs=1e-15))
+
+
+@pytest.mark.parametrize("criterion, part, tree, n_states, recorded, widened, wide_verdict",
+                         SENSITIVITY_CASES, ids=[f"{c[0]} {c[1]} {c[3]}-{c[6]}".replace("  ", " ")
+                                                 for c in SENSITIVITY_CASES])
+def test_wu0003_8d_block_sensitivity_matches_the_hand_worked_verdicts(
+        criterion, part, tree, n_states, recorded, widened, wide_verdict) -> None:
+    """Widened bounds and verdicts of every criterion, worked by hand from v3 section 2.
+
+    Reference: the widening factor sqrt(V*(10)/V*(5)) = 1.31445 of the step series (closed form) and
+    the verdict rules written out: H2a(i) pass iff hi < 0.1; H2a(ii) pass iff inside the open band
+    (-0.1, 0.1); H2b and H3c one-sided (lo > 0 / hi < 1.05); H1a inside the closed band [0.75, 1.25];
+    fail iff the interval lies wholly outside; fewer than 50 states is inconclusive. Each widened bound
+    is at least 2e-4 from its edge, so the factor's round-off (1e-15) cannot change a verdict;
+    bounds are compared at 1e-12.
+    """
+    s = rd.Series("lorenz63", criterion, part, STEP, True, n_states)
+    got = rd.block_sensitivity(step_context(tree), s)
+    assert got["ratio10"] == pytest.approx(STEP_V10 / STEP_V5, rel=1e-12)
+    assert got["factor"] == pytest.approx(STEP_FACTOR, rel=1e-12)
+    assert got["verdict"] == recorded and got["widened_verdict"] == wide_verdict
+    assert got["widened_interval"] == pytest.approx(list(widened), abs=1e-12)
+    assert got["sensitive"] is (wide_verdict != recorded)
+
+
+def test_wu0003_8d_a_ratio_below_one_does_not_shrink_the_interval() -> None:
+    """factor = sqrt(max(1, ratio)): the alternating series has V*(10) = 0 (every even block sums to
+    0), so the factor is exactly 1 and the interval is returned unchanged.
+
+    Reference: hand count. x = +1, -1, ... (n = 40): a block of 10 sums to 0 so V*(10) = 0; a block of
+    5 sums to +-1 so its means are +-0.2 (half each) and V*(5) = 5 x 0.04 = 0.2.
+    """
+    alt = np.tile([1.0, -1.0], 20)
+    tree = {"H3c": {"A5_over_A4_mse": 1.0, "ci": [0.9, 1.04], "verdict": "pass"}}
+    got = rd.block_sensitivity(step_context(tree), rd.Series("lorenz63", "H3c", "", alt, True, 100))
+    assert rd.block_variance(alt, 5) == pytest.approx(0.2, abs=1e-15)
+    assert got["ratio10"] == pytest.approx(0.0, abs=1e-12) and got["factor"] == 1.0
+    assert got["widened_interval"] == [0.9, 1.04] and got["sensitive"] is False
+
+
+@pytest.mark.parametrize("change, message", [
+    (lambda t: t["H3c"].pop("verdict"), "results leaf H3c/verdict is absent"),
+    (lambda t: t["H3c"].update(verdict="fail"), "differs from the recorded one"),
+    (lambda t: t["H3c"].update(A5_over_A4_mse=float("nan")), "not usable"),
+    (lambda t: t["H3c"].update(ci=[1.2, 0.9]), "not usable"),
+    (lambda t: t["H3c"].update(ci=["x", 1.0]), "not a number"),
+], ids=["leaf absent", "recorded verdict differs", "point NaN", "lower above upper", "not a number"])
+def test_wu0003_8d_missing_or_unusable_inputs_are_not_computable_never_skipped(change, message) -> None:
+    """Every input problem raises ``NotComputable`` with its reason (PRIME.4); the constant series
+    (V*(5) = 0) and a criterion without a verdict rule do too.
+
+    Reference: the specification above (a reason for each class of missing input).
+    """
+    tree = {"H3c": {"A5_over_A4_mse": 1.0, "ci": [0.9, 1.04], "verdict": "pass"}}
+    change(tree)
+    with pytest.raises(rd.NotComputable, match=message):
+        rd.block_sensitivity(step_context(tree), rd.Series("lorenz63", "H3c", "", STEP, True, 100))
+    with pytest.raises(rd.NotComputable, match="V\\*\\(5\\) is not positive"):
+        rd.block_sensitivity(step_context(SENSITIVITY_CASES[0][2]),
+                             rd.Series("lorenz63", "H3c", "", np.ones(40), True, 100))
+    with pytest.raises(rd.NotComputable, match="no verdict rule"):
+        rd.block_sensitivity(step_context({}), rd.Series("lorenz63", "H2c", "A4-A2", STEP, False, 100))
+
+
+def test_wu0003_8d_the_verdict_bands_are_the_production_ones() -> None:
+    """The tool's copies of the production bands equal ``lpcstudy.analysis``'s constants.
+
+    Reference: the module constants themselves (the production source of the bands); the closed or
+    open edges are exercised by the hand-worked cases above.
+    """
+    from lpcstudy import analysis
+    assert rd.VERDICT_RULES["H2a(i)"][0] == tuple(analysis.H2A_RANGE_BAND)
+    assert rd.VERDICT_RULES["H2a(ii)"][0] == tuple(analysis.H2A_PARTIAL_BAND)
+    assert rd.VERDICT_RULES["H3c"][0] == (-math.inf, analysis.H3C_BOUND)
+    assert rd.VERDICT_RULES["H1a"][0] == tuple(analysis.H1A_BAND)
+    assert rd.VERDICT_RULES["H2b(i)"][0] == rd.VERDICT_RULES["H2b(ii)"][0] == (0.0, math.inf)
+
+
+def stub_sensitivity(monkeypatch, sensitive: bool | None) -> None:
+    """Replace the per-part computation: sensitive, not sensitive, or not computable (None)."""
+    def stub(ctx, s):
+        if sensitive is None:
+            raise rd.NotComputable("simulated missing input")
+        return {"point": 0.0, "interval": [-1.0, 1.0], "ratio10": 1.2, "factor": 1.1,
+                "verdict": "pass", "widened_interval": [-1.1, 1.1],
+                "widened_verdict": "inconclusive" if sensitive else "pass", "sensitive": sensitive,
+                "reason": None}
+    monkeypatch.setattr(rd, "block_sensitivity", stub)
+
+
+def test_wu0003_8d_the_label_is_counted_printed_and_has_no_effect_on_the_exit_code(monkeypatch) -> None:
+    """A BLOCK-SENSITIVE part, a not-block-sensitive part and a not-computable part are each printed,
+    counted in the section's summary, the run-level line and the JSON data, and none of them adds to
+    ``rep.incomplete`` or ``rep.defects`` (exit code unchanged).
+
+    Reference: the specification (informational label); the counts are the number of primary
+    series of the world, read from ``series_log`` of a run without the stub.
+    """
+    d, res, _ = build_world(rng_for("world"))
+    quiet_d2(monkeypatch)
+    baseline = d1_d2_report(d, res)
+    n_primary = sum(e["primary"] for e in baseline.series_log)
+    assert n_primary >= 6
+    for state, word in ((True, "BLOCK-SENSITIVE"), (False, "not block-sensitive"),
+                        (None, "block sensitivity not computable: simulated missing input")):
+        stub_sensitivity(monkeypatch, state)
+        rep = d1_d2_report(d, res)
+        text = "\n".join(rep.lines)
+        assert rep.incomplete == baseline.incomplete and rep.defects == baseline.defects
+        assert rep.exit_code() == baseline.exit_code()
+        assert text.count(word) >= n_primary
+        data = rep.data["lorenz63"]["block_sensitivity"]
+        assert data["exit_code_effect"] == "none"
+        assert (len(data["sensitive_parts"]), data["n_computable"], data["n_not_computable"]) == (
+            (n_primary, n_primary, 0) if state else
+            (0, n_primary, 0) if state is False else (0, 0, n_primary))
+        rd.run_level_lines(rep)
+        run = rep.data["run_level"]["block_sensitive"]
+        assert (len(run["parts"]), run["n_computable"], run["n_not_computable"]) == (
+            len(data["sensitive_parts"]), data["n_computable"], data["n_not_computable"])
+        assert rep.exit_code() == baseline.exit_code()
+
+
+def test_wu0003_8d_a_primary_part_without_a_series_is_counted_not_computable_in_the_label(monkeypatch) -> None:
+    """H3c cannot be built (dump without ``core/state_mse/A5``): the label rows list "H3c" as not
+    computable with the reason "no influence series", beside the computed ones; no new entry in
+    ``rep.incomplete`` beyond the one the missing series already made.
+
+    Reference: the same world with and without the array (the r19 construction).
+    """
+    d, res, _ = build_world(rng_for("world"))
+    quiet_d2(monkeypatch)
+    stub_sensitivity(monkeypatch, False)
+    full = d1_d2_report(d, res)
+    gap = d1_d2_report({k: v for k, v in d.items() if k != "core/state_mse/A5"}, res)
+    data = gap.data["lorenz63"]["block_sensitivity"]
+    assert data["not_computable_parts"] == ["H3c"] and data["n_not_computable"] == 1
+    assert data["n_computable"] == full.data["lorenz63"]["block_sensitivity"]["n_computable"] - 1
+    assert "H3c" in data["rows"] and data["rows"]["H3c"]["sensitive"] is None
+    assert all("block" not in x for x in gap.incomplete)
+
+
+def test_wu0003_8d_of3_the_pooled_permutation_reading_governs_the_d2_headline(monkeypatch) -> None:
+    """OF-3: the headline "block length 5 is a design question" fires iff the pooled permutation
+    reading fires; the A5 rule and beta5 are printed as information and decide nothing.
+
+    Reference: the owner's ruling (amendments note 31, section 31): four states of the three readings
+    and their expected wording: permutation fires with the others quiet; permutation quiet with A5 and
+    beta5 firing on every primary series; permutation not computable (A5 firing); all quiet (the
+    wording of r19, unchanged). ``--json``: ``D2_design_question`` follows the governing reading
+    (True, False, None) and ``D2_any_reading_fired`` keeps the old meaning.
+    """
+    d, res, _ = build_world(rng_for("world"))
+
+    def flag_of(rep: rd.Report) -> str:
+        return [x for x in rep.lines if "D2 owner flag" in x][0]
+
+    quiet_d2(monkeypatch)
+    n = sum(e["primary"] for e in d1_d2_report(d, res).series_log)
+    monkeypatch.setattr(rd, "_permutation_reading", lambda ctx, prim: {"fires": True, "n_series": len(prim)})
+    rep = d1_d2_report(d, res)
+    assert ("block length 5 is a design question (the pooled permutation reading fired; it governs, "
+            f"OF-3; the A5 rule and beta5 are information, not governing: A5 rule fired on 0 of {n} "
+            f"primary series, beta5 on 0 of {n})") in flag_of(rep)
+    data = rep.data["lorenz63"]
+    assert data["D2_design_question"] is True and data["D2_any_reading_fired"] is True
+    assert data["D2_governing_reading"] == "pooled permutation (OF-3)"
+
+    monkeypatch.setattr(rd, "_permutation_reading", lambda ctx, prim: {"fires": False, "n_series": len(prim)})
+    monkeypatch.setattr(rd, "variance_summary", lambda v, _f=rd.variance_summary: {**_f(v), "fires": True})
+    real_beta = rd.beta_reading
+    monkeypatch.setattr(rd, "beta_reading", lambda lags, n: {**real_beta(lags, n), "fires": True})
+    rep = d1_d2_report(d, res)
+    assert (f"lorenz63: no design question on the governing reading (the pooled permutation did not "
+            f"fire); information, not governing: A5 rule fired on {n} of {n} primary series, beta5 on "
+            f"{n} of {n}") in flag_of(rep)
+    assert "is a design question" not in flag_of(rep)
+    data = rep.data["lorenz63"]
+    assert data["D2_design_question"] is False and data["D2_any_reading_fired"] is True
+
+    def broken(ctx, prim):
+        raise rd.NotComputable("simulated")
+    monkeypatch.setattr(rd, "_permutation_reading", broken)
+    rep = d1_d2_report(d, res)
+    assert ("not determined (the governing pooled permutation reading was not computed; information, "
+            "not governing: A5 rule fired on") in flag_of(rep)
+    assert "not computed: lorenz63 permutation null" in flag_of(rep)
+    assert rep.data["lorenz63"]["D2_design_question"] is None and rep.exit_code() == 2
+
+    quiet_d2(monkeypatch)
+    assert flag_of(d1_d2_report(d, res)).endswith("lorenz63: no reading fired")
+
+
+def test_wu0003_8d_the_run_level_governing_line_reads_the_permutation_per_system() -> None:
+    """The run-level governing line and its data.
+
+    Reference: hand cases of the line's specification. (a) the R1 values of the analysis note (p = 0.86,
+    0.18, 0.41, none fired): "fired on 0 of 3", smallest p 0.1800, "design question: no". (b) one system
+    fired, one not computed: "YES ... (lorenz63)", "1 of 1", the other named. (c) nothing computed:
+    "not determined".
+    """
+    def line_of(perms: dict) -> tuple[str, dict]:
+        rep = rd.Report()
+        rep.data["run_level"] = {}
+        for system, perm in perms.items():
+            rep.data[system] = {"D2_permutation": perm}
+        rd.governing_line(rep)
+        return rep.lines[-1], rep.data["run_level"]["d2_governing"]
+
+    quiet = lambda p: {"fires": False, "p": p}  # noqa: E731
+    text, data = line_of({"lorenz63": quiet(0.86), "rossler": quiet(0.18), "chua": quiet(0.41)})
+    assert "fired on 0 of 3 computed system(s), smallest one-sided p 0.1800" in text
+    assert text.endswith("block length 5 is a design question: no")
+    assert data["design_question"] is False and data["smallest_p"] == 0.18 and data["fired_systems"] == []
+    text, data = line_of({"lorenz63": {"fires": True, "p": 0.004}, "rossler": None})
+    assert "fired on 1 of 1 computed system(s), smallest one-sided p 0.0040" in text
+    assert "design question: YES, block length 5 is a design question (lorenz63)" in text
+    assert text.endswith("; not computed: rossler")
+    assert data["design_question"] is True and data["not_computed_systems"] == ["rossler"]
+    text, data = line_of({"lorenz63": None})
+    assert "design question: not determined (no system had a pooled permutation reading)" in text
+    assert data["design_question"] is None and data["smallest_p"] is None
+
+
+def test_wu0003_8d_the_run_level_block_sensitive_line_names_parts_and_gaps() -> None:
+    """The run-level label line lists the labelled parts and the not-computable ones.
+
+    Reference: hand cases (R1 of the analysis note: one part labelled, "rossler H1a rho=0.02"; here with
+    24 entries, one of them not computable).
+    """
+    rep = rd.Report()
+    rep.data["run_level"] = {}
+    rows: dict = {"rossler": {}, "chua": {}}
+    for i in range(24):
+        system = "chua" if i == 23 else "rossler"
+        name = "H1a rho=0.02" if i == 5 else f"p{i}"
+        rows[system][name] = {"sensitive": None if i == 23 else (i == 5), "reason": "x"}
+    for system, part_rows in rows.items():
+        rep.data[system] = {"block_sensitivity": {"rows": part_rows}}
+    rd.block_sensitive_line(rep)
+    assert "1 of 23 computable primary parts: rossler H1a rho=0.02; not computable: 1: chua p23" in rep.lines[-1]
+    assert "no effect on the exit code" in rep.lines[-1]
+    assert rep.data["run_level"]["block_sensitive"] == {
+        "parts": ["rossler H1a rho=0.02"], "n_computable": 23, "n_not_computable": 1,
+        "not_computable_parts": ["chua p23"], "exit_code_effect": "none"}

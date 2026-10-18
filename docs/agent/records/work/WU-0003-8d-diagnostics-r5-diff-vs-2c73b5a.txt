@@ -1,0 +1,42 @@
+220c220,230
+<   D2 owner flag, lorenz63: block length 5 is a design question (a reading fired; which reading governs is OF-3, the owner's)
+---
+>   D2 owner flag, lorenz63: no design question on the governing reading (the pooled permutation did not fire); information, not governing: A5 rule fired on 2 of 8 primary series, beta5 on 0 of 8
+> Block-sensitive label, lorenz63 (report-only: each primary interval widened on each side by sqrt(max(1, V*(10)/V*(5))) of its own series; a verdict that changes is BLOCK-SENSITIVE; no criterion, verdict, number or exit code changes)
+>   H2a(i)                   verdict inconclusive V10/V5 1.021 widen x1.010: [+0.0971, +0.1528] -> [+0.0968, +0.1531] inconclusive not block-sensitive
+>   H2a(ii) zero             verdict pass         V10/V5 1.099 widen x1.048: [-0.0843, +0.0702] -> [-0.0880, +0.0740] pass         not block-sensitive
+>   H2a(ii) interior         verdict fail         V10/V5 1.002 widen x1.001: [+0.1273, +0.3083] -> [+0.1273, +0.3083] fail         not block-sensitive
+>   H2b(i)                   verdict pass         V10/V5 0.982 widen x1.000: [+0.1806, +0.2811] -> [+0.1806, +0.2811] pass         not block-sensitive
+>   H2b(ii)                  verdict pass         V10/V5 1.081 widen x1.040: [+0.0506, +0.1020] -> [+0.0496, +0.1031] pass         not block-sensitive
+>   H3c                      verdict pass         V10/V5 0.919 widen x1.000: [+0.5092, +0.9196] -> [+0.5092, +0.9196] pass         not block-sensitive
+>   H1a rho=0.01             verdict pass         V10/V5 1.193 widen x1.092: [+0.9124, +1.1235] -> [+0.9030, +1.1335] pass         not block-sensitive
+>   H1a rho=0.02             verdict pass         V10/V5 1.024 widen x1.012: [+0.9113, +1.1849] -> [+0.9097, +1.1866] pass         not block-sensitive
+>   block-sensitive parts, lorenz63: 0 of 8 computable primary parts; not computable: 0; informational, no effect on the exit code
+460c470,480
+<   D2 owner flag, rossler: block length 5 is a design question (a reading fired; which reading governs is OF-3, the owner's)
+---
+>   D2 owner flag, rossler: no design question on the governing reading (the pooled permutation did not fire); information, not governing: A5 rule fired on 2 of 8 primary series, beta5 on 0 of 8
+> Block-sensitive label, rossler (report-only: each primary interval widened on each side by sqrt(max(1, V*(10)/V*(5))) of its own series; a verdict that changes is BLOCK-SENSITIVE; no criterion, verdict, number or exit code changes)
+>   H2a(i)                   verdict fail         V10/V5 0.973 widen x1.000: [+0.2514, +0.3285] -> [+0.2514, +0.3285] fail         not block-sensitive
+>   H2a(ii) zero             verdict inconclusive V10/V5 1.077 widen x1.038: [-0.1443, +0.0207] -> [-0.1473, +0.0239] inconclusive not block-sensitive
+>   H2a(ii) interior         verdict inconclusive V10/V5 0.995 widen x1.000: [-0.0900, +0.1335] -> [-0.0900, +0.1335] inconclusive not block-sensitive
+>   H2b(i)                   verdict pass         V10/V5 1.036 widen x1.018: [+0.1621, +0.2630] -> [+0.1613, +0.2639] pass         not block-sensitive
+>   H2b(ii)                  verdict pass         V10/V5 0.931 widen x1.000: [+0.0363, +0.0786] -> [+0.0363, +0.0786] pass         not block-sensitive
+>   H3c                      verdict pass         V10/V5 0.938 widen x1.000: [+0.9094, +0.9994] -> [+0.9094, +0.9994] pass         not block-sensitive
+>   H1a rho=0.01             verdict pass         V10/V5 1.059 widen x1.029: [+0.8572, +0.9958] -> [+0.8550, +0.9976] pass         not block-sensitive
+>   H1a rho=0.02             verdict inconclusive V10/V5 1.043 widen x1.021: [+0.7193, +0.9139] -> [+0.7172, +0.9160] inconclusive not block-sensitive
+>   block-sensitive parts, rossler: 0 of 8 computable primary parts; not computable: 0; informational, no effect on the exit code
+700a721,730
+> Block-sensitive label, chua (report-only: each primary interval widened on each side by sqrt(max(1, V*(10)/V*(5))) of its own series; a verdict that changes is BLOCK-SENSITIVE; no criterion, verdict, number or exit code changes)
+>   H2a(i)                   verdict fail         V10/V5 0.992 widen x1.000: [+0.1451, +0.2337] -> [+0.1451, +0.2337] fail         not block-sensitive
+>   H2a(ii) zero             verdict inconclusive V10/V5 1.052 widen x1.026: [-0.1310, +0.0321] -> [-0.1331, +0.0342] inconclusive not block-sensitive
+>   H2a(ii) interior         verdict fail         V10/V5 1.008 widen x1.004: [+0.1568, +0.3460] -> [+0.1564, +0.3464] fail         not block-sensitive
+>   H2b(i)                   verdict pass         V10/V5 0.876 widen x1.000: [+0.1789, +0.2840] -> [+0.1789, +0.2840] pass         not block-sensitive
+>   H2b(ii)                  verdict pass         V10/V5 1.001 widen x1.001: [+0.0076, +0.0567] -> [+0.0076, +0.0567] pass         not block-sensitive
+>   H3c                      verdict pass         V10/V5 0.953 widen x1.000: [+0.9011, +1.0440] -> [+0.9011, +1.0440] pass         not block-sensitive
+>   H1a rho=0.01             verdict pass         V10/V5 1.064 widen x1.032: [+0.7736, +0.9253] -> [+0.7712, +0.9278] pass         not block-sensitive
+>   H1a rho=0.02             verdict inconclusive V10/V5 0.975 widen x1.000: [+0.6557, +0.8549] -> [+0.6557, +0.8549] inconclusive not block-sensitive
+>   block-sensitive parts, chua: 0 of 8 computable primary parts; not computable: 0; informational, no effect on the exit code
+739a770,771
+>   D2 governing reading (pooled permutation, OF-3; the A5 rule and beta5 above are information): fired on 0 of 3 computed system(s), smallest one-sided p 0.0250 (trigger: the 0.99 quantile of the null); block length 5 is a design question: no
+>   Block-sensitive primary verdicts (report-only; widening by sqrt(max(1, V*(10)/V*(5))) would change them; informational, no effect on the exit code): 0 of 24 computable primary parts; not computable: 0

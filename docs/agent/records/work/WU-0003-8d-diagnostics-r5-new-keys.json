@@ -1,0 +1,493 @@
+{
+ "run_level": {
+  "d2_governing": {
+   "reading": "pooled permutation (OF-3)",
+   "n_systems_computed": 3,
+   "fired_systems": [],
+   "not_computed_systems": [],
+   "smallest_p": 0.024975024975024976,
+   "design_question": false
+  },
+  "block_sensitive": {
+   "parts": [],
+   "n_computable": 24,
+   "n_not_computable": 0,
+   "not_computable_parts": [],
+   "exit_code_effect": "none"
+  }
+ },
+ "lorenz63": {
+  "D2_design_question": false,
+  "D2_any_reading_fired": true,
+  "D2_governing_reading": "pooled permutation (OF-3)",
+  "D2_owner_flag": "no design question on the governing reading (the pooled permutation did not fire); information, not governing: A5 rule fired on 2 of 8 primary series, beta5 on 0 of 8",
+  "D2_permutation": {
+   "observed": 0.03651675419100707,
+   "q99": 0.043830382627775034,
+   "p": 0.024975024975024976,
+   "fires": false,
+   "n_series": 8
+  },
+  "block_sensitivity": {
+   "rows": {
+    "H2a(i)": {
+     "point": 0.1189944126063217,
+     "interval": [
+      0.09705572002328614,
+      0.15277426907623087
+     ],
+     "ratio10": 1.020946333878576,
+     "factor": 1.0104188903017284,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.09682714319190014,
+      0.153126217695199
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) zero": {
+     "point": -0.007730560708519633,
+     "interval": [
+      -0.08431282363545865,
+      0.07023316857684293
+     ],
+     "ratio10": 1.0992728937882625,
+     "factor": 1.048462156583757,
+     "verdict": "pass",
+     "widened_interval": [
+      -0.08802416525296243,
+      0.07401145903332382
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) interior": {
+     "point": 0.2194510439791898,
+     "interval": [
+      0.12734493013119888,
+      0.3082610181646962
+     ],
+     "ratio10": 1.0015868300879596,
+     "factor": 1.0007931005397468,
+     "verdict": "fail",
+     "widened_interval": [
+      0.12727188072259205,
+      0.3083314534031576
+     ],
+     "widened_verdict": "fail",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(i)": {
+     "point": 0.2306205517475179,
+     "interval": [
+      0.18055818434988113,
+      0.2811181261874079
+     ],
+     "ratio10": 0.9819648212784512,
+     "factor": 1.0,
+     "verdict": "pass",
+     "widened_interval": [
+      0.18055818434988113,
+      0.2811181261874079
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(ii)": {
+     "point": 0.07617041046133796,
+     "interval": [
+      0.05063277208798949,
+      0.10204682285213969
+     ],
+     "ratio10": 1.0811900210710337,
+     "factor": 1.0398028760640325,
+     "verdict": "pass",
+     "widened_interval": [
+      0.04961630063284702,
+      0.10307677848751257
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H3c": {
+     "point": 0.7143239026643878,
+     "interval": [
+      0.5091808734833444,
+      0.9196080123248238
+     ],
+     "ratio10": 0.91891840351053,
+     "factor": 1.0,
+     "verdict": "pass",
+     "widened_interval": [
+      0.5091808734833444,
+      0.9196080123248238
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.01": {
+     "point": 1.0142424783692285,
+     "interval": [
+      0.9123737666333483,
+      1.1234727404625762
+     ],
+     "ratio10": 1.192690656535283,
+     "factor": 1.092103775533847,
+     "verdict": "pass",
+     "widened_interval": [
+      0.9029912736737047,
+      1.1335332600039252
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.02": {
+     "point": 1.0421548885638465,
+     "interval": [
+      0.9112749861787852,
+      1.1849189100862714
+     ],
+     "ratio10": 1.0239351117619875,
+     "factor": 1.0118967890857187,
+     "verdict": "pass",
+     "widened_interval": [
+      0.9097179355845507,
+      1.1866173435393526
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    }
+   },
+   "sensitive_parts": [],
+   "n_computable": 8,
+   "n_not_computable": 0,
+   "not_computable_parts": [],
+   "exit_code_effect": "none"
+  }
+ },
+ "rossler": {
+  "D2_design_question": false,
+  "D2_any_reading_fired": true,
+  "D2_governing_reading": "pooled permutation (OF-3)",
+  "D2_owner_flag": "no design question on the governing reading (the pooled permutation did not fire); information, not governing: A5 rule fired on 2 of 8 primary series, beta5 on 0 of 8",
+  "D2_permutation": {
+   "observed": 0.005227605225985145,
+   "q99": 0.039945695996551824,
+   "p": 0.2647352647352647,
+   "fires": false,
+   "n_series": 8
+  },
+  "block_sensitivity": {
+   "rows": {
+    "H2a(i)": {
+     "point": 0.2870363852134905,
+     "interval": [
+      0.2514388076143891,
+      0.328530180971517
+     ],
+     "ratio10": 0.9731742348802714,
+     "factor": 1.0,
+     "verdict": "fail",
+     "widened_interval": [
+      0.2514388076143891,
+      0.328530180971517
+     ],
+     "widened_verdict": "fail",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) zero": {
+     "point": -0.06366443375417873,
+     "interval": [
+      -0.1442558739056112,
+      0.020669403587143222
+     ],
+     "ratio10": 1.0774126302373748,
+     "factor": 1.0379848892143733,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      -0.14731713083139014,
+      0.023872815055576313
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) interior": {
+     "point": 0.021051686512993974,
+     "interval": [
+      -0.08995226352715135,
+      0.13348485022394851
+     ],
+     "ratio10": 0.9949014221295196,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      -0.08995226352715135,
+      0.13348485022394851
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(i)": {
+     "point": 0.21151989514561312,
+     "interval": [
+      0.1621435827156831,
+      0.263005723892935
+     ],
+     "ratio10": 1.0357651129013237,
+     "factor": 1.0177254604761166,
+     "verdict": "pass",
+     "widened_interval": [
+      0.16126836484125,
+      0.26391833391547576
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(ii)": {
+     "point": 0.05670462604835281,
+     "interval": [
+      0.03631976016266903,
+      0.07856965717532154
+     ],
+     "ratio10": 0.9311594786749537,
+     "factor": 1.0,
+     "verdict": "pass",
+     "widened_interval": [
+      0.03631976016266903,
+      0.07856965717532154
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H3c": {
+     "point": 0.9514694679422497,
+     "interval": [
+      0.9093819403462886,
+      0.9993506262848033
+     ],
+     "ratio10": 0.9380884036539348,
+     "factor": 1.0,
+     "verdict": "pass",
+     "widened_interval": [
+      0.9093819403462886,
+      0.9993506262848033
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.01": {
+     "point": 0.934323641484708,
+     "interval": [
+      0.8572131885480575,
+      0.9957782219533856
+     ],
+     "ratio10": 1.0593518391764765,
+     "factor": 1.029248191242752,
+     "verdict": "pass",
+     "widened_interval": [
+      0.8549578472737511,
+      0.9975756572756765
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.02": {
+     "point": 0.81783718485585,
+     "interval": [
+      0.7192694067953475,
+      0.913931709006418
+     ],
+     "ratio10": 1.0428948068176753,
+     "factor": 1.021222212262187,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.7171775804871353,
+      0.9159710473951752
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    }
+   },
+   "sensitive_parts": [],
+   "n_computable": 8,
+   "n_not_computable": 0,
+   "not_computable_parts": [],
+   "exit_code_effect": "none"
+  }
+ },
+ "chua": {
+  "D2_design_question": false,
+  "D2_any_reading_fired": false,
+  "D2_governing_reading": "pooled permutation (OF-3)",
+  "D2_owner_flag": "no reading fired",
+  "D2_permutation": {
+   "observed": -0.011396864331619412,
+   "q99": 0.04154484114781928,
+   "p": 0.5744255744255744,
+   "fires": false,
+   "n_series": 8
+  },
+  "block_sensitivity": {
+   "rows": {
+    "H2a(i)": {
+     "point": 0.18273566307914918,
+     "interval": [
+      0.1450503589066485,
+      0.23374225123546494
+     ],
+     "ratio10": 0.9923335698099526,
+     "factor": 1.0,
+     "verdict": "fail",
+     "widened_interval": [
+      0.1450503589066485,
+      0.23374225123546494
+     ],
+     "widened_verdict": "fail",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) zero": {
+     "point": -0.04910503066790649,
+     "interval": [
+      -0.13103660401419664,
+      0.03207404365305565
+     ],
+     "ratio10": 1.0518176098215852,
+     "factor": 1.0255815958867365,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      -0.13313254441390593,
+      0.03415073392679385
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) interior": {
+     "point": 0.2513176670155671,
+     "interval": [
+      0.15677466461022163,
+      0.34601783898241373
+     ],
+     "ratio10": 1.008398473390369,
+     "factor": 1.0041904567313757,
+     "verdict": "fail",
+     "widened_interval": [
+      0.15637848624938766,
+      0.34641467595549463
+     ],
+     "widened_verdict": "fail",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(i)": {
+     "point": 0.23221463450871216,
+     "interval": [
+      0.17886300910815855,
+      0.2840335162709423
+     ],
+     "ratio10": 0.8762704568983294,
+     "factor": 1.0,
+     "verdict": "pass",
+     "widened_interval": [
+      0.17886300910815855,
+      0.2840335162709423
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(ii)": {
+     "point": 0.0317359850580559,
+     "interval": [
+      0.007606442139434065,
+      0.056660315501121467
+     ],
+     "ratio10": 1.0012374251113447,
+     "factor": 1.0006185212713907,
+     "verdict": "pass",
+     "widened_interval": [
+      0.007591517503869962,
+      0.056675731729675674
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H3c": {
+     "point": 0.9675453055352257,
+     "interval": [
+      0.9011101244911376,
+      1.044043538551362
+     ],
+     "ratio10": 0.9528813635376584,
+     "factor": 1.0,
+     "verdict": "pass",
+     "widened_interval": [
+      0.9011101244911376,
+      1.044043538551362
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.01": {
+     "point": 0.8472838748350298,
+     "interval": [
+      0.7735518320399412,
+      0.925312897237725
+     ],
+     "ratio10": 1.0640237662441423,
+     "factor": 1.0315152767866032,
+     "verdict": "pass",
+     "widened_interval": [
+      0.7712281463032122,
+      0.9277720034761341
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.02": {
+     "point": 0.7455982118210674,
+     "interval": [
+      0.6557221697214894,
+      0.8549326966368638
+     ],
+     "ratio10": 0.9750065447364978,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.6557221697214894,
+      0.8549326966368638
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    }
+   },
+   "sensitive_parts": [],
+   "n_computable": 8,
+   "n_not_computable": 0,
+   "not_computable_parts": [],
+   "exit_code_effect": "none"
+  }
+ }
+}

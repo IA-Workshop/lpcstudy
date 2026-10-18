@@ -1267,8 +1267,65 @@
    "fires": false,
    "n_series": 9
   },
-  "D2_design_question": true,
-  "D2_owner_flag": "block length 5 is a design question (a reading fired; which reading governs is OF-3, the owner's)",
+  "D2_any_reading_fired": true,
+  "D2_governing_reading": "pooled permutation (OF-3)",
+  "D2_design_question": false,
+  "D2_owner_flag": "no design question on the governing reading (the pooled permutation did not fire); information, not governing: A5 rule fired on 1 of 9 primary series, beta5 on 0 of 9",
+  "block_sensitivity": {
+   "rows": {
+    "H2a(i)": {
+     "sensitive": null,
+     "reason": "results leaf H2a/part_i_verdict is absent"
+    },
+    "H2a(ii) zero": {
+     "sensitive": null,
+     "reason": "results leaf H2a/part_ii/zero/ci is absent"
+    },
+    "H2a(ii) interior": {
+     "sensitive": null,
+     "reason": "results leaf H2a/part_ii/interior/ci is absent"
+    },
+    "H2a(ii) one": {
+     "sensitive": null,
+     "reason": "results leaf H2a/part_ii/one/ci is absent"
+    },
+    "H2b(i)": {
+     "sensitive": null,
+     "reason": "results leaf H2b/noise/ci is absent"
+    },
+    "H2b(ii)": {
+     "sensitive": null,
+     "reason": "results leaf H2b/library_change/verdict is absent"
+    },
+    "H3c": {
+     "sensitive": null,
+     "reason": "results leaf H3c/ci is absent"
+    },
+    "H1a rho=0.01": {
+     "sensitive": null,
+     "reason": "results leaf H1a/by_noise/0.01/verdict is absent"
+    },
+    "H1a rho=0.02": {
+     "sensitive": null,
+     "reason": "results leaf H1a/by_noise/0.02/verdict is absent"
+    }
+   },
+   "sensitive_parts": [],
+   "n_computable": 0,
+   "n_not_computable": 9,
+   "not_computable_parts": [
+    "H2a(i)",
+    "H2a(ii) zero",
+    "H2a(ii) interior",
+    "H2a(ii) one",
+    "H2b(i)",
+    "H2b(ii)",
+    "H3c",
+    "H1a rho=0.01",
+    "H1a rho=0.02"
+   ],
+   "exit_code_effect": "none"
+  },
   "D3": {
    "E": 2,
    "rules": {
@@ -1529,6 +1586,31 @@
   "predicted_at_least_one": null,
   "at_least_one_fired": true,
   "uncomputed": [],
-  "predicted_acf_any": 0.9050075474415895
+  "predicted_acf_any": 0.9050075474415895,
+  "d2_governing": {
+   "reading": "pooled permutation (OF-3)",
+   "n_systems_computed": 1,
+   "fired_systems": [],
+   "not_computed_systems": [],
+   "smallest_p": 0.5490196078431373,
+   "design_question": false
+  },
+  "block_sensitive": {
+   "parts": [],
+   "n_computable": 0,
+   "n_not_computable": 9,
+   "not_computable_parts": [
+    "lorenz63 H2a(i)",
+    "lorenz63 H2a(ii) zero",
+    "lorenz63 H2a(ii) interior",
+    "lorenz63 H2a(ii) one",
+    "lorenz63 H2b(i)",
+    "lorenz63 H2b(ii)",
+    "lorenz63 H3c",
+    "lorenz63 H1a rho=0.01",
+    "lorenz63 H1a rho=0.02"
+   ],
+   "exit_code_effect": "none"
+  }
  }
 }

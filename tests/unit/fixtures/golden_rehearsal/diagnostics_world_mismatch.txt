@@ -190,7 +190,16 @@ D2 block-length diagnostics, lorenz63 (V*(b) exact; A5 rule: V*(10)/V*(5) > 1.1 
   A5 rule fires on 1 of 6 primary series; predicted rates are tabulated for n = 300, 500, 1000 only (not tabulated here)
   beta5 reading fires on 0 of 6 primary series
   pooled mean log V*(10)/V*(5) over 6 primary series: -0.1817; permutation null (50 permutations, seed 20261018) 0.99 quantile +0.0884, one-sided p 0.4510: no [non-default option: permutations 50]
-  D2 owner flag, lorenz63: block length 5 is a design question (a reading fired; which reading governs is OF-3, the owner's); not computed: lorenz63 H2a(ii) [non-default option: permutations 50]
+  D2 owner flag, lorenz63: no design question on the governing reading (the pooled permutation did not fire); information, not governing: A5 rule fired on 1 of 6 primary series, beta5 on 0 of 6; not computed: lorenz63 H2a(ii) [non-default option: permutations 50]
+Block-sensitive label, lorenz63 (report-only: each primary interval widened on each side by sqrt(max(1, V*(10)/V*(5))) of its own series; a verdict that changes is BLOCK-SENSITIVE; no criterion, verdict, number or exit code changes)
+  H2a(i)                   block sensitivity not computable: results leaf H2a/part_i_verdict is absent
+  H2b(i)                   block sensitivity not computable: results leaf H2b/noise/ci is absent
+  H2b(ii)                  block sensitivity not computable: results leaf H2b/library_change/verdict is absent
+  H3c                      block sensitivity not computable: results leaf H3c/ci is absent
+  H1a rho=0.01             block sensitivity not computable: results leaf H1a/by_noise/0.01/verdict is absent
+  H1a rho=0.02             block sensitivity not computable: results leaf H1a/by_noise/0.02/verdict is absent
+  H2a(ii)                  block sensitivity not computable: no influence series for this part (listed as not computable above)
+  block-sensitive parts, lorenz63: 0 of 0 computable primary parts; not computable: 7 (H2a(i), H2b(i), H2b(ii), H3c, H1a rho=0.01, H1a rho=0.02, H2a(ii)); informational, no effect on the exit code
 D3 log-SD of the per-state evaluation MSE at H_ref, lorenz63 (E = 2 evaluation draws; reading: above 1.5 the C2h/C4h rows apply)
   A1: log-SD 1.051 (C2h/C4h rows do not apply); at E = 4: 0.322; draw-free state part 1.56
   A2: log-SD 0.991 (C2h/C4h rows do not apply); at E = 4: not defined (log-SD^2 is below psi'(E/2) - psi'(2)); draw-free state part 1.43
@@ -226,6 +235,8 @@ Run level (all systems)
   D1: |acf(1)| within its threshold for 18 of 20 computed series (5 of 6 primary): NOT every computed series is within: lorenz63 H3c (+0.218); lorenz63 H1c PLP (+0.167); not computed, so not read here: lorenz63 H2a(ii), lorenz63 H1d
       predicted P(some |acf(1)| of these 6 primary series above its threshold) under no dependence: 0.828
   D2: the A5 rule fired on 1 of the 6 computed primary series (6 computed of 7 expected; at least one fired: yes; primary series not computed: lorenz63 H2a(ii)); predicted P(at least one) under no dependence for these 6 series not tabulated for these n (18 primaries: 0.97 pilot, 0.83 full; with H1a, 24 series: 0.993 and 0.91)
+  D2 governing reading (pooled permutation, OF-3; the A5 rule and beta5 above are information): fired on 0 of 1 computed system(s), smallest one-sided p 0.4510 (trigger: the 0.99 quantile of the null); block length 5 is a design question: no
+  Block-sensitive primary verdicts (report-only; widening by sqrt(max(1, V*(10)/V*(5))) would change them; informational, no effect on the exit code): 0 of 0 computable primary parts; not computable: 7: lorenz63 H2a(i); lorenz63 H2b(i); lorenz63 H2b(ii); lorenz63 H3c; lorenz63 H1a rho=0.01; lorenz63 H1a rho=0.02; lorenz63 H2a(ii)
 
 Summary
   not computable: 4 item(s) (listed above); never skipped
