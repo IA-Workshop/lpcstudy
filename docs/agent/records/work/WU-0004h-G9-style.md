@@ -62,7 +62,11 @@ Behavior checks done before any test run:
 7. Output: the wrapper uses `-q --tb=short -rfE`.
 8. Command: `LPC_PYTHON=/home/brianm/projects/physics/chaos/lpcstudy/.venv/bin/python tools/run_tests.sh unit tests/unit/test_tools_lm_doubling.py tests/unit/test_tools_gpu_hours.py tests/unit/test_tools_test_impact.py`.
 
-(results appended below)
+Result (once, after all edits, commit c81fd03): `231 passed in 6.08s` for the three files. No tolerance in any assert or approx was changed.
+
+After the run, unchanged by any code edit: `compare` over the stored DEV-0 inputs again byte-identical (stdout `41c6e6487d71...`, JSON `633558134...`, exit 0); `ledger verify` prints `ledger chain intact`; `ledger status` identical to before. `uvx black==26.10.1 --check` on the seven files: unchanged (idempotent). The usage text of the `compare` and `probe` subcommands differs between develop's file and this one only when the old file is run under a different file name (argparse wraps the usage by the length of the program name); with the same name the help texts are identical.
+
+No smoke run: nothing in `lpcstudy/` imports these tools (they import `lpcstudy`, not the reverse).
 
 ## Review
 
