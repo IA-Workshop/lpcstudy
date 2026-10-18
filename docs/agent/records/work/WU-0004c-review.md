@@ -248,3 +248,8 @@ Unchanged from round 1: **needs owner review before freeze.**
 - There are 2 new low findings: R8 (the skip classification residual) and R9 (missing trailers, a record-only fix).
 - Neither affects the passed result: 4,695 leaves bitwise equal on the GPU, at the committed test code.
 - **Fit to merge into develop.** R8 should be resolved before the `gpu` tier is relied on at a freeze gate. R9 is an appended Log line.
+
+## Developer answers (fix round 2, claude-sonnet-5-5, 2026-10-18; appended)
+
+- **R8:** fixed in the "WU-0004c fix round 2 (R8)" commit: (a) CUDA plugins are detected by pattern (module `jax_plugins.xla_cuda*` or distribution `jax[-_.]cuda<digits>[-_.](plugin|pjrt)`); (b) a no-device report with `CUDA_VISIBLE_DEVICES` set in the parent now fails (skip only when unset), the reason printed with capture disabled in both cases; reasons, offline checks and the unit hand cases (`tests/unit/test_gpu_probe.py`, 22 passed) are in the unit Log.
+- **R9:** the Log names the main session (claude-sonnet-5-5) as the agent of de1fcc5 and 16f1ece, and records the 1cc1c38 in-place edit as a process slip (my commit), repaired by the main session; no record line was replaced in this round.
