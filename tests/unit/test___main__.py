@@ -783,7 +783,7 @@ def test_existing_sealed_guards_still_come_first_on_a_dirty_tree(
 
 
 def test_choose_clean_tree_function_level(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A6: ``choose_clean_tree`` is silent for a clean known commit and ignores a development run.
+    """A6: ``choose_clean_tree`` returns the checked commit when clean and ignores a development run.
 
     Reference: the plan. With the flag absent git must not be read at all (the spy raises); with
     the flag and a clean state it returns ``None``; with a dirty state it raises ``SeedRefusal``
@@ -801,7 +801,7 @@ def test_choose_clean_tree_function_level(monkeypatch: pytest.MonkeyPatch) -> No
     assert choose_clean_tree(parse([])) is None
     assert choose_clean_tree(parse(["--seed-id", "DEV-1"])) is None
     monkeypatch.setattr(provenance, "git_state", lambda root: (CLEAN_COMMIT, False, None))
-    assert choose_clean_tree(parse([FLAG])) is None
+    assert choose_clean_tree(parse([FLAG])) == CLEAN_COMMIT   # returns the commit it checked (R1)
     monkeypatch.setattr(provenance, "git_state", lambda root: (CLEAN_COMMIT, True, None))
     with pytest.raises(SeedRefusal) as caught:
         choose_clean_tree(parse([FLAG]))
@@ -852,8 +852,83 @@ def test_guard_with_the_real_git_reader_on_a_throwaway_repository(
     monkeypatch.setattr(provenance, "ROOT", repo)
     args = build_parser().parse_known_args([FLAG])[0]
     if line is None:
-        assert choose_clean_tree(args) is None
+        head = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], check=True,
+                              capture_output=True, text=True).stdout.strip()
+        assert choose_clean_tree(args) == head
     else:
         with pytest.raises(SeedRefusal) as caught:
             choose_clean_tree(args)
         assert PREFIX + caught.value.reason == line
+
+
+# ---------------------------------------- WU-0004a fix round 1, R1: the second git read (the one
+# ``provenance.collect`` takes for the block) must equal the guard's read. The sealed seed has been
+# read by then (the one-time draw is not undone; that is why the first guard exists); what is
+# refused is a run whose own block would say another commit or ``dirty: true``.
+
+CHANGED_LINE = (PREFIX + "the git state changed after the check (the commit moved, the tree became "
+                "dirty or git became unreadable); no sealed run on a changed tree")
+
+
+@pytest.mark.parametrize("extra", [[], ["--report-only"]], ids=["run", "report-only"])
+@pytest.mark.parametrize("second", [
+    pytest.param((CLEAN_COMMIT, True, None), id="dirty-second"),
+    pytest.param(("b" * 40, False, None), id="head-moved-second"),
+    pytest.param((None, None, "RuntimeError: gone"), id="unreadable-second"),
+    pytest.param((CLEAN_COMMIT, None, None), id="dirty-unknown-second"),
+])
+def test_sealed_run_is_refused_when_the_second_git_read_differs(
+        second: tuple, extra: list[str], tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """R1: clean first read, a different second read: exit 64, one exact line, nothing created.
+
+    Reference: the plan of the fix (compare the block's commit and ``dirty`` with the checked
+    commit after ``collect`` and before ``mkdir``), with hand-written expectations. The stub
+    returns a clean state at ``CLEAN_COMMIT`` on its first call and ``second`` on every later one.
+    Expected call order by construction of ``main``: guard read, seed read, then for a run
+    ``collect`` and its read (``[git, seed, collect, git]``), and for ``--report-only`` (no
+    ``collect``) a direct read (``[git, seed, git]``). The seed was already read, so the test
+    asserts what remains true: the output never holds the seed or salt, and no directory exists.
+    """
+    monkeypatch.setenv("LPC_CONF_SEED", str(SEED))
+    monkeypatch.setenv("LPC_CONF_SALT", SALT)
+    ledger = ledger_with(tmp_path / "l.jsonl", SEED)
+    calls = spy_calls(monkeypatch)
+    reads: list = []
+
+    def stub(root: Path) -> tuple:
+        calls.append(("git", root))
+        reads.append(root)
+        return (CLEAN_COMMIT, False, None) if len(reads) == 1 else second
+
+    monkeypatch.setattr(provenance, "git_state", stub)
+    out = tmp_path / "out"
+    code = main([FLAG, "--preset", "smoke", *extra, "--out", str(out)], ledger_path=ledger)
+    captured = capsys.readouterr()
+    root = provenance.ROOT
+    assert code == 64
+    assert captured.err == CHANGED_LINE + "\n" and captured.out == ""
+    assert calls == ([("git", root), "seed", ("git", root)] if extra
+                     else [("git", root), "seed", "collect", ("git", root)])
+    assert not out.exists() and not list(tmp_path.glob("out*"))
+    for secret in (str(SEED), SALT, "gone"):
+        assert secret not in captured.err
+
+
+def test_check_tree_unchanged_function_level() -> None:
+    """R1: ``check_tree_unchanged`` accepts only the same commit with ``dirty`` exactly false.
+
+    Reference: the definition (hand-worked truth table). A development run (``checked`` None) is
+    never refused, whatever the second read says.
+    """
+    from lpcstudy.__main__ import check_tree_unchanged
+    from lpcstudy.seeds import SeedRefusal
+
+    check_tree_unchanged(CLEAN_COMMIT, CLEAN_COMMIT, False)
+    check_tree_unchanged(None, "b" * 40, True)
+    check_tree_unchanged(None, None, None)
+    for commit, dirty in [(CLEAN_COMMIT, True), ("b" * 40, False), (None, None), (CLEAN_COMMIT, None),
+                          (None, False)]:
+        with pytest.raises(SeedRefusal) as caught:
+            check_tree_unchanged(CLEAN_COMMIT, commit, dirty)
+        assert PREFIX + caught.value.reason == CHANGED_LINE

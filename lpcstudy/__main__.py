@@ -107,19 +107,29 @@ def choose_refine_steps(args: argparse.Namespace) -> int | None:
     return int(text)
 
 
-def choose_clean_tree(args: argparse.Namespace) -> None:
+def choose_clean_tree(args: argparse.Namespace) -> str | None:
     """Refuse a sealed run unless the working tree is clean and the commit is known (B8).
 
-    Acts only with the confirmatory flag; a development run is not checked. The state is read
-    with ``provenance.git_state(provenance.ROOT)``, the reader that fills ``commit`` and ``dirty``
-    in the provenance block, so the block of an accepted run records exactly what was checked
-    (``dirty`` is ``bool(git status --porcelain)``: untracked files count). Refused: a commit that
-    is not a full hexadecimal object name (``None``, empty, ``"unknown"``, abbreviated) or an
-    unknown ``dirty`` (git failed, so cleanliness cannot be told), and ``dirty`` true. Git's own
-    error text is not echoed (it can hold newlines and paths); it stays in the provenance block of
-    a development run. This runs before the seed is chosen, so a refused request has not read the
-    sealed seed, and before ``provenance.collect``, so nothing has been written. Needs owner review
-    before freeze (LPC.PC.11): it sits beside the seed guard. Owner ruling B8, 2026-10-18.
+    Acts only with the confirmatory flag; a development run is not checked and ``None`` is
+    returned. The state is read with ``provenance.git_state(provenance.ROOT)``, the reader that
+    fills ``commit`` and ``dirty`` in the provenance block. The block of an accepted run is built
+    from a second read, taken after the sealed seed has been read; ``main`` compares that read
+    with the commit returned here and refuses if it differs (``check_tree_unchanged``), so an
+    accepted run's block records the state that was checked. ``dirty`` is true when
+    ``git status --porcelain`` is non-empty (untracked files count, whatever the git
+    configuration says) or a tracked file is hidden by the skip-worktree or assume-unchanged bit.
+    Refused here: a commit that is not a full hexadecimal object name (``None``, empty,
+    ``"unknown"``, abbreviated) or an unknown ``dirty`` (git failed, so cleanliness cannot be
+    told), and ``dirty`` true. Git's own error text is not echoed (it can hold newlines and
+    paths); it stays in the provenance block of a development run. This runs before the seed is
+    chosen, so a refused request has not read the sealed seed, and before ``provenance.collect``,
+    so nothing has been written. Needs owner review before freeze (LPC.PC.11): it sits beside the
+    seed guard. Owner ruling B8, 2026-10-18.
+
+    Returns
+    -------
+    str or None
+        The checked commit (a full object name) for a sealed request, ``None`` otherwise.
 
     Raises
     ------
@@ -128,7 +138,7 @@ def choose_clean_tree(args: argparse.Namespace) -> None:
         tree is clean, or the tree is dirty.
     """
     if not args.confirmatory:
-        return
+        return None
     commit, dirty, _git_error = provenance.git_state(provenance.ROOT)
     if (commit is None or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit) is None
             or dirty is None):
@@ -137,6 +147,29 @@ def choose_clean_tree(args: argparse.Namespace) -> None:
     if dirty:
         raise SeedRefusal("the confirmatory flag needs a clean working tree (git status "
                           "--porcelain is not empty); commit or remove the changes first")
+    return commit
+
+
+def check_tree_unchanged(checked: str | None, commit: str | None, dirty: bool | None) -> None:
+    """Refuse a sealed run whose second git read differs from the one ``choose_clean_tree`` passed.
+
+    The sealed seed has been read by the time this runs (the one-time draw is not undone; this is
+    why the first guard exists and runs before it). What this prevents is output from a run whose
+    own provenance block would say ``dirty: true`` or name another commit. Called by ``main``
+    after ``provenance.collect`` (or a direct read for ``--report-only``) and before the output
+    directory is made. A development run (``checked`` is ``None``) is not checked.
+
+    Raises
+    ------
+    SeedRefusal
+        If ``checked`` is a commit and the second read has another commit, or is not clean (a
+        ``dirty`` that is not exactly ``False``, including an unreadable state).
+    """
+    if checked is None:
+        return
+    if commit != checked or dirty is not False:
+        raise SeedRefusal("the git state changed after the check (the commit moved, the tree "
+                          "became dirty or git became unreadable); no sealed run on a changed tree")
 
 
 def choose_seed(args: argparse.Namespace, extras: list[str], registry_path: Path,
@@ -189,7 +222,7 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     try:
         refine_steps = choose_refine_steps(args)  # before the seed: a sealed request stops here
         states_dump = choose_states_dump(args)  # the same: refused before the seed is read
-        choose_clean_tree(args)  # B8: a sealed run needs a clean tree and a known commit, first
+        checked_commit = choose_clean_tree(args)  # B8: clean tree and known commit, before the seed
         seed_id, seed = choose_seed(args, extras, registry_path, ledger_path)
     except SeedRefusal as refusal:
         print(f"lpcstudy: refused (LPC.PC.7): {refusal.reason}", file=sys.stderr)
@@ -207,6 +240,14 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
                                    clock)
         if states_dump:  # the one added leaf of a dump run (absent otherwise: 0 added)
             block["states_dump"] = True
+    if checked_commit is not None:  # B8: the second read must equal the first, before any output
+        now = ((block["commit"], block["dirty"]) if not args.report_only
+               else provenance.git_state(provenance.ROOT)[:2])
+        try:
+            check_tree_unchanged(checked_commit, *now)
+        except SeedRefusal as refusal:
+            print(f"lpcstudy: refused (LPC.PC.7): {refusal.reason}", file=sys.stderr)
+            return REFUSAL_EXIT
     out_dir.mkdir(parents=True, exist_ok=True)
     if args.report_only:
         results = json.loads((out_dir / "results.json").read_text())

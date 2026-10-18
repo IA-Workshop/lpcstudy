@@ -35,6 +35,9 @@ ENV_NAMES = ("JAX_PLATFORMS", "XLA_FLAGS", "XLA_PYTHON_CLIENT_PREALLOCATE", "LPC
              "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "PJRT_NPROC", "NPROC",
              "OPENBLAS_CORETYPE", "NPY_DISABLE_CPU_FEATURES")
 GIT_TIMEOUT_SECONDS = 30
+GIT_REDIRECT_VARIABLES = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                          "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_NAMESPACE")
+HIDDEN_TAGS = ("S", "s", "h")   # ``git ls-files -v``: skip-worktree, assume-unchanged
 CPUINFO = Path("/proc/cpuinfo")
 MAPS = Path("/proc/self/maps")
 ISA_FLAGS = ("sse4_1", "sse4_2", "avx", "avx2", "fma", "f16c", "bmi1", "bmi2", "avx_vnni",
@@ -70,13 +73,23 @@ class RunClock:
 def git_state(root: Path) -> tuple[str | None, bool | None, str | None]:
     """Return ``(commit, dirty, error)`` of the repository at ``root``.
 
-    ``dirty`` is ``bool(git status --porcelain)``, so untracked files count. On any
-    failure the result is ``(None, None, <error text>)``; the error is recorded by the
+    ``dirty`` is true when ``git status --porcelain`` is non-empty (untracked files count) or
+    when ``git ls-files -v`` shows a tracked file hidden from status by the skip-worktree or
+    assume-unchanged bit (tags ``S``, ``s``, ``h``). The status call names its untracked-file and
+    submodule modes (``--untracked-files=normal``, ``--ignore-submodules=none``), so a user,
+    global or system setting such as ``status.showUntrackedFiles=no`` cannot hide a file, and git
+    runs without the variables that redirect it to another repository (``GIT_DIR``,
+    ``GIT_WORK_TREE``, ``GIT_INDEX_FILE`` and the object-store variables), so ``root`` is what is
+    read. In an ordinary checkout the value of ``dirty`` is unchanged by these (WU-0004a, R2). On
+    any failure the result is ``(None, None, <error text>)``; the error is recorded by the
     caller, never dropped.
     """
+    environment = {name: value for name, value in os.environ.items()
+                   if name not in GIT_REDIRECT_VARIABLES}
+
     def run(*args: str) -> str:
         done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True,
-                              timeout=GIT_TIMEOUT_SECONDS)
+                              timeout=GIT_TIMEOUT_SECONDS, env=environment)
         if done.returncode != 0:
             raise RuntimeError(f"git {' '.join(args)} exited {done.returncode}: "
                                f"{done.stderr.strip()[:200]}")
@@ -84,10 +97,13 @@ def git_state(root: Path) -> tuple[str | None, bool | None, str | None]:
 
     try:
         commit = run("rev-parse", "HEAD").strip()
-        dirty = bool(run("status", "--porcelain").strip())
+        status = run("status", "--porcelain", "--untracked-files=normal",
+                     "--ignore-submodules=none")
+        listing = run("ls-files", "-v")
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         return None, None, f"{type(exc).__name__}: {exc}"
-    return commit, dirty, None
+    hidden = any(line[:1] in HIDDEN_TAGS for line in listing.splitlines())
+    return commit, bool(status.strip()) or hidden, None
 
 
 def peak_rss_bytes() -> int:
