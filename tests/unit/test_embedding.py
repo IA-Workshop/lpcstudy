@@ -72,7 +72,10 @@ def test_regression_ami_delay_lorenz_band() -> None:
     """
     spec = SYSTEMS["lorenz63"]
     step = make_flow_step(spec, spec.params, 0.0368)
-    x = simulate_trajectory(step, jnp.asarray(spec.initial_state), 60_000)[5_000:, 0]
+    x = simulate_trajectory(step, jnp.asarray(spec.initial_state), 60_000)[
+        5_000:,
+        0,
+    ]
     assert 3 <= select_delay((x - x.mean()) / x.std(), 60) <= 8
 
 

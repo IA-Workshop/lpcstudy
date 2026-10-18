@@ -53,7 +53,11 @@ def test_config_has_no_transfer_fields() -> None:
     test and Lorenz-96 are not in v3), written out in the test. Tolerance: none
     (exact checks of field names and strings).
     """
-    assert [f.name for f in dataclasses.fields(StudyConfig) if f.name.startswith("transfer")] == []
+    assert [
+        f.name
+        for f in dataclasses.fields(StudyConfig)
+        if f.name.startswith("transfer")
+    ] == []
     for preset in PRESETS.values():
         assert "lorenz96" not in preset.core_systems
 
@@ -88,7 +92,10 @@ def test_k_rule_candidates_cover_eight() -> None:
     Tolerance: none (exact comparison of integer lists).
     """
     for preset in (PRESETS["full"], PRESETS["pilot"]):
-        assert [k for k in preset.regime_counts if k <= preset.regime_max_primary] \
-            == [2, 3, 4, 5, 6, 8]
+        assert [
+            k for k in preset.regime_counts if k <= preset.regime_max_primary
+        ] == [2, 3, 4, 5, 6, 8]
     smoke = PRESETS["smoke"]
-    assert [k for k in smoke.regime_counts if k <= smoke.regime_max_primary] == [2, 3, 4]
+    assert [
+        k for k in smoke.regime_counts if k <= smoke.regime_max_primary
+    ] == [2, 3, 4]
