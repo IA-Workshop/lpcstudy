@@ -76,19 +76,19 @@ The study asks three research questions (abbreviated RQ), with three primary hyp
 
 | ID | Hypothesis | Statistic | Pass if |
 | --- | --- | --- | --- |
-| H1a | The analog seed shrinks with library size as nearest-neighbor theory predicts | Fit of the median ε\_s² to b² N\_lib^(−2/d) + f² | interval of 1/d within ±25% of the independently estimated 1/d |
+| H1a | The analog seed shrinks with library size as nearest-neighbor theory predicts | Fit of the median ε\_s² to b² N\_lib^(−2/d) + f², at ρ = 1% and 2%; the ratio of the fitted 1/d to the independently estimated 1/d (the mean over states of the per-state Levina–Bickel inverse estimates), with its interval from a joint block bootstrap; the floor f is reported | ratio interval inside \[0.75, 1.25\] (closed), at both ρ |
 | H1b | PLP error = seed × amplifier | Slope of log r.m.s. PLP error on log(g\_H δ/√m) at H\_ref | in \[0.8, 1.2\] |
-| H1c | Horizon law: horizon grows with log tolerance at rate 1/Λ | Median of Λ̄ × dT/d ln θ (PLP) | in \[0.8, 1.25\] |
-| H1d | Deployable estimates of recurrence, observability and instability track their exact values | Spearman correlation, each | ≥ 0.7 |
-| Q-N (estimate) | How much does N add to the other three? | Out-of-sample gain in R² (ΔR²) for predicting logit w\*, with exact (oracle) values | read by the table in §7 |
+| H1c | Horizon law: horizon grows with log tolerance at rate 1/Λ | Median of Λ̄ × dT/d ln θ (PLP; the CP value is reported without a verdict) | in \[0.8, 1.25\] |
+| H1d | Deployable estimates of recurrence, observability and instability track their exact values | Spearman correlation, each, on the first evaluation draw; N̂ reported, not tested | each lower bound ≥ 0.7 |
+| Q-N (estimate) | How much does N add to the other three? | Out-of-sample gain in R² (ΔR²), with exact (oracle) values, in two parts: for predicting logit w\* on the states with 0 < w\* < 1, and for predicting the indicator of w\* = 0 | each part read by the table in §7; a part with fewer than 50 states is inconclusive |
 
 **RQ2 (decision).** Does allocation derived from the conditions beat simple alternatives, and do the two interventions move the weight as predicted?
 
 | ID | Hypothesis | Statistic | Pass if |
 | --- | --- | --- | --- |
-| **H2a** | Separation: once the seeds are fixed, w\* does not depend on horizon or instability | (i) median range of w\* over 1, 2, 4 LT in the small-error regime; (ii) partial correlation of logit w\* with Λ̃ given both seeds | (i) interval below 0.1 and (ii) interval inside (−0.1, 0.1) |
+| **H2a** | Separation: once the seeds are fixed, w\* does not depend on horizon or instability | (i) median range of w\* over the horizons 1, 2, 4 LT, up to the last horizon at which both r.m.s. errors are ≤ 0.5 σ\_x (spans {1, 2} or {1, 2, 4} LT); states with fewer than two such horizons are excluded and counted; medians and counts per span reported; the complete-case {1, 2, 4} range reported as a sensitivity. (ii) two parts at H\_ref, given both seeds: the partial correlation with Λ̃ of the indicator of w\* = 0 (all test states) and of logit w\* (states with 0 < w\* < 1); the seed controls are x₁, x₂, x₁², x₂², x₁x₂ with x₁ = ln(ε\_s/ρ), x₂ = ln(δ/ρ); the counts of w\* = 0 and w\* = 1 are reported, and a third part (the indicator of w\* = 1) is added if w\* = 1 exceeds 5% of states | (i) interval below 0.1 and (ii) every part's interval inside (−0.1, 0.1) |
 | **H2b** | w\* rises with noise level, and with library size below saturation | (i) mean per-state rank correlation of w\* with ρ; (ii) mean paired change in w\* from N\_lib = 10³ to 10⁴ at ρ = 1% | both lower bounds > 0 |
-| H2c | The closed-form allocator beats a global weight and the better single forecaster | Paired MSE differences at H\_ref | both upper bounds < 0 |
+| H2c | The closed-form allocator beats a global weight and the better single forecaster | Paired MSE differences at H\_ref: A4 − A2, and A4 − the better single forecaster, chosen on the calibration split; A4o − A2 reported with its interval | both upper bounds < 0 |
 | H2d | The closed form is within 10% of a learned allocator | MSE ratio minus 1 at H\_ref | upper bound ≤ 0.10 |
 | H2e | Noise matching: CP and PLP errors become correlated as the library grows | Median per-state change in error correlation, N\_lib 10³ → 10⁵ | lower bound > 0 at ρ = 1% and 2% |
 
@@ -96,8 +96,8 @@ The study asks three research questions (abbreviated RQ), with three primary hyp
 
 | ID | Hypothesis | Statistic | Pass if |
 | --- | --- | --- | --- |
-| H3a | Regimes separate forecast horizons | Holm-adjusted log-rank tests between consecutive regimes | all p < 0.01 |
-| H3b | Instability sets the horizon, not the weight | Importances in a weight tree and a horizon tree | weight tree: Λ̃ < 0.2; horizon tree: Λ̃ highest |
+| H3a | Regimes separate forecast horizons | Holm-adjusted log-rank tests between regimes consecutive in Kaplan–Meier median horizon, one observation per test state (the first evaluation draw); at least 50 test states in total, no minimum per regime; a pair that cannot be computed enters at p = 1; events and censored states per regime reported | all adjusted p < 0.01; otherwise inconclusive (no equivalence margin is set, so H3a cannot fail) |
+| H3b | Instability sets the horizon, not the weight | Importances in a weight tree and a horizon tree, each with 8 leaves, with block-bootstrap intervals over construction states (both trees refitted in each resample); D = horizon-tree importance of Λ̃ minus the largest other; the stability fraction is reported | weight tree: interval of Λ̃'s importance inside \[0, 0.2); horizon tree: lower bound of D > 0 |
 | **H3c** | A few regimes cost almost nothing against the closed form | MSE ratio, regimes / closed form, at H\_ref | upper bound ≤ 1.05 |
 
 The hybrid's horizon gain over the better forecaster is reported against the P1 bound, without a pass/fail bar.
@@ -197,11 +197,13 @@ All experiments are simulations of three chaotic systems with exact models, so t
 - The observation interval is set so that one Lyapunov time (LT = 1/λ\_max) is 30 steps.
 - Truth and the physics model use the same fourth-order Runge–Kutta integrator. Halving the step must change the observable by less than 10⁻³ σ\_x over 1 LT.
 
-**Trajectories.** Each system gets three trajectories, after a 100-LT burn-in:
+**Trajectories.** Each system gets three trajectories:
 
 - **statistics:** normalization, mean and covariance;
 - **main:** library and evaluation states;
 - **separate:** used only to train the state estimator's first stage.
+
+The statistics orbit (and the orbit used for λ\_max) starts from a fixed state of the system and defines its units: σ\_x, the mean and covariance, the delay, the state spacing and λ\_max. It is the same for every seed and carries no test data. The main and separate trajectories each start from a seed-drawn point of the statistics orbit, perturbed by 10⁻⁶ in whitened units, and discard a 100-LT burn-in. A new seed therefore redraws every state used as data, the observation noise, the network initializations and the bootstrap resamples. An orbit that leaves a fixed bound (Lorenz-63 40, Rössler 25, Chua 3) stops the run.
 
 Hidden states are whitened by the attractor's covariance, so all errors are dimensionless and comparable across systems.
 
@@ -221,11 +223,11 @@ Hidden states are whitened by the attractor's covariance, so all errors are dime
 **PLP (physics-based latent-state propagation).** The estimator ψ maps X\_t to the hidden state in two stages:
 
 1. A small neural network (two hidden layers) gives an initial guess. It is trained on the separate trajectory with fresh noise at the cell's ρ.
-2. Fifteen Levenberg–Marquardt iterations then fit the known model to the delay window. This is the maximum-likelihood estimate, so it reaches the Cramér–Rao floor ρν to first order. Here ν² = tr\[(JᵀJ)⁻¹\], with J the delay-map Jacobian.
+2. Fifteen Levenberg–Marquardt iterations then fit the known model to the delay window. At convergence this is the maximum-likelihood estimate, which reaches the Cramér–Rao floor ρν to first order (checked by V7). Here ν² = tr\[(JᵀJ)⁻¹\], with J the delay-map Jacobian. Fifteen is the design value; it is not assumed that every estimate has converged by then.
 
-The model is then integrated forward. About 2% of estimates (Lorenz-63, ρ = 1%) converge to a wrong basin. They are kept, because this is a real property of nonlinear estimation (Judd 2003).
+The model is then integrated forward. About 2% of estimates (Lorenz-63, ρ = 1%, in the pilot) converge to a wrong basin. They are kept, because this is a real property of nonlinear estimation (Judd 2003). The final residual is reported in noise units, with the fraction of estimates above the 0.999 quantile of χ² with D − 3 degrees of freedom (18.47); this is a diagnostic, not a gate. The error left at the fifteenth iteration was measured on a development seed and is reported per primary quantity, not corrected (§8).
 
-**Hybrid.** x̂ = w · x̂\_CP + (1 − w) · x̂\_PLP, with w ∈ \[0, 1\]. Errors are measured against the noise-free truth and clipped at 10 σ\_x. True states are never forecaster inputs.
+**Hybrid.** x̂ = w · x̂\_CP + (1 − w) · x̂\_PLP, with w ∈ \[0, 1\]. Errors are measured against the noise-free truth and clipped at 10 σ\_x. True states are never forecaster inputs. A clip-sensitivity flag recomputes the MSE- and weight-based verdicts with the clip at 20 σ\_x and marks a verdict whose interval or outcome the clip moves; it is reported only and never marks results provisional.
 
 **Data partition.** The main trajectory is laid out as library | construction | calibration | test. The segments are separated by gaps longer than one Theiler window (1 LT; Theiler 1986), plus the delay and forecast windows, so no window crosses a boundary.
 
@@ -236,7 +238,7 @@ The model is then integrated forward. About 2% of estimates (Lorenz-63, ρ = 1%)
 | Test | all reported results | 1000 |
 | Sweep cells | noise and library sweeps | 1000 |
 
-Evaluation states are at least 1 LT apart. Each state gets M = 200 noise draws for exact (oracle) moments and 4 draws for deployable evaluation.
+Evaluation states are max(5·min(τ\_ac, 1 LT), 1 LT) apart, where τ\_ac is the autocorrelation time. Each state gets M = 200 noise draws for exact (oracle) moments and 4 draws for deployable evaluation.
 
 ## 5. Per-state quantities, the four-condition profile, and allocation rules
 
@@ -286,7 +288,7 @@ The coefficients a, b, a′, b′ are fitted on construction states by robust le
 | A4o | A4 with exact seeds (reference) | ε\_s, δ | — |
 | A\* | State-optimal w\* (reference) | true state | — |
 
-K is the smallest value in {2, 3, 4, 5, 6, 8} whose calibration error is within 5% of the best value in that set. Excess error is computed exactly from the moments, as V(w) − V(w\*).
+K is the smallest value in {2, 3, 4, 5, 6, 8} whose mean calibration excess MSE at H\_ref is at most 1.05 times the minimum over that set (a value exactly at 1.05 times counts as within). Excess error is computed exactly from the moments, as V(w) − V(w\*).
 
 ## 6. Experiments
 
@@ -294,15 +296,15 @@ Seven experiments, all run on each of the three systems. Each experiment either 
 
 | # | Experiment | Design | Feeds |
 | --- | --- | --- | --- |
-| E0 | Validation gate | Checks V1–V7 below; a failure marks that system's results provisional | all |
+| E0 | Validation gate | Checks V1–V7 below; a failure marks that system's results provisional, is reported, and is referred to the owner; it is never repaired by retuning or rerunning. Verdicts are computed and shown as provisional | all |
 | E1 | Noise sweep | ρ ∈ {0.5, 1, 2, 5}% at N\_lib = 10⁴; ψ retrained at each ρ | V7, H2b(i) |
 | E2 | Library sweep | N\_lib ∈ {10³, 10^3.5, 10⁴, 10^4.5, 10⁵} at ρ ∈ {1, 2}%; nested libraries | H1a, H2b(ii), H2e |
 | E3 | Mechanism at the core cell | ρ = 1%, N\_lib = 10⁴, horizons 1–240 steps; seed × amplifier fit; horizons over θ; proxy fidelity; Q-N with gradient-boosted regressors | H1b–H1d, Q-N |
 | E4 | Allocation and separation | All rules on the core test split; MSE at 0.25, 0.5, 1, 2, 4 LT; w\*(H) per state; horizon gain | H2a, H2c, H2d |
 | E5 | Regimes | A5 for K ∈ {2, 3, 4, 5, 6, 8, 12, 16}; excess error against K; log-rank tests; tree importances | H3a–H3c |
-| E6 | Robustness (reported only; Lorenz-63 and Rössler) | D ∈ {5, 10}; 5 averaged analogs; model parameters perturbed ±5% and ±10%; finite-amplitude growth in place of Λ̄ | — |
+| E6 | Robustness (reported only; Lorenz-63 and Rössler) | D ∈ {5, 10}; 5 averaged analogs; model parameters scaled by 1 ± 5% and 1 ± 10%, with one random sign per parameter drawn once per seed and system; finite-amplitude growth in place of Λ̄ | — |
 
-**Validation checks (****R****u****n**** ****a****t**** ****E0).**
+**Validation checks (run at E0).**
 
 - **V1.** Jacobians and amplifiers agree with finite differences: relative error < 10⁻⁴.
 - **V2.** At ρ = 10⁻⁴, least squares attains the Cramér–Rao value ρ²ν²: ratio in \[0.8, 1.2\].
@@ -310,7 +312,7 @@ Seven experiments, all run on each of the three systems. Each experiment either 
 - **V4.** w\* is converged at M = 200 noise draws: median bootstrap half-width ≤ 0.05 (checked at M = 50, 200, 800).
 - **V5.** Kaplan–Meier matches exact censored survival: maximum deviation < 0.01.
 - **V6.** Halving the RK4 step changes the observable by < 10⁻³ σ\_x over 1 LT.
-- **V7.** The estimator is efficient: median δ/(ρν), and the median slope of ln δ on ln ρ, both in \[0.9, 1.1\].
+- **V7.** The estimator is efficient: median δ/(ρν) at every ρ, and the median per-state slope of ln δ on ln ρ, both in \[0.9, 1.1\].
 
 **Horizons.** The realized horizon is the first step at which the error against the *noisy* verifying observation exceeds θ σ\_x. It is right-censored at 8 LT.
 
@@ -319,11 +321,11 @@ Seven experiments, all run on each of the three systems. Each experiment either 
 
 ## 7. Analysis plan and decision rules
 
-Every criterion in §2 is decided by an interval, and the rules below are fixed before the confirmatory run.
+Every criterion in §2 except H3a is decided by an interval (H3a by Holm-adjusted p-values), and the rules below are fixed before the confirmatory run.
 
 **Intervals.**
 
-- Moving-block bootstrap over test states in time order (Künsch 1989): blocks of 5 states, 2000 resamples.
+- Moving-block bootstrap percentile intervals over test states in time order (Künsch 1989): blocks of 5 states, 2000 resamples (H3b resamples construction states). A resample whose statistic cannot be computed is counted and placed at the unfavourable tail, so too many failures make the bound infinite; it is never dropped.
 - The three primary hypotheses (H2a, H2b, H3c) use level 1 − 0.05/3 (Bonferroni). Everything else uses 95%.
 
 **Verdict per system.**
@@ -334,15 +336,17 @@ Every criterion in §2 is decided by an interval, and the rules below are fixed 
 
 A criterion with several parts passes only if every part passes, and fails if any part fails.
 
+Bands are strict for H2a, H2b, H2c, H2e and H3a and closed for H1a to H1d, H2d and H3c, exactly as §2 writes them; endpoints are compared unrounded. A statistic that cannot be computed, or one computed on fewer than 50 states, is inconclusive, with the reason and the count reported.
+
 **Overall verdict.**
 
 - **supported:** pass on all three systems;
 - **not supported:** fail on at least one system;
-- **inconclusive:** otherwise.
+- **inconclusive:** otherwise, including when a system has no result.
 
-Requiring every system to pass is an intersection–union test, so it needs no further multiplicity correction.
+Requiring every system to pass is an intersection–union test, so the error of "supported" needs no further multiplicity correction. The error of "not supported" is not controlled this way: with 95% intervals it can reach about 7.3% over three systems (about 14% for H2c's two parts).
 
-**Reading Q-N** (oracle ΔR² for logit w\* at 1 LT; the deployable version is secondary):
+**Reading Q-N** (oracle ΔR² at 1 LT, read separately for its two parts, logit w\* on 0 < w\* < 1 and the indicator of w\* = 0; a part with fewer than 50 states is undetermined; the deployable version is secondary):
 
 | Interval for ΔR² | Reading |
 | --- | --- |
@@ -350,6 +354,8 @@ Requiring every system to pass is an intersection–union test, so it needs no f
 | lower bound > 0, upper bound < 0.05 | N is distinct but small |
 | lower bound > 0, upper bound ≥ 0.05 | N carries substantial additional information |
 | otherwise | undetermined |
+
+The interval covers the gain of the two fitted models with their training held fixed. Under no added information this gain is slightly negative (about −0.003 to −0.010 in simulation), so an interval that excludes 0 from below is expected and reads "reduces".
 
 **Pre-registered readings of failures.**
 
@@ -378,6 +384,12 @@ The study is deliberately narrow: three low-dimensional systems, an exact physic
 - **N̂ measures retrieval sensitivity at the observed (noisy) query, not at the true one.** It is therefore reported, not tested.
 - **The seed × amplifier test (H1b) assumes isotropic seeds,** so it is applied to PLP only. Analog seeds lie along the attractor.
 - **Same attractors, fresh seeds.** The confirmatory run uses new noise, libraries and trajectories on the same three systems. That adds precision and guards against tuning to the pilot; it is not new systems.
+- **Interval coverage.** The block-5 percentile intervals undercover at these sample sizes: about 0.938 to 0.947 at 95% with independent states and 0.923 to 0.931 at lag-1 autocorrelation 0.3, which adds about 1 to 2 percentage points of false-verdict probability under dependence. The pre-registered intervals and block length are kept. A primary verdict that widening the half-width by √max(1, V\*(10)/V\*(5)) would change is labelled "block-sensitive" (report only).
+- **Slow dependence.** Block 5 absorbs the short-range dependence measured on development seeds; dependence beyond 5 states cannot be resolved at n ≤ 1000.
+- **Small regimes in H3a.** No minimum is set per regime, so a regime with one event among many censored states can give an extreme log-rank p and a Holm-adjusted pass. Events and censored states are reported per regime.
+- **Iterative error of PLP.** On a development seed (15 against 30 and 60 iterations), the error left at the fifteenth iteration is not negligible against the interval half-width for 5 of the 18 primary parts (Lorenz-63 and Chua; none on Rössler). It is reported per part as a flag, projected to the full size by √(n\_full/n\_pilot), and not corrected; the uncertainty budget lists it as not estimated for the confirmatory run.
+- **λ\_max for Chua** at the study's parameters has no published reference value; the routine is validated on a published Chua case and on Lorenz-63 and Rössler.
+- **Doubled thinning.** Whether the intervals are stable when the state spacing is doubled is not checked (Methods v2 §M16).
 
 **Future work (not in this study):**
 
@@ -396,9 +408,10 @@ The proposal and methods are due on Oct 30, 2026.
 
 **After 30 October** (dates to be set):
 
-1. Update the code to match this document (about one day).
-2. Freeze the pre-registration: a dated copy of this document, the code commit and the configuration.
-3. Run the full study on fresh seeds on the mentor's GPU workstation.
+1. Update the code to match this document.
+2. Freeze the pre-registration: a dated copy of this document, the code commit and the configuration, including the device (CPU), the thread count (LPC\_THREADS = 8) and the platform record.
+3. Run the full study once on a sealed fresh seed, on the CPU of the mentor's workstation with LPC\_THREADS = 8. This run's verdicts are the study's. A GPU run of the same seed is a cross-check only: GPU and CPU build different trajectories, so it is compared by a statistical test on the 18 primary parts (z = |d| / √(se₁² + se₂²), each standard error taken from the interval arm facing away from the other estimate; a part disagrees if z > 3.4). A disagreement, a differing verdict or a GPU gate failure is reported and changes no verdict.
+4. Another actor regenerates the official run on the CPU from the same commit and inputs. On the same platform and thread count it must agree bitwise; otherwise it is judged by the declared per-quantity tolerances.
 4. Analyze the results, and write the paper and the fair materials.
 
 **Roles** (to be confirmed by the student and mentor):
