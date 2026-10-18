@@ -18,7 +18,7 @@
 
 ### Changes by file (code-level changes; everything else is docstring, comment or layout)
 
-lpcstudy/report.py (1143 -> see end of log)
+lpcstudy/report.py
 - Removed `_qn_primary_reading` (one caller; inlined into `verdicts`), `_lm_number` and `_lm_ratio` (`_lm_number` equals `_fmt` for every finite or `None` input; they differ only for a NaN, which `estimation.lm_block` never stores because it uses `finite_or_none`; the ratio is a local helper of `_lm_lines`).
 - Merged the three `from .budget import` hunks (with their `# --- WU-0008.x begin/end ---` markers, which no tool reads) into one import.
 - `write_markdown` split into `_verdict_rows`, `_allocation_lines`, `_validation_lines` and `_robustness_lines`; the gate-line insertion by `list.index` is replaced by building the list in order. `make_figures` uses `_new_figure` and `_save_figure` (the same calls in the same order: `tight_layout`, `caption_figure`, `savefig`, `close`).
@@ -46,3 +46,31 @@ tests (no assertion, reference or tolerance changed)
 ### Verification so far
 - Rendering check (bitwise): `RESULTS.md`, `results.json` and the four PNGs rendered from the stored smoke `results.json` of `runs/refactor-base3/smoke` with the develop code and with this branch are byte-identical (`diff`, `cmp`).
 - Black: `uvx black==26.10.1 --check` on the six files: unchanged (idempotent). No line over 80 columns.
+
+### 4.9 checklist before the unit-test run
+1. Change set: `lpcstudy/report.py`, `lpcstudy/budget.py`, `lpcstudy/clip_sensitivity.py`, `tests/unit/test_report.py`, `tests/unit/test_budget.py`, `tests/unit/test_clip_sensitivity.py`, this unit file (`git diff --name-only develop...HEAD` plus `git status --porcelain`).
+2. Radius: `python3 tools/test_impact.py --base develop --explain` gives the unit set `test___main__, test_analysis, test_budget, test_clip_sensitivity, test_data, test_experiments, test_identifiers, test_report, test_rng_hygiene, test_tools_test_impact`; I add `test_tools_lm_doubling` (the tool `tools/lm_doubling.py` imports `budget`). Smaller than the whole suite. The integration tier is left to the main session (brief).
+3. Already run? No: first run on this code (the rendering check above is not a pytest run).
+4. Device: `JAX_PLATFORMS=cpu` is set by the wrapper.
+5. Threads and time: `LPC_THREADS` default 4; unit timeout 300 s.
+6. Contention: no preset or GPU job is started by this unit.
+7. Output: wrapper default (`-q --tb=short -rfE`); only the summary and failures are recorded.
+8. Command: `LPC_PYTHON=/home/brianm/projects/physics/chaos/lpcstudy/.venv/bin/python tools/run_tests.sh unit tests/unit/test___main__.py tests/unit/test_analysis.py tests/unit/test_budget.py tests/unit/test_clip_sensitivity.py tests/unit/test_data.py tests/unit/test_experiments.py tests/unit/test_identifiers.py tests/unit/test_report.py tests/unit/test_rng_hygiene.py tests/unit/test_tools_lm_doubling.py tests/unit/test_tools_test_impact.py`
+
+### Results
+- Unit run (the command above, once): `1 failed, 548 passed in 42.98s`. The one failure is `tests/unit/test_identifiers.py::test_criterion_text_is_the_v3_section_2_row`. It is not caused by this unit: it compares `HYPOTHESIS_TABLE` with the proposal text, and the same test fails identically on the develop worktree (tip ab7431f; one run of `test_identifiers.py` there: `1 failed, 10 passed`). No file of this group is involved. No tolerance, test or criterion was changed.
+- Bitwise neutrality: `python -m lpcstudy --preset smoke --seed-id DEV-0 --systems lorenz63 rossler chua --out /tmp/claude-1000/style-g6-smoke` (66 s), then `tools/compare_runs.py runs/refactor-base3/smoke /tmp/claude-1000/style-g6-smoke/smoke`: tier T0, leaves REF 13914, NEW 13914, equal 13914, different 0, one-sided 0, `RESULT: PASS (exit 0)`. The four PNG figures are byte-identical to the reference, and `RESULTS.md` differs only in the four timing and memory rows of the provenance table.
+- Line counts (before -> after black at 80 columns, with the new docstrings): report.py 1143 -> 1840, budget.py 1026 -> 1596, clip_sensitivity.py 1014 -> 1743, test_report.py 1334 -> 2323, test_budget.py 1100 -> 1705, test_clip_sensitivity.py 1591 -> 2841 (one item per line and wrapped docstrings grow the files; code removal is small).
+- Removed symbols (no caller anywhere in lpcstudy/, tools/, tests/, docs scripts: `grep -rnw` over the whole repo): report `_qn_primary_reading` (one caller, inlined), `_lm_number`, `_lm_ratio`; budget `NO_INTERVAL_KEYS`; clip_sensitivity `TIERS`. Removed parameters: `clip` of `perturb_moments` and `perturb_errors`; the `None` defaults of `caught` in `_block`, `_guarded`, `_compute`. Tests removed: none.
+- Runtime strings with British spelling, left unchanged (they reach RESULTS.md or an error message pinned by a test): budget.py:134 `a defect, not relabelled` (ValueError; pinned by the regex at tests/unit/test_budget.py:287); budget.py:211-212 `serial dependence between neighbouring states is not modelled` (H3a interval label in RESULTS.md); budget.py:1113 `favours a pass` (budget cell, RESULTS.md); budget.py:1152 `partly cancelling in the pair` (budget cell, RESULTS.md). Outside the group: lpcstudy/identifiers.py:299 `neighbouring`.
+
+## Review
+
+- **Reviewer:** not yet assigned.
+- **Findings and resolution:** none yet.
+
+## Audit
+
+- Is the definition of done met? Items (1) to (4) are met; the evidence is in the Log. One pre-existing failure outside the group is reported.
+- Defects recorded: none new. `test_identifiers.py::test_criterion_text_is_the_v3_section_2_row` already fails on develop.
+- Notes for successors: the unit-wide rule used here was that a name used outside the group keeps its name and signature; `budget._parts_of`, `budget.QOI_KEYS`, `budget.QOI_IDS`, `budget.below_tenth`, `budget.stored_levels` and `budget.role_level` are read from tools/ or other tests.

@@ -188,7 +188,7 @@ def test_markdown_labels_every_interval_table_before_the_next_heading(
             i = j
         else:
             i += 1
-    labelled = 0
+    labeled = 0
     for start, end in tables:
         if not any(NUMERIC_INTERVAL.search(ln) for ln in lines[start:end]):
             continue
@@ -198,10 +198,10 @@ def test_markdown_labels_every_interval_table_before_the_next_heading(
         )
         found = [ln for ln in lines[end:nxt] if all(tag in ln for tag in TAGS)]
         assert found, lines[start]
-        labelled += 1
+        labeled += 1
     # the verdict table, the declaration table (its criteria name bands
     # such as [0.8, 1.2]) and the validation table
-    assert labelled == 3
+    assert labeled == 3
     verdict_lines = [
         ln for ln in lines if ln.startswith("- ") and "— procedure:" in ln
     ]
