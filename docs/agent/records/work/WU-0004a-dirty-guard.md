@@ -56,8 +56,13 @@
 
 ## Review
 
-- **Reviewer:** <actor, not the author>
-- **Findings and resolution:**
+- **Reviewer:** `reviewer`, claude-opus-5-5 (fresh context), 2026-10-18.
+- **Findings and resolution:** round 1 in `WU-0004a-review.md`. The verdict is **approve with fixes**, with 3 findings:
+  - R1 (medium): the guard-to-`collect` window, and a docstring claim that the provenance block records exactly what was checked;
+  - R2 (low): the clean reading depends on git config and environment (`status.showUntrackedFiles`, skip-worktree, `GIT_DIR`);
+  - R3 (low): the Q1 tag-check follow-up is not registered.
+
+  Open; all three go back to the developer. The unit still needs owner review before freeze.
 
 ## Audit
 
