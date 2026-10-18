@@ -1,4 +1,16 @@
-"""C1, C3 and C1s: coverage of the generic moving-block percentile intervals (WU-0006.2).
+"""Simulation tests of the study's basic bootstrap confidence intervals (cases C1, C3 and C1s).
+
+A 95% confidence interval should contain the true value in about 95% of repeated
+experiments; that fraction is its "coverage". The study builds intervals with a
+moving-block bootstrap: resample the series in blocks of consecutive values (so that
+time dependence is kept), recompute the statistic many times, and take percentiles of
+the results. This module checks the coverage of those intervals in the simplest cases,
+where the true answer is known exactly: C1 is the mean and C3 the median of a series
+with known autocorrelation (WU-0006.2). It calls ``bootstrap_values`` and
+``percentile_interval`` from ``lpcstudy.statistics``. The simulation tools are in
+``tests/slow/wu0006_harness.py`` and the independent reference tables in
+``tests/slow/wu0006_reference.py``. The rest of this docstring is the detailed
+specification, kept for reviewers.
 
 Slow tier: R = 1000 replications of 2000 resamples per (case, phi), run once on a pool of single-thread
 workers (about 15 s per run). The harness and the reference tables are in ``wu0006_harness`` and
@@ -54,59 +66,77 @@ CASES = ("C1", "C3")
 
 @pytest.fixture(scope="module")
 def pool():
-    """Spawned single-thread workers for the module."""
+    """Start the pool of single-thread worker processes, shared by the whole module."""
     with wu.worker_pool() as shared:
         yield shared
 
 
 @pytest.fixture(scope="module")
 def cache() -> wu.RunCache:
+    """Return the on-disk cache that keeps each simulation result for the module's tests."""
     return wu.RunCache("coverage_statistics")
 
 
 @pytest.mark.parametrize("phi", wu.PHIS)
 @pytest.mark.parametrize("case", CASES)
 def test_exact_checks(pool, cache: wu.RunCache, case: str, phi: float) -> None:
-    """Regression guard: identity with ``block_bootstrap_counted`` (bitwise, 10 replications) and A5
-    (0 failed resamples in continuous data). For C1 and C3 the harness's path is the body of that
-    function, so the identity is a self-comparison, not correctness evidence; the evidence is the
-    coverage against the analytic truth and the independent reference (the other two tests)."""
+    """Regression guard: identity with ``block_bootstrap_counted`` and check A5.
+
+    The identity is bitwise, over 10 replications. A5 requires 0 failed
+    resamples in continuous data. For C1 and C3 the harness's path is the body of
+    that function, so the identity is a self-comparison, not correctness
+    evidence. The evidence is the coverage against the analytic truth and the
+    independent reference (the other two tests).
+    """
     evaluation = cache.coverage(pool, wu.CaseSpec(case), phi)
     assert not evaluation.exact, "; ".join(evaluation.exact)
 
 
 @pytest.mark.parametrize("phi", wu.PHIS)
 @pytest.mark.parametrize("case", CASES)
-def test_counts_are_consistent_with_the_reference(pool, cache: wu.RunCache, case: str,
-                                                  phi: float) -> None:
-    """The coverage counts at 95% and 98.3% lie in the pre-registered ranges (central 0.9995 of
-    Bin(1000, p_ref) mixed over the reference's Monte Carlo error): a count outside is a defect
-    candidate, a DEF of class "code"."""
+def test_counts_are_consistent_with_the_reference(
+    pool, cache: wu.RunCache, case: str, phi: float
+) -> None:
+    """The coverage counts at 95% and 98.3% lie in the pre-registered ranges.
+
+    A range is the central 0.9995 of Bin(1000, p_ref), a binomial count of 1000
+    trials, mixed over the reference's Monte Carlo error. A count outside is a
+    defect candidate, a DEF of class "code".
+    """
     evaluation = cache.coverage(pool, wu.CaseSpec(case), phi)
     assert not evaluation.consistency, "; ".join(evaluation.consistency)
 
 
 @pytest.mark.parametrize("phi", wu.PHIS)
 @pytest.mark.parametrize("case", CASES)
-def test_roadmap_coverage_bounds(pool, cache: wu.RunCache, case: str, phi: float) -> None:
+def test_roadmap_coverage_bounds(
+    pool, cache: wu.RunCache, case: str, phi: float
+) -> None:
     """A1 (>= 930 of 1000 at 95%) and A2 (>= 972 of 1000 at 1 - 0.05/3): nominal - 3 SE, R = 1000.
 
-    Truth 0 (analytic). Predicted P(fail) per the module table; a failure at phi = 0.3 is a finding
-    of class "method" recorded in the unit Log, never tuned away (PRIME.2). Under Option C
-    (``ASSERT_ROADMAP_BOUNDS = False``, as shipped) the outcome is only recorded and warned about,
-    never asserted; under Option K (True) a failed bound raises."""
+    The truth is 0 (analytic). The predicted P(fail) is in the module table. A
+    failure at phi = 0.3 is a finding of class "method" recorded in the unit Log,
+    never tuned away (PRIME.2). Under Option C (``ASSERT_ROADMAP_BOUNDS = False``,
+    as shipped) the outcome is only recorded and warned about, never asserted;
+    under Option K (True) a failed bound raises.
+    """
     evaluation = cache.coverage(pool, wu.CaseSpec(case), phi)
     outcome = wu.enforce(evaluation.roadmap)
     assert outcome in ("pass", "fail")
 
 
 @pytest.mark.parametrize("phi", (0.1, 0.2))
-def test_c1s_dependence_curve_is_reported(pool, cache: wu.RunCache, phi: float) -> None:
+def test_c1s_dependence_curve_is_reported(
+    pool, cache: wu.RunCache, phi: float
+) -> None:
     """C1s: the coverage of the mean at lag-1 0.1 and 0.2, reported for the owner, not asserted.
 
     Reference (R_ref 20 000): 0.9398 / 0.9794 at 0.1 and 0.9328 / 0.9740 at 0.2 (95% / 98.3%). The
     row records the deviation in standard errors; only the exact checks are asserted.
     """
     evaluation = cache.coverage(pool, wu.CaseSpec("C1", tag="s"), phi)
-    assert evaluation.row["asserted"] is False and "z_vs_reference" in evaluation.row
+    assert (
+        evaluation.row["asserted"] is False
+        and "z_vs_reference" in evaluation.row
+    )
     assert not evaluation.exact, "; ".join(evaluation.exact)

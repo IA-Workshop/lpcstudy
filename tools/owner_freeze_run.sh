@@ -16,6 +16,12 @@
 # script on purpose: they are owner-only (LPC.PC.7, LPC.AUTH.6) and a hook blocks agents from the commands.
 #
 # Environment: REPO (default: the checkout this script is in), V3_EXPORT (path of the v3 export, needed by `tag`).
+# In plain words: this script is the owner's checklist for the freeze, the point after which
+# the study code and design may no longer change and the sealed confirmatory run can be
+# prepared. Each step above is a shell function below. It checks the state of the repository,
+# runs the tests, merges, records the exact package versions, writes the governance ledger
+# entry and creates the tag freeze-1. The usage text that the script prints for a missing or
+# unknown step is lines 2 to 18 of this file, so those lines must stay as they are.
 set -euo pipefail
 
 REPO="${REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -35,7 +41,6 @@ preflight() {
   say "branch $branch, commit $(git rev-parse --short HEAD)"
   [ -z "$(git status --porcelain)" ] && ok "working tree clean" \
     || { bad "working tree not clean (a sealed run is refused on a dirty tree):"; git status --short | head -20; }
-  git diff --quiet 2>/dev/null || true
   local n
   n="$(git branch --no-merged develop --list 'wu/*' 2>/dev/null | wc -l)"
   [ "$n" = 0 ] && ok "every wu/* branch is merged into develop" \
