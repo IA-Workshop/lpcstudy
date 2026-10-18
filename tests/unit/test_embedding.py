@@ -25,22 +25,34 @@ def test_delay_vectors_order() -> None:
 def test_regression_ami_delay_lorenz_band() -> None:
     """AMI delay of Lorenz-63 x at 1 LT = 30 steps lies near 0.15-0.2 time units.
 
-    REGRESSION GUARD (WU-0013.2, DEF-0007 audit item 2), not correctness evidence. The
-    band's source ("0.15-0.2 time units") is uncited, so LPC.PC.21a is not met for
-    it: a published value must be cited in the code, and no source has been verified
-    (needs ``/verify-citation`` or the ``researcher``). Until it is, the test is a
-    deliberately loose guard that the selected delay stays within [3, 8] steps. It
-    does not pin the current value: ``select_delay`` currently returns 5 steps =
-    0.184 time units at Delta t = 0.0368, but any value from 3 to 8 passes.
+    REGRESSION GUARD (WU-0013.2, DEF-0007 audit item 2), not correctness evidence.
+    Source (LPC.PC.21a; verified by the ``researcher``, note
+    ``docs/agent/notes/2026-10-11-research-ami-delay.md``, retrieved 2026-10-11):
+    Deshmukh, Bradley, Garland and Meiss, "Using Curvature to Select the Time Lag for
+    Delay Reconstruction", arXiv:2003.06509v1 (7 Mar 2020), Sec. IV.B "Classic Lorenz
+    Attractor", Fig. 5 (PDF p. 8). For x(t) of Lorenz-63 (sigma = 10, beta = 8/3,
+    rho = 28; RK4 with a time step of 0.01; 90,000 points; AMI by TISEAN ``mutual``,
+    bin count not stated) "the first minima of both curves fall near tau = 18", that
+    is about 0.18 time units, which is 4.9 steps at Delta t = 0.0368. The researcher
+    reads that minimum in Fig. 5 as a shallow shoulder (AMI about 0.65 at tau = 18
+    against 0.7 near 30; a reading of the figure, not a quotation), and the paper says
+    that, from this AMI profile, a practitioner would quite likely choose tau_I = 60
+    (0.60 time units, 16.3 steps). The citation anchors the order of magnitude of the
+    first minimum, not a pinned value, so the test stays a regression guard: the
+    estimator here differs (32 equiprobable bins, 3-point smoothing), and the
+    location of a first minimum depends on the estimator. The test does not pin the
+    current value: ``select_delay`` currently returns 5 steps = 0.184 time units at
+    Delta t = 0.0368, but any value from 3 to 8 passes.
 
-    Tolerance: integer band [3, 8] steps (0.110-0.294 time units), unchanged. The band
-    is uncited and wider than the docstring's own 0.15-0.2 time-unit claim
-    (4.08-5.43 steps). It is kept, neither widened nor tightened: the audit does not
-    allow tightening without a source. A cited reference, to be retrieved by the
-    ``researcher``, would let the band be tightened and the test renamed back
-    (dropping ``regression``). The estimator is the default 32-equiprobable-bin
-    histogram AMI with the first local minimum of a 3-point smoothed curve, on
-    55 000 normalized samples (60 000 steps, 5 000 burn-in).
+    Tolerance: integer band [3, 8] steps (0.110-0.294 time units), unchanged. The
+    cited 0.18 time units (4.9 steps) lies inside it, and so does the current value.
+    The band is kept, neither widened nor tightened: the researcher's assessment is
+    that the evidence does not justify a tighter band without a stated
+    estimator-matching tolerance (a band of about [4, 6] steps would be weakly
+    supported by this source and by an informal course page, 0.16 time units, which
+    is not peer reviewed). The estimator is the default 32-equiprobable-bin histogram
+    AMI with the first local minimum of a 3-point smoothed curve, on 55 000
+    normalized samples (60 000 steps, 5 000 burn-in).
     """
     spec = SYSTEMS["lorenz63"]
     step = make_flow_step(spec, spec.params, 0.0368)

@@ -13,26 +13,30 @@
     {
       "id": "DEV-1",
       "value": 2844678021587022684,
-      "status": "unused",
-      "use": "Dress rehearsal of the v2 code at the pilot preset (WU-0003)."
+      "status": "used",
+      "use": "Dress rehearsal of the v2 code at the pilot preset (WU-0003).",
+      "note": "Used 2026-10-17 in rehearsal runs R0 (smoke, GPU and CPU), R1 and R2 (pilot, GPU) and R3 (pilot, CPU), records WU-0003-R*.md; also V6 context checks (pilot and full presets, CPU), docs/agent/notes/2026-10-17-v6-v4-offline-check.md (its V4 update read R1's outputs). Status updated per owner ratification of 2026-10-18 (WU-0004e)."
     },
     {
       "id": "DEV-2",
       "value": 1747709410296405302,
-      "status": "unused",
-      "use": "Precision check at the full preset, if the owner authorizes the compute (WU-0003)."
+      "status": "used",
+      "use": "Precision check at the full preset, if the owner authorizes the compute (WU-0003).",
+      "note": "Used 2026-10-17 in rehearsal runs R5 (full, GPU) and R6 (full, CPU), records WU-0003-R3R6*.md and WU-0003-R1R2-R5*; also V6 context checks (pilot and full presets, CPU), docs/agent/notes/2026-10-17-v6-v4-offline-check.md. Status updated per owner ratification of 2026-10-18 (WU-0004e)."
     },
     {
       "id": "DEV-3",
       "value": 4138800076919414624,
-      "status": "unused",
-      "use": "Spare for debugging and for seed-sensitivity checks."
+      "status": "used",
+      "use": "Spare for debugging and for seed-sensitivity checks.",
+      "note": "Used 2026-10-17 for V6 context checks only (pilot and full presets, CPU; no V4, no outcome run); docs/agent/notes/2026-10-17-v6-v4-offline-check.md. Status updated per owner ratification of 2026-10-18 (WU-0004e)."
     },
     {
       "id": "DEV-4",
       "value": 20219064491771980,
-      "status": "unused",
-      "use": "Spare for debugging and for seed-sensitivity checks."
+      "status": "used",
+      "use": "Spare for debugging and for seed-sensitivity checks.",
+      "note": "Used 2026-10-17 for V6 context checks only (pilot and full presets, CPU; no V4, no outcome run); docs/agent/notes/2026-10-17-v6-v4-offline-check.md. Status updated per owner ratification of 2026-10-18 (WU-0004e)."
     }
   ]
 }
