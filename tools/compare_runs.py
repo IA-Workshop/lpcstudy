@@ -1981,7 +1981,7 @@ def decide(
                 "listed beside H2c, H2d, H3c, oracle_recovery",
                 "listed",
             )
-            row.note = "OF-1: no licence for 0.1 hw"
+            row.note = "OF-1: no license for 0.1 hw"
         elif verdictlike:
             row.cls, row.rule = "verdict", "every verdict identical"
             row.outcome, row.note = "DEF", "a verdict or flag differs"
@@ -2002,7 +2002,7 @@ def decide(
                 "listed beside H2c, H2d, H3c, oracle_recovery",
                 "listed",
             )
-            row.note = "OF-1: no licence for 0.1 hw"
+            row.note = "OF-1: no license for 0.1 hw"
         elif licensing_kind(path, "int") is not None:
             row.cls, row.rule, row.outcome = (
                 "discrete",

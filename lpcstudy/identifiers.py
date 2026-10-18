@@ -562,7 +562,7 @@ QOI_DECLARATIONS: dict[str, dict[str, str]] = {
             " than 50 states moves the verdict only between pass and "
             "inconclusive, and no outcome refutes it; the log-rank test "
             "treats states as independent, so serial dependence of "
-            "neighbouring states could overstate significance"
+            "neighboring states could overstate significance"
         ),
         "decision": (
             "whether regimes separate forecast horizons (RQ3, "

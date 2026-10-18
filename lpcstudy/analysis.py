@@ -591,7 +591,7 @@ def h1a_library_scaling(
         ),
         "reference_estimator": (
             "mean over states of S/(k-1), S = sum_j ln(T_k/T_j), k = 20 "
-            "(Levina-Bickel with the k-1 normalisation; exactly unbiased for "
+            "(Levina-Bickel with the k-1 normalization; exactly unbiased for "
             "1/d under the Poisson law)"
         ),
         "n_states": int(n_states),
@@ -1921,7 +1921,7 @@ def h2a_part_ii(
         "n_w_one": n_one,
         "controls": (
             "x1, x2, x1^2, x2^2, x1*x2 with x = (ln(eps_s/rho), "
-            "ln(delta/rho)) centred on the full-sample mean"
+            "ln(delta/rho)) centered on the full-sample mean"
         ),
         "part_ii_verdict": combine_verdicts(verdicts),
     }

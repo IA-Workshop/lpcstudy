@@ -131,7 +131,7 @@ def row_level(row: Hypothesis, results: dict, systems: list[str]) -> float:
                 raise ValueError(
                     f"result {row.key} of system {system} stores level "
                     f"{found!r} but its role ({row.role}) has level "
-                    f"{nominal!r}: a defect, not relabelled"
+                    f"{nominal!r}: a defect, not relabeled"
                 )
     return nominal
 
@@ -208,8 +208,8 @@ def interval_label(row: Hypothesis, level: float, config: StudyConfig) -> str:
             "procedure: Holm-adjusted log-rank tests between consecutive "
             "regimes, p-values with no interval; level: each adjusted p must "
             "be below 0.01; dependence: the log-rank test treats states as "
-            "independent, serial dependence between neighbouring states is not "
-            "modelled; multiplicity: Holm over the consecutive comparisons "
+            "independent, serial dependence between neighboring states is not "
+            "modeled; multiplicity: Holm over the consecutive comparisons "
             "within a system, intersection–union across systems"
         )
     if row.key == "H3b":
@@ -1110,7 +1110,7 @@ def _oracle_cell(
         return (
             NOT_ESTIMATED
             + "per-state draw variance on the logit scale not stored; the "
-            "classical part attenuates toward 0 (favours a pass; a fail is "
+            "classical part attenuates toward 0 (favors a pass; a fail is "
             "robust)",
             flag,
         )
@@ -1149,7 +1149,7 @@ def _oracle_cell(
         return (
             NOT_ESTIMATED
             + "finite-M clip-boundary bias (≤ 0.40 s per state near a clip "
-            "bound, partly cancelling in the pair); variance inside the "
+            "bound, partly canceling in the pair); variance inside the "
             "interval, " + reason,
             flag,
         )

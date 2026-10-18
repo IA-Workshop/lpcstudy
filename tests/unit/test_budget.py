@@ -284,7 +284,7 @@ def test_label_level_equals_the_stored_level_and_a_mismatch_raises(
         results["systems"] = {"lorenz63": system}
         results["verdicts"] = verdicts(results, config)
         with pytest.raises(
-            ValueError, match=f"result {key} .*defect, not relabelled"
+            ValueError, match=f"result {key} .*defect, not relabeled"
         ):
             write_markdown(results, config, tmp_path / "bad.md")
 
