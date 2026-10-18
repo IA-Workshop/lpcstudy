@@ -363,3 +363,7 @@ The settings carry `ask: Edit(/seeds/**)` (kept by the owner when the number of 
 ## 43. Owner approval of the registry diff (2026-10-18; main session; not a ledger entry)
 
 After the slip of section 42 the owner approved the exact corrected diff of `seeds/development_seeds.json` ("Approve as shown", question tool): DEV-1 to DEV-4 `status` "used" and a `note` key; ids, values, `use`, `schema` and DEV-0 unchanged. Re-review round 2 approved (no new findings). Merged `51c6f45`. Still the owner's: confirm the `note` key as a convention and amend `seeds/README.md` ("fresh", "never edit or remove"), which now contradicts the registry.
+
+## 44. Bitwise CPU repeat at LPC_THREADS=8 (2026-10-18; main session; development seed DEV-0, smoke size)
+
+The note of the DEF-0005 drafts (U7) said a bitwise CPU repeat at `LPC_THREADS=8` had never been run (only a smoke at 4 threads, R0 (c)). Two DEV-0 smoke runs on the CPU at `LPC_THREADS=8` on develop 988d825+ (`tools/run_preset.sh smoke DEV-0 runs/t8-a|t8-b --device cpu`, 61 s and 62 s) compared by `tools/compare_runs.py`: **tier T0, 4695 leaves, all equal, 0 different, 0 one-sided, exit 0**. So the bitwise repeat now holds at 8 threads at smoke size. Not shown: pilot or full size at 8 threads (the full CPU run takes 4.7 h), and another host (R4 was not run). The official run's regeneration is on the CPU at the same thread count (DEF-0023: the thread count belongs to the freeze configuration).
