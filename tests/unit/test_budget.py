@@ -765,37 +765,56 @@ def test_lm_development_note_under_every_table() -> None:
     """B7: each table points to the DEV-0 doubling study as development evidence, once, after the
     iterative-error sentence, with the sqrt(n_full/n_pilot) projection factor of its QoI.
 
-    Reference: the owner ruling of amendments note section 35 (B7) and the text of the WU-0005.6
-    record (line 359): the factor is sqrt(1000/500) = 1.41 for H2a(i), H2a(ii) and H3c (test
-    states 500 to 1000) and sqrt(1000/300) = 1.83 for H2b(i) and H2b(ii) (sweep 300 to 1000); the
-    study reports 5 of 18 parts with the LM-row flag, classes N 5, X 6, U 7. The factors are
-    computed here by arithmetic, to the 3 significant digits that are printed. The pointer names
-    the report file; it says "development evidence" and "not a sealed result"; the LM row stays
-    "not estimated". Exact text and counts; no tolerance.
+    Reference: the owner ruling of amendments note section 35 (B7), the WU-0005.6 record (line 359:
+    the full-n projection) and the table of section 3 of ``docs/study/lm_doubling_dev0_report_v3.md``,
+    all written out here by hand. The report's LM-row flag is "yes" (the iterative change is below
+    10% of the sampling half-width, class N) for 5 of the 18 parts and "no" for 13, which it
+    describes as "not shown negligible": X (not negligible) 6 and U (not certified) 7; the note
+    must not say that the 13 are found above 10%. Per QoI, class N parts: H2a(i) 0 of 3,
+    H2a(ii) 3 of 6, H2b(i) 0 of 3, H2b(ii) 2 of 3, H3c 0 of 3 (sum 5). The factor is
+    sqrt(1000/500) = 1.41 for H2a(i), H2a(ii), H3c and sqrt(1000/300) = 1.83 for H2b(i), H2b(ii),
+    computed here by arithmetic to the 3 significant digits that are printed; the quoted sizes are
+    cross-checked against ``config.PILOT`` and ``config.FULL`` (n_test, n_test_sweep), so a preset
+    change cannot leave the text stale. Exact sentences and counts; no tolerance.
     """
+    from lpcstudy.config import FULL, PILOT
+
     results, systems = budget_results(full_system(), names=("lorenz63",))
     lines = budget.budget_lines(results, systems, SMOKE)
     heads = [i for i, ln in enumerate(lines) if ln.startswith("### ")]
     assert len(heads) == 5
-    factors = {"H2a(i)": math.sqrt(1000 / 500), "H2a(ii)": math.sqrt(1000 / 500),
-               "H3c": math.sqrt(1000 / 500), "H2b(i)": math.sqrt(1000 / 300),
-               "H2b(ii)": math.sqrt(1000 / 300)}
-    assert [f"{factors[q]:.3g}" for q in budget.QOI_TITLES] == [
-        "1.41", "1.41", "1.83", "1.83", "1.41"]
+    sizes = {"H2a(i)": ("n_test", "test"), "H2a(ii)": ("n_test", "test"),
+             "H3c": ("n_test", "test"), "H2b(i)": ("n_test_sweep", "sweep"),
+             "H2b(ii)": ("n_test_sweep", "sweep")}
+    own_counts = {"H2a(i)": (0, 3), "H2a(ii)": (3, 6), "H2b(i)": (0, 3), "H2b(ii)": (2, 3),
+                  "H3c": (0, 3)}
+    assert sum(n for n, _ in own_counts.values()) == 5
+    assert sum(m for _, m in own_counts.values()) == 18 == 3 * 6
+    count_sentence = ("finds the iterative change below 10% of the sampling half-width (class N) "
+                      "for 5 of the 18 parts of the five QoIs and three systems (this QoI: "
+                      "class N in {n} of {m} parts), and does not show it below 10% for the "
+                      "other 13 (X, not negligible, 6; U, not certified, 7).")
+    assert [f"{math.sqrt(getattr(FULL, sizes[q][0]) / getattr(PILOT, sizes[q][0])):.3g}"
+            for q in budget.QOI_TITLES] == ["1.41", "1.41", "1.83", "1.83", "1.41"]
     for qoi, start, stop in zip(budget.QOI_TITLES, heads, [*heads[1:], len(lines)]):
         block = lines[start:stop]
         notes = [ln for ln in block if "lm_doubling_dev0_report_v3.md" in ln]
         assert len(notes) == 1, qoi
         note = notes[0]
-        assert block.index(budget.ITERATIVE_SENTENCE) < block.index(note), qoi
         assert block.index(note) == block.index(budget.ITERATIVE_SENTENCE) + 2, qoi
-        assert note.startswith("Development evidence") and "not a sealed result" in note, qoi
+        attribute, word = sizes[qoi]
+        small, big = getattr(PILOT, attribute), getattr(FULL, attribute)
+        factor = f"{math.sqrt(big / small):.3g}"
+        assert note.startswith("Development evidence on the iterative error, not a sealed result: "), qoi
         assert "docs/study/lm_doubling_dev0_report_v3.md" in note, qoi
-        assert "5 of 18" in note and "classes N 5, X 6, U 7" in note, qoi
-        assert f"×{factors[qoi]:.3g}" in note, qoi
-        other = {f"×{f:.3g}" for f in factors.values()} - {f"×{factors[qoi]:.3g}"}
+        assert count_sentence.format(n=own_counts[qoi][0], m=own_counts[qoi][1]) in note, qoi
+        assert "not below it" not in note, qoi
+        assert (f"from the pilot preset to the full preset by about √(n_full/n_pilot), ×{factor} "
+                f"for this QoI ({small} → {big} {word} states in the two presets).") in note, qoi
+        other = {"×1.41", "×1.83"} - {f"×{factor}"}
         assert not any(o in note for o in other), qoi
-        assert "stays not estimated" in note, qoi
+        assert "a 30/60-iteration twin of the full-size run would remove it." in note, qoi
+        assert note.endswith("The iterative row of this report stays not estimated."), qoi
     table = tables_of(lines)[budget.QOI_TITLES["H3c"]]
     assert table[4][3].startswith("not estimated: ") and table[4][5] == "not estimated"
 

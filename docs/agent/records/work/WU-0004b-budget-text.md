@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | implemented; pending independent review |
+| Status | fix round 1 done; pending re-review |
 | Class | CSQ3 development |
 | Agent(s) | claude-sonnet-5-5 (developer) under the owner rulings of amendments note §33 (OF-4) and §35 (B7) |
 | Estimate | small (text only; one source file, one test file) |
@@ -145,6 +145,40 @@ Branch `wu/0004b-budget-text` from develop 7b6f6e6.
 - DEV-0 smoke neutrality check (0 changed `results.json` leaves, plan A2.6, C16): main session.
 - Ledger entry for addendum A3 (the owner's), edits of the WU-0008 record lines 216, 310, 313-315, 868
   (draft §3.2 "replacement wording"; a dated correction to the WU-0008 Log is not part of this code unit).
+
+### 2026-10-18, claude-sonnet-5-5 (developer): fix round 1 (review `WU-0004b-review.md`, 9d7dd53; R1 to R6)
+
+Answers (commit given below once made):
+- R1 fixed: the note now says "finds the iterative change below 10% of the sampling half-width (class N) for 5 of
+  the 18 parts ... and does not show it below 10% for the other 13 (X, not negligible, 6; U, not certified, 7)",
+  the report's wording (sections 2, 3, 7).
+- R2 fixed: "grows from the pilot preset to the full preset by about sqrt(n_full/n_pilot), x<f> for this QoI
+  (<a> -> <b> <test|sweep> states in the two presets)". The test cross-checks the quoted sizes and factors against
+  `config.PILOT` and `config.FULL` (`n_test`, `n_test_sweep`).
+- R3 fixed: "a 30/60-iteration twin of the full-size run would remove it" (report section 5, WU-0005.6 line 372); "only" dropped.
+- R4 fixed: "5 of the 18 parts of the five QoIs and three systems (this QoI: class N in k of m parts)"; per-QoI counts
+  quoted from the table of report section 3 (H2a(i) 0 of 3, H2a(ii) 3 of 6, H2b(i) 0 of 3, H2b(ii) 2 of 3, H3c 0 of 3; the
+  test also checks that they sum to 5 and that the parts total 18).
+- R5 fixed: the test asserts the exact count sentence (direction included) and that "not below it" is absent; its
+  docstring states the flag direction.
+- R6 safe option: the docstring of `oracle_range_bound` cites the draft addendum A3
+  (`docs/agent/notes/2026-10-18-owner-decision-drafts.md` section 3.2) and says it is not yet in the ledger. The
+  owner's ledger entry of A3 stays a freeze-checklist dependency.
+- Assertions updated: only those of `test_lm_development_note_under_every_table` (my own new test, rewritten to the
+  new text, stricter than before: exact sentences instead of substrings). No other existing assertion touched; no
+  tolerance. No number changes.
+
+#### 4.9 checklist before the fix-round invocation
+
+1. Change set: `lpcstudy/budget.py`, `tests/unit/test_budget.py`, this unit file (modified, uncommitted); committed
+   earlier: plan, code (614d889), review (9d7dd53).
+2. Radius: unchanged, the same 9 unit files as above (importers of `lpcstudy.budget`: tool selection plus `test___main__`
+   and `test_tools_lm_doubling` by hand); smaller than the whole suite; integration tier not run.
+3. Already run on this code? No: the code changed after the first run (new text, new test). Run once.
+4. Device: `JAX_PLATFORMS=cpu` (wrapper). 5. `LPC_THREADS=4`, unit timeout 300 s. 6. No preset running.
+7. Output `-q --tb=short -rfE`. 8. `LPC_PYTHON=<main .venv python> tools/run_tests.sh unit <the nine files>`.
+
+Result: `447 passed in 41.90s` (the same nine files; one run, no failure). Diff grep for `clip|nan_to_num|isfinite|where(|try:|except|default_rng|random.|PRNGKey|approx|rel=|abs=` finds no added site.
 
 ## Review
 
