@@ -1,18 +1,35 @@
 #!/usr/bin/env python3
 """Extract the C7 inputs of the DEV-0 pilots P0 and P1 into small committed fixtures (WU-0003.3a).
 
-DEVELOPMENT (DEV-0): not a hypothesis test. Reads the two ``results.json`` files read-only and
-copies, bit for bit (JSON floats round-trip exactly in Python), only the leaves that
-``tools/rehearsal_report.py`` reads: the configuration, a few provenance keys, and per system the
-interval, point estimate and level of the 18 primary and secondary criteria of the C7 projection.
+What this script does for the study
+-----------------------------------
+``tools/rehearsal_report.py`` projects pilot results onto the pre-registered
+criteria of the study (the "C7 projection"). To test that tool on real
+numbers, the tests need pilot data, but the two full ``results.json`` files
+are about 2 MB each and are not committed. This script copies out only the
+few numbers the tool reads, so the tests can use small files (about 8 KB
+each).
+
+DEVELOPMENT (DEV-0): not a hypothesis test. The script reads the two
+``results.json`` files read-only. It copies, bit for bit (JSON floats
+round-trip exactly in Python, so nothing is rounded), only the leaves that
+``tools/rehearsal_report.py`` reads:
+
+* the configuration;
+* a few provenance keys (``PROVENANCE``: which run it was, and which code);
+* for each system, the interval, point estimate and level of the 18 primary
+  and secondary criteria of the C7 projection (``LEAVES``).
+
 Usage::
 
     python3 -I extract_p0p1.py P0_results.json P0_fixture.json
     python3 -I extract_p0p1.py P1_results.json P1_fixture.json
 
-with ``P0`` = ``lpcstudy-wt/run/p0-1b20db9/runs/dev/p0/pilot/results.json`` (lpcstudy 1b20db9) and
-``P1`` = ``lpcstudy-wt/run/p1-5b3fd8f/runs/dev/p1/pilot/results.json`` (lpcstudy 5b3fd8f). The
-fixtures are what the test reads; the full results (about 2 MB each) are not copied.
+with ``P0`` = ``lpcstudy-wt/run/p0-1b20db9/runs/dev/p0/pilot/results.json``
+(lpcstudy 1b20db9) and ``P1`` =
+``lpcstudy-wt/run/p1-5b3fd8f/runs/dev/p1/pilot/results.json`` (lpcstudy
+5b3fd8f). The fixtures are what the tests read: ``p0_pilot.json`` and
+``p1_pilot.json`` in this folder.
 """
 
 import json
@@ -28,6 +45,8 @@ PROVENANCE = (
     "dirty",
     "preset",
 )
+# Keys of the "systems/<name>" tree: a path inside the tree -> the leaf names
+# to copy from there (the criteria named after each hypothesis, such as H1b).
 LEAVES = {
     "H1b/PLP": ("slope", "ci"),
     "H1c/PLP": ("median_ratio", "ci"),
@@ -60,7 +79,15 @@ LEAVES = {
 
 
 def main(src: str, dst: str) -> None:
-    """Copy the listed leaves of ``src`` into ``dst``."""
+    """Copy the leaves listed in ``LEAVES`` from ``src`` into ``dst``.
+
+    Parameters
+    ----------
+    src : str
+        Path of a full pilot ``results.json`` (read only).
+    dst : str
+        Path of the small fixture file to write.
+    """
     full = json.load(open(src))
     out = {
         "config": full["config"],

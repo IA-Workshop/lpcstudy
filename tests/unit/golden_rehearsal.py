@@ -1,18 +1,52 @@
-"""Cases and runner for the golden outputs of the two rehearsal tools (WU-0003.10, plan amendment 7 G4, h1).
+"""Golden-output cases and runner for the two rehearsal tools (WU-0003.10).
 
-The golden files in ``tests/unit/fixtures/golden_rehearsal/`` were written by ``produce()`` from the
-tools as they stood BEFORE ``tools/rehearsal_common.py`` existed (the commit is in the README of that
-folder). ``tests/unit/test_tools_rehearsal_common.py`` calls ``produce()`` on the code under test and
-compares the text byte for byte. A golden file is a regression guard, not correctness evidence.
+What this module does for the study
+-----------------------------------
+Before the real run, the study rehearses its analysis on pilot results from
+the development seed. Two command-line tools do the rehearsing:
+``tools/rehearsal_report.py`` projects the pilot results onto the
+pre-registered criteria, and ``tools/rehearsal_diagnostics.py`` checks that
+the numbers behind those criteria are consistent. Both tools print text, and
+a silent change in that text could change what the study team reads. A
+*golden file* is a saved copy of the exact output of a tool on a fixed input.
+If the tool's output ever differs from the golden file by even one byte, a
+test fails and tells us. (The plan reference is plan amendment 7, item G4,
+step h1.)
 
-The worlds are the ones the two tool test files build (``write_run``, ``make_dump``, ``build_world``);
-they are imported from those files, so the golden cases cannot drift from the worlds those tests use.
-Three machine- or run-dependent texts are normalised, so that the golden files hold on any machine:
-the temporary directory of a run becomes ``<TMP>``, the repository root ``<ROOT>``, and the values
-of the analysis-stack lines of the diagnostics (python, numpy, scipy, CPU, BLAS, SIMD, environment:
-their status ``same``, ``different`` or ``unusable`` is kept, their values become ``<values>``).
+How the pieces connect
+----------------------
+* ``produce()`` runs both tools on a fixed list of cases and returns a
+  dictionary: file name -> output text.
+* The golden files in ``tests/unit/fixtures/golden_rehearsal/`` were written
+  by ``produce()`` from the tools as they stood BEFORE
+  ``tools/rehearsal_common.py`` (the shared code both tools now use) existed.
+  The commit is named in the README of that folder.
+* ``tests/unit/test_tools_rehearsal_common.py`` calls ``produce()`` on the
+  code under test and compares the text byte for byte. If the shared-code
+  refactoring changed any output, that test fails.
+* Because a golden file is only a copy of earlier output, it is a regression
+  guard (it detects change), not evidence that the output is correct. The
+  correctness tests live in the two tool test files.
 
-Regenerate (only to record a deliberate change of output, with the reason in the unit Log)::
+The test "worlds" (small made-up result sets) are the ones those two tool
+test files build (``write_run``, ``make_dump``, ``build_world``). They are
+imported from there rather than copied, so the golden cases cannot drift away
+from the worlds those tests use.
+
+Machine-dependent text
+----------------------
+Three kinds of text differ from machine to machine or from run to run, so
+they are replaced by placeholders and the golden files hold on any machine:
+
+* the temporary directory of a run becomes ``<TMP>``;
+* the repository root becomes ``<ROOT>``;
+* the values on the analysis-stack lines of the diagnostics (python, numpy,
+  scipy, CPU, BLAS, SIMD, environment) become ``<values>``. The status of
+  each line (``same``, ``different`` or ``unusable``) is kept, because that
+  status is part of what the tool reports.
+
+Regenerate (only to record a deliberate change of output, with the reason
+written in the unit Log)::
 
     python tests/unit/golden_rehearsal.py tests/unit/fixtures/golden_rehearsal
 """
@@ -39,7 +73,12 @@ import test_tools_rehearsal_report as trep  # noqa: E402
 
 GOLDEN = HERE / "fixtures" / "golden_rehearsal"
 DIAGNOSTIC_OPTIONS = ["--resamples", "100", "--permutations", "50"]
-"""Small bootstrap and permutation counts (the tool's own test settings); the seed is the default."""
+"""Command-line options that keep the diagnostics tool fast.
+
+The tool resamples the data (bootstrap) and shuffles it (permutations) many
+times. These small counts are the ones its own tests use; the random seed is
+left at the tool's default, so the output is reproducible.
+"""
 
 
 STACK_LINE = re.compile(
@@ -47,17 +86,33 @@ STACK_LINE = re.compile(
     r"run .*; here .*: (same|different|unusable)$",
     re.MULTILINE,
 )
-"""A line of the stack comparison of the diagnostics report (the values depend on the machine)."""
+"""Pattern for one line of the diagnostics' analysis-stack comparison.
+
+Each such line says what the pilot run used, what this machine uses, and
+whether the two are ``same``, ``different`` or ``unusable``. The values
+depend on the machine, so the golden files keep only the status.
+"""
 
 
 def _normalise_text(text: str, tmp: Path) -> str:
-    """The temporary directory, the repository root and the stack values replaced by placeholders."""
+    """Replace machine-dependent parts of a tool's text by placeholders.
+
+    The temporary directory becomes ``<TMP>``, the repository root becomes
+    ``<ROOT>``, and the values on the stack lines become ``<values>`` (their
+    ``same``/``different``/``unusable`` status is kept).
+    """
     text = text.replace(str(tmp), "<TMP>").replace(str(ROOT), "<ROOT>")
     return STACK_LINE.sub(r"\1: <values>: \2", text)
 
 
 def _normalise_json(text: str, tmp: Path) -> str:
-    """As ``_normalise_text``, and the run and own values of ``stack.rows`` replaced by ``<value>``."""
+    """Normalize a tool's JSON output the same way as ``_normalise_text``.
+
+    In addition, the "run" and "own" values in ``stack.rows`` (the two machine
+    dependent columns) become ``<value>``. The JSON must also survive a
+    load-and-dump round trip unchanged; if not, the tool's formatting changed
+    and the assertion says so.
+    """
     text = text.replace(str(tmp), "<TMP>").replace(str(ROOT), "<ROOT>")
     tree = json.loads(text)
     assert (
@@ -76,7 +131,13 @@ def _call(
     name: str,
     out_files: dict[str, str],
 ) -> None:
-    """Run ``main(argv + --json)`` capturing stdout and stderr; store text and JSON under ``name``."""
+    """Run one tool call and store what it printed and wrote.
+
+    ``main`` is called with ``argv`` plus a ``--json`` output path. Its exit
+    code, standard output and standard error go into ``out_files[name.txt]``,
+    and the JSON file (if the tool wrote one) into ``out_files[name.json]``,
+    both normalized.
+    """
     json_path = tmp / f"{name}.json"
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
@@ -88,7 +149,16 @@ def _call(
 
 
 def produce() -> dict[str, str]:
-    """All golden cases of both tools: file name -> text (the report tool, then the diagnostics)."""
+    """Run every golden case of both tools.
+
+    Returns
+    -------
+    dict[str, str]
+        File name -> normalized text. The report tool's cases come first,
+        then the diagnostics tool's. The cases cover exit codes 0, 1 and 2
+        (success, a mismatch found, an input refused or incomplete), so each way the tools can end is
+        guarded.
+    """
     files: dict[str, str] = {}
     with tempfile.TemporaryDirectory(prefix="golden_rehearsal_") as raw:
         tmp = Path(raw)
@@ -187,7 +257,11 @@ def produce() -> dict[str, str]:
 
 
 def main(argv: list[str]) -> int:
-    """Write the golden files into the folder named by ``argv[0]``."""
+    """Write the golden files into the folder named by ``argv[0]``.
+
+    Use it only to record a deliberate change of a tool's output (see the
+    module docstring). Returns the process exit code, 0.
+    """
     folder = Path(argv[0])
     folder.mkdir(parents=True, exist_ok=True)
     produced = produce()
