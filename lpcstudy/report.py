@@ -769,20 +769,23 @@ H3A_EXPOSURE = (
     "limitation): the H3a log-rank test sets no minimum number of states or events per regime "
     "(DEC-0011 O1; only the full sample needs 50 states), so a regime with few events can give an "
     "extreme log-rank p-value, for example one event among 99 censored states. Read each p-value "
-    "beside the events and censored counts above. This is a stated limitation of the H3a verdict; "
-    "the verdict rule is unchanged.")
+    "of the pair table beside the events and censored counts of its two regimes. This is a stated "
+    "limitation of the H3a verdict; the verdict rule is unchanged.")
 """The limitation sentence of the H3a events/censored section (exact text pinned by a test)."""
 
 
 def h3a_regime_lines(results: dict, systems: list[str]) -> list[str]:
     """The ``## H3a: events/censored per regime`` section of RESULTS.md (WU-0004d, DEF-0018), or ``[]``.
 
-    One row per (system, regime), the regime index being the one used in ``H3a.pairs``: the states,
-    events and censored states of the first evaluation draw, from ``n_per_regime``,
-    ``n_events_per_regime`` and ``n_censored_per_regime``; then the exposure sentence
-    (``H3A_EXPOSURE``). A system whose H3a block lacks the two new lists (results written before
-    WU-0004d) gets a line saying so, never a silent gap (PRIME.4). The section reads the counts
-    only; it changes no verdict.
+    Two tables and the exposure sentence (``H3A_EXPOSURE``). The first has one row per (system,
+    regime), the regime index being the one used in ``H3a.pairs``: the states, events and censored
+    states of the first evaluation draw, from ``n_per_regime``, ``n_events_per_regime`` and
+    ``n_censored_per_regime``. The second has one row per tested pair, in test order, with the
+    events/censored of its two regimes beside its raw and Holm-adjusted p (``logrank_p_raw`` and
+    ``logrank_p_holm`` as stored, ``not computed`` where the raw p is None); nothing is recomputed.
+    A system whose H3a block has neither new list (results written before WU-0004d) gets a line
+    saying so, never a silent gap (PRIME.4). The section reads stored numbers only; it changes no
+    verdict.
 
     Parameters
     ----------
@@ -800,19 +803,25 @@ def h3a_regime_lines(results: dict, systems: list[str]) -> list[str]:
     Raises
     ------
     ValueError
-        If the three lists of a system differ in length, or events plus censored differ from the
-        states of a regime (a corrupt result is not printed).
+        If exactly one of the two new lists is present (a corrupt block, not an older file), if
+        the lists differ in length, if events plus censored differ from the states of a regime, or
+        if the pair lists differ in length or name a regime that has no count.
     """
     shown = [s for s in systems if "H3a" in results["systems"][s]]
     if not shown:
         return []
     rows: list[str] = []
+    pair_rows: list[str] = []
     missing: list[str] = []
     for s in shown:
         block = results["systems"][s]["H3a"]
-        if "n_events_per_regime" not in block or "n_censored_per_regime" not in block:
+        has = ("n_events_per_regime" in block, "n_censored_per_regime" in block)
+        if has == (False, False):
             missing.append(s)
             continue
+        if has != (True, True):
+            raise ValueError(f"{s}: H3a block has only one of n_events_per_regime and "
+                             "n_censored_per_regime (a corrupt block, not an older results file)")
         states, events, censored = (block["n_per_regime"], block["n_events_per_regime"],
                                     block["n_censored_per_regime"])
         if not len(states) == len(events) == len(censored) or any(
@@ -821,10 +830,23 @@ def h3a_regime_lines(results: dict, systems: list[str]) -> list[str]:
                              f"n_events_per_regime {events}, n_censored_per_regime {censored}")
         rows += [f"| {s} | {k} | {n} | {e} | {c} |"
                  for k, (n, e, c) in enumerate(zip(states, events, censored))]
+        pairs, raw, holm = block["pairs"], block["logrank_p_raw"], block["logrank_p_holm"]
+        if not len(pairs) == len(raw) == len(holm) or any(
+                not 0 <= k < len(states) for pair in pairs for k in pair):
+            raise ValueError(f"{s}: H3a pairs are inconsistent: pairs {pairs}, "
+                             f"logrank_p_raw {raw}, logrank_p_holm {holm}")
+        for (a, b), p_raw, p_holm in zip(pairs, raw, holm):
+            pair_rows.append(
+                f"| {s} | {a}, {b} | {events[a]}/{censored[a]} | {events[b]}/{censored[b]} | "
+                f"{'not computed' if p_raw is None else _fmt(p_raw, 3)} | {_fmt(p_holm, 3)} |")
     blocks: list[list[str]] = []  # paragraphs, each preceded by a blank line
     if rows:
         blocks.append(["| System | Regime | States | Events | Censored |", "|---|---|---|---|---|",
                        *rows])
+        blocks.append(["Tested pairs, in test order (regime indices as above; events/censored of "
+                       "each regime of the pair):", "",
+                       "| System | Pair (a, b) | Events/censored a | Events/censored b | Raw p | "
+                       "Holm p |", "|---|---|---|---|---|---|", *pair_rows])
     blocks += [[f"{s}: events/censored per regime not recorded (results written before WU-0004d)."]
                for s in missing]
     lines = ["## H3a: events/censored per regime (DEF-0018)"]
