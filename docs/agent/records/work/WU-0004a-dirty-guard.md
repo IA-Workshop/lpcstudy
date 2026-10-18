@@ -72,6 +72,12 @@
   - R3 (low): the Q1 tag-check follow-up is not registered.
 
   Open; all three go back to the developer. The unit still needs owner review before freeze.
+- **Round 2** (re-review of fix round 1, commit `6c740e6`; reviewer claude-opus-5-5, fresh context, 2026-10-18), in `WU-0004a-review.md`. R1, R2 and R3 are **fixed**. The verdict is **approve with fixes**, with 3 new low findings:
+  - R4: configuration can still hide untracked files (`core.excludesFile` from config or `GIT_CONFIG_*`, and `.git/info/exclude`), and two docstrings claim otherwise;
+  - R5: `tools/lm_doubling.py` `git_dirty` still claims to be the `git_state` definition, and no longer is;
+  - R6: the dirty refusal line and the A6 test docstring misstate what they describe.
+
+  These go back to the developer. One fix round remains. The unit still needs owner review before freeze.
 
 ## Audit
 
