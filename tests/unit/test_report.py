@@ -1134,3 +1134,141 @@ def test_clip_column_says_not_computed_and_is_absent_without_a_block(tmp_path: P
     assert header == "| ID | Hypothesis | lorenz63 | Verdict |"
     assert not any("clip" in row.rsplit(" | ", 1)[-1] for row in rows.values())
     assert not any("Clip sensitivity (the `clip` column" in line for line in lines)
+
+
+# ---------------------------------------------------------------- WU-0004d: H3a events/censored
+EXPOSURE_TEXT = (
+    "Exposure (DEF-0018; owner ruling B6b: keep as is, report the counts, state the exposure as a "
+    "limitation): the H3a log-rank test sets no minimum number of states or events per regime "
+    "(DEC-0011 O1; only the full sample needs 50 states), so a regime with few events can give an "
+    "extreme log-rank p-value, for example one event among 99 censored states. Read each p-value "
+    "of the pair table beside the events and censored counts of its two regimes. This is a stated "
+    "limitation of the H3a verdict; the verdict rule is unchanged.")
+"""The sentence typed from the ruling (owner packet B6b), independent of ``report.H3A_EXPOSURE``."""
+
+
+EXPOSURE_NO_COUNTS_TEXT = (
+    "Exposure (DEF-0018; owner ruling B6b: keep as is, report the counts, state the exposure as a "
+    "limitation): the H3a log-rank test sets no minimum number of states or events per regime "
+    "(DEC-0011 O1; only the full sample needs 50 states), so a regime with few events can give an "
+    "extreme log-rank p-value, for example one event among 99 censored states. The events and "
+    "censored counts are not recorded in this results file, so the exposure cannot be read from "
+    "it. This is a stated limitation of the H3a verdict; the verdict rule is unchanged.")
+"""The variant sentence for results without the counts, typed from the review R4 (option b)."""
+
+
+def _h3a_markdown(tmp_path: Path, counts: dict | None) -> list[str]:
+    """RESULTS.md lines of a one-system fake run whose H3a block gets ``counts`` (or nothing)."""
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    system["H3a"].update(n_per_regime=[100, 100], **(counts or {}))
+    system["H3a"].update(pairs=[[1, 0]], logrank_p_raw=[0.002], logrank_p_holm=[0.004])
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    return (tmp_path / "RESULTS.md").read_text().splitlines()
+
+
+def test_h3a_section_prints_one_event_among_100_states_and_the_exposure(tmp_path: Path) -> None:
+    """RESULTS.md shows states, events and censored per regime, and the exposure sentence (A4).
+
+    Reference: hand-typed expectation for a regime of 100 states with ONE event (99 censored) and a
+    regime of 100 states, all events: rows ``| lorenz63 | 0 | 100 | 1 | 99 |`` and
+    ``| lorenz63 | 1 | 100 | 100 | 0 |``. The sentence is typed in this test from the ruling, not
+    read from the code. The verdict table row of H3a is unchanged by the section (the cell text is
+    the old one). Exact string checks.
+    """
+    lines = _h3a_markdown(tmp_path, {"n_events_per_regime": [1, 100],
+                                     "n_censored_per_regime": [99, 0]})
+    head = lines.index("## H3a: events/censored per regime (DEF-0018)")
+    assert lines[head + 2:head + 6] == ["| System | Regime | States | Events | Censored |",
+                                        "|---|---|---|---|---|",
+                                        "| lorenz63 | 0 | 100 | 1 | 99 |",
+                                        "| lorenz63 | 1 | 100 | 100 | 0 |"]
+    # R1 of the review: the pair table puts each p beside the counts of its two regimes (pair
+    # (1, 0): regime 1 has 100 events / 0 censored, regime 0 has 1 event / 99 censored)
+    assert lines[head + 7:head + 12] == [
+        "Tested pairs, in test order (regime indices as above; events/censored of each regime of "
+        "the pair):", "",
+        "| System | Pair (a, b) | Events/censored a | Events/censored b | Raw p | Holm p |",
+        "|---|---|---|---|---|---|"] + ["| lorenz63 | 1, 0 | 100/0 | 1/99 | 0.002 | 0.004 |"]
+    assert lines[head + 13] == EXPOSURE_TEXT
+    row = next(line for line in lines if line.startswith("| H3a | "))
+    assert "K=3: largest Holm p 0.004, IQR 0.4 LT: pass" in row  # the verdict cell is untouched
+    assert "not recorded" not in "\n".join(lines[head:head + 14])
+
+
+def test_h3a_section_says_not_recorded_for_results_without_the_counts(tmp_path: Path) -> None:
+    """Results written before WU-0004d print "not recorded", not a gap, an error or a zero (A4).
+
+    Reference: the backward-compatibility rule (PRIME.4: a missing input is stated). Exact strings.
+    """
+    lines = _h3a_markdown(tmp_path, None)
+    head = lines.index("## H3a: events/censored per regime (DEF-0018)")
+    assert "| lorenz63 |" not in "\n".join(lines[head:head + 6])
+    assert ("lorenz63: events/censored per regime not recorded (results written before WU-0004d)."
+            in lines[head:head + 6])
+    # R4: with no counts anywhere the sentence must not point at a pair table or counts
+    assert lines[head + 4] == EXPOSURE_NO_COUNTS_TEXT
+    assert EXPOSURE_TEXT not in lines and "pair table" not in lines[head + 4]
+    assert not any(line.startswith("Tested pairs") for line in lines)  # no counts: no pair table
+
+
+def test_h3a_section_refuses_inconsistent_counts() -> None:
+    """Events plus censored must equal the states of each regime, and the lists must have one length (A4).
+
+    Reference: the invariant of the definition (a state is an event or censored). Hand cases:
+    1 + 98 != 100, and a list one entry short. Both raise ``ValueError`` naming the system.
+    """
+    base = {"H3a": {"n_per_regime": [100, 100], "n_events_per_regime": [1, 100],
+                    "n_censored_per_regime": [98, 0]}}
+    with pytest.raises(ValueError, match="lorenz63: H3a counts are inconsistent"):
+        report.h3a_regime_lines({"systems": {"lorenz63": base}}, ["lorenz63"])
+    short = {"H3a": {"n_per_regime": [100, 100], "n_events_per_regime": [1],
+                     "n_censored_per_regime": [99]}}
+    with pytest.raises(ValueError, match="inconsistent"):
+        report.h3a_regime_lines({"systems": {"lorenz63": short}}, ["lorenz63"])
+    assert report.h3a_regime_lines({"systems": {}}, []) == []  # no system: no section
+
+
+def test_h3a_pair_table_prints_not_computed_and_stored_p_unchanged() -> None:
+    """A pair whose raw p is None reads "not computed"; stored p-values are printed, not recomputed (R1).
+
+    Reference: hand-typed K = 3 block. Pairs (0, 1) and (1, 2) in test order; the first has raw None
+    (as for an empty regime) and Holm 1.0; the second raw 0.0123456 and Holm 0.0123456, printed
+    to 3 significant digits ("0.0123") by the report's own ``_fmt`` rule (``%.3g``). Counts per
+    regime: events 5, 0, 7 and censored 10, 0, 3. Exact strings.
+    """
+    block = {"H3a": {"n_per_regime": [15, 0, 10], "n_events_per_regime": [5, 0, 7],
+                     "n_censored_per_regime": [10, 0, 3], "pairs": [[0, 1], [1, 2]],
+                     "logrank_p_raw": [None, 0.0123456], "logrank_p_holm": [1.0, 0.0123456]}}
+    lines = report.h3a_regime_lines({"systems": {"lorenz63": block}}, ["lorenz63"])
+    assert "| lorenz63 | 0, 1 | 5/10 | 0/0 | not computed | 1 |" in lines
+    assert "| lorenz63 | 1, 2 | 0/0 | 7/3 | 0.0123 | 0.0123 |" in lines
+    assert lines[-1] == EXPOSURE_TEXT
+
+
+def test_h3a_section_refuses_a_block_with_only_one_of_the_two_lists() -> None:
+    """Exactly one of the two lists present is a corrupt block: ValueError naming the system (R2).
+
+    Reference: no results file written before WU-0004d can hold one list without the other, so
+    "not recorded (written before WU-0004d)" would state a false cause. Hand cases: events only,
+    censored only. A pairs list of a different length than the p lists also raises.
+    """
+    base = {"n_per_regime": [100, 100], "pairs": [[1, 0]], "logrank_p_raw": [0.01],
+            "logrank_p_holm": [0.01]}
+    for key in ("n_events_per_regime", "n_censored_per_regime"):
+        block = {"H3a": {**base, key: [1, 100]}}
+        with pytest.raises(ValueError, match="lorenz63: H3a block has only one of"):
+            report.h3a_regime_lines({"systems": {"lorenz63": block}}, ["lorenz63"])
+    both = {"H3a": {**base, "n_events_per_regime": [1, 100], "n_censored_per_regime": [99, 0],
+                    "logrank_p_holm": []}}
+    with pytest.raises(ValueError, match="pairs are inconsistent"):
+        report.h3a_regime_lines({"systems": {"lorenz63": both}}, ["lorenz63"])
+    # R5: a regime index outside 0..K-1 would print another regime's counts (a negative index
+    # counts from the end in Python) or fail late; hand cases with K = 2 regimes
+    for pairs in ([[0, 2]], [[-1, 0]]):
+        bad = {"H3a": {**base, "n_events_per_regime": [1, 100], "n_censored_per_regime": [99, 0],
+                       "pairs": pairs}}
+        with pytest.raises(ValueError, match="pairs are inconsistent"):
+            report.h3a_regime_lines({"systems": {"lorenz63": bad}}, ["lorenz63"])

@@ -1894,7 +1894,11 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
     -------
     dict
         ``chosen_K``, ``pairs`` (regime indices, in test order), ``logrank_p_raw`` (None where
-        not computed), ``logrank_p_holm``, ``n_per_regime``, ``n_km_not_reached``,
+        not computed), ``logrank_p_holm``, ``n_per_regime``, ``n_events_per_regime`` and
+        ``n_censored_per_regime`` (per regime, in regime-index order, on the same first-draw
+        states and event flags as the test; events plus censored equals ``n_per_regime``; reported
+        beside the p-values because the test sets no minimum per regime and a regime with one event
+        can give an extreme p, DEF-0018, ruling B6b; they enter no decision), ``n_km_not_reached``,
         ``n_empty_regimes`` (regimes with no test state; independent of ``n_km_not_reached``, which
         counts the regimes whose Kaplan-Meier median, from the calibration split, is not reached), ``n_degenerate_pairs`` (pairs not computed because
         the log-rank variance is 0; ``logrank_test`` would return p = 1 for them, DEF-0001 row T2;
@@ -1906,6 +1910,10 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
     n_regimes = len(horizons_km)
     n_states = len(first_regime)
     counts = [int(np.sum(first_regime == k)) for k in range(n_regimes)]
+    # WU-0004d (DEF-0018, owner ruling B6b): the events and the censored states of each regime,
+    # beside the p-values. Read-only: nothing below uses them.
+    events_per_regime = [int(np.count_nonzero(events[first_regime == k])) for k in range(n_regimes)]
+    censored_per_regime = [c - e for c, e in zip(counts, events_per_regime)]
     iqr: list[float | None] = []
     for k in range(n_regimes):
         members = first_regime == k
@@ -1950,6 +1958,7 @@ def h3a_logrank(first_regime: np.ndarray, durations: np.ndarray, events: np.ndar
                                            f">= {H3A_ALPHA}")
     return {"chosen_K": chosen_k, "pairs": [list(pair) for pair in pairs],
             "logrank_p_raw": raw, "logrank_p_holm": adjusted, "n_per_regime": counts,
+            "n_events_per_regime": events_per_regime, "n_censored_per_regime": censored_per_regime,
             "n_km_not_reached": int(np.isnan(horizons_km).sum()),
             "n_empty_regimes": n_empty_regimes, "n_degenerate_pairs": n_degenerate_pairs,
             "iqr_lt": iqr,

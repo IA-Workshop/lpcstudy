@@ -851,6 +851,10 @@ def _build_rules() -> list[Rule]:
     add(_rules("new", f"{h3a}/{{iqr_lt/[],logrank_p_raw/[],n_degenerate_pairs,n_empty_regimes,"
                "n_km_not_reached,n_per_regime/[],pairs/[]/[],reason,threshold,verdict}",
                "WU-0002.8, .9, .11", "D-08, DEC-0008 A3", "log-rank detail, counts, verdict"))
+    # WU-0004d (needs owner review before freeze): the events and the censored states of each regime,
+    # additive integer lists beside ``n_per_regime`` (DEF-0018, owner ruling B6b). Integers: no chain tag.
+    add(_rules("new", f"{h3a}/{{n_censored_per_regime/[],n_events_per_regime/[]}}", "WU-0004d",
+               "DEF-0018, B6b", "events and censored states per regime, reported beside the p-values"))
     # ---- H3b (v1 H3c) -----------------------------------------------------------------------
     h3b = f"{S}/H3b"
     add(_rules("changed", f"{h3b}/{{horizon_tree_importance,weight_tree_importance}}/*", "WU-0002.8",
