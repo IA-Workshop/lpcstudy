@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | in progress |
+| Status | implemented, awaiting independent review (not merged) |
 | Class | CSQ3 development (DEV-0 only, CPU smoke). **Needs owner review before freeze** (LPC.PC.11): it touches counter and report code of `clip_sensitivity.py`, `experiments.py`, `report.py` (counters and statistics reporting) |
 | Agent(s) | claude-sonnet-5-5 (developer), on the request of the main session |
 | Estimate | S (three small additive changes, one radius run, one CPU smoke) |
@@ -99,3 +99,19 @@ Changed: `lpcstudy/clip_sensitivity.py`, `lpcstudy/experiments.py`, `lpcstudy/re
 - Grep of the diff for `clip|nan_to_num|isfinite|where(|try:|except`: the sites are the floor of `h1b_part` (counted: `n_floored`, `n_floored_2L`), the three broad `except Exception` (counted: `n_caught_exceptions`; the one of `_failed` is now also logged), `except _BaselineMismatch` (a refusal with a reason, unchanged), and `np.isfinite` of the existing code. No new clip, replacement or fallback was introduced.
 - Grep for `default_rng|random\.|PRNGKey` in `lpcstudy/` diff: none; no randomness is consumed (the counters are integer sums).
 - No tolerance grew.
+
+**Smoke (V1, V3), checklist.** (1) Change set: committed at dbce486, tree clean, `runs/` ignored by git. (2) Radius: the CPU smoke by hand replaces the integration tier (§4.2). (3) Not run before on this code. (4) `--device cpu`. (5) `LPC_THREADS` 4, 56 s wall. (6) No `lpcstudy --preset` process was running; no lock needed on CPU. (7) Only the summary lines were read. (8) `LPC_PYTHON=.../lpcstudy/.venv/bin/python tools/run_preset.sh smoke DEV-0 runs/wu0004f-smoke --device cpu` (exit 0; `run.meta.json`: wall_seconds 56, exit_code 0, seed_id DEV-0, lpc_threads 4).
+
+**V1, numbers unchanged.** Baseline: the develop smoke `runs/gate-smoke/smoke` in the develop worktree, provenance commit ff26883 (the merge-gate run of 2026-10-18). Between ff26883 and the branch base c89ebe5 the only changes under `lpcstudy/`, `tools/`, `tests/`, `seeds/` are `seeds/development_seeds.json` (status notes of DEV-1 to DEV-4; DEV-0's value is unchanged) and `tests/unit/test_embedding.py`, so the baseline is the base code. `python3 -I tools/compare_runs.py <baseline> runs/wu0004f-smoke/smoke`:
+- tier **T0**; leaves REF 4695, NEW 4702, common 4695, **equal 4695, different 0**, one-sided 7 (all in NEW); untagged float leaves 0 (REF and NEW); 10x rule: 0 leaves in every class.
+- The tool exits 1 ("present on both runs (class structure)") because it fails any one-sided leaf; the seven are exactly the planned set: `handling/skipped_variants` (0), `systems/lorenz63/clip_sensitivity/n_caught_exceptions` (0), `.../clip_sensitivity/by_hypothesis/H1b/parts/PLP/n_floored` (0), `.../n_floored_2L` (0), and the three mirrors `systems/lorenz63/handling/result_counts/clip_sensitivity%2F{n_caught_exceptions, by_hypothesis%2FH1b%2Fparts%2FPLP%2Fn_floored, ...%2Fn_floored_2L}` (0). No leaf removed.
+- `H1b.PLP.n_floored` of the verdict is 0, equal to the new `n_floored` (A2 at run level). The smoke has one system (`lorenz63`).
+- `RESULTS.md`: identical except the provenance table (commit, argv, times, peak RSS) and the new line "Robustness variants not run (`skipped_variants`): 0." in `## Handling`.
+
+**V3, warnings.** The WARNING/ERROR lines of both `run.log` (timestamps and durations stripped, sorted): 8 lines each, identical (`diff` empty). All new counters are 0 at smoke, which writes no line.
+
+**Proposed DEF-0001 status line, for the main session to append to `defects.md` (not appended by me; it is a record owned by the main session).**
+
+> - DEF-0001, status line (2026-10-18, claude-sonnet-5-5, developer, WU-0004f, branch wu/0004f-def0001-residues, <tip>; **not merged, awaiting independent review and the owner's code review**): residues (a) and (c) of the line of 2026-10-18 "fixed in code; open pending confirmation" are closed in code. (a) `clip_sensitivity.h1b_part`: the 1e-12 floor is counted (`n_floored`, `n_floored_2L`, in the H1b part entry, mirrored in `handling.result_counts`; `n_floored` equals `H1b.PLP.n_floored`; docstring proof: `sq_plp_2 >= sq_plp`, so `n_floored_2L <= n_floored`). The three broad `except Exception` clauses (lines 570, 579, 619): 570 and 619 were recorded and logged but not counted; **579 (`_failed`) swallowed its exception with no log and no count**; all three now add to `n_caught_exceptions`, present in every block (0 at smoke), the 579 one is logged. (c) `handling.skipped_variants` (int) is in `results.json` and printed in `## Handling`. Sentinel paths added to the report. Smoke DEV-0 on CPU against the develop smoke (ff26883): tier T0, 4695 common leaves identical, 0 removed, 7 added (all 0), WARNING lines identical. V4 repeated (appended block of `WU-0002.11-counters.md`): no hit outside a row; it is the developer's grep, not the audit. Remaining: (b) DEF-0019 (the owner confirmed it on develop in e52177f, per its commit message: check), (d) `## Audit` of WU-0002.11 and `/audit freeze`, (e) the owner's code review (this unit adds counter and report code: needs owner review before freeze).
+
+**Left for the main session / reviewer.** Independent review (`/independent-review`); the integration test `test_smoke_pipeline.py` was not edited or run (the smoke by hand is the same evidence, §4.2): at the next merge gate it runs on the branch, and an assertion `results["handling"]["skipped_variants"] == 0` and `clip_sensitivity["n_caught_exceptions"] == 0` could be added there. `tools/compare_runs.py` has no flag to accept new one-sided leaves, so a comparison after a counter is added always exits 1 on exactly those leaves (read the list).
