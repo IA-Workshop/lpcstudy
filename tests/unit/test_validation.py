@@ -36,12 +36,16 @@ from lpcstudy.validation import (
 
 CONFIG = dataclasses.replace(SMOKE, bootstrap_resamples=40)
 LEVELS = np.array([0.005, 0.01, 0.02, 0.05])
-NU11 = 2.0 ** ((np.arange(11) - 5) / 2.0)  # distinct, geometric: median / mean = 0.582
+NU11 = 2.0 ** (
+    (np.arange(11) - 5) / 2.0
+)  # distinct, geometric: median / mean = 0.582
 TOL = 1e-12
 SYSTEM = "lorenz63"  # the system label of the V7 bootstrap generators
 
 
-def _exact(levels: np.ndarray, nu: np.ndarray, factor: float = 1.0) -> np.ndarray:
+def _exact(
+    levels: np.ndarray, nu: np.ndarray, factor: float = 1.0
+) -> np.ndarray:
     """``delta_i(rho) = factor * rho * nu_i``, shape (n_states, n_levels)."""
     return factor * levels[None, :] * nu[:, None]
 
@@ -59,18 +63,35 @@ def test_v7_passes_at_unit_efficiency_and_fails_at_085() -> None:
     assert out["pass"] is True and out["slope_pass"] is True
     assert out["n_states"] == 11 and out["n_nonfinite"] == 0
     assert out["median_slope"] == pytest.approx(1.0, abs=TOL)
-    assert out["ci"] == pytest.approx([1.0, 1.0], abs=TOL)  # identical slopes: zero width
-    assert set(out["efficiency_median_by_noise"]) == {"0.005", "0.01", "0.02", "0.05"}
+    assert out["ci"] == pytest.approx(
+        [1.0, 1.0], abs=TOL
+    )  # identical slopes: zero width
+    assert set(out["efficiency_median_by_noise"]) == {
+        "0.005",
+        "0.01",
+        "0.02",
+        "0.05",
+    }
     for key, value in out["efficiency_median_by_noise"].items():
         assert value == pytest.approx(1.0, abs=TOL), key
         assert out["efficiency_pass_by_noise"][key] is True
-        assert out["efficiency_ci_by_noise"][key] == pytest.approx([1.0, 1.0], abs=TOL)
+        assert out["efficiency_ci_by_noise"][key] == pytest.approx(
+            [1.0, 1.0], abs=TOL
+        )
 
     mean_variant = np.median(NU11) / np.mean(NU11)
-    assert mean_variant == pytest.approx(0.5824, abs=1e-4) and not 0.9 <= mean_variant <= 1.1
+    assert (
+        mean_variant == pytest.approx(0.5824, abs=1e-4)
+        and not 0.9 <= mean_variant <= 1.1
+    )
 
-    low = v7_efficiency(LEVELS, _exact(LEVELS, NU11, 0.85), NU11, CONFIG, SYSTEM)
-    assert low["median_slope"] == pytest.approx(1.0, abs=TOL) and low["slope_pass"] is True
+    low = v7_efficiency(
+        LEVELS, _exact(LEVELS, NU11, 0.85), NU11, CONFIG, SYSTEM
+    )
+    assert (
+        low["median_slope"] == pytest.approx(1.0, abs=TOL)
+        and low["slope_pass"] is True
+    )
     for value in low["efficiency_median_by_noise"].values():
         assert value == pytest.approx(0.85, abs=TOL)
     assert not any(low["efficiency_pass_by_noise"].values())
@@ -93,7 +114,9 @@ def test_v7_slope_band_is_part_of_pass() -> None:
         out = v7_efficiency(levels, deltas, NU11, CONFIG, SYSTEM)
         assert out["median_slope"] == pytest.approx(1.0 + b, abs=TOL)
         assert out["slope_pass"] is slope_ok
-        assert out["efficiency_median_by_noise"]["0.011"] == pytest.approx(1.1**b, abs=TOL)
+        assert out["efficiency_median_by_noise"]["0.011"] == pytest.approx(
+            1.1**b, abs=TOL
+        )
         assert all(out["efficiency_pass_by_noise"].values())
         assert out["pass"] is slope_ok
     hand = {0.2: 1.019245, 0.05: 1.004777}
@@ -118,8 +141,12 @@ def test_v7_holds_at_every_noise_level() -> None:
     assert eff["0.05"] == pytest.approx(1.15, abs=TOL)
     for key in ("0.005", "0.01", "0.02"):
         assert eff[key] == pytest.approx(1.0, abs=TOL)
-    assert out["efficiency_pass_by_noise"] == {"0.005": True, "0.01": True, "0.02": True,
-                                               "0.05": False}
+    assert out["efficiency_pass_by_noise"] == {
+        "0.005": True,
+        "0.01": True,
+        "0.02": True,
+        "0.05": False,
+    }
     polyfit = np.polyfit(np.log(LEVELS), np.log(deltas[0]), 1)[0]
     assert out["median_slope"] == pytest.approx(polyfit, abs=TOL)
     assert out["median_slope"] == pytest.approx(1.0581011, abs=1e-7)
@@ -145,10 +172,16 @@ def test_v7_uses_medians_over_states_not_means_or_ratios_of_medians() -> None:
     levels = np.array([0.01, 0.02])
     deltas = eff[:, None] * _exact(levels, nu)
     assert np.mean(eff) == pytest.approx(1.16, abs=TOL)
-    assert np.median(deltas[:, 0] / levels[0]) / np.median(nu) == pytest.approx(0.80, abs=TOL)
+    assert np.median(deltas[:, 0] / levels[0]) / np.median(nu) == pytest.approx(
+        0.80, abs=TOL
+    )
     out = v7_efficiency(levels, deltas, nu, CONFIG, SYSTEM)
-    assert out["efficiency_median_by_noise"]["0.01"] == pytest.approx(1.0, abs=TOL)
-    assert out["efficiency_median_by_noise"]["0.02"] == pytest.approx(1.0, abs=TOL)
+    assert out["efficiency_median_by_noise"]["0.01"] == pytest.approx(
+        1.0, abs=TOL
+    )
+    assert out["efficiency_median_by_noise"]["0.02"] == pytest.approx(
+        1.0, abs=TOL
+    )
     assert out["pass"] is True
 
     exponents = np.array([-0.5, 0.0, 0.05, 0.1, 3.0])
@@ -156,7 +189,9 @@ def test_v7_uses_medians_over_states_not_means_or_ratios_of_medians() -> None:
     out = v7_efficiency(levels, deltas, nu, CONFIG, SYSTEM)
     assert out["median_slope"] == pytest.approx(1.05, abs=TOL)
     assert np.mean(1.0 + exponents) == pytest.approx(1.53, abs=TOL)
-    assert out["efficiency_median_by_noise"]["0.02"] == pytest.approx(2.0**0.05, abs=TOL)
+    assert out["efficiency_median_by_noise"]["0.02"] == pytest.approx(
+        2.0**0.05, abs=TOL
+    )
     assert out["pass"] is True
 
 
@@ -166,10 +201,19 @@ def test_v7_band_is_closed_and_edges_are_sharp() -> None:
     Reference: delta = c rho nu_i with c set to the edge +- 1e-4 (the slope is 1). The
     margin 1e-4 is eight orders above the rounding of the ratio (about 1e-16). Exact decisions.
     """
-    for factor, expected in ((1.0999, True), (0.9001, True), (1.1001, False), (0.8999, False)):
-        out = v7_efficiency(LEVELS, _exact(LEVELS, NU11, factor), NU11, CONFIG, SYSTEM)
+    for factor, expected in (
+        (1.0999, True),
+        (0.9001, True),
+        (1.1001, False),
+        (0.8999, False),
+    ):
+        out = v7_efficiency(
+            LEVELS, _exact(LEVELS, NU11, factor), NU11, CONFIG, SYSTEM
+        )
         assert out["pass"] is expected, factor
-        assert all(v is expected for v in out["efficiency_pass_by_noise"].values()), factor
+        assert all(
+            v is expected for v in out["efficiency_pass_by_noise"].values()
+        ), factor
         assert out["slope_pass"] is True
 
 
@@ -188,9 +232,14 @@ def test_v7_band_edges_are_inside_exactly() -> None:
     nu = np.ones(5)
     for edge in (1.1, 0.9):
         deltas = edge * levels[None, :] * nu[:, None]
-        assert np.all(deltas / (levels[None, :] * nu[:, None]) == edge)  # exact, by construction
+        assert np.all(
+            deltas / (levels[None, :] * nu[:, None]) == edge
+        )  # exact, by construction
         out = v7_efficiency(levels, deltas, nu, CONFIG, SYSTEM)
-        assert list(out["efficiency_median_by_noise"].values()) == [edge, edge], edge
+        assert list(out["efficiency_median_by_noise"].values()) == [
+            edge,
+            edge,
+        ], edge
         assert all(out["efficiency_pass_by_noise"].values()), edge
         assert out["slope_pass"] is True and out["pass"] is True, edge
 
@@ -252,13 +301,18 @@ def test_v7_rejects_malformed_arrays() -> None:
     with pytest.raises(ValueError):
         v7_efficiency(np.array([0.01, 0.01]), good[:, :2], NU11, CONFIG, SYSTEM)
     with pytest.raises(ValueError):
-        v7_efficiency(np.array([-0.01, 0.02]), good[:, :2], NU11, CONFIG, SYSTEM)
+        v7_efficiency(
+            np.array([-0.01, 0.02]), good[:, :2], NU11, CONFIG, SYSTEM
+        )
 
 
 def _stub_cell(est_seed: np.ndarray, nu: np.ndarray) -> SimpleNamespace:
     moments = SimpleNamespace(est_seed=est_seed)
-    return SimpleNamespace(system=SYSTEM, splits={"test": SimpleNamespace(moments=moments)},
-                           oracles={"test": SimpleNamespace(nu=nu)})
+    return SimpleNamespace(
+        system=SYSTEM,
+        splits={"test": SimpleNamespace(moments=moments)},
+        oracles={"test": SimpleNamespace(nu=nu)},
+    )
 
 
 def test_v7_wrapper_sorts_the_levels_and_only_extracts_arrays() -> None:

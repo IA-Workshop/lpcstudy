@@ -48,7 +48,9 @@ SYSTEMS = ("lorenz63", "rossler", "chua")
 
 def load_pilot_tool():
     """``tools/compare_pilot.py`` as a module (its flatten and its unchanged rule table)."""
-    spec = importlib.util.spec_from_file_location("compare_pilot", ROOT / "tools" / "compare_pilot.py")
+    spec = importlib.util.spec_from_file_location(
+        "compare_pilot", ROOT / "tools" / "compare_pilot.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules["compare_pilot"] = module
@@ -62,7 +64,11 @@ def shape_of(path: tuple[str, ...]) -> str:
     where = None
     if segs[0] in ("systems", "robustness") and len(segs) > 1:
         where = 1
-    elif segs[0] == "handling" and len(segs) > 2 and segs[1] in ("by_system", "robustness"):
+    elif (
+        segs[0] == "handling"
+        and len(segs) > 2
+        and segs[1] in ("by_system", "robustness")
+    ):
         where = 2
     if where is not None and segs[where] in SYSTEMS:
         segs[where] = "<sys>"
@@ -75,7 +81,14 @@ def chain_before(cp, path: tuple[str, ...]) -> str:
         chain = cp.TABLE.classify(path).chain
     except cp.ToolError:
         chain = ""
-    if not chain and "H1a" in path and (path[-1] == "inverse_dim_reference" or "median_seed_by_n_lib" in path):
+    if (
+        not chain
+        and "H1a" in path
+        and (
+            path[-1] == "inverse_dim_reference"
+            or "median_seed_by_n_lib" in path
+        )
+    ):
         return "cp"
     return chain
 
@@ -84,21 +97,31 @@ def float_shapes(cp, source: Path) -> dict[str, str]:
     """Shape to chain-before of the float leaves of one results file."""
     out: dict[str, str] = {}
     for path, value in cp.flatten(json.loads(source.read_text())).items():
-        if type(value) is not float or path[0] == "provenance" or "seconds" in path:
+        if (
+            type(value) is not float
+            or path[0] == "provenance"
+            or "seconds" in path
+        ):
             continue
         shape, chain = shape_of(path), chain_before(cp, path)
         if out.setdefault(shape, chain) != chain:
-            raise SystemExit(f"{source}: shape {shape!r} has two chains: {out[shape]!r} and {chain!r}")
+            raise SystemExit(
+                f"{source}: shape {shape!r} has two chains: {out[shape]!r} and {chain!r}"
+            )
     return out
 
 
 def write(dst: Path, shapes: dict[str, str], sources: list[Path]) -> None:
     """Write one fixture file (sorted shapes, a header that names the sources and their SHA-256)."""
-    lines = ["# DEVELOPMENT (DEV-0): paths only, no values. WU-0003.9b. See extract_paths.py for the format.",
-             "# columns: shape TAB chain tag before WU-0003.9b (empty: untagged)"]
+    lines = [
+        "# DEVELOPMENT (DEV-0): paths only, no values. WU-0003.9b. See extract_paths.py for the format.",
+        "# columns: shape TAB chain tag before WU-0003.9b (empty: untagged)",
+    ]
     for source in sources:
-        lines.append(f"# source {'/'.join(source.parts[-6:])}: "
-                     f"sha256 {hashlib.sha256(source.read_bytes()).hexdigest()}")
+        lines.append(
+            f"# source {'/'.join(source.parts[-6:])}: "
+            f"sha256 {hashlib.sha256(source.read_bytes()).hexdigest()}"
+        )
     lines += [f"{shape}\t{chain}" for shape, chain in sorted(shapes.items())]
     dst.write_text("\n".join(lines) + "\n")
 
@@ -118,11 +141,15 @@ def main(argv: list[str] | None = None) -> int:
     for source in (args.p0, args.smoke):
         for shape, chain in float_shapes(cp, source).items():
             if union.setdefault(shape, chain) != chain:
-                raise SystemExit(f"shape {shape!r} has two chains across P0 and the smoke")
+                raise SystemExit(
+                    f"shape {shape!r} has two chains across P0 and the smoke"
+                )
     write(args.out_p1, p1, [args.p1])
     write(args.out_p0_smoke, union, [args.p0, args.smoke])
-    print(f"P1: {len(p1)} shapes ({sum(1 for c in p1.values() if not c)} untagged before); "
-          f"P0 + smoke: {len(union)} shapes ({sum(1 for c in union.values() if not c)} untagged before)")
+    print(
+        f"P1: {len(p1)} shapes ({sum(1 for c in p1.values() if not c)} untagged before); "
+        f"P0 + smoke: {len(union)} shapes ({sum(1 for c in union.values() if not c)} untagged before)"
+    )
     return 0
 
 

@@ -42,8 +42,11 @@ DIAGNOSTIC_OPTIONS = ["--resamples", "100", "--permutations", "50"]
 """Small bootstrap and permutation counts (the tool's own test settings); the seed is the default."""
 
 
-STACK_LINE = re.compile(r"^(  (?:python|packages\.\w+|cpu\.\w+|blas\.\w+|numpy_simd\.\w+|env\.\w+)): "
-                        r"run .*; here .*: (same|different|unusable)$", re.MULTILINE)
+STACK_LINE = re.compile(
+    r"^(  (?:python|packages\.\w+|cpu\.\w+|blas\.\w+|numpy_simd\.\w+|env\.\w+)): "
+    r"run .*; here .*: (same|different|unusable)$",
+    re.MULTILINE,
+)
 """A line of the stack comparison of the diagnostics report (the values depend on the machine)."""
 
 
@@ -57,15 +60,22 @@ def _normalise_json(text: str, tmp: Path) -> str:
     """As ``_normalise_text``, and the run and own values of ``stack.rows`` replaced by ``<value>``."""
     text = text.replace(str(tmp), "<TMP>").replace(str(ROOT), "<ROOT>")
     tree = json.loads(text)
-    assert json.dumps(tree, indent=1) == text, "the JSON of a tool does not round-trip"
+    assert (
+        json.dumps(tree, indent=1) == text
+    ), "the JSON of a tool does not round-trip"
     if isinstance(tree.get("stack"), dict):
         for row in tree["stack"]["rows"]:
             row[1] = row[2] = "<value>"
     return json.dumps(tree, indent=1)
 
 
-def _call(main: Callable[[list[str]], int], argv: list[str], tmp: Path, name: str,
-          out_files: dict[str, str]) -> None:
+def _call(
+    main: Callable[[list[str]], int],
+    argv: list[str],
+    tmp: Path,
+    name: str,
+    out_files: dict[str, str],
+) -> None:
     """Run ``main(argv + --json)`` capturing stdout and stderr; store text and JSON under ``name``."""
     json_path = tmp / f"{name}.json"
     out, err = io.StringIO(), io.StringIO()
@@ -84,48 +94,95 @@ def produce() -> dict[str, str]:
         tmp = Path(raw)
         # ---- tools/rehearsal_report.py
         for fixture in ("p0_pilot", "p1_pilot"):
-            _call(trep.rr.main, [str(trep.FIXTURES / f"{fixture}.json")], tmp,
-                  f"report_{fixture}", files)
-        worlds = {"report_world": {}, "report_world_best_a0": {"best": "A0"},
-                  "report_world_h3c_mismatch": {"scale_h3c": 1.0 + 1e-6},
-                  "report_world_refused_dump": {"dump_seed": "DEV-9"}}
+            _call(
+                trep.rr.main,
+                [str(trep.FIXTURES / f"{fixture}.json")],
+                tmp,
+                f"report_{fixture}",
+                files,
+            )
+        worlds = {
+            "report_world": {},
+            "report_world_best_a0": {"best": "A0"},
+            "report_world_h3c_mismatch": {"scale_h3c": 1.0 + 1e-6},
+            "report_world_refused_dump": {"dump_seed": "DEV-9"},
+        }
         for name, kwargs in worlds.items():
             run = trep.write_run(tmp / name / "run", **kwargs)
             _call(trep.rr.main, [str(run)], tmp, name, files)
         run = tmp / "report_world" / "run" / "results.json"
-        observed = trep.observed_file(tmp / "observed", {"H1b PLP slope": 1.2, "H2c A4-A2": 2.0}, run)
-        _call(trep.rr.main, [str(run.parent), "--observed", str(observed)], tmp,
-              "report_world_observed", files)
+        observed = trep.observed_file(
+            tmp / "observed", {"H1b PLP slope": 1.2, "H2c A4-A2": 2.0}, run
+        )
+        _call(
+            trep.rr.main,
+            [str(run.parent), "--observed", str(observed)],
+            tmp,
+            "report_world_observed",
+            files,
+        )
         # ---- tools/rehearsal_diagnostics.py
         for fixture in ("p0_pilot", "p1_pilot"):
-            _call(tdiag.rd.main, [str(trep.FIXTURES / f"{fixture}.json"), *DIAGNOSTIC_OPTIONS],
-                  tmp, f"diagnostics_{fixture}", files)
+            _call(
+                tdiag.rd.main,
+                [str(trep.FIXTURES / f"{fixture}.json"), *DIAGNOSTIC_OPTIONS],
+                tmp,
+                f"diagnostics_{fixture}",
+                files,
+            )
         data, res, _ = tdiag.build_world(tdiag.rng_for("world"))
         run = tdiag.write_run(tmp / "diag_world", data, res)
-        _call(tdiag.rd.main, [str(run), *DIAGNOSTIC_OPTIONS], tmp, "diagnostics_world", files)
+        _call(
+            tdiag.rd.main,
+            [str(run), *DIAGNOSTIC_OPTIONS],
+            tmp,
+            "diagnostics_world",
+            files,
+        )
         data, res, _ = tdiag.build_world(tdiag.rng_for("world"))
         res["systems"]["lorenz63"]["H3c"]["A5_over_A4_mse"] *= 1.000001
         del data["core/Lambda_bar"]
         run = tdiag.write_run(tmp / "diag_mismatch", data, res)
-        _call(tdiag.rd.main, [str(run), *DIAGNOSTIC_OPTIONS], tmp, "diagnostics_world_mismatch",
-              files)
+        _call(
+            tdiag.rd.main,
+            [str(run), *DIAGNOSTIC_OPTIONS],
+            tmp,
+            "diagnostics_world_mismatch",
+            files,
+        )
         data, res, _ = tdiag.build_world(tdiag.rng_for("world"))
         del data["core/E_C_A"]
         del data["core/w_star_B"]
         run = tdiag.write_run(tmp / "diag_missing", data, res)
-        _call(tdiag.rd.main, [str(run), *DIAGNOSTIC_OPTIONS], tmp, "diagnostics_world_missing",
-              files)
+        _call(
+            tdiag.rd.main,
+            [str(run), *DIAGNOSTIC_OPTIONS],
+            tmp,
+            "diagnostics_world_missing",
+            files,
+        )
         data, res, _ = tdiag.build_world(tdiag.rng_for("world"))
         res["provenance"]["packages"]["scipy"] = "0.0.0"
         cell = res["systems"]["lorenz63"]["H1a"]["by_noise"]["0.01"]
         cell["fitted_inverse_dim"] += 2e-5 * tdiag.h1a_scale(res)
         run = tdiag.write_run(tmp / "diag_stack", data, res)
-        _call(tdiag.rd.main, [str(run), *DIAGNOSTIC_OPTIONS], tmp, "diagnostics_world_other_stack",
-              files)
+        _call(
+            tdiag.rd.main,
+            [str(run), *DIAGNOSTIC_OPTIONS],
+            tmp,
+            "diagnostics_world_other_stack",
+            files,
+        )
         data, res, _ = tdiag.build_world(tdiag.rng_for("world"))
         (tmp / "diag_nodump").mkdir()
         (tmp / "diag_nodump" / "results.json").write_text(json.dumps(res))
-        _call(tdiag.rd.main, [str(tmp / "diag_nodump")], tmp, "diagnostics_world_no_dump", files)
+        _call(
+            tdiag.rd.main,
+            [str(tmp / "diag_nodump")],
+            tmp,
+            "diagnostics_world_no_dump",
+            files,
+        )
     return files
 
 
