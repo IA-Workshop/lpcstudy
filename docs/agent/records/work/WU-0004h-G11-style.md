@@ -41,3 +41,8 @@
 ### Flagged runtime names (not changed)
 
 - `golden_rehearsal.py`: private functions `_normalise_text` and `_normalise_json` carry British spelling in their names; they are used only in this file and were not renamed (the brief forbids changing names).
+
+### Results
+
+- `tools/run_tests.sh unit tests/unit/test_validation.py tests/unit/test_tools_rehearsal_common.py`: `37 passed in 7.10s` (run once, after all edits).
+- Status: done (awaiting review). No smoke run (no file is imported by `lpcstudy/`).
