@@ -74,13 +74,13 @@ Reproduction of the results statistics from the dump, lorenz63
   check H1b PLP slope: dump -0.0182112490505 vs results -0.0182112490505 (|diff| 8.33e-17, allowed 1.42e-09 = 1e-09 x max(|leaf|, scale 1.42)): MATCH
   check H1b PLP states excluded as non-finite: dump 0 vs results 0 (|diff| 0.00e+00, allowed 0.00e+00 = 0 x max(|leaf|, scale 0)): MATCH
   check H1b PLP states where the floor binds: dump 0 vs results 0 (|diff| 0.00e+00, allowed 0.00e+00 = 0 x max(|leaf|, scale 0)): MATCH
-  check H1d analog_seed Spearman: dump 0.636544772621 vs results 0.636544772621 (|diff| 5.55e-16, allowed 6.37e-13 = 1e-12 x max(|leaf|, scale 0.112)): MATCH
+  check H1d analog_seed Spearman: dump 0.636544772621 vs results 0.636544772621 (|diff| 5.55e-16, allowed 6.37e-13): MATCH
   check H1d analog_seed states excluded as non-finite: dump 0 vs results 0 (|diff| 0.00e+00, allowed 0.00e+00 = 0 x max(|leaf|, scale 0)): MATCH
-  check H1d estimation_seed Spearman: dump 0.61223628692 vs results 0.61223628692 (|diff| 3.33e-16, allowed 6.12e-13 = 1e-12 x max(|leaf|, scale 0.112)): MATCH
+  check H1d estimation_seed Spearman: dump 0.61223628692 vs results 0.61223628692 (|diff| 3.33e-16, allowed 6.12e-13): MATCH
   check H1d estimation_seed states excluded as non-finite: dump 0 vs results 0 (|diff| 0.00e+00, allowed 0.00e+00 = 0 x max(|leaf|, scale 0)): MATCH
-  check H1d growth Spearman: dump 0.815002344116 vs results 0.815002344116 (|diff| 6.66e-16, allowed 8.15e-13 = 1e-12 x max(|leaf|, scale 0.112)): MATCH
+  check H1d growth Spearman: dump 0.815002344116 vs results 0.815002344116 (|diff| 6.66e-16, allowed 8.15e-13): MATCH
   check H1d growth states excluded as non-finite: dump 0 vs results 0 (|diff| 0.00e+00, allowed 0.00e+00 = 0 x max(|leaf|, scale 0)): MATCH
-  check H1d nhat Spearman: dump 0.858087201125 vs results 0.858087201125 (|diff| 1.11e-16, allowed 8.58e-13 = 1e-12 x max(|leaf|, scale 0.112)): MATCH
+  check H1d nhat Spearman: dump 0.858087201125 vs results 0.858087201125 (|diff| 1.11e-16, allowed 8.58e-13): MATCH
   check H1d nhat states excluded as non-finite: dump 0 vs results 0 (|diff| 0.00e+00, allowed 0.00e+00 = 0 x max(|leaf|, scale 0)): MATCH
   check H1a states kept: dump 50 vs results 50 (|diff| 0.00e+00, allowed 0.00e+00 = 0 x max(|leaf|, scale 0)): MATCH
   check H1a states excluded as non-finite: dump 0 vs results 0 (|diff| 0.00e+00, allowed 0.00e+00 = 0 x max(|leaf|, scale 0)): MATCH
