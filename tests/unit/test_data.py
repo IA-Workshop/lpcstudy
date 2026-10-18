@@ -434,7 +434,7 @@ LYAPUNOV_CASES = [
 
 
 @pytest.mark.parametrize(("spec", "references", "bound"), LYAPUNOV_CASES)
-def test_lyapunov_record_matches_published_reference(
+def test_lyapunov_cached_matches_published_reference(
     spec: SystemSpec,
     references: list[tuple[float, float]],
     bound: float,
@@ -442,6 +442,10 @@ def test_lyapunov_record_matches_published_reference(
 ) -> None:
     """``lyapunov_record`` agrees with the published lambda_max on a bounded
     orbit (WU-0007.2).
+
+    The test id keeps the old word "cached" on purpose: ``report.py`` prints
+    the id ``...::test_lyapunov_cached_matches_published_reference[chua_memo]``
+    in RESULTS.md as the evidence for the Chua memo check.
 
     The Lyapunov exponent measures how fast tiny errors grow. It sets the
     study's time unit, so a wrong value would silently rescale everything.
