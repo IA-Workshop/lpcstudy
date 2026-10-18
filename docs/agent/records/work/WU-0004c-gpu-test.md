@@ -106,6 +106,7 @@
     6. Contention: no `lpcstudy --preset` active (`ps` checked just before); a CPU unit run needs no lock.
     7. Output: `-q --tb=short -rfE` from the wrapper; summary line and failures only.
     8. Command: `LPC_PYTHON=/home/brianm/projects/physics/chaos/lpcstudy/.venv/bin/python tools/run_tests.sh unit tests/unit/test_gpu_reproducibility_probe.py tests/unit/test_conftest_markers.py`.
+- **2026-10-18, result of the rename run (claude-sonnet-5-5; appended).** `LPC_PYTHON=<main .venv python> tools/run_tests.sh unit tests/unit/test_gpu_reproducibility_probe.py tests/unit/test_conftest_markers.py`, run once at e054763: summary line `27 passed in 1.56s` (22 of the renamed file, 5 of `test_conftest_markers.py`, including `test_directory_sets_exactly_one_tier_marker`). The collision is gone. No tolerance or other test touched. Not merged.
 
 ## Review
 
