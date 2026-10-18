@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | in progress |
+| Status | done pending review |
 | Class | CSQ3 development |
 | Agent(s) | claude-sonnet-5-5 (no ledger entry of its own; owner's order of 2026-10-18) |
 | Estimate | one session |
@@ -83,6 +83,14 @@ Cause: commit e4da1f9 (DEF-0005 edits) changed the section-2 rows of `docs/study
 ### Behavior neutrality of the sources
 
 AST check against the base (docstrings and every bare string statement ignored, since attribute docstrings are string statements): seeds.py, config.py and provenance.py equal; identifiers.py differs only in the eight criterion strings; data.py differs only by the removal of `clean_delays` and `lyapunov_cached`; embedding.py only by `n_bins` -> `MI_BINS`; __main__.py only by `_refuse` and the literal parser description; __init__.py only by its new docstring. The standard `ast_compare.py` reports DIFFERENT for provenance.py and identifiers.py only because their bare attribute-docstring statements (`ISA_FLAGS`, `GAIN_BOUND_PENDING`) were rewritten.
+
+### Verification (2026-10-18)
+
+- Black: `uvx black==26.10.1 --check` on the 17 files: "17 files would be left unchanged" (idempotent). No line over 80 columns in the 17 files (`awk 'length>80'`: 0).
+- Unit tests, once, after all edits: `LPC_PYTHON=.../.venv/bin/python tools/run_tests.sh unit tests/unit/test_{data,seeds,config,provenance,identifiers,embedding,rng_hygiene,__main__}.py` -> `264 passed in 19.29s` (includes `test_criterion_text_is_the_v3_section_2_row`, which failed on the base).
+- Integration, once: `tools/run_tests.sh integration tests/integration/test_cli_seeds.py` -> `8 passed in 7.06s`.
+- Bitwise neutrality: `python -m lpcstudy --preset smoke --seed-id DEV-0 --systems lorenz63 rossler chua --out /tmp/claude-1000/style-g1-smoke` (4 threads, CPU; exit 0, 71 s), then `python tools/compare_runs.py runs/refactor-base3/smoke /tmp/claude-1000/style-g1-smoke/smoke`: tier T0, leaves REF 13914, NEW 13914, equal 13914, different 0, one-sided 0, RESULT: PASS (exit 0). RESULTS.md differs from the baseline only in the provenance table (commit, argv, times, memory) and in the criterion text of the eight rows listed above (expected).
+- Dependents of config and data (pipeline, ensemble, oracle, ...) were not re-tested by their own unit files (owner's brief); their inputs and code are unchanged and the smoke comparison above is bitwise.
 
 ## Review
 
