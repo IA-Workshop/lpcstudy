@@ -1,14 +1,13 @@
-"""End-to-end check that ``python -m lpcstudy`` refuses unsafe seed requests.
+"""Seed refusals of ``python -m lpcstudy`` run as a subprocess (WU-0001.3,
+LPC.PC.7).
 
-The study may use only registered development seeds, and the sealed seed must
-never be drawn or read except by the owner (LPC.PC.7). The command line enforces
-this by refusing bad requests with exit code 64 and a one-line message
-(WU-0001.3). This module tests those refusals with the real entry point ``main``
-in a fresh Python process. Each case uses a throwaway ledger (the hash-chained
-log of governance events) in ``tmp_path`` and made-up seeds. The real ledger and
-any real seed never appear. The ``LPC_CONF_*`` variables are removed from the
-child's environment unless a case sets made-up values, and the study is never
-run: each case is refused before any output.
+The unit tests in ``tests/unit/test___main__.py`` call ``main`` in the test
+process. These cases run the real entry point ``main`` in a fresh interpreter,
+with a throwaway ledger in ``tmp_path`` and synthetic seeds, to check what a
+user would see: the exit code and the stderr text. The real ledger and any real
+seed never appear, ``LPC_CONF_*`` are removed from the child environment unless
+a case sets synthetic values, and the study is never run (each case is refused
+before any output).
 """
 
 from __future__ import annotations
@@ -23,18 +22,19 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-# one jax import (~3 s) per case on a shared CPU; far below this bound
+# One jax import (about 3 s) per case on a shared CPU; far below this bound.
 TIMEOUT_SECONDS = 120
 PREFIX = "lpcstudy: refused (LPC.PC.7):"
-SEED = 123456789012345  # synthetic; never a real sealed seed
+# A synthetic seed: never a real one.
+SEED = 123456789012345
 SALT = "0f" * 16
-# only ever with a tmp_path ledger and synthetic values
+# Only ever used with a tmp_path ledger and synthetic values.
 CONFIRMATORY = "--confirmatory"
 # The driver pins the repository state to a clean tree at a known commit
-# (WU-0004a). The sealed-run flag is refused on a dirty tree before the
-# commitment is looked at, and these cases test the commitment and variable
-# refusals, which must not depend on whether the checkout is clean. The tree
-# guard itself is tested in tests/unit/test___main__.py.
+# (WU-0004a): the sealed flag is refused on a dirty tree before the commitment
+# is looked at, and these cases test the commitment and variable refusals,
+# which must not depend on whether the checkout is clean. The tree guard itself
+# is tested in tests/unit/test___main__.py.
 DRIVER = (
     "import sys; from pathlib import Path; from lpcstudy import provenance; "
     "from lpcstudy.__main__ import main; "
@@ -44,11 +44,8 @@ DRIVER = (
 
 
 def write_ledger(path: Path, entries: list[dict]) -> Path:
-    """Write a hash-chained ledger file and return its path.
-
-    Each entry stores the hash of the one before it, so changing any entry
-    breaks the chain. The chain is computed here with ``hashlib``, not with
-    project code.
+    """Write a hash-chained ledger (the chain is computed here with
+    ``hashlib``).
     """
     lines, previous = [], "0" * 64
     for number, entry in enumerate(entries, start=1):
@@ -71,11 +68,7 @@ def write_ledger(path: Path, entries: list[dict]) -> Path:
 
 
 def commitment(seed: int) -> dict:
-    """Return a ``CONF-1`` commitment entry for ``seed`` and the made-up salt.
-
-    A commitment stores only a hash of the seed and a salt (random text mixed
-    in), so the seed can be checked later without being revealed.
-    """
+    """Make a ``CONF-1`` commitment entry for ``seed`` and the salt."""
     digest = hashlib.sha256(f"{seed}:{SALT}".encode()).hexdigest()
     return {
         "type": "commitment",
@@ -113,17 +106,18 @@ CASES = {
 
 @pytest.mark.parametrize("case", sorted(CASES))
 def test_refusal_exits_64_with_one_line_and_writes_nothing(
-    case: str, tmp_path: Path
+    case: str,
+    tmp_path: Path,
 ) -> None:
     """Each refusal exits 64, gives one stderr line and creates no output
     (WU-0001.3).
 
-    Reference: the refusal rule of the plan. The assertions are exact: exit code
-    64; the stderr text is exactly one line and starts with ``lpcstudy: refused
-    (LPC.PC.7):``; the output folder does not exist and no ``results.json``
-    exists under ``tmp_path``. The cases are the four kinds of refusal (unknown
-    id; no or mismatched commitment; missing variables; raw integer seed). No
-    made-up seed or salt appears on stderr. There is no numerical tolerance.
+    Reference: the refusal contract of the plan. The assertions are exact:
+    return code 64; the stderr text is exactly one line and starts with
+    ``lpcstudy: refused (LPC.PC.7):``; the out directory does not exist and no
+    ``results.json`` exists under ``tmp_path``. The cases are the four refusals
+    (unknown id; no or mismatched commitment; missing variables; raw integer
+    seed). No synthetic seed or salt appears on stderr. Tolerance: none.
     """
     args, entries, extra_env = CASES[case]
     ledger = write_ledger(tmp_path / "ledger.jsonl", entries)
