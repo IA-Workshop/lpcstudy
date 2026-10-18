@@ -91,6 +91,11 @@
     6. Contention: to be checked at the launch by a bounded `ps` wait (a check every 10 s, at most 5 minutes) that starts the run only when no `lpcstudy --preset` and no pytest process is active, and writes `active=<n> at <UTC>` to its output; the result is appended to this Log with the run. Lock free is checked by the wrapper (`flock -w 30`, exit 75 would be reported).
     7. Output: `-q --tb=short -rfE` from the wrapper; summary line and measured line go in this Log.
     8. Command: `LPC_PYTHON=/home/brianm/projects/physics/chaos/lpcstudy/.venv/bin/python tools/run_tests.sh gpu --background tests/gpu/test_reproducibility.py`.
+- **2026-10-18, result of the rerun after fix round 2 (claude-sonnet-5-5; appended).** Started 2026-10-18T12:06:57Z at tip ab242a3 (test code ec2a306; git `dirty` false; the bounded `ps` wait logged `active=0 at 2026-10-18T12:06:57Z`), through `LPC_PYTHON=<main .venv python> tools/run_tests.sh gpu --background tests/gpu/test_reproducibility.py`; lock taken, exit 0, log `runs/tests/gpu-20261018T120657Z.log` (not committed). A rerun after a code change (R8), not a retry; `CUDA_VISIBLE_DEVICES` unset. The tolerance stayed 0.0.
+  - Summary line: `1 passed in 473.63s (0:07:53)`.
+  - Measured line: `GPU reproducibility, smoke DEV-0, run 1 236 s, run 2 236 s (GPU gpu 1 NVIDIA GeForce RTX 4090): 4695 leaves compared (3166 floats), 0 different, 0 one-sided; max abs difference 0.0; max rel difference 0.0; declared tolerance bitwise (abs 0.0, rel 0.0); compare_runs tier T0, exit 0, 0 differing and 0 one-sided leaves`.
+  - GPU hours of this run: the two GPU smoke runs, 472 s (0.131 h). Total for the unit over its three runs: 413 s + 442 s + 472 s = 1,327 s = **0.369 h**, for the main session to add to the LPC.AUTH.3 tally by hand (`tools/gpu_hours.py` cannot see gpu-tier test runs).
+  - Needs: a read of fix round 2 if the owner wants one (R8 and R9 were the last allowed round); the ROADMAP row edit is the owner's. The probe's real-GPU success path and the 22 unit hand cases are both evidenced above.
 
 ## Review
 

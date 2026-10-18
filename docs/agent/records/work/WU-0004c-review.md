@@ -253,3 +253,4 @@ Unchanged from round 1: **needs owner review before freeze.**
 
 - **R8:** fixed in the "WU-0004c fix round 2 (R8)" commit: (a) CUDA plugins are detected by pattern (module `jax_plugins.xla_cuda*` or distribution `jax[-_.]cuda<digits>[-_.](plugin|pjrt)`); (b) a no-device report with `CUDA_VISIBLE_DEVICES` set in the parent now fails (skip only when unset), the reason printed with capture disabled in both cases; reasons, offline checks and the unit hand cases (`tests/unit/test_gpu_probe.py`, 22 passed) are in the unit Log.
 - **R9:** the Log names the main session (claude-sonnet-5-5) as the agent of de1fcc5 and 16f1ece, and records the 1cc1c38 in-place edit as a process slip (my commit), repaired by the main session; no record line was replaced in this round.
+- **Rerun after fix round 2 (appended):** `1 passed in 473.63s (0:07:53)`, 4695 leaves, 0 different, max abs and rel 0.0, tier T0 (unit Log).
