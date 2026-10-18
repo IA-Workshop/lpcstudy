@@ -29,7 +29,12 @@ from scipy.stats import rankdata
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.tree import DecisionTreeRegressor
 
-from .allocation import deployable_profile
+from .allocation import (
+    NOISE_SENS_FLOOR,
+    deployable_profile,
+    regime_regret,
+    state_horizon_target,
+)
 from .config import StudyConfig
 from .data import make_rng, sklearn_seed
 from .dump import StateDump
@@ -234,12 +239,6 @@ def _fit_seed_law(sizes: np.ndarray, mean_sq: np.ndarray) -> tuple[float, float]
     return float(params[1]), float(np.exp(params[2]))
 
 
-def _at_bound(two_over_d: float) -> bool:
-    """True if a fitted ``2/d`` lies within ``H1A_BOUND_TOL`` of a bound of the fit."""
-    return bool(np.isfinite(two_over_d)
-                and min(abs(two_over_d - bound) for bound in H1A_EXPONENT_BOUNDS) <= H1A_BOUND_TOL)
-
-
 def _median_fit_stats(seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.ndarray,
                       rows: np.ndarray) -> np.ndarray:
     """``[ratio, fitted 1/d, floor f^2, at bound, n warnings]`` of the median fit on ``rows``.
@@ -275,35 +274,11 @@ def _median_fit_stats(seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.nd
     fitted = two_over_d / 2.0
     reference = float(inverse_dim[rows].mean())
     ratio = fitted / reference if np.isfinite(fitted) and reference > 0 else float("nan")
-    return np.array([ratio, fitted, floor_sq, float(_at_bound(two_over_d)), float(n_warnings)])
-
-
-def h1a_ratio(seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.ndarray,
-              rows: np.ndarray) -> float:
-    """H1a ratio ``(1/d_fit) / (1/d_LB)`` on the states ``rows`` (DEC-0008 A4(h)).
-
-    ``1/d_fit`` is half the exponent of the floor-power-law fit to the column medians of
-    ``seed_sq[rows]``; ``1/d_LB`` is the mean of ``inverse_dim[rows]``. Numerator and denominator
-    use the same ``rows``, so one resampled index set feeds both in the joint bootstrap.
-
-    Parameters
-    ----------
-    seed_sq : np.ndarray
-        Squared analog seed error per state and library size, ``(n_states, n_sizes)``.
-    inverse_dim : np.ndarray
-        Per-state reference ``S / (k - 1)`` (:func:`lpcstudy.oracle.inverse_dimension`),
-        ``(n_states,)``.
-    sizes : np.ndarray
-        Library sizes, ``(n_sizes,)``.
-    rows : np.ndarray
-        State indices (repeats allowed).
-
-    Returns
-    -------
-    float
-        The ratio, or NaN if it cannot be computed (see ``_median_fit_stats``).
-    """
-    return float(_median_fit_stats(seed_sq, inverse_dim, sizes, rows)[0])
+    at_bound = np.isfinite(two_over_d) and (
+        min(abs(two_over_d - bound) for bound in H1A_EXPONENT_BOUNDS)
+        <= H1A_BOUND_TOL
+    )
+    return np.array([ratio, fitted, floor_sq, float(at_bound), float(n_warnings)])
 
 
 def h1a_library_scaling(library_cells: dict[tuple[float, int], Cell],
@@ -605,10 +580,11 @@ def h1c_horizon_law(cell: Cell, config: StudyConfig, capture: dict | None = None
     if capture is not None:
         capture["thresholds"] = thetas
     for name, mse in (("PLP", m.sq_plp), ("CP", m.sq_cp)):
-        horizons = np.column_stack([characteristic_horizon(mse, m.horizons, cell.noise, t)[0]
-                                    for t in thetas])
-        events = np.column_stack([characteristic_horizon(mse, m.horizons, cell.noise, t)[1]
-                                  for t in thetas])
+        passages = [
+            characteristic_horizon(mse, m.horizons, cell.noise, t) for t in thetas
+        ]
+        horizons = np.column_stack([horizon for horizon, _ in passages])
+        events = np.column_stack([event for _, event in passages])
         ratios, eligible = [], np.zeros(len(horizons), dtype=bool)
         for i in range(len(horizons)):
             ok = events[i] & (horizons[i] > 1)
@@ -746,8 +722,6 @@ def h1d_proxies(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
 
 def _oracle_profile(cell: Cell, split: str, config: StudyConfig) -> np.ndarray:
     """Oracle four-coordinate profile of a split (state level)."""
-    from .allocation import NOISE_SENS_FLOOR
-
     m, o = cell.splits[split].moments, cell.oracles[split]
     return np.column_stack([np.log(m.analog_seed / cell.noise), np.log(m.est_seed / cell.noise),
                             o.growth * config.steps_per_lyapunov,
@@ -780,6 +754,12 @@ def qn_regressor(seed: int) -> HistGradientBoostingRegressor:
         max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=20,
         l2_regularization=1.0, early_stopping=False,
         random_state=sklearn_seed(seed, "qn-regressor"))
+
+
+def _masked_logit(weight: np.ndarray, rows: np.ndarray) -> np.ndarray:
+    """Logit of ``weight`` on ``rows``; 0.5 (logit 0) elsewhere, never read."""
+    inner = np.where(rows, weight, 0.5)
+    return np.log(inner / (1.0 - inner))
 
 
 def _r2(y: np.ndarray, pred: np.ndarray, idx: np.ndarray) -> float:
@@ -927,17 +907,13 @@ def qn_profile_block(x_train: np.ndarray, x_test: np.ndarray, w_train: np.ndarra
         if not np.all(np.isfinite(weight)) or weight.min() < 0.0 or weight.max() > 1.0:
             raise ValueError("w* must be finite and inside [0, 1]")
 
-    def logit_of(weight: np.ndarray, rows: np.ndarray) -> np.ndarray:
-        inner = np.where(rows, weight, 0.5)  # placeholder outside the interior, never read
-        return np.log(inner / (1.0 - inner))
-
     interior_train = (w_train > 0.0) & (w_train < 1.0)
     interior_test = (w_test > 0.0) & (w_test < 1.0)
     everywhere_train = np.ones(len(w_train), bool)
     everywhere_test = np.ones(len(w_test), bool)
     targets = {
-        "logit_w_interior": (interior_train, logit_of(w_train, interior_train),
-                             interior_test, logit_of(w_test, interior_test)),
+        "logit_w_interior": (interior_train, _masked_logit(w_train, interior_train),
+                             interior_test, _masked_logit(w_test, interior_test)),
         "w_zero_indicator": (everywhere_train, (w_train == 0.0).astype(float),
                              everywhere_test, (w_test == 0.0).astype(float)),
         "log_horizon": (everywhere_train, log_t_train, everywhere_test, log_t_test),
@@ -1017,8 +993,6 @@ def qn_noise_redundancy(cell: Cell, rules: FittedRules, config: StudyConfig,
         ``role`` ("estimate"), ``primary`` ("oracle"), ``n_w_zero``, ``n_w_one``, ``n_test``,
         and the blocks ``oracle`` and ``deployable`` of ``qn_profile_block``.
     """
-    from .allocation import state_horizon_target
-
     col = config.reference_horizon - 1
     lt = config.steps_per_lyapunov
 
@@ -1265,7 +1239,7 @@ def h2a_part_ii(w_ref: np.ndarray, growth_scaled: np.ndarray, seeds: np.ndarray,
     interior = ~is_zero & ~is_one
     n_zero, n_one, n_interior = int(is_zero.sum()), int(is_one.sum()), int(interior.sum())
     add_one = 20 * n_one > n_states  # strictly more than 5% of the states, in integers
-    logit = np.log(np.where(interior, weight, 0.5) / (1.0 - np.where(interior, weight, 0.5)))
+    logit = _masked_logit(weight, interior)
     indicators = {"zero": is_zero.astype(float), "one": is_one.astype(float)}
     names = ["zero", "interior"] + (["one"] if add_one else [])
     domain_size = {"zero": n_states, "interior": n_interior, "one": n_states}
@@ -1381,11 +1355,6 @@ def _per_state_spearman_counted(levels: np.ndarray, values: np.ndarray
     denom = np.sqrt(np.sum(ranks_c**2, axis=1) * np.sum(lev_c**2))
     return (np.where(denom > 0, ranks_c @ lev_c / np.maximum(denom, 1e-300), 0.0),
             int((~(denom > 0)).sum()))
-
-
-def _per_state_spearman(levels: np.ndarray, values: np.ndarray) -> np.ndarray:
-    """Spearman correlation of each row of ``values`` with ``levels`` (see the counted form)."""
-    return _per_state_spearman_counted(levels, values)[0]
 
 
 def _decision(verdict: str, reason: str | None) -> dict:
@@ -2175,8 +2144,6 @@ def h3_regimes(cell: Cell, rules: FittedRules, scores: dict[str, RuleScores],
         (:func:`h3c_ratio`), and the reported ``regime_curve`` (regret ratio and realized regime
         count by requested ``K``).
     """
-    from .allocation import regime_regret, state_horizon_target
-
     test = cell.splits["test"]
     m, ev = test.moments, test.evals
     col = config.reference_horizon - 1

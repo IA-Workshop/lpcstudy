@@ -13,13 +13,66 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 from scipy import stats as sps
+from scipy.optimize import OptimizeWarning
+from scipy.stats import norm, rankdata, spearmanr
+from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.metrics import r2_score
 from sklearn.tree import DecisionTreeRegressor
 
+from lpcstudy.allocation import RegimeMap, state_horizon_target
+from lpcstudy.analysis import (
+    PRIMARY_LEVEL,
+    PROFILE_NAMES,
+    _boot,
+    _fit_seed_law,
+    _h3b_trees,
+    _median_fit_stats,
+    _per_state_spearman_counted,
+    _state_rows,
+    delta_r2,
+    gain_horizon_bound,
+    h1a_library_scaling,
+    h1b_seed_amplifier,
+    h1c_horizon_law,
+    h1c_ratio_block,
+    h1d_correlations,
+    h1d_proxies,
+    h2a_initial_segments,
+    h2a_part_ii,
+    h2b_knob_response,
+    h2c_state_dependence,
+    h2d_empirical_comparison,
+    h2e_noise_matching,
+    h3a_logrank,
+    h3b_importances,
+    h3c_ratio,
+    qn_profile_block,
+    qn_reading,
+    qn_regressor,
+    quadratic_controls,
+)
 from lpcstudy.config import SMOKE, StudyConfig
-from lpcstudy.data import make_rng
+from lpcstudy.data import make_rng, sklearn_seed
+from lpcstudy.dump import StateDump
 from lpcstudy.ensemble import EnsembleMoments, EvaluationDraws
-from lpcstudy.pipeline import Cell, RuleScores, SplitData
-from lpcstudy.statistics import block_bootstrap, block_bootstrap_counted, holm_adjust
+from lpcstudy.identifiers import HYPOTHESIS_TABLE
+from lpcstudy.oracle import inverse_dimension
+from lpcstudy.pipeline import Cell, FittedRules, RuleScores, SplitData
+from lpcstudy.seeds import REGISTRY_PATH
+from lpcstudy.statistics import (
+    block_bootstrap,
+    block_bootstrap_counted,
+    block_bootstrap_dropped,
+    block_resample_indices,
+    bootstrap_values,
+    endpoint_mc_error,
+    holm_adjust,
+    ols_slope,
+    partial_correlation,
+    percentile_interval,
+    spearman,
+)
+from unit_helpers import realizable_triples
 
 LEVEL = 1.0 - 0.05 / 3.0  # the primary level of v3 section 7, written out again here
 CONFIG = dataclasses.replace(SMOKE, bootstrap_resamples=200)  # 200 resamples, block 5
@@ -85,10 +138,9 @@ def test_per_state_spearman_handles_ties() -> None:
     small integers and half-integers (round-off below 1e-15), so the defaults are
     far above round-off.
     """
-    from lpcstudy.analysis import _per_state_spearman
 
     values = np.array([[0.0, 0.0, 0.0, 0.0], [0.1, 0.2, 0.3, 0.4], [0.4, 0.3, 0.2, 0.1]])
-    rho = _per_state_spearman(np.array([1.0, 2.0, 3.0, 4.0]), values)
+    rho, _ = _per_state_spearman_counted(np.array([1.0, 2.0, 3.0, 4.0]), values)
     assert np.allclose(rho, [0.0, 1.0, -1.0])
 
 
@@ -105,10 +157,9 @@ def test_per_state_spearman_partial_ties_and_non_monotone() -> None:
     Tolerance ``atol=1e-12``, ``rtol=0``: a handful of float64 operations on numbers
     of order 1 (error below 1e-15), so 1e-12 leaves three orders of magnitude.
     """
-    from lpcstudy.analysis import _per_state_spearman
 
     values = np.array([[0.0, 0.0, 0.1, 0.2], [1.0, 3.0, 2.0, 4.0]])
-    rho = _per_state_spearman(np.array([1.0, 2.0, 3.0, 4.0]), values)
+    rho, _ = _per_state_spearman_counted(np.array([1.0, 2.0, 3.0, 4.0]), values)
     assert np.allclose(rho, [3.0 / np.sqrt(10.0), 0.8], rtol=0.0, atol=1e-12)
 
 
@@ -125,11 +176,7 @@ def test_h2d_is_the_in_distribution_part_only() -> None:
     order 1 (relative round-off a few 1e-16, times about 6 operations), 1e-12 is a margin of
     three orders. The booleans, the verdict and the key set are exact.
     """
-    import pytest
 
-    from lpcstudy.analysis import h2d_empirical_comparison
-    from lpcstudy.config import SMOKE
-    from lpcstudy.pipeline import RuleScores
 
     base = np.random.default_rng(7).uniform(1.0, 2.0, 60)
 
@@ -178,9 +225,7 @@ def test_quadratic_controls_columns_and_contract() -> None:
     Reference: the five columns written out by hand from the centred input. Tolerance: exact
     (``==``): the same float operations. Bad shapes and non-finite input raise (PRIME.4).
     """
-    import pytest
 
-    from lpcstudy.analysis import quadratic_controls
 
     x = np.random.default_rng(3).normal(size=(40, 2)) + 5.0
     assert np.array_equal(quadratic_controls(x), _hand_controls(x))
@@ -199,7 +244,6 @@ def test_partial_correlation_with_quadratic_controls_constructed_case() -> None:
     Tolerance 1e-12: cond([1, Q]) is about 10 after centring, so round-off is about
     cond * eps = 1e-14, two orders below.
     """
-    from lpcstudy.statistics import partial_correlation
 
     rng = np.random.default_rng(11)
     x = rng.multivariate_normal([0.0, 0.0], [[1.0, 0.5], [0.5, 1.0]], size=200)
@@ -221,8 +265,6 @@ def test_partial_correlation_with_quadratic_controls_matches_qr_reference() -> N
     The same agreement holds for the centring chosen on a resample: T4(c) re-centred controls
     give the same value, because span[1, Q] does not change under translation.
     """
-    from lpcstudy.analysis import quadratic_controls
-    from lpcstudy.statistics import partial_correlation
 
     rng = np.random.default_rng(12)
     x = rng.normal(size=(200, 2)) @ np.array([[1.0, 0.4], [0.0, 0.9]]) + 3.0
@@ -245,7 +287,6 @@ def _synthetic(model: str, n: int, rng: np.random.Generator, tail: float = 0.02)
     Var h = .48 + bZ^2 + 1 + 2 a^2 (population); else w* = 1 iff g > Phi^-1(1 - tail); else
     sigmoid(L). S0: bI = bZ = a = 0; S1: bI = .447; S2: bZ = .5; S0n: a = .6.
     """
-    from scipy.stats import norm
 
     b_i, b_z, a = {"S0": (0.0, 0.0, 0.0), "S1": (0.447, 0.0, 0.0), "S2": (0.0, 0.5, 0.0),
                    "S0n": (0.0, 0.0, 0.6)}[model]
@@ -263,7 +304,6 @@ def _synthetic(model: str, n: int, rng: np.random.Generator, tail: float = 0.02)
 
 
 def _run_part_ii(data: dict, seed: int = 2) -> dict:
-    from lpcstudy.analysis import h2a_part_ii
 
     return h2a_part_ii(data["w"], data["lam"], data["x"], n_resamples=2000, block=5,
                        seed=seed, level=PRIMARY)
@@ -303,7 +343,6 @@ def test_recovery_with_three_parts_under_the_null() -> None:
     Reference: exact value 0 for each part (the indicator 1{w* = 1} depends on g only, which is
     independent of Lambda_tilde given the seeds). Tolerance as in the other null checks.
     """
-    from scipy.stats import norm
 
     tail = 0.115  # P(g > t) among the 70% non-zero states: about 8% of all states at w* = 1
     data = _synthetic("S0", 2000, np.random.default_rng(103), tail=tail)
@@ -374,8 +413,6 @@ def test_parts_share_the_resamples_and_refit_inside_each_one() -> None:
     from the code only by round-off (QR against lstsq, about 1e-14 per value, quantiles
     interpolate two of them).
     """
-    from lpcstudy.analysis import h2a_part_ii
-    from lpcstudy.statistics import block_resample_indices, percentile_interval
 
     data = _synthetic("S1", 300, np.random.default_rng(107))
     controls = _hand_controls(data["x"])
@@ -407,8 +444,6 @@ def test_constant_indicator_resamples_are_counted_as_failed() -> None:
     threshold floor((B - 1) a) + 1, so both bounds are infinite and the part is inconclusive
     with the reason of ``criterion_verdict`` (never a pass or fail from the finite part).
     """
-    from lpcstudy.analysis import h2a_part_ii
-    from lpcstudy.statistics import block_resample_indices
 
     rng = np.random.default_rng(108)
     n = 100
@@ -432,7 +467,6 @@ def test_third_part_triggers_at_six_of_one_hundred_and_not_at_five() -> None:
     20 * 6 > 100 so the third part exists; 5 give 20 * 5 = 100, not strictly more, so it does
     not. ``np.clip`` returns exact 0.0 and 1.0, so equality tests are exact. Tolerance: exact.
     """
-    from lpcstudy.analysis import h2a_part_ii
 
     rng = np.random.default_rng(109)
     seeds, lam = rng.normal(size=(100, 2)), rng.normal(size=100)
@@ -456,7 +490,6 @@ def test_part_ii_verdicts_use_the_open_band_and_the_multi_part_rule(monkeypatch)
     0.0999) passes; (-0.1, 0.05) is inconclusive (open edge); (0.1, 0.3) fails; (-0.3, -0.1)
     fails. Combination enumerated over the 3^2 and 3^3 verdict triples. Tolerance: exact.
     """
-    import itertools
 
     import lpcstudy.analysis as an
 
@@ -497,9 +530,7 @@ def test_part_ii_rejects_bad_input() -> None:
 
     Reference: the contract of ``h2a_part_ii``. Tolerance: none.
     """
-    import pytest
 
-    from lpcstudy.analysis import h2a_part_ii
 
     rng = np.random.default_rng(111)
     w, lam, x = rng.uniform(0.2, 0.8, 60), rng.normal(size=60), rng.normal(size=(60, 2))
@@ -521,7 +552,6 @@ T8_RANGE_0, T8_RANGE_1 = 0.50 - 0.10, 0.60 - 0.20
 
 
 def _t8(**kw):
-    from lpcstudy.analysis import h2a_initial_segments
 
     return h2a_initial_segments(T8_WEIGHT, T8_SMALL, ["1", "2", "4"], n_resamples=10, block=2,
                                 seed=3, level=PRIMARY, **kw)
@@ -585,7 +615,6 @@ def test_initial_segments_pass_when_every_range_is_small() -> None:
     the upper bound is below 0.1, so ``criterion_verdict`` gives "pass"; the {1,2,4} span is
     empty (median NaN, count 0). Tolerance: exact (the same float subtraction).
     """
-    from lpcstudy.analysis import h2a_initial_segments
 
     weight = np.tile([0.30, 0.32, 0.9], (60, 1))
     small = np.tile([True, True, False], (60, 1))
@@ -607,7 +636,6 @@ def test_initial_segments_band_is_open_at_the_upper_edge() -> None:
     does not pass) is the job of ``criterion_verdict`` and is tested with it in test_statistics.
     Tolerance: exact.
     """
-    from lpcstudy.analysis import h2a_initial_segments
 
     small = np.ones((60, 3), bool)
     flat = np.zeros((60, 3))
@@ -631,7 +659,6 @@ def test_qn_reading_returns_each_reading_at_the_table_boundaries() -> None:
     (nextafter(0, 1), nextafter(0.05, 0)) distinct but small; (0.01, 0.05) substantial;
     (-0.01, 0.06) undetermined; a NaN bound is undetermined. Tolerance: exact strings.
     """
-    from lpcstudy.analysis import qn_reading
 
     assert qn_reading(0.0, 0.04) == "reduces"
     assert qn_reading(-0.2, 0.0499) == "reduces"
@@ -654,11 +681,7 @@ def test_qn_regressor_parameters_and_seed() -> None:
     seed for DEV-0 and a 32-bit value for a 62-bit seed, so a fit does not raise (DEF-0010; the
     DEV-1 value is read from the registry by ``json.load``). Tolerance: exact.
     """
-    import json
 
-    from lpcstudy.analysis import qn_regressor
-    from lpcstudy.data import sklearn_seed
-    from lpcstudy.seeds import REGISTRY_PATH
 
     params = qn_regressor(20261005).get_params()
     expected = {"max_iter": 300, "learning_rate": 0.05, "max_leaf_nodes": 15,
@@ -682,10 +705,7 @@ def test_delta_r2_equals_sklearn_r2_score_difference() -> None:
     with different summation orders; the error is about n eps = 5e-14. A constant target or an
     empty row set gives NaN (a failed resample).
     """
-    from sklearn.metrics import r2_score
 
-    from lpcstudy.analysis import delta_r2
-    from lpcstudy.data import make_rng
 
     rng = make_rng(7, "delta-r2")
     for y in (rng.normal(size=200), (rng.uniform(size=200) < 0.3).astype(float)):
@@ -718,6 +738,26 @@ def _qn_synthetic(n_train: int, n_test: int, seed: int) -> dict:
             "x_test": x_te, "w_test": w_te, "log_t_test": t_te}
 
 
+def _reference_fit_predict(
+    data: dict, cols: list[int], rows: np.ndarray, y: np.ndarray, x_test: np.ndarray
+) -> np.ndarray:
+    """Fit a gradient-boosted regressor with literal parameters; predict ``x_test``.
+
+    The parameter values are written out here on purpose, so the tests do not
+    reuse ``qn_regressor``, the function under test.
+    """
+    model = HistGradientBoostingRegressor(
+        max_iter=300,
+        learning_rate=0.05,
+        max_leaf_nodes=15,
+        min_samples_leaf=20,
+        l2_regularization=1.0,
+        early_stopping=False,
+        random_state=5,
+    )
+    return model.fit(data["x_train"][rows][:, cols], y[rows]).predict(x_test[:, cols])
+
+
 def test_qn_profile_block_matches_an_independent_fit_and_scores() -> None:
     """The Q-N block: targets, training sets, point values, counts and readings are as specified.
 
@@ -731,18 +771,9 @@ def test_qn_profile_block_matches_an_independent_fit_and_scores() -> None:
     counted, not clipped. Also checks ``reading == qn_reading(*ci)`` for both profiles' interior
     and indicator targets (T1), and that log_horizon has no reading (D-04).
     """
-    from sklearn.ensemble import HistGradientBoostingRegressor
-    from sklearn.metrics import r2_score
 
-    from lpcstudy.analysis import qn_profile_block, qn_reading
 
     d = _qn_synthetic(500, 200, 31)
-
-    def fit_predict(cols, rows, y, x_test):
-        model = HistGradientBoostingRegressor(
-            max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=20,
-            l2_regularization=1.0, early_stopping=False, random_state=5)
-        return model.fit(d["x_train"][rows][:, cols], y[rows]).predict(x_test[:, cols])
 
     int_tr = (d["w_train"] > 0) & (d["w_train"] < 1)
     int_te = (d["w_test"] > 0) & (d["w_test"] < 1)
@@ -755,8 +786,8 @@ def test_qn_profile_block_matches_an_independent_fit_and_scores() -> None:
             ("w_zero_indicator", everyone, (d["w_train"] == 0).astype(float),
              (d["w_test"] == 0).astype(float), np.ones(200, bool)),
             ("log_horizon", everyone, d["log_t_train"], d["log_t_test"], np.ones(200, bool))):
-        p3 = fit_predict([0, 1, 2], rows, y_tr, d["x_test"])
-        p4 = fit_predict([0, 1, 2, 3], rows, y_tr, d["x_test"])
+        p3 = _reference_fit_predict(d, [0, 1, 2], rows, y_tr, d["x_test"])
+        p4 = _reference_fit_predict(d, [0, 1, 2, 3], rows, y_tr, d["x_test"])
         ref[name] = (r2_score(y_te[keep], p3[keep]), r2_score(y_te[keep], p4[keep]),
                      int(rows.sum()), int(keep.sum()), p3, p4)
     out = qn_profile_block(d["x_train"], d["x_test"], d["w_train"], d["w_test"],
@@ -775,10 +806,9 @@ def test_qn_profile_block_matches_an_independent_fit_and_scores() -> None:
     p3z, p4z = ref["w_zero_indicator"][4], ref["w_zero_indicator"][5]
     assert outside["three"] == int(np.sum((p3z < 0) | (p3z > 1)))
     assert outside["four"] == int(np.sum((p4z < 0) | (p4z > 1)))
-    n_model = HistGradientBoostingRegressor(
-        max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=20,
-        l2_regularization=1.0, early_stopping=False, random_state=5)
-    n_pred = n_model.fit(d["x_train"][:, :3], d["x_train"][:, 3]).predict(d["x_test"][:, :3])
+    n_pred = _reference_fit_predict(
+        d, [0, 1, 2], np.ones(500, bool), d["x_train"][:, 3], d["x_test"]
+    )
     assert abs(out["noise_sens_r2_from_three"] - r2_score(d["x_test"][:, 3], n_pred)) < 1e-12
 
 
@@ -791,19 +821,12 @@ def test_qn_block_intervals_share_resamples_across_targets_and_profiles() -> Non
     equal ``percentile_interval`` of those values. Tolerance 1e-10 (r2_score against the code's
     sums; quantile interpolation of two values each about 1e-14 apart).
     """
-    from sklearn.ensemble import HistGradientBoostingRegressor
-    from sklearn.metrics import r2_score
 
-    from lpcstudy.analysis import qn_profile_block
-    from lpcstudy.statistics import block_resample_indices, percentile_interval
 
     d = _qn_synthetic(400, 150, 32)
 
     def predict(cols, rows, y):
-        model = HistGradientBoostingRegressor(
-            max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=20,
-            l2_regularization=1.0, early_stopping=False, random_state=5)
-        return model.fit(d["x_train"][rows][:, cols], y[rows]).predict(d["x_test"][:, cols])
+        return _reference_fit_predict(d, cols, rows, y, d["x_test"])
 
     int_tr = (d["w_train"] > 0) & (d["w_train"] < 1)
     int_te = (d["w_test"] > 0) & (d["w_test"] < 1)
@@ -834,9 +857,7 @@ def test_qn_block_reading_needs_fifty_test_states_and_rejects_bad_input() -> Non
     Reference: DEC-0008 A3 (a subset statistic needs at least 50 states) applied to the Q-N
     reading, and the contract of the function. Tolerance: exact strings. Bad input raises.
     """
-    import pytest
 
-    from lpcstudy.analysis import qn_profile_block
 
     d = _qn_synthetic(300, 40, 33)
     out = qn_profile_block(d["x_train"], d["x_test"], d["w_train"], d["w_test"],
@@ -904,9 +925,15 @@ def _config(resamples: int = 200) -> StudyConfig:
     return dataclasses.replace(StudyConfig(), bootstrap_resamples=resamples)
 
 
+def _h1a_ratio(
+    seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.ndarray, rows: np.ndarray
+) -> float:
+    """The H1a ratio on ``rows``: first entry of ``_median_fit_stats``."""
+    return float(_median_fit_stats(seed_sq, inverse_dim, sizes, rows)[0])
+
+
 def _hand_ratio(seed_sq: np.ndarray, inverse_dim: np.ndarray, rows: np.ndarray) -> float:
     """Median fit over mean reference on ``rows``, medians and mean formed by hand."""
-    from lpcstudy.analysis import _fit_seed_law
 
     medians = []
     for j in range(seed_sq.shape[1]):
@@ -934,7 +961,6 @@ def test_h1a_median_fit_recovers_inverse_dimension_with_heavy_tail() -> None:
     also equals ``0.5 * _fit_seed_law(sizes, np.median(sq, 0))[0]`` bitwise, which pins the
     statistic as the fit of the column medians.
     """
-    from lpcstudy.analysis import _fit_seed_law, h1a_library_scaling
 
     rng = np.random.default_rng(11002)
     sq = _seed_sq(rng, 300, floor_index=1)
@@ -955,21 +981,19 @@ def test_h1a_ratio_is_the_hand_value_and_the_interval_is_the_joint_bootstrap() -
     mean by a sum, relative 1e-12 (a median is an order statistic or the mean of two, exact;
     the fit is the same deterministic function; one division and one sum, a few ulp).
     (ii) End to end, ``ratio_ci`` equals bitwise the percentile interval that
-    ``block_bootstrap_counted`` gives for the closure ``idx -> h1a_ratio(sq, inv, sizes, idx)``
+    ``block_bootstrap_counted`` gives for the closure ``idx -> _h1a_ratio(sq, inv, sizes, idx)``
     seeded with ``make_rng(config.seed, system, "bootstrap", "H1a", "0.01")``: one index draw
     feeds the numerator and the denominator (a mutant with separate draws, or another label,
     changes the interval), and ``ci_inverse_dim`` equals the interval of the half fit alone with
     the same seed (same indices). ``n_failed_resamples`` equals the counted failures. Exact.
     """
-    from lpcstudy.analysis import _fit_seed_law, h1a_library_scaling, h1a_ratio
-    from lpcstudy.oracle import inverse_dimension
 
     rng = np.random.default_rng(11003)
     small = _seed_sq(rng, 60, floor_index=1, sigma=0.3)
     inv_small = 1.0 / _gamma_local_dim(rng, 60, D_TRUE) * 18.0 / 19.0
     rows = rng.integers(0, 60, size=80)
     assert len(np.unique(rows)) < 80
-    assert h1a_ratio(small, inv_small, SIZES, rows) == pytest.approx(
+    assert _h1a_ratio(small, inv_small, SIZES, rows) == pytest.approx(
         _hand_ratio(small, inv_small, rows), rel=1e-12, abs=0.0)
 
     sq = _seed_sq(rng, 300, floor_index=1)
@@ -980,7 +1004,7 @@ def test_h1a_ratio_is_the_hand_value_and_the_interval_is_the_joint_bootstrap() -
         [np.sqrt(sq[:, j]) ** 2 for j in range(len(SIZES))])  # what the cells hold, squared again
     inverse = inverse_dimension(local_dim)
     label = (config.seed, "lorenz63", "bootstrap", "H1a", "0.01")
-    joint = block_bootstrap_counted(lambda idx: h1a_ratio(sq_cells, inverse, SIZES, idx), 300,
+    joint = block_bootstrap_counted(lambda idx: _h1a_ratio(sq_cells, inverse, SIZES, idx), 300,
                                     config.bootstrap_resamples, config.bootstrap_block,
                                     make_rng(*label), 0.95)
     assert out["ratio_ci"] == [joint.lower, joint.upper]
@@ -1015,18 +1039,18 @@ def test_h1a_ratio_is_nan_when_a_median_is_not_positive_or_the_fit_raises(
     for bad in (0.0, -1.0, np.nan, np.inf):
         broken = sq.copy()
         broken[:, 2] = bad
-        assert np.isnan(analysis.h1a_ratio(broken, inv, SIZES, rows))
+        assert np.isnan(_h1a_ratio(broken, inv, SIZES, rows))
 
     def raises(sizes: np.ndarray, medians: np.ndarray) -> tuple[float, float]:
         raise ValueError("Residuals are not finite in the initial point.")
 
     monkeypatch.setattr(analysis, "_fit_seed_law", raises)
-    assert np.isnan(analysis.h1a_ratio(sq, inv, SIZES, rows))
+    assert np.isnan(_h1a_ratio(sq, inv, SIZES, rows))
     monkeypatch.setattr(analysis, "_fit_seed_law", lambda sizes, medians: (np.nan, np.nan))
-    assert np.isnan(analysis.h1a_ratio(sq, inv, SIZES, rows))
+    assert np.isnan(_h1a_ratio(sq, inv, SIZES, rows))
     monkeypatch.undo()
-    assert np.isfinite(analysis.h1a_ratio(sq, inv, SIZES, rows))
-    assert np.isnan(analysis.h1a_ratio(sq, np.zeros(40), SIZES, rows))  # reference 0: no ratio
+    assert np.isfinite(_h1a_ratio(sq, inv, SIZES, rows))
+    assert np.isnan(_h1a_ratio(sq, np.zeros(40), SIZES, rows))  # reference 0: no ratio
 
 
 def test_h1a_verdicts_on_known_truth_at_both_noise_levels() -> None:
@@ -1047,7 +1071,6 @@ def test_h1a_verdicts_on_known_truth_at_both_noise_levels() -> None:
       (D-19); the floors are reported only.
     Exact verdicts, band [0.75, 1.25], level 0.95.
     """
-    from lpcstudy.analysis import h1a_library_scaling
 
     rng = np.random.default_rng(11005)
     config = _config()
@@ -1118,8 +1141,6 @@ def test_h1a_excludes_and_counts_states_with_nonfinite_inputs_once_for_both_rho(
     over the arrays with those two rows deleted, which fails if state 7 is kept at rho = 0.01,
     and ``inverse_dim_reference`` equals the mean of the kept ``S / (k - 1)``. Exact.
     """
-    from lpcstudy.analysis import h1a_library_scaling, h1a_ratio
-    from lpcstudy.oracle import inverse_dimension
 
     rng = np.random.default_rng(11007)
     sq = {0.01: _seed_sq(rng, 300, 1), 0.02: _seed_sq(rng, 300, 1)}
@@ -1134,7 +1155,7 @@ def test_h1a_excludes_and_counts_states_with_nonfinite_inputs_once_for_both_rho(
     assert out["inverse_dim_reference"] == inverse.mean()
     kept_sq = np.column_stack([np.sqrt(sq[0.01][keep, j]) ** 2 for j in range(len(SIZES))])
     joint = block_bootstrap_counted(
-        lambda idx: h1a_ratio(kept_sq, inverse, SIZES, idx), 298, config.bootstrap_resamples,
+        lambda idx: _h1a_ratio(kept_sq, inverse, SIZES, idx), 298, config.bootstrap_resamples,
         config.bootstrap_block, make_rng(config.seed, "lorenz63", "bootstrap", "H1a", "0.01"),
         0.95)
     assert out["by_noise"]["0.01"]["ratio_ci"] == [joint.lower, joint.upper]
@@ -1149,7 +1170,6 @@ def test_h1a_rejects_cells_that_do_not_share_the_states_and_has_the_documented_k
     compared exactly with the plan's; ``reference_estimator`` is text; ``pass`` equals
     ``verdict == "pass"``.
     """
-    from lpcstudy.analysis import h1a_library_scaling
 
     rng = np.random.default_rng(11008)
     local_dim = _gamma_local_dim(rng, 80, D_TRUE)
@@ -1215,7 +1235,6 @@ def test_h1b_verdict_uses_the_plp_slope_only() -> None:
     PLP entry adds ``n_failed_resamples``; the top-level keys are the plan's plus the
     exclusion count (fix R2). Exact verdicts.
     """
-    from lpcstudy.analysis import h1b_seed_amplifier
 
     config = _config(100)
     ok = h1b_seed_amplifier(_fake_h1b_cell(np.random.default_rng(21001), 100, 1.6, 1.0), config)
@@ -1252,8 +1271,6 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
     and 49 give "n_states < 50"; a constant regressor gives a 0/0 slope, "not computable", and
     every resample counted failed; 40 states give "n_states < 50".
     """
-    from lpcstudy.analysis import h1b_seed_amplifier
-    from lpcstudy.statistics import block_bootstrap, ols_slope
 
     config = _config(100)
     cell = _fake_h1b_cell(np.random.default_rng(21003), 100, 1.1, 0.9, log_noise=0.1)
@@ -1345,9 +1362,7 @@ def test_h1d_spearman_equals_scipy_and_the_closed_form_on_500_points() -> None:
     a few hundred operations on numbers of order 10^2 to 10^5 with relative error a few 1e-16
     times 500; 1e-12 leaves about three orders.
     """
-    from scipy.stats import rankdata, spearmanr
 
-    from lpcstudy.analysis import h1d_correlations
 
     pairs = _pairs(np.random.default_rng(21011), 500, (0.7861,) * 4)
     out = h1d_correlations(pairs, "lorenz63", _config(50))
@@ -1371,8 +1386,6 @@ def test_h1d_interval_is_the_seeded_block_bootstrap_at_the_study_settings() -> N
     The interval contains the point estimate (the percentile interval of a smooth statistic
     does, with the observed margin far from the edge). Exact.
     """
-    from lpcstudy.analysis import h1d_correlations
-    from lpcstudy.statistics import spearman
 
     config = StudyConfig()
     assert config.bootstrap_resamples == 2000 and config.bootstrap_block == 5
@@ -1401,7 +1414,6 @@ def test_h1d_nhat_has_no_verdict_and_does_not_move_the_overall_verdict() -> None
     unchanged (identical dicts), while ``nhat`` has ``spearman`` and ``interval`` and neither
     ``pass`` nor ``verdict``. One tested row at 0.2 gives fail overall.
     """
-    from lpcstudy.analysis import h1d_correlations
 
     config = _config(200)
     rng = np.random.default_rng(21013)
@@ -1436,9 +1448,7 @@ def test_h1d_exclusions_minimum_states_and_uncomputable_rows() -> None:
     correlation undefined: the row is "inconclusive" with reason "not computable" and
     every resample is counted failed. (The scipy constant-input warning is expected.)
     """
-    import warnings
 
-    from lpcstudy.analysis import h1d_correlations
 
     config = _config(100)
     rng = np.random.default_rng(21014)
@@ -1483,9 +1493,7 @@ def test_h1d_proxies_pairs_each_proxy_with_its_oracle_on_the_first_draw() -> Non
     below 1e-14). Different Spearman targets per pair (0.9, 0.7, 0.5, 0.3, 0.1) make a swapped
     pair visible. The result carries ``estimation_seed_vs_cramer_rao`` with no interval.
     """
-    from scipy.stats import spearmanr
 
-    from lpcstudy.analysis import h1d_proxies
 
     rng = np.random.default_rng(21015)
     n, noise = 80, 0.02
@@ -1533,7 +1541,6 @@ def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> No
     verdict is inconclusive with that reason (pass False).
     Tolerance: mean ``abs=1e-12`` (the stub weights are exact, the mean is one division).
     """
-    from lpcstudy.analysis import h2b_knob_response
 
     noise_cells = {0.01: _stub_cell(TABLE[:, 2]), 0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0))}
     out = h2b_knob_response(noise_cells, _library_cells(TABLE), CONFIG)
@@ -1564,7 +1571,6 @@ def test_regression_h2b_noise_part_uses_its_own_generator() -> None:
     This is a regression guard on the pre-existing statistic, not new correctness evidence.
     Exact equality (same function, same generator).
     """
-    from lpcstudy.analysis import h2b_knob_response
 
     low = np.array([0.0, 0.125, 0.25, 0.5, 0.5, 0.75])
     high = np.array([0.125, 0.25, 0.5, 0.625, 0.5, 0.875])
@@ -1590,7 +1596,6 @@ def test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing() 
     ``mean_change`` None, ``ci`` None, pass False, the reason names the cell, and the result has no
     NaN. Exact comparisons of booleans, None and strings.
     """
-    from lpcstudy.analysis import h2b_knob_response
 
     noise_cells = {0.01: _stub_cell(np.tile(TABLE[:, 2], 10)),
                    0.02: _stub_cell(np.tile(np.minimum(TABLE[:, 2] + 0.125, 1.0), 10))}
@@ -1626,7 +1631,6 @@ def test_h2b_curves_and_the_reported_change_at_two_percent() -> None:
     ``block_bootstrap`` at ``make_rng(seed, system, "h2b-library-change", "0.02")`` exactly. The library
     Spearman keys of v1 and the saturation rule are gone.
     """
-    from lpcstudy.analysis import h2b_knob_response
 
     noise_cells = {0.01: _stub_cell(TABLE[:, 2]), 0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0))}
     out = h2b_knob_response(noise_cells, _library_cells(TABLE, (0.01, 0.02)), CONFIG)
@@ -1677,7 +1681,6 @@ def test_h2e_median_change_with_a_cp_constant_state_and_the_counts() -> None:
     (rho = 1% and 2%) and none at 10^5, and the interval equals ``block_bootstrap`` of the median
     at ``make_rng(seed, system, "h2e", "0.01")``, level 0.95, exactly.
     """
-    from lpcstudy.analysis import h2e_noise_matching
 
     n = 50
     idx = np.arange(n)
@@ -1715,7 +1718,6 @@ def test_h2e_no_change_is_not_a_pass_and_missing_cells_are_named() -> None:
     reason names n_lib=100000 at rho=0.01 and rho=0.02, and the dict has no NaN. (c) Moments
     without ``err_corr`` raise ``ValueError``. Exact.
     """
-    from lpcstudy.analysis import h2e_noise_matching
 
     low = np.linspace(0.0, 0.4, 50)
     out = h2e_noise_matching(_h2e_cells(low, low.copy()), CONFIG)
@@ -1768,7 +1770,6 @@ def test_h3a_holm_and_raw_p_match_independent_references() -> None:
     ``iqr_lt_mean`` their size-weighted mean (equal sizes: the plain mean). There is no key with
     "regret" or "fail" in it, and no ``iqr_pass`` (D-08, DEC-0008 A3).
     """
-    from lpcstudy.analysis import h3a_logrank
 
     regime, durations, target = _regime_data((0.05, 0.45, 0.15), 60, 3)
     events = np.ones(len(durations), dtype=bool)
@@ -1807,7 +1808,6 @@ def test_h3a_inconclusive_paths_and_small_regimes() -> None:
     inconclusive. All results have ``verdict`` (only pass or inconclusive: no equivalence margin
     is set), ``reason`` and ``pass``, and no ``fail`` key. Exact comparisons.
     """
-    from lpcstudy.analysis import h3a_logrank
 
     regime, durations, target = _regime_data((0.1, 0.1), 60, 5)
     ones = np.ones(len(durations), dtype=bool)
@@ -1865,7 +1865,6 @@ def test_h3a_orders_tied_and_missing_horizons_by_regime_index() -> None:
     7 regimes of 5 states with identical durations (the p-values are irrelevant; only the pairs are
     checked). Exact.
     """
-    from lpcstudy.analysis import h3a_logrank
 
     regime = np.repeat(np.arange(7), 5)
     out = h3a_logrank(regime, np.arange(1, 36), np.ones(35, dtype=bool),
@@ -1894,7 +1893,6 @@ def test_h3a_one_event_among_a_hundred_states_is_visible_in_the_counts() -> None
     record DEF-0018), so the counts are what tells the reader that the p rests on one event. The
     keys other than the two new ones are exactly the 14 of the previous output.
     """
-    from lpcstudy.analysis import h3a_logrank
 
     regime = np.repeat([0, 1], 100)
     durations = np.concatenate([np.arange(1, 101), np.arange(1, 101)])
@@ -1923,7 +1921,6 @@ def test_h3a_event_counts_match_a_python_loop_and_add_up() -> None:
     events + censored == ``n_per_regime`` for every regime, and an empty regime is 0, 0, 0.
     Integers: exact.
     """
-    from lpcstudy.analysis import h3a_logrank
 
     rng = np.random.default_rng(7)
     labels = rng.choice([0, 1, 2, 4], size=400)  # regime 3 never occurs
@@ -1956,7 +1953,6 @@ def test_regression_h3a_new_keys_change_no_pre_existing_number() -> None:
     is in the scipy comparisons of the tests above and below (bitwise neutrality of the whole
     results.json is the DEV-0 smoke comparison of WU-0004d). Exact.
     """
-    from lpcstudy.analysis import h3a_logrank
 
     regime, durations, target = _regime_data((0.05, 0.45, 0.15), 60, 3)
     out = h3a_logrank(regime, durations, np.ones(len(durations), dtype=bool),
@@ -1997,7 +1993,6 @@ def test_h3b_known_ordering_lambda_irrelevant_for_the_weight_and_first_for_the_h
     mathematician observed at least 0.982 over 8 seeds). The tolerances are exact equalities for
     the zeros and ``>= 0.9`` for D, fixed before the run.
     """
-    from lpcstudy.analysis import h3b_importances
 
     x, profile, curvature = _h3b_data(31)
     w_star = 0.5 * (x[:, 0] > 0.5) + 0.25 * (x[:, 1] > 0.3)
@@ -2025,7 +2020,6 @@ def test_h3b_reversed_ordering_fails_both_parts() -> None:
     no inconclusive reason. D is about -0.95, so its upper bound is at most -0.9 (observed at most
     -0.978 over 8 seeds), stability is exactly 0.0, and the combined result is not a pass.
     """
-    from lpcstudy.analysis import h3b_importances
 
     x, profile, curvature = _h3b_data(31)
     out = h3b_importances(profile, 0.5 * (x[:, 2] > 0.5), curvature,
@@ -2048,7 +2042,6 @@ def test_h3b_construction_leaf_count_row_expansion_and_point_fit() -> None:
     the same deterministic algorithm on identical inputs (the seed 20261005 is below 2**32, so
     ``sklearn_seed`` is the identity).
     """
-    from lpcstudy.analysis import PROFILE_NAMES, _h3b_trees, _state_rows, h3b_importances
 
     tree_w, tree_t = _h3b_trees(CONFIG.seed)
     assert tree_w.max_leaf_nodes == tree_t.max_leaf_nodes == 8
@@ -2085,8 +2078,6 @@ def test_h3b_degenerate_fits_are_counted_failed_resamples_and_not_zeros() -> Non
     interval's ``n_failed_resamples``. (c) A constant ``ln T`` makes D not computable and
     stability 0.0. Exact comparisons.
     """
-    from lpcstudy.analysis import h3b_importances
-    from lpcstudy.statistics import block_resample_indices
 
     x, profile, curvature = _h3b_data(33, n=60)
     log_t = 3.0 * x[:, 2] + 0.5 * x[:, 0]
@@ -2135,7 +2126,6 @@ def test_h3c_ratio_of_means_paired_resampling_and_closed_bound() -> None:
     round-off, so it is not asserted exactly. (d) Fewer than 50 states: pass False with the
     reason "n_states < 50".
     """
-    from lpcstudy.analysis import h3c_ratio
 
     rng = np.random.default_rng(21)
     a4 = rng.uniform(1.0, 2.0, 60)
@@ -2196,7 +2186,6 @@ def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o
     be read: the column is located by the horizon value, not by position. The entry
     ``A4_minus_A0`` exists and ``A4_minus_A1`` does not.
     """
-    from lpcstudy.analysis import h2c_state_dependence
 
     # WU-0002.9 plan-listed edit: the six hand states are tiled ten times (60 states), because
     # each part now carries the 50-state minimum of DEC-0008 A3; every mean is unchanged.
@@ -2243,10 +2232,7 @@ def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -
     tests above check).
     """
     from lpcstudy import analysis
-    from lpcstudy.allocation import RegimeMap, state_horizon_target
     from lpcstudy.oracle import curvature, oracle_weight
-    from lpcstudy.pipeline import FittedRules
-    from unit_helpers import realizable_triples
 
     rng = np.random.default_rng(55)
     n_test, n_con, n_hor, n_draws = 60, 80, 30, 2
@@ -2316,8 +2302,6 @@ def test_h2c_a4o_minus_a2_counts_failed_resamples() -> None:
     ``block_resample_indices`` at ``make_rng(config.seed, system, "bootstrap", "H2c")``
     (independent use of the tested helper). Exact.
     """
-    from lpcstudy.analysis import h2c_state_dependence
-    from lpcstudy.statistics import block_resample_indices
 
     n = 60
     a2 = np.linspace(1.0, 2.0, n)
@@ -2348,7 +2332,6 @@ def test_h2b_combined_verdict_uses_both_parts() -> None:
     (inconclusive) one fail still fails the criterion (v3 section 7): verdict "fail", reason
     None. (c) (i) rising in every state and (ii) passing: verdict pass. Exact comparisons.
     """
-    from lpcstudy.analysis import h2b_knob_response
 
     n = 60
     tiled = np.tile(TABLE, (10, 1))
@@ -2384,7 +2367,6 @@ def test_h3c_closed_edge_at_exactly_1_05_passes() -> None:
     to the real number 1.05). The interval is [1.05, 1.05]: pass. A5 = 21.000001 gives a ratio
     above the bound: not a pass (a fail, no reason). Exact comparisons.
     """
-    from lpcstudy.analysis import h3c_ratio
 
     edge = h3c_ratio(np.full(60, 21.0), np.full(60, 20.0), CONFIG, SYSTEM)
     assert edge["ci"] == [1.05, 1.05] and edge["A5_over_A4_mse"] == 1.05
@@ -2443,7 +2425,6 @@ def test_h1c_ratio_block_closed_band_edges_and_state_minimum() -> None:
     (the CP) adds no verdict key. Two non-finite ratios among 60 finite ones are excluded and
     counted (N3). Exact comparisons.
     """
-    from lpcstudy.analysis import h1c_ratio_block
 
     def block(value: float, n: int = 60) -> dict:
         return h1c_ratio_block(np.full(n, value), CONFIG, SYSTEM)
@@ -2485,7 +2466,6 @@ def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_genera
     data from ``default_rng(11)``. Exact (``==``) on floats; non-finite ratios are excluded
     before the median, so the reference runs on the finite ones.
     """
-    from lpcstudy.analysis import h1c_ratio_block, h2c_state_dependence, h2d_empirical_comparison
 
     rng = np.random.default_rng(11)
     ratios = rng.uniform(0.5, 1.5, n_states)
@@ -2558,7 +2538,6 @@ def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_with
     passes; with 40 good states it is inconclusive "n_states < 50" although the numbers are
     reported. Counts are exact; the keys of CP are exactly those of the helper without a verdict.
     """
-    from lpcstudy.analysis import h1c_horizon_law
 
     thetas = np.log([0.1, 0.2, 0.3, 0.5])
     slope = lambda row: np.polyfit(thetas, row, 1)[0]
@@ -2611,9 +2590,7 @@ def test_h1c_horizon_law_capture_holds_the_per_state_ratios_and_reproduces_the_l
     generator label), apart from ``n_ineligible_states``. The independent parts are the hand-built
     mask and NaN placement and the ratio 1 to 1e-12. Exact except the 1e-12 above.
     """
-    import json
 
-    from lpcstudy.analysis import h1c_horizon_law, h1c_ratio_block
 
     thetas = np.log([0.1, 0.2, 0.3, 0.5])
     slope = lambda row: np.polyfit(thetas, row, 1)[0]
@@ -2661,10 +2638,7 @@ def test_h1a_library_scaling_capture_holds_the_seed_errors_and_reproduces_the_st
     statistics ``ratio`` and ``fitted_inverse_dim`` equal ``_median_fit_stats`` on the dumped
     arrays with the production generator label, bitwise. Exact.
     """
-    import json
 
-    from lpcstudy.analysis import _median_fit_stats, h1a_library_scaling
-    from lpcstudy.statistics import bootstrap_values
 
     rng = np.random.default_rng(11031)
     local = _gamma_local_dim(rng, 300, D_TRUE)
@@ -2725,7 +2699,6 @@ def test_h2c_multi_part_verdicts_all_nine_combinations_and_the_open_edge() -> No
     **fail**, for both parts. The best single forecaster is A0 (calibration 0.25 against 4.0).
     The top-level ``n_failed_resamples`` is 0. Exact.
     """
-    from lpcstudy.analysis import h2c_state_dependence
 
     n = 60
     parts = {"pass": np.full(n, -1.0), "fail": np.full(n, 1.0),
@@ -2824,7 +2797,6 @@ def test_gain_bound_has_no_bar_and_reports_each_screen() -> None:
     median gain 5 steps and maximum 10 over 30 steps per Lyapunov time. Exact up to the division
     by 30 (abs 1e-12).
     """
-    from lpcstudy.analysis import gain_horizon_bound
 
     h_max = 20
     horizons = np.arange(1, h_max + 1)
@@ -2876,7 +2848,6 @@ def test_boot_returns_the_old_interval_and_the_dropped_count() -> None:
     and 25 of the 200 resamples (a fresh closure per function: the call order is resamples, then
     the point). Count 3 by construction. Tolerance: none (``==``).
     """
-    from lpcstudy.analysis import _boot
 
     x_values = np.random.default_rng(31).standard_normal(60)
 
@@ -2946,7 +2917,6 @@ def test_h1a_fit_at_a_bound_and_covariance_warnings_are_counted(
     A different warning class is re-issued (not swallowed), and a fit that returns NaN is not
     at a bound. The first three entries (ratio, fitted 1/d, floor) are those of the fit, bitwise.
     """
-    from scipy.optimize import OptimizeWarning
 
     def make_fit(two_over_d: float, n_optimize: int, n_other: int = 0):
         def fit(sizes, medians):
@@ -2993,9 +2963,7 @@ def test_h1a_real_fit_at_the_lower_bound_is_flagged_and_matches_the_warning_reco
     degrees of freedom, so scipy warns that the covariance cannot be estimated: expected 1).
     A well-determined data set (exponent 0.5 over 5 sizes) is not at a bound.
     """
-    from scipy.optimize import OptimizeWarning
 
-    from lpcstudy.analysis import _fit_seed_law, _median_fit_stats
 
     sizes = np.array([1e3, 1e4, 1e5])
     medians = sizes ** -0.001 + 1e-8
@@ -3030,10 +2998,8 @@ def test_h1a_library_scaling_reports_the_bound_and_warning_counts_per_noise(
     ``test_h1a_median_fit_recovers_inverse_dimension_with_heavy_tail``). Without the stub, on
     ordinary data, the real result has the same keys with nonnegative ints.
     """
-    from scipy.optimize import OptimizeWarning
 
     from lpcstudy import analysis
-    from lpcstudy.oracle import inverse_dimension
 
     rng = np.random.default_rng(31001)
     sq = _seed_sq(rng, 80, floor_index=1)
@@ -3051,7 +3017,7 @@ def test_h1a_library_scaling_reports_the_bound_and_warning_counts_per_noise(
     assert out["n_covariance_warnings"] == {"point": 1, "resamples": 200}
     sq_cells = np.column_stack([np.sqrt(sq[:, j]) ** 2 for j in range(len(SIZES))])
     joint = block_bootstrap_counted(
-        lambda idx: analysis.h1a_ratio(sq_cells, inverse_dimension(local_dim), SIZES, idx), 80,
+        lambda idx: _h1a_ratio(sq_cells, inverse_dimension(local_dim), SIZES, idx), 80,
         200, config.bootstrap_block, make_rng(config.seed, "lorenz63", "bootstrap", "H1a", "0.01"),
         0.95)
     assert out["ratio_ci"] == [joint.lower, joint.upper] and out["ratio"] == joint.estimate
@@ -3079,8 +3045,6 @@ def test_h1b_counts_floored_states_among_the_regression_states_and_dropped_cp_re
     counted PLP bootstrap is bitwise equal), and the other states are untouched. A constant CP
     regressor (all x = 0) makes every CP resample NaN: ``CP.n_dropped_resamples == B``.
     """
-    from lpcstudy.analysis import h1b_seed_amplifier
-    from lpcstudy.statistics import ols_slope
 
     config = _config(100)
     cell = _fake_h1b_cell(np.random.default_rng(31002), 100, 1.0, 1.0, log_noise=0.1)
@@ -3127,8 +3091,6 @@ def test_per_state_spearman_counted_reports_the_constant_states_and_h2b_carries_
     ``noise.n_constant_states`` is 3 and ``noise.n_dropped_resamples`` is 0 (a mean of finite
     correlations cannot fail), and the mean of the per-state values is the hand mean.
     """
-    from lpcstudy.analysis import _per_state_spearman, _per_state_spearman_counted, \
-        h2b_knob_response
 
     levels = np.array([0.01, 0.02, 0.04])
     table = np.array([[0.0, 0.0, 0.0], [0.5, 0.5, 0.5], [0.0, 0.25, 0.5], [0.25, 0.125, 0.0],
@@ -3136,7 +3098,6 @@ def test_per_state_spearman_counted_reports_the_constant_states_and_h2b_carries_
     rho, n_constant = _per_state_spearman_counted(levels, table)
     hand_constant = sum(len(np.unique(row)) == 1 for row in table)
     assert n_constant == hand_constant == 3 and type(n_constant) is int
-    assert np.array_equal(rho, _per_state_spearman(levels, table))
     reference = [0.0 if len(np.unique(row)) == 1 else sps.spearmanr(levels, row).statistic
                  for row in table]
     assert rho == pytest.approx(reference, abs=1e-12, rel=0)
@@ -3161,7 +3122,6 @@ def test_h3a_counts_empty_regimes_and_degenerate_pairs() -> None:
     A well-populated example has both counts 0. The raw p-values and reasons are those of the
     earlier code (the zero-variance and empty pairs are None).
     """
-    from lpcstudy.analysis import h3a_logrank
 
     rng = np.random.default_rng(41)
     regime = np.repeat([0, 2, 3], 30)
@@ -3185,7 +3145,6 @@ def _old_boot(config: StudyConfig, stat, n_items: int, rng: np.random.Generator,
               level: float = 0.95):
     """Body of ``analysis._boot`` before WU-0002.9b (the independent reference), taking the
     generator that WU-0002.14 gave it in place of the integer ``config.seed + salt``."""
-    from lpcstudy.statistics import block_bootstrap_dropped
     return block_bootstrap_dropped(stat, n_items, config.bootstrap_resamples,
                                    config.bootstrap_block, rng, level)
 
@@ -3226,8 +3185,6 @@ def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails(
     (``block_bootstrap_counted`` is documented bitwise equal to ``block_bootstrap``). The failure
     count and its alias ``n_dropped_resamples`` are 0.
     """
-    from lpcstudy.analysis import PRIMARY_LEVEL, _per_state_spearman_counted, h2b_knob_response
-    from lpcstudy.statistics import block_resample_indices
 
     levels = np.array([0.01, 0.02, 0.04])
     weights = np.random.default_rng(90201).uniform(0.0, 1.0, (60, 3))
@@ -3271,8 +3228,6 @@ def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_incon
     dropped the failures and passed). Exact comparisons: the injected values are in the
     resamples, not in a computation.
     """
-    from lpcstudy.analysis import PRIMARY_LEVEL, _per_state_spearman_counted, h2b_knob_response
-    from lpcstudy.statistics import block_resample_indices
 
     n_res = CONFIG.bootstrap_resamples
     alpha = (1.0 - PRIMARY_LEVEL) / 2.0
@@ -3341,7 +3296,6 @@ def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
     no tolerance.
     """
     from lpcstudy import analysis as an
-    from lpcstudy.statistics import bootstrap_values, endpoint_mc_error, percentile_interval
 
     # H3c
     rng = np.random.default_rng(21)
@@ -3413,7 +3367,6 @@ def test_stored_levels_are_found_on_real_producer_output() -> None:
     """
     from lpcstudy import analysis as an
     from lpcstudy import budget
-    from lpcstudy.identifiers import HYPOTHESIS_TABLE
 
     rng = np.random.default_rng(11005)
     config = _config()
@@ -3455,7 +3408,6 @@ def test_h2c_parts_resample_with_identical_index_arrays() -> None:
     premise that the test can see the difference is checked: the same statistic on a generator
     that has already drawn gives another interval. Tolerance: none (``==``).
     """
-    from lpcstudy.analysis import h2c_state_dependence
 
     rng = np.random.default_rng(14021)
     a2 = rng.uniform(1.0, 2.0, 60)
@@ -3483,7 +3435,6 @@ def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(monkeypa
     equal to a fresh one (a shared generator would have advanced). The data stubs only supply
     shapes. Tolerance: none (bit-generator state equality).
     """
-    from lpcstudy import allocation
     from lpcstudy import analysis as an
 
     n = 8
@@ -3497,7 +3448,7 @@ def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(monkeypa
     monkeypatch.setattr(an, "_oracle_profile", lambda cell, split, config: np.zeros((n, 4)))
     monkeypatch.setattr(an, "deployable_profile", lambda ev, proxies, noise, lt: np.zeros((n, 1, 4)))
     monkeypatch.setattr(an, "oracle_weight", lambda m: np.full((n, CONFIG.reference_horizon), 0.5))
-    monkeypatch.setattr(allocation, "state_horizon_target", lambda m, noise, thr: np.ones(n))
+    monkeypatch.setattr(an, "state_horizon_target", lambda m, noise, thr: np.ones(n))
     split = SimpleNamespace(moments=None, evals=None)
     cell = SimpleNamespace(system=SYSTEM, noise=0.01,
                            splits={s: split for s in ("construction", "calibration", "test")})
@@ -3519,9 +3470,7 @@ def test_qn_noise_redundancy_records_the_dump_keys_without_a_key_that_is_also_a_
     input ``log_horizon`` to ``log_t`` because it was also the folder of the target's keys), so
     reverting the rename fails here. Exact.
     """
-    from lpcstudy import allocation
     from lpcstudy import analysis as an
-    from lpcstudy.dump import StateDump
 
     n = 8
     targets = ("logit_w_interior", "w_zero_indicator", "log_horizon")
@@ -3535,7 +3484,7 @@ def test_qn_noise_redundancy_records_the_dump_keys_without_a_key_that_is_also_a_
     monkeypatch.setattr(an, "_oracle_profile", lambda cell, split, config: np.zeros((n, 4)))
     monkeypatch.setattr(an, "deployable_profile", lambda ev, proxies, noise, lt: np.zeros((n, 1, 4)))
     monkeypatch.setattr(an, "oracle_weight", lambda m: np.full((n, CONFIG.reference_horizon), 0.5))
-    monkeypatch.setattr(allocation, "state_horizon_target", lambda m, noise, thr: np.ones(n))
+    monkeypatch.setattr(an, "state_horizon_target", lambda m, noise, thr: np.ones(n))
     split = SimpleNamespace(moments=None, evals=None)
     cell = SimpleNamespace(system=SYSTEM, noise=0.01,
                            splits={s: split for s in ("construction", "calibration", "test")})
@@ -3562,11 +3511,8 @@ def test_qn_profile_block_capture_holds_the_predictions_and_changes_nothing() ->
     the others. (iii) ``analysis.delta_r2`` of the captured arrays on the domain rows reproduces
     the ``delta_r2`` leaf bitwise (it is the same call on the same arrays; b3 of the plan).
     """
-    import json
 
-    from sklearn.ensemble import HistGradientBoostingRegressor
 
-    from lpcstudy.analysis import delta_r2, qn_profile_block
 
     d = _qn_synthetic(500, 200, 31)
     args = (d["x_train"], d["x_test"], d["w_train"], d["w_test"], d["log_t_train"],
@@ -3578,10 +3524,7 @@ def test_qn_profile_block_capture_holds_the_predictions_and_changes_nothing() ->
     assert json.dumps(out, sort_keys=True) == json.dumps(plain, sort_keys=True)
 
     def fit_predict(cols, rows, y):
-        model = HistGradientBoostingRegressor(
-            max_iter=300, learning_rate=0.05, max_leaf_nodes=15, min_samples_leaf=20,
-            l2_regularization=1.0, early_stopping=False, random_state=5)
-        return model.fit(d["x_train"][rows][:, cols], y[rows]).predict(d["x_test"][:, cols])
+        return _reference_fit_predict(d, cols, rows, y, d["x_test"])
 
     int_tr = (d["w_train"] > 0) & (d["w_train"] < 1)
     int_te = (d["w_test"] > 0) & (d["w_test"] < 1)
