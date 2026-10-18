@@ -116,6 +116,14 @@ def perturb_moments(moments: EnsembleMoments, column: int, n_draws: int,
     ``global_weight`` and ``regime_weight``, which read the three second moments only. The input is
     not modified, and a state with no clipped draw gets ``+ 0.0`` (bitwise unchanged).
 
+    The ``1e-300`` floors of ``oracle_weight``, ``global_weight`` and ``regime_weight`` that run on
+    these perturbed moments are not counted here, by this argument (DEF-0001, WU-0004f O-2). The
+    curvature is ``c = E sq_cp - 2 E cross + E sq_plp``, and with the CP sentinel at 0 (checked by
+    ``_block``: CP never clips, so ``|e_C| <= L`` and ``|chi| <= L q / M``) the perturbation changes it by
+    ``c' - c = 3 L^2 q / M - 2 L chi >= L^2 q / M >= 0``; with ``q = 0`` it is bitwise unchanged. So a
+    floor binds under P2 only where it already binds in the original, and those are counted by
+    ``curvature_floor`` and ``pooled_curvature_floor``.
+
     Parameters
     ----------
     moments : EnsembleMoments
@@ -335,12 +343,24 @@ def _hypothesis(parts: dict[str, dict], **extra: object) -> dict:
 
 
 # ----------------------------------------------- recomputation of the tier-A verdict statistics
+def _counted(entry: dict, n_failed: int | None, **more: int) -> dict:
+    """``entry`` plus the counts of the P2 recomputation it would otherwise drop (DEF-0001, WU-0004f).
+
+    ``n_failed_resamples`` is the number of non-finite bootstrap resamples of the recomputed
+    statistic (placed at the unfavourable tail of the interval, as in the verdict code; ``None`` if
+    the recomputation did not report one); ``more`` adds further int counts (``n_constant_states``).
+    Additive keys only: no existing key of ``entry`` changes.
+    """
+    return {**entry, "n_failed_resamples": None if n_failed is None else int(n_failed), **more}
+
+
 def h3c_part(original: dict, a5_2: np.ndarray, a4_2: np.ndarray, config: StudyConfig,
              system: str, n_clipped: int) -> dict:
     """H3c under P2: ``an.h3c_ratio`` on the perturbed per-state MSEs (same generator labels)."""
     out = an.h3c_ratio(a5_2, a4_2, config, system)
-    return part_entry(original["A5_over_A4_mse"], original["ci"], original["verdict"],
-                      out["A5_over_A4_mse"], out["ci"], out["verdict"], n_clipped)
+    return _counted(part_entry(original["A5_over_A4_mse"], original["ci"], original["verdict"],
+                               out["A5_over_A4_mse"], out["ci"], out["verdict"], n_clipped),
+                    out["n_failed_resamples"])
 
 
 def h2d_part(original: dict, a3_2: np.ndarray, a4_2: np.ndarray, config: StudyConfig,
@@ -349,8 +369,9 @@ def h2d_part(original: dict, a3_2: np.ndarray, a4_2: np.ndarray, config: StudyCo
     out = an.h2d_empirical_comparison({"A3": SimpleNamespace(state_mse_ref=a3_2),
                                        "A4": SimpleNamespace(state_mse_ref=a4_2)}, config,
                                       system)
-    return part_entry(original["in_distribution_excess"], original["ci"], original["verdict"],
-                      out["in_distribution_excess"], out["ci"], out["verdict"], n_clipped)
+    return _counted(part_entry(original["in_distribution_excess"], original["ci"],
+                               original["verdict"], out["in_distribution_excess"], out["ci"],
+                               out["verdict"], n_clipped), out["n_failed_resamples"])
 
 
 def h2c_parts(original: dict, mse_2: dict[str, np.ndarray], calibration_2: SimpleNamespace,
@@ -389,8 +410,9 @@ def h2c_parts(original: dict, mse_2: dict[str, np.ndarray], calibration_2: Simpl
         old = original[name]
         if name == "A4_minus_A2" or best_2 == best:
             new = out[name]
-            parts[name] = part_entry(old["mean"], old["ci"], old["verdict"], new["mean"], new["ci"],
-                                     new["verdict"], n_clipped[name])
+            parts[name] = _counted(part_entry(old["mean"], old["ci"], old["verdict"], new["mean"],
+                                              new["ci"], new["verdict"], n_clipped[name]),
+                                   new["n_failed_resamples"])
         else:
             parts[name] = {"status": "computed", "reason": "best single changes at 2L",
                            "delta": None, "ratio": None, "flag": True, "verdict_2L": None,
@@ -443,8 +465,9 @@ def h1b_part(original: dict, sq_plp: np.ndarray, sq_plp_2: np.ndarray, gain: np.
     verdict_2, _ = criterion_verdict(boot.estimate, boot.lower, boot.upper, an.H1B_BAND,
                                      n_states=len(x))
     plp = original["PLP"]
-    return {**part_entry(plp["slope"], plp["ci"], original["verdict"], boot.estimate,
-                         [boot.lower, boot.upper], verdict_2, n_clipped), **floored}
+    return {**_counted(part_entry(plp["slope"], plp["ci"], original["verdict"], boot.estimate,
+                                  [boot.lower, boot.upper], verdict_2, n_clipped), boot.n_failed),
+            **floored}
 
 
 def h2a_parts(original: dict, w_ref_2: np.ndarray, growth_scaled: np.ndarray, seeds: np.ndarray,
@@ -463,8 +486,9 @@ def h2a_parts(original: dict, w_ref_2: np.ndarray, growth_scaled: np.ndarray, se
     for name, old in original["part_ii"].items():
         new = out["part_ii"].get(name)
         parts[name] = not_computed("part absent at 20 sigma_x", n_clipped) if new is None else \
-            part_entry(old["partial_corr"], old["ci"], old["verdict"], new["partial_corr"],
-                       new["ci"], new["verdict"], n_clipped)
+            _counted(part_entry(old["partial_corr"], old["ci"], old["verdict"],
+                                new["partial_corr"], new["ci"], new["verdict"], n_clipped),
+                     new["n_failed_resamples"])
     return _hypothesis(parts, parts_2L=list(out["part_ii"]),
                        extra_flag=set(out["part_ii"]) != set(original["part_ii"]))
 
@@ -476,15 +500,16 @@ def h2b_noise_part(original: dict, w_by_noise_2: np.ndarray, levels: np.ndarray,
     The statistic, the generator ``make_rng(config.seed, system, "bootstrap", "H2b-noise")``, the level ``1 - 0.05/3`` and the verdict rule
     are those of ``analysis.h2b_knob_response``.
     """
-    rho_corr, _ = an._per_state_spearman_counted(levels, w_by_noise_2)
+    rho_corr, n_constant = an._per_state_spearman_counted(levels, w_by_noise_2)
     point, values = bootstrap_values(lambda idx: float(np.mean(rho_corr[idx])), len(rho_corr),
                                      config.bootstrap_resamples, config.bootstrap_block,
                                      make_rng(config.seed, system, "bootstrap", "H2b-noise"))
-    lower, upper, _ = percentile_interval(values, an.PRIMARY_LEVEL)
+    lower, upper, n_failed = percentile_interval(values, an.PRIMARY_LEVEL)
     verdict_2, _ = criterion_verdict(float(point), lower, upper, (0.0, np.inf), (False, True),
                                      n_states=len(rho_corr))
-    return part_entry(original["mean_state_spearman"], original["ci"], original["verdict"],
-                      float(point), [lower, upper], verdict_2, n_clipped)
+    return _counted(part_entry(original["mean_state_spearman"], original["ci"],
+                               original["verdict"], float(point), [lower, upper], verdict_2,
+                               n_clipped), n_failed, n_constant_states=int(n_constant))
 
 
 def h2b_library_part(original: dict, low_2: np.ndarray, high_2: np.ndarray, rho: float,
@@ -494,8 +519,9 @@ def h2b_library_part(original: dict, low_2: np.ndarray, high_2: np.ndarray, rho:
                                              (system, "h2b-library-change", f"{rho:g}"),
                                              "mean_change",
                                              mc_error=True)
-    return part_entry(original["mean_change"], original["ci"], original["verdict"],
-                      fields["mean_change"], fields["ci"], verdict_2, n_clipped)
+    return _counted(part_entry(original["mean_change"], original["ci"], original["verdict"],
+                               fields["mean_change"], fields["ci"], verdict_2, n_clipped),
+                    fields["n_failed_resamples"])
 
 
 # ------------------------------------------------------------------------------ orchestration

@@ -1313,6 +1313,7 @@ def test_an_exception_inside_the_block_is_recorded_not_raised(monkeypatch, caplo
 # (A delimited block.)
 # ---------------------------------------------------------------------------------------------
 _NEW_PART_KEYS = {"n_floored", "n_floored_2L"}
+_NEW_COMPUTED_KEYS = _NEW_PART_KEYS | {"n_failed_resamples"}  # the bootstrap ran only when computed
 
 
 def _h1b_hand_inputs():
@@ -1401,7 +1402,8 @@ def test_regression_h1b_part_values_are_unchanged_by_the_counters_a3() -> None:
     because the regression set changes under P2 (a finite squared error becomes NaN); not computed
     because no state is in the regression (an infinite seed error). The comparison is of the JSON text
     of the entries (``repr`` of a float round-trips exactly), restricted to the old keys; the new keys
-    are exactly ``n_floored`` and ``n_floored_2L``.
+    are exactly ``n_floored`` and ``n_floored_2L``, plus ``n_failed_resamples`` (WU-0004f O-1) when
+    the bootstrap ran.
     """
     import json
 
@@ -1415,7 +1417,8 @@ def test_regression_h1b_part_values_are_unchanged_by_the_counters_a3() -> None:
     for name, (a, b, g, e) in cases.items():
         args = (_h1b_original(), a, b, g, e, 3, _config(), "mini", 7)
         old, new = _h1b_before(*args), cs.h1b_part(*args)
-        assert set(new) - set(old) == _NEW_PART_KEYS, name
+        assert set(new) - set(old) == (_NEW_COMPUTED_KEYS if new["status"] == "computed"
+                                       else _NEW_PART_KEYS), name
         assert json.dumps({k: new[k] for k in old}, sort_keys=True) == json.dumps(old, sort_keys=True)
         statuses[name] = new["status"]
     assert statuses == {"computed": "computed", "set changes": "not_computed",
@@ -1495,8 +1498,10 @@ def test_block_counts_caught_exceptions_a5(monkeypatch, caplog) -> None:
       traceback (it wrote nothing before);
     * ``h2d_part`` raising: one criterion clause, 1, the block still computed, its parts read
       ``not_computed`` with the error; with ``h3c_part`` as well, 2;
-    * a criterion raising followed by a forced P-c failure (a ``_BaselineMismatch``, which carries
-      its reason and is not itself counted): the block is not computed and the count 1 is kept.
+    * criteria raising followed by a forced P-c failure (a ``_BaselineMismatch``, which carries
+      its reason and is not itself counted): the block is not computed and the count is kept. The
+      count is 2, not the plan's 1: ``h2d_part`` and ``h3c_part`` are both still patched to raise at
+      that point (the patches of the previous bullet are in the same ``with`` block).
     """
     world = _world(1101, with_reference=False)
     block = _run(world)
@@ -1553,4 +1558,34 @@ def test_failed_blocks_without_an_exception_count_zero() -> None:
                                       world.config)
     assert block["status"] == "not_computed" and "clip arrays absent" in block["reason"]
     assert block["n_caught_exceptions"] == 0
+
+
+def test_p2_parts_report_the_counts_they_recompute_o1() -> None:
+    """O-1 (WU-0004f): the P2 part entries carry ``n_failed_resamples`` (and ``n_constant_states``).
+
+    Reference: hand counts. H1b: a well-posed regression has 0 failed resamples; one whose ``x`` is
+    constant (zero variance, the slope is 0/0) fails on every resample, so the count equals
+    ``bootstrap_resamples``. The mini-world block: every computed tier-A part has an int
+    ``n_failed_resamples``, the H2b noise part an int ``n_constant_states``, and H3c (a ratio of means
+    of positive per-state MSEs, finite on every resample) has 0. Exact integers.
+    """
+    config = _config()
+    sq, q, sq_2, gain, _ = _h1b_hand_inputs()
+    good = cs.h1b_part(_h1b_original(), sq, sq_2, gain, 0.5 + 0.1 * np.arange(len(sq)), 3, config,
+                       "mini", 0)
+    assert good["status"] == "computed" and good["n_failed_resamples"] == 0
+    with pytest.warns(RuntimeWarning, match="invalid value"):  # the 0/0 slope is the point
+        flat = cs.h1b_part(_h1b_original(), sq, sq_2, gain, np.full(len(sq), 2.0), 3, config,
+                           "mini", 0)
+    assert flat["n_failed_resamples"] == config.bootstrap_resamples  # x constant: every slope is 0/0
+    world = _world(1101, with_reference=False)
+    block = _run(world)
+    for hypothesis in ("H1b", "H2a", "H2b", "H2c", "H2d", "H3c"):
+        for name, part in block["by_hypothesis"][hypothesis]["parts"].items():
+            if part["status"] == "computed" and "delta" in part and part["delta"] is not None:
+                assert type(part["n_failed_resamples"]) is int, (hypothesis, name)
+    noise = block["by_hypothesis"]["H2b"]["parts"]["noise"]
+    assert type(noise["n_constant_states"]) is int
+    # a ratio of means of positive per-state MSEs is finite on every resample: hand expectation 0
+    assert block["by_hypothesis"]["H3c"]["parts"]["A5_over_A4"]["n_failed_resamples"] == 0
 # ------------------------------------------------------------ end of the WU-0004f block
