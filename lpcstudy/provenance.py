@@ -73,19 +73,34 @@ class RunClock:
 def git_state(root: Path) -> tuple[str | None, bool | None, str | None]:
     """Return ``(commit, dirty, error)`` of the repository at ``root``.
 
-    ``dirty`` is true when ``git status --porcelain`` is non-empty (untracked files count) or
-    when ``git ls-files -v`` shows a tracked file hidden from status by the skip-worktree or
-    assume-unchanged bit (tags ``S``, ``s``, ``h``). The status call names its untracked-file and
-    submodule modes (``--untracked-files=normal``, ``--ignore-submodules=none``), so a user,
-    global or system setting such as ``status.showUntrackedFiles=no`` cannot hide a file, and git
-    runs without the variables that redirect it to another repository (``GIT_DIR``,
-    ``GIT_WORK_TREE``, ``GIT_INDEX_FILE`` and the object-store variables), so ``root`` is what is
-    read. In an ordinary checkout the value of ``dirty`` is unchanged by these (WU-0004a, R2). On
-    any failure the result is ``(None, None, <error text>)``; the error is recorded by the
+    ``dirty`` is true when either of two reads shows a difference from ``HEAD``:
+
+    * ``git status --porcelain`` is non-empty (modified, staged or untracked files);
+    * ``git ls-files -v`` shows a tracked file hidden from status by the skip-worktree or
+      assume-unchanged bit (tags ``S``, ``s``, ``h``).
+
+    Hiding routes closed (WU-0004a, R2 and R4): ``status.showUntrackedFiles`` and the submodule
+    setting (the status call names ``--untracked-files=normal --ignore-submodules=none``);
+    ``core.excludesFile`` from any config file or from the environment (the status call sets it to
+    ``/dev/null`` on the command line, and every ``GIT_CONFIG*`` variable is removed from git's
+    environment, which also drops the user's global ignore file); the skip-worktree and
+    assume-unchanged bits; and the variables that redirect git to another repository (``GIT_DIR``,
+    ``GIT_WORK_TREE``, ``GIT_INDEX_FILE`` and the object-store variables are removed).
+
+    Hiding routes **not** closed (accepted limitations, covered by the WU-0015.1 pre-run checks):
+    a file excluded by a ``.gitignore`` in the tree (the project's own declared ignore list), and
+    a line in ``.git/info/exclude``. The second could be closed by listing untracked files with
+    only the in-tree ``.gitignore`` files applied, but a git worktree shares ``info/exclude`` with
+    its main checkout, and the project's worktrees hold a ``.venv`` symlink that the ``.venv/``
+    pattern of ``.gitignore`` does not match and only ``info/exclude`` hides, so that read would
+    make every such worktree record ``dirty: true`` (a change to ordinary development runs). In an
+    ordinary checkout the value of ``dirty`` is unchanged by the closed routes.
+
+    On any failure the result is ``(None, None, <error text>)``; the error is recorded by the
     caller, never dropped.
     """
     environment = {name: value for name, value in os.environ.items()
-                   if name not in GIT_REDIRECT_VARIABLES}
+                   if name not in GIT_REDIRECT_VARIABLES and not name.startswith("GIT_CONFIG")}
 
     def run(*args: str) -> str:
         done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True,
@@ -97,8 +112,8 @@ def git_state(root: Path) -> tuple[str | None, bool | None, str | None]:
 
     try:
         commit = run("rev-parse", "HEAD").strip()
-        status = run("status", "--porcelain", "--untracked-files=normal",
-                     "--ignore-submodules=none")
+        status = run("-c", "core.excludesFile=/dev/null", "status", "--porcelain",
+                     "--untracked-files=normal", "--ignore-submodules=none")
         listing = run("ls-files", "-v")
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         return None, None, f"{type(exc).__name__}: {exc}"

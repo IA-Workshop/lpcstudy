@@ -1379,18 +1379,28 @@ PRECONDITION_PACKAGES = ("jax", "jaxlib")
 
 
 def current_commit() -> str | None:
-    """``git rev-parse HEAD`` of the repository of this tool, or ``None`` if git fails."""
-    done = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True,
-                          text=True, check=False)
-    return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
+    """``git rev-parse HEAD`` of the repository of this tool, or ``None`` if git fails.
+
+    Read through ``lpcstudy.provenance.git_state``, the reader that fills the arms' ``commit`` and
+    ``dirty`` (WU-0004a R5), so the probe and the arms use one definition. The import is inside the
+    function, like the other ``lpcstudy`` imports of this tool that need jax (the probe imports
+    the study before it reaches this call).
+    """
+    from lpcstudy.provenance import git_state
+    return git_state(ROOT)[0]
 
 
 def git_dirty() -> bool | None:
-    """``bool(git status --porcelain)`` of this repository (untracked files count, ``runs/`` is
-    ignored by git), the definition of ``provenance.git_state``; ``None`` if git fails."""
-    done = subprocess.run(["git", "-C", str(ROOT), "status", "--porcelain"], capture_output=True,
-                          text=True, check=False)
-    return bool(done.stdout.strip()) if done.returncode == 0 else None
+    """Whether this repository is dirty by the definition of ``provenance.git_state``.
+
+    That definition (see its docstring for the hiding routes it closes and its one accepted
+    limitation) counts modified, staged and untracked files (``runs/`` is ignored by the tree's
+    ``.gitignore``) and tracked files hidden by the skip-worktree or assume-unchanged bit. Returns
+    ``None`` if git fails. In an ordinary checkout the value is the same as the former
+    ``bool(git status --porcelain)`` of this function (WU-0004a R5).
+    """
+    from lpcstudy.provenance import git_state
+    return git_state(ROOT)[1]
 
 
 def precondition_mismatches(provenance: Mapping, env: Mapping[str, str | None],

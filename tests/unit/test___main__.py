@@ -20,6 +20,16 @@ CLEAN_COMMIT = "a" * 40
 REAL_GIT_STATE = provenance.git_state   # the production reader, kept before any test patches it
 
 
+def own_git_env() -> dict[str, str]:
+    """The environment for the tests' own git calls, without the variables that redirect git.
+
+    A suite started from a git hook has ``GIT_DIR`` or ``GIT_INDEX_FILE`` set; without this the
+    ``add`` and ``commit`` of a throwaway repository would act on the real repository.
+    """
+    import os
+    return {k: v for k, v in os.environ.items() if k not in provenance.GIT_REDIRECT_VARIABLES}
+
+
 @pytest.fixture(autouse=True)
 def _clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """No test sees a confirmatory seed or salt (LPC.PC.7)."""
@@ -647,8 +657,9 @@ def test_states_dump_on_adds_one_provenance_leaf_and_hands_the_study_a_dump(
 # and the tests prove the guard fires before the seed function is called. The references are the
 # hand-written messages and call orders below, independent of the code under test.
 
-DIRTY_LINE = (PREFIX + "the confirmatory flag needs a clean working tree (git status --porcelain "
-              "is not empty); commit or remove the changes first")
+DIRTY_LINE = (PREFIX + "the confirmatory flag needs a clean working tree (modified or untracked "
+              "files, or a tracked file hidden by skip-worktree or assume-unchanged); "
+              "commit or remove the changes first")
 UNKNOWN_LINE = (PREFIX + "the confirmatory flag needs a known commit and a readable git state "
                 "(commit unknown or git unavailable)")
 REFUSED_STATES = [
@@ -786,7 +797,7 @@ def test_choose_clean_tree_function_level(monkeypatch: pytest.MonkeyPatch) -> No
     """A6: ``choose_clean_tree`` returns the checked commit when clean and ignores a development run.
 
     Reference: the plan. With the flag absent git must not be read at all (the spy raises); with
-    the flag and a clean state it returns ``None``; with a dirty state it raises ``SeedRefusal``
+    the flag and a clean state it returns the checked commit; with a dirty state it raises ``SeedRefusal``
     whose reason is the hand-written text after the shared prefix.
     """
     from lpcstudy.seeds import SeedRefusal
@@ -836,7 +847,7 @@ def test_guard_with_the_real_git_reader_on_a_throwaway_repository(
 
     def git(*args: str) -> None:
         subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.org", "-C",
-                        str(repo), *args], check=True, capture_output=True)
+                        str(repo), *args], check=True, capture_output=True, env=own_git_env())
 
     if setup != "not-a-repository":
         git("init", "-q")
@@ -853,7 +864,7 @@ def test_guard_with_the_real_git_reader_on_a_throwaway_repository(
     args = build_parser().parse_known_args([FLAG])[0]
     if line is None:
         head = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], check=True,
-                              capture_output=True, text=True).stdout.strip()
+                              capture_output=True, text=True, env=own_git_env()).stdout.strip()
         assert choose_clean_tree(args) == head
     else:
         with pytest.raises(SeedRefusal) as caught:

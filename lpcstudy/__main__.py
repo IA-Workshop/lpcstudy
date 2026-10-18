@@ -115,9 +115,13 @@ def choose_clean_tree(args: argparse.Namespace) -> str | None:
     fills ``commit`` and ``dirty`` in the provenance block. The block of an accepted run is built
     from a second read, taken after the sealed seed has been read; ``main`` compares that read
     with the commit returned here and refuses if it differs (``check_tree_unchanged``), so an
-    accepted run's block records the state that was checked. ``dirty`` is true when
-    ``git status --porcelain`` is non-empty (untracked files count, whatever the git
-    configuration says) or a tracked file is hidden by the skip-worktree or assume-unchanged bit.
+    accepted run's block records the state that was checked. ``dirty`` is defined and its hiding
+    routes are listed in ``provenance.git_state``: modified, staged or untracked files count (an
+    untracked file counts whatever ``status.showUntrackedFiles``, ``core.excludesFile`` or the
+    ``GIT_CONFIG*`` environment say), and so does a tracked file hidden by the skip-worktree or
+    assume-unchanged bit. Not closed, and left to the WU-0015.1 pre-run checks (accepted
+    limitations): a file excluded by a ``.gitignore`` in the tree and a line in
+    ``.git/info/exclude``.
     Refused here: a commit that is not a full hexadecimal object name (``None``, empty,
     ``"unknown"``, abbreviated) or an unknown ``dirty`` (git failed, so cleanliness cannot be
     told), and ``dirty`` true. Git's own error text is not echoed (it can hold newlines and
@@ -145,8 +149,9 @@ def choose_clean_tree(args: argparse.Namespace) -> str | None:
         raise SeedRefusal("the confirmatory flag needs a known commit and a readable git state "
                           "(commit unknown or git unavailable)")
     if dirty:
-        raise SeedRefusal("the confirmatory flag needs a clean working tree (git status "
-                          "--porcelain is not empty); commit or remove the changes first")
+        raise SeedRefusal("the confirmatory flag needs a clean working tree (modified or untracked "
+                          "files, or a tracked file hidden by skip-worktree or assume-unchanged); "
+                          "commit or remove the changes first")
     return commit
 
 
