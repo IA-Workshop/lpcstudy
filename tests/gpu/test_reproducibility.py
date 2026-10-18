@@ -1,24 +1,24 @@
 """GPU reproducibility test: run the smoke preset twice on the GPU and compare.
 
-The study's results must be repeatable: the same code, seed and machine must give
-the same numbers, bit for bit. This module checks that claim on the GPU (WU-0004c,
-ruling B10). It starts the small "smoke" version of the study twice as child
-processes with the development seed DEV-0, then compares the two ``results.json``
-files leaf by leaf. A "leaf" is one value at the end of the nested results
-dictionary. Before it can run, a small probe decides whether a usable CUDA GPU
-(NVIDIA's computing platform) exists. The decision rules, ``classify_probe`` and
-``cuda_plugin_installed``, are tested without a GPU in
+The study's results must be repeatable: the same code, seed and machine must
+give the same numbers, bit for bit. This module checks that claim on the GPU
+(WU-0004c, ruling B10). It starts the small "smoke" version of the study twice
+as child processes with the development seed DEV-0, then compares the two
+``results.json`` files leaf by leaf. A "leaf" is one value at the end of the
+nested results dictionary. Before it can run, a small probe decides whether a
+usable CUDA GPU (NVIDIA's computing platform) exists. The decision rules,
+``classify_probe`` and ``cuda_plugin_installed``, are tested without a GPU in
 ``tests/unit/test_gpu_reproducibility_probe.py``. The comparison is this file's
 own code and does not reuse ``tools/compare_runs.py`` for the main check, so the
 two readings of the files are independent.
 
-Run it only through ``tools/run_tests.sh gpu tests/gpu/test_reproducibility.py``.
-That script holds the GPU lock ``/tmp/lpcstudy-gpu.lock`` and applies the
-1800-second timeout of DEVELOPMENT_WORKFLOW.md section 4.5. Never rerun it
-without a code change (section 4.4). The test refuses to start unless the parent
-process has ``JAX_PLATFORMS=cuda,cpu`` (only the wrapper's ``gpu`` tier sets
-it), so a direct call cannot start two GPU jobs outside the lock (WU-0004c
-review R6).
+Run it only through ``tools/run_tests.sh gpu
+tests/gpu/test_reproducibility.py``. That script holds the GPU lock
+``/tmp/lpcstudy-gpu.lock`` and applies the 1800-second timeout of
+DEVELOPMENT_WORKFLOW.md section 4.5. Never rerun it without a code change
+(section 4.4). The test refuses to start unless the parent process has
+``JAX_PLATFORMS=cuda,cpu`` (only the wrapper's ``gpu`` tier sets it), so a
+direct call cannot start two GPU jobs outside the lock (WU-0004c review R6).
 """
 
 from __future__ import annotations
@@ -41,25 +41,21 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 GPU_BACKENDS = frozenset({"gpu", "cuda", "rocm"})
 SEED_ID = "DEV-0"
 PROBE_TIMEOUT_SECONDS = 120
-RUN_TIMEOUT_SECONDS = (
-    780  # two runs plus the probe stay under the 1800 s tier timeout
-)
-NO_PLUGIN_EXIT = (
-    3  # RuntimeError from jax.devices('gpu') and no CUDA plugin installed
-)
-BACKEND_FAILED_EXIT = (
-    4  # RuntimeError from jax.devices('gpu') with a CUDA plugin installed
-)
-NO_DEVICE_MARK = "CUDA_ERROR_NO_DEVICE"  # cuInit's own message when the driver sees no device
-WRAPPER_PLATFORMS = (
-    "cuda,cpu"  # set by tools/run_tests.sh for the gpu tier only
-)
-# Floor against an empty tree; the default (one-system) smoke at bd8e168 has 4,695
-# leaves, of which 3,166 are floats.
+# two runs plus the probe stay under the 1800 s tier timeout
+RUN_TIMEOUT_SECONDS = 780
+# RuntimeError from jax.devices('gpu') and no CUDA plugin installed
+NO_PLUGIN_EXIT = 3
+# RuntimeError from jax.devices('gpu') with a CUDA plugin installed
+BACKEND_FAILED_EXIT = 4
+# cuInit's own message when the driver sees no device.
+NO_DEVICE_MARK = "CUDA_ERROR_NO_DEVICE"
+# set by tools/run_tests.sh for the gpu tier only
+WRAPPER_PLATFORMS = "cuda,cpu"
+# Floor against an empty tree; the default (one-system) smoke at bd8e168 has
+# 4,695 leaves, of which 3,166 are floats.
 MIN_LEAVES = 1000
-DECLARED_ABS = (
-    0.0  # tier T0 of the declared tolerance: bitwise (see the test docstring)
-)
+# tier T0 of the declared tolerance: bitwise (see the test docstring)
+DECLARED_ABS = 0.0
 DECLARED_REL = 0.0
 SAME_SETTINGS = (
     "seed_id",
@@ -135,15 +131,15 @@ def classify_probe(returncode: int, text: str, devices_hidden: bool) -> str:
 
     The inputs are the probe's exit code, its combined output text and whether
     the parent process hides GPUs (``devices_hidden``). The answer is ``skip``
-    only when there is no CUDA to start and nothing was set up to hide it: either
-    no CUDA plugin is installed (exit 3), or a plugin is installed and ``cuInit``
-    (the driver's start-up call) reports ``CUDA_ERROR_NO_DEVICE`` (exit 4 and
-    that mark in the output, which JAX logs to stderr) while
+    only when there is no CUDA to start and nothing was set up to hide it:
+    either no CUDA plugin is installed (exit 3), or a plugin is installed and
+    ``cuInit`` (the driver's start-up call) reports ``CUDA_ERROR_NO_DEVICE``
+    (exit 4 and that mark in the output, which JAX logs to stderr) while
     ``CUDA_VISIBLE_DEVICES`` is **unset** in the parent. With the variable set,
     a no-device report is a configuration fault of the GPU workstation (an
     inherited ``CUDA_VISIBLE_DEVICES=-1`` would hide the card), so the answer is
-    ``fail`` (review R8 b). Every other failure, including a CUDA backend that is
-    present but will not start, is also ``fail`` (PRIME.4: a broken GPU stack
+    ``fail`` (review R8 b). Every other failure, including a CUDA backend that
+    is present but will not start, is also ``fail`` (PRIME.4: a broken GPU stack
     must not look like a pass).
     """
     if returncode == 0:
@@ -202,8 +198,8 @@ def leaves(tree: object, path: tuple = ()) -> dict[tuple, object]:
 
     Dictionary keys named ``seconds`` and the top-level ``provenance`` block are
     skipped: timing and provenance (who ran what, where) are the two things the
-    declared tolerance allows to differ. This is the test's own walk, independent
-    of ``tools/compare_runs.py`` and ``tools/compare_pilot.py``.
+    declared tolerance allows to differ. This is the test's own walk,
+    independent of ``tools/compare_runs.py`` and ``tools/compare_pilot.py``.
     """
     if isinstance(tree, dict):
         out: dict[tuple, object] = {}
@@ -263,7 +259,9 @@ def compare_bitwise(first: dict, second: dict) -> Difference:
 
 
 def load_compare_runs():
-    """Import ``tools/compare_runs.py`` by file path (``tools`` is not a package)."""
+    """Import ``tools/compare_runs.py`` by file path (``tools`` is not a
+    package).
+    """
     spec = importlib.util.spec_from_file_location(
         "compare_runs_for_gpu_test", REPO_ROOT / "tools" / "compare_runs.py"
     )
@@ -277,11 +275,11 @@ def load_compare_runs():
 def gpu_environment() -> dict[str, str]:
     """Return the environment variables for a child process that uses the GPU.
 
-    CUDA only (no silent fallback to the CPU) and no memory preallocation (section
-    4.5). The persistent compilation cache is turned off
-    (``JAX_ENABLE_COMPILATION_CACHE=false`` and no ``JAX_COMPILATION_CACHE_DIR``),
-    so run 2 cannot load run 1's compiled programs or autotuning choices
-    (review R4).
+    CUDA only (no silent fallback to the CPU) and no memory preallocation
+    (section 4.5). The persistent compilation cache is turned off
+    (``JAX_ENABLE_COMPILATION_CACHE=false`` and no
+    ``JAX_COMPILATION_CACHE_DIR``), so run 2 cannot load run 1's compiled
+    programs or autotuning choices (review R4).
     """
     env = {
         **os.environ,
@@ -374,60 +372,64 @@ def run_smoke(out_dir: Path) -> tuple[dict, float]:
 def test_smoke_twice_on_gpu_is_bitwise_reproducible(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], record_property
 ) -> None:
-    """Two GPU runs of the smoke preset (DEV-0, same settings) agree bit for bit.
+    """Two GPU runs of the smoke preset (DEV-0, same settings) agree bit for
+    bit.
 
     This is reproducibility tier T0: "bitwise", the strictest tier.
 
-    Reference (independent): the first run against the second run. The pair is its
-    own reference, because the claim is that two executions of the same code on the
-    same device agree, not that either equals a known value. The comparison is this
-    file's own walk of the two ``results.json`` trees, with floats compared as
-    IEEE-754 bytes. It does not use ``tools/compare_runs.py``; that tool is
-    imported afterwards only to classify the pair (tier T0, exit 0), as a second,
-    independent reading of the same files. Nothing is compared between the GPU and
-    the CPU: across devices the contexts differ and the rule is the TD statistic,
-    not a per-leaf tolerance.
+    Reference (independent): the first run against the second run. The pair is
+    its own reference, because the claim is that two executions of the same code
+    on the same device agree, not that either equals a known value. The
+    comparison is this file's own walk of the two ``results.json`` trees, with
+    floats compared as IEEE-754 bytes. It does not use
+    ``tools/compare_runs.py``; that tool is imported afterwards only to classify
+    the pair (tier T0, exit 0), as a second, independent reading of the same
+    files. Nothing is compared between the GPU and the CPU: across devices the
+    contexts differ and the rule is the TD statistic, not a per-leaf tolerance.
 
-    Declared tolerance: **bitwise**. The maximum absolute difference is 0.0 and the
-    maximum relative difference is 0.0 over every leaf except timing (keys
-    ``seconds``) and the top-level ``provenance`` block. No leaf may exist on one
-    side only, and no integer, boolean, string or null leaf may differ. Source: the
-    declared reproducibility tolerance of WU-0003.6, item 1 (same context, device
-    type, host, code, seed and environment: tier T0, bitwise; draft decision in
-    ``docs/agent/notes/2026-10-18-owner-decision-drafts.md`` section 1). The
-    measured fact behind it is R1 against R2 (DEV-1 pilot on this host's GPU,
-    20,533 of 20,533 leaves equal). The tolerance was fixed before this test ran
-    and is not loosened on failure (PRIME.2): a difference is a nondeterminism
-    finding to be recorded as a DEF (defect), not a reason to widen it. No Monte
-    Carlo error applies: nothing is estimated, and the test draws no random number
-    (the seed is the registered DEV-0, passed to the preset).
+    Declared tolerance: **bitwise**. The maximum absolute difference is 0.0 and
+    the maximum relative difference is 0.0 over every leaf except timing (keys
+    ``seconds``) and the top-level ``provenance`` block. No leaf may exist on
+    one side only, and no integer, boolean, string or null leaf may differ.
+    Source: the declared reproducibility tolerance of WU-0003.6, item 1 (same
+    context, device type, host, code, seed and environment: tier T0, bitwise;
+    draft decision in ``docs/agent/notes/2026-10-18-owner-decision-drafts.md``
+    section 1). The measured fact behind it is R1 against R2 (DEV-1 pilot on
+    this host's GPU, 20,533 of 20,533 leaves equal). The tolerance was fixed
+    before this test ran and is not loosened on failure (PRIME.2): a difference
+    is a nondeterminism finding to be recorded as a DEF (defect), not a reason
+    to widen it. No Monte Carlo error applies: nothing is estimated, and the
+    test draws no random number (the seed is the registered DEV-0, passed to the
+    preset).
 
     Scope of the property (review R3). Bitwise repeatability of a GPU run is a
-    **measured property of this card, driver and jaxlib (RTX 4090, jaxlib 0.11.2),
-    without ``--xla_gpu_deterministic_ops``** (plan item O3, still open), not a
-    guarantee of XLA or CUDA. The tolerance cited is the ruled but not yet entered
-    decision of WU-0003.6 (no DEC id exists yet; the draft is the file above). A
-    failure after a driver, jaxlib or host change is a finding about that change,
-    to be recorded as a DEF, and not a reason to widen the tolerance.
+    **measured property of this card, driver and jaxlib (RTX 4090, jaxlib
+    0.11.2), without ``--xla_gpu_deterministic_ops``** (plan item O3, still
+    open), not a guarantee of XLA or CUDA. The tolerance cited is the ruled but
+    not yet entered decision of WU-0003.6 (no DEC id exists yet; the draft is
+    the file above). A failure after a driver, jaxlib or host change is a
+    finding about that change, to be recorded as a DEF, and not a reason to
+    widen the tolerance.
 
     Settings check: the two ``provenance`` blocks must agree on seed, preset,
     config, commit, dirty flag, device, environment, package versions, Python,
     ``jax_x64`` and matmul precision, so "identical settings" is verified.
     ``jax_x64`` must be true (float64). The children run with the persistent
-    compilation cache off, so run 2 cannot reuse run 1's compiled code. The parent
-    must have ``JAX_PLATFORMS=cuda,cpu`` (the wrapper's ``gpu`` tier): otherwise
-    the test fails at once rather than start GPU jobs outside the lock.
+    compilation cache off, so run 2 cannot reuse run 1's compiled code. The
+    parent must have ``JAX_PLATFORMS=cuda,cpu`` (the wrapper's ``gpu`` tier):
+    otherwise the test fails at once rather than start GPU jobs outside the
+    lock.
 
-    The test is skipped, not failed, only when there is no CUDA to start: no CUDA
-    plugin installed (detected by pattern, any CUDA major version), or the driver
-    reports ``CUDA_ERROR_NO_DEVICE`` while ``CUDA_VISIBLE_DEVICES`` is unset. The
-    reason is printed with capture disabled, because ``-rfE`` does not report
-    skips. A CUDA backend that is present but will not start fails the test, and
-    so does a no-device report with ``CUDA_VISIBLE_DEVICES`` set (a hidden device
-    is a configuration fault on the GPU workstation). The measured maximum
-    differences are printed (capture disabled) and recorded with
-    ``record_property``. Cost: two smoke runs on the GPU, each about 4 times slower
-    than on the CPU, inside the 1800 s tier timeout.
+    The test is skipped, not failed, only when there is no CUDA to start: no
+    CUDA plugin installed (detected by pattern, any CUDA major version), or the
+    driver reports ``CUDA_ERROR_NO_DEVICE`` while ``CUDA_VISIBLE_DEVICES`` is
+    unset. The reason is printed with capture disabled, because ``-rfE`` does
+    not report skips. A CUDA backend that is present but will not start fails
+    the test, and so does a no-device report with ``CUDA_VISIBLE_DEVICES`` set
+    (a hidden device is a configuration fault on the GPU workstation). The
+    measured maximum differences are printed (capture disabled) and recorded
+    with ``record_property``. Cost: two smoke runs on the GPU, each about 4
+    times slower than on the CPU, inside the 1800 s tier timeout.
     """
     assert os.environ.get("JAX_PLATFORMS") == WRAPPER_PLATFORMS, (
         f"run this test only through tools/run_tests.sh gpu (it holds the GPU lock and sets JAX_PLATFORMS="

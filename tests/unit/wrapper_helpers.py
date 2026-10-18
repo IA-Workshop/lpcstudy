@@ -6,8 +6,8 @@ would start real study runs and could touch the real ``runs/`` folder and the
 real GPU lock. Instead, the tests in ``test_tools_run_tests.py``,
 ``test_tools_run_preset.py`` and ``test_tools_gpu_hours.py`` use ``FakeRoot``,
 which copies the wrappers and the seed registry into a temporary folder and puts
-fakes in place of the programs the wrappers start. The fakes only record how they
-were called, so a test can check what a wrapper did.
+fakes in place of the programs the wrappers start. The fakes only record how
+they were called, so a test can check what a wrapper did.
 
 * ``fakepy`` (used through ``LPC_PYTHON``) records its arguments and environment
   as one JSON line in ``$FAKE_DIR/python.jsonl``. It answers ``--help`` with or
@@ -18,8 +18,8 @@ were called, so a test can check what a wrapper did.
 * ``tools/gpu_hours.py`` in the root is a fake that records its arguments in
   ``$FAKE_DIR/tally.jsonl`` and exits with ``$FAKE_TALLY_EXIT`` (default 0),
   unless ``real_tally=True`` copies the real tool.
-* ``bin/timeout`` records its arguments in ``$FAKE_DIR/timeout.log`` and runs the
-  command that follows the duration.
+* ``bin/timeout`` records its arguments in ``$FAKE_DIR/timeout.log`` and runs
+  the command that follows the duration.
 """
 
 from __future__ import annotations
@@ -88,8 +88,8 @@ class FakeRoot:
     Parameters
     ----------
     base : Path
-        Empty folder (``tmp_path``) that will hold ``root/``, ``fake/``, ``bin/``
-        and ``lock``.
+        Empty folder (``tmp_path``) that will hold ``root/``, ``fake/``,
+        ``bin/`` and ``lock``.
     real_tally : bool
         Keep the real ``tools/gpu_hours.py`` (default: replace it with the
         recording fake).
@@ -122,9 +122,9 @@ class FakeRoot:
     def environment(self, **extra: str) -> dict[str, str]:
         """Return a clean environment for running a wrapper.
 
-        The real ``PATH`` stays behind the fakes. Variables that the wrappers read
-        (``LPC_*``, ``JAX_*``, ``XLA_*``, ``PJRT_*``, ``NPROC``, thread counts) are
-        dropped, so a developer's own settings cannot change a test.
+        The real ``PATH`` stays behind the fakes. Variables that the wrappers
+        read (``LPC_*``, ``JAX_*``, ``XLA_*``, ``PJRT_*``, ``NPROC``, thread
+        counts) are dropped, so a developer's own settings cannot change a test.
         """
         env = {
             k: v
@@ -161,7 +161,9 @@ class FakeRoot:
         env: dict[str, str] | None = None,
         timeout: float = 20.0,
     ) -> subprocess.CompletedProcess[str]:
-        """Run ``<root>/tools/<tool>`` from the root; return the finished process."""
+        """Run ``<root>/tools/<tool>`` from the root; return the finished
+        process.
+        """
         return subprocess.run(
             [str(self.root / "tools" / tool), *args],
             cwd=self.root,
@@ -173,14 +175,18 @@ class FakeRoot:
         )
 
     def calls(self) -> list[dict]:
-        """Return the fake Python's JSON records, in order (empty if it never ran)."""
+        """Return the fake Python's JSON records, in order (empty if it never
+        ran).
+        """
         path = self.fake_dir / "python.jsonl"
         if not path.exists():
             return []
         return [json.loads(line) for line in path.read_text().splitlines()]
 
     def tally_calls(self) -> list[list[str]]:
-        """Return the arguments of each fake ``gpu_hours.py`` call (empty if none)."""
+        """Return the arguments of each fake ``gpu_hours.py`` call (empty if
+        none).
+        """
         path = self.fake_dir / "tally.jsonl"
         return (
             [json.loads(line) for line in path.read_text().splitlines()]
@@ -189,7 +195,7 @@ class FakeRoot:
         )
 
     def timeout_calls(self) -> list[list[str]]:
-        """Return the arguments of each fake ``timeout`` call (empty if none)."""
+        """Return the arguments of each fake ``timeout`` call (none: empty)."""
         path = self.fake_dir / "timeout.log"
         return (
             [line.split() for line in path.read_text().splitlines()]

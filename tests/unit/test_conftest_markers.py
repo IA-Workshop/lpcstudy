@@ -4,14 +4,14 @@
 gpu) by its folder and stops tests outside ``tests/gpu`` from using a GPU. These
 rules keep quick checks from touching the shared GPU, so they protect every
 other test of the study (WU-0010.1). The independent reference for every test
-here is the written rule, not the conftest's own output: the folder-to-tier table
-of DEVELOPMENT_WORKFLOW.md section 4.1 (``tests/unit`` is unit,
+here is the written rule, not the conftest's own output: the folder-to-tier
+table of DEVELOPMENT_WORKFLOW.md section 4.1 (``tests/unit`` is unit,
 ``tests/integration`` is integration, ``tests/slow`` is slow, ``tests/gpu`` is
 gpu) and the section 4.5 rule that tests outside ``tests/gpu/`` never request a
 GPU. Each test builds a small throwaway ``tests/`` tree with the ``pytester``
-tool (a pytest feature that runs pytest inside a temporary folder), copies in the
-real ``tests/conftest.py`` and ``pytest.ini``, and checks what pytest does with
-it. The results are exact (a marker is present or not), so no numerical
+tool (a pytest feature that runs pytest inside a temporary folder), copies in
+the real ``tests/conftest.py`` and ``pytest.ini``, and checks what pytest does
+with it. The results are exact (a marker is present or not), so no numerical
 tolerance is involved.
 """
 
@@ -85,7 +85,8 @@ def test_gpu_request_outside_gpu_tier_fails_with_clear_message(
     (tests / "unit").mkdir()
     (tests / "unit" / "test_gpu_call.py").write_text(GPU_CALL)
     monkeypatch.delenv("JAX_PLATFORMS", raising=False)
-    # Hide the devices so a regressed guard cannot initialize CUDA or ROCm outside the lock.
+    # Hide the devices so a regressed guard cannot initialize CUDA or ROCm
+    # outside the lock.
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     monkeypatch.setenv("ROCR_VISIBLE_DEVICES", "")
     result = pytester.runpytest_subprocess()

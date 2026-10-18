@@ -1,23 +1,24 @@
-"""Hand-written cases for the GPU probe in ``tests/gpu/test_reproducibility.py``.
+"""Hand-written cases for the GPU probe in
+``tests/gpu/test_reproducibility.py``.
 
 The GPU reproducibility test first runs a small "probe" to see whether a usable
 GPU exists, and the probe's answer decides skip or fail (WU-0004c, review R8). A
 wrong rule would turn a broken GPU stack into a silent skip, and then the study
-would lose its check that GPU runs repeat exactly. These tests run on the CPU and
-start no GPU job. They import the gpu test module by file path (at module level it
-imports only pytest and the standard library).
+would lose its check that GPU runs repeat exactly. These tests run on the CPU
+and start no GPU job. They import the gpu test module by file path (at module
+level it imports only pytest and the standard library).
 
 References (none is the code under test):
 
-* ``classify_probe``: the decision table of the plan, typed by hand. Exit 0 is ok;
-  exit 3 (no CUDA plugin) skips; exit 4 (a plugin is installed and JAX raised an
-  error) skips only with cuInit's ``CUDA_ERROR_NO_DEVICE`` in the output and
-  ``CUDA_VISIBLE_DEVICES`` unset in the parent; every other exit, and exit 4
-  without the mark or with the variable set, fails.
+* ``classify_probe``: the decision table of the plan, typed by hand. Exit 0 is
+  ok; exit 3 (no CUDA plugin) skips; exit 4 (a plugin is installed and JAX
+  raised an error) skips only with cuInit's ``CUDA_ERROR_NO_DEVICE`` in the
+  output and ``CUDA_VISIBLE_DEVICES`` unset in the parent; every other exit, and
+  exit 4 without the mark or with the variable set, fails.
 * ``cuda_plugin_installed``: synthetic site directories built here with a known
   content (a ``jax_plugins/xla_cuda13`` module, a
-  ``jax_cuda13_plugin-1.0.dist-info`` metadata folder, and non-CUDA look-alikes),
-  so the expected answer is known by construction.
+  ``jax_cuda13_plugin-1.0.dist-info`` metadata folder, and non-CUDA
+  look-alikes), so the expected answer is known by construction.
 
 No tolerance is involved: every assertion is an exact equality of strings or
 booleans.
@@ -93,7 +94,7 @@ def probe_module():
 def test_classify_probe_decision_table(
     probe_module, code: int, text: str, hidden: bool, expected: str
 ) -> None:
-    """``classify_probe`` returns the hand-typed table's answer in every case."""
+    """``classify_probe`` returns the hand-typed table's answer in each case."""
     assert probe_module.classify_probe(code, text, hidden) == expected
 
 
@@ -102,8 +103,8 @@ def make_site(
 ) -> str:
     """Build a fake site directory and return its path as a string.
 
-    It holds ``jax_plugins/<module>/__init__.py`` for each name in ``modules`` and
-    ``<dist>-1.0.dist-info/METADATA`` for each name in ``dists``.
+    It holds ``jax_plugins/<module>/__init__.py`` for each name in ``modules``
+    and ``<dist>-1.0.dist-info/METADATA`` for each name in ``dists``.
     """
     root.mkdir(parents=True, exist_ok=True)
     for module in modules:
@@ -152,7 +153,8 @@ def make_site(
 def test_cuda_plugin_detection_by_pattern(
     probe_module, tmp_path: Path, modules, dists, expected: bool
 ) -> None:
-    """``cuda_plugin_installed`` finds a CUDA plugin of any major version, and only that.
+    """``cuda_plugin_installed`` finds a CUDA plugin of any major version, and
+    only that.
 
     The fake site directory is built here, so the expected answer is known.
     """
@@ -161,10 +163,12 @@ def test_cuda_plugin_detection_by_pattern(
 
 
 def test_probe_source_compiles_and_embeds_the_detector(probe_module) -> None:
-    """The probe's source text is valid Python and carries the detector and its patterns.
+    """The probe's source text is valid Python and carries the detector and its
+    patterns.
 
-    The probe runs as a child process, so its code is passed as text; this checks
-    that the text compiles and includes the detector function and both constants.
+    The probe runs as a child process, so its code is passed as text; this
+    checks that the text compiles and includes the detector function and both
+    constants.
     """
     compile(probe_module.PROBE, "probe", "exec")
     assert "def cuda_plugin_installed" in probe_module.PROBE

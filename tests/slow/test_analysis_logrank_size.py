@@ -1,41 +1,49 @@
-"""Simulation tests of the false-alarm rate of the H3a log-rank tests (rows L1 and L2).
+"""Simulation tests of the false-alarm rate of the H3a log-rank tests (rows L1
+and L2).
 
 Hypothesis H3a asks whether forecast skill lasts a different time in different
-regimes of the system. The study answers with log-rank tests (a standard test that
-compares how quickly events happen in two groups) on pairs of regimes, and corrects
-for testing several pairs with the Holm method. A test's "size" is how often it
-wrongly reports a difference when there is none. Here we make synthetic durations
-whose true answer is known, run the production function ``h3a_logrank`` many times,
-and count the false alarms (WU-0006.3). The simulation tools are in
-``tests/slow/wu0006_harness.py`` and the independent reference tables in
-``tests/slow/wu0006_reference.py``. The rest of this docstring is the detailed
-specification, kept for reviewers.
+regimes of the system. The study answers with log-rank tests (a standard test
+that compares how quickly events happen in two groups) on pairs of regimes, and
+corrects for testing several pairs with the Holm method. A test's "size" is how
+often it wrongly reports a difference when there is none. Here we make synthetic
+durations whose true answer is known, run the production function
+``h3a_logrank`` many times, and count the false alarms (WU-0006.3). The
+simulation tools are in ``tests/slow/wu0006_harness.py`` and the independent
+reference tables in ``tests/slow/wu0006_reference.py``. The rest of this
+docstring is the detailed specification, kept for reviewers.
 
 Slow tier: R = 2000 families per (row, phi), about 5 s each on the pool.
 
-**Design** (applied-mathematician's M5). 3 regimes of exactly 200 states each, the terciles of an AR(1)
-latent; geometric durations with hazard h = 0.0125 per step through a Gaussian copula of an independent
-AR(1) latent, censored at 240 steps (4.89% censored in L1); horizons for the regime order from
-``kaplan_meier(...).median()`` on an independent calibration draw, as in the pipeline. L1: all hazards
-equal (global null). L2: regimes 0 and 1 at h, regime 2 at 2h (partial null; "pass" needs the null pair
-to reject). phi (lag-1 of both latents) in {0, 0.3}. ``h3a_logrank`` uses the Holm family of the 2
-consecutive pairs at 0.01.
+**Design** (applied-mathematician's M5). 3 regimes of exactly 200 states each,
+the terciles of an AR(1) latent; geometric durations with hazard h = 0.0125 per
+step through a Gaussian copula of an independent AR(1) latent, censored at 240
+steps (4.89% censored in L1); horizons for the regime order from
+``kaplan_meier(...).median()`` on an independent calibration draw, as in the
+pipeline. L1: all hazards equal (global null). L2: regimes 0 and 1 at h, regime
+2 at 2h (partial null; "pass" needs the null pair to reject). phi (lag-1 of both
+latents) in {0, 0.3}. ``h3a_logrank`` uses the Holm family of the 2 consecutive
+pairs at 0.01.
 
-**Reference and prediction** (production ``h3a_logrank``, 40 000 families per row, scratch seed
-20261011): L1 FWER (any Holm-adjusted p < 0.01) 0.0105 at phi 0 and 0.0134 at 0.3, P(pass) 0.0010 and
-0.0013; L2 P(pass) 0.0115 and 0.0122; variance inflation of the null pair 1.009 and 1.079 (L1), 1.012
-and 1.046 (L2). Predicted P(the ROADMAP bound fails | correct code): L1 0.006 (phi 0) and 0.105
-(phi 0.3), L2 0.021 and 0.041. The log-rank test assumes independent states; the serially correlated
-labels and durations at phi = 0.3 inflate its variance by about 1.08, a property of the method.
+**Reference and prediction** (production ``h3a_logrank``, 40 000 families per
+row, scratch seed 20261011): L1 FWER (any Holm-adjusted p < 0.01) 0.0105 at phi
+0 and 0.0134 at 0.3, P(pass) 0.0010 and 0.0013; L2 P(pass) 0.0115 and 0.0122;
+variance inflation of the null pair 1.009 and 1.079 (L1), 1.012 and 1.046 (L2).
+Predicted P(the ROADMAP bound fails | correct code): L1 0.006 (phi 0) and 0.105
+(phi 0.3), L2 0.021 and 0.041. The log-rank test assumes independent states; the
+serially correlated labels and durations at phi = 0.3 inflate its variance by
+about 1.08, a property of the method.
 
-**Assertion groups**: exact (L3: no pair left uncomputed, counted, 0), consistency (the pre-registered
-ranges of counts of 2000: L1 FWER 7 to 39 at phi 0 and 11 to 47 at 0.3; L1 pass 0 to 9 and 0 to 10; L2
-pass 8 to 42 and 9 to 44), and roadmap (each error count <= 33 of 2000: nominal 0.01 + 3 SE, SE 0.00222,
-bound 0.016675). Under Option C (``ASSERT_ROADMAP_BOUNDS = False``, in force since 2026-10-12,
-DEC-0026 item 2) this bound is a recorded characterization row (computed, written to the results table,
-shown as a pytest warning, not asserted); the exact and consistency groups are asserted in both
-positions, and the bound is asserted only under Option K (True). Results are written to
-``runs/tests/wu0006_logrank.json`` with the censoring fraction and the variance inflation.
+**Assertion groups**: exact (L3: no pair left uncomputed, counted, 0),
+consistency (the pre-registered ranges of counts of 2000: L1 FWER 7 to 39 at phi
+0 and 11 to 47 at 0.3; L1 pass 0 to 9 and 0 to 10; L2 pass 8 to 42 and 9 to 44),
+and roadmap (each error count <= 33 of 2000: nominal 0.01 + 3 SE, SE 0.00222,
+bound 0.016675). Under Option C (``ASSERT_ROADMAP_BOUNDS = False``, in force
+since 2026-10-12, DEC-0026 item 2) this bound is a recorded characterization row
+(computed, written to the results table, shown as a pytest warning, not
+asserted); the exact and consistency groups are asserted in both positions, and
+the bound is asserted only under Option K (True). Results are written to
+``runs/tests/wu0006_logrank.json`` with the censoring fraction and the variance
+inflation.
 """
 
 from __future__ import annotations
@@ -50,14 +58,18 @@ ROWS = ("L1", "L2")
 
 @pytest.fixture(scope="module")
 def pool():
-    """Start the pool of single-thread worker processes, shared by the whole module."""
+    """Start the pool of single-thread worker processes, shared by the whole
+    module.
+    """
     with wu.worker_pool() as shared:
         yield shared
 
 
 @pytest.fixture(scope="module")
 def cache() -> wu.RunCache:
-    """Return the on-disk cache that keeps each simulation result for the module's tests."""
+    """Return the on-disk cache that keeps each simulation result for the
+    module's tests.
+    """
     return wu.RunCache("logrank")
 
 
@@ -69,8 +81,8 @@ def test_no_pair_is_left_uncomputed(
     """L3: no pair is left uncomputed in any of the 2000 families.
 
     With 200 states per regime and 4.9% censoring, no pair has zero log-rank
-    variance or an empty regime (reference: 0 in 160 000 families). The cases are
-    counted, and the tolerance is zero.
+    variance or an empty regime (reference: 0 in 160 000 families). The cases
+    are counted, and the tolerance is zero.
     """
     evaluation = cache.logrank(pool, row, phi)
     assert not evaluation.exact, "; ".join(evaluation.exact)
@@ -84,8 +96,8 @@ def test_counts_are_consistent_with_the_reference(
     """The FWER and P(pass) counts lie in the pre-registered ranges.
 
     FWER is the family-wise error rate, the chance of at least one false alarm
-    among the pairs. A range is the central 0.9995 of the predictive distribution
-    of the count out of 2000 under the reference rate.
+    among the pairs. A range is the central 0.9995 of the predictive
+    distribution of the count out of 2000 under the reference rate.
     """
     evaluation = cache.logrank(pool, row, phi)
     assert not evaluation.consistency, "; ".join(evaluation.consistency)
@@ -96,14 +108,16 @@ def test_counts_are_consistent_with_the_reference(
 def test_roadmap_size_bound(
     pool, cache: wu.RunCache, row: str, phi: float
 ) -> None:
-    """The ROADMAP size bound: FWER (L1) and P(H3a verdict = pass) (L1 and L2) <= 33 of 2000.
+    """The ROADMAP size bound: FWER (L1) and P(H3a verdict = pass) (L1 and L2)
+    <= 33 of 2000.
 
     That is 0.01 + 3 SE = 0.016675. Under L1 a "pass" is a false positive; under
     L2 it needs the null pair to reject. Predicted P(fail): see the module table
     (0.105 for L1 at phi = 0.3). A failure is a finding of class "method"
-    (dependent labels), recorded in the unit Log, never tuned away. Under Option C
-    (``ASSERT_ROADMAP_BOUNDS = False``, as shipped) the outcome is only recorded
-    and warned about, never asserted; under Option K (True) a failed bound raises.
+    (dependent labels), recorded in the unit Log, never tuned away. Under Option
+    C (``ASSERT_ROADMAP_BOUNDS = False``, as shipped) the outcome is only
+    recorded and warned about, never asserted; under Option K (True) a failed
+    bound raises.
     """
     evaluation = cache.logrank(pool, row, phi)
     assert wu.enforce(evaluation.roadmap) in ("pass", "fail")

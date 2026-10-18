@@ -1,54 +1,56 @@
 """End-to-end check of the optional state dump on the smoke preset (WU-0003.7b).
 
-With the flag ``--states-dump`` a run also saves the raw per-state arrays behind its
-summary numbers (error moments, weights, estimator results) in an ``.npz`` file, so
-a reader can recompute any reported number from the saved arrays. The dump must
-change nothing else, and the saved arrays must really be what the run used. This
-module runs the smoke preset (a small, fast version of the study) twice on the
-development seed DEV-0 on the CPU, each time in a fresh Python process: once without
-and once with ``--states-dump``. Each run is a preset, so the file is run only when
-the preset slot is free. The numbering b1 to b7 follows the plan (B2 row .7b).
-Check b1 (dump off against the .7a tip: 0 changed, 0 removed, 0 added) needs a run
-of that older commit and is done by hand with ``tools/leafdiff.py``; it is in the
-unit Log.
+With the flag ``--states-dump`` a run also saves the raw per-state arrays behind
+its summary numbers (error moments, weights, estimator results) in an ``.npz``
+file, so a reader can recompute any reported number from the saved arrays. The
+dump must change nothing else, and the saved arrays must really be what the run
+used. This module runs the smoke preset (a small, fast version of the study)
+twice on the development seed DEV-0 on the CPU, each time in a fresh Python
+process: once without and once with ``--states-dump``. Each run is a preset, so
+the file is run only when the preset slot is free. The numbering b1 to b7
+follows the plan (B2 row .7b). Check b1 (dump off against the .7a tip: 0
+changed, 0 removed, 0 added) needs a run of that older commit and is done by
+hand with ``tools/leafdiff.py``; it is in the unit Log.
 
-* b2: the ``results.json`` files of the two runs are bitwise equal (floats compared
-  by their IEEE bytes), except that the dump run's ``provenance`` block has the extra
-  leaf ``states_dump`` (and its own command line). Reference: the comparison in
-  ``tools/leafdiff.py``, which excludes ``provenance`` and ``seconds``, and the
-  provenance blocks compared here by hand.
-* b3: the production summary function applied to each dumped array reproduces its
-  leaf in the results. The summaries are the V4 median and mean absolute deviation,
-  the Q-N Delta R^2 (``analysis.delta_r2``), the H1b PLP slope
-  (``statistics.ols_slope``), the median weight profile and the H2b median weights,
-  the per-rule MSE at ``H_ref`` and the cell's Levenberg-Marquardt block
-  (``pipeline.lm_block``). The match is bitwise where the function and the order of
-  operations are the same (V4, Q-N, H1b, weight profile, H2b, LM). The per-rule MSE
-  leaf is the mean over all (state, draw) pairs while the dump holds per-state
-  means, so it is compared to ``2 n E 2**-52`` relative. The reason: the worst-case
-  relative error of a sum of ``n E`` positive terms is ``gamma_{nE}``, about
-  ``n E 2**-53``, and the two orders of summation can differ by twice that.
-* b3 also: the clip and replacement counts. The core cell's record pools the three
-  data splits, so the per-split ``handling/<split>/`` arrays are summed and compared
-  exactly with ``handling/cells/<core>/by_kind/<oracle|eval>/counts`` (the eight
-  ``handled`` columns and the three clipped-entry totals).
-* b3 also, schema /2 (WU-0003.7c; a **dump-fidelity check**: the reference is the
-  production statistic itself, so it proves that the dump holds what the run used,
-  not that H1c or H1a is right): ``analysis.h1c_ratio_block`` applied to the dumped
-  per-state H1c ratios of the eligible states reproduces the PLP and CP leaves
-  (bitwise). The H1a medians ``median_seed_by_n_lib``, the reference
+* b2: the ``results.json`` files of the two runs are bitwise equal (floats
+  compared by their IEEE bytes), except that the dump run's ``provenance`` block
+  has the extra leaf ``states_dump`` (and its own command line). Reference: the
+  comparison in ``tools/leafdiff.py``, which excludes ``provenance`` and
+  ``seconds``, and the provenance blocks compared here by hand.
+* b3: the production summary function applied to each dumped array reproduces
+  its leaf in the results. The summaries are the V4 median and mean absolute
+  deviation, the Q-N Delta R^2 (``analysis.delta_r2``), the H1b PLP slope
+  (``statistics.ols_slope``), the median weight profile and the H2b median
+  weights, the per-rule MSE at ``H_ref`` and the cell's Levenberg-Marquardt
+  block (``pipeline.lm_block``). The match is bitwise where the function and the
+  order of operations are the same (V4, Q-N, H1b, weight profile, H2b, LM). The
+  per-rule MSE leaf is the mean over all (state, draw) pairs while the dump
+  holds per-state means, so it is compared to ``2 n E 2**-52`` relative. The
+  reason: the worst-case relative error of a sum of ``n E`` positive terms is
+  ``gamma_{nE}``, about ``n E 2**-53``, and the two orders of summation can
+  differ by twice that.
+* b3 also: the clip and replacement counts. The core cell's record pools the
+  three data splits, so the per-split ``handling/<split>/`` arrays are summed
+  and compared exactly with
+  ``handling/cells/<core>/by_kind/<oracle|eval>/counts`` (the eight ``handled``
+  columns and the three clipped-entry totals).
+* b3 also, schema /2 (WU-0003.7c; a **dump-fidelity check**: the reference is
+  the production statistic itself, so it proves that the dump holds what the run
+  used, not that H1c or H1a is right): ``analysis.h1c_ratio_block`` applied to
+  the dumped per-state H1c ratios of the eligible states reproduces the PLP and
+  CP leaves (bitwise). The H1a medians ``median_seed_by_n_lib``, the reference
   ``inverse_dim_reference`` and, with the production generator labels, the fit
   statistics ``ratio`` and ``fitted_inverse_dim`` are reproduced from the dumped
   squared seed errors (bitwise).
-* b4: ``(m_A + m_B) / 2 = m`` for ``E_C``, ``E_P`` and ``C`` (mean squared errors of
-  CP and PLP, and their cross moment) at every evaluation horizon of the core cell
-  and at ``H_ref`` of every sweep cell. Here ``m_A`` and ``m_B`` are the moments from
-  the two halves of the draws. The tolerance is ``1e-13`` times the exact mean
-  absolute term: the moment itself for the two squares (their terms are positive)
-  and the dumped ``abs_C`` (the mean of ``|e_C e_P|`` over the draws) for the cross
-  moment. This is the plan's scale.
-* b5: the median of the per-state V4 half-widths at ``H_ref`` equals the V4 leaf,
-  bitwise.
+* b4: ``(m_A + m_B) / 2 = m`` for ``E_C``, ``E_P`` and ``C`` (mean squared
+  errors of CP and PLP, and their cross moment) at every evaluation horizon of
+  the core cell and at ``H_ref`` of every sweep cell. Here ``m_A`` and ``m_B``
+  are the moments from the two halves of the draws. The tolerance is ``1e-13``
+  times the exact mean absolute term: the moment itself for the two squares
+  (their terms are positive) and the dumped ``abs_C`` (the mean of ``|e_C e_P|``
+  over the draws) for the cross moment. This is the plan's scale.
+* b5: the median of the per-state V4 half-widths at ``H_ref`` equals the V4
+  leaf, bitwise.
 * b7: the file size is printed (the Log records it).
 """
 
@@ -113,10 +115,11 @@ def run_smoke(out: Path, *flags: str) -> Path:
 
 @pytest.fixture(scope="module")
 def runs(tmp_path_factory):
-    """Run the smoke preset without and with the dump, once for the whole module.
+    """Run the smoke preset without and with the dump, once for the whole
+    module.
 
-    Returns the two output folders, the two parsed ``results.json`` trees and the
-    arrays loaded from the dump.
+    Returns the two output folders, the two parsed ``results.json`` trees and
+    the arrays loaded from the dump.
     """
     base = tmp_path_factory.mktemp("states_dump")
     off = run_smoke(base / "off")
@@ -131,7 +134,9 @@ def runs(tmp_path_factory):
 
 
 def test_b2_dump_on_equals_dump_off_except_the_provenance_leaf(runs) -> None:
-    """b2: no leaf differs, is added or is removed; only the provenance block shows the flag."""
+    """b2: no leaf differs, is added or is removed; only the provenance block
+    shows the flag.
+    """
     off, on = runs["results"]["off"], runs["results"]["on"]
     outcome = leafdiff.compare(leafdiff.flatten(off), leafdiff.flatten(on))
     assert (
@@ -163,7 +168,8 @@ def test_b2_dump_on_equals_dump_off_except_the_provenance_leaf(runs) -> None:
 def test_b3_the_production_summaries_of_the_dumped_arrays_reproduce_their_leaves(
     runs,
 ) -> None:
-    """b3: the dumped arrays reproduce the V4, Q-N, H1b, H2b and LM leaves and the other summaries.
+    """b3: the dumped arrays reproduce the V4, Q-N, H1b, H2b and LM leaves and
+    the other summaries.
 
     The per-rule MSE agrees to the rounding bound ``gamma_nE`` described in the
     module docstring; the others agree bitwise.
@@ -196,7 +202,8 @@ def test_b3_the_production_summaries_of_the_dumped_arrays_reproduce_their_leaves
                 a[f"{key}/y"], a[f"{key}/pred3"], a[f"{key}/pred4"], rows
             )
             assert got == res["Q-N"][kind][target]["delta_r2"], key
-    # H1b PLP slope: x = log(g_H delta / sqrt(m)), y = 0.5 log(max(E_P, 1e-12)), finite pairs
+    # H1b PLP slope: x = log(g_H delta / sqrt(m)), y = 0.5 log(max(E_P, 1e-12)),
+    # finite pairs
     x_all = np.log(a["core/g_H_ref"] * a["core/delta"] / np.sqrt(3))
     y_all = 0.5 * np.log(np.maximum(a["core/E_P"][:, ref_index], 1e-12))
     keep = np.isfinite(x_all) & np.isfinite(y_all)
@@ -213,14 +220,16 @@ def test_b3_the_production_summaries_of_the_dumped_arrays_reproduce_their_leaves
     for rho, median in res["H2b"]["noise"]["median_w_by_noise"].items():
         group = f"sweep/rho={float(rho):g}|n_lib={SMOKE.core_library}"
         assert float(np.median(a[f"{group}/w_star_href"])) == median, rho
-    # per-rule MSE at H_ref: the mean of the per-state means, to 2 n E 2**-52 relative
+    # per-rule MSE at H_ref: the mean of the per-state means, to 2 n E 2**-52
+    # relative
     n_states, n_draws = a["core/state_mse/A0"].shape[0], a["core/R"].shape[1]
     for rule, score in res["scores"].items():
         mean_state = float(np.mean(a[f"core/state_mse/{rule}"][:, ref_index]))
         assert mean_state == pytest.approx(
             score["mse_href"], rel=2 * n_states * n_draws * 2.0**-52, abs=0.0
         ), rule
-    # schema /2: H1c from the dumped per-state ratios, H1a from the dumped seed errors
+    # schema /2: H1c from the dumped per-state ratios, H1a from the dumped seed
+    # errors
     # (dump-fidelity check: the reference is the production statistic itself)
     from lpcstudy.analysis import _median_fit_stats, h1c_ratio_block
     from lpcstudy.data import make_rng
@@ -294,7 +303,8 @@ def test_b3_the_production_summaries_of_the_dumped_arrays_reproduce_their_leaves
                 )
                 == counts[name]
             ), (kind, name)
-    # the cell's Levenberg-Marquardt block, pooled over the three splits in the run's order
+    # the cell's Levenberg-Marquardt block, pooled over the three splits in the
+    # run's order
     parts = {
         kind: [
             tuple(
@@ -315,7 +325,8 @@ def test_b3_the_production_summaries_of_the_dumped_arrays_reproduce_their_leaves
 
 
 def test_b4_the_two_halves_average_to_the_full_moment(runs) -> None:
-    """b4: the two halves of the draws average to the full moment, in the core and sweep cells.
+    """b4: the two halves of the draws average to the full moment, in the core
+    and sweep cells.
 
     ``(m_A + m_B) / 2 = m`` to 1e-13 times the exact mean absolute term.
     """
@@ -346,7 +357,8 @@ def test_b4_the_two_halves_average_to_the_full_moment(runs) -> None:
 def test_the_key_tree_has_no_key_that_is_also_a_prefix_and_the_qn_inputs_exist(
     runs,
 ) -> None:
-    """R6 and R10: no dumped key is the ``/`` prefix of another, and ``qn/<kind>/`` has its inputs.
+    """R6 and R10: no dumped key is the ``/`` prefix of another, and
+    ``qn/<kind>/`` has its inputs.
 
     A key that is also the prefix of another would clash when the arrays are
     stored as a tree. Reference: the schema in ``lpcstudy/dump.py`` (names typed
@@ -371,8 +383,8 @@ def test_the_key_tree_has_no_key_that_is_also_a_prefix_and_the_qn_inputs_exist(
 def test_b7_the_dump_size_is_reported(runs) -> None:
     """b7: the size of the dump at smoke is reported and under 5 MB.
 
-    The size is recorded in the unit Log, where the pilot and full sizes are also
-    estimated.
+    The size is recorded in the unit Log, where the pilot and full sizes are
+    also estimated.
     """
     path = runs["on"] / "states" / f"{SYSTEM}.npz"
     print(

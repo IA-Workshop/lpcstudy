@@ -50,7 +50,8 @@ def realizable_triples(
     n_above: int,
     inside: tuple[float, float] = (0.0, 1.0),
 ) -> dict[str, np.ndarray]:
-    """Draw realizable second-moment triples ``(E_C, E_P, C)`` with a known ``u``.
+    """Draw realizable second-moment triples ``(E_C, E_P, C)`` with a known
+    ``u``.
 
     ``E_C`` and ``E_P`` are the mean squared errors of CP and PLP, and ``C`` is
     their mean cross product. A triple is "realizable" when it could come from
@@ -90,7 +91,8 @@ def realizable_triples(
 def moments_from_triples(
     e_c: np.ndarray, e_p: np.ndarray, cross: np.ndarray
 ) -> EnsembleMoments:
-    """Wrap ``(n_states, n_horizons)`` arrays of ``E_C``, ``E_P``, ``C`` as moments.
+    """Wrap ``(n_states, n_horizons)`` arrays of ``E_C``, ``E_P``, ``C`` as
+    moments.
 
     The fields the blend weight does not use (means, seeds, noise sensitivity)
     are filled with dummy values.

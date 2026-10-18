@@ -1,44 +1,54 @@
-"""Monte Carlo checks of ``tools/rehearsal_diagnostics.py`` (WU-0003.8, plan B2 row .8, c-slow).
+"""Monte Carlo checks of ``tools/rehearsal_diagnostics.py`` (WU-0003.8, plan B2
+row .8, c-slow).
 
 Before the final study, the owner rehearses it on development data and the tool
-``tools/rehearsal_diagnostics.py`` computes diagnostics from the rehearsal: how the
-variance of block averages depends on the block length (this decides the block length
-of the bootstrap), whether a permutation test detects dependence between series, and
-how much the noise in the optimal blend weights shrinks ("attenuates") a correlation.
-A diagnostic is only useful if it gives the right answer when the truth is known. So
-each test below feeds the tool synthetic data with a known truth, repeats many times
-(a "Monte Carlo" experiment), and compares the average with the truth.
+``tools/rehearsal_diagnostics.py`` computes diagnostics from the rehearsal: how
+the variance of block averages depends on the block length (this decides the
+block length of the bootstrap), whether a permutation test detects dependence
+between series, and how much the noise in the optimal blend weights shrinks
+("attenuates") a correlation. A diagnostic is only useful if it gives the right
+answer when the truth is known. So each test below feeds the tool synthetic data
+with a known truth, repeats many times (a "Monte Carlo" experiment), and
+compares the average with the truth.
 
-DEVELOPMENT, synthetic data, fixed seeds through ``make_rng`` (master seed ``SEED``); needs owner
-review before freeze (statistics feeding the block-length and M decisions). Slow tier, CPU, run once
-by the .8 developer, who owns the statistic. Three checks; each states its reference, its Monte
-Carlo (MC) error and why the bound was fixed before the run.
+DEVELOPMENT, synthetic data, fixed seeds through ``make_rng`` (master seed
+``SEED``); needs owner review before freeze (statistics feeding the block-length
+and M decisions). Slow tier, CPU, run once by the .8 developer, who owns the
+statistic. Three checks; each states its reference, its Monte Carlo (MC) error
+and why the bound was fixed before the run.
 
-**S1. E V*(10)/V*(5) at phi = 0, n = 500.** Reference: ``m4_ratios.log`` of the mathematics check,
-mean 0.987, SD 0.083 per series (R = 4000). Here R = 2000 iid Gaussian series; the MC SE of the mean
-is 0.083/sqrt(2000) = 0.00186, so the bound is 0.987 +- 4 x 0.00186 = +- 0.0074 (the plan's text).
+**S1. E V*(10)/V*(5) at phi = 0, n = 500.** Reference: ``m4_ratios.log`` of the
+mathematics check, mean 0.987, SD 0.083 per series (R = 4000). Here R = 2000 iid
+Gaussian series; the MC SE of the mean is 0.083/sqrt(2000) = 0.00186, so the
+bound is 0.987 +- 4 x 0.00186 = +- 0.0074 (the plan's text).
 
-**S2. Trigger rate of the pooled permutation reading on iid data.** Reference: a permutation test at
-the 0.99 quantile of 1000 permutations has size 0.01 under exchangeability; with the observed value
-not among the null draws the size is 0.01 up to the quantile's own error. R = 500 systems of three
-iid series (lengths 500, 500 and 300: the induced-order rule is exercised). The bound is the plan's:
-rate <= 0.01 + 3 sqrt(0.0099/500) = 0.0233 (MC SE of a rate of 0.01 at R = 500 is 0.0045).
+**S2. Trigger rate of the pooled permutation reading on iid data.** Reference: a
+permutation test at the 0.99 quantile of 1000 permutations has size 0.01 under
+exchangeability; with the observed value not among the null draws the size is
+0.01 up to the quantile's own error. R = 500 systems of three iid series
+(lengths 500, 500 and 300: the induced-order rule is exercised). The bound is
+the plan's: rate <= 0.01 + 3 sqrt(0.0099/500) = 0.0233 (MC SE of a rate of 0.01
+at R = 500 is 0.0045).
 
-**S3. The attenuation A of D4 against a known A0.** Design (fixed before the run): n = 4000 states,
-logit w ~ N(0, 0.18^2) (w in about (0.36, 0.64): every state delta-valid), the two half-draw optima
-``u_A = w + e_A``, ``u_B = w + e_B`` with e ~ N(0, 0.02^2/2), so the 200-draw optimum is
-``(u_A + u_B)/2`` with noise SD exactly 0.01 (the SD of a half is 0.01 sqrt 2); five independent N(0, 1) controls and an N(0, 1)
-Lambda. The known value is the delta-method reliability of the logit of the 200-draw weight,
-``A0^2 = Var(l)/(Var(l) + E v)`` with ``E v = E[sigma_200^2/(w (1 - w))^2]`` integrated by 80-point
-Gauss-Hermite quadrature over l (the true w, not the noisy one): about 0.9755 (share of noise 0.049),
-independent of the estimator. The tool's plug-in has three known finite-sample biases, all
-well below the MC error here: (i) the ``w`` in ``v`` is the noisy one, a second-order relative bias
-of ``8 sigma_200^2 = 8e-4`` in ``v`` (A: 2e-5); (ii) the residual variance of ``y~`` loses the
-6 degrees of freedom of the intercept and five controls, ``(1 - 6/n)``, so the noise share is
-overstated by 0.15% (A: -4e-5; at the pilot's ~330 interior states it is 1.8% of the share, a
-stricter reading, noted in the unit Log); (iii) the ratio of two sample moments (1e-5). Their sum
-is about 6e-5 against an MC SE of SD(A)/sqrt(R) = 5e-5 at R = 200, so the bound
-``|mean(A) - A0| <= 4 SE`` has a margin of about 3. No bound was changed after a result was seen
+**S3. The attenuation A of D4 against a known A0.** Design (fixed before the
+run): n = 4000 states, logit w ~ N(0, 0.18^2) (w in about (0.36, 0.64): every
+state delta-valid), the two half-draw optima ``u_A = w + e_A``, ``u_B = w +
+e_B`` with e ~ N(0, 0.02^2/2), so the 200-draw optimum is ``(u_A + u_B)/2`` with
+noise SD exactly 0.01 (the SD of a half is 0.01 sqrt 2); five independent N(0,
+1) controls and an N(0, 1) Lambda. The known value is the delta-method
+reliability of the logit of the 200-draw weight, ``A0^2 = Var(l)/(Var(l) + E
+v)`` with ``E v = E[sigma_200^2/(w (1 - w))^2]`` integrated by 80-point
+Gauss-Hermite quadrature over l (the true w, not the noisy one): about 0.9755
+(share of noise 0.049), independent of the estimator. The tool's plug-in has
+three known finite-sample biases, all well below the MC error here: (i) the
+``w`` in ``v`` is the noisy one, a second-order relative bias of ``8 sigma_200^2
+= 8e-4`` in ``v`` (A: 2e-5); (ii) the residual variance of ``y~`` loses the 6
+degrees of freedom of the intercept and five controls, ``(1 - 6/n)``, so the
+noise share is overstated by 0.15% (A: -4e-5; at the pilot's ~330 interior
+states it is 1.8% of the share, a stricter reading, noted in the unit Log);
+(iii) the ratio of two sample moments (1e-5). Their sum is about 6e-5 against an
+MC SE of SD(A)/sqrt(R) = 5e-5 at R = 200, so the bound ``|mean(A) - A0| <= 4
+SE`` has a margin of about 3. No bound was changed after a result was seen
 (PRIME.2).
 """
 
@@ -67,7 +77,8 @@ SEED = 20261031
 
 
 def test_s1_variance_ratio_mean_at_phi_zero_matches_the_m4_log() -> None:
-    """S1: the mean of V*(10)/V*(5) is 0.987 within 4 standard errors, for iid series of n = 500 (R = 2000).
+    """S1: the mean of V*(10)/V*(5) is 0.987 within 4 standard errors, for iid
+    series of n = 500 (R = 2000).
 
     "iid" means independent and identically distributed; the standard error is
     0.083/sqrt(2000) from the mathematics check's log.
@@ -86,7 +97,8 @@ def test_s1_variance_ratio_mean_at_phi_zero_matches_the_m4_log() -> None:
 def test_s2_permutation_reading_has_size_at_most_the_plan_bound_on_iid_data() -> (
     None
 ):
-    """S2: the pooled permutation reading fires on at most 0.01 + 3 sqrt(0.0099/500) of 500 iid systems.
+    """S2: the pooled permutation reading fires on at most 0.01 + 3
+    sqrt(0.0099/500) of 500 iid systems.
 
     On independent data the test should fire (a false alarm) about 1% of the
     time; the bound allows 3 standard errors of slack.
@@ -112,8 +124,8 @@ def test_s3_attenuation_matches_the_known_delta_method_value_within_four_mc_se()
 ):
     """S3: |mean A - A0| <= 4 SE over R = 200 replications of n = 4000 states.
 
-    ``A`` is the attenuation estimated by the tool and ``A0`` the known value; the
-    design is in the module docstring.
+    ``A`` is the attenuation estimated by the tool and ``A0`` the known value;
+    the design is in the module docstring.
     """
     n, reps, sd_l, sigma_h = (
         4000,

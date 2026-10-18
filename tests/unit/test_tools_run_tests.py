@@ -1,24 +1,26 @@
-"""Tests of ``tools/run_tests.sh``, the shell script that runs pytest for the study.
+"""Tests of ``tools/run_tests.sh``, the shell script that runs pytest for the
+study.
 
 Every test run in this project goes through this wrapper. It sets the safe
 environment (CPU only, four threads, no GPU memory grab), picks a time limit for
 each tier, takes the GPU lock for the ``gpu`` tier, and refuses unsafe requests
-such as running the whole suite (WU-0012.1, DEVELOPMENT_WORKFLOW.md section 4.5).
-These tests check each of those promises.
+such as running the whole suite (WU-0012.1, DEVELOPMENT_WORKFLOW.md section
+4.5). These tests check each of those promises.
 
-Reference for every test: the contract of DEVELOPMENT_WORKFLOW.md sections 4.5 and
-4.6 and the acceptance criterion of WU-0012.1, applied by hand. The wrapper is run
-in a throwaway root folder in ``tmp_path`` (``wrapper_helpers.FakeRoot``) with a
-fake Python interpreter and a fake ``timeout`` that record what they were called
-with, so there is no real pytest run and no real GPU lock. The expected values
-(``cpu``, ``4``, ``-q --tb=short -rfE``, the time limits 300/900/3600/1800 s, the
-exit codes 64/75/124) are written literally from the document, not taken from the
-wrapper.
+Reference for every test: the contract of DEVELOPMENT_WORKFLOW.md sections 4.5
+and 4.6 and the acceptance criterion of WU-0012.1, applied by hand. The wrapper
+is run in a throwaway root folder in ``tmp_path`` (``wrapper_helpers.FakeRoot``)
+with a fake Python interpreter and a fake ``timeout`` that record what they were
+called with, so there is no real pytest run and no real GPU lock. The expected
+values (``cpu``, ``4``, ``-q --tb=short -rfE``, the time limits
+300/900/3600/1800 s, the exit codes 64/75/124) are written literally from the
+document, not taken from the wrapper.
 
 Tolerance: none. Every outcome is a string, a set of arguments or an exit code,
-compared for exact equality. The one timing check is the 30 s bound of section 4.5
-for the lock wait. The expected elapsed time is about 1 s (``LPC_GPU_WAIT=1``)
-plus process start-up, far under the bound, which is the one in the criterion.
+compared for exact equality. The one timing check is the 30 s bound of section
+4.5 for the lock wait. The expected elapsed time is about 1 s
+(``LPC_GPU_WAIT=1``) plus process start-up, far under the bound, which is the
+one in the criterion.
 """
 
 from __future__ import annotations
@@ -43,19 +45,24 @@ def fake(tmp_path: Path) -> FakeRoot:
 
 
 def only_call(fake: FakeRoot) -> dict:
-    """Return the one recorded call of the fake interpreter (fail if not exactly one)."""
+    """Return the one recorded call of the fake interpreter (fail if not exactly
+    one).
+    """
     calls = fake.calls()
     assert len(calls) == 1, calls
     return calls[0]
 
 
 def test_wrapper_is_executable() -> None:
-    """The script exists and is executable (definition of done; reference: ``os.access``)."""
+    """The script exists and is executable (definition of done; reference:
+    ``os.access``).
+    """
     assert os.access(REPO / "tools" / "run_tests.sh", os.X_OK)
 
 
 def test_unit_tier_environment_and_arguments(fake: FakeRoot) -> None:
-    """Unit tier: CPU only, 4 threads each, no preallocation, fixed pytest flags (a).
+    """Unit tier: CPU only, 4 threads each, no preallocation, fixed pytest flags
+    (a).
 
     Reference: the criterion text of WU-0012.1. The inherited
     ``JAX_PLATFORMS=cuda`` and ``OMP_NUM_THREADS=1`` must be overridden.
@@ -109,15 +116,16 @@ def test_lpc_threads_is_copied_to_the_thread_variables(fake: FakeRoot) -> None:
 def test_xla_thread_cap_is_exported_from_lpc_threads(
     fake: FakeRoot, tier: str, threads: str | None, expected: str
 ) -> None:
-    """``PJRT_NPROC`` and ``NPROC`` equal the checked ``LPC_THREADS`` (default 4).
+    """``PJRT_NPROC`` and ``NPROC`` equal the checked ``LPC_THREADS`` (default
+    4).
 
-    These two environment variables cap the threads that XLA (the compiler behind
-    JAX) starts (WU-0012.4, 1). Reference: the criterion text of WU-0012.4 and the
-    research note ``2026-10-11-research-xla-threads.md`` (XLA's
-    ``DefaultThreadPoolSize()`` reads these two plain variables). The expected
-    strings are written literally (4, 2, 17), not taken from the wrapper. Larger
-    values inherited from the caller (``9``) must be overridden, as for OMP.
-    Tolerance: none, exact string equality.
+    These two environment variables cap the threads that XLA (the compiler
+    behind JAX) starts (WU-0012.4, 1). Reference: the criterion text of
+    WU-0012.4 and the research note ``2026-10-11-research-xla-threads.md``
+    (XLA's ``DefaultThreadPoolSize()`` reads these two plain variables). The
+    expected strings are written literally (4, 2, 17), not taken from the
+    wrapper. Larger values inherited from the caller (``9``) must be overridden,
+    as for OMP. Tolerance: none, exact string equality.
     """
     extra = {"PJRT_NPROC": "9", "NPROC": "9"}
     if threads is not None:
@@ -138,7 +146,8 @@ def test_xla_thread_cap_is_exported_from_lpc_threads(
 def test_invalid_lpc_threads_still_refused_and_no_cap_is_set(
     fake: FakeRoot, threads: str
 ) -> None:
-    """An invalid ``LPC_THREADS`` gives exit 64 and one message line (WU-0012.4, 1).
+    """An invalid ``LPC_THREADS`` gives exit 64 and one message line (WU-0012.4,
+    1).
 
     The refusal comes before any child process starts.
     """
@@ -157,12 +166,14 @@ def test_invalid_lpc_threads_still_refused_and_no_cap_is_set(
 def test_xla_flags_is_passed_through_unchanged_and_never_added(
     fake: FakeRoot, tier: str
 ) -> None:
-    """The wrapper neither sets nor alters ``XLA_FLAGS`` (WU-0012.4, 1; research note, claims 1, 2).
+    """The wrapper neither sets nor alters ``XLA_FLAGS`` (WU-0012.4, 1; research
+    note, claims 1, 2).
 
     An unknown ``XLA_FLAGS`` token aborts XLA, so the thread cap must not travel
     through it. Reference: the behavior before WU-0012.4 (an inherited value
     passes unchanged, an absent one stays absent) and a literal scan of the
-    script: no code line (comments excluded) names ``XLA_FLAGS``. Tolerance: none.
+    script: no code line (comments excluded) names ``XLA_FLAGS``. Tolerance:
+    none.
     """
     absent = fake.run("run_tests.sh", tier, f"tests/{tier}/test_x.py")
     assert absent.returncode == 0, absent.stderr
@@ -186,7 +197,9 @@ def test_xla_flags_is_passed_through_unchanged_and_never_added(
 
 @pytest.mark.parametrize("tier", ["integration", "slow"])
 def test_other_cpu_tiers_force_cpu(fake: FakeRoot, tier: str) -> None:
-    """The integration and slow tiers also run with ``JAX_PLATFORMS=cpu`` (section 4.5)."""
+    """The integration and slow tiers also run with ``JAX_PLATFORMS=cpu``
+    (section 4.5).
+    """
     env = fake.environment(JAX_PLATFORMS="cuda")
     done = fake.run("run_tests.sh", tier, f"tests/{tier}/test_x.py", env=env)
     assert done.returncode == 0, done.stderr
@@ -194,7 +207,8 @@ def test_other_cpu_tiers_force_cpu(fake: FakeRoot, tier: str) -> None:
 
 
 def test_gpu_tier_disables_preallocation(fake: FakeRoot) -> None:
-    """GPU tier: memory preallocation stays off even if ``true`` is inherited (b).
+    """GPU tier: memory preallocation stays off even if ``true`` is inherited
+    (b).
 
     The fake lock is free, so the child runs. ``JAX_PLATFORMS`` is ``cuda,cpu``
     (plan, section 4.5).
@@ -210,7 +224,8 @@ def test_gpu_tier_disables_preallocation(fake: FakeRoot) -> None:
 def test_gpu_tier_exits_75_within_30_s_when_the_lock_is_held(
     fake: FakeRoot,
 ) -> None:
-    """A competing lock holder gives exit 75 in under 30 s, and nothing runs (c).
+    """A competing lock holder gives exit 75 in under 30 s, and nothing runs
+    (c).
 
     Reference: ``fcntl.flock`` in the test process, which is the same advisory
     lock (a lock programs agree to respect) as the ``flock`` command on Linux.
@@ -234,7 +249,9 @@ def test_gpu_tier_exits_75_within_30_s_when_the_lock_is_held(
 
 
 def test_gpu_tier_default_wait_is_30_s(fake: FakeRoot) -> None:
-    """With a fake ``flock`` on the path, the wrapper calls ``flock -w 30 9`` (c)."""
+    """With a fake ``flock`` on the path, the wrapper calls ``flock -w 30 9``
+    (c).
+    """
     write_script(
         fake.bin / "flock",
         "#!/usr/bin/env bash\n" 'echo "$*" >>"$FAKE_DIR/flock.log"\nexit 0\n',
@@ -245,7 +262,9 @@ def test_gpu_tier_default_wait_is_30_s(fake: FakeRoot) -> None:
 
 
 def test_cpu_tiers_take_no_lock(fake: FakeRoot) -> None:
-    """A held lock does not block the unit tier (section 4.5: only the gpu tier is locked)."""
+    """A held lock does not block the unit tier (section 4.5: only the gpu tier
+    is locked).
+    """
     with open(fake.lock, "w") as holder:
         fcntl.flock(holder, fcntl.LOCK_EX | fcntl.LOCK_NB)
         done = fake.run("run_tests.sh", "unit", "tests/unit/test_x.py")
@@ -254,7 +273,8 @@ def test_cpu_tiers_take_no_lock(fake: FakeRoot) -> None:
 
 @pytest.mark.parametrize("tier", TIERS)
 def test_timeout_per_tier(fake: FakeRoot, tier: str) -> None:
-    """The ``timeout`` command gets 300, 900, 3600 or 1800 s and a 30 s kill delay (d).
+    """The ``timeout`` command gets 300, 900, 3600 or 1800 s and a 30 s kill
+    delay (d).
 
     Reference: DEVELOPMENT_WORKFLOW.md section 4.5, "Timeouts".
     """
@@ -266,7 +286,9 @@ def test_timeout_per_tier(fake: FakeRoot, tier: str) -> None:
 
 
 def test_timeout_exit_124_is_reported(fake: FakeRoot) -> None:
-    """A child that exits 124 (what ``timeout`` returns) gives 124 and a TIMEOUT line (d)."""
+    """A child that exits 124 (what ``timeout`` returns) gives 124 and a TIMEOUT
+    line (d).
+    """
     done = fake.run(
         "run_tests.sh",
         "unit",
@@ -279,12 +301,13 @@ def test_timeout_exit_124_is_reported(fake: FakeRoot) -> None:
 
 
 def test_timeout_kill_exit_137_is_reported(fake: FakeRoot) -> None:
-    """A child that exits 137 (what ``timeout`` returns after a forced kill) is reported (R4).
+    """A child that exits 137 (what ``timeout`` returns after a forced kill) is
+    reported (R4).
 
     Reference: the ``timeout`` command, which exits 137 when it had to send
     SIGKILL after ``--kill-after``. The fake interpreter exits 137; the wrapper
-    returns 137 and prints a TIMEOUT line that names the tier's limit (300 s) and
-    the code.
+    returns 137 and prints a TIMEOUT line that names the tier's limit (300 s)
+    and the code.
     """
     done = fake.run(
         "run_tests.sh",
@@ -301,7 +324,9 @@ def test_timeout_kill_exit_137_is_reported(fake: FakeRoot) -> None:
 
 
 def test_pytest_exit_code_is_returned(fake: FakeRoot) -> None:
-    """pytest's own failure code (1) is passed on, so ``tools/test_impact.py --run`` sees it."""
+    """pytest's own failure code (1) is passed on, so ``tools/test_impact.py
+    --run`` sees it.
+    """
     done = fake.run(
         "run_tests.sh",
         "unit",
@@ -313,11 +338,12 @@ def test_pytest_exit_code_is_returned(fake: FakeRoot) -> None:
 
 
 def test_allowed_extras_node_ids_and_directories(fake: FakeRoot) -> None:
-    """``--lf``, ``--tb=long``, ``--durations=N``, a ``::`` test id and the tier folder pass.
+    """``--lf``, ``--tb=long``, ``--durations=N``, a ``::`` test id and the tier
+    folder pass.
 
     The extras follow the fixed flags and come before the paths, in the order
-    given. The test id keeps its suffix. The tier folder is allowed because a gate
-    runs one call per tier.
+    given. The test id keeps its suffix. The tier folder is allowed because a
+    gate runs one call per tier.
     """
     done = fake.run(
         "run_tests.sh",
@@ -339,7 +365,9 @@ def test_allowed_extras_node_ids_and_directories(fake: FakeRoot) -> None:
 
 
 def test_relative_path_from_another_directory(fake: FakeRoot) -> None:
-    """A path is read from the caller's folder and passed on relative to the root."""
+    """A path is read from the caller's folder and passed on relative to the
+    root.
+    """
     done = subprocess.run(
         [str(fake.root / "tools" / "run_tests.sh"), "unit", "test_x.py"],
         cwd=fake.root / "tests" / "unit",
@@ -386,7 +414,8 @@ def test_relative_path_from_another_directory(fake: FakeRoot) -> None:
 def test_refusals_exit_64_with_one_line(
     fake: FakeRoot, args: list[str], env: dict[str, str]
 ) -> None:
-    """Whole-suite, wrong-tier, missing and flagged requests and bad limits give 64 (e).
+    """Whole-suite, wrong-tier, missing and flagged requests and bad limits give
+    64 (e).
 
     Each refusal prints exactly one line on stderr and starts nothing (no fake
     call).
@@ -399,7 +428,8 @@ def test_refusals_exit_64_with_one_line(
 
 
 def test_background_logs_and_records_the_exit_code(fake: FakeRoot) -> None:
-    """``--background`` prints ``pid=... log=...``, exits 0, and records the child's exit code.
+    """``--background`` prints ``pid=... log=...``, exits 0, and records the
+    child's exit code.
 
     The code goes to ``<log>.exit``. Reference: the plan of WU-0012.1
     (``runs/tests/<tier>-<stamp>.log`` and ``<log>.exit``). The fake interpreter

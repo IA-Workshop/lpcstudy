@@ -1,14 +1,15 @@
-"""End-to-end check: a failure in the clip-sensitivity block must not cost a run its results.
+"""End-to-end check: a failure in the clip-sensitivity block must not cost a run
+its results.
 
-The study clips some values to a valid range, and the clip-sensitivity block asks
-how much the conclusions depend on that clipping. The block is report-only
-(OD6, an owner decision): it never changes a verdict. So if it breaks, the failure
-must be recorded and shown, and the run must go on (WU-0002.11e, R3).
+The study clips some values to a valid range, and the clip-sensitivity block
+asks how much the conclusions depend on that clipping. The block is report-only
+(OD6, an owner decision): it never changes a verdict. So if it breaks, the
+failure must be recorded and shown, and the run must go on (WU-0002.11e, R3).
 
-The test makes two smoke runs (the small version of the study) on the development
-seed DEV-0, each in a fresh Python process. One is normal. In the other,
-``lpcstudy.clip_sensitivity._compute`` is replaced by a function that raises an
-error. The second run must exit 0 and leave every leaf outside the
+The test makes two smoke runs (the small version of the study) on the
+development seed DEV-0, each in a fresh Python process. One is normal. In the
+other, ``lpcstudy.clip_sensitivity._compute`` is replaced by a function that
+raises an error. The second run must exit 0 and leave every leaf outside the
 ``clip_sensitivity`` subtree and its mirrors bitwise equal to the first run, so
 every verdict is intact. (A "leaf" is one value at the end of the nested results
 dictionary.) It must also show the failure in four places:
@@ -17,12 +18,13 @@ dictionary.) It must also show the failure in four places:
 * the RESULTS.md table and note;
 * a WARNING line in the run log;
 * a count: the mirror of ``clip_sensitivity.n_caught_exceptions`` in
-  ``handling.result_counts`` is at least 1 in the failed run (0 in the normal one).
+  ``handling.result_counts`` is at least 1 in the failed run (0 in the normal
+  one).
 
 Since WU-0004f the counters of the clip subtree are mirrored in
-``handling.result_counts`` under keys that start with ``clip_sensitivity/``. They
-are the subtree's own leaves, so they are dropped from the comparison together
-with it (WU-0004g).
+``handling.result_counts`` under keys that start with ``clip_sensitivity/``.
+They are the subtree's own leaves, so they are dropped from the comparison
+together with it (WU-0004g).
 """
 
 from __future__ import annotations
@@ -49,7 +51,8 @@ DRIVER = (
 
 
 def run_smoke(mode: str, out: Path) -> Path:
-    """Run the smoke preset in a fresh process; ``mode`` is ``normal`` or ``fail``.
+    """Run the smoke preset in a fresh process; ``mode`` is ``normal`` or
+    ``fail``.
 
     In ``fail`` mode the clip computation is replaced by one that raises.
     Returns the folder that holds the run's output.
@@ -94,9 +97,9 @@ def leaves(node: object, prefix: tuple = ()):
 def comparable(results: dict) -> dict:
     """Return the leaves that two runs must share exactly.
 
-    Left out: the provenance block (who ran what, where), every timing value, the
-    ``clip_sensitivity`` subtrees and their mirrors (the ``clip_sensitivity/...``
-    keys of ``handling.result_counts``).
+    Left out: the provenance block (who ran what, where), every timing value,
+    the ``clip_sensitivity`` subtrees and their mirrors (the
+    ``clip_sensitivity/...`` keys of ``handling.result_counts``).
     """
     return {
         path: value
@@ -115,7 +118,8 @@ def comparable(results: dict) -> dict:
 def test_a_failure_in_the_clip_block_is_visible_and_costs_no_verdict(
     tmp_path: Path,
 ) -> None:
-    """The smoke run with ``_compute`` raising exits 0, keeps every other leaf bitwise, and says so.
+    """The smoke run with ``_compute`` raising exits 0, keeps every other leaf
+    bitwise, and says so.
 
     Reference: the normal smoke run in the same test. It is independent of the
     code under test, because the second run differs from it only by the injected

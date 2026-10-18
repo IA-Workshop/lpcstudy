@@ -1,47 +1,54 @@
-"""Tests S-D1 and S-D2: are the seed-drawn start states of a run safe and well distributed? (WU-0002.14).
+"""Tests S-D1 and S-D2: are the seed-drawn start states of a run safe and well
+distributed? (WU-0002.14).
 
 Each study run starts its three chaotic systems (Lorenz-63, Rossler, Chua) from
 states that are drawn from the run's seed by ``lpcstudy.data.draw_starts``. Two
-things could go wrong. First, a start could make the trajectory blow up or leave a
-sensible region, and then the run would be refused by the orbit guard
-(``systems.guard_orbit``). Second, the starts could be concentrated in the wrong part
-of the attractor (the set the system settles onto) instead of looking like typical
-states. S-D1 checks safety by running 400 starts from 200 made-up seeds for the full
-run length and counting refusals. S-D2 checks the distribution with the
-Kolmogorov-Smirnov statistic, which is the largest gap between two cumulative
-distribution curves, comparing the starts after the burn-in (the initial stretch that
-is thrown away) with a long reference orbit. The helper functions at the top advance
-a whole batch of starts at once.
+things could go wrong. First, a start could make the trajectory blow up or leave
+a sensible region, and then the run would be refused by the orbit guard
+(``systems.guard_orbit``). Second, the starts could be concentrated in the wrong
+part of the attractor (the set the system settles onto) instead of looking like
+typical states. S-D1 checks safety by running 400 starts from 200 made-up seeds
+for the full run length and counting refusals. S-D2 checks the distribution with
+the Kolmogorov-Smirnov statistic, which is the largest gap between two
+cumulative distribution curves, comparing the starts after the burn-in (the
+initial stretch that is thrown away) with a long reference orbit. The helper
+functions at the top advance a whole batch of starts at once.
 
-DEVELOPMENT: synthetic seeds only (62-bit integers from ``numpy.random.default_rng(14002)``), never
-a registry seed and never the sealed seed. Seed code: needs owner review before freeze.
-Slow tier: per system the cost is the statistics orbit (203 000 steps), the Benettin exponent and
-two vmapped scans of 400 starts for about 7.1e5 steps (a few seconds each on one CPU core); run
-once, by the developer of the unit, with the results in the unit log.
+DEVELOPMENT: synthetic seeds only (62-bit integers from
+``numpy.random.default_rng(14002)``), never a registry seed and never the sealed
+seed. Seed code: needs owner review before freeze. Slow tier: per system the
+cost is the statistics orbit (203 000 steps), the Benettin exponent and two
+vmapped scans of 400 starts for about 7.1e5 steps (a few seconds each on one CPU
+core); run once, by the developer of the unit, with the results in the unit log.
 
-What is checked (the plan and its mathematics check, M1 and M6; the numbers were fixed there):
+What is checked (the plan and its mathematics check, M1 and M6; the numbers were
+fixed there):
 
-* **S-D1 safety.** For N = 200 synthetic seeds the 400 starts of a system (main and estimator),
-  drawn by ``data.draw_starts`` on the production statistics orbit, are run for
-  ``burn + 705 000`` steps (the burn-in plus the full-preset main length, which is longer than the
-  estimator's) under the orbit guard of ``systems.guard_orbit`` (finite, ``|x| <= B``, the start
-  included), vectorized over the starts. **0 refusals.** The rule of three alone gives only a
-  1.5% bound at 95%; the bound for a confirmatory seed comes from the mathematics check
-  (M1(b)), not from this test. A **stress arm** repeats the same seeds at ``eta = 1e-3`` for the
-  burn-in only: 0 refusals, through the real code path (whitening, eta and the guard), so a units
-  or scaling error would show. A **negative control** (a start at twice the bound) must be
-  refused by the same vectorized guard, so the check cannot pass vacuously.
-* **S-D2 distribution.** The ``x`` of the 400 states after the burn-in (main and estimator
-  pooled, independent draws) against the ``x`` marginal of the 2e5-state statistics orbit:
-  the two-sample Kolmogorov-Smirnov statistic is at most
-  ``D_crit = c(0.001) sqrt(1/400 + 1/200000) = 1.94947 * 0.05013 = 0.0976`` (alpha = 0.001 per
-  system, family 0.003). The effective size of the autocorrelated reference is at least 7000 (M6),
-  so the true level is at most 1.5e-3. The statistic detects a start that stays near the registry
-  state (D about 0.40 for Rossler); it cannot detect a missing burn-in (``stats[k] + eta`` is
-  already distributed like the orbit), which is why the burn-in is pinned by P8 in the unit tier.
+* **S-D1 safety.** For N = 200 synthetic seeds the 400 starts of a system (main
+  and estimator), drawn by ``data.draw_starts`` on the production statistics
+  orbit, are run for ``burn + 705 000`` steps (the burn-in plus the full-preset
+  main length, which is longer than the estimator's) under the orbit guard of
+  ``systems.guard_orbit`` (finite, ``|x| <= B``, the start included), vectorized
+  over the starts. **0 refusals.** The rule of three alone gives only a 1.5%
+  bound at 95%; the bound for a confirmatory seed comes from the mathematics
+  check (M1(b)), not from this test. A **stress arm** repeats the same seeds at
+  ``eta = 1e-3`` for the burn-in only: 0 refusals, through the real code path
+  (whitening, eta and the guard), so a units or scaling error would show. A
+  **negative control** (a start at twice the bound) must be refused by the same
+  vectorized guard, so the check cannot pass vacuously.
+* **S-D2 distribution.** The ``x`` of the 400 states after the burn-in (main and
+  estimator pooled, independent draws) against the ``x`` marginal of the
+  2e5-state statistics orbit: the two-sample Kolmogorov-Smirnov statistic is at
+  most ``D_crit = c(0.001) sqrt(1/400 + 1/200000) = 1.94947 * 0.05013 = 0.0976``
+  (alpha = 0.001 per system, family 0.003). The effective size of the
+  autocorrelated reference is at least 7000 (M6), so the true level is at most
+  1.5e-3. The statistic detects a start that stays near the registry state (D
+  about 0.40 for Rossler); it cannot detect a missing burn-in (``stats[k] +
+  eta`` is already distributed like the orbit), which is why the burn-in is
+  pinned by P8 in the unit tier.
 
-Tolerances: S-D1 counts (0 refusals), S-D2 the derived D_crit; neither is to be changed to pass
-(PRIME.2).
+Tolerances: S-D1 counts (0 refusals), S-D2 the derived D_crit; neither is to be
+changed to pass (PRIME.2).
 """
 
 from __future__ import annotations
@@ -74,9 +81,8 @@ N_SEEDS = 200
 SYNTHETIC_SEEDS = [
     int(v) for v in np.random.default_rng(14002).integers(0, 2**62, N_SEEDS)
 ]
-HORIZON = (
-    705_000  # steps after the burn-in: the full-preset main length (7.05e5)
-)
+# steps after the burn-in: the full-preset main length (7.05e5)
+HORIZON = 705_000
 STRESS_ETA = 1e-3
 N_REFERENCE = 200_000
 C_ALPHA_001 = 1.94947  # c(alpha) of the two-sample KS test at alpha = 0.001
@@ -88,7 +94,9 @@ SUMMARY: dict[str, dict] = {}
 
 
 def _advance(step, state, largest, finite, n_steps: int):
-    """Run ``n_steps`` of the flow map on a batch, tracking ``max |x_0|`` and finiteness."""
+    """Run ``n_steps`` of the flow map on a batch, tracking ``max |x_0|`` and
+    finiteness.
+    """
     batched = jax.vmap(step)
 
     def body(carry, _):
@@ -107,7 +115,9 @@ def _advance(step, state, largest, finite, n_steps: int):
 
 
 def _start_batch(state: np.ndarray):
-    """Pack start states into the ``(state, largest |x|, all finite)`` triple that ``_advance`` takes."""
+    """Pack start states into the ``(state, largest |x|, all finite)`` triple
+    that ``_advance`` takes.
+    """
     return (
         jnp.asarray(state, dtype=jnp.float64),
         jnp.abs(jnp.asarray(state[:, 0], jnp.float64)),
@@ -191,7 +201,8 @@ def run(request, tmp_path_factory) -> dict:
 
 
 def test_sd1_no_start_is_refused_over_the_full_horizon(run: dict) -> None:
-    """S-D1: 0 refusals for 400 starts over ``burn + 705 000`` steps; the control is refused.
+    """S-D1: 0 refusals for 400 starts over ``burn + 705 000`` steps; the
+    control is refused.
 
     Reference: the rule of three (if 0 of 400 runs fail, the failure probability
     is below 3/400 = 0.75% at 95% confidence; 1.5% for the 200 seeds) and the
@@ -216,11 +227,11 @@ def test_sd1_stress_arm_at_eta_1e3_burn_in_only(run: dict) -> None:
     """S-D1 stress arm: the same seeds at eta = 1e-3, burn-in only, 0 refusals.
 
     Here eta is the size of the random offset added to a start. Reference: the
-    escape table of the mathematics check (M1(b)): no escape at a whitened offset
-    of 3e-3 or less on any system (Rossler's first escape is at 2e-2, Chua's at
-    0.2), and a margin of more than 10 against 1e-3. The offsets are drawn
-    through the real ``draw_starts`` with the production whitening, so a units or
-    scaling error would produce refusals. Tolerance: none.
+    escape table of the mathematics check (M1(b)): no escape at a whitened
+    offset of 3e-3 or less on any system (Rossler's first escape is at 2e-2,
+    Chua's at 0.2), and a margin of more than 10 against 1e-3. The offsets are
+    drawn through the real ``draw_starts`` with the production whitening, so a
+    units or scaling error would produce refusals. Tolerance: none.
     """
     assert not run["stress_refused"].any(), (
         f"{run['name']}: {int(run['stress_refused'].sum())} stress starts refused; "
@@ -235,7 +246,8 @@ def test_sd1_stress_arm_at_eta_1e3_burn_in_only(run: dict) -> None:
 def test_sd2_the_x_marginal_after_the_burn_in_matches_the_statistics_orbit(
     run: dict,
 ) -> None:
-    """S-D2: the KS distance of the pooled post-burn ``x`` (n = 400) to the orbit's ``x`` distribution.
+    """S-D2: the KS distance of the pooled post-burn ``x`` (n = 400) to the
+    orbit's ``x`` distribution.
 
     Reference: the two-sample Kolmogorov-Smirnov statistic of
     ``scipy.stats.ks_2samp`` against the 2e5 orbit states (an independent sample

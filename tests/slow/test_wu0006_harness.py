@@ -1,41 +1,52 @@
-"""Self-checks of the WU-0006 simulation harness (WU-0006.1), run before its numbers are read.
+"""Self-checks of the WU-0006 simulation harness (WU-0006.1), run before its
+numbers are read.
 
 The WU-0006 studies (the other files in ``tests/slow``) judge the study's
 confidence intervals by simulation. Their conclusions are only as good as the
 harness in ``wu0006_harness.py`` that makes the data, runs the trials and scores
 the counts. This file tests the harness itself: that its random-data generators
-have the properties they claim, that its bounds follow from the formulas, that its
-scoring functions apply the registered ranges exactly, that a trial gives the same
-result on any number of worker processes, and that the switch
-``ASSERT_ROADMAP_BOUNDS`` behaves as the owner ruled. The checks follow the labels
-H1 to H3 below.
+have the properties they claim, that its bounds follow from the formulas, that
+its scoring functions apply the registered ranges exactly, that a trial gives
+the same result on any number of worker processes, and that the switch
+``ASSERT_ROADMAP_BOUNDS`` behaves as the owner ruled. The checks follow the
+labels H1 to H3 below.
 
-Slow tier (a few seconds each, about two minutes in all, mostly worker start-up and the 10^7-draw
-truth checks): the checks of the harness itself that must hold before its numbers are read.
+Slow tier (a few seconds each, about two minutes in all, mostly worker start-up
+and the 10^7-draw truth checks): the checks of the harness itself that must hold
+before its numbers are read.
 
-* **H1** the AR(1) generator has the lag-1 autocorrelation and variance it claims (10^6 draws);
-* **H3** the truths the coverage cases rely on (C2, C4, C5, C6, C7) are realized by the generators
-  (10^7 draws), and the log-rank and delta-R2 generators have the designed marginals;
-* **H2** a replication's result does not depend on the number of workers or on how the replications
-  are split into tasks (1 worker, 2 workers, in process);
-* the integer bounds follow from the formulas z = 3, SE = sqrt(p (1 - p) / R) of the plan;
-* the independent verdict rule agrees with ``criterion_verdict`` at the band edges, including ties
-  (which a continuous simulation never produces, so A4 alone cannot check the open and closed edges);
-* the evaluation functions apply the registered bounds and ranges exactly (boundary counts), and the
-  switch ``ASSERT_ROADMAP_BOUNDS`` works in both positions: Option C (False, in force since the
-  owner's ratification of 2026-10-12, DEC-0026 item 2, and the default tested here) records the
-  ROADMAP-bound rows and asserts nothing about them, Option K (True) asserts them; the always-asserted
-  groups (exact checks, consistency ranges) are asserted in both positions, which is tested on the
-  real study test bodies driven by a stub cache;
-* every design runs end to end on the pool at a tiny R, and the exact checks (identity with the
-  production function, A4, A5, the C7 zero column, L3, the bitwise refit) hold there.
+* **H1** the AR(1) generator has the lag-1 autocorrelation and variance it
+  claims (10^6 draws);
+* **H3** the truths the coverage cases rely on (C2, C4, C5, C6, C7) are realized
+  by the generators (10^7 draws), and the log-rank and delta-R2 generators have
+  the designed marginals;
+* **H2** a replication's result does not depend on the number of workers or on
+  how the replications are split into tasks (1 worker, 2 workers, in process);
+* the integer bounds follow from the formulas z = 3, SE = sqrt(p (1 - p) / R) of
+  the plan;
+* the independent verdict rule agrees with ``criterion_verdict`` at the band
+  edges, including ties (which a continuous simulation never produces, so A4
+  alone cannot check the open and closed edges);
+* the evaluation functions apply the registered bounds and ranges exactly
+  (boundary counts), and the switch ``ASSERT_ROADMAP_BOUNDS`` works in both
+  positions: Option C (False, in force since the owner's ratification of
+  2026-10-12, DEC-0026 item 2, and the default tested here) records the
+  ROADMAP-bound rows and asserts nothing about them, Option K (True) asserts
+  them; the always-asserted groups (exact checks, consistency ranges) are
+  asserted in both positions, which is tested on the real study test bodies
+  driven by a stub cache;
+* every design runs end to end on the pool at a tiny R, and the exact checks
+  (identity with the production function, A4, A5, the C7 zero column, L3, the
+  bitwise refit) hold there.
 
-Tolerances. Each H1 and H3 check is a 3-standard-error z-test with the standard error stated at the
-assertion; on fixed seeds the outcome is deterministic. There are 31 such z-tests (AR(1) 6, bivariate 12,
-truths 5, log-rank 4, delta-R2 4). About 25 have a false-alarm probability of 0.27% for a correct
-generator and 6 (the phi = 0.3 bivariate lag-1 checks, whose estimator's bias is 0.46 SE) 0.58%, so the
-chance that at least one of the 31 fails for a correct generator is about 10%. A failure would be a finding about the
-generator, not a reason to move a seed or a bound.
+Tolerances. Each H1 and H3 check is a 3-standard-error z-test with the standard
+error stated at the assertion; on fixed seeds the outcome is deterministic.
+There are 31 such z-tests (AR(1) 6, bivariate 12, truths 5, log-rank 4, delta-R2
+4). About 25 have a false-alarm probability of 0.27% for a correct generator and
+6 (the phi = 0.3 bivariate lag-1 checks, whose estimator's bias is 0.46 SE)
+0.58%, so the chance that at least one of the 31 fails for a correct generator
+is about 10%. A failure would be a finding about the generator, not a reason to
+move a seed or a bound.
 """
 
 from __future__ import annotations
@@ -61,25 +72,31 @@ import wu0006_reference as ref
 
 
 def rng_for(*labels: object) -> np.random.Generator:
-    """Return the random stream for a self-check: ``make_rng(6006, "wu0006", "selfcheck", ...)``."""
+    """Return the random stream for a self-check: ``make_rng(6006, "wu0006",
+    "selfcheck", ...)``.
+    """
     return make_rng(wu.WU0006_SEED, "wu0006", "selfcheck", *labels)
 
 
 @pytest.fixture(scope="module")
 def pool():
-    """Start one pool of single-thread worker processes for the tiny end-to-end runs."""
+    """Start one pool of single-thread worker processes for the tiny end-to-end
+    runs.
+    """
     with wu.worker_pool() as shared:
         yield shared
 
 
-# ------------------------------------------------------------------------------ bounds, tables
+# --------------------------------------------------------------- bounds, tables
 def test_integer_bounds_follow_the_plan_formulas() -> None:
-    """The registered integer bounds are the counts of nominal -/+ 3 sqrt(p (1 - p) / R).
+    """The registered integer bounds are the counts of nominal -/+ 3 sqrt(p (1 -
+    p) / R).
 
-    Reference: the plan's formulas evaluated here (z = 3), taking the stricter of formula and ROADMAP
-    rounding (applied-mathematician M1): A1 0.929324 (ROADMAP 0.929), A2 0.971188 (0.971),
-    A3 0.039811 and 0.016957, L 0.016675 (0.0167), N1 and N3 0.920760 (0.921), N2 0.045946.
-    The ROADMAP's rounded values give counts no stricter than the formula's (929, 971, 33, 461).
+    Reference: the plan's formulas evaluated here (z = 3), taking the stricter
+    of formula and ROADMAP rounding (applied-mathematician M1): A1 0.929324
+    (ROADMAP 0.929), A2 0.971188 (0.971), A3 0.039811 and 0.016957, L 0.016675
+    (0.0167), N1 and N3 0.920760 (0.921), N2 0.045946. The ROADMAP's rounded
+    values give counts no stricter than the formula's (929, 971, 33, 461).
     """
 
     def lower(p: float, total: int) -> int:
@@ -109,7 +126,9 @@ def test_integer_bounds_follow_the_plan_formulas() -> None:
 
 
 def test_reference_tables_hold_the_70_ranges() -> None:
-    """36 coverage + 28 A3 + 6 log-rank ranges, each containing its own reference rate."""
+    """36 coverage + 28 A3 + 6 log-rank ranges, each containing its own
+    reference rate.
+    """
     n_ranges = 0
     for (case, phi), levels in ref.COVERAGE_REFERENCE.items():
         for name, (rate, _, _, (low, high)) in levels.items():
@@ -130,21 +149,24 @@ def test_reference_tables_hold_the_70_ranges() -> None:
 
 
 def test_design_is_the_study_procedure() -> None:
-    """B = 2000, block 5, levels 95% and 1 - 0.05/3, delta-R2 sizes 3000 / 1000 (from FULL)."""
+    """B = 2000, block 5, levels 95% and 1 - 0.05/3, delta-R2 sizes 3000 / 1000
+    (from FULL).
+    """
     wu.assert_design()
     assert (FULL.bootstrap_resamples, FULL.bootstrap_block) == (2000, 5)
     assert wu.WU0006_SEED == 6006
 
 
-# --------------------------------------------------------------------------------- generators
+# ------------------------------------------------------------------- generators
 @pytest.mark.parametrize("phi", [0.0, 0.3])
 def test_ar1_has_the_stated_lag1_and_variance(phi: float) -> None:
-    """H1: 10^6 draws; lag-1 autocorrelation within 3 sqrt((1 - phi^2)/N) of phi, variance within
-    3 sqrt(2 (1 + phi^2) / ((1 - phi^2) N)) of 1, mean within 3 sqrt((1 + phi)/((1 - phi) N)) of 0.
+    """H1: 10^6 draws; lag-1 autocorrelation within 3 sqrt((1 - phi^2)/N) of
+    phi, variance within 3 sqrt(2 (1 + phi^2) / ((1 - phi^2) N)) of 1, mean
+    within 3 sqrt((1 + phi)/((1 - phi) N)) of 0.
 
-    References: Bartlett's variance of the sample lag-1 autocorrelation of an AR(1) (checked by the
-    review: empirical 0.00944 vs 0.00954 at phi = 0.3, N = 1e4) and the variance of the sample
-    variance, 2 sum_k phi^(2|k|) / N.
+    References: Bartlett's variance of the sample lag-1 autocorrelation of an
+    AR(1) (checked by the review: empirical 0.00944 vs 0.00954 at phi = 0.3, N =
+    1e4) and the variance of the sample variance, 2 sum_k phi^(2|k|) / N.
     """
     n = 10**6
     x = wu.ar1(rng_for("ar1", f"{phi:g}"), n, phi)
@@ -163,12 +185,14 @@ def test_ar1_has_the_stated_lag1_and_variance(phi: float) -> None:
 def test_bivariate_ar1_has_the_stated_correlations(
     phi: float, cross: float
 ) -> None:
-    """H1: lag-0 cross-correlation ``cross`` and lag-1 autocorrelation ``phi`` in both columns.
+    """H1: lag-0 cross-correlation ``cross`` and lag-1 autocorrelation ``phi``
+    in both columns.
 
-    200 independent paths of 5000 states; the mean of the per-path estimates is compared with the
-    target at 3 standard errors, the standard error being the sample SD / sqrt(200) (about 9.5e-4 for the
-    lag-1). The lag-1 estimator's O(1/N) bias (about 4e-4) is 0.46 SE, which shifts the z-test and
-    roughly doubles its false-alarm rate to 0.0058 (from 0.0027); 3 SE is kept.
+    200 independent paths of 5000 states; the mean of the per-path estimates is
+    compared with the target at 3 standard errors, the standard error being the
+    sample SD / sqrt(200) (about 9.5e-4 for the lag-1). The lag-1 estimator's
+    O(1/N) bias (about 4e-4) is 0.46 SE, which shifts the z-test and roughly
+    doubles its false-alarm rate to 0.0058 (from 0.0027); 3 SE is kept.
     """
     paths = 200
     rng = rng_for("ar1-bivariate", f"{phi:g}", f"{cross:g}")
@@ -194,7 +218,9 @@ def test_bivariate_ar1_has_the_stated_correlations(
 def _chunks(
     spec: wu.CaseSpec, name: str, n_chunks: int, size: int, statistic
 ) -> np.ndarray:
-    """Return the statistic of each of ``n_chunks`` independent i.i.d. samples of ``size`` states (phi = 0)."""
+    """Return the statistic of each of ``n_chunks`` independent i.i.d. samples
+    of ``size`` states (phi = 0).
+    """
     rng = rng_for("truth", name)
     return np.array(
         [
@@ -205,18 +231,23 @@ def _chunks(
 
 
 def _within_three_se(values: np.ndarray, target: float) -> bool:
-    """Return whether the mean of ``values`` is within 3 standard errors of ``target``."""
+    """Return whether the mean of ``values`` is within 3 standard errors of
+    ``target``.
+    """
     return abs(values.mean() - target) < 3 * values.std(ddof=1) / math.sqrt(
         len(values)
     )
 
 
 def test_truths_of_the_log_normal_cases() -> None:
-    """H3: E[a - b] = 0 (C2), E[a]/E[b] = 1.05 (C4) and 1.10 (C5), over 10^7 draws each.
+    """H3: E[a - b] = 0 (C2), E[a]/E[b] = 1.05 (C4) and 1.10 (C5), over 10^7
+    draws each.
 
-    Reference: analytic (a = exp(mu + sigma u), b = exp(sigma v) with u, v standard normal, so
-    E[a]/E[b] = exp(mu)). 100 chunks of 10^5 draws; the standard error is the SD of the chunk values
-    / sqrt(100); the ratio estimator's O(1/n) bias is about 1e-5 against a standard error of 3.3e-4 to 5.2e-4.
+    Reference: analytic (a = exp(mu + sigma u), b = exp(sigma v) with u, v
+    standard normal, so E[a]/E[b] = exp(mu)). 100 chunks of 10^5 draws; the
+    standard error is the SD of the chunk values / sqrt(100); the ratio
+    estimator's O(1/n) bias is about 1e-5 against a standard error of 3.3e-4 to
+    5.2e-4.
     """
     assert _within_three_se(
         _chunks(
@@ -251,11 +282,13 @@ def test_truths_of_the_log_normal_cases() -> None:
 
 
 def test_truth_of_the_spearman_case() -> None:
-    """H3: the Spearman correlation of C6's Gaussian pair is 0.7, over 10^7 draws.
+    """H3: the Spearman correlation of C6's Gaussian pair is 0.7, over 10^7
+    draws.
 
-    Reference: Spearman = (6/pi) arcsin(c/2) = 0.7 exactly at c = 2 sin(0.7 pi/6). 100 chunks of
-    10^5 draws; standard error from the chunk SD / sqrt(100) (about 2e-4); the finite-n bias
-    3 (tau - rho_S)/(n + 1) = -6e-6 is negligible.
+    Reference: Spearman = (6/pi) arcsin(c/2) = 0.7 exactly at c = 2 sin(0.7
+    pi/6). 100 chunks of 10^5 draws; standard error from the chunk SD /
+    sqrt(100) (about 2e-4); the finite-n bias 3 (tau - rho_S)/(n + 1) = -6e-6 is
+    negligible.
     """
     assert abs(6 / math.pi * math.asin(wu.C6_CORR / 2) - 0.7) < 1e-15
     values = _chunks(
@@ -265,11 +298,13 @@ def test_truth_of_the_spearman_case() -> None:
 
 
 def test_truth_of_the_partial_correlation_case() -> None:
-    """H3: the partial correlation of C7's target and growth given [1, Q] is 0.1, over 10^7 draws.
+    """H3: the partial correlation of C7's target and growth given [1, Q] is
+    0.1, over 10^7 draws.
 
-    Reference: both conditional means lie in span[1, Q(s)], so the population partial correlation
-    is corr(e1, e2) = 0.1 exactly (review M3 (d)). 100 chunks of 10^5 states; standard error of the mean
-    from the chunk SD / sqrt(100): the per-chunk SD is about 3.1e-3, the standard error 3.1e-4.
+    Reference: both conditional means lie in span[1, Q(s)], so the population
+    partial correlation is corr(e1, e2) = 0.1 exactly (review M3 (d)). 100
+    chunks of 10^5 states; standard error of the mean from the chunk SD /
+    sqrt(100): the per-chunk SD is about 3.1e-3, the standard error 3.1e-4.
     """
 
     def partial(d: dict) -> float:
@@ -284,9 +319,10 @@ def test_truth_of_the_partial_correlation_case() -> None:
 
 
 def test_logrank_design_marginals() -> None:
-    """The log-rank generator: terciles of exactly 200, censoring (1 - h)^240 = 0.0489 (L1) and
-    (2 (1 - h)^240 + (1 - 2h)^240)/3 = 0.0334 (L2), also at phi = 0.3 (Gaussian copula, uniform
-    marginal). 100 samples of 600 states each; standard error from the SD across samples.
+    """The log-rank generator: terciles of exactly 200, censoring (1 - h)^240 =
+    0.0489 (L1) and (2 (1 - h)^240 + (1 - 2h)^240)/3 = 0.0334 (L2), also at phi
+    = 0.3 (Gaussian copula, uniform marginal). 100 samples of 600 states each;
+    standard error from the SD across samples.
     """
     h, hmax = wu.LOGRANK_HAZARD, wu.LOGRANK_HMAX
     for phi in wu.PHIS:
@@ -308,12 +344,14 @@ def test_logrank_design_marginals() -> None:
 
 
 def test_delta_r2_design_marginals() -> None:
-    """The delta-R2 generator: 15% exact zeros, x4 unit variance with corr(x4, x1) = 0.6, and a
-    target noise that carries no information on x4 beyond x1 to x3 (corr of x4's innovation xi with
-    the latent's residual is 0 by construction; here the correlation of x4 - 0.6 x1 with L - its
-    x1..x3 part is checked to be 0). 10^6 i.i.d. draws; standard errors binomial 3.6e-4 for the zero
-    fraction and 6.4e-4 for corr(x4, x1) ((1 - 0.36)/sqrt(n)), whose tolerance is 3 SE = 1.9e-3 (it was
-    3e-3, 4.7 SE; tightened to the 3-SE rule of the other checks, a tightening of a self-check).
+    """The delta-R2 generator: 15% exact zeros, x4 unit variance with corr(x4,
+    x1) = 0.6, and a target noise that carries no information on x4 beyond x1 to
+    x3 (corr of x4's innovation xi with the latent's residual is 0 by
+    construction; here the correlation of x4 - 0.6 x1 with L - its x1..x3 part
+    is checked to be 0). 10^6 i.i.d. draws; standard errors binomial 3.6e-4 for
+    the zero fraction and 6.4e-4 for corr(x4, x1) ((1 - 0.36)/sqrt(n)), whose
+    tolerance is 3 SE = 1.9e-3 (it was 3e-3, 4.7 SE; tightened to the 3-SE rule
+    of the other checks, a tightening of a self-check).
     """
     n = 10**6
     profile, weight, _ = wu.delta_states(rng_for("delta"), n, 0.0, iid=True)
@@ -337,7 +375,7 @@ def test_delta_r2_design_marginals() -> None:
     )
 
 
-# ------------------------------------------------------------------------------- verdict rule
+# ----------------------------------------------------------------- verdict rule
 CASE_EDGES = {
     "C2": 0.0,
     "C4": 1.05,
@@ -353,13 +391,15 @@ CASE_EDGES = {
 def test_independent_rule_agrees_with_criterion_verdict_at_the_edges(
     case: str,
 ) -> None:
-    """The band rule of ``expected_verdict`` equals ``criterion_verdict`` at every tie.
+    """The band rule of ``expected_verdict`` equals ``criterion_verdict`` at
+    every tie.
 
-    A continuous simulation never has a bound equal to the edge, so A4 cannot tell an open from a
-    closed edge; this deterministic table does (edge, just inside, just outside, straddle). The
-    reference is the rule written in the harness from the criterion's wording (v3 section 2, DEC-0008
-    A1): H2c upper edge 0 open; H2d 0.10 and H3c 1.05 closed; H1d lower edge 0.7 closed; H2b and
-    H2e lower edge 0 open; H2a(ii) band (-0.1, 0.1) open.
+    A continuous simulation never has a bound equal to the edge, so A4 cannot
+    tell an open from a closed edge; this deterministic table does (edge, just
+    inside, just outside, straddle). The reference is the rule written in the
+    harness from the criterion's wording (v3 section 2, DEC-0008 A1): H2c upper
+    edge 0 open; H2d 0.10 and H3c 1.05 closed; H1d lower edge 0.7 closed; H2b
+    and H2e lower edge 0 open; H2a(ii) band (-0.1, 0.1) open.
     """
     edge = CASE_EDGES[case]
     band, closed = wu._BANDS[case]
@@ -403,7 +443,7 @@ def test_independent_rule_agrees_with_criterion_verdict_at_the_edges(
         )
 
 
-# ------------------------------------------------------------------ evaluation and the switch
+# ---------------------------------------------------- evaluation and the switch
 def fake_run(
     case: str,
     phi: float,
@@ -414,13 +454,15 @@ def fake_run(
     mismatch: bool = False,
     identity_bad: bool = False,
 ) -> wu.CoverageRun:
-    """Build a made-up ``CoverageRun`` of R = 1000 replications of the upper-sided case C4.
+    """Build a made-up ``CoverageRun`` of R = 1000 replications of the
+    upper-sided case C4.
 
-    The counts are the stated ones, so a test can probe the scoring at its boundaries.
+    The counts are the stated ones, so a test can probe the scoring at its
+    boundaries.
 
-    Level 0 and level 1 cover in the first ``covered[j]`` replications; at level 1 ``fail_misses``
-    of the others have the truth below the lower bound (verdict fail), the rest above the upper bound
-    (verdict pass).
+    Level 0 and level 1 cover in the first ``covered[j]`` replications; at level
+    1 ``fail_misses`` of the others have the truth below the lower bound
+    (verdict fail), the rest above the upper bound (verdict pass).
     """
     spec, total = wu.CaseSpec(case), wu.R_COVERAGE
     truth = spec.truth
@@ -467,10 +509,12 @@ def fake_run(
 
 
 def test_evaluate_coverage_applies_the_registered_bounds_exactly() -> None:
-    """Boundary counts of A1 (930), A2 (972), A3 (39 / 16), the C4 ranges and the exact checks.
+    """Boundary counts of A1 (930), A2 (972), A3 (39 / 16), the C4 ranges and
+    the exact checks.
 
-    Reference: the registered integers and the C4 phi = 0 ranges of the review: coverage 95%
-    (912, 965), 98.3% (959, 992), A3 P(pass) and P(fail) (2, 25) (level 98.3%, bound 16).
+    Reference: the registered integers and the C4 phi = 0 ranges of the review:
+    coverage 95% (912, 965), 98.3% (959, 992), A3 P(pass) and P(fail) (2, 25)
+    (level 98.3%, bound 16).
     """
     ok = wu.evaluate_coverage(fake_run("C4", 0.0, (930, 972), 12))
     assert (ok.exact, ok.consistency, ok.roadmap) == ([], [], [])
@@ -485,7 +529,8 @@ def test_evaluate_coverage_applies_the_registered_bounds_exactly() -> None:
         "A2"
         in wu.evaluate_coverage(fake_run("C4", 0.0, (930, 971), 12)).roadmap[0]
     )
-    # misses = 1000 - 972 = 28 = 12 fail + 16 pass; 11 fail + 17 pass breaks the A3 pass bound only
+    # misses = 1000 - 972 = 28 = 12 fail + 16 pass; 11 fail + 17 pass breaks the
+    # A3 pass bound only
     assert (
         "A3 P(pass)"
         in wu.evaluate_coverage(fake_run("C4", 0.0, (930, 972), 11)).roadmap[0]
@@ -533,7 +578,8 @@ def test_evaluate_coverage_applies_the_registered_bounds_exactly() -> None:
         )
         >= 1
     )
-    # the range is the defect test: coverage that passes the ROADMAP bound but is too high is flagged
+    # the range is the defect test: coverage that passes the ROADMAP bound but
+    # is too high is flagged
     assert (
         wu.evaluate_coverage(fake_run("C4", 0.0, (970, 972), 12)).roadmap == []
     )
@@ -573,12 +619,13 @@ def test_evaluate_coverage_applies_the_registered_bounds_exactly() -> None:
 
 
 def test_roadmap_switch_has_both_modes(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Option K (``ASSERT_ROADMAP_BOUNDS = True``) raises on a failed bound, Option C reports it.
+    """Option K (``ASSERT_ROADMAP_BOUNDS = True``) raises on a failed bound,
+    Option C reports it.
 
-    The outcome is "fail" in both modes, so the results table always shows it. The constant is read
-    at call time, so flipping the module attribute flips the behavior of every test that calls
-    ``enforce``. Option C is the default (DEC-0026 item 2): see
-    ``test_default_position_is_option_c``.
+    The outcome is "fail" in both modes, so the results table always shows it.
+    The constant is read at call time, so flipping the module attribute flips
+    the behavior of every test that calls ``enforce``. Option C is the default
+    (DEC-0026 item 2): see ``test_default_position_is_option_c``.
     """
     assert (
         wu.enforce([], asserting=True)
@@ -598,7 +645,9 @@ def test_roadmap_switch_has_both_modes(monkeypatch: pytest.MonkeyPatch) -> None:
 def fake_logrank(
     row: str, phi: float, fwer: int, passed: int, uncomputed: int = 0
 ) -> wu.LogrankRun:
-    """Build a made-up ``LogrankRun`` with the stated counts of false alarms, passes and gaps."""
+    """Build a made-up ``LogrankRun`` with the stated counts of false alarms,
+    passes and gaps.
+    """
     table = np.zeros((wu.R_LOGRANK, 10))
     table[:fwer, 0] = 1.0
     table[:passed, 1] = 1.0
@@ -609,9 +658,11 @@ def fake_logrank(
 
 
 def test_evaluate_logrank_applies_the_registered_bounds_exactly() -> None:
-    """L ROADMAP bound 33 of 2000 and the L1 / L2 ranges, boundary counts (review M5).
+    """L ROADMAP bound 33 of 2000 and the L1 / L2 ranges, boundary counts
+    (review M5).
 
-    L1 phi = 0: FWER range (7, 39), pass range (0, 9); L2 phi = 0.3: pass range (9, 44).
+    L1 phi = 0: FWER range (7, 39), pass range (0, 9); L2 phi = 0.3: pass range
+    (9, 44).
     """
     assert wu.evaluate_logrank(fake_logrank("L1", 0.0, 20, 5)).roadmap == []
     assert len(wu.evaluate_logrank(fake_logrank("L1", 0.0, 34, 5)).roadmap) == 1
@@ -675,8 +726,9 @@ def fake_delta(
 
 
 def test_evaluate_delta_applies_the_registered_bounds_exactly() -> None:
-    """N1 >= 461, N2 <= 22 and N3 >= 461 (all under the constant since addendum A9), the bitwise
-    refit (exact). N1 alone can fail with no false 'distinct' when the missed intervals lie below 0.
+    """N1 >= 461, N2 <= 22 and N3 >= 461 (all under the constant since addendum
+    A9), the bitwise refit (exact). N1 alone can fail with no false 'distinct'
+    when the missed intervals lie below 0.
     """
     assert wu.evaluate_delta(fake_delta(478, 22, 461)).roadmap == []
     only_n1 = wu.evaluate_delta(fake_delta(460, 0, 461))
@@ -697,10 +749,12 @@ def test_evaluate_delta_applies_the_registered_bounds_exactly() -> None:
 
 
 def test_delta_roadmap_rows_follow_the_switch_in_both_modes() -> None:
-    """A failed N1, N2 or N3 row raises under Option K and is only reported under Option C.
+    """A failed N1, N2 or N3 row raises under Option K and is only reported
+    under Option C.
 
-    Their consistency ranges are asserted in both modes: ``evaluate_delta`` fills ``consistency``
-    independently of the switch (checked by the next test).
+    Their consistency ranges are asserted in both modes: ``evaluate_delta``
+    fills ``consistency`` independently of the switch (checked by the next
+    test).
     """
     for counts in ((460, 0, 461), (477, 23, 461), (478, 22, 460)):
         failures = wu.evaluate_delta(fake_delta(*counts)).roadmap
@@ -717,9 +771,10 @@ def test_delta_roadmap_rows_follow_the_switch_in_both_modes() -> None:
 
 
 def test_evaluate_delta_applies_the_a9_ranges_exactly() -> None:
-    """The 12 pre-registered ranges (phi 0: N1 logit (431, 483), indicator (440, 487); N2 (0, 23) and
-    (0, 25); N3 (446, 490) and (448, 491); phi 0.3: N1 (434, 484) and (436, 485), N2 (0, 16) and
-    (0, 21), N3 (449, 491) and (448, 491)): inclusive ends, row by row, independent of the switch.
+    """The 12 pre-registered ranges (phi 0: N1 logit (431, 483), indicator (440,
+    487); N2 (0, 23) and (0, 25); N3 (446, 490) and (448, 491); phi 0.3: N1
+    (434, 484) and (436, 485), N2 (0, 16) and (0, 21), N3 (449, 491) and (448,
+    491)): inclusive ends, row by row, independent of the switch.
     """
     logit, indicator = "logit_w_interior", "w_zero_indicator"
     ok = wu.evaluate_delta(fake_delta(478, 22, 461))
@@ -750,7 +805,8 @@ def test_evaluate_delta_applies_the_a9_ranges_exactly() -> None:
         f"n3|{indicator}"
     ]
     assert len(wu.evaluate_delta(fake_delta(478, 22, 445)).consistency) == 2
-    # phi = 0.3 has its own ranges: N2 = 17 is out for the logit (<= 16), in for the indicator
+    # phi = 0.3 has its own ranges: N2 = 17 is out for the logit (<= 16), in for
+    # the indicator
     third = wu.evaluate_delta(fake_delta(478, 17, 461, phi=0.3))
     assert [k for k, v in third.consistency_rows.items() if v] == [
         f"n2|{logit}"
@@ -758,8 +814,9 @@ def test_evaluate_delta_applies_the_a9_ranges_exactly() -> None:
 
 
 def test_delta_reference_holds_12_ranges() -> None:
-    """Addendum A9: 4 (phi, target) cells x 3 rows = 12 ranges, each containing its rate x 500; the
-    rates are probabilities, the bound-failure chances lie in [0, 1], and N1 is the row that fails.
+    """Addendum A9: 4 (phi, target) cells x 3 rows = 12 ranges, each containing
+    its rate x 500; the rates are probabilities, the bound-failure chances lie
+    in [0, 1], and N1 is the row that fails.
     """
     cells = ref.DELTA_R2_REFERENCE
     assert sorted(cells) == [
@@ -784,7 +841,9 @@ def test_delta_reference_holds_12_ranges() -> None:
 
 
 def test_result_table_round_trips_numpy_and_non_finite_values(tmp_path) -> None:
-    """The results JSON holds numpy values and non-finite numbers as plain JSON, row by row."""
+    """The results JSON holds numpy values and non-finite numbers as plain JSON,
+    row by row.
+    """
     table = wu.ResultTable("selfcheck", tmp_path)
     table.add(
         "a",
@@ -811,9 +870,11 @@ def test_result_table_round_trips_numpy_and_non_finite_values(tmp_path) -> None:
     assert loaded["_meta"]["bootstrap"] == [2000, 5]
 
 
-# ------------------------------------------------------------------------------ pool, end to end
+# ------------------------------------------------------------- pool, end to end
 def test_pool_sets_single_thread_workers_and_restores_the_environment() -> None:
-    """Workers see one thread everywhere; the parent environment is restored on exit (O1)."""
+    """Workers see one thread everywhere; the parent environment is restored on
+    exit (O1).
+    """
     names = (
         "OMP_NUM_THREADS",
         "MKL_NUM_THREADS",
@@ -832,10 +893,12 @@ def test_pool_sets_single_thread_workers_and_restores_the_environment() -> None:
 
 
 def test_worker_count_does_not_change_a_replication() -> None:
-    """H2: the first 8 replications of C4 (phi 0.3) and L1 (phi 0) are bitwise equal with 1 worker,
-    2 workers, and in process, however the replications are split into tasks.
+    """H2: the first 8 replications of C4 (phi 0.3) and L1 (phi 0) are bitwise
+    equal with 1 worker, 2 workers, and in process, however the replications are
+    split into tasks.
 
-    Reference: the same function called in process on one task of all 8 replications.
+    Reference: the same function called in process on one task of all 8
+    replications.
     """
     cov_tasks = [(wu.CaseSpec("C4"), 0.3, r, r + 1, 10) for r in range(8)]
     log_tasks = [("L1", 0.0, r, r + 1) for r in range(8)]
@@ -864,10 +927,11 @@ def test_worker_count_does_not_change_a_replication() -> None:
 def test_every_design_runs_end_to_end_and_passes_the_exact_checks(
     pool, tmp_path
 ) -> None:
-    """All nine coverage designs, the characterization rows, L1, L2 and the delta-R2 study run on
-    the pool at a tiny R and satisfy the exact checks (identity with the production function, A4,
-    A5, the C7 zero column, L3, the bitwise refit). The counts against the registered bounds are
-    meaningless at this R and are ignored (``strict=False``); this checks the wiring only.
+    """All nine coverage designs, the characterization rows, L1, L2 and the
+    delta-R2 study run on the pool at a tiny R and satisfy the exact checks
+    (identity with the production function, A4, A5, the C7 zero column, L3, the
+    bitwise refit). The counts against the registered bounds are meaningless at
+    this R and are ignored (``strict=False``); this checks the wiring only.
     """
     table = wu.ResultTable("selfcheck-e2e", tmp_path)
     specs = [wu.CaseSpec(f"C{k}") for k in range(1, 10)]
@@ -902,11 +966,13 @@ def test_every_design_runs_end_to_end_and_passes_the_exact_checks(
 
 
 def test_c7_zero_column_rule_allows_a_failing_interior_part() -> None:
-    """The combined verdict of H2a(ii) is "fail" when the interior part fails (``combine_verdicts``:
-    one fail fails the whole), else "inconclusive" because the zero part is not computable.
+    """The combined verdict of H2a(ii) is "fail" when the interior part fails
+    (``combine_verdicts``: one fail fails the whole), else "inconclusive"
+    because the zero part is not computable.
 
-    Added after run 2, in which the first form of the check demanded "inconclusive" and so rejected a
-    correct replication whose interior part failed (a defect of the harness's expectation, found at
+    Added after run 2, in which the first form of the check demanded
+    "inconclusive" and so rejected a correct replication whose interior part
+    failed (a defect of the harness's expectation, found at
     phi = 0.3, replication with an interior "fail"; no bound moved)."""
     zero = {
         "n_failed_resamples": 2000,
@@ -936,7 +1002,9 @@ def test_c7_zero_column_rule_allows_a_failing_interior_part() -> None:
 
 
 def test_result_files_are_stamped_and_never_overwritten(tmp_path) -> None:
-    """Two tables of the same name get different files, each keeps its own rows (R2)."""
+    """Two tables of the same name get different files, each keeps its own rows
+    (R2).
+    """
     first, second = wu.ResultTable("same", tmp_path), wu.ResultTable(
         "same", tmp_path
     )
@@ -956,10 +1024,12 @@ def test_result_files_are_stamped_and_never_overwritten(tmp_path) -> None:
 
 
 def test_run_cache_records_the_pool_size_at_creation(pool, tmp_path) -> None:
-    """R1: the results JSON written by ``RunCache`` says ``workers`` = the pool's size (4 here), not
-    1, although the parent environment has ``LPC_THREADS=1`` while the pool lives. Runs C1 at phi 0
-    (R = 1000, a few seconds), the cheapest study design, through the same code path as the study
-    files, and checks the file and the exact checks."""
+    """R1: the results JSON written by ``RunCache`` says ``workers`` = the
+    pool's size (4 here), not 1, although the parent environment has
+    ``LPC_THREADS=1`` while the pool lives. Runs C1 at phi 0 (R = 1000, a few
+    seconds), the cheapest study design, through the same code path as the study
+    files, and checks the file and the exact checks.
+    """
     assert os.environ["LPC_THREADS"] == "1"
     cache = wu.RunCache("smoke-cache", tmp_path)
     evaluation = cache.coverage(pool, wu.CaseSpec("C1"), 0.0)
@@ -969,10 +1039,12 @@ def test_run_cache_records_the_pool_size_at_creation(pool, tmp_path) -> None:
 
 
 def test_delta_roadmap_rows_are_keyed_not_matched_by_text() -> None:
-    """R6: the N-row tests select failures by row key (``delta_rows``), never by message text.
+    """R6: the N-row tests select failures by row key (``delta_rows``), never by
+    message text.
 
-    Every message of ``roadmap`` is in exactly one row list and names its row; an unknown row raises.
-    A reworded message that dropped its row label would fail here, and a row that selected nothing
+    Every message of ``roadmap`` is in exactly one row list and names its row;
+    an unknown row raises. A reworded message that dropped its row label would
+    fail here, and a row that selected nothing
     would raise ``KeyError``."""
     ev = wu.evaluate_delta(
         fake_delta(460, 23, 460)
@@ -998,7 +1070,9 @@ def test_delta_roadmap_rows_are_keyed_not_matched_by_text() -> None:
 
 
 def test_option_c_failure_warns_instead_of_passing_silently() -> None:
-    """R6: under Option C a failed ROADMAP row gives a passing node plus a visible UserWarning."""
+    """R6: under Option C a failed ROADMAP row gives a passing node plus a
+    visible UserWarning.
+    """
     with pytest.warns(UserWarning, match="Option C"):
         assert wu.enforce(["C4: A1 929 < 930"], asserting=False) == "fail"
     with warnings.catch_warnings():
@@ -1006,12 +1080,14 @@ def test_option_c_failure_warns_instead_of_passing_silently() -> None:
         assert wu.enforce([], asserting=False) == "pass"
 
 
-# ------------------------------------------------------------ Option C (DEC-0026 item 2) and Option K
+# -------------------------------------- Option C (DEC-0026 item 2) and Option K
 class StubCache:
-    """Stands in for ``RunCache``: every design returns the given evaluation, and no pool is needed.
+    """Stands in for ``RunCache``: every design returns the given evaluation,
+    and no pool is needed.
 
-    It lets the real study test bodies run on a manufactured evaluation, so what each one asserts
-    under each switch position is read from the code, not from a description of it.
+    It lets the real study test bodies run on a manufactured evaluation, so what
+    each one asserts under each switch position is read from the code, not from
+    a description of it.
     """
 
     def __init__(self, evaluation: wu.Evaluation) -> None:
@@ -1032,7 +1108,9 @@ class StubCache:
 
 
 def roadmap_bodies(evaluation: wu.Evaluation) -> list:
-    """Each ROADMAP-bound test body of the four study files as a zero-argument call on a stub cache."""
+    """Each ROADMAP-bound test body of the four study files as a zero-argument
+    call on a stub cache.
+    """
     cache = StubCache(evaluation)
     return [
         lambda: study_statistics.test_roadmap_coverage_bounds(
@@ -1054,7 +1132,9 @@ def roadmap_bodies(evaluation: wu.Evaluation) -> list:
 def failing_roadmap(
     row_keys: tuple[str, ...] = ("n1", "n2", "n3")
 ) -> wu.Evaluation:
-    """An evaluation whose ROADMAP bounds failed and whose exact and consistency groups are clean."""
+    """An evaluation whose ROADMAP bounds failed and whose exact and consistency
+    groups are clean.
+    """
     rows = {key: [f"x {key.upper()} failed"] for key in row_keys}
     rows |= {key: [] for key in ("n1", "n2", "n3") if key not in rows}
     flat = [message for key in ("n1", "n2", "n3") for message in rows[key]]
@@ -1071,12 +1151,14 @@ def failing_roadmap(
 
 
 def test_default_position_is_option_c() -> None:
-    """The shipped switch position is Option C: ``ASSERT_ROADMAP_BOUNDS`` is False (DEC-0026 item 2).
+    """The shipped switch position is Option C: ``ASSERT_ROADMAP_BOUNDS`` is
+    False (DEC-0026 item 2).
 
-    Reference: the owner's ratification, quoted from DEC-0026 item 2 ("``ASSERT_ROADMAP_BOUNDS`` is
-    set to False"), not the code. With the shipped constant, ``enforce`` called as the study tests call
-    it (no ``asserting`` argument) reports a failed bound as "fail" with a UserWarning and does not
-    raise. Exact (a boolean and a string).
+    Reference: the owner's ratification, quoted from DEC-0026 item 2
+    ("``ASSERT_ROADMAP_BOUNDS`` is set to False"), not the code. With the
+    shipped constant, ``enforce`` called as the study tests call it (no
+    ``asserting`` argument) reports a failed bound as "fail" with a UserWarning
+    and does not raise. Exact (a boolean and a string).
     """
     assert wu.ASSERT_ROADMAP_BOUNDS is False
     with pytest.warns(UserWarning, match="Option C"):
@@ -1090,8 +1172,9 @@ def test_default_position_is_option_c() -> None:
 def test_results_table_records_the_switch_position(
     monkeypatch: pytest.MonkeyPatch, tmp_path, position: bool
 ) -> None:
-    """Every results file states the switch position it was written under (``_meta``), so a reader of
-    the JSON can tell recorded characterization rows (Option C) from asserted ones (Option K).
+    """Every results file states the switch position it was written under
+    (``_meta``), so a reader of the JSON can tell recorded characterization rows
+    (Option C) from asserted ones (Option K).
     """
     monkeypatch.setattr(wu, "ASSERT_ROADMAP_BOUNDS", position)
     table = wu.ResultTable("switch", tmp_path)
@@ -1108,12 +1191,14 @@ def test_results_table_records_the_switch_position(
 def test_study_roadmap_bodies_follow_the_switch(
     monkeypatch: pytest.MonkeyPatch, position: bool
 ) -> None:
-    """The five ROADMAP-bound test bodies of the study files, run on a failed-bound evaluation.
+    """The five ROADMAP-bound test bodies of the study files, run on a
+    failed-bound evaluation.
 
-    Option K (True): every body raises AssertionError. Option C (False): every body passes and emits
-    the UserWarning naming the failure (the recorded outcome shown by pytest). Also: a body selects
-    only its own rows (the N2/N3 body ignores an N1-only failure; the N1 body ignores an N2/N3-only
-    failure), and with no failed bound no body raises or warns in either position. Exact.
+    Option K (True): every body raises AssertionError. Option C (False): every
+    body passes and emits the UserWarning naming the failure (the recorded
+    outcome shown by pytest). Also: a body selects only its own rows (the N2/N3
+    body ignores an N1-only failure; the N1 body ignores an N2/N3-only failure),
+    and with no failed bound no body raises or warns in either position. Exact.
     """
     monkeypatch.setattr(wu, "ASSERT_ROADMAP_BOUNDS", position)
     for body in roadmap_bodies(failing_roadmap()):
@@ -1129,7 +1214,8 @@ def test_study_roadmap_bodies_follow_the_switch(
         body = roadmap_bodies(evaluation)[quiet_body]
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            body()  # no failure of its own rows: passes silently in both positions
+            # No failure of its own rows: passes silently in both positions.
+            body()
     # nothing failed: silent and passing in both positions
     for body in roadmap_bodies(failing_roadmap(())):
         with warnings.catch_warnings():
@@ -1143,12 +1229,14 @@ def test_study_roadmap_bodies_follow_the_switch(
 def test_exact_and_consistency_bodies_are_asserted_in_both_positions(
     monkeypatch: pytest.MonkeyPatch, position: bool
 ) -> None:
-    """The exact checks and the pre-registered consistency ranges raise whatever the switch says.
+    """The exact checks and the pre-registered consistency ranges raise whatever
+    the switch says.
 
-    Option C moves only the ROADMAP-bound rows; the 70 + 12 consistency ranges (the defect test) and
-    the exact checks stay asserted (DEC-0026 item 2). Each study test body of those two groups is run
-    on an evaluation with one failure in its group: it must raise in both positions, and it must pass
-    on a clean evaluation. Exact.
+    Option C moves only the ROADMAP-bound rows; the 70 + 12 consistency ranges
+    (the defect test) and the exact checks stay asserted (DEC-0026 item 2). Each
+    study test body of those two groups is run on an evaluation with one failure
+    in its group: it must raise in both positions, and it must pass on a clean
+    evaluation. Exact.
     """
     monkeypatch.setattr(wu, "ASSERT_ROADMAP_BOUNDS", position)
     clean = failing_roadmap(())
@@ -1194,7 +1282,8 @@ def test_exact_and_consistency_bodies_are_asserted_in_both_positions(
         body(cache["clean"])
         with pytest.raises(AssertionError):
             body(cache["range"])
-    # delta-R2 consistency is keyed by row and target; one failing key fails its own test only
+    # delta-R2 consistency is keyed by row and target; one failing key fails its
+    # own test only
     keyed = failing_roadmap(())
     keyed.consistency_rows["n2|" + wu.DELTA_TARGETS[0]] = (
         "x: N2 outside the range"

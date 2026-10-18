@@ -1,45 +1,56 @@
-"""Shared tools for the WU-0006 simulation studies (WU-0006.1): data generators, runner, scoring.
+"""Shared tools for the WU-0006 simulation studies (WU-0006.1): data generators,
+runner, scoring.
 
-The study reports confidence intervals and verdicts, and the WU-0006 tests check by
-simulation that they behave as promised. Each simulation study does the same four
-things: (1) generate synthetic data whose true answer is known (``ar1``, ``generate``,
-``logrank_draw``, ``delta_states``); (2) run the real study functions on many
-independent copies of that data, spread over several worker processes
-(``worker_pool``, ``run_coverage``, ``run_logrank``, ``run_delta``); (3) score the
-counts against the bounds in the ROADMAP and against the reference ranges in
-``wu0006_reference`` (``evaluate_coverage``, ``evaluate_logrank``, ``evaluate_delta``);
-and (4) write every result to a JSON table (``ResultTable``, ``RunCache``). This
-module holds those four parts so the four study test files stay short. Read the
-generators first, then ``_replicate``, which shows one full trial. The rest of this
-docstring is the detailed design, kept for reviewers.
+The study reports confidence intervals and verdicts, and the WU-0006 tests check
+by simulation that they behave as promised. Each simulation study does the same
+four things: (1) generate synthetic data whose true answer is known (``ar1``,
+``generate``, ``logrank_draw``, ``delta_states``); (2) run the real study
+functions on many independent copies of that data, spread over several worker
+processes (``worker_pool``, ``run_coverage``, ``run_logrank``, ``run_delta``);
+(3) score the counts against the bounds in the ROADMAP and against the reference
+ranges in ``wu0006_reference`` (``evaluate_coverage``, ``evaluate_logrank``,
+``evaluate_delta``); and (4) write every result to a JSON table
+(``ResultTable``, ``RunCache``). This module holds those four parts so the four
+study test files stay short. Read the generators first, then ``_replicate``,
+which shows one full trial. The rest of this docstring is the detailed design,
+kept for reviewers.
 
-A test helper, not a test module (no ``test_`` prefix, so pytest does not collect it). It is shared by
-``test_statistics_coverage.py``, ``test_analysis_coverage.py``, ``test_analysis_logrank_size.py``,
-``test_analysis_null_delta_r2.py`` and the smoke ``test_wu0006_harness.py``. It changes nothing under
-``lpcstudy/`` and uses only public (and, for the paired change of H2b and H2e, one private) production
-functions, which it checks bitwise against its own computation (the identity check I).
+A test helper, not a test module (no ``test_`` prefix, so pytest does not
+collect it). It is shared by ``test_statistics_coverage.py``,
+``test_analysis_coverage.py``, ``test_analysis_logrank_size.py``,
+``test_analysis_null_delta_r2.py`` and the smoke ``test_wu0006_harness.py``. It
+changes nothing under ``lpcstudy/`` and uses only public (and, for the paired
+change of H2b and H2e, one private) production functions, which it checks
+bitwise against its own computation (the identity check I).
 
-Design (plan d954db9, the applied-mathematician's review 9d1152e, the main-session amendment and DEC-0018):
+Design (plan d954db9, the applied-mathematician's review 9d1152e, the
+main-session amendment and DEC-0018):
 
-* **Generators** are the specifications of the review's M3 (a) and (g). The consistency ranges of
-  ``wu0006_reference`` hold only for them. All randomness is ``make_rng(WU0006_SEED, "wu0006", case,
-  phi, replication, purpose)`` with the literal ``WU0006_SEED = 6006`` (not a registered seed). A
-  replication's bootstrap seed is an integer drawn from its own ``"boot"`` stream and enters
-  ``replace(FULL, seed=...)``, so the production code derives its resample seeds exactly as in the
-  pipeline. A result depends on (case, phi, replication) only, not on the number of workers.
-* **Procedure under test** is the study's: moving-block bootstrap with block 5 and B = 2000
-  resamples (asserted from ``FULL`` by ``assert_design``), percentile intervals at 95% and at
-  ``1 - 0.05/3`` taken from the same resamples, verdicts by ``criterion_verdict``.
-* **Workers.** A spawned pool of single-thread processes (``worker_pool``). The thread variables are
-  set to 1 in the parent environment before the pool is created and restored afterwards; the pool size
-  is ``min(LPC_THREADS, 4)`` of the invoking environment.
-* **Assertion groups.** ``Evaluation.exact`` (identity with production, A4 verdict equality per
-  replication, A5 no failed resamples, the C7 zero column), ``Evaluation.consistency`` (the
-  pre-registered reference ranges, the defect test) and ``Evaluation.roadmap`` (the ROADMAP bounds).
-  The exact and consistency groups are asserted in every run. The ROADMAP-bound group is recorded
-  and not asserted (``ASSERT_ROADMAP_BOUNDS = False``, Option C of DEC-0018, owner-ratified on
-  2026-10-12, DEC-0026 item 2); it would be asserted only if the constant were set to True (Option K).
-  Every group is always computed and written to the results table.
+* **Generators** are the specifications of the review's M3 (a) and (g). The
+  consistency ranges of ``wu0006_reference`` hold only for them. All randomness
+  is ``make_rng(WU0006_SEED, "wu0006", case, phi, replication, purpose)`` with
+  the literal ``WU0006_SEED = 6006`` (not a registered seed). A replication's
+  bootstrap seed is an integer drawn from its own ``"boot"`` stream and enters
+  ``replace(FULL, seed=...)``, so the production code derives its resample seeds
+  exactly as in the pipeline. A result depends on (case, phi, replication) only,
+  not on the number of workers.
+* **Procedure under test** is the study's: moving-block bootstrap with block 5
+  and B = 2000 resamples (asserted from ``FULL`` by ``assert_design``),
+  percentile intervals at 95% and at ``1 - 0.05/3`` taken from the same
+  resamples, verdicts by ``criterion_verdict``.
+* **Workers.** A spawned pool of single-thread processes (``worker_pool``). The
+  thread variables are set to 1 in the parent environment before the pool is
+  created and restored afterwards; the pool size is ``min(LPC_THREADS, 4)`` of
+  the invoking environment.
+* **Assertion groups.** ``Evaluation.exact`` (identity with production, A4
+  verdict equality per replication, A5 no failed resamples, the C7 zero column),
+  ``Evaluation.consistency`` (the pre-registered reference ranges, the defect
+  test) and ``Evaluation.roadmap`` (the ROADMAP bounds). The exact and
+  consistency groups are asserted in every run. The ROADMAP-bound group is
+  recorded and not asserted (``ASSERT_ROADMAP_BOUNDS = False``, Option C of
+  DEC-0018, owner-ratified on 2026-10-12, DEC-0026 item 2); it would be asserted
+  only if the constant were set to True (Option K). Every group is always
+  computed and written to the results table.
 """
 
 from __future__ import annotations
@@ -103,24 +114,29 @@ from wu0006_reference import (
     LOGRANK_REFERENCE,
 )
 
-# ------------------------------------------------------------------------------------ constants
+# -------------------------------------------------------------------- constants
+# Option C of DEC-0018, in force since the owner's ratification of 2026-10-12
+# (DEC-0026 item 2).
+#
+# False: the ROADMAP-bound rows (A1, A2, A3, L1, L2 and N1, N2, N3) are
+# computed, written to the results table and reported as labeled
+# characterization rows (a UserWarning in the pytest output names each failed
+# bound); they are never asserted. The pytest outcome is the consistency ranges
+# (the defect test) and the exact checks, which are asserted whatever this
+# constant says. True is Option K: the same rows are asserted and a failed bound
+# raises. DEC-0018 predicts that 16 to 17 of the 82 probabilistic assertions at
+# the nominal bounds fail for correct code (about 13 of them in the coverage
+# rows alone; DEF-0020 and DEF-0021), across the L, A1 to A3, C and N1 to N3
+# families; under Option C none of those fails a node. N2 and N3 of the delta-R2
+# study joined the switch after addendum A9 (their nominal bounds, like A1 and
+# A2, are method-validity bounds that correct code fails with probability about
+# 0.15 per run); the 12 delta-R2 ranges are always asserted. No bound, level, R
+# or B depends on the constant.
 ASSERT_ROADMAP_BOUNDS = False
-"""Option C of DEC-0018, in force since the owner's ratification of 2026-10-12 (DEC-0026 item 2).
 
-False: the ROADMAP-bound rows (A1, A2, A3, L1, L2 and N1, N2, N3) are computed, written to the results
-table and reported as labeled characterization rows (a UserWarning in the pytest output names each
-failed bound); they are never asserted. The pytest outcome is the consistency ranges (the defect
-test) and the exact checks, which are asserted whatever this constant says. True is Option K: the
-same rows are asserted and a failed bound raises. DEC-0018 predicts that 16 to 17 of the 82
-probabilistic assertions at the nominal bounds fail for correct code (about 13 of them in the coverage rows
-alone; DEF-0020 and DEF-0021), across the L, A1 to A3, C and N1 to N3 families; under Option C none of
-those fails a node. N2 and N3 of the delta-R2 study joined the switch after addendum A9 (their
-nominal bounds, like A1 and A2, are method-validity bounds that correct code fails with probability
-about 0.15 per run); the 12 delta-R2 ranges are always asserted. No bound, level, R or B depends on
-the constant."""
-
+# Literal master seed of the simulation studies; not a registered DEV or
+# confirmatory seed.
 WU0006_SEED = 6006
-"""Literal master seed of the simulation studies; not a registered DEV or confirmatory seed."""
 
 R_COVERAGE = 1000
 R_LOGRANK = 2000
@@ -129,8 +145,9 @@ LEVELS: tuple[float, float] = (0.95, PRIMARY_LEVEL)
 LEVEL_NAMES: tuple[str, str] = ("95", "98.3")
 PHIS: tuple[float, float] = (0.0, 0.3)
 
-# Integer bounds (applied-mathematician M1): the count out of R at which the formula
-# nominal -/+ 3 sqrt(p (1 - p) / R) is met, the stricter of the formula and the ROADMAP rounding.
+# Integer bounds (applied-mathematician M1): the count out of R at which the
+# formula nominal -/+ 3 sqrt(p (1 - p) / R) is met, the stricter of the formula
+# and the ROADMAP rounding.
 A1_MIN = 930  # coverage at 95%: >= 0.929324 * 1000
 A2_MIN = 972  # coverage at 1 - 0.05/3: >= 0.971188 * 1000
 A3_MAX = {
@@ -143,8 +160,9 @@ N3_MIN = 461  # coverage of the conditional estimand: >= 0.921 * 500
 N2_MAX = 22  # false "distinct": <= 0.045946 * 500
 
 LOGNORMAL_CORR = 0.8
+# Gaussian correlation whose Spearman correlation is exactly 6/pi * arcsin(c/2)
+# = 0.7.
 C6_CORR = 2.0 * math.sin(0.7 * math.pi / 6.0)
-"""Gaussian correlation whose Spearman correlation is exactly 6/pi * arcsin(c/2) = 0.7."""
 
 TRUTH = {
     "C1": 0.0,
@@ -161,14 +179,15 @@ SAMPLE_SIZE = {
     "C8": 300,
     "C9": 300,
 }  # sweep states (H2b, H2e); the others use 500 test states
+# Index into ``LEVELS`` of the level at which the criterion's verdict is read.
 VERDICT_LEVEL = {"C2": 0, "C4": 1, "C5": 0, "C6": 0, "C7": 1, "C8": 1, "C9": 0}
-"""Index into ``LEVELS`` of the level at which the criterion's verdict is read."""
 IDENTITY_REPS = {"C6": 3}
 IDENTITY_DEFAULT = 10
 CHUNK = 25
 
-# Edge of each criterion for the independent verdict rule: (kind, edge, closed). Hard-coded here, not
-# read from lpcstudy.analysis, so that a change of a band constant is caught by A4.
+# Edge of each criterion for the independent verdict rule: (kind, edge, closed).
+# Hard-coded here, not read from lpcstudy.analysis, so that a change of a band
+# constant is caught by A4.
 EDGE_RULES = {
     "C2": ("upper", 0.0, False),
     "C4": ("upper", 1.05, True),
@@ -193,7 +212,7 @@ SYSTEM_LABEL = "wu0006"
 
 RESULTS_DIR = Path(__file__).resolve().parents[2] / "runs" / "tests"
 
-# --------------------------------------------------------------------------------- worker pool
+# ------------------------------------------------------------------ worker pool
 _POOL_ENV = {
     "OMP_NUM_THREADS": "1",
     "MKL_NUM_THREADS": "1",
@@ -206,7 +225,9 @@ _POOL_ENV = {
 
 
 def pool_size() -> int:
-    """Return the number of workers: ``min(LPC_THREADS, 4)`` of the invoking environment (default 4)."""
+    """Return the number of workers: ``min(LPC_THREADS, 4)`` of the invoking
+    environment (default 4).
+    """
     text = os.environ.get("LPC_THREADS", "4")
     if not text.isdigit() or not 1 <= int(text) <= 99:
         raise ValueError(
@@ -220,8 +241,8 @@ def worker_pool(workers: int | None = None) -> Iterator[ProcessPoolExecutor]:
     """Run a block with a pool of spawned single-thread worker processes.
 
     The parent environment is restored on exit. The thread variables are set in
-    ``os.environ`` before the pool exists, because a spawned child reads them when
-    numpy, OpenBLAS and jax are imported to unpickle its first task (an
+    ``os.environ`` before the pool exists, because a spawned child reads them
+    when numpy, OpenBLAS and jax are imported to unpickle its first task (an
     initializer would be too late). They stay set while the pool lives, since
     children are started on demand. The pool's size is read before that and kept
     as ``pool.wu_workers`` for the results table.
@@ -235,7 +256,9 @@ def worker_pool(workers: int | None = None) -> Iterator[ProcessPoolExecutor]:
         with ProcessPoolExecutor(
             max_workers=size, mp_context=get_context("spawn")
         ) as pool:
-            pool.wu_workers = size  # recorded in the results table (the env now says LPC_THREADS=1)
+            # Recorded in the results table (the environment now says
+            # LPC_THREADS=1).
+            pool.wu_workers = size
             yield pool
     finally:
         for key, value in saved.items():
@@ -248,7 +271,9 @@ def worker_pool(workers: int | None = None) -> Iterator[ProcessPoolExecutor]:
 def run_tasks(
     pool: ProcessPoolExecutor, function: Callable, tasks: Sequence
 ) -> list:
-    """Return the results of ``function(task)`` in task order, so they do not depend on the worker count."""
+    """Return the results of ``function(task)`` in task order, so they do not
+    depend on the worker count.
+    """
     futures = [pool.submit(function, task) for task in tasks]
     return [future.result() for future in futures]
 
@@ -268,7 +293,7 @@ def assert_design() -> None:
     )
 
 
-# ---------------------------------------------------------------------------------- generators
+# ------------------------------------------------------------------- generators
 def ar1(
     rng: np.random.Generator,
     n: int,
@@ -276,7 +301,8 @@ def ar1(
     columns: int = 1,
     cross: float = 0.0,
 ) -> np.ndarray:
-    """Stationary unit-variance AR(1): ``x_0 = e_0``, ``x_t = phi x_{t-1} + sqrt(1 - phi^2) e_t``.
+    """Stationary unit-variance AR(1): ``x_0 = e_0``, ``x_t = phi x_{t-1} +
+    sqrt(1 - phi^2) e_t``.
 
     Parameters
     ----------
@@ -287,8 +313,9 @@ def ar1(
     phi : float
         Lag-1 autocorrelation, in ``[0, 1)``; common to both columns.
     columns : int, optional
-        1 for a series of shape ``(n,)``; 2 for a bivariate series ``(n, 2)`` whose innovations
-        have lag-0 correlation ``cross`` (so the stationary marginal correlation is ``cross``).
+        1 for a series of shape ``(n,)``; 2 for a bivariate series ``(n, 2)``
+        whose innovations have lag-0 correlation ``cross`` (so the stationary
+        marginal correlation is ``cross``).
     cross : float, optional
         Correlation of the two columns.
 
@@ -316,21 +343,23 @@ def ar1(
     return lfilter([1.0], [1.0, -phi], scaled, axis=0)
 
 
-# ------------------------------------------------------------------------- coverage case specs
+# ---------------------------------------------------------- coverage case specs
 @dataclass(frozen=True)
 class CaseSpec:
-    """One coverage design: the base case C1..C9, and the log-SD of the log-normal cases.
+    """One coverage design: the base case C1..C9, and the log-SD of the
+    log-normal cases.
 
     Attributes
     ----------
     base : str
         "C1" to "C9" (the plan's case table).
     sigma : float
-        Log-SD of the log-normal pair of C2, C4 and C5 (1 in the asserted cases).
+        Log-SD of the log-normal pair of C2, C4 and C5 (1 in the asserted
+        cases).
     tag : str
-        Suffix of the seed label and the table key for a characterization variant
-        ("h1.5" for C2h at sigma = 1.5, "h2" for sigma = 2, "s" for C1s, whose key adds phi);
-        empty for an asserted case.
+        Suffix of the seed label and the table key for a characterization
+        variant ("h1.5" for C2h at sigma = 1.5, "h2" for sigma = 2, "s" for C1s,
+        whose key adds phi); empty for an asserted case.
     """
 
     base: str
@@ -354,24 +383,31 @@ class CaseSpec:
 
     @property
     def verdict_level(self) -> int | None:
-        """Index into ``LEVELS`` of the verdict level, or None for a case without a verdict."""
+        """Index into ``LEVELS`` of the verdict level, or None for a case
+        without a verdict.
+        """
         return VERDICT_LEVEL.get(self.base)
 
     @property
     def asserted(self) -> bool:
-        """Whether the case is one of the nine asserted designs (not a characterization row)."""
+        """Whether the case is one of the nine asserted designs (not a
+        characterization row).
+        """
         return self.tag == ""
 
 
 def expected_verdict(case: str, lower: float, upper: float) -> str:
-    """The verdict the band rule implies for an interval, written from the criterion's wording.
+    """The verdict the band rule implies for an interval, written from the
+    criterion's wording.
 
-    One-sided misses for the one-sided bands, both edges for the two-sided band of C7.
+    One-sided misses for the one-sided bands, both edges for the two-sided band
+    of C7.
 
-    Pass iff the interval is wholly on the predicted side of the edge, fail iff it is wholly on the
-    other side, otherwise inconclusive; the edge belongs to the band as the criterion says (the
-    upper edge of H2c is open, of H2d and H3c closed; the lower edge of H1d is closed, of H2b and
-    H2e open; the band of H2a(ii) is open at both ends). Independent of
+    Pass iff the interval is wholly on the predicted side of the edge, fail iff
+    it is wholly on the other side, otherwise inconclusive; the edge belongs to
+    the band as the criterion says (the upper edge of H2c is open, of H2d and
+    H3c closed; the lower edge of H1d is closed, of H2b and H2e open; the band
+    of H2a(ii) is open at both ends). Independent of
     ``statistics.interval_verdict``.
     """
     kind, edge, closed = EDGE_RULES[case]
@@ -390,9 +426,11 @@ def expected_verdict(case: str, lower: float, upper: float) -> str:
 def generate(
     spec: CaseSpec, phi: float, rng: np.random.Generator, n: int | None = None
 ) -> dict[str, np.ndarray]:
-    """Data of one replication, by the generator specification of the review's M3 (a).
+    """Data of one replication, by the generator specification of the review's
+    M3 (a).
 
-    ``n`` overrides the case's sample size (the self-checks of the truths use very long series).
+    ``n`` overrides the case's sample size (the self-checks of the truths use
+    very long series).
     """
     base = spec.base
     n = spec.n if n is None else n
@@ -422,10 +460,11 @@ def generate(
 def _bootstrap_plan(
     spec: CaseSpec, data: dict[str, np.ndarray], cfg
 ) -> tuple[Callable[[np.ndarray], float], Callable[[], object]]:
-    """The statistic of an index array and a factory of its bootstrap seed, as production uses them.
+    """The statistic of an index array and a factory of its bootstrap seed, as
+    production uses them.
 
-    The seed factory returns a fresh generator (or the integer) on every call, because a generator
-    advances; production and harness each take their own.
+    The seed factory returns a fresh generator (or the integer) on every call,
+    because a generator advances; production and harness each take their own.
     """
     base = spec.base
     if base == "C1":
@@ -485,14 +524,17 @@ def _bootstrap_plan(
 
 
 def _state(values: np.ndarray) -> SimpleNamespace:
-    """Wrap per-state errors in the minimal object that the production functions read."""
+    """Wrap per-state errors in the minimal object that the production functions
+    read.
+    """
     return SimpleNamespace(state_mse_ref=values)
 
 
 def _production(
     spec: CaseSpec, data: dict[str, np.ndarray], cfg, seed_factory
 ) -> tuple[dict, dict | None]:
-    """The production function of the case at its own level, and for C7 the zero column.
+    """The production function of the case at its own level, and for C7 the zero
+    column.
 
     Returns ``({estimate, lower, upper, n_failed, verdict}, extra)``.
     """
@@ -633,10 +675,12 @@ def _production(
 def _zero_column_ok(
     extra: dict, interior_verdict: str, n_resamples: int
 ) -> bool:
-    """C7: with all w* interior the zero part is not computable: all resamples failed (A5).
+    """C7: with all w* interior the zero part is not computable: all resamples
+    failed (A5).
 
-    The combined verdict of (ii) is ``combine_verdicts`` of the parts: "fail" if the interior part
-    fails, otherwise "inconclusive" (the zero part can neither pass nor fail).
+    The combined verdict of (ii) is ``combine_verdicts`` of the parts: "fail" if
+    the interior part fails, otherwise "inconclusive" (the zero part can neither
+    pass nor fail).
     """
     zero = extra["zero_part"]
     combined = "fail" if interior_verdict == "fail" else "inconclusive"
@@ -649,7 +693,9 @@ def _zero_column_ok(
 
 
 def _replicate(spec: CaseSpec, phi: float, r: int, identity: bool) -> tuple:
-    """One replication: intervals at both levels from the same resamples, verdicts, identity."""
+    """One replication: intervals at both levels from the same resamples,
+    verdicts, identity.
+    """
     key = (WU0006_SEED, "wu0006", spec.label, f"{phi:g}", r)
     data = generate(spec, phi, make_rng(*key, "data"))
     cfg = replace(FULL, seed=int(make_rng(*key, "boot").integers(2**31)))
@@ -705,7 +751,9 @@ def _replicate(spec: CaseSpec, phi: float, r: int, identity: bool) -> tuple:
 
 
 def _coverage_task(task: tuple) -> list[tuple]:
-    """Run one chunk of replications (the unit of work sent to a worker process)."""
+    """Run one chunk of replications (the unit of work sent to a worker
+    process).
+    """
     spec, phi, start, stop, n_identity = task
     return [
         _replicate(spec, phi, r, r < n_identity) for r in range(start, stop)
@@ -714,7 +762,9 @@ def _coverage_task(task: tuple) -> list[tuple]:
 
 @dataclass
 class CoverageRun:
-    """The replications of one (case, phi): bounds at both levels, verdicts, identity flags."""
+    """The replications of one (case, phi): bounds at both levels, verdicts,
+    identity flags.
+    """
 
     spec: CaseSpec
     phi: float
@@ -730,7 +780,9 @@ class CoverageRun:
     seconds: float = 0.0
 
     def counts(self) -> dict:
-        """Counts out of R: coverage, one-sided misses, verdicts, failed resamples."""
+        """Counts out of R: coverage, one-sided misses, verdicts, failed
+        resamples.
+        """
         truth = self.spec.truth
         inside = (self.lower <= truth) & (truth <= self.upper)
         out = {
@@ -786,20 +838,24 @@ def run_coverage(
     )
 
 
-# ---------------------------------------------------------------------------------- evaluation
+# ------------------------------------------------------------------- evaluation
 @dataclass
 class Evaluation:
-    """Outcome of one study row, by assertion group; ``row`` goes to the results table."""
+    """Outcome of one study row, by assertion group; ``row`` goes to the results
+    table.
+    """
 
     row: dict
     exact: list[str] = field(default_factory=list)
     consistency: list[str] = field(default_factory=list)
     roadmap: list[str] = field(default_factory=list)
+    # Delta-R2 only: the ROADMAP failures keyed by row, ``"n1"``, ``"n2"``,
+    # ``"n3"`` (structured, so that no test selects a row by matching message
+    # text).
     roadmap_rows: dict[str, list[str]] = field(default_factory=dict)
-    """Delta-R2 only: the ROADMAP failures keyed by row, ``"n1"``, ``"n2"``, ``"n3"`` (structured, so
-    that no test selects a row by matching message text)."""
+    # Delta-R2 only: the consistency message (or None) of each row, keyed
+    # ``"n1|<target>"``.
     consistency_rows: dict[str, str | None] = field(default_factory=dict)
-    """Delta-R2 only: the consistency message (or None) of each row, keyed ``"n1|<target>"``."""
 
 
 def in_range(count: int, bounds: tuple[int, int]) -> bool:
@@ -808,15 +864,17 @@ def in_range(count: int, bounds: tuple[int, int]) -> bool:
 
 
 def enforce(failures: Sequence[str], *, asserting: bool | None = None) -> str:
-    """Raise on the ROADMAP-bound failures while they are asserted; return the outcome.
+    """Raise on the ROADMAP-bound failures while they are asserted; return the
+    outcome.
 
     Parameters
     ----------
     failures : Sequence[str]
         One message per failed ROADMAP-bound row.
     asserting : bool, optional
-        True for Option K (raise), False for Option C (only report). Default: the module constant
-        ``ASSERT_ROADMAP_BOUNDS`` read at call time (False, Option C, as shipped).
+        True for Option K (raise), False for Option C (only report). Default:
+        the module constant ``ASSERT_ROADMAP_BOUNDS`` read at call time (False,
+        Option C, as shipped).
 
     Returns
     -------
@@ -841,10 +899,12 @@ def enforce(failures: Sequence[str], *, asserting: bool | None = None) -> str:
 
 
 def evaluate_coverage(run: CoverageRun, *, strict: bool = True) -> Evaluation:
-    """A1 to A5, I and the reference ranges for one (case, phi), plus the results-table row.
+    """A1 to A5, I and the reference ranges for one (case, phi), plus the
+    results-table row.
 
-    ``strict`` requires the registered R (1000); the smoke test turns it off to exercise the code at a
-    tiny R, where the integer bounds are applied unscaled and so read as failures that it ignores.
+    ``strict`` requires the registered R (1000); the smoke test turns it off to
+    exercise the code at a tiny R, where the integer bounds are applied unscaled
+    and so read as failures that it ignores.
     """
     if strict and run.R != R_COVERAGE:
         raise ValueError(
@@ -953,7 +1013,9 @@ def evaluate_coverage(run: CoverageRun, *, strict: bool = True) -> Evaluation:
 
 
 def _characterize(run: CoverageRun, ev: Evaluation) -> Evaluation:
-    """Characterization row (C1s, C2h, C4h): observed coverage against the reference, no assertion."""
+    """Characterization row (C1s, C2h, C4h): observed coverage against the
+    reference, no assertion.
+    """
     spec = run.spec
     key = spec.label + (f"{run.phi:g}" if spec.tag == "s" else "")
     ref = CHARACTERIZATION_REFERENCE.get(key)
@@ -973,7 +1035,7 @@ def _characterize(run: CoverageRun, ev: Evaluation) -> Evaluation:
     return ev
 
 
-# ------------------------------------------------------------------------------------ log-rank
+# --------------------------------------------------------------------- log-rank
 LOGRANK_HAZARD = 0.0125
 LOGRANK_HMAX = 240
 LOGRANK_PER_REGIME = 200
@@ -984,11 +1046,13 @@ LOGRANK_K = 3
 def logrank_draw(
     rng: np.random.Generator, phi: float, partial: bool
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """One sample of regime labels, durations and event flags (the review's M5 design).
+    """One sample of regime labels, durations and event flags (the review's M5
+    design).
 
-    Labels are the terciles of an AR(1) latent (200 states per regime); durations are geometric with
-    hazard 0.0125 per step through a Gaussian copula of a second AR(1) latent, censored at 240 steps.
-    ``partial`` doubles the hazard of regime 2 (the partial null L2).
+    Labels are the terciles of an AR(1) latent (200 states per regime);
+    durations are geometric with hazard 0.0125 per step through a Gaussian
+    copula of a second AR(1) latent, censored at 240 steps. ``partial`` doubles
+    the hazard of regime 2 (the partial null L2).
     """
     n = LOGRANK_K * LOGRANK_PER_REGIME
     latent = ar1(rng, n, phi)
@@ -1007,7 +1071,9 @@ def logrank_draw(
 
 
 def _logrank_replicate(row: str, phi: float, r: int) -> list[float]:
-    """Run one log-rank trial and return its numbers as a flat list (see ``LogrankRun.table``)."""
+    """Run one log-rank trial and return its numbers as a flat list (see
+    ``LogrankRun.table``).
+    """
     key = (WU0006_SEED, "wu0006", row, f"{phi:g}", r, "data")
     rng = make_rng(*key)
     partial = row == "L2"
@@ -1037,14 +1103,18 @@ def _logrank_replicate(row: str, phi: float, r: int) -> list[float]:
 
 
 def _logrank_task(task: tuple) -> list[list[float]]:
-    """Run one chunk of log-rank trials (the unit of work sent to a worker process)."""
+    """Run one chunk of log-rank trials (the unit of work sent to a worker
+    process).
+    """
     row, phi, start, stop = task
     return [_logrank_replicate(row, phi, r) for r in range(start, stop)]
 
 
 @dataclass
 class LogrankRun:
-    """Replications of one log-rank row: error indicators, raw p-values, counts of uncomputed pairs."""
+    """Replications of one log-rank row: error indicators, raw p-values, counts
+    of uncomputed pairs.
+    """
 
     row: str
     phi: float
@@ -1058,7 +1128,9 @@ class LogrankRun:
 def run_logrank(
     pool: ProcessPoolExecutor, row: str, phi: float, R: int = R_LOGRANK
 ) -> LogrankRun:
-    """Run R families of the log-rank design ``row`` ("L1" global null, "L2" partial null)."""
+    """Run R families of the log-rank design ``row`` ("L1" global null, "L2"
+    partial null).
+    """
     assert_design()
     tasks = [
         (row, phi, start, min(start + CHUNK * 2, R))
@@ -1078,7 +1150,9 @@ def run_logrank(
 
 
 def evaluate_logrank(run: LogrankRun, *, strict: bool = True) -> Evaluation:
-    """L1, L2 against the ROADMAP bound and the reference ranges; L3 (uncomputed pairs) exact."""
+    """L1, L2 against the ROADMAP bound and the reference ranges; L3 (uncomputed
+    pairs) exact.
+    """
     if strict and run.R != R_LOGRANK:
         raise ValueError(f"R must be {R_LOGRANK}; got {run.R}")
     phi_key = f"{run.phi:g}"
@@ -1139,23 +1213,28 @@ def evaluate_logrank(run: LogrankRun, *, strict: bool = True) -> Evaluation:
     return ev
 
 
-# ------------------------------------------------------------------------------ null delta R^2
+# --------------------------------------------------------------- null delta R^2
+# 15% quantile of L = x1 - 0.5 x2^2 + 0.5 x2 x3 + e (2e6 draws, the review's M3
+# (g)); w* = 0 below it.
 DELTA_Q15 = -2.1471
-"""15% quantile of L = x1 - 0.5 x2^2 + 0.5 x2 x3 + e (2e6 draws, the review's M3 (g)); w* = 0 below it."""
 DELTA_TARGETS = ("logit_w_interior", "w_zero_indicator")
 DELTA_TRUTH_STATES = 100_000
-DELTA_COLUMNS = 9  # per target: est, lo, hi, truth, truth_se, refit_equal, n_failed, r2_three, reduces
+# Columns per target: est, lo, hi, truth, truth_se, refit_equal, n_failed,
+# r2_three, reduces.
+DELTA_COLUMNS = 9
 
 
 def delta_states(
     rng: np.random.Generator, n: int, phi: float, iid: bool = False
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Profile ``(n, 4)``, oracle weight and log horizon of the null design (the review's M3 (g)).
+    """Profile ``(n, 4)``, oracle weight and log horizon of the null design (the
+    review's M3 (g)).
 
-    x1, x2, x3, xi, e and e' are independent AR(1) (or i.i.d. N(0, 1) for the fresh states of the
-    truth); x4 = 0.6 x1 + 0.8 xi is unit variance and carries nothing beyond x1..x3 for any target.
-    L = x1 - 0.5 x2^2 + 0.5 x2 x3 + e, w* = 0 where L < DELTA_Q15 (about 15%) and expit(L) otherwise,
-    and the log horizon is 0.5 x1 + 0.3 x3 + 0.5 e'.
+    x1, x2, x3, xi, e and e' are independent AR(1) (or i.i.d. N(0, 1) for the
+    fresh states of the truth); x4 = 0.6 x1 + 0.8 xi is unit variance and
+    carries nothing beyond x1..x3 for any target. L = x1 - 0.5 x2^2 + 0.5 x2 x3
+    + e, w* = 0 where L < DELTA_Q15 (about 15%) and expit(L) otherwise, and the
+    log horizon is 0.5 x1 + 0.3 x3 + 0.5 e'.
     """
     draw = (
         (lambda: rng.standard_normal(n)) if iid else (lambda: ar1(rng, n, phi))
@@ -1168,12 +1247,15 @@ def delta_states(
 
 
 def _r2(y: np.ndarray, pred: np.ndarray) -> float:
-    """Return R^2, the share of the variance of ``y`` that the predictions ``pred`` explain."""
+    """Return R^2, the share of the variance of ``y`` that the predictions
+    ``pred`` explain.
+    """
     return float(1.0 - np.sum((y - pred) ** 2) / np.sum((y - y.mean()) ** 2))
 
 
 def _delta_replicate(phi: float, r: int) -> list[float]:
-    """Run one delta-R^2 trial: fit the learners, build the interval, compute the truth.
+    """Run one delta-R^2 trial: fit the learners, build the interval, compute
+    the truth.
 
     Returns ``DELTA_COLUMNS`` numbers for each of the two targets.
     """
@@ -1242,7 +1324,9 @@ def _delta_replicate(phi: float, r: int) -> list[float]:
 
 
 def _delta_task(task: tuple) -> list[list[float]]:
-    """Run one chunk of delta-R^2 trials (the unit of work sent to a worker process)."""
+    """Run one chunk of delta-R^2 trials (the unit of work sent to a worker
+    process).
+    """
     phi, start, stop = task
     return [_delta_replicate(phi, r) for r in range(start, stop)]
 
@@ -1265,7 +1349,9 @@ class DeltaRun:
 def run_delta(
     pool: ProcessPoolExecutor, phi: float, R: int = R_DELTA, chunk: int = 5
 ) -> DeltaRun:
-    """Run R replications of the null delta-R2 study (3000 training, 1000 test states)."""
+    """Run R replications of the null delta-R2 study (3000 training, 1000 test
+    states).
+    """
     assert_design()
     tasks = [
         (phi, start, min(start + chunk, R)) for start in range(0, R, chunk)
@@ -1283,12 +1369,15 @@ def run_delta(
 
 
 def evaluate_delta(run: DeltaRun, *, strict: bool = True) -> Evaluation:
-    """N1, N2, N3 against the ROADMAP bounds, the A9 ranges and the exact refit check.
+    """N1, N2, N3 against the ROADMAP bounds, the A9 ranges and the exact refit
+    check.
 
-    The nominal bounds of all three rows (N1 and N3 >= 461 of 500, N2 <= 22 of 500) go to ``roadmap``
-    and are recorded, asserted only if ``ASSERT_ROADMAP_BOUNDS`` is True (Option K; DEC-0018,
-    as for A1 to A3). The pre-registered consistency ranges of the 3000/1000 reference (addendum A9, 12 in all) are the
-    always-asserted defect test; ``consistency_rows`` holds one entry per row.
+    The nominal bounds of all three rows (N1 and N3 >= 461 of 500, N2 <= 22 of
+    500) go to ``roadmap`` and are recorded, asserted only if
+    ``ASSERT_ROADMAP_BOUNDS`` is True (Option K; DEC-0018, as for A1 to A3). The
+    pre-registered consistency ranges of the 3000/1000 reference (addendum A9,
+    12 in all) are the always-asserted defect test; ``consistency_rows`` holds
+    one entry per row.
     """
     if strict and run.R != R_DELTA:
         raise ValueError(f"R must be {R_DELTA}; got {run.R}")
@@ -1382,16 +1471,20 @@ def evaluate_delta(run: DeltaRun, *, strict: bool = True) -> Evaluation:
 
 
 def delta_rows(evaluation: Evaluation, *rows: str) -> list[str]:
-    """ROADMAP failures of the named delta-R2 rows (``"n1"``, ``"n2"``, ``"n3"``), selected by key.
+    """ROADMAP failures of the named delta-R2 rows (``"n1"``, ``"n2"``,
+    ``"n3"``), selected by key.
 
-    An unknown row raises ``KeyError``, so a test cannot silently select nothing.
+    An unknown row raises ``KeyError``, so a test cannot silently select
+    nothing.
     """
     return [message for row in rows for message in evaluation.roadmap_rows[row]]
 
 
-# --------------------------------------------------------------------------------------- tables
+# ----------------------------------------------------------------------- tables
 def _plain(value: object) -> object:
-    """JSON-safe copy: numpy scalars and arrays to Python, tuples to lists, non-finite to strings."""
+    """JSON-safe copy: numpy scalars and arrays to Python, tuples to lists,
+    non-finite to strings.
+    """
     if isinstance(value, dict):
         return {str(k): _plain(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
@@ -1406,15 +1499,19 @@ def _plain(value: object) -> object:
 
 
 class ResultTable:
-    """The results table of one test file: a JSON under ``runs/tests/`` rewritten on every row.
+    """The results table of one test file: a JSON under ``runs/tests/``
+    rewritten on every row.
 
-    The file name carries the UTC stamp of the session (``wu0006_<name>_<stamp>.json``, with the
-    process id and a counter added if that name exists). The name is reserved (created exclusively)
-    at construction, so no earlier or concurrent table is ever overwritten.
+    The file name carries the UTC stamp of the session
+    (``wu0006_<name>_<stamp>.json``, with the process id and a counter added if
+    that name exists). The name is reserved (created exclusively) at
+    construction, so no earlier or concurrent table is ever overwritten.
     """
 
     def __init__(self, name: str, directory: Path = RESULTS_DIR) -> None:
-        """Reserve a fresh, time-stamped file name under ``directory`` for the table ``name``."""
+        """Reserve a fresh, time-stamped file name under ``directory`` for the
+        table ``name``.
+        """
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         directory.mkdir(parents=True, exist_ok=True)
         for suffix in (
@@ -1439,10 +1536,12 @@ class ResultTable:
         self.rows: dict[str, object] = {}
 
     def add(self, key: str, row: dict, *, workers: int) -> None:
-        """Store a row and rewrite the file (so a crashed run keeps what it finished).
+        """Store a row and rewrite the file (so a crashed run keeps what it
+        finished).
 
-        ``workers`` is the pool size read when the pool was created (``pool.wu_workers``); the
-        environment of the parent says ``LPC_THREADS=1`` while the pool lives.
+        ``workers`` is the pool size read when the pool was created
+        (``pool.wu_workers``); the environment of the parent says
+        ``LPC_THREADS=1`` while the pool lives.
         """
         self.rows[key] = _plain(row)
         meta = {
@@ -1459,11 +1558,12 @@ class ResultTable:
 
 
 class RunCache:
-    """Runs each design once per session and records its row; shared by the tests of one table.
+    """Runs each design once per session and records its row; shared by the
+    tests of one table.
 
-    A design is run by the first test that needs it. An exception is cached and raised again for the
-    later tests of the same design, so a failing run is not repeated (and not paid for) per assertion
-    group.
+    A design is run by the first test that needs it. An exception is cached and
+    raised again for the later tests of the same design, so a failing run is not
+    repeated (and not paid for) per assertion group.
     """
 
     def __init__(self, name: str, directory: Path = RESULTS_DIR) -> None:
@@ -1474,7 +1574,9 @@ class RunCache:
     def _get(
         self, key: str, make: Callable[[], Evaluation], workers: int
     ) -> Evaluation:
-        """Return the cached evaluation for ``key``, running ``make`` the first time only."""
+        """Return the cached evaluation for ``key``, running ``make`` the first
+        time only.
+        """
         if key not in self._done:
             try:
                 evaluation = make()

@@ -1,4 +1,5 @@
-"""Shared pytest rules for the whole test suite: test tiers and the CPU-only guard.
+"""Shared pytest rules for the whole test suite: test tiers and the CPU-only
+guard.
 
 The study's tests are sorted into four folders by cost and by the device they
 need: ``tests/unit`` (fast, CPU), ``tests/integration`` (small end-to-end runs,
