@@ -33,8 +33,10 @@ def test_regression_ami_delay_lorenz_band() -> None:
     Attractor", Fig. 5 (PDF p. 8). For x(t) of Lorenz-63 (sigma = 10, beta = 8/3,
     rho = 28; RK4 with a time step of 0.01; 90,000 points; AMI by TISEAN ``mutual``,
     bin count not stated) "the first minima of both curves fall near tau = 18", that
-    is about 0.18 time units, which is 4.9 steps at Delta t = 0.0368. The paper calls
-    that minimum shallow and says a practitioner would probably choose tau_I = 60
+    is about 0.18 time units, which is 4.9 steps at Delta t = 0.0368. The researcher
+    reads that minimum in Fig. 5 as a shallow shoulder (AMI about 0.65 at tau = 18
+    against 0.7 near 30; a reading of the figure, not a quotation), and the paper says
+    that, from this AMI profile, a practitioner would quite likely choose tau_I = 60
     (0.60 time units, 16.3 steps). The citation anchors the order of magnitude of the
     first minimum, not a pinned value, so the test stays a regression guard: the
     estimator here differs (32 equiprobable bins, 3-point smoothing), and the
