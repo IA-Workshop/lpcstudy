@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | in progress |
+| Status | done (pending review) |
 | Class | CSQ3 development |
 | Agent(s) | claude-sonnet-5-5 |
 | Estimate | small (style only; no numeric change) |
@@ -52,3 +52,12 @@ None: no runtime string (log message, error message, results leaf) was changed, 
 7. Output: `-q --tb=short -rfE` (the wrapper).
 8. Command: `LPC_PYTHON=/home/brianm/projects/physics/chaos/lpcstudy/.venv/bin/python tools/run_tests.sh unit tests/unit/test_allocation.py tests/unit/test_ensemble.py tests/unit/test_experiments.py`
 
+### Results
+
+- Line counts (wc -l), before to after: allocation.py 607 to 823; ensemble.py 899 to 1187; experiments.py 814 to 1279; test_allocation.py 428 to 627; test_ensemble.py 760 to 1159; test_experiments.py 1093 to 1876. The growth is black putting one item per line at 80 columns and the longer docstrings; the logic shrank slightly (shared helpers).
+- Symbols removed: 0 functions or classes; 1 unused parameter (`study` of `_v4_extra_forecasts`). Tests removed: 0. Tests added: 1.
+- Code changes (all stated above under "Complexity audit"): reasons are duplication (helpers), an unused argument, an in-function import and a name-bound lambda. A script comparing every non-docstring string constant of old and new files found no difference in the three source files; in the tests the only new constants are those of the added test.
+- Black: `uvx black==26.10.1 --check` on the six files: unchanged (idempotent).
+- Unit tests of the six files, once: `80 passed in 1.98s`.
+- Bitwise neutrality: smoke DEV-0 (lorenz63 rossler chua) in 76 s, compared with `refactor-base3/smoke`: tier T0, 13914 leaves, equal 13914, different 0, one-sided 0, RESULT PASS (exit 0).
+- Status: done pending independent review.
