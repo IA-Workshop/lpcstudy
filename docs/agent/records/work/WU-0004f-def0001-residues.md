@@ -115,3 +115,51 @@ Changed: `lpcstudy/clip_sensitivity.py`, `lpcstudy/experiments.py`, `lpcstudy/re
 > - DEF-0001, status line (2026-10-18, claude-sonnet-5-5, developer, WU-0004f, branch wu/0004f-def0001-residues, <tip>; **not merged, awaiting independent review and the owner's code review**): residues (a) and (c) of the line of 2026-10-18 "fixed in code; open pending confirmation" are closed in code. (a) `clip_sensitivity.h1b_part`: the 1e-12 floor is counted (`n_floored`, `n_floored_2L`, in the H1b part entry, mirrored in `handling.result_counts`; `n_floored` equals `H1b.PLP.n_floored`; docstring proof: `sq_plp_2 >= sq_plp`, so `n_floored_2L <= n_floored`). The three broad `except Exception` clauses (lines 570, 579, 619): 570 and 619 were recorded and logged but not counted; **579 (`_failed`) swallowed its exception with no log and no count**; all three now add to `n_caught_exceptions`, present in every block (0 at smoke), the 579 one is logged. (c) `handling.skipped_variants` (int) is in `results.json` and printed in `## Handling`. Sentinel paths added to the report. Smoke DEV-0 on CPU against the develop smoke (ff26883): tier T0, 4695 common leaves identical, 0 removed, 7 added (all 0), WARNING lines identical. V4 repeated (appended block of `WU-0002.11-counters.md`): no hit outside a row; it is the developer's grep, not the audit. Remaining: (b) DEF-0019 (the owner confirmed it on develop in e52177f, per its commit message: check), (d) `## Audit` of WU-0002.11 and `/audit freeze`, (e) the owner's code review (this unit adds counter and report code: needs owner review before freeze).
 
 **Left for the main session / reviewer.** Independent review (`/independent-review`); the integration test `test_smoke_pipeline.py` was not edited or run (the smoke by hand is the same evidence, §4.2): at the next merge gate it runs on the branch, and an assertion `results["handling"]["skipped_variants"] == 0` and `clip_sensitivity["n_caught_exceptions"] == 0` could be added there. `tools/compare_runs.py` has no flag to accept new one-sided leaves, so a comparison after a counter is added always exits 1 on exactly those leaves (read the list).
+
+## Review
+
+### Round 1 (2026-10-18; reviewer, claude-opus-5-5; fresh context; tip e55732e, base c89ebe5)
+
+Scope: the diff c89ebe5..e55732e, this unit file, the verification note `docs/agent/notes/2026-10-18-def0001-v4-verification.md` (branch wu/def0001-audit-note), and governance. No test and no preset was run. One offline rerun of `python3 -I tools/compare_runs.py <develop>/runs/gate-smoke/smoke runs/wu0004f-smoke/smoke` reproduced the developer's result: `tier: T0`, `leaves: REF 4695, NEW 4702, union 4702, common 4695, equal 4695, different 0, one-sided 7`. The 7 one-sided leaves are all in NEW, all 0, and are exactly the planned set. Exit 1 comes only from the structure rule on those 7 leaves. No pre-existing leaf changed and none was removed.
+
+**What was checked and holds:**
+- **(a1) Same expression and inputs.** `h1b_part` computes `(sq_plp < 1e-12)[keep]`, with `keep` built from the same `x_all` and floored `y`. `analysis.h1b_seed_amplifier` (PLP, floor 0.0) computes `((sq - 0.0) < 1e-12)[keep]`. The inputs come from the same arrays: `m_test.sq_plp[:, wcol]`, `est_seed`, `gains[:, ref-1]` and `spec.dim`. So the two counts are equal by construction. Test A2 checks this against production code, including at 0.
+- **(a1) The docstring proof.** It is correct. `perturb_moments` (`:146`) adds `3 L^2 q / M`, which is at least 0. Rounding to nearest is monotone, so `sq_plp_2 >= sq_plp` and `n_floored_2L <= n_floored`. In (ii), the bound at `M = 3e14` gives exactly 1e-12, not a value "above" it. The claim still holds because the floor test is a strict `<`.
+- **Counts on every return path.** Every return of `h1b_part` carries the counts, and no existing key changed. Test A3 is labelled as a regression guard.
+- **(a2) Every broad `except` is now counted.** The three sites are `_guarded` (one per criterion), `clip_sensitivity_block` and `_failed`. The `_failed` site now also calls `LOG.exception`. The `caught` list belongs to the outermost caller, so a later block failure or `_BaselineMismatch` keeps the count from the criteria.
+- **(a2) `_BaselineMismatch` is rightly not counted.** It is a designed refusal and carries its own reason.
+- **(a2) No swallow is left uncounted.** No other broad `except` exists in the module.
+- **(c) `skipped_variants`.** It is an int at run level and is printed next to `failed_variants`. Older results get the line "not recorded".
+- **The DEF-0025 test edit.** The replaced key-list assertion is just as exact, and its docstring says why. It is not a loosening (PRIME.2).
+- **References and tolerances.** Every new test names an independent reference: a hand loop, production `h1b_seed_amplifier`, hand strings, or the table contract. All checks are exact integers or strings, and no tolerance was touched.
+- **`compare_pilot`.** Each new path matches exactly one rule, of class `new`, and the `LOOK_AT` row is added.
+- **Randomness.** None is consumed: the counters are integer sums.
+- **Records are append-only.** The diff of `docs/` deletes no line.
+- **Commits and seeds.** All three commits name the unit and carry `Agent:` and `Co-Authored-By:` trailers. No sealed seed is touched, and neither are `seeds/`, `docs/study/` or `.claude/`.
+
+**Owner checkpoint.** This unit touches counter, report and verdict-adjacent code (`clip_sensitivity.py`, `experiments.py`, `report.py`, `compare_pilot.py`). It **needs owner review before freeze**, as the header already states.
+
+**Findings**
+
+- **R1 (record; must change before the DEF-0001 status line is appended).**
+  - **Where:** this file, the proposed DEF-0001 status line (Log, "Remaining: ..."), and the appended inventory block in `WU-0002.11-counters.md`.
+  - **What is wrong:** the line says residues (a) and (c) are closed and lists only (b), (d) and (e) as remaining. Observations O-1 and O-2 of the verification note are still open and appear in neither place:
+    - **O-1.** The P2 recomputation drops its counts. For example, `h1b_part` (`clip_sensitivity.py:440-447`, the function this unit edited) never reports `boot.n_failed`. `:454` drops `n_constant_states`, and `:458` drops the `n_failed` of `percentile_interval`.
+    - **O-2.** The `1e-300` weight floors on the perturbed moments are not counted, and their justification is not written in the code.
+  - **Why it matters:** with the line as written, DEF-0001 could be confirmed at freeze while these report-only counts are still silent (PRIME.4, NVVUQ.11).
+  - **Judgment:**
+    - O-1 must be dispositioned before freeze. Either count failed resamples in the P2 part entries (as `n_failed_resamples`, mirrored), or have the owner record it as **J**. Failed resamples go to the A3 tail, so the interval is conservative, and no verdict depends on it.
+    - O-2 needs the one docstring sentence the note proposes. It can be done in the freeze pass.
+    - O-3 is resolved by this unit: A5 injects a failure into a single criterion builder, and the new counter is a sentinel in RESULTS.md. Its other part (no WARNING line from `log_flags`) is acceptable because the count, the ERROR traceback and the sentinel row carry it.
+  - **Fix:** add "O-1 and O-2 of the 2026-10-18 verification note (open, report-only)" to the "Remaining" of the proposed line. Append a dated row for each to the inventory block, marked **D** with the owner's disposition pending. No code change is required in this unit.
+- **R2 (evidence; small).**
+  - **Where:** `tests/unit/test_clip_sensitivity.py`, docstring of `test_block_counts_caught_exceptions_a5`, last bullet.
+  - **What is wrong:** the docstring says the forced P-c case keeps "the count 1", but the test asserts `forced["n_caught_exceptions"] == 2`. Two builders are patched to raise at that point. Plan A5 states 1.
+  - **Why it matters:** the property (the count survives a `_BaselineMismatch`) is tested, and nothing was loosened. But the stated reference disagrees with the assertion (LPC.PC.21).
+  - **Fix:** correct the docstring to 2, with the reason (h2d and h3c both raise). Optionally add a note in the Log that A5's "count 1" was tested as 2.
+
+**Notes (no change required).**
+- **The radius was not rerun after the test fix.** After the failing A5 assertion was fixed, only `--lf` was run (1 passed), not the radius (§4 says fix, `--lf`, then the radius once). The fix touched one test function and no production code, and the merge gate runs the whole suite, so no rerun is asked for.
+- **Scratchpad overwrites are harmless for the evidence.** The developer overwrote `smoke.out`, `cmp.txt` and `radius1.log` in the shared scratchpad. No record cites a scratchpad path as evidence. The summary lines are in this Log, the smoke tree `runs/wu0004f-smoke` persists, and the compare reproduces offline. The only risk is clobbering a file another concurrent agent kept under the same name. Use unit-prefixed names from now on.
+
+**Verdict: approve with fixes** (R1 and R2; 2 findings; both are record or docstring fixes, and no code change is required). **Needs owner review before freeze.**
