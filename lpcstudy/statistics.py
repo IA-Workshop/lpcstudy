@@ -1,4 +1,24 @@
-"""Survival analysis for censored horizons, bootstrap intervals, verdicts and regressions."""
+"""Statistical tools: survival curves, bootstrap intervals and verdicts.
+
+The study asks how long each forecaster stays accurate (its "horizon") and
+whether four predictability conditions hold well enough to decide how to blend
+the analog forecaster (CP) and the physics-based forecaster (PLP). This module
+holds the generic statistics behind those answers, with no dynamics in it.
+
+* A *survival curve* (Kaplan-Meier) summarizes horizons, including runs that
+  were still accurate when we stopped watching (these are "censored").
+* The *log-rank test* and the Holm adjustment compare groups of horizons.
+* The *moving-block bootstrap* makes a confidence interval for any statistic of
+  the states. Resampling blocks of consecutive states, not single states,
+  keeps the serial dependence between neighboring states.
+* *Verdicts* turn an interval and a target band into "pass", "fail" or
+  "inconclusive", and turn the three systems' verdicts into one overall verdict.
+
+``analysis`` (the four conditions), ``allocation``, ``validation``,
+``clip_sensitivity``, ``budget`` and ``report`` call this module; ``pipeline``
+calls ``kaplan_meier``. Read the bootstrap functions first: every failure of a
+resample is counted and reported, never dropped without a trace (PRIME.4).
+"""
 
 from __future__ import annotations
 
@@ -10,60 +30,82 @@ import numpy as np
 from scipy import stats as sps
 
 MIN_STATES: int = 50
-"""Fewest states a bootstrapped statistic may rest on (DEC-0008 A3: 10 blocks of 5)."""
+"""Fewest states a bootstrap statistic may use (DEC-0008 A3: 10 blocks of 5)."""
 
 Verdict = Literal["pass", "fail", "inconclusive"]
 
+_VERDICTS: tuple[str, ...] = ("pass", "fail", "inconclusive")
+
 V3_SYSTEMS: tuple[str, ...] = ("lorenz63", "rossler", "chua")
-"""The three systems of v3 section 7; the overall verdict is over exactly these (DEC-0016 O1)."""
+"""The three systems of v3 section 7; the overall verdict covers exactly these
+(DEC-0016 O1)."""
 
 
 @dataclass
 class SurvivalCurve:
-    """Kaplan-Meier estimate on integer horizons ``1..H_max``.
+    """A Kaplan-Meier survival curve on the integer horizons ``1..H_max``.
 
     Attributes
     ----------
     times : np.ndarray
-        Horizons ``1..H_max``.
+        The horizons ``1..H_max``.
     survival : np.ndarray
-        ``S(H) = Pr(T > H)``.
+        ``S(H) = Pr(T > H)``: the fraction of runs still accurate after ``H``
+        steps.
     """
 
     times: np.ndarray
     survival: np.ndarray
 
     def median(self) -> float:
-        """Smallest horizon with ``S(H) <= 0.5`` (``nan`` if not reached)."""
+        """Return the smallest horizon with ``S(H) <= 0.5``.
+
+        Returns ``nan`` if the curve never falls that low.
+        """
         hit = np.nonzero(self.survival <= 0.5)[0]
         return float(self.times[hit[0]]) if hit.size else float("nan")
 
     def restricted_mean(self) -> float:
-        """Restricted mean survival time to ``H_max`` (``sum_{H<H_max} S(H)`` + 1)."""
+        """Return the mean survival time, cut off at ``H_max``.
+
+        This is ``1 + sum_{H < H_max} S(H)``. It is finite even when more than
+        half of the runs are still accurate at ``H_max``.
+        """
         return float(1.0 + np.sum(self.survival[:-1]))
 
 
-def kaplan_meier(durations: np.ndarray, events: np.ndarray, horizon_max: int
-                 ) -> SurvivalCurve:
-    """Kaplan-Meier estimator for discrete first-passage times.
+def kaplan_meier(
+    durations: np.ndarray, events: np.ndarray, horizon_max: int
+) -> SurvivalCurve:
+    """Estimate a survival curve for discrete first-passage times.
 
-    The hazard is 0 where nobody is at risk (the ``np.where`` below; DEF-0001, the Kaplan-Meier row of the WU-0002.11 inventory).
-    That branch never changes a value of the formula, and its two cases are these.
+    Each run has a duration: the step at which its error first exceeded the
+    tolerance (an "event"), or the cutoff ``horizon_max`` if it never did (a
+    "censored" run). At each horizon the estimator takes the fraction of the
+    runs still "at risk" that have an event there (the hazard) and multiplies
+    the complements ``1 - hazard`` together.
 
-    * Since ``deaths(t) <= at_risk(t)``, ``at_risk = 0`` implies ``deaths = 0``, so
-      ``deaths / max(at_risk, 1)`` is already 0: the ``np.where`` states the convention
-      "hazard 0 when nobody is at risk, so S is carried forward" and is not a replacement.
-    * With ``n >= 1`` and censoring only at ``H_max`` (every caller using ``realized_horizon``
-      or ``characteristic_horizon``), ``at_risk = 0`` before ``H_max`` means that everyone had
-      an event. At the last event time ``t_L`` the risk set is exactly the ``d(t_L)`` subjects
-      that fail, so the hazard is ``d / d = 1`` in IEEE arithmetic and ``S(t_L) = 0`` exactly;
-      S stays 0 afterwards. So the convention fires only where S is already 0.
+    The hazard is set to 0 where nobody is at risk (the ``np.where`` below;
+    DEF-0001, the Kaplan-Meier row of the WU-0002.11 inventory). That branch
+    never changes a value of the formula, for two reasons.
 
-    Two hypotheses. (i) ``check_kaplan_meier`` (V5) censors at random times, so there the branch
-    is the standard carry-forward convention and not "S is already 0"; it does not fire at its
-    n = 20000. (ii) ``n = 0`` (an empty set; no caller passes one) gives ``S = 1`` at every
-    horizon, a NaN median and a restricted mean of ``H_max``; ``durations`` must then have an
-    integer dtype (``np.bincount`` rejects floats).
+    * Deaths never outnumber the runs at risk, so ``at_risk = 0`` already
+      gives ``deaths = 0``. The ``np.where`` only states the convention
+      "hazard 0 when nobody is at risk, so S is carried forward"; it replaces
+      no value.
+    * With ``n >= 1`` and censoring only at ``H_max`` (every caller using
+      ``realized_horizon`` or ``characteristic_horizon``), ``at_risk = 0``
+      before ``H_max`` means that everyone had an event. At the last event time
+      ``t_L`` the risk set is exactly the ``d(t_L)`` runs that fail, so the
+      hazard is ``d / d = 1`` in IEEE arithmetic and ``S(t_L) = 0`` exactly.
+      The convention therefore fires only where S is already 0.
+
+    Two special cases. (i) ``check_kaplan_meier`` (V5) censors at random times,
+    so there the branch is the standard carry-forward convention and not "S is
+    already 0"; it does not fire at its n = 20000. (ii) ``n = 0`` (an empty set;
+    no caller passes one) gives ``S = 1`` at every horizon, a NaN median and a
+    restricted mean of ``H_max``; ``durations`` must then have an integer dtype
+    (``np.bincount`` rejects floats).
 
     Parameters
     ----------
@@ -77,7 +119,7 @@ def kaplan_meier(durations: np.ndarray, events: np.ndarray, horizon_max: int
     Returns
     -------
     SurvivalCurve
-        The estimate.
+        The estimated curve.
     """
     durations = np.asarray(durations).ravel()
     events = np.asarray(events, dtype=bool).ravel()
@@ -89,14 +131,20 @@ def kaplan_meier(durations: np.ndarray, events: np.ndarray, horizon_max: int
     return SurvivalCurve(times=times, survival=np.cumprod(1.0 - hazard))
 
 
-def logrank_parts(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
-                  ev_b: np.ndarray) -> tuple[float, float]:
-    """Observed minus expected events of group A and the log-rank variance.
+def logrank_parts(
+    dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray, ev_b: np.ndarray
+) -> tuple[float, float]:
+    """Return the two numbers that the log-rank test is built from.
 
-    The sum over event times of ``d_A - d n_A / n`` and of the tie-corrected hypergeometric
-    variance ``d (n_A/n)(1 - n_A/n)(n - d)/(n - 1)`` (terms with ``n = 1`` skipped). A
-    variance of 0 is the case that ``logrank_test`` maps to ``p = 1.0``; a caller that must
-    tell "no information" from "no evidence" (H3a, DEC-0011) reads it here.
+    At each event time, group A has an observed number of events and an
+    expected number if both groups had the same hazard. The first returned
+    value is the sum over event times of ``d_A - d n_A / n`` (observed minus
+    expected). The second is the variance of that sum, the sum of the
+    tie-corrected hypergeometric variances
+    ``d (n_A/n)(1 - n_A/n)(n - d)/(n - 1)`` (terms with ``n = 1`` skipped). A
+    variance of 0 is the case that ``logrank_test`` maps to ``p = 1.0``; a
+    caller that must tell "no information" from "no evidence" (H3a, DEC-0011)
+    reads it here.
 
     Parameters
     ----------
@@ -108,7 +156,7 @@ def logrank_parts(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
     Returns
     -------
     tuple[float, float]
-        ``(O - E, V)``.
+        ``(O - E, V)``: observed minus expected events of A, and the variance.
     """
     dur = np.concatenate([dur_a, dur_b]).ravel()
     ev = np.concatenate([ev_a, ev_b]).ravel().astype(bool)
@@ -122,14 +170,23 @@ def logrank_parts(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
         d_a = (ev & (dur == t) & (group == 0)).sum()
         observed_minus_expected += d_a - d_total * n_a / n_total
         if n_total > 1:
-            variance += d_total * (n_a / n_total) * (1 - n_a / n_total) * \
-                (n_total - d_total) / (n_total - 1)
+            variance += (
+                d_total
+                * (n_a / n_total)
+                * (1 - n_a / n_total)
+                * (n_total - d_total)
+                / (n_total - 1)
+            )
     return float(observed_minus_expected), float(variance)
 
 
-def logrank_test(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
-                 ev_b: np.ndarray) -> float:
-    """Two-sample log-rank test p-value.
+def logrank_test(
+    dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray, ev_b: np.ndarray
+) -> float:
+    """Return the p-value of the two-sample log-rank test.
+
+    The test asks whether two groups of horizons have the same hazard. A small
+    p-value says they probably do not.
 
     Parameters
     ----------
@@ -141,15 +198,16 @@ def logrank_test(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
     Returns
     -------
     float
-        Two-sided p-value (chi-square, 1 degree of freedom); 1.0 if the variance is 0
-        (see ``logrank_parts``).
+        Two-sided p-value (chi-square, 1 degree of freedom); 1.0 if the
+        variance is 0 (see ``logrank_parts``).
 
     Notes
     -----
-    ``p = 1.0`` at ``V <= 0`` is a convention, not a measurement (DEF-0001, row T2). ``V`` is a
-    sum of non-negative terms, so ``V < 0`` is impossible and ``V = 0`` is exact. The only caller
-    (``analysis.h3a_logrank``) reads ``logrank_parts`` first, does not call this function for such
-    a pair, records the reason, and counts the pair in ``H3a.n_degenerate_pairs``.
+    ``p = 1.0`` at ``V <= 0`` is a convention, not a measurement (DEF-0001,
+    row T2). ``V`` is a sum of non-negative terms, so ``V < 0`` is impossible
+    and ``V = 0`` is exact. The only caller (``analysis.h3a_logrank``) reads
+    ``logrank_parts`` first, does not call this function for such a pair,
+    records the reason, and counts the pair in ``H3a.n_degenerate_pairs``.
     """
     observed_minus_expected, variance = logrank_parts(dur_a, ev_a, dur_b, ev_b)
     if variance <= 0:
@@ -158,7 +216,11 @@ def logrank_test(dur_a: np.ndarray, ev_a: np.ndarray, dur_b: np.ndarray,
 
 
 def holm_adjust(p_values: list[float]) -> list[float]:
-    """Holm step-down adjusted p-values.
+    """Adjust p-values for testing several hypotheses at once (Holm).
+
+    Testing many hypotheses makes a false alarm more likely. The Holm step-down
+    method sorts the p-values, multiplies the smallest by the number of tests,
+    the next by one fewer, and so on, then keeps the running maximum.
 
     Parameters
     ----------
@@ -180,16 +242,24 @@ def holm_adjust(p_values: list[float]) -> list[float]:
     return adjusted.tolist()
 
 
-def block_resample_indices(n_items: int, n_resamples: int, block: int,
-                           seed: int | np.random.Generator) -> Iterator[np.ndarray]:
+def block_resample_indices(
+    n_items: int,
+    n_resamples: int,
+    block: int,
+    seed: int | np.random.Generator,
+) -> Iterator[np.ndarray]:
     """Yield moving-block bootstrap index arrays, one per resample.
 
-    Blocks of ``block`` consecutive items start at independent uniform positions
-    and are concatenated and cut to ``n_items``. (The final ``np.minimum`` clip to the
-    last item is kept from the original code for bitwise identity; it never fires,
-    because every start is at most ``n_items - block`` or 0.) Parts of one criterion that must share resamples take the same
-    integer seed (or a fresh generator per part built from the same labels), or use
-    one vector statistic; a shared ``Generator`` advances between calls.
+    A bootstrap resample re-draws the data with replacement to see how much a
+    statistic would change from sample to sample. States that follow each other
+    in time are not independent, so this draws whole blocks of ``block``
+    consecutive items. Each block starts at a uniform random position; the
+    blocks are joined and cut to ``n_items``. Every start is at most
+    ``n_items - block`` (or 0), so no index leaves ``0..n_items - 1``.
+
+    Parts of one criterion that must share resamples take the same integer
+    seed (or a fresh generator per part built from the same labels), or use one
+    vector statistic; a shared ``Generator`` advances between calls.
 
     Parameters
     ----------
@@ -213,35 +283,48 @@ def block_resample_indices(n_items: int, n_resamples: int, block: int,
         If ``n_items`` or ``block`` is below 1 or ``n_resamples`` is negative.
     """
     if n_items < 1 or block < 1 or n_resamples < 0:
-        raise ValueError(f"need n_items >= 1, block >= 1, n_resamples >= 0; got "
-                         f"{n_items}, {block}, {n_resamples}")
-    rng = seed if isinstance(seed, np.random.Generator) else np.random.default_rng(seed)
+        raise ValueError(
+            f"need n_items >= 1, block >= 1, n_resamples >= 0; got "
+            f"{n_items}, {block}, {n_resamples}"
+        )
+    rng = (
+        seed
+        if isinstance(seed, np.random.Generator)
+        else np.random.default_rng(seed)
+    )
     return _draw_indices(n_items, n_resamples, block, rng)
 
 
-def _draw_indices(n_items: int, n_resamples: int, block: int,
-                  rng: np.random.Generator) -> Iterator[np.ndarray]:
-    """Draw the index arrays of ``block_resample_indices`` from ``rng``."""
-    base = np.arange(n_items)
+def _draw_indices(
+    n_items: int, n_resamples: int, block: int, rng: np.random.Generator
+) -> Iterator[np.ndarray]:
+    """Draw the index arrays of ``block_resample_indices`` from ``rng``.
+
+    This is a separate generator function so that the argument check in
+    ``block_resample_indices`` runs when it is called, not at the first draw.
+    """
     n_blocks = int(np.ceil(n_items / block))
     starts_max = max(1, n_items - block + 1)
     for _ in range(n_resamples):
         starts = rng.integers(0, starts_max, n_blocks)
-        idx = (starts[:, None] + np.arange(block)[None, :]).ravel()[:n_items]
-        yield base[np.minimum(idx, n_items - 1)]
+        yield (starts[:, None] + np.arange(block)[None, :]).ravel()[:n_items]
 
 
-def bootstrap_values(statistic: Callable[[np.ndarray], float | np.ndarray], n_items: int,
-                     n_resamples: int, block: int, seed: int | np.random.Generator
-                     ) -> tuple[float | np.ndarray, np.ndarray]:
-    """Evaluate a statistic on moving-block bootstrap resamples and on all items.
+def bootstrap_values(
+    statistic: Callable[[np.ndarray], float | np.ndarray],
+    n_items: int,
+    n_resamples: int,
+    block: int,
+    seed: int | np.random.Generator,
+) -> tuple[float | np.ndarray, np.ndarray]:
+    """Evaluate a statistic on block-bootstrap resamples and on all items.
 
     Parameters
     ----------
     statistic : Callable[[np.ndarray], float | np.ndarray]
         Function of an index array returning a scalar, or a 1-D array of fixed
-        length ``q`` (several quantities that share the same resamples). It signals
-        "cannot compute" by returning NaN; exceptions are not caught.
+        length ``q`` (several quantities that share the same resamples). It
+        signals "cannot compute" by returning NaN; exceptions are not caught.
     n_items, n_resamples, block, seed
         As in ``block_resample_indices``.
 
@@ -251,52 +334,103 @@ def bootstrap_values(statistic: Callable[[np.ndarray], float | np.ndarray], n_it
         ``statistic(np.arange(n_items))``, evaluated after the resamples.
     values : np.ndarray
         Resampled values, shape ``(n_resamples,)`` for a scalar statistic and
-        ``(n_resamples, q)`` for a vector statistic. Non-finite values are kept.
+        ``(n_resamples, q)`` for a vector statistic. Non-finite values are
+        kept.
 
     Raises
     ------
     ValueError
-        If the statistic's output is not a scalar or 1-D array, or its shape changes.
+        If the output of the statistic is not a scalar or 1-D array, or its
+        shape changes.
     """
-    draws = [np.asarray(statistic(idx), dtype=float)
-             for idx in block_resample_indices(n_items, n_resamples, block, seed)]
+    draws = [
+        np.asarray(statistic(idx), dtype=float)
+        for idx in block_resample_indices(n_items, n_resamples, block, seed)
+    ]
     point = np.asarray(statistic(np.arange(n_items)), dtype=float)
     shapes = {draw.shape for draw in draws} | {point.shape}
     if len(shapes) != 1 or point.ndim > 1:
-        raise ValueError(f"statistic must return a scalar or a 1-D array of fixed "
-                         f"shape; got shapes {sorted(shapes)}")
+        raise ValueError(
+            f"statistic must return a scalar or a 1-D array of fixed "
+            f"shape; got shapes {sorted(shapes)}"
+        )
     values = np.stack(draws) if draws else np.empty((0, *point.shape))
     return (float(point) if point.ndim == 0 else point), values
 
 
-def percentile_interval(values: np.ndarray, level: float) -> tuple[float, float, int]:
-    """Percentile interval of bootstrap values with failed resamples counted (DEC-0008 A3).
+def _check_values(values: np.ndarray, level: float) -> np.ndarray:
+    """Return ``values`` as a float array after checking the interval inputs."""
+    resampled = np.asarray(values, dtype=float)
+    if resampled.ndim != 1 or resampled.size == 0:
+        raise ValueError(
+            f"values must be a non-empty 1-D array; got shape {resampled.shape}"
+        )
+    if not 0.0 < level < 1.0:
+        raise ValueError(f"level must lie in (0, 1); got {level}")
+    return resampled
 
-    A resample is failed if its value is not finite. Failed values count as ``-inf``
-    for the lower bound and ``+inf`` for the upper bound (widening is the unfavourable
-    tail for both pass and fail). With ``a = (1 - level)/2`` and ``B`` resamples, a bound
-    is infinite iff the linear-interpolation quantile gives weight to a failed order
-    statistic, i.e. iff the number of failures ``F >= floor((B - 1) a) + 1``; then both
-    bounds are infinite. Otherwise each failed value is replaced by the smallest (lower
-    bound) or largest (upper bound) finite value, which leaves the quantile unchanged
-    and avoids infinite arithmetic. With ``F = 0`` the result is ``np.quantile``.
 
-    Float convention: the threshold is evaluated in float64 with ``a = (1 - level)/2``
-    as computed. When ``(B - 1) a`` is an exact integer but the float ``a`` rounds
-    below it, the float floor is one lower than exact arithmetic, so the threshold is
-    one failure lower: for ``B = 21`` at level 0.8, ``(B - 1) a = 1.9999999999999996``
-    gives ``F* = 2``, and ``F = 2`` returns ``(-inf, inf)`` where exact arithmetic gives
-    a finite lower bound (the third order statistic). This is conservative (more
-    inconclusive, never fewer), and it matches ``np.quantile`` only for the lower
-    bound, whose float index puts weight 4e-16 on a failure; making both bounds
-    infinite together is a convention. It occurs only for some B at levels 0.8 and 0.9
-    (748 pairs with B <= 5000, none at 0.95 or ``1 - 0.05/3`` or at B in {50, 500, 2000}),
-    so no study verdict changes. The tests pin the ``B = 21`` case.
+def _failures_reach(n_failed: int, n_resamples: int, quantile: float) -> bool:
+    """Say whether ``n_failed`` failures reach the ``quantile`` order statistic.
+
+    The linear-interpolation quantile at ``quantile`` gives weight to a failed
+    value iff ``n_failed >= floor((B - 1) * quantile) + 1``.
+    """
+    return n_failed >= int(np.floor((n_resamples - 1) * quantile)) + 1
+
+
+def _fill_failed(
+    resampled: np.ndarray, failed: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Replace failed values by the finite minimum and by the finite maximum.
+
+    Returns the array for the lower bound (failures set to the smallest finite
+    value) and the one for the upper bound (failures set to the largest).
+    """
+    finite = resampled[~failed]
+    return (
+        np.where(failed, finite.min(), resampled),
+        np.where(failed, finite.max(), resampled),
+    )
+
+
+def percentile_interval(
+    values: np.ndarray, level: float
+) -> tuple[float, float, int]:
+    """Return the percentile interval of bootstrap values (DEC-0008 A3).
+
+    The interval runs from the ``a`` quantile to the ``1 - a`` quantile of the
+    resampled values, with ``a = (1 - level) / 2``.
+
+    A resample is failed if its value is not finite. Failed values count as
+    ``-inf`` for the lower bound and ``+inf`` for the upper bound (widening is
+    the unfavorable tail for both pass and fail). With ``B`` resamples, a bound
+    is infinite iff the linear-interpolation quantile gives weight to a failed
+    order statistic, i.e. iff the number of failures
+    ``F >= floor((B - 1) a) + 1``; then both bounds are infinite. Otherwise
+    each failed value is replaced by the smallest (lower bound) or largest
+    (upper bound) finite value, which leaves the quantile unchanged and avoids
+    infinite arithmetic. With ``F = 0`` the result is ``np.quantile``.
+
+    Float convention: the threshold is evaluated in float64 with
+    ``a = (1 - level)/2`` as computed. When ``(B - 1) a`` is an exact integer
+    but the float ``a`` rounds below it, the float floor is one lower than
+    exact arithmetic, so the threshold is one failure lower: for ``B = 21`` at
+    level 0.8, ``(B - 1) a = 1.9999999999999996`` gives ``F* = 2``, and
+    ``F = 2`` returns ``(-inf, inf)`` where exact arithmetic gives a finite
+    lower bound (the third order statistic). This is conservative (more
+    inconclusive, never fewer), and it matches ``np.quantile`` only for the
+    lower bound, whose float index puts weight 4e-16 on a failure; making both
+    bounds infinite together is a convention. It occurs only for some B at
+    levels 0.8 and 0.9 (748 pairs with B <= 5000, none at 0.95 or
+    ``1 - 0.05/3`` or at B in {50, 500, 2000}), so no study verdict changes.
+    The tests pin the ``B = 21`` case.
 
     Parameters
     ----------
     values : np.ndarray
-        1-D resampled values (for a vector statistic call this once per column).
+        1-D resampled values (for a vector statistic call this once per
+        column).
     level : float
         Confidence level in (0, 1).
 
@@ -310,28 +444,23 @@ def percentile_interval(values: np.ndarray, level: float) -> tuple[float, float,
     ValueError
         If ``values`` is not 1-D and non-empty or ``level`` is outside (0, 1).
     """
-    resampled = np.asarray(values, dtype=float)
-    if resampled.ndim != 1 or resampled.size == 0:
-        raise ValueError(f"values must be a non-empty 1-D array; got shape {resampled.shape}")
-    if not 0.0 < level < 1.0:
-        raise ValueError(f"level must lie in (0, 1); got {level}")
+    resampled = _check_values(values, level)
     alpha = (1.0 - level) / 2.0
     failed = ~np.isfinite(resampled)
     n_failed = int(failed.sum())
-    if n_failed >= int(np.floor((resampled.size - 1) * alpha)) + 1:
+    if _failures_reach(n_failed, resampled.size, alpha):
         return float("-inf"), float("inf"), n_failed
-    if n_failed == 0:
-        return (float(np.quantile(resampled, alpha)),
-                float(np.quantile(resampled, 1.0 - alpha)), 0)
-    finite = resampled[~failed]
-    return (float(np.quantile(np.where(failed, finite.min(), resampled), alpha)),
-            float(np.quantile(np.where(failed, finite.max(), resampled), 1.0 - alpha)),
-            n_failed)
+    lower_values, upper_values = _fill_failed(resampled, failed)
+    return (
+        float(np.quantile(lower_values, alpha)),
+        float(np.quantile(upper_values, 1.0 - alpha)),
+        n_failed,
+    )
 
 
 @dataclass(frozen=True)
 class BootstrapInterval:
-    """Point estimate and percentile interval with the failed resamples counted.
+    """A point estimate with its percentile interval and failure count.
 
     Attributes
     ----------
@@ -355,18 +484,25 @@ class BootstrapInterval:
     level: float
 
 
-def block_bootstrap_counted(statistic: Callable[[np.ndarray], float], n_items: int,
-                            n_resamples: int, block: int, seed: int | np.random.Generator,
-                            level: float = 0.95) -> BootstrapInterval:
-    """Moving-block bootstrap interval that counts failed resamples (DEC-0008 A3).
+def block_bootstrap_counted(
+    statistic: Callable[[np.ndarray], float],
+    n_items: int,
+    n_resamples: int,
+    block: int,
+    seed: int | np.random.Generator,
+    level: float = 0.95,
+) -> BootstrapInterval:
+    """Return a block-bootstrap interval that counts failed resamples.
 
-    Same resamples as ``block_bootstrap``; with no failed resample the estimate and
-    both bounds equal its output bitwise (integer seed).
+    This is the interval rule of DEC-0008 A3. It uses the same resamples as
+    ``block_bootstrap``; with no failed resample the estimate and both bounds
+    equal its output bitwise (integer seed).
 
     Parameters
     ----------
     statistic : Callable[[np.ndarray], float]
-        Function of an index array returning a scalar (NaN if it cannot compute).
+        Function of an index array returning a scalar (NaN if it cannot
+        compute).
     n_items, n_resamples, block, seed
         As in ``block_resample_indices``.
     level : float, optional
@@ -383,97 +519,118 @@ def block_bootstrap_counted(statistic: Callable[[np.ndarray], float], n_items: i
         If the statistic returns an array (use ``bootstrap_values`` and
         ``percentile_interval`` for a vector statistic).
     """
-    point, values = bootstrap_values(statistic, n_items, n_resamples, block, seed)
+    point, values = bootstrap_values(
+        statistic, n_items, n_resamples, block, seed
+    )
     if values.ndim != 1:
-        raise ValueError("block_bootstrap_counted needs a scalar statistic; use "
-                         "bootstrap_values and percentile_interval for a vector")
+        raise ValueError(
+            "block_bootstrap_counted needs a scalar statistic; use "
+            "bootstrap_values and percentile_interval for a vector"
+        )
     lower, upper, n_failed = percentile_interval(values, level)
-    return BootstrapInterval(estimate=float(point), lower=lower, upper=upper,
-                             n_failed=n_failed, n_resamples=int(values.size), level=level)
+    return BootstrapInterval(
+        estimate=float(point),
+        lower=lower,
+        upper=upper,
+        n_failed=n_failed,
+        n_resamples=int(values.size),
+        level=level,
+    )
 
 
-def endpoint_mc_error(values: np.ndarray, level: float) -> tuple[float | None, float | None]:
-    """Monte Carlo standard error of the two endpoints of a percentile interval (WU-0008.2a).
+def endpoint_mc_error(
+    values: np.ndarray, level: float
+) -> tuple[float | None, float | None]:
+    """Return the Monte Carlo error of the two ends of a percentile interval.
 
-    **Needs owner review before freeze** (statistics code).
+    **Needs owner review before freeze** (statistics code; WU-0008.2a).
 
-    The error of the endpoint at percentile ``q`` from using ``B`` resamples instead of
-    infinitely many, given the data (it is not sampling error). The rank of the ``q``-quantile of
-    the bootstrap distribution among ``B`` resamples is Binomial(B, q), so the empirical CDF has
-    standard deviation ``d = sqrt(q (1 - q) / B)`` there; ``(Q(q + d) - Q(q - d)) / 2``, with ``Q``
-    the empirical quantile (``np.quantile``, linear), is the half-length of the one-standard-error
-    order-statistic interval, which estimates ``d / f(F^-1(q))``, the asymptotic SD of the endpoint
-    (Bahadur). ``q`` is ``a = (1 - level) / 2`` and ``1 - a``; ``d`` is the same at both. The
-    quantiles are taken on the same array as ``percentile_interval`` uses: a failed resample is
-    replaced by the finite minimum for the lower endpoint and by the finite maximum for the upper
-    (the failure count is the ``n_failed`` of the interval; nothing is dropped).
+    Using ``B`` resamples instead of infinitely many makes each interval
+    endpoint a little noisy, even for fixed data. This is not sampling error;
+    it shrinks as ``B`` grows. The rank of the ``q``-quantile of the bootstrap
+    distribution among ``B`` resamples is Binomial(B, q), so the empirical CDF
+    has standard deviation ``d = sqrt(q (1 - q) / B)`` there. Then
+    ``(Q(q + d) - Q(q - d)) / 2``, with ``Q`` the empirical quantile
+    (``np.quantile``, linear), is the half-length of the one-standard-error
+    order-statistic interval. It estimates ``d / f(F^-1(q))``, the asymptotic
+    standard deviation of the endpoint (Bahadur). ``q`` is
+    ``a = (1 - level) / 2`` and ``1 - a``; ``d`` is the same at both. The
+    quantiles are taken on the same array as ``percentile_interval`` uses: a
+    failed resample is replaced by the finite minimum for the lower endpoint
+    and by the finite maximum for the upper (the failure count is the
+    ``n_failed`` of the interval; nothing is dropped).
 
     Both values are ``None`` (never a number) when any of these holds:
 
-    1. the bound is infinite by the A3 rule (``percentile_interval`` returns an infinite pair);
+    1. the bound is infinite by the A3 rule (``percentile_interval`` returns an
+       infinite pair);
     2. failed resamples reach the binomial window: their count is at least
-       ``floor((B - 1) (a - d)) + 1``, so ``Q(q - d)`` (lower) or ``Q(q + d)`` (upper) would weigh a
-       failed value and the bound could become infinite under another seed (at ``B = 2000`` the
-       counts are 43 at level 0.95 and 13 at ``1 - 0.05/3``, against bound thresholds 50 and 17);
-    3. the window leaves ``(0, 1)``: ``q - d <= 0`` or ``q + d >= 1`` (``B = 50`` at
-       ``1 - 0.05/3``).
+       ``floor((B - 1) (a - d)) + 1``, so ``Q(q - d)`` (lower) or ``Q(q + d)``
+       (upper) would weigh a failed value and the bound could become infinite
+       under another seed (at ``B = 2000`` the counts are 43 at level 0.95 and
+       13 at ``1 - 0.05/3``, against bound thresholds 50 and 17);
+    3. the window leaves ``(0, 1)``: ``q - d <= 0`` or ``q + d >= 1``
+       (``B = 50`` at ``1 - 0.05/3``).
 
-    A value of exactly 0 means a tie: the endpoint sits on an atom of the bootstrap distribution.
+    A value of exactly 0 means a tie: the endpoint sits on an atom of the
+    bootstrap distribution.
 
     Parameters
     ----------
     values : np.ndarray
-        All ``B`` resampled values of a scalar statistic, failed ones included, 1-D.
+        All ``B`` resampled values of a scalar statistic, failed ones included,
+        1-D.
     level : float
         Confidence level in (0, 1).
 
     Returns
     -------
     tuple[float | None, float | None]
-        Standard error of the lower and of the upper endpoint, in the units of the statistic.
+        Standard error of the lower and of the upper endpoint, in the units of
+        the statistic.
 
     Raises
     ------
     ValueError
         If ``values`` is not 1-D and non-empty or ``level`` is outside (0, 1).
     """
-    resampled = np.asarray(values, dtype=float)
-    if resampled.ndim != 1 or resampled.size == 0:
-        raise ValueError(f"values must be a non-empty 1-D array; got shape {resampled.shape}")
-    if not 0.0 < level < 1.0:
-        raise ValueError(f"level must lie in (0, 1); got {level}")
+    resampled = _check_values(values, level)
     n_resamples = resampled.size
     alpha = (1.0 - level) / 2.0
     spread = float(np.sqrt(alpha * (1.0 - alpha) / n_resamples))
     failed = ~np.isfinite(resampled)
     n_failed = int(failed.sum())
-    if n_failed >= int(np.floor((n_resamples - 1) * alpha)) + 1:  # rule 1
+    if _failures_reach(n_failed, n_resamples, alpha):  # rule 1
         return None, None
     if alpha - spread <= 0.0 or (1.0 - alpha) + spread >= 1.0:  # rule 3
         return None, None
-    if n_failed >= int(np.floor((n_resamples - 1) * (alpha - spread))) + 1:  # rule 2
+    if _failures_reach(n_failed, n_resamples, alpha - spread):  # rule 2
         return None, None
-    if n_failed:
-        finite = resampled[~failed]
-        lower_values = np.where(failed, finite.min(), resampled)
-        upper_values = np.where(failed, finite.max(), resampled)
-    else:
-        lower_values = upper_values = resampled
+    lower_values, upper_values = _fill_failed(resampled, failed)
 
     def half_range(array: np.ndarray, q: float) -> float:
-        return float((np.quantile(array, q + spread) - np.quantile(array, q - spread)) / 2.0)
+        upper = np.quantile(array, q + spread)
+        return float((upper - np.quantile(array, q - spread)) / 2.0)
 
-    return half_range(lower_values, alpha), half_range(upper_values, 1.0 - alpha)
+    return (
+        half_range(lower_values, alpha),
+        half_range(upper_values, 1.0 - alpha),
+    )
 
 
-def interval_verdict(lower: float, upper: float, band: tuple[float, float],
-                     closed: tuple[bool, bool] = (True, True)) -> Verdict:
-    """Verdict of an interval against a band (DEC-0008 A1; v3 section 2).
+def interval_verdict(
+    lower: float,
+    upper: float,
+    band: tuple[float, float],
+    closed: tuple[bool, bool] = (True, True),
+) -> Verdict:
+    """Compare an interval with a target band (DEC-0008 A1; v3 section 2).
 
-    Pass iff the interval lies inside the band; fail iff it misses the band entirely;
-    otherwise inconclusive. ``band = (a, b)``; ``a = -inf`` or ``b = +inf`` gives a
-    one-sided band, whose infinite edge is always satisfied. ``closed`` says whether
-    each finite edge belongs to the band. Unrounded float64 values are compared.
+    Pass iff the interval lies inside the band; fail iff it misses the band
+    entirely; otherwise inconclusive. ``band = (a, b)``; ``a = -inf`` or
+    ``b = +inf`` gives a one-sided band, whose infinite edge is always
+    satisfied. ``closed`` says whether each finite edge belongs to the band.
+    Unrounded float64 values are compared.
 
     Parameters
     ----------
@@ -498,17 +655,34 @@ def interval_verdict(lower: float, upper: float, band: tuple[float, float],
     if not edge_a < edge_b:
         raise ValueError(f"band edges must satisfy a < b; got {band}")
     if lower > upper:
-        raise ValueError(f"interval needs lower <= upper; got ({lower}, {upper})")
+        raise ValueError(
+            f"interval needs lower <= upper; got ({lower}, {upper})"
+        )
     if np.isnan(lower) or np.isnan(upper):
         return "inconclusive"
     closed_a, closed_b = closed
-    inside_a = edge_a == -np.inf or (lower >= edge_a if closed_a else lower > edge_a)
-    inside_b = edge_b == np.inf or (upper <= edge_b if closed_b else upper < edge_b)
+    inside_a = edge_a == -np.inf or (
+        lower >= edge_a if closed_a else lower > edge_a
+    )
+    inside_b = edge_b == np.inf or (
+        upper <= edge_b if closed_b else upper < edge_b
+    )
     if inside_a and inside_b:
         return "pass"
-    below = edge_a > -np.inf and (upper < edge_a if closed_a else upper <= edge_a)
-    above = edge_b < np.inf and (lower > edge_b if closed_b else lower >= edge_b)
+    below = edge_a > -np.inf and (
+        upper < edge_a if closed_a else upper <= edge_a
+    )
+    above = edge_b < np.inf and (
+        lower > edge_b if closed_b else lower >= edge_b
+    )
     return "fail" if below or above else "inconclusive"
+
+
+def _check_labels(labels: Iterable[object]) -> None:
+    """Raise ``ValueError`` if a label is not one of the three verdicts."""
+    unknown = [label for label in labels if label not in _VERDICTS]
+    if unknown:
+        raise ValueError(f"unknown verdict(s) {unknown}")
 
 
 def combine_verdicts(parts: Iterable[Verdict]) -> Verdict:
@@ -522,7 +696,8 @@ def combine_verdicts(parts: Iterable[Verdict]) -> Verdict:
     Returns
     -------
     Verdict
-        "fail" if any part fails; else "pass" if all parts pass; else "inconclusive".
+        "fail" if any part fails; else "pass" if all parts pass; else
+        "inconclusive".
 
     Raises
     ------
@@ -532,25 +707,26 @@ def combine_verdicts(parts: Iterable[Verdict]) -> Verdict:
     listed = list(parts)
     if not listed:
         raise ValueError("combine_verdicts needs at least one part")
-    unknown = [part for part in listed if part not in ("pass", "fail", "inconclusive")]
-    if unknown:
-        raise ValueError(f"unknown verdict(s) {unknown}")
+    _check_labels(listed)
     if "fail" in listed:
         return "fail"
     return "pass" if all(part == "pass" for part in listed) else "inconclusive"
 
 
-def overall_verdict(by_system: dict[str, Verdict], required: tuple[str, ...] = V3_SYSTEMS
-                    ) -> tuple[str, list[str]]:
-    """Overall verdict of a hypothesis over the systems (v3 section 7; DEC-0008 A1; DEC-0016 O1).
+def overall_verdict(
+    by_system: dict[str, Verdict], required: tuple[str, ...] = V3_SYSTEMS
+) -> tuple[str, list[str]]:
+    """Combine the systems' verdicts into one (v3 section 7; DEC-0016 O1).
 
-    "supported" if every system in ``required`` is present and passes; "not supported" if any
-    system present fails (whatever is missing); "inconclusive" otherwise. A missing system has
-    no pass, so a run of fewer than the three v3 systems (smoke, development) can never read
-    "supported". ``required`` is the constant ``V3_SYSTEMS``, never the run's configured
-    systems. The rule is total on the three verdicts and absence; only the all-absent input and
-    bad labels raise. The intersection-union argument of v3 section 7 controls the error of
-    "supported" only; "not supported" is a union over systems (DEC-0016, error-rate note).
+    The result is "supported" if every system in ``required`` is present and
+    passes; "not supported" if any system present fails (whatever is missing);
+    "inconclusive" otherwise. A missing system has no pass, so a run of fewer
+    than the three v3 systems (smoke, development) can never read "supported".
+    ``required`` is the constant ``V3_SYSTEMS``, never the run's configured
+    systems. The rule is total on the three verdicts and absence; only the
+    all-absent input and bad labels raise. The intersection-union argument of
+    v3 section 7 controls the error of "supported" only; "not supported" is a
+    union over systems (DEC-0016, error-rate note).
 
     Parameters
     ----------
@@ -562,23 +738,26 @@ def overall_verdict(by_system: dict[str, Verdict], required: tuple[str, ...] = V
     Returns
     -------
     tuple[str, list[str]]
-        The overall verdict and the systems of ``required`` that are absent, in the order of
-        ``required``.
+        The overall verdict and the systems of ``required`` that are absent,
+        in the order of ``required``.
 
     Raises
     ------
     ValueError
-        If ``by_system`` is empty, has a system outside ``required`` (a non-v3 label must not
-        decide "not supported"), or has a value that is not "pass", "fail" or "inconclusive".
+        If ``by_system`` is empty, has a system outside ``required`` (a non-v3
+        label must not decide "not supported"), or has a value that is not
+        "pass", "fail" or "inconclusive".
     """
     if not by_system:
-        raise ValueError("overall_verdict needs at least one system with a verdict")
+        raise ValueError(
+            "overall_verdict needs at least one system with a verdict"
+        )
     outside = [name for name in by_system if name not in required]
     if outside:
-        raise ValueError(f"system(s) {outside} are not in required {list(required)}")
-    unknown = [v for v in by_system.values() if v not in ("pass", "fail", "inconclusive")]
-    if unknown:
-        raise ValueError(f"unknown verdict(s) {unknown}")
+        raise ValueError(
+            f"system(s) {outside} are not in required {list(required)}"
+        )
+    _check_labels(by_system.values())
     missing = [name for name in required if name not in by_system]
     values = list(by_system.values())
     if "fail" in values:
@@ -588,16 +767,25 @@ def overall_verdict(by_system: dict[str, Verdict], required: tuple[str, ...] = V
     return "inconclusive", missing
 
 
-def criterion_verdict(estimate: float, lower: float, upper: float,
-                      band: tuple[float, float], closed: tuple[bool, bool] = (True, True),
-                      *, n_states: int) -> tuple[Verdict, str | None]:
-    """Verdict of one criterion with the A3 guards applied in order (DEC-0008 A3).
+def criterion_verdict(
+    estimate: float,
+    lower: float,
+    upper: float,
+    band: tuple[float, float],
+    closed: tuple[bool, bool] = (True, True),
+    *,
+    n_states: int,
+) -> tuple[Verdict, str | None]:
+    """Give the verdict of one criterion, with the A3 guards in order.
+
+    The guards (DEC-0008 A3) are applied in this order.
 
     1. ``n_states < MIN_STATES``: inconclusive, reason "n_states < 50".
-    2. A non-finite estimate (or a NaN bound): inconclusive, reason "not computable".
+    2. A non-finite estimate (or a NaN bound): inconclusive, reason
+       "not computable".
     3. Otherwise ``interval_verdict``. The reason is None for pass and fail;
-       for inconclusive it is "failed resamples >= threshold" if a bound is infinite,
-       else "interval meets band edge".
+       for inconclusive it is "failed resamples >= threshold" if a bound is
+       infinite, else "interval meets band edge".
 
     Parameters
     ----------
@@ -627,19 +815,25 @@ def criterion_verdict(estimate: float, lower: float, upper: float,
     return verdict, "interval meets band edge"
 
 
-def block_bootstrap_dropped(statistic: Callable[[np.ndarray], float], n_items: int,
-                            n_resamples: int, block: int, seed: int | np.random.Generator,
-                            level: float = 0.95) -> tuple[float, float, float, int]:
-    """Moving-block bootstrap of a statistic of item indices, counting the dropped resamples.
+def block_bootstrap_dropped(
+    statistic: Callable[[np.ndarray], float],
+    n_items: int,
+    n_resamples: int,
+    block: int,
+    seed: int | np.random.Generator,
+    level: float = 0.95,
+) -> tuple[float, float, float, int]:
+    """Bootstrap a statistic of item indices, dropping and counting NaNs.
 
     Items are states in temporal order; blocks of consecutive states are
     resampled with replacement to respect residual serial dependence. NaN
-    resamples are dropped here (``np.nanquantile``), as ``block_bootstrap`` always did, and
-    **counted** (DEF-0001, row T3). Use ``block_bootstrap_counted`` for the DEC-0008 A3 rule,
-    which places failed resamples at the unfavourable tail instead. A resample of +-inf is not
-    dropped by ``np.nanquantile``: it stays in the quantiles and is not counted here. If every
-    resample is NaN (``n_dropped == n_resamples``) both bounds are NaN and NumPy warns
-    ``All-NaN slice``.
+    resamples are dropped here (``np.nanquantile``), as ``block_bootstrap``
+    always did, and **counted** (DEF-0001, row T3). Use
+    ``block_bootstrap_counted`` for the DEC-0008 A3 rule, which places failed
+    resamples at the unfavorable tail instead. A resample of +-inf is not
+    dropped by ``np.nanquantile``: it stays in the quantiles and is not counted
+    here. If every resample is NaN (``n_dropped == n_resamples``) both bounds
+    are NaN and NumPy warns ``All-NaN slice``.
 
     Parameters
     ----------
@@ -659,27 +853,38 @@ def block_bootstrap_dropped(statistic: Callable[[np.ndarray], float], n_items: i
     Returns
     -------
     tuple[float, float, float, int]
-        Point estimate on all items, lower and upper percentile bounds, and the number of NaN
-        resamples that were dropped.
+        Point estimate on all items, lower and upper percentile bounds, and
+        the number of NaN resamples that were dropped.
     """
     values = np.empty(n_resamples)
-    for r, idx in enumerate(block_resample_indices(n_items, n_resamples, block, seed)):
+    for r, idx in enumerate(
+        block_resample_indices(n_items, n_resamples, block, seed)
+    ):
         values[r] = statistic(idx)
     alpha = (1.0 - level) / 2.0
-    return (float(statistic(np.arange(n_items))), float(np.nanquantile(values, alpha)),
-            float(np.nanquantile(values, 1.0 - alpha)), int(np.isnan(values).sum()))
+    return (
+        float(statistic(np.arange(n_items))),
+        float(np.nanquantile(values, alpha)),
+        float(np.nanquantile(values, 1.0 - alpha)),
+        int(np.isnan(values).sum()),
+    )
 
 
-def block_bootstrap(statistic: Callable[[np.ndarray], float], n_items: int,
-                    n_resamples: int, block: int, seed: int | np.random.Generator,
-                    level: float = 0.95) -> tuple[float, float, float]:
-    """Moving-block bootstrap of a statistic of item indices.
+def block_bootstrap(
+    statistic: Callable[[np.ndarray], float],
+    n_items: int,
+    n_resamples: int,
+    block: int,
+    seed: int | np.random.Generator,
+    level: float = 0.95,
+) -> tuple[float, float, float]:
+    """Bootstrap a statistic of item indices, dropping NaNs silently.
 
-    Items are states in temporal order; blocks of consecutive states are
-    resampled with replacement to respect residual serial dependence. Non-finite
-    resamples are dropped silently here (``np.nanquantile``); use
-    ``block_bootstrap_dropped`` to count them and ``block_bootstrap_counted`` for the
-    DEC-0008 A3 rule. This is the first three items of ``block_bootstrap_dropped``.
+    This is the first three items of ``block_bootstrap_dropped``. Non-finite
+    resamples are dropped without a count (``np.nanquantile``); use
+    ``block_bootstrap_dropped`` to count them and
+    ``block_bootstrap_counted`` for the DEC-0008 A3 rule. The tests keep it as
+    an independent reference for the counted version.
 
     Parameters
     ----------
@@ -701,18 +906,24 @@ def block_bootstrap(statistic: Callable[[np.ndarray], float], n_items: int,
     tuple[float, float, float]
         Point estimate on all items, lower and upper percentile bounds.
     """
-    return block_bootstrap_dropped(statistic, n_items, n_resamples, block, seed, level)[:3]
+    return block_bootstrap_dropped(
+        statistic, n_items, n_resamples, block, seed, level
+    )[:3]
 
 
 def ols_slope(x_values: np.ndarray, y_values: np.ndarray) -> float:
-    """Ordinary least-squares slope of ``y`` on ``x`` (with intercept)."""
+    """Return the least-squares slope of ``y`` on ``x`` (with intercept)."""
     x_c = x_values - x_values.mean()
     return float(np.sum(x_c * (y_values - y_values.mean())) / np.sum(x_c**2))
 
 
-def partial_correlation(target: np.ndarray, variable: np.ndarray,
-                        controls: np.ndarray) -> float:
-    """Correlation of ``target`` and ``variable`` after regressing out ``controls``.
+def partial_correlation(
+    target: np.ndarray, variable: np.ndarray, controls: np.ndarray
+) -> float:
+    """Correlate ``target`` and ``variable`` after removing ``controls``.
+
+    Both series are first regressed on the control variables (plus a constant);
+    the correlation of what is left over is the partial correlation.
 
     Parameters
     ----------
@@ -730,10 +941,12 @@ def partial_correlation(target: np.ndarray, variable: np.ndarray,
     """
     design = np.column_stack([np.ones(len(target)), controls])
     resid_t = target - design @ np.linalg.lstsq(design, target, rcond=None)[0]
-    resid_v = variable - design @ np.linalg.lstsq(design, variable, rcond=None)[0]
+    resid_v = (
+        variable - design @ np.linalg.lstsq(design, variable, rcond=None)[0]
+    )
     return float(np.corrcoef(resid_t, resid_v)[0, 1])
 
 
 def spearman(a_values: np.ndarray, b_values: np.ndarray) -> float:
-    """Spearman rank correlation."""
+    """Return the Spearman rank correlation of two series."""
     return float(sps.spearmanr(a_values, b_values).statistic)
