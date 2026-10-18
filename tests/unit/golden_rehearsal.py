@@ -94,7 +94,7 @@ depend on the machine, so the golden files keep only the status.
 """
 
 
-def _normalise_text(text: str, tmp: Path) -> str:
+def _normalize_text(text: str, tmp: Path) -> str:
     """Replace machine-dependent parts of a tool's text by placeholders.
 
     The temporary directory becomes ``<TMP>``, the repository root becomes
@@ -105,8 +105,8 @@ def _normalise_text(text: str, tmp: Path) -> str:
     return STACK_LINE.sub(r"\1: <values>: \2", text)
 
 
-def _normalise_json(text: str, tmp: Path) -> str:
-    """Normalize a tool's JSON output the same way as ``_normalise_text``.
+def _normalize_json(text: str, tmp: Path) -> str:
+    """Normalize a tool's JSON output the same way as ``_normalize_text``.
 
     In addition, the "run" and "own" values in ``stack.rows`` (the two machine
     dependent columns) become ``<value>``. The JSON must also survive a
@@ -143,9 +143,9 @@ def _call(
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
         code = main([*argv, "--json", str(json_path)])
     text = f"exit code: {code}\n--- stdout ---\n{out.getvalue()}--- stderr ---\n{err.getvalue()}"
-    out_files[f"{name}.txt"] = _normalise_text(text, tmp)
+    out_files[f"{name}.txt"] = _normalize_text(text, tmp)
     if json_path.exists():
-        out_files[f"{name}.json"] = _normalise_json(json_path.read_text(), tmp)
+        out_files[f"{name}.json"] = _normalize_json(json_path.read_text(), tmp)
 
 
 def produce() -> dict[str, str]:
