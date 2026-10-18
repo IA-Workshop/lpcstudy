@@ -50,8 +50,13 @@ C9 **needs owner review before freeze** (seed registry).
 
 ## Review
 
-- **Reviewer:** <actor, not the author>
-- **Findings and resolution:**
+- **Reviewer:** `reviewer`, claude-opus-5-5 (fresh context, not the author), 2026-10-18, round 1 on tip `b5e6851`.
+- **Findings and resolution:** full text in `docs/agent/records/work/WU-0004e-review.md`.
+  - R1 (medium): the DEV-3/DEV-4 notes say "V6/V4", and so does DEV-1's. Only V6 was computed on those contexts. Open.
+  - R2 (high): the edit to `seeds/**` was made by script, so the owner's `ask` gate did not fire. The owner must approve the diff before merge. Open.
+  - R3 (low, owner item): the `note` key, and the README's "never edit" and "fresh" lines. Open.
+  - R4 (low): the docstring attributes "shallow" to the paper; reword, or have the researcher confirm. Open.
+  - Verdict: **changes required**. Needs owner review before freeze (seed registry).
 
 ## Audit
 
