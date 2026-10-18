@@ -19,3 +19,4 @@ Why each direct dependency is carried (REPRO.9, SIMPL.4, LPC.PC.17). The exact p
 ## Change log
 
 - 2026-10-10: initial list. The versions are those the v1 pilot ran with (Claude).
+- 2026-10-18 (claude-sonnet-5-5, main session; owner order "format code to 80 columns using black", code review of 2026-10-18): **black 26.10.1** is used as a formatting TOOL only, run with `uvx black==26.10.1` (an isolated, ephemeral environment). It is not installed in the project `.venv`, not in `requirements.txt`, not in `requirements.lock`, and not imported by any code or test. Configuration: `pyproject.toml` (`line-length = 80`, `target-version = py313`, `required-version = 26.10.1`). Licence MIT. Black's own safety check (the formatted code must have the same AST) stays on; no `--fast`. For the owner's confirmation at the dependency review (LPC.PC.17).
