@@ -130,3 +130,14 @@
 - only timing and provenance differ, confirmed independently from the retained files.
 
 R1, R4, R5 and R6 change the test file. After those fixes the passing run no longer covers the file as committed, so one rerun under the lock is warranted, as a code change (4.4). R2's comment, R3 and R7 are text only.
+
+## Developer answers (fix round 1, claude-sonnet-5-5, 2026-10-18)
+
+- **R1:** fixed in da88bf6. Skip only without a CUDA plugin, or with `CUDA_ERROR_NO_DEVICE` from the driver; a present but broken CUDA backend fails; the skip reason is printed with capture disabled. Offline: `CUDA_VISIBLE_DEVICES=-1` skip, `XLA_PYTHON_CLIENT_ALLOCATOR=bogus` fail, no plugin skip (detail and the jaxlib-wording caveat in the unit Log). Not exercised through pytest (that would be a rerun).
+- **R2:** fixed in da88bf6 (comment) and the correction line in the unit Log (commit c82fa16).
+- **R3:** fixed in da88bf6 (docstring scope; the draft is cited until the DEC id exists, as the Log says).
+- **R4:** fixed in da88bf6 (`JAX_ENABLE_COMPILATION_CACHE=false`, no `JAX_COMPILATION_CACHE_DIR`). The speed difference is not explained: it reversed sign in the rerun (run 2 slower by 32 s), so it is neither a compile cache nor a systematic warm-up (unit Log).
+- **R5:** fixed in da88bf6 (`python`, `jax_x64`, `jax_matmul_precision` compared; `jax_x64 is True` asserted).
+- **R6:** fixed in da88bf6 (fails unless the parent has `JAX_PLATFORMS=cuda,cpu`).
+- **R7:** fixed in c82fa16 and the next commit: queue.md note, the main session records the hours (0.238 h in total for the unit), tier-wide gap for the owner.
+- Rerun: `1 passed in 443.39s (0:07:23)`, 4695 leaves, 0 different, tier T0 (unit Log).
