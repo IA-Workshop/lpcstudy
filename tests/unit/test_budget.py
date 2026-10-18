@@ -761,6 +761,45 @@ def test_text_under_every_table() -> None:
                for tag in TAGS)
 
 
+def test_lm_development_note_under_every_table() -> None:
+    """B7: each table points to the DEV-0 doubling study as development evidence, once, after the
+    iterative-error sentence, with the sqrt(n_full/n_pilot) projection factor of its QoI.
+
+    Reference: the owner ruling of amendments note section 35 (B7) and the text of the WU-0005.6
+    record (line 359): the factor is sqrt(1000/500) = 1.41 for H2a(i), H2a(ii) and H3c (test
+    states 500 to 1000) and sqrt(1000/300) = 1.83 for H2b(i) and H2b(ii) (sweep 300 to 1000); the
+    study reports 5 of 18 parts with the LM-row flag, classes N 5, X 6, U 7. The factors are
+    computed here by arithmetic, to the 3 significant digits that are printed. The pointer names
+    the report file; it says "development evidence" and "not a sealed result"; the LM row stays
+    "not estimated". Exact text and counts; no tolerance.
+    """
+    results, systems = budget_results(full_system(), names=("lorenz63",))
+    lines = budget.budget_lines(results, systems, SMOKE)
+    heads = [i for i, ln in enumerate(lines) if ln.startswith("### ")]
+    assert len(heads) == 5
+    factors = {"H2a(i)": math.sqrt(1000 / 500), "H2a(ii)": math.sqrt(1000 / 500),
+               "H3c": math.sqrt(1000 / 500), "H2b(i)": math.sqrt(1000 / 300),
+               "H2b(ii)": math.sqrt(1000 / 300)}
+    assert [f"{factors[q]:.3g}" for q in budget.QOI_TITLES] == [
+        "1.41", "1.41", "1.83", "1.83", "1.41"]
+    for qoi, start, stop in zip(budget.QOI_TITLES, heads, [*heads[1:], len(lines)]):
+        block = lines[start:stop]
+        notes = [ln for ln in block if "lm_doubling_dev0_report_v3.md" in ln]
+        assert len(notes) == 1, qoi
+        note = notes[0]
+        assert block.index(budget.ITERATIVE_SENTENCE) < block.index(note), qoi
+        assert block.index(note) == block.index(budget.ITERATIVE_SENTENCE) + 2, qoi
+        assert note.startswith("Development evidence") and "not a sealed result" in note, qoi
+        assert "docs/study/lm_doubling_dev0_report_v3.md" in note, qoi
+        assert "5 of 18" in note and "classes N 5, X 6, U 7" in note, qoi
+        assert f"×{factors[qoi]:.3g}" in note, qoi
+        other = {f"×{f:.3g}" for f in factors.values()} - {f"×{factors[qoi]:.3g}"}
+        assert not any(o in note for o in other), qoi
+        assert "stays not estimated" in note, qoi
+    table = tables_of(lines)[budget.QOI_TITLES["H3c"]]
+    assert table[4][3].startswith("not estimated: ") and table[4][5] == "not estimated"
+
+
 def test_markdown_has_the_budget_section_between_validation_and_robustness(
         tmp_path: Path) -> None:
     """RESULTS.md holds the budget section once, after the validation gate and before Handling."""
@@ -985,11 +1024,17 @@ def test_f1_uses_the_number_of_long_horizons_of_the_configuration() -> None:
             budget.QOI_TITLES["H2a(i)"]][0][3]
 
     z = norm.ppf(0.975)
-    assert f"F1 = {3 / math.sqrt(math.pi) * 0.01 / z:.3g} (independent draw noise across 3 " \
-        "horizons" in cell(SMOKE)
+    # OF-4 (addendum A3): the superseded wording "indicative worst case <= F1 = x (independent
+    # draw noise across 3 horizons" is replaced by "indicative F1 = x (bias of a zero-range
+    # state, independent draw noise across 3 horizons; not a bound on the median; ...".
+    assert f"indicative F1 = {3 / math.sqrt(math.pi) * 0.01 / z:.3g} (bias of a zero-range " \
+        "state, independent draw noise across 3 horizons; not a bound on the median; V4 at " \
+        "H_ref only)" in cell(SMOKE)
+    assert "worst case" not in cell(SMOKE) and "≤ F1" not in cell(SMOKE)
     two = dataclasses.replace(SMOKE, eval_horizons_lyapunov=(0.5, 1.0, 2.0))
-    assert f"F1 = {2 / math.sqrt(math.pi) * 0.01 / z:.3g} (independent draw noise across 2 " \
-        "horizons" in cell(two)
+    assert f"indicative F1 = {2 / math.sqrt(math.pi) * 0.01 / z:.3g} (bias of a zero-range " \
+        "state, independent draw noise across 2 horizons; not a bound on the median; V4 at " \
+        "H_ref only)" in cell(two)
     four = dataclasses.replace(SMOKE, eval_horizons_lyapunov=(1.0, 2.0, 4.0, 8.0))
     assert cell(four).endswith("F1 not computable: tabulated for 2 or 3 horizons, this "
                                "configuration has 4")

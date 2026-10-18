@@ -402,6 +402,24 @@ H3C_SENTENCE = ("Conditional on the fitted A4 and A5. Fit-stage variability is o
 ITERATIVE_SENTENCE = ("The iterative (Levenberg–Marquardt) error is not estimated, so the "
                       "numerical error of this QoI is partly unverified (PRIME.3, NVVUQ.9; "
                       "DEC-0024).")
+LM_DEVELOPMENT_NOTE = (
+    "Development evidence on the iterative error, not a sealed result: the Levenberg–Marquardt "
+    "doubling study on the development seed DEV-0 (15, 30 and 60 iterations; "
+    "docs/study/lm_doubling_dev0_report_v3.md) finds the iterative change below 10% of the "
+    "sampling half-width for 5 of 18 parts (system and QoI part) and not below it for 13 "
+    "(classes N 5, X 6, U 7). A systematic iterative change does not shrink with n while the "
+    "half-width does, so its size against the half-width grows from the pilot to this run by "
+    "about √(n_full/n_pilot), ×{factor} for this QoI ({sizes}). The projection is stated, not "
+    "applied: only a 30-iteration run at the full size would remove it. The iterative row of this "
+    "report stays not estimated.")
+LM_PROJECTION = {"H2a(i)": ("1.41", "500 → 1000 test states"),
+                 "H2a(ii)": ("1.41", "500 → 1000 test states"),
+                 "H2b(i)": ("1.83", "300 → 1000 sweep states"),
+                 "H2b(ii)": ("1.83", "300 → 1000 sweep states"),
+                 "H3c": ("1.41", "500 → 1000 test states")}
+"""Projection factor sqrt(n_full/n_pilot) and the sizes it rests on, per primary QoI, as recorded
+in ``docs/agent/records/work/WU-0005.6-lm-doubling.md`` (the full-n projection): quoted as text,
+never computed here (B7, owner ruling of 2026-10-18)."""
 WIDENING_SENTENCE = ("A numerical row at or above 10% of the sampling half-width is flagged, not "
                      "widened: the rule of the uq-budget skill is to widen the interval or "
                      "refine, and which of the two is the owner's choice; this report does not "
@@ -562,12 +580,16 @@ def _half_width(ci: list | None) -> float | None:
 
 
 def oracle_range_bound(v4_half_width: float, horizons: int = 3) -> float:
-    """F1 of M3: indicative worst-case upward bias of the H2a(i) median range from finite M.
+    """F1 of M3: the indicative bias of a zero-range state in the H2a(i) median range from finite M.
 
     E[range of k iid N(0, s^2)] is ``2 s / sqrt(pi)`` for k = 2 and ``3 s / sqrt(pi)`` for k = 3
     (the expected range of three standard normals is ``3 / sqrt(pi)``), with ``s`` the SD of the
     per-state weight at H_ref, ``s = v4_half_width / z_0.975`` (V4's median half-width is a 95%
-    half-width). Independent draw noise across the horizons is the worst case.
+    half-width). The draw noise is taken as independent across the horizons. F1 is an indicative
+    value, **not a bound** on the bias of the median range (DEC-0024 addendum A3, owner ruling
+    OF-4): when more than half of the eligible states have exact separation, the median of the
+    noisy ranges lies near an upper quantile of the noise-only range, above its mean, and a
+    synthetic case reaches 1.38 F1 (``docs/agent/notes/2026-10-14-math-wu0003.md`` M5).
     """
     if horizons not in (2, 3):
         raise ValueError(f"the expected range is tabulated for 2 or 3 horizons; got {horizons}")
@@ -699,8 +721,9 @@ def _oracle_cell(qoi: str, part: _Part, system: dict, config: StudyConfig, level
         elif k not in (2, 3):
             bound = f"; F1 not computable: tabulated for 2 or 3 horizons, this configuration has {k}"
         else:
-            bound = (f"; indicative worst case ≤ F1 = {_num(oracle_range_bound(v4[0], k))} "
-                     f"(independent draw noise across {k} horizons; V4 at H_ref only)")
+            bound = (f"; indicative F1 = {_num(oracle_range_bound(v4[0], k))} "
+                     f"(bias of a zero-range state, independent draw noise across {k} horizons; "
+                     "not a bound on the median; V4 at H_ref only)")
         return (NOT_ESTIMATED + "finite-M bias upward (toward fail)" + bound, flag)
     if qoi == "H2a(ii)":
         return (NOT_ESTIMATED + "per-state draw variance on the logit scale not stored; the "
@@ -955,7 +978,8 @@ def _table(qoi: str, results: dict, systems: list[str], config: StudyConfig, lev
         lines += [H2A_ONE_NOTE, ""]
     if qoi == "H3c":
         lines += [H3C_SENTENCE, ""]
-    lines += [ITERATIVE_SENTENCE]
+    factor, sizes = LM_PROJECTION[qoi]
+    lines += [ITERATIVE_SENTENCE, "", LM_DEVELOPMENT_NOTE.format(factor=factor, sizes=sizes)]
     return lines
 
 
