@@ -90,6 +90,10 @@
   - R6: the dirty refusal line and the A6 test docstring misstate what they describe.
 
   These go back to the developer. One fix round remains. The unit still needs owner review before freeze.
+- **Round 3** (re-review of fix round 2, commit `6e29001`; reviewer claude-opus-5-5, fresh context, 2026-10-18), in `WU-0004a-review.md`. R4, R5 and R6 are **fixed**. The L1 reasoning (the `.venv` symlink in worktrees is hidden only by `info/exclude`) was confirmed by read-only git. The verdict is **approve with fixes**, with 1 new low finding:
+  - R7: the "not closed" lists in the docstrings read as complete, and they are not. A self-ignoring untracked `sub/.gitignore` and a clean filter (from `.git/config` with `info/attributes`, or from global config) also hide changes. None is present today. The fix is the docstring wording and three WU-0015.1 pre-run items.
+
+  The fix rounds are exhausted, so R7 goes to the owner with L1 to L3 and U1 through `/refer`. The unit is fit to merge into develop. It needs owner review before freeze.
 
 ## Audit
 

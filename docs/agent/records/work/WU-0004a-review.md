@@ -170,3 +170,97 @@
 ### Verdict (round 2)
 
 **approve with fixes.** R1, R2 and R3 are fixed. 3 new findings, all low: R4, R5, R6. No path reaches the sealed seed without the first check or output without the second. The unit still **needs owner review before freeze** (seed and provenance code). One fix round (the second and last) remains before `/refer` (DEVELOPMENT_WORKFLOW.md §2.3).
+
+## Round 3
+
+- **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-18.
+- **Scope:** fix round 2, `git diff 9906e84..6e29001` (commit `6e29001`), limited to R4 to R6 and the new code, with an adversarial reading of the provenance code (LPC.PC.7).
+- **Method:** reading; read-only git in `lpcstudy-wt/develop`, `lpcstudy-wt/wu/0003-rehearsal`, this worktree and the main checkout; probes on a throwaway repository in the reviewer's scratchpad (`GIT_CEILING_DIRECTORIES` set). No test was run. No preset, sealed flag or sealed seed was used, and the seal script was not named. The developer's recorded radius stands: `439 passed` (once, ten unit files).
+- **Owner checkpoint:** seed and provenance code. **Needs owner review before freeze** (LPC.PC.11).
+
+### R4: fixed, with the `.git/info/exclude` sub-case accepted as L1
+
+- **Code.** The status call is `git -C ROOT -c core.excludesFile=/dev/null status --porcelain --untracked-files=normal --ignore-submodules=none` (`provenance.py:115-116`).
+  - A command-line `-c` takes precedence over the repository, global and system config files.
+  - Setting `core.excludesFile` explicitly also replaces its default (`$XDG_CONFIG_HOME/git/ignore`).
+  - The environment drops every name that starts with `GIT_CONFIG` (l. 102-103). That covers `GIT_CONFIG_COUNT`, `_KEY_n`, `_VALUE_n`, `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM`, `GIT_CONFIG_NOSYSTEM` and the legacy `GIT_CONFIG`.
+  - Dropping `GIT_CONFIG_GLOBAL` or `GIT_CONFIG_NOSYSTEM` can only bring back the default config files, and `-c` overrides those for this key. At worst git fails, which is recorded and refused, not silent.
+  - `rev-parse` and `ls-files -v` are unaffected.
+- **Tests: sound and safe.**
+  - *`core.excludesFile` in the repository config.* The config is written to the throwaway repository; the fixture sets `GIT_CEILING_DIRECTORIES`. The test's own status, with `--untracked-files=normal`, prints nothing, so the hazard is real. Expected `dirty` is `True` by construction.
+  - *`GIT_CONFIG_COUNT`/`KEY_0`/`VALUE_0`.* `monkeypatch` sets and restores them. `own_git_env` strips only the redirect variables, so the precondition call really inherits the injection, which is the intended reference.
+  - *The `.gitignore` pin.* The committed `runs/` → `False`, an unnamed untracked file → `True`, and `sub/.gitignore` with `*.tmp` → `True` are all correct as asserted. Its docstring generalizes the last case: see R7.
+  - *Helpers.* Every helper git call now passes `env=own_git_env()` (redirect variables removed). The `GIT_DIR` hazard test's deliberate redirected call still inherits, which is correct.
+- **The L1 reasoning, checked by read-only git: confirmed.**
+  - `lpcstudy-wt/develop` and `lpcstudy-wt/wu/0003-rehearsal` each hold `.venv`, a symlink to the main checkout's `.venv`.
+  - `.gitignore:1` is `.venv/`, which matches directories only. `check-ignore -v` attributes the exclusion to `.git/info/exclude:7` (`.venv`).
+  - `ls-files --others --exclude-per-directory=.gitignore --directory` lists `.venv` in both worktrees. So that read would set `dirty: true` there.
+  - The hardened status of the final code is empty in both, and `ls-files -v` shows no non-`H` entry, so `dirty` is `False`, as the Log says.
+  - In the main checkout `.venv` is a directory matched by `.gitignore` itself.
+  - Accepting L1 with a pre-run check is sound. Two other ways to close it, for the owner's referral:
+    - an explicit, declared `--exclude=/.venv` on an in-tree-only listing;
+    - launching the sealed run from a fresh clone at `freeze-1`, which also closes L2 and R7 (below).
+- **Docstrings.** Both now separate closed from not-closed routes, and the closed list is accurate. The not-closed list is incomplete, though it reads as exhaustive: see R7.
+
+### R5: fixed
+
+- `current_commit` and `git_dirty` return `git_state(ROOT)[0]` and `[1]`.
+- `lpcstudy` resolves to this tree: `tools/lm_doubling.py:61-63` puts `ROOT` first on `sys.path`, and `ROOT` is passed explicitly in any case.
+- The gate `dirty is not False` (l. 1760) is unchanged. A git failure still gives `None` and a refusal.
+- One behaviour change: `current_commit` is now `None` if `status` or `ls-files` fails, not only `rev-parse`. This is more conservative, and it falls in the same refusal path because `dirty` is then `None` too.
+- The docstrings are accurate. "Its one accepted limitation" is slightly stale, since there are two (L1, L2). That is not material.
+
+### R6: fixed
+
+- The refusal text (`__main__.py:152-154`) and `DIRTY_LINE` (`test___main__.py:660-662`) are the same new string, and the assertion is still exact whole-line equality. The change is logged as a deliberate message change. It is not a loosening.
+- The A6 docstring now says the function returns the checked commit, which matches `== CLEAN_COMMIT`.
+
+### Governance checks
+
+- **PRIME.2.** No `assert` line was removed or weakened in the round-2 diff. The test edits add `env=`, two new tests, one pin and the reworded `DIRTY_LINE`.
+- **Integration tier.** `git diff 54816a9..6e29001 -- tests/integration` is empty, so it has not been edited since round 0.
+- **Sealed material.** Nothing touches the seal script, the seed registry, `seeds/`, the ledger, `.claude/` or the dependencies.
+- **Commit.** It names the unit and carries `Co-Authored-By` and `Agent: claude-sonnet-5-5`. History is not rewritten.
+
+### New findings
+
+#### R7 (low; documentation and pre-run procedure, no code change): the "not closed" list is presented as complete, and it is not
+
+- **Where.**
+  - `lpcstudy/provenance.py`, the `git_state` docstring ("Hiding routes **not** closed …": two items).
+  - `lpcstudy/__main__.py`, the `choose_clean_tree` docstring ("Not closed …": the same two).
+  - `tests/unit/test_provenance.py`, the `.gitignore` pin docstring ("and so is an untracked `.gitignore` itself").
+  - The unit Log's L2 text ("the project's declared list").
+- **Evidence (scratchpad, git 2.56, the exact status call of `git_state`).**
+  - **(a) A self-ignoring untracked `.gitignore`.**
+    - `sub/.gitignore` containing `*` hides itself and every untracked file under `sub/`. With `sub/numpy.py` present, the hardened status printed nothing, and `ls-files -v` showed only `H` entries.
+    - So L2 is not limited to "the project's declared list": any directory can carry an uncommitted one.
+    - `git status --porcelain --ignored` does show it (`!! sub/.gitignore`). L2's own pre-run checks (`git diff --stat freeze-1`, `git describe --tags`) do not.
+  - **(b) A clean filter hides a tracked edit.**
+    - Set `filter.hide.clean = "sed s/b/a/"` in `.git/config` and `g filter=hide` in `.git/info/attributes`, both untracked. Then a committed `g` (`a`) edited to `b` reads clean: empty status, tag `H`.
+    - The working tree, and so the code that runs, differs from `HEAD`.
+    - `git diff --stat freeze-1` applies the same filter and also shows nothing.
+    - The same can come from global or system config (`filter.*`, `core.attributesFile`), which `-c core.excludesFile` does not touch.
+- **Present state: not a defect today.** There is no `.gitattributes` in the tree. `.git/info/` holds only `exclude`. `git config --get-regexp '^(filter\.|core\.attributesfile|core\.fsmonitor|core\.excludesfile)'` is empty.
+- **Why it matters.** This is the same failure R4 named: the owner will rely on these docstrings at the B8 review, and an exhaustive-looking list that omits routes overstates the guarantee.
+- **Fix (no third developer round; route it with the referral).**
+  1. Reword both "not closed" lists as "known routes not closed include". Add (a), (b) and the global/system `filter.*`/`core.attributesFile` route. Correct the pin docstring to "an untracked `.gitignore` that does not ignore itself".
+  2. Add to the WU-0015.1 pre-run checks:
+     - `git status --porcelain --ignored` lists only the declared ignore paths (this catches L1 and (a));
+     - `git config --show-origin --get-regexp '^(filter\.|core\.attributesfile|core\.fsmonitor)'` is empty;
+     - `$(git rev-parse --git-common-dir)/info/attributes` is absent.
+  3. Owner option: launch the sealed run from a fresh `git clone` at `freeze-1`, with no local config or info files. That closes L1, L2 and R7 together, without code.
+
+### Fitness to merge into develop
+
+**Yes.**
+- The guard is a strict improvement on the round-0 base.
+- No path reaches the sealed seed without the first check, or output without the second. The refusals are strict, exact and tested against independent references. Ordinary development checkouts record the same `commit` and `dirty` as before (verified in two worktrees).
+- The remaining items are disclosed residuals of a git-based cleanliness reading, not defects of the code as specified: L1 (`info/exclude`), L2 (in-tree `.gitignore`, widened by R7a), L3 (sparse/`ignoreStat` read dirty; conservative), U1 (tag check), and R7 (docstring completeness and pre-run items).
+- All of them are owner referral items before freeze. None blocks a develop merge.
+- The integration tier and the C16 DEV-0 smoke must still be run by the main session at the merge gate.
+- A merge to `main` stays an owner decision.
+
+### Verdict (round 3)
+
+**approve with fixes.** R4, R5 and R6 are fixed. There is 1 new finding: R7 (low; documentation and pre-run procedure). The fix rounds are exhausted, so R7 goes with L1 to L3 and U1 to the owner through `/refer`, and does not go back to the developer. The unit **needs owner review before freeze** (seed and provenance code).
