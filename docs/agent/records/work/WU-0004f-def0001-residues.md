@@ -92,3 +92,10 @@ Changed: `lpcstudy/clip_sensitivity.py`, `lpcstudy/experiments.py`, `lpcstudy/re
 6. Contention: no preset or GPU job started by me.
 7. Output: `-q --tb=short -rfE` (the wrapper), summary and failures only.
 8. Command: `LPC_PYTHON=/home/brianm/projects/physics/chaos/lpcstudy/.venv/bin/python tools/run_tests.sh unit <the 13 files>`.
+
+**Radius run (once).** `LPC_PYTHON=.../lpcstudy/.venv/bin/python tools/run_tests.sh unit` on the 13 files of item 2 of the checklist: `1 failed, 825 passed in 38.21s`. The failure was in my new test `test_block_counts_caught_exceptions_a5`, a test-design error, not a code defect: `caplog` still held the records of the earlier injections and `"Traceback"` is counted once per chained exception (7, not 2). I replaced that assertion by an exact one on the records of the single call (exactly two ERROR records, in the order block then listing, each with `exc_info`); the count of `n_caught_exceptions` and every later assertion are as planned (the failure stopped the test at that line, so the later assertions ran for the first time in the `--lf` run). `run_tests.sh unit --lf tests/unit/test_clip_sensitivity.py`: `1 passed, 32 deselected in 0.73s`. No tolerance in any assert grew; no assertion was removed or loosened. One existing assertion was replaced as the plan lists (A6): the key list of `run_handling` in `test_run_handling_warns_of_skipped_variants_and_keeps_its_keys_def_0025` now ends with `skipped_variants` (the list is exact, the docstring says why). Committed as dbce486.
+
+**Self-check of the diff.**
+- Grep of the diff for `clip|nan_to_num|isfinite|where(|try:|except`: the sites are the floor of `h1b_part` (counted: `n_floored`, `n_floored_2L`), the three broad `except Exception` (counted: `n_caught_exceptions`; the one of `_failed` is now also logged), `except _BaselineMismatch` (a refusal with a reason, unchanged), and `np.isfinite` of the existing code. No new clip, replacement or fallback was introduced.
+- Grep for `default_rng|random\.|PRNGKey` in `lpcstudy/` diff: none; no randomness is consumed (the counters are integer sums).
+- No tolerance grew.
