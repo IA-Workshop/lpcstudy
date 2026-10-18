@@ -52,10 +52,14 @@ def wait_until(predicate: Callable[[], bool], seconds: float = 5.0) -> bool:
 
 
 def alive(pid: int) -> bool:
-    """True if the process exists and is not a zombie."""
+    """True if the process exists and is not a zombie.
+
+    A process that exits between the open and the read of ``/proc/<pid>/stat`` makes the read raise
+    ``ProcessLookupError`` (ESRCH), not ``FileNotFoundError``: both mean "not alive" (WU-0004g).
+    """
     try:
         state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
         return False
     return state != "Z"
 
@@ -696,3 +700,19 @@ def test_dump_background_pilot_carries_the_flag_and_the_tally(fake: FakeRoot) ->
     assert call["argv"][-1] == "--states-dump" and call["argv"].count("--states-dump") == 1
     assert fake.tally_calls() == [["check", "--hours", "0"]]
     assert "--states-dump" in json.loads(meta_path(fake, "pilot").read_text())["command"].split()
+
+
+def test_alive_is_false_for_a_pid_that_does_not_exist_and_true_for_this_process() -> None:
+    """The helper's job is liveness (WU-0004g): a missing pid is not alive, this process is.
+
+    Reference: the OS. A pid above ``pid_max`` cannot exist (read the limit from
+    ``/proc/sys/kernel/pid_max``); ``os.getpid()`` is alive. The ESRCH race itself (the process
+    vanishing between open and read) cannot be forced deterministically; the helper maps its
+    exception to False, which this test covers through the ``FileNotFoundError`` branch of the
+    same ``except``. Exact booleans.
+    """
+    import os
+
+    beyond = int(Path("/proc/sys/kernel/pid_max").read_text()) + 1
+    assert alive(beyond) is False
+    assert alive(os.getpid()) is True
