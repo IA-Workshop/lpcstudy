@@ -76,8 +76,10 @@ Tolerances applied to a pair (A6 and B1 items 2 to 5)
   ``DEF`` line. In TD the verdicts are reported only.
 * **TD:** no per-leaf tolerance. Per primary part (6 parts per system, 18 over three systems)
   z is computed twice, with the symmetric se = hw / z_level and with the arms facing away from the
-  other estimate (DEC-0027); a part fails if ``max(|z_sym|, |z_away|) > 3.4``. Both are printed. A
-  TD pair between two devices triggers O4 (printed).
+  other estimate (DEC-0027). **The failing rule is ``z_away > 3.4`` alone (owner ruling OF-5 of 2026-10-18,
+  WU-0003.9c; before it a part failed on ``max(z_sym, z_away)``).** ``z_sym`` is still computed and printed, as
+  information only: it fails no part, ``n_fail`` counts ``z_away`` only, and ``td["governing"]`` says ``"z_away"``.
+  A TD pair between two devices triggers O4 (printed).
 
 Scale classes and the 10x rule (B1 item 4, note M2)
 ---------------------------------------------------
@@ -110,15 +112,21 @@ Readings that the plan leaves open (strict where possible; the looser owner read
   tagged by the table, tightened, by an override and untagged, and the reason of every override that tagged a differing leaf;
   ``--tags`` prints the whole override table. The pin is the test on the committed path shapes of P1, P0 and the smoke
   preset (``tests/unit/fixtures/pilot_schema``).
-* The H1a ``ratio`` and ``ratio_ci`` are cp by dependence and meet the strict cp 1e-12, like the four sibling
-  outputs of the tolerance-stopped ``curve_fit`` (``fitted_inverse_dim``, ``ci_inverse_dim``, ``floor_rms``, whose
-  cp tag is in ``compare_pilot``'s table). The mathematician proposes the A6 QoI rule (class (a) or (g)) for all of
-  them (OF-7, a loosening, **not adopted**; it now covers ``ratio`` and ``ratio_ci`` too: the working default fails
-  every T2 pair on up to 42 H1a leaves per pilot, 3 systems x 2 rho x 7, with correct code). A pointer to
-  ``docs/agent/notes/2026-10-14-math-wu0003-9-q1.md`` is printed beside these five leaves (``fitted_inverse_dim``,
-  ``ratio``, ``ci_inverse_dim/[0|1]``, ``ratio_ci/[0|1]``, ``floor_rms``) when they fail the cp rule; the exit code is
-  unchanged. The cp 1e-12 rule also applies to ``H1a`` ``inverse_dim_reference`` and ``median_seed_by_n_lib/*`` (direct
-  arithmetic; the adopted tightening of Q1.4).
+* **OF-7 (owner ruling of 2026-10-18, WU-0003.9c).** Four H1a outputs of the tolerance-stopped ``curve_fit`` (TRF,
+  ftol = xtol = gtol = 1e-8, 2-point Jacobian) are governed by the A6 rules for QoIs, not by the cp 1e-12 of N1
+  (which assumes forward-stable direct arithmetic): ``fitted_inverse_dim`` and ``ci_inverse_dim/[0|1]`` as class (a)
+  (``|d| <= 1e-4 s``, ``s = max(|lo|, |hi|)`` of the reference ``ci_inverse_dim``), ``floor_rms`` as class (g) (the
+  (b) to (g) tolerance ``--tol-other``, default ``1e-4 |ref|``; an exceedance is a FINDING). Basis: note
+  ``docs/agent/notes/2026-10-14-math-wu0003-9-q1.md`` sections Q1.3 and Q1.4 (a-priori bound 4.0e-5 s, so the
+  QoI tolerance has a safety factor of 2.5; 1e-5 s is not derivable). The table is ``RETAGS``. It changes the
+  tolerance rule only: the dependence chain of these leaves stays ``cp`` (``compare_pilot``'s tag is not edited), so
+  a whole-system clip count still does not reach them. If the reference has no interval for a class-(a) leaf, the
+  class cannot be established and the strict cp 1e-12 rule stays, said in the row's note. The 1e-12 rule stays for
+  every other leaf. In particular the H1a ``ratio`` and ``ratio_ci`` (the same fit, cp by dependence, not named in
+  the ruling) still meet cp 1e-12 and carry a pointer to the note when they fail: 3 pointer leaves per
+  (system, rho), 18 per pilot, where the first report counted 42. Extending the ruling to them is one row each in
+  ``RETAGS``; the owner has not so ruled. The cp 1e-12 rule also applies to ``H1a`` ``inverse_dim_reference`` and
+  ``median_seed_by_n_lib/*`` (direct arithmetic; the adopted tightening of Q1.4).
 * ``TIGHTENINGS`` may replace a ``network`` chain of ``compare_pilot``'s table by a network-independent one where the
   code shows no estimator dependence, never the reverse (``H1d/rows/nhat/spearman``, review R2); ``compare_pilot`` is
   not edited. The scope of a clip, nu-cap or replacement count follows the chain, so it never reaches a
@@ -165,8 +173,9 @@ if cp is None or not hasattr(cp, "TABLE"):
     sys.modules["compare_pilot"] = cp
     _SPEC.loader.exec_module(cp)
 
-OF7_POINTER = ("OF-7 (proposed, not adopted): the H1a fit outputs (also ratio and ratio_ci) are tolerance-stopped, see "
-               "docs/agent/notes/2026-10-14-math-wu0003-9-q1.md; cp 1e-12 kept as the working default")
+OF7_POINTER = ("OF-7 (ruled 2026-10-18 for fitted_inverse_dim, ci_inverse_dim and floor_rms only): ratio and ratio_ci come "
+               "from the same tolerance-stopped fit but are not named in the ruling, so cp 1e-12 is kept; see "
+               "docs/agent/notes/2026-10-14-math-wu0003-9-q1.md")
 LABEL = "DEVELOPMENT: comparison of two runs, not a hypothesis test"
 REVIEW = ("needs owner review before freeze (tolerance and verdict-comparison code; "
           "CSQ2 use in WU-0016)")
@@ -181,7 +190,8 @@ TOL_LM_SUMMARY = 1e-8      # WU-0005.4 M7(i): LM summaries relative (T1)
 TOL_LM_ITERATIONS = 1.0    # WU-0005.4 M7: median_iterations within 1
 TOL_O3 = 1e-4              # ROADMAP rule: a declared tolerance above this is a finding (O3)
 HW_FRACTION = 0.1          # A6: discrete-count exception |d| <= 0.1 hw
-TD_BOUND = 3.4             # A6, B1 item 5: |z| bound per primary part
+TD_BOUND = 3.4             # A6, B1 item 5: |z| bound per primary part (applied to z_away: OF-5, 2026-10-18)
+TD_GOVERNING = "z_away"    # the TD form that fails a part; z_sym is information only
 PRIMARY_LEVEL = cp.PRIMARY_LEVEL
 CHI2_4_999 = 18.47         # chi2_4 quantile 0.999 (WU-0005.4 D3): converged iff c / rho^2 <= this
 ETA_ABS = 1e-12            # WU-0005.4 M2: eta = 1e-12 max(1, ||X||_inf)
@@ -753,9 +763,10 @@ def _build_tags() -> list[cp.Rule]:
               "2026-10-14-math-wu0003-9-q1 section Q1.4"))
     add(_tags("cp", f"{S}/H1a/by_noise/*/ratio {S}/H1a/by_noise/*/ratio_ci/[]",
               "analysis.py:_median_fit_stats via h1a_library_scaling: depends on the CP seed errors and the oracle local "
-              "dimension only (cp). It is an output of the tolerance-stopped curve_fit, like the four sibling fit leaves, "
-              "so cp 1e-12 may fail on correct code at a T2 pair: OF-7 (not adopted; working default cp 1e-12 with the "
-              "pointer to note 2026-10-14-math-wu0003-9-q1, which also covers these two leaves)"))
+              "dimension only (cp). It is an output of the tolerance-stopped curve_fit, like the three sibling fit leaves "
+              "that the OF-7 ruling of 2026-10-18 re-tags (RETAGS); the ruling does not name ratio and ratio_ci, so "
+              "cp 1e-12 may fail on correct code at a T2 pair and carries the pointer to note "
+              "2026-10-14-math-wu0003-9-q1 (owner to rule whether they follow)"))
     add(_tags("cp", f"{S}/H1d/rows/nhat/interval/[]",
               "analysis.py:h1d_proxies: the pair (nhat, N) is ev.noise_sens against moments.noise_sens, both from analog "
               "retrieval on the noisy library (ensemble.py:evaluation_draws, ensemble_moments, retrieval_spread): no "
@@ -858,6 +869,55 @@ def _build_tightenings() -> list[cp.Rule]:
 TIGHTENINGS = cp.Table(_build_tightenings())
 
 
+@dataclass(frozen=True)
+class Retag(cp.Rule):
+    """One tolerance re-tag (OF-7, owner ruling of 2026-10-18): a leaf that keeps its dependence chain but is
+    governed by the A6 rules for QoIs instead of the cp 1e-12 of N1.
+
+    Attributes
+    ----------
+    scale : str
+        ``"a"``: class (a), ``|d| <= 1e-4 s`` with ``s = max(|lo|, |hi|)`` of the reference interval of the leaf.
+        ``"g"``: class (g), the (b) to (g) tolerance (``--tol-other``) relative to ``|ref|``.
+    """
+
+    scale: str = "a"
+
+
+def _build_retags() -> list[Retag]:
+    """The OF-7 re-tag table (owner ruling of 2026-10-18, note 33; needs owner review before freeze).
+
+    Exactly the four H1a leaves that the ruling names: ``fitted_inverse_dim`` and ``ci_inverse_dim/[0|1]`` (class
+    (a)) and ``floor_rms`` (class (g), as note 2026-10-14-math-wu0003-9-q1 section Q1.4 says). A row never tags a
+    leaf (``chain_source`` does not read this table): it only selects the tolerance rule of a leaf that already has
+    its chain. The H1a ``ratio`` and ``ratio_ci`` are deliberately absent (not named in the ruling).
+    """
+    common = ("OF-7 ruled 2026-10-18: output of the tolerance-stopped curve_fit in analysis.py:_fit_seed_law "
+              "(TRF, ftol = xtol = gtol = 1e-8, 2-point Jacobian), for which the 1e-12 premise of N1 (direct arithmetic) "
+              "fails; ")
+    qoi = (common + "a-priori bound 4.0e-5 s, so the A6 rule for QoIs (class (a), 1e-4 s) holds with a factor 2.5 "
+           "(note 2026-10-14-math-wu0003-9-q1 sections Q1.3 and Q1.4)")
+    cls_g = (common + "no interval, so relative to |ref|: measured flip <= 6.3e-7 and stopping error <= 6.8e-7 relative, "
+             "so the A6 rule of class (g) (1e-4 |ref|) holds with a factor >= 70 (note 2026-10-14-math-wu0003-9-q1 "
+             "sections Q1.3, last row of the table, and Q1.4)")
+    return [Retag(pattern, "unchanged", reason=reason, chain="cp", scale=scale)
+            for pattern, scale, reason in (
+                ("systems/*/H1a/by_noise/*/fitted_inverse_dim", "a", qoi),
+                ("systems/*/H1a/by_noise/*/ci_inverse_dim/[]", "a", qoi),
+                ("systems/*/H1a/by_noise/*/floor_rms", "g", cls_g))]
+
+
+RETAGS = cp.Table(_build_retags())
+
+
+def retag_of(path: Path_) -> Retag | None:
+    """The OF-7 re-tag row of a leaf, or ``None`` (an overlap of two rows is a defect and raises)."""
+    found = RETAGS.matches(path)
+    if len(found) > 1:
+        raise ToolError(f"{len(found)} re-tag rows match {'/'.join(path)}: " + "; ".join(t.pattern for t in found))
+    return found[0] if found else None  # type: ignore[return-value]
+
+
 def chain_source(path: Path_) -> tuple[str, str, str]:
     """``(chain, source, reason)`` of a leaf: ``compare_pilot``'s table first, then the override table.
 
@@ -917,6 +977,18 @@ def tag_lines(flats: dict[str, dict[Path_, object]]) -> list[str]:
     for tag in TAGS.rules:
         out.append(f"  {tag.pattern}: chain {tag.chain}, float leaves "
                    + ", ".join(f"{counts[n][tag.pattern]} {n}" for n in flats))
+        out.append(f"      reason: {tag.reason}")
+    out.append(f"tolerance re-tags (OF-7, owner ruling of 2026-10-18; {len(RETAGS.rules)} patterns; the chain stays, "
+               "the tolerance rule is the A6 rule of the class):")
+    retag_counts: dict[str, dict[str, int]] = {name: defaultdict(int) for name in flats}
+    for name, flat in flats.items():
+        for path, value in flat.items():
+            tag = retag_of(path) if is_float(value) else None
+            if tag is not None:
+                retag_counts[name][tag.pattern] += 1
+    for tag in RETAGS.rules:
+        out.append(f"  {tag.pattern}: class {tag.scale}, float leaves "
+                   + ", ".join(f"{retag_counts[n][tag.pattern]} {n}" for n in flats))
         out.append(f"      reason: {tag.reason}")
     out.append(f"chain tags tightened over compare_pilot's table ({len(TIGHTENINGS.rules)} patterns; network to a "
                "network-independent chain, never the reverse):")
@@ -1096,6 +1168,14 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
     elif lm is not None:
         row.cls = "lm"
         lmrow(row, ref, tier, tol_other)
+    elif (retag := retag_of(path)) is not None and (retag.scale == "g" or row.cls == "a"):
+        # OF-7 (WU-0003.9c): a tolerance-stopped fit output meets the A6 rule of its class, not the cp 1e-12
+        if retag.scale == "a":
+            row.rule, row.tol = "QoI / interval endpoint (OF-7 re-tag)", TOL_QOI
+            row.outcome = "pass" if row.metric <= row.tol else "FAIL"
+        else:
+            row.rule, row.tol = "class (b) to (g) (OF-7 re-tag)", tol_other
+            row.outcome = "pass" if row.metric <= row.tol else "FINDING"
     elif chain in cp.NETWORK_INDEPENDENT:
         row.rule, row.tol = f"{chain} chain relative", TOL_CHAIN
         row.metric = abs(a - b) / abs(a) if a and math.isfinite(a) and math.isfinite(b) else (
@@ -1107,9 +1187,11 @@ def decide(row: Row, ref: dict, tier: Tier, scopes: list, tol_other: float) -> i
     else:
         row.rule, row.tol = "class (b) to (g)", tol_other
         row.outcome = "pass" if row.metric <= row.tol else "FINDING"
+    if row.rule == "cp chain relative" and retag_of(path) is not None:     # class (a) needs the reference interval
+        row.note = (row.note + "; " if row.note else "") + (
+            "OF-7 re-tag not applied: no reference interval, so the class (a) scale is undefined; cp 1e-12 kept")
     if (row.outcome == "FAIL" and row.rule == "cp chain relative" and "H1a" in path and "by_noise" in path
-            and (name in ("fitted_inverse_dim", "floor_rms", "ratio")
-                 or (path[-2] in ("ci_inverse_dim", "ratio_ci") and name in ("[0]", "[1]")))):
+            and (name == "ratio" or (path[-2] == "ratio_ci" and name in ("[0]", "[1]")))):
         row.note = (row.note + "; " if row.note else "") + OF7_POINTER
     return 0
 
@@ -1177,12 +1259,14 @@ def td_part(est0: float, ci0: list, est1: float, ci1: list) -> dict:
     ``z_sym = |d| / sqrt(se0^2 + se1^2)`` with ``se = hw / z_level``; ``z_away`` uses the arms that
     face away from the other estimate (run 1 above run 0: run 0's lower arm and run 1's upper arm).
     A division of zero by zero is 0; a nonzero difference over a zero standard error is infinite.
+    Since the OF-5 ruling of 2026-10-18 the failing rule is ``z_away`` alone (``z_sym`` is information).
 
     Returns
     -------
     dict
-        ``d``, ``z_sym``, ``z_away``, ``hw0``, ``hw1``; or ``{"error": text}`` if an input is
-        missing or not finite, or an arm is negative (the estimate outside its interval).
+        ``d``, ``z_sym`` (information), ``z_away``, ``z_governing`` (= ``z_away``, the value the bound applies to),
+        ``hw0``, ``hw1``; or ``{"error": text}`` if an input is missing or not finite, or an arm is negative
+        (the estimate outside its interval).
     """
     if not isinstance(ci0, list) or not isinstance(ci1, list) or len(ci0) != 2 or len(ci1) != 2:
         return {"error": "interval missing"}
@@ -1202,7 +1286,8 @@ def td_part(est0: float, ci0: list, est1: float, ci1: list) -> dict:
         den = math.hypot(se0, se1)
         return (0.0 if d == 0 else math.inf) if den == 0 else abs(d) / den
 
-    return {"d": d, "z_sym": ratio(hw0 / zl, hw1 / zl), "z_away": ratio(arm0 / zl, arm1 / zl),
+    z_away = ratio(arm0 / zl, arm1 / zl)
+    return {"d": d, "z_sym": ratio(hw0 / zl, hw1 / zl), "z_away": z_away, "z_governing": z_away,
             "hw0": hw0, "hw1": hw1}
 
 
@@ -1221,12 +1306,16 @@ def td_statistic(ref_tree: dict, new_tree: dict) -> dict:
     A system missing on one run gives 6 parts that cannot be computed (never dropped silently: B1 item 5
     fixes the number of parts).
 
+    A part fails iff ``z_away > TD_BOUND`` (OF-5, owner ruling of 2026-10-18, WU-0003.9c); ``z_sym`` is computed
+    and kept for information.
+
     Returns
     -------
     dict
-        ``parts`` (rows with ``system``, ``part`` and ``td_part``'s keys, or ``error``), ``expected``
-        (6 x systems), ``sum_sym``, ``sum_away``, ``max_z``, ``k`` (parts computed), ``n_error``,
-        ``n_fail``.
+        ``parts`` (rows with ``system``, ``part`` and ``td_part``'s keys, or ``error``; ``fail`` is the
+        away-arm rule), ``governing`` (``"z_away"``: the form the bound applies to), ``expected`` (6 x systems),
+        ``sum_sym`` (information), ``sum_away``, ``max_z`` (the largest governing ``z_away``), ``max_sym``
+        (information), ``max_away``, ``k`` (parts computed), ``n_error``, ``n_fail`` (``z_away`` only).
     """
     ref_systems, new_systems = ref_tree.get("systems", {}), new_tree.get("systems", {})
     systems = sorted(set(ref_systems) | set(new_systems))
@@ -1240,13 +1329,14 @@ def td_statistic(ref_tree: dict, new_tree: dict) -> dict:
                 res = td_part(lookup(r, point), lookup(r, interval), lookup(n, point), lookup(n, interval))
             res.update(system=system, part=name)
             errors += "error" in res
-            res["fail"] = "error" not in res and max(res["z_sym"], res["z_away"]) > TD_BOUND
+            res["fail"] = "error" not in res and res["z_away"] > TD_BOUND
             parts.append(res)
     good = [p for p in parts if "error" not in p]
-    return {"parts": parts, "k": len(good), "n_error": errors, "n_fail": sum(p["fail"] for p in good),
+    return {"parts": parts, "governing": TD_GOVERNING, "k": len(good), "n_error": errors,
+            "n_fail": sum(p["fail"] for p in good),
             "expected": len(TD_PARTS) * len(systems),
             "sum_sym": sum(p["z_sym"] ** 2 for p in good), "sum_away": sum(p["z_away"] ** 2 for p in good),
-            "max_z": max((max(p["z_sym"], p["z_away"]) for p in good), default=0.0),
+            "max_z": max((p["z_away"] for p in good), default=0.0),
             "max_sym": max((p["z_sym"] for p in good), default=0.0),
             "max_away": max((p["z_away"] for p in good), default=0.0),
             "no_systems": not systems}
@@ -1310,7 +1400,7 @@ def compare_trees(ref_tree: dict, new_tree: dict, tol_other: float = TOL_O3,
     if td is not None:
         if td["n_fail"]:
             code = EXIT_FAIL
-            reasons.append(f"TD: {td['n_fail']} of {td['k']} parts exceed {TD_BOUND}")
+            reasons.append(f"TD: {td['n_fail']} of {td['k']} parts exceed {TD_BOUND} ({TD_GOVERNING})")
         if td["n_error"] or td["no_systems"]:
             code = code if code == EXIT_FAIL else EXIT_UNDETERMINED
             reasons.append(f"TD: {td['n_error']} parts cannot be computed")
@@ -1371,6 +1461,16 @@ def tag_summary(cmp: Comparison) -> list[str]:
     for key in sorted(used):
         chain, _, reason = chain_source(used[key][0].path)
         out.append(f"  {key}: chain {chain}, {len(used[key])} differing leaves; reason: {reason}")
+    retagged: dict[str, list[Row]] = defaultdict(list)
+    for r in cmp.rows:
+        tag = retag_of(r.path) if r.kind == "float" else None
+        if tag is not None and r.rule.endswith("(OF-7 re-tag)"):
+            retagged[tag.pattern].append(r)
+    for pattern in sorted(retagged):
+        tag = retag_of(retagged[pattern][0].path)
+        assert tag is not None
+        out.append(f"  OF-7 re-tag {pattern}: class {tag.scale}, {len(retagged[pattern])} differing leaves; "
+                   f"reason: {tag.reason}")
     return out
 
 
@@ -1457,18 +1557,20 @@ def render(cmp: Comparison, ref_path: str, new_path: str, show: int = 20, every:
 
 def render_td(td: dict) -> list[str]:
     """The TD table lines."""
-    out = [f"TD statistic: z_level {z_level():.4f}, bound {TD_BOUND} on max(|z_sym|, |z_away|) per part",
-           f"  {'system':9s} {'part':17s} {'d':>9s} {'z_sym':>7s} {'z_away':>7s} {'hw1/hw0':>8s}  status"]
+    out = [f"TD statistic: z_level {z_level():.4f}, bound {TD_BOUND} on z_away per part (the away-arm standard error, "
+           f"DEC-0027; owner ruling OF-5 of 2026-10-18); z_sym is information only and fails no part",
+           f"  {'system':9s} {'part':17s} {'d':>9s} {'z_sym (information)':>19s} {'z_away (governs)':>16s} "
+           f"{'hw1/hw0':>8s}  status"]
     for p in td["parts"]:
         if "error" in p:
             out.append(f"  {p['system']:9s} {p['part']:17s} NOT COMPUTABLE: {p['error']}")
             continue
         ratio = p["hw1"] / p["hw0"] if p["hw0"] else math.inf
-        out.append(f"  {p['system']:9s} {p['part']:17s} {p['d']:9.4f} {p['z_sym']:7.2f} {p['z_away']:7.2f} "
+        out.append(f"  {p['system']:9s} {p['part']:17s} {p['d']:9.4f} {p['z_sym']:19.2f} {p['z_away']:16.2f} "
                    f"{ratio:8.3f}  {'FAIL' if p['fail'] else 'ok'}")
-    out.append(f"  parts computed {td['k']} of {td['expected']} expected (cannot be computed: {td['n_error']}); sum z^2 symmetric "
-               f"{td['sum_sym']:.2f}, away {td['sum_away']:.2f}; max |z| symmetric {td['max_sym']:.2f}, "
-               f"away {td['max_away']:.2f}; failing parts {td['n_fail']}")
+    out.append(f"  parts computed {td['k']} of {td['expected']} expected (cannot be computed: {td['n_error']}); sum z^2 away "
+               f"{td['sum_away']:.2f}, symmetric (information) {td['sum_sym']:.2f}; max z away {td['max_away']:.2f}, "
+               f"symmetric (information) {td['max_sym']:.2f}; failing parts (z_away > {TD_BOUND}) {td['n_fail']}")
     return out
 
 

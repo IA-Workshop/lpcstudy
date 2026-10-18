@@ -868,12 +868,14 @@ def test_cp_rule_applies_to_the_untagged_h1a_leaves(tier: str, path: str, value:
     assert row(run(*high), path).outcome == "FAIL"
 
 
-def test_failures_of_the_h1a_fit_keep_the_cp_rule_and_print_the_of7_pointer_with_an_unchanged_exit() -> None:
-    """Round 2, item 1, extended by WU-0003.9b fix round 1 (review R1): the H1a fit leaves that fail the cp rule on a
-    platform pair (here 1e-7 relative, as on the S3 pair) still FAIL (exit 1, nothing loosened) and carry the OF-7
-    pointer; the report prints it once. The leaves are ``fitted_inverse_dim``, ``floor_rms``, ``ci_inverse_dim`` and,
-    since this round, ``ratio`` and ``ratio_ci`` (the same ``curve_fit``). A failure outside ``H1a/by_noise`` carries
-    none; a pass carries none."""
+def test_failures_of_the_h1a_ratio_keep_the_cp_rule_and_print_the_of7_pointer_with_an_unchanged_exit() -> None:
+    """Round 2, item 1, extended by WU-0003.9b fix round 1 (review R1), SUPERSEDED IN PART by WU-0003.9c (owner ruling
+    OF-7 of 2026-10-18, note 33): the four H1a fit leaves ``fitted_inverse_dim``, ``ci_inverse_dim/[0|1]`` and
+    ``floor_rms`` are re-tagged under the A6 QoI rule, so a move of 1e-7 relative (the size on the S3 kernel pair)
+    now PASSES for them and carries no pointer (it FAILED, with the pointer, before). The ruling names those four
+    only: ``ratio`` and ``ratio_ci`` (the same ``curve_fit``) keep cp 1e-12 and the pointer, so a 1e-7 move of them
+    still FAILS (exit 1, nothing else loosened). The pointer is on three leaves per (system, rho). A failure outside
+    ``H1a/by_noise`` carries none; a pass carries none."""
     ref, new = tier_pair("T2")
     for tree in (ref, new):
         with_h1a(tree)
@@ -884,10 +886,13 @@ def test_failures_of_the_h1a_fit_keep_the_cp_rule_and_print_the_of7_pointer_with
     edit(new, f"{H1A}/ci_inverse_dim/[1]", 0.65 * (1 + 1e-7))
     edit(new, f"{H1A}/ratio_ci/[1]", 1.3 * (1 + 1e-7))
     res = run(ref, new)
-    # seven leaves per (system, rho) carry the pointer: 3 systems x 2 rho x 7 = 42 per pilot T2 pair (the OF-7 row
-    # of plan amendment 3 C6 said 24 before ratio and ratio_ci joined)
-    assert sum(cr.OF7_POINTER in r.note for r in res.rows) == 7
-    for leaf in ("fitted_inverse_dim", "floor_rms", "ci_inverse_dim/[0]", "ratio", "ratio_ci/[0]"):
+    # three leaves per (system, rho) carry the pointer: 3 systems x 2 rho x 3 = 18 per pilot T2 pair (42 before the
+    # ruling, 24 of them the four leaves that are now re-tagged)
+    assert sum(cr.OF7_POINTER in r.note for r in res.rows) == 3
+    for leaf in ("fitted_inverse_dim", "floor_rms", "ci_inverse_dim/[0]", "ci_inverse_dim/[1]"):
+        r = row(res, f"{H1A}/{leaf}")
+        assert r.outcome == "pass" and cr.OF7_POINTER not in r.note, leaf
+    for leaf in ("ratio", "ratio_ci/[0]", "ratio_ci/[1]"):
         r = row(res, f"{H1A}/{leaf}")
         assert r.outcome == "FAIL" and cr.OF7_POINTER in r.note and "2026-10-14-math-wu0003-9-q1.md" in r.note
     assert res.exit_code == 1
@@ -985,28 +990,33 @@ def test_a_main_system_k_one_sided_shape_is_not_excused_by_a_robustness_k() -> N
 
 
 @pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
-def test_a_differing_clip_count_does_not_replace_the_cp_rule_of_the_h1a_fit_leaves(tier: str) -> None:
-    """R17: the whole-system scope of a clip count must not let a cp-chain leaf pass at 0.1 hw (that replaced the
-    OF-7 working default, cp 1e-12). With rossler-style cell ``error_clips`` +1, the H1a fit outputs moved by 1e-7
-    relative still FAIL, while the network-chain H3c estimate passes at 0.5 x 0.1 hw. A state count of the H1a
-    block itself (block-local) still licenses them, as A6 says: the strictness is only against the system-wide
-    scope."""
+def test_a_differing_clip_count_does_not_license_the_h1a_fit_leaves(tier: str) -> None:
+    """R17, adapted to the OF-7 ruling of WU-0003.9c (the old test moved the fit leaves by 1e-7 and expected FAIL under
+    cp 1e-12; under the ruling 1e-7 passes the QoI rule, so the move is now 1e-3 absolute, which is what the
+    whole-system clip scope would wrongly license): the whole-system scope of a clip count must not let a cp-dependent
+    leaf pass at 0.1 hw. Hand numbers: ``ci_inverse_dim`` [0.48, 0.65] has s = 0.65, QoI tolerance 6.5e-5, and
+    0.1 hw = 0.1 x 0.085 = 8.5e-3, so a move of 1e-3 FAILS the QoI rule and would pass at 0.1 hw; ``floor_rms``
+    (class g, 1e-4 |ref| = 3e-6) moved by 1e-4 is a FINDING and has no interval to license. With the cell
+    ``error_clips`` +1 they must all stay outside, while the network-chain H3c estimate passes at 0.5 x 0.1 hw.
+    A state count of the H1a block itself (block-local) licenses the interval leaves, as A6 says."""
     ref, new = tier_pair(tier)
     for tree in (ref, new):
         with_h1a(tree)
     edit(new, f"{CELL}/counts/error_clips", 1)
     edit(new, f"{S}/H3c/A5_over_A4_mse", 0.915)
-    for leaf, value in (("fitted_inverse_dim", 0.55), ("floor_rms", 0.03)):
-        edit(new, f"{H1A}/{leaf}", value * (1 + 1e-7))
-    edit(new, f"{H1A}/ci_inverse_dim/[0]", 0.48 * (1 + 1e-7))
+    edit(new, f"{H1A}/fitted_inverse_dim", 0.55 + 1e-3)
+    edit(new, f"{H1A}/floor_rms", 0.03 + 1e-4)
+    edit(new, f"{H1A}/ci_inverse_dim/[0]", 0.48 + 1e-3)
     res = run(ref, new)
     assert row(res, f"{S}/H3c/A5_over_A4_mse").outcome == "pass"
-    for leaf in ("fitted_inverse_dim", "floor_rms", "ci_inverse_dim/[0]"):
-        assert row(res, f"{H1A}/{leaf}").outcome == "FAIL", leaf
+    assert row(res, f"{H1A}/fitted_inverse_dim").outcome == "FAIL"
+    assert row(res, f"{H1A}/ci_inverse_dim/[0]").outcome == "FAIL"
+    assert row(res, f"{H1A}/floor_rms").outcome == "FINDING"
     edit(new, f"{CELL}/counts/error_clips", 0)
     edit(new, f"{S}/H1a/n_states", 79)                     # block-local count of H1a: licenses its interval leaves
     res = run(ref, new)
     assert row(res, f"{H1A}/ci_inverse_dim/[0]").outcome == "pass"
+    assert row(res, f"{H1A}/ci_inverse_dim/[0]").rule == "discrete scope: 0.1 hw"
 
 
 @pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
@@ -1158,13 +1168,15 @@ def test_td_part_hand_case_symmetric_intervals() -> None:
     assert res["d"] == 3.0 and res["hw0"] == 1.0 and res["hw1"] == 1.0
 
 
-def test_td_part_uses_the_arms_facing_away_and_either_form_can_decide() -> None:
+def test_td_part_uses_the_arms_facing_away_and_the_two_forms_differ() -> None:
     """DEC-0027 by hand. Run 1 above run 0, so run 0's lower arm and run 1's upper arm enter.
 
     * Short away arms (0.2 each, hw 1): z_sym = 2 z_level / sqrt(2) = 3.386 < 3.4 but
-      z_away = 2 z_level / 0.2828 = 16.9: the part fails on the away form alone.
-    * Long away arms (1.8 each, hw 1), d = 2.02: z_sym = 3.420 > 3.4 but z_away = 1.90: fails on the
-      symmetric form alone. Tolerance: relative 1e-5.
+      z_away = 2 z_level / 0.2828 = 16.9.
+    * Long away arms (1.8 each, hw 1), d = 2.02: z_sym = 3.420 > 3.4 but z_away = 1.90. Tolerance: relative 1e-5.
+
+    This test checks the two z values of ``td_part`` only. Which one fails a part was "either" before the OF-5 ruling
+    of 2026-10-18 and is z_away alone since (WU-0003.9c); ``test_td_failing_rule_is_the_away_form_alone`` pins that.
     """
     short = cr.td_part(0.0, [-0.2, 1.8], 2.0, [0.2, 2.2])
     assert short["z_sym"] == pytest.approx(2.0 * Z_LEVEL / math.sqrt(2), rel=1e-5) and short["z_sym"] < 3.4
@@ -1725,9 +1737,10 @@ def test_an_override_chain_meets_the_chain_tolerance(tier: str, name: str) -> No
 
 @pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
 def test_the_h1a_ratio_is_cp_and_meets_the_strict_chain_tolerance_with_the_of7_pointer(tier: str) -> None:
-    """Review R1 of WU-0003.9b: ``ratio`` and ``ratio_ci`` depend on the cp chain only and meet cp 1e-12 relative, the
-    working default of the four sibling outputs of the same tolerance-stopped ``curve_fit`` (OF-7 not adopted; the
-    A6 QoI rule 1e-4 s is the owner's alternative, not applied). Reference: the plan's 1e-12 by hand
+    """Review R1 of WU-0003.9b: ``ratio`` and ``ratio_ci`` depend on the cp chain only and meet cp 1e-12 relative. The
+    four sibling outputs of the same tolerance-stopped ``curve_fit`` were re-tagged by the OF-7 ruling of 2026-10-18
+    (WU-0003.9c); the ruling does not name ``ratio`` and ``ratio_ci``, so they keep cp 1e-12 (the A6 QoI rule 1e-4 s
+    is the owner's alternative, not applied, flagged in the Log). Reference: the plan's 1e-12 by hand
     (``ratio`` 1.09, ``ratio_ci/[1]`` 1.3); 0.5 x passes and 2 x fails, and a failure carries the OF-7 pointer."""
     assert cr.chain_of(("systems", "lorenz63", "H1a", "by_noise", "0.01", "ratio")) == "cp"
     for leaf, value in (("ratio", 1.09), ("ratio_ci/[1]", 1.3)):
@@ -1841,3 +1854,241 @@ def test_the_command_line_prints_the_tag_table_with_tags(tmp_path: Path, capsys)
     assert cr.main([str(a), str(a), "--tags"]) == 0
     out = capsys.readouterr().out
     assert "chain tags assigned by override" in out and "RESULT: PASS" in out
+
+
+# ======================================================================================================
+# WU-0003.9c (owner rulings of 2026-10-18, note 33 of the amendments note): OF-7 re-tag and OF-5 TD rule
+# ======================================================================================================
+# Needs owner review before freeze (these tests pin tolerances and the failing rule of a reproducibility tool).
+#
+# References, independent of the tool: the ruling text and the mathematician's note section Q1.4 (the class of each
+# leaf, typed here), the plan's tolerance 1e-4 s of class (a) and the (b) to (g) tolerance 1e-4 |ref|, evaluated by
+# hand on the H1a block of the synthetic tree (``with_h1a``: ``ci_inverse_dim`` [0.48, 0.65] so s = 0.65), and the
+# DEC-0027 arms by hand. Tolerances: decisions and counts are exact; the numeric cases use 0.5 x and 2 x the plan's
+# number, so round-off (1e-16 relative) never decides a case.
+OF7_RETAGS = {          # pattern -> class letter: the four leaves named by the ruling, and nothing else
+    "systems/*/H1a/by_noise/*/fitted_inverse_dim": "a",
+    "systems/*/H1a/by_noise/*/ci_inverse_dim/[]": "a",
+    "systems/*/H1a/by_noise/*/floor_rms": "g",
+}
+OF7_SHAPES = {          # the shapes of the pilot schema (both fixtures) that the retag rows match
+    f"systems/<sys>/H1a/by_noise/{rho}/{leaf}" for rho in ("0.01", "0.02")
+    for leaf in ("ci_inverse_dim/[]", "fitted_inverse_dim", "floor_rms")}
+OF7_KEPT_CP = ("ratio", "ratio_ci/[0]", "ratio_ci/[1]", "median_seed_by_n_lib/1000")
+
+
+def test_of7_retag_table_is_pinned_to_the_four_named_leaves_and_leaves_the_rest_alone() -> None:
+    """The owner's OF-7 ruling re-tags ``fitted_inverse_dim``, ``ci_inverse_dim[0..1]`` and ``floor_rms`` and nothing
+    else. Pinned: the three patterns and their classes (a, a, g: note Q1.4); each keeps the dependence chain ``cp``
+    (the note says do not edit that meaning) and cites the note; on both schema fixtures (P1; P0 plus smoke) they
+    match exactly the six shapes of the two noise levels, which is 4 leaves x 2 rho x 3 systems = 24 per pilot
+    (counted by hand: a ``[]`` shape stands for 2 endpoints); ``ratio``, ``ratio_ci``, ``median_seed_by_n_lib`` and
+    ``inverse_dim_reference`` are not re-tagged, so the cp 1e-12 rule stays for every other leaf."""
+    assert {r.pattern: r.scale for r in cr.RETAGS.rules} == OF7_RETAGS
+    for r in cr.RETAGS.rules:
+        assert r.chain == "cp" and "2026-10-14-math-wu0003-9-q1" in r.reason and "OF-7" in r.reason, r.pattern
+    # R1 of the review: each row prints the basis of its own class (note Q1.3: class (a) rests on the a-priori bound
+    # 4.0e-5 s, factor 2.5; floor_rms on the measured flip <= 6.3e-7 and stopping error <= 6.8e-7 relative, factor >= 70)
+    for r in cr.RETAGS.rules:
+        if r.scale == "a":
+            assert "4.0e-5 s" in r.reason and "factor 2.5" in r.reason, r.pattern
+        else:
+            assert r.pattern.endswith("floor_rms")
+            assert "6.3e-7" in r.reason and "6.8e-7" in r.reason and "factor >= 70" in r.reason
+            assert "4.0e-5" not in r.reason and "factor 2.5" not in r.reason
+    for name, shapes in ALL_SHAPES.items():
+        hit = {s for s in shapes if cr.retag_of(concrete(s)) is not None}
+        assert hit == OF7_SHAPES, name
+        n_leaves = sum(2 if s.endswith("/[]") else 1 for s in hit) * 3
+        assert n_leaves == 24
+    base = ("systems", "lorenz63", "H1a")
+    for leaf in OF7_KEPT_CP + ("inverse_dim_reference",):
+        path = (*base, "inverse_dim_reference") if leaf == "inverse_dim_reference" else (
+            *base, "by_noise", "0.01", *leaf.split("/"))
+        assert cr.retag_of(path) is None and cr.chain_of(path) == "cp", leaf
+    # a retag row is not a chain tag: a leaf of that shape outside H1a stays untagged
+    assert cr.retag_of(("systems", "lorenz63", "novel", "by_noise", "0.01", "floor_rms")) is None
+    assert cr.chain_of(("systems", "lorenz63", "novel", "by_noise", "0.01", "floor_rms")) == ""
+
+
+def test_of7_declared_class_is_the_class_the_tool_assigns_to_the_leaf() -> None:
+    """A retag row declares the class it applies (a: the interval scale s = max(|lo|, |hi|); g: |ref|). The class
+    the tool derives for each leaf of an H1a block (``classify_float``) must equal it, with the scale s = 0.65 of
+    [0.48, 0.65] for the class-(a) leaves (hand value)."""
+    flat = cr.flatten(with_h1a(make()))
+    for leaf, letter in (("fitted_inverse_dim", "a"), ("ci_inverse_dim/[0]", "a"), ("ci_inverse_dim/[1]", "a"),
+                         ("floor_rms", "g")):
+        path = tuple(f"{H1A}/{leaf}".split("/"))
+        retag = cr.retag_of(path)
+        assert retag is not None and retag.scale == letter, leaf
+        cls, scale, defaulted = cr.classify_float(flat, path)
+        assert cls == letter and not defaulted, leaf
+        if letter == "a":
+            assert scale == 0.65
+
+
+OF7_CASES = {   # leaf -> (reference value, absolute tolerance by hand, outcome beyond it, rule)
+    "fitted_inverse_dim": (0.55, 1e-4 * 0.65, "FAIL", "QoI / interval endpoint (OF-7 re-tag)"),
+    "ci_inverse_dim/[0]": (0.48, 1e-4 * 0.65, "FAIL", "QoI / interval endpoint (OF-7 re-tag)"),
+    "ci_inverse_dim/[1]": (0.65, 1e-4 * 0.65, "FAIL", "QoI / interval endpoint (OF-7 re-tag)"),
+    "floor_rms": (0.03, 1e-4 * 0.03, "FINDING", "class (b) to (g) (OF-7 re-tag)"),
+}
+
+
+@pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
+@pytest.mark.parametrize("leaf", sorted(OF7_CASES))
+def test_of7_retagged_leaf_meets_the_a6_rule_at_half_and_fails_at_double(tier: str, leaf: str) -> None:
+    """Hand-worked: ``fitted_inverse_dim`` 0.55 with the reference interval [0.48, 0.65] has s = 0.65, so the QoI
+    tolerance is 1e-4 x 0.65 = 6.5e-5; a move of 0.5 x passes (relative 5e-5 of s), 2 x FAILS (2e-4). The same for
+    the endpoints. ``floor_rms`` 0.03 is class (g): 1e-4 x 0.03 = 3e-6, 2 x is a FINDING (the (b) to (g) outcome).
+    Before WU-0003.9c all four met cp 1e-12, so 0.5 x was a FAIL (6.5e-5 / 0.55 = 1.2e-4 >> 1e-12) and carried the
+    OF-7 pointer; here it passes, with no pointer and the re-tag named in the rule."""
+    value, tol, beyond, rule = OF7_CASES[leaf]
+    for factor, outcome in ((0.5, "pass"), (2.0, beyond)):
+        ref, new = tier_pair(tier)
+        for tree in (ref, new):
+            with_h1a(tree)
+        edit(new, f"{H1A}/{leaf}", value + factor * tol)
+        r = row(run(ref, new), f"{H1A}/{leaf}")
+        assert r.outcome == outcome and r.rule == rule, (leaf, factor)
+        assert r.tol == 1e-4 and r.cls == ("g" if leaf == "floor_rms" else "a")
+        assert cr.OF7_POINTER not in r.note
+
+
+def test_of7_floor_rms_follows_the_tol_other_option_like_every_class_g_leaf() -> None:
+    """``floor_rms`` is class (g), so ``--tol-other`` governs it: 0.5 x 3e-6 = 1.5e-6 is 5e-5 relative, a pass at the
+    default 1e-4 and a FINDING at 1e-5 (hand: 1e-5 x 0.03 = 3e-7 < 1.5e-6)."""
+    ref, new = tier_pair("T2")
+    for tree in (ref, new):
+        with_h1a(tree)
+    edit(new, f"{H1A}/floor_rms", 0.03 + 1.5e-6)
+    assert row(run(ref, new), f"{H1A}/floor_rms").outcome == "pass"
+    r = row(run(ref, new, tol_other=1e-5), f"{H1A}/floor_rms")
+    assert r.outcome == "FINDING" and r.tol == 1e-5
+
+
+@pytest.mark.parametrize("tier", ["T1", "T2", "T3"])
+def test_of7_effect_on_a_pair_the_four_pass_the_ratio_leaves_still_fail_and_nothing_else_moves(tier: str) -> None:
+    """The effect of the ruling on a pair like the S3 kernel pair, in the synthetic tree: every H1a fit leaf moved by
+    3e-7 relative (the largest measured on that pair is 2.94e-7 of s). The four named leaves pass; ``ratio`` and
+    ``ratio_ci/[0|1]`` (same fit, not named) still FAIL cp 1e-12 with the pointer, so the exit is 1 and the pointer
+    leaves per (system, rho) are 3 (18 per pilot). With only the four moved, the pair passes (exit 0) and prints no
+    pointer. Reference: 3e-7 vs the plan's 1e-12 and 1e-4 by hand."""
+    ref, new = tier_pair(tier)
+    for tree in (ref, new):
+        with_h1a(tree)
+    four = (("fitted_inverse_dim", 0.55), ("floor_rms", 0.03), ("ci_inverse_dim/[0]", 0.48), ("ci_inverse_dim/[1]", 0.65))
+    for leaf, value in four:
+        edit(new, f"{H1A}/{leaf}", value * (1 + 3e-7))
+    res = run(ref, new)
+    assert res.exit_code == 0 and all(r.outcome == "pass" for r in res.rows if r.path[:4] == ("systems", "lorenz63", "H1a", "by_noise"))
+    assert "pointer:" not in "\n".join(cr.render(res, "a", "b"))
+    for leaf, value in (("ratio", 1.09), ("ratio_ci/[0]", 0.96), ("ratio_ci/[1]", 1.3)):
+        edit(new, f"{H1A}/{leaf}", value * (1 + 3e-7))
+    res = run(ref, new)
+    assert res.exit_code == 1
+    assert [r.outcome for r in res.rows if cr.OF7_POINTER in r.note] == ["FAIL"] * 3
+    assert {r.path[-1] if r.path[-1] == "ratio" else "/".join(r.path[-2:]) for r in res.rows if r.outcome == "FAIL"} == {
+        "ratio", "ratio_ci/[0]", "ratio_ci/[1]"}
+
+
+def test_of7_retag_without_a_reference_interval_keeps_cp_and_says_so() -> None:
+    """A class-(a) retag needs the reference interval (its scale s). If the reference has none, the class cannot be
+    established; the tool does not guess a looser class: the strict cp 1e-12 rule stays and the row says why.
+    Hand: ``fitted_inverse_dim`` moved by 1e-7 relative fails cp 1e-12."""
+    ref, new = tier_pair("T2")
+    for tree in (ref, new):
+        with_h1a(tree)
+        edit(tree, f"{H1A}/ci_inverse_dim", None)
+    edit(new, f"{H1A}/fitted_inverse_dim", 0.55 * (1 + 1e-7))
+    r = row(run(ref, new), f"{H1A}/fitted_inverse_dim")
+    assert r.outcome == "FAIL" and r.rule == "cp chain relative" and r.tol == 1e-12
+    assert "OF-7 re-tag not applied" in r.note and "no reference interval" in r.note
+
+
+def test_of7_an_untagged_float_leaf_still_exits_2_beside_retagged_leaves() -> None:
+    """The ruling re-tags a tolerance, not a schema: an untagged float leaf is still NOT COMPUTABLE (exit 2), also
+    when it has the name of a retagged leaf under another block, and the retagged leaves beside it still pass."""
+    ref, new = tier_pair("T2")
+    for tree in (ref, new):
+        with_h1a(tree)
+        edit(tree, f"{S}/novel", {"by_noise": {"0.01": {"floor_rms": 0.03}}})
+    edit(new, f"{H1A}/fitted_inverse_dim", 0.55 * (1 + 1e-7))
+    res = run(ref, new)
+    assert res.exit_code == 2
+    assert res.untagged_leaves == [("systems", "lorenz63", "novel", "by_noise", "0.01", "floor_rms")]
+    assert row(res, f"{H1A}/fitted_inverse_dim").outcome == "pass"
+    edit(new, f"{S}/novel/by_noise/0.01/floor_rms", 0.04)
+    res = run(ref, new)
+    assert res.exit_code == 2 and row(res, f"{S}/novel/by_noise/0.01/floor_rms").outcome == "NOT COMPUTED"
+
+
+def test_of7_report_names_the_retag_and_the_tags_option_prints_the_table() -> None:
+    """The report says which retag decided a differing leaf (pattern, class, reason) and ``--tags`` prints the whole
+    retag table with the float-leaf counts per run (hand: one noise level of the synthetic block gives 1 + 2 + 1 = 4
+    leaves)."""
+    ref, new = tier_pair("T2")
+    for tree in (ref, new):
+        with_h1a(tree)
+    edit(new, f"{H1A}/fitted_inverse_dim", 0.55 * (1 + 1e-7))
+    res = run(ref, new)
+    text = "\n".join(cr.render(res, "a", "b"))
+    assert "OF-7 re-tag systems/*/H1a/by_noise/*/fitted_inverse_dim: class a, 1 differing leaves" in text
+    full = "\n".join(cr.render(res, "a", "b", tags=True))
+    assert "tolerance re-tags (OF-7, owner ruling of 2026-10-18" in full
+    for pattern in OF7_RETAGS:
+        assert pattern in full
+    assert "systems/*/H1a/by_noise/*/ci_inverse_dim/[]: class a, float leaves 2 REF, 2 NEW" in full
+    assert "systems/*/H1a/by_noise/*/fitted_inverse_dim: class a, float leaves 1 REF, 1 NEW" in full
+    assert "systems/*/H1a/by_noise/*/floor_rms: class g, float leaves 1 REF, 1 NEW" in full
+
+
+# ---- OF-5: the TD failing rule is the away-arm form alone
+def h3c_td_pair(est0: float, ci0: list, est1: float, ci1: list) -> tuple[dict, dict]:
+    """A TD pair whose only differing primary part is H3c, with the given estimates and intervals."""
+    ref, new = td_pair()
+    edit(ref, f"{S}/H3c/A5_over_A4_mse", est0)
+    edit(ref, f"{S}/H3c/ci", ci0)
+    edit(new, f"{S}/H3c/A5_over_A4_mse", est1)
+    edit(new, f"{S}/H3c/ci", ci1)
+    return ref, new
+
+
+def test_td_failing_rule_is_the_away_form_alone() -> None:
+    """OF-5 (owner ruling of 2026-10-18; WU-0003.9c): a part fails iff z_away > 3.4; z_sym is information only.
+    Hand cases of DEC-0027 with z_level = 2.39398:
+
+    * short away arms (0.2, hw 1), d = 2: z_away = 2 z_level / hypot(0.2, 0.2) = 16.9 > 3.4 fails (z_sym = 3.386);
+    * long away arms (1.8, hw 1), d = 2.02: z_sym = 2.02 z_level / sqrt 2 = 3.420 > 3.4, z_away = 1.90: before the
+      ruling this part FAILED on max(z_sym, z_away); now it passes, with z_sym printed.
+
+    ``n_fail`` counts z_away only, ``max_z`` is the largest z_away, the governing field says ``z_away``, and the
+    dict is JSON-serializable with both z values."""
+    ref, new = h3c_td_pair(0.0, [-0.2, 1.8], 2.0, [0.2, 2.2])
+    res = run(ref, new)
+    part = next(p for p in res.td["parts"] if p["part"] == "H3c")
+    assert part["z_sym"] < 3.4 < part["z_away"] and part["fail"] and part["z_governing"] == part["z_away"]
+    assert res.td["n_fail"] == 1 and res.exit_code == 1
+    assert res.td["governing"] == "z_away" and res.td["max_z"] == res.td["max_away"]
+    ref, new = h3c_td_pair(0.0, [-1.8, 0.2], 2.02, [1.82, 3.82])
+    res = run(ref, new)
+    part = next(p for p in res.td["parts"] if p["part"] == "H3c")
+    assert part["z_sym"] == pytest.approx(2.02 * Z_LEVEL / math.sqrt(2), rel=1e-5) and part["z_sym"] > 3.4
+    assert part["z_away"] == pytest.approx(2.02 * Z_LEVEL / math.hypot(1.8, 1.8), rel=1e-5) and part["z_away"] < 3.4
+    assert not part["fail"] and res.td["n_fail"] == 0 and res.exit_code == 0
+    assert res.td["max_z"] == res.td["max_away"] < 3.4 < res.td["max_sym"]
+    back = json.loads(json.dumps(res.td))
+    assert back["governing"] == "z_away" and back["parts"][0]["z_sym"] >= 0.0
+    h3c = next(p for p in back["parts"] if p["part"] == "H3c")
+    assert h3c["z_sym"] == part["z_sym"] and h3c["z_away"] == part["z_away"] and h3c["z_governing"] == part["z_away"]
+
+
+def test_td_report_says_which_form_governs_and_prints_the_other_as_information() -> None:
+    """The printed header names the governing form and the bound; the symmetric column and sums are labelled
+    information; the failing-parts count is the away count. ``--td-only`` prints the same."""
+    ref, new = h3c_td_pair(0.0, [-1.8, 0.2], 2.02, [1.82, 3.82])
+    text = "\n".join(cr.render(run(ref, new), "a", "b"))
+    assert "bound 3.4 on z_away" in text and "OF-5" in text and "z_sym (information)" in text
+    assert "max(|z_sym|, |z_away|)" not in text
+    lines, code = cr.run_td_only(ref, new, "a", "b")
+    assert code == 0 and "bound 3.4 on z_away" in "\n".join(lines)
