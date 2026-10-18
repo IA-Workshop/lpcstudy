@@ -1,0 +1,497 @@
+{
+ "run_level": {
+  "d2_governing": {
+   "reading": "pooled permutation (OF-3)",
+   "n_systems_computed": 3,
+   "fired_systems": [],
+   "not_computed_systems": [],
+   "smallest_p": 0.1838161838161838,
+   "design_question": false
+  },
+  "block_sensitive": {
+   "parts": [
+    "rossler H1a rho=0.02"
+   ],
+   "n_computable": 24,
+   "n_not_computable": 0,
+   "not_computable_parts": [],
+   "exit_code_effect": "none"
+  }
+ },
+ "lorenz63": {
+  "D2_design_question": false,
+  "D2_any_reading_fired": false,
+  "D2_governing_reading": "pooled permutation (OF-3)",
+  "D2_owner_flag": "no reading fired",
+  "D2_permutation": {
+   "observed": -0.06134499526608346,
+   "q99": 0.06021614338984846,
+   "p": 0.8571428571428571,
+   "fires": false,
+   "n_series": 8
+  },
+  "block_sensitivity": {
+   "rows": {
+    "H2a(i)": {
+     "point": 0.10909736841584866,
+     "interval": [
+      0.08001556572608638,
+      0.17945907903883238
+     ],
+     "ratio10": 0.9103235791555524,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.08001556572608638,
+      0.17945907903883238
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) zero": {
+     "point": 0.06169458255189861,
+     "interval": [
+      -0.02497606826071902,
+      0.1628634159277346
+     ],
+     "ratio10": 0.8454601622438709,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      -0.02497606826071902,
+      0.1628634159277346
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) interior": {
+     "point": 0.18399179518198794,
+     "interval": [
+      0.0714205257650598,
+      0.3023093967510951
+     ],
+     "ratio10": 1.0532641389124424,
+     "factor": 1.026286577381017,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.06846141238065241,
+      0.3054195615402778
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(i)": {
+     "point": 0.1961678528896296,
+     "interval": [
+      0.1063134367845553,
+      0.29454549942312297
+     ],
+     "ratio10": 0.9402137432340394,
+     "factor": 1.0,
+     "verdict": "pass",
+     "widened_interval": [
+      0.1063134367845553,
+      0.29454549942312297
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(ii)": {
+     "point": 0.08755751846458323,
+     "interval": [
+      0.04741069060439102,
+      0.1286566421387959
+     ],
+     "ratio10": 1.0092639697838401,
+     "factor": 1.0046213066543235,
+     "verdict": "pass",
+     "widened_interval": [
+      0.047225159801650735,
+      0.1288465737925184
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H3c": {
+     "point": 0.2832740025998917,
+     "interval": [
+      0.13919621378193117,
+      0.5255203837761653
+     ],
+     "ratio10": 0.8530442196399549,
+     "factor": 1.0,
+     "verdict": "pass",
+     "widened_interval": [
+      0.13919621378193117,
+      0.5255203837761653
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.01": {
+     "point": 1.2091105080202307,
+     "interval": [
+      0.999091479884396,
+      1.3914203690418634
+     ],
+     "ratio10": 0.9008999714067378,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.999091479884396,
+      1.3914203690418634
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.02": {
+     "point": 1.374709622969901,
+     "interval": [
+      1.0245499333187154,
+      1.6080613670400683
+     ],
+     "ratio10": 1.0355234450051076,
+     "factor": 1.0176067241351678,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      1.0183847682597709,
+      1.612169926824372
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    }
+   },
+   "sensitive_parts": [],
+   "n_computable": 8,
+   "n_not_computable": 0,
+   "not_computable_parts": [],
+   "exit_code_effect": "none"
+  }
+ },
+ "rossler": {
+  "D2_design_question": false,
+  "D2_any_reading_fired": true,
+  "D2_governing_reading": "pooled permutation (OF-3)",
+  "D2_owner_flag": "no design question on the governing reading (the pooled permutation did not fire); information, not governing: A5 rule fired on 2 of 8 primary series, beta5 on 0 of 8",
+  "D2_permutation": {
+   "observed": 0.009764766865077684,
+   "q99": 0.06451689090412795,
+   "p": 0.1838161838161838,
+   "fires": false,
+   "n_series": 8
+  },
+  "block_sensitivity": {
+   "rows": {
+    "H2a(i)": {
+     "point": 0.2820473365259955,
+     "interval": [
+      0.24021775131817774,
+      0.323897212123573
+     ],
+     "ratio10": 0.8858426732368857,
+     "factor": 1.0,
+     "verdict": "fail",
+     "widened_interval": [
+      0.24021775131817774,
+      0.323897212123573
+     ],
+     "widened_verdict": "fail",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) zero": {
+     "point": -0.043471526688468494,
+     "interval": [
+      -0.14385013007304567,
+      0.04491964406657813
+     ],
+     "ratio10": 0.9092420659935352,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      -0.14385013007304567,
+      0.044919644066578134
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) interior": {
+     "point": 0.11163744308939143,
+     "interval": [
+      -0.037729033411048475,
+      0.24998572821891632
+     ],
+     "ratio10": 1.0750446368369062,
+     "factor": 1.0368435932371411,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      -0.04323223111449569,
+      0.25508297616128456
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(i)": {
+     "point": 0.14563362915182723,
+     "interval": [
+      0.03913077357773302,
+      0.24966884051700128
+     ],
+     "ratio10": 0.9681388647464599,
+     "factor": 1.0,
+     "verdict": "pass",
+     "widened_interval": [
+      0.03913077357773302,
+      0.24966884051700128
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(ii)": {
+     "point": 0.057101653333149954,
+     "interval": [
+      0.015700937755800105,
+      0.10898205450450245
+     ],
+     "ratio10": 1.1282150420849513,
+     "factor": 1.0621746758819621,
+     "verdict": "pass",
+     "widened_interval": [
+      0.013126861683497075,
+      0.11220770163195745
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H3c": {
+     "point": 0.962891532434083,
+     "interval": [
+      0.8746627028732409,
+      1.0644050140222334
+     ],
+     "ratio10": 0.9875514215319087,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.8746627028732409,
+      1.0644050140222334
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.01": {
+     "point": 1.0925720236370782,
+     "interval": [
+      0.9464098494559428,
+      1.2599700144807378
+     ],
+     "ratio10": 1.0166903221218846,
+     "factor": 1.008310627793779,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.9451951500287938,
+      1.2613611968760658
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.02": {
+     "point": 0.9817550069167215,
+     "interval": [
+      0.7593534987510738,
+      1.1793248235536744
+     ],
+     "ratio10": 1.1386381008416484,
+     "factor": 1.0670698668979686,
+     "verdict": "pass",
+     "widened_interval": [
+      0.7444370592004964,
+      1.1925758048585708
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": true,
+     "reason": null
+    }
+   },
+   "sensitive_parts": [
+    "H1a rho=0.02"
+   ],
+   "n_computable": 8,
+   "n_not_computable": 0,
+   "not_computable_parts": [],
+   "exit_code_effect": "none"
+  }
+ },
+ "chua": {
+  "D2_design_question": false,
+  "D2_any_reading_fired": true,
+  "D2_governing_reading": "pooled permutation (OF-3)",
+  "D2_owner_flag": "no design question on the governing reading (the pooled permutation did not fire); information, not governing: A5 rule fired on 2 of 8 primary series, beta5 on 0 of 8",
+  "D2_permutation": {
+   "observed": -0.013536950176642568,
+   "q99": 0.058399876845465874,
+   "p": 0.40559440559440557,
+   "fires": false,
+   "n_series": 8
+  },
+  "block_sensitivity": {
+   "rows": {
+    "H2a(i)": {
+     "point": 0.14053833232945734,
+     "interval": [
+      0.11546572255008554,
+      0.19299626303195205
+     ],
+     "ratio10": 0.8781898660998981,
+     "factor": 1.0,
+     "verdict": "fail",
+     "widened_interval": [
+      0.11546572255008554,
+      0.19299626303195205
+     ],
+     "widened_verdict": "fail",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) zero": {
+     "point": -0.09120904511892752,
+     "interval": [
+      -0.18914488749392325,
+      0.01902831352518719
+     ],
+     "ratio10": 1.1247008399842633,
+     "factor": 1.0605191370193483,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      -0.19507188015772092,
+      0.025699783337621407
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2a(ii) interior": {
+     "point": 0.1487657882451119,
+     "interval": [
+      0.0071106774723614305,
+      0.2965572446875448
+     ],
+     "ratio10": 0.9689696390356718,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.0071106774723614374,
+      0.2965572446875448
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(i)": {
+     "point": 0.25523669533726295,
+     "interval": [
+      0.1741046267917089,
+      0.329860404691115
+     ],
+     "ratio10": 1.026449585387352,
+     "factor": 1.013138482828163,
+     "verdict": "pass",
+     "widened_interval": [
+      0.1730386745023098,
+      0.3308408470150344
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H2b(ii)": {
+     "point": 0.028646987407388143,
+     "interval": [
+      -0.017381456623973047,
+      0.07211613686774405
+     ],
+     "ratio10": 0.8680422992242265,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      -0.01738145662397305,
+      0.07211613686774405
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H3c": {
+     "point": 0.9926311207977434,
+     "interval": [
+      0.9063432716015737,
+      1.1234943636347419
+     ],
+     "ratio10": 0.9761047548365698,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.9063432716015737,
+      1.1234943636347419
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.01": {
+     "point": 0.9319290436992441,
+     "interval": [
+      0.801696335513273,
+      1.0864552900519755
+     ],
+     "ratio10": 1.0791606215966618,
+     "factor": 1.0388265599206934,
+     "verdict": "pass",
+     "widened_interval": [
+      0.7966398474652563,
+      1.0924550126153096
+     ],
+     "widened_verdict": "pass",
+     "sensitive": false,
+     "reason": null
+    },
+    "H1a rho=0.02": {
+     "point": 0.8443261658312131,
+     "interval": [
+      0.6526234572012021,
+      1.068592326257411
+     ],
+     "ratio10": 0.999013087142512,
+     "factor": 1.0,
+     "verdict": "inconclusive",
+     "widened_interval": [
+      0.6526234572012021,
+      1.068592326257411
+     ],
+     "widened_verdict": "inconclusive",
+     "sensitive": false,
+     "reason": null
+    }
+   },
+   "sensitive_parts": [],
+   "n_computable": 8,
+   "n_not_computable": 0,
+   "not_computable_parts": [],
+   "exit_code_effect": "none"
+  }
+ }
+}

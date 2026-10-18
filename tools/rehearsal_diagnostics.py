@@ -38,8 +38,26 @@ What it computes (plan amendment 2, B1 item 7 as amended; mathematics check
   question" when ``beta_5 + 2 SE < 0.8685``, used only when ``acf(2..10)`` is within ``2.5/sqrt(n)``
   of ``acf(1)**k``); and the pooled per-system mean of ``log V*(10)/V*(5)`` against a permutation
   null (one permutation of the test states per draw, applied to all the system's primary series;
-  trigger at the 0.99 quantile). Any of the three readings firing is flagged to the owner as
-  "block length 5 is a design question"; which reading governs is the owner's (OF-3).
+  trigger at the 0.99 quantile). **Owner ruling OF-3 (2026-10-17, amendments note 31): the pooled
+  permutation reading governs the D2 verdict**: the per-system line "D2 owner flag" says "block
+  length 5 is a design question" iff that reading fires. The A5 rule and beta_5 stay computed and
+  printed, with their predicted rates, as information (they do not decide the line). The block
+  length stays 5. A run-level line repeats the governing reading over the systems.
+* **Block-sensitive label (owner ruling of 2026-10-17, amendments note 31; report-only).** For
+  every primary part (the 24 parts of F3: H2a(i), H2a(ii) zero and interior, and "one" when it is
+  triggered, H2b(i), H2b(ii), H3c, H1a per rho), the interval of ``results.json`` is widened on each
+  side about its point estimate by ``f = sqrt(max(1, V*(10)/V*(5)))`` of the part's own influence
+  series, and the verdict rule of the part (the production band and the production
+  ``criterion_verdict``, with ``n_states`` the part's domain) is applied to the widened interval.
+  If the verdict changes, the part is labelled "BLOCK-SENSITIVE" (also in ``--json``). The label
+  changes no criterion, no verdict, no number of the report and **no exit code**: it is
+  informational. A part for which the inputs are missing (a leaf absent or not finite, V*(5) not
+  positive, the point estimate outside its interval, a baseline verdict recomputed from the
+  interval that differs from the recorded one, a widened verdict that is neither the baseline nor
+  inconclusive, a series that could not be built) is counted "not computable" in the label lines and
+  in the ``--json``, and never skipped; because the label is informational, those rows do not add to the
+  "not computable" list that decides the exit code (a series that could not be built is there
+  already).
 * **D3.** The log-SD of the per-state evaluation MSE at H_ref of A1, A2, A3, A4 and A5 (reading:
   above 1.5 means the C2h/C4h rows apply), at the run's own number of evaluation draws E, with the
   projection to E = 4 (``sigma^2 - psi'(E/2) + psi'(2)``, Gaussian hybrid error) and the log-SD of
@@ -70,7 +88,8 @@ results file carries the statistic that a series is the influence of, the tool r
 the dump and prints MATCH or MISMATCH (a mismatch is a defect of the dump or of this tool) with
 ``|diff| <= tol max(|leaf|, scale)``, the scale being the natural size of the statistic's terms.
 After the systems it prints the run-level D1 line (every |acf(1)| within its threshold?) and the
-D2 line (at least one primary series triggers the A5 rule, against its predicted probability).
+D2 lines (at least one primary series triggers the A5 rule, against its predicted probability; the
+governing pooled permutation reading over the systems; the block-sensitive parts).
 
 The bootstrap and permutation generators are ``make_rng(--seed, system, label)``; the default seed
 is a literal scratch seed (``TOOL_SEED``), not a development or confirmatory seed, so a report is
@@ -78,7 +97,9 @@ reproducible. The run's own seed is never read.
 
 Exit codes: 0 everything computed and no mismatch; 1 at least one MISMATCH; 2 unreadable input, a
 usage error, a refused run, an internal error, or at least one "not computable" (the report is still
-printed in full; 1 takes precedence over 2). The seed and the options are printed prominently and
+printed in full; 1 takes precedence over 2). The not-computable rows of the block-sensitive label
+("block sensitivity not computable") are informational and do not count toward exit 2; a part
+whose series could not be built is in the exit-2 list through the series. The seed and the options are printed prominently and
 recorded in the ``--json`` output: rerunning with other options to change a reading is not allowed
 (an owner question).
 """
@@ -105,7 +126,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from lpcstudy.config import PRESETS  # noqa: E402  (after the path line; no jax import)
-from lpcstudy.statistics import block_resample_indices  # noqa: E402
+from lpcstudy.statistics import block_resample_indices, criterion_verdict  # noqa: E402
 
 common = sys.modules.get("rehearsal_common")
 if common is None:  # the shared code of the two rehearsal tools (WU-0003.10), loaded by path
@@ -152,6 +173,18 @@ UNION_NULL = {300: 0.210, 500: 0.164, 1000: 0.094}
 """P(V*(10)/V*(5) > 1.1 or V*(20)/V*(5) > 1.15) per series, no dependence (``m5_d5split.log``)."""
 UNION_STRESS = {300: 0.401, 500: 0.425, 1000: 0.400}
 """The same at phi = 0.3 (power)."""
+VERDICT_RULES = {
+    "H2a(i)": ((-math.inf, 0.1), (True, False)),
+    "H2a(ii)": ((-0.1, 0.1), (False, False)),
+    "H2b(i)": ((0.0, math.inf), (False, True)),
+    "H2b(ii)": ((0.0, math.inf), (False, True)),
+    "H3c": ((-math.inf, 1.05), (True, True)),
+    "H1a": ((0.75, 1.25), (True, True)),
+}
+"""Band and closed edges of each primary part's verdict: copies of ``lpcstudy.analysis``
+(``H2A_RANGE_BAND`` with closed edges ``(True, False)``, ``H2A_PARTIAL_BAND`` ``(False, False)``,
+the one-sided ``(0, inf)`` with ``(False, True)`` of H2b, ``H3C_BOUND`` and ``H1A_BAND``); that module
+is not imported (it needs the whole pipeline). A test compares the copies with it."""
 LOGSD_RULE = 1.5
 PRIMARY_LEVEL_FACTOR = 1.014
 """E hw(B = 2000)/E hw(B = 500) at 1 - 0.05/3 (M3, ``m3_bfactor.log``)."""
@@ -1653,23 +1686,37 @@ def section_d1_d2(ctx: Context) -> list[Series]:
     perm = attempt(rep, f"{ctx.system} D2 permutation null", _permutation_reading, ctx, prim)
     rep.data.setdefault(ctx.system, {})["D2_permutation"] = perm
     any_fire = bool(fires or beta_fires or (perm and perm["fires"]))
-    rep.data.setdefault(ctx.system, {})["D2_design_question"] = any_fire
+    governing = None if perm is None else bool(perm["fires"])
+    rep.data.setdefault(ctx.system, {})["D2_any_reading_fired"] = any_fire
+    rep.data[ctx.system]["D2_governing_reading"] = "pooled permutation (OF-3)"
+    rep.data[ctx.system]["D2_design_question"] = governing
     gaps = [name for name, primary in rep.uncomputed
             if primary and name.startswith(ctx.system + " ")]
     if perm is None:
         gaps.append(f"{ctx.system} permutation null")
-    if any_fire:
-        text = ("block length 5 is a design question (a reading fired; which reading governs is "
-                "OF-3, the owner's)" + (f"; not computed: {', '.join(gaps)}" if gaps else ""))
+    gap_text = f"; not computed: {', '.join(gaps)}" if gaps else ""
+    info = (f"A5 rule fired on {fires} of {len(prim)} primary series, beta5 on {beta_fires} of "
+            f"{len(prim)}")
+    if governing:
+        text = ("block length 5 is a design question (the pooled permutation reading fired; it "
+                "governs, OF-3; the A5 rule and beta5 are information, not governing: " + info + ")"
+                + gap_text)
     elif not prim:
-        text = "not determined (no D2 reading was computed)" + (
-            f"; not computed: {', '.join(gaps)}" if gaps else "")
+        text = "not determined (no D2 reading was computed)" + gap_text
+    elif governing is None:
+        text = ("not determined (the governing pooled permutation reading was not computed; "
+                "information, not governing: " + info + ")" + gap_text)
+    elif fires or beta_fires:
+        text = ("no design question on the governing reading (the pooled permutation did not fire); "
+                "information, not governing: " + info
+                + (f"; not computed: {', '.join(gaps)}" if gaps else ""))
     elif gaps:
-        text = f"no reading fired among the computed readings; not computed: {', '.join(gaps)}"
+        text = f"no reading fired among the computed readings{gap_text}"
     else:
         text = "no reading fired"
     rep.data[ctx.system]["D2_owner_flag"] = text
     rep.say("  D2 owner flag, " + ctx.system + ": " + text + ctx.option_flag("d2"))
+    attempt(rep, f"{ctx.system} block-sensitive label", _block_sensitivity_lines, ctx, series)
     return series
 
 
@@ -1692,6 +1739,130 @@ def _permutation_reading(ctx: Context, primaries: list[Series]) -> dict:
             f"{q99:+.4f}, one-sided p {p:.4f}: {'DESIGN QUESTION' if fires else 'no'}"
             + ctx.option_flag("d2"))
     return {"observed": obs, "q99": q99, "p": p, "fires": fires, "n_series": len(usable)}
+
+
+def verdict_leaves(s: Series) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    """Results paths of the point estimate, the interval and the recorded verdict of a primary part.
+
+    Raises
+    ------
+    NotComputable
+        If the series is not a part with a verdict rule (not one of the six primary criteria).
+    """
+    c, part = s.criterion, s.part
+    if c == "H2a(i)":
+        return ("H2a", "median_range"), ("H2a", "range_ci"), ("H2a", "part_i_verdict")
+    if c == "H2a(ii)":
+        base = ("H2a", "part_ii", part)
+        return base + ("partial_corr",), base + ("ci",), base + ("verdict",)
+    if c in ("H2b(i)", "H2b(ii)"):
+        base, stat = (("H2b", "noise"), "mean_state_spearman") if c == "H2b(i)" else (
+            ("H2b", "library_change"), "mean_change")
+        return base + (stat,), base + ("ci",), base + ("verdict",)
+    if c == "H3c":
+        return ("H3c", "A5_over_A4_mse"), ("H3c", "ci"), ("H3c", "verdict")
+    if c == "H1a" and part.startswith("rho="):
+        base = ("H1a", "by_noise", part[len("rho="):])
+        return base + ("ratio",), base + ("ratio_ci",), base + ("verdict",)
+    raise NotComputable(f"no verdict rule for {s.name}")
+
+
+def widen_interval(point: float, lower: float, upper: float, factor: float) -> tuple[float, float]:
+    """Each side of an interval scaled about its point estimate: ``point -+ factor x (side length)``."""
+    return point - factor * (point - lower), point + factor * (upper - point)
+
+
+def block_sensitivity(ctx: Context, s: Series) -> dict:
+    """Would widening the half-width by ``sqrt(max(1, V*(10)/V*(5)))`` change the part's verdict?
+
+    First order (the half-width of a block-bootstrap interval of an asymptotically linear
+    statistic goes as ``sqrt(V*(b))`` of its own influence series). The verdict of the recorded
+    interval is recomputed with the production rule and must equal the recorded one; the widened
+    interval is then read with the same rule and the same ``n_states`` (the part's domain).
+    Report-only: nothing here changes a number, a verdict or the exit code.
+
+    Raises
+    ------
+    NotComputable
+        If a leaf is absent or not finite, V*(5) is not positive, the part has no verdict rule, the
+        point estimate lies outside its interval, the recomputed baseline verdict differs from the
+        recorded one, or the widened verdict is neither the baseline nor inconclusive.
+    """
+    rule = VERDICT_RULES.get(s.criterion)
+    if rule is None:
+        raise NotComputable(f"no verdict rule for {s.name}")
+    band, closed = rule
+    ratio = variance_summary(s.values)["ratio10"]
+    factor = math.sqrt(max(1.0, ratio))
+    point_path, interval_path, verdict_path = verdict_leaves(s)
+    try:
+        point = float(dig(ctx.res, *point_path))
+        lower, upper = (float(x) for x in dig(ctx.res, *interval_path))
+    except (TypeError, ValueError) as exc:
+        raise NotComputable(f"point or interval of {s.name} is not a number: {exc}") from exc
+    recorded = str(dig(ctx.res, *verdict_path))
+    if not math.isfinite(point) or math.isnan(lower) or math.isnan(upper) or lower > upper:
+        raise NotComputable(f"point {point!r} or interval [{lower!r}, {upper!r}] of {s.name} is "
+                            "not usable")
+    if not lower <= point <= upper:  # a percentile interval can exclude the point (skewed bootstrap)
+        raise NotComputable(f"the point estimate {point!r} lies outside its interval [{lower!r}, "
+                            f"{upper!r}] of {s.name}: widening about the point would move the "
+                            "interval away, so the widening is undefined here")
+    base, _ = criterion_verdict(point, lower, upper, band, closed, n_states=s.domain)
+    if base != recorded:
+        raise NotComputable(f"the verdict recomputed from the interval ({base}) differs from the "
+                            f"recorded one ({recorded})")
+    wide_lower, wide_upper = widen_interval(point, lower, upper, factor)
+    wide, _ = criterion_verdict(point, wide_lower, wide_upper, band, closed, n_states=s.domain)
+    if wide not in (base, "inconclusive"):  # more variance cannot improve a verdict or flip pass/fail
+        raise NotComputable(f"the widened verdict ({wide}) is neither the baseline ({base}) nor "
+                            "inconclusive: the first-order widening does not apply to this part")
+    return {"point": point, "interval": [lower, upper], "ratio10": ratio, "factor": factor,
+            "verdict": base, "widened_interval": [wide_lower, wide_upper],
+            "widened_verdict": wide, "sensitive": bool(wide != base), "reason": None}
+
+
+def _block_sensitivity_lines(ctx: Context, series: list[Series]) -> None:
+    """The report-only block-sensitive label of every primary part of one system."""
+    rep = ctx.rep
+    rep.say(f"Block-sensitive label, {ctx.system} (report-only: each primary interval widened on each "
+            "side by sqrt(max(1, V*(10)/V*(5))) of its own series; a verdict that changes is "
+            "BLOCK-SENSITIVE; no criterion, verdict, number or exit code changes)")
+    built = {f"{ctx.system} {s.name}" for s in series}
+    unbuilt = [name for name, primary in rep.uncomputed
+               if primary and name.startswith(ctx.system + " ") and name not in built
+               and not name.endswith("(D2)")]
+    rows: dict[str, dict] = {}
+    for s in series:
+        if not s.primary:
+            continue
+        try:
+            row = block_sensitivity(ctx, s)
+        except NotComputable as exc:
+            row = {"sensitive": None, "reason": str(exc)}
+            rep.say(f"  {s.name:24s} block sensitivity not computable: {exc}")
+        else:
+            rep.say(f"  {s.name:24s} verdict {row['verdict']:12s} V10/V5 {row['ratio10']:.3f} "
+                    f"widen x{row['factor']:.3f}: [{row['interval'][0]:+.4f}, "
+                    f"{row['interval'][1]:+.4f}] -> [{row['widened_interval'][0]:+.4f}, "
+                    f"{row['widened_interval'][1]:+.4f}] {row['widened_verdict']:12s} "
+                    + ("BLOCK-SENSITIVE" if row["sensitive"] else "not block-sensitive"))
+        rows[s.name] = row
+    for name in unbuilt:
+        reason = "no influence series for this part (listed as not computable above)"
+        rep.say(f"  {name[len(ctx.system) + 1:]:24s} block sensitivity not computable: {reason}")
+        rows[name[len(ctx.system) + 1:]] = {"sensitive": None, "reason": reason}
+    flagged = [n for n, r in rows.items() if r["sensitive"]]
+    computable = [n for n, r in rows.items() if r["sensitive"] is not None]
+    missing = [n for n, r in rows.items() if r["sensitive"] is None]
+    rep.say(f"  block-sensitive parts, {ctx.system}: {len(flagged)} of {len(computable)} computable "
+            "primary parts" + (f" ({', '.join(flagged)})" if flagged else "")
+            + f"; not computable: {len(missing)}" + (f" ({', '.join(missing)})" if missing else "")
+            + "; informational, no effect on the exit code")
+    rep.data.setdefault(ctx.system, {})["block_sensitivity"] = {
+        "rows": rows, "sensitive_parts": flagged, "n_computable": len(computable),
+        "n_not_computable": len(missing), "not_computable_parts": missing,
+        "exit_code_effect": "none"}
 
 
 def section_d3(ctx: Context) -> None:
@@ -2430,6 +2601,52 @@ def run_level_lines(rep: Report) -> None:
                              "n_primary_known": len(known), "predicted_at_least_one": predicted,
                              "at_least_one_fired": bool(fired), "uncomputed": gaps,
                              "predicted_acf_any": p_any}
+    governing_line(rep)
+    block_sensitive_line(rep)
+
+
+def governing_line(rep: Report) -> None:
+    """The run-level line of the governing D2 reading (OF-3): the pooled permutation, per system."""
+    perms = {k: v["D2_permutation"] for k, v in rep.data.items()
+             if isinstance(v, dict) and "D2_permutation" in v}
+    done = {k: v for k, v in perms.items() if v}
+    fired = [k for k, v in done.items() if v["fires"]]
+    missing = [k for k, v in perms.items() if not v]
+    smallest = min((v["p"] for v in done.values() if v.get("p") is not None), default=None)
+    if fired:
+        answer = "YES, block length 5 is a design question (" + ", ".join(fired) + ")"
+    elif done:
+        answer = "no" + (" among the computed systems" if missing else "")
+    else:
+        answer = "not determined (no system had a pooled permutation reading)"
+    rep.say(f"  D2 governing reading (pooled permutation, OF-3; the A5 rule and beta5 above are "
+            f"information): fired on {len(fired)} of {len(done)} computed system(s)"
+            + (f", smallest one-sided p {smallest:.4f} (trigger: the 0.99 quantile of the null)"
+               if smallest is not None else "")
+            + f"; block length 5 is a design question: {answer}"
+            + (f"; not computed: {', '.join(missing)}" if missing else ""))
+    rep.data["run_level"]["d2_governing"] = {
+        "reading": "pooled permutation (OF-3)", "n_systems_computed": len(done),
+        "fired_systems": fired, "not_computed_systems": missing, "smallest_p": smallest,
+        "design_question": (True if fired else (False if done else None))}
+
+
+def block_sensitive_line(rep: Report) -> None:
+    """The run-level line of the report-only block-sensitive label (no effect on the exit code)."""
+    log = [(system, name, row["sensitive"]) for system, v in rep.data.items()
+           if isinstance(v, dict) and "block_sensitivity" in v
+           for name, row in v["block_sensitivity"]["rows"].items()]
+    flagged = [f"{system} {name}" for system, name, state in log if state]
+    missing = [f"{system} {name}" for system, name, state in log if state is None]
+    n_computable = sum(state is not None for _, _, state in log)
+    rep.say(f"  Block-sensitive primary verdicts (report-only; widening by sqrt(max(1, V*(10)/V*(5))) "
+            f"would change them; informational, no effect on the exit code): {len(flagged)} of "
+            f"{n_computable} computable primary parts"
+            + (": " + "; ".join(flagged) if flagged else "")
+            + f"; not computable: {len(missing)}" + (": " + "; ".join(missing) if missing else ""))
+    rep.data["run_level"]["block_sensitive"] = {
+        "parts": flagged, "n_computable": n_computable, "n_not_computable": len(missing),
+        "not_computable_parts": missing, "exit_code_effect": "none"}
 
 
 def check_provenance(ctx: Context, seed_id: str) -> None:

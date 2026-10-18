@@ -14,8 +14,10 @@ test files against independent references.
 python tests/unit/golden_rehearsal.py tests/unit/fixtures/golden_rehearsal
 ```
 
-with the tools exactly as at commit `d63677d` (branch `wu/0003-rehearsal`, "Merge WU-0003.8 (.8, .8b,
-.8c)"; `tools/` was unchanged in the commit that added these files, on branch `wu/0003-10-common`),
+with the tools as at commit `d63677d` (branch `wu/0003-rehearsal`, "Merge WU-0003.8 (.8, .8b,
+.8c)"; `tools/` was unchanged in the commit that added these files, on branch `wu/0003-10-common`);
+the files were later regenerated as listed under "Regenerations" at the end of this file (the
+diagnostics files no longer correspond to d63677d),
 development seed ids only, JAX on the CPU. Run twice: the two folders were identical (the tools are
 deterministic: the diagnostics draw only through `make_rng` with its default tool seed 20261018, here
 with `--resamples 100 --permutations 50`).
@@ -47,3 +49,11 @@ is the tool's own text. The numbers are those of this machine's BLAS; on another
 digits may differ and the golden test would then fail: that is a measured difference of the
 stack, to be examined and recorded, never a reason to edit a golden file silently. A golden file
 is rewritten only to record a deliberate change of output, with the reason in the unit `## Log`.
+
+## Regenerations (append-only; each with its tool commit and reason, details in the unit `## Log`)
+
+| Commit | Files | Tool used | What changed and why |
+| --- | --- | --- | --- |
+| `6b04e49` (WU-0003.8d) | `diagnostics_world.txt`, `diagnostics_world_mismatch.txt`, `diagnostics_world_missing.txt`, `diagnostics_world_other_stack.txt` (14 lines in all: 4, 2, 4, 4) | `tools/rehearsal_diagnostics.py` at `2c73b5a` (unchanged develop) | The printed H1d reproduction check line lost the clause ` = 1e-12 x max(\|leaf\|, scale ...)` (commit `53483c4`, fix round 5). Wording only: same numbers, same tolerance. The golden test went red at the develop merge `1ed9e2d` (a sibling branch added the golden test, `53483c4` changed the output) until this refresh. No `.json` file changed. |
+| `dc88338` (WU-0003.8d) | the eight `diagnostics_world*` files (`.txt` and `.json`) | `tools/rehearsal_diagnostics.py` at `dc88338` | OF-3 and the block-sensitive label (owner rulings of 2026-10-17): the "D2 owner flag" wording, the new "Block-sensitive label" lines and the two new run-level lines, and the new JSON keys (`D2_any_reading_fired`, `D2_governing_reading`, `block_sensitivity`, `run_level.d2_governing`, `run_level.block_sensitive`; `D2_design_question` follows the governing reading). Everything else is byte-identical to the state after `6b04e49`. |
+| WU-0003.8d fix round 1 | none | | The fix of review R1 (a point outside its interval is not computable, not a label) does not change any golden file: the golden worlds have no interval leaves, so no label row is computed there. |

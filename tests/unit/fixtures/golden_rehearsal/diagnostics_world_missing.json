@@ -1223,8 +1223,65 @@
    "fires": false,
    "n_series": 8
   },
+  "D2_any_reading_fired": false,
+  "D2_governing_reading": "pooled permutation (OF-3)",
   "D2_design_question": false,
   "D2_owner_flag": "no reading fired among the computed readings; not computed: lorenz63 H2a(i)",
+  "block_sensitivity": {
+   "rows": {
+    "H2a(ii) zero": {
+     "sensitive": null,
+     "reason": "results leaf H2a/part_ii/zero/ci is absent"
+    },
+    "H2a(ii) interior": {
+     "sensitive": null,
+     "reason": "results leaf H2a/part_ii/interior/ci is absent"
+    },
+    "H2a(ii) one": {
+     "sensitive": null,
+     "reason": "results leaf H2a/part_ii/one/ci is absent"
+    },
+    "H2b(i)": {
+     "sensitive": null,
+     "reason": "results leaf H2b/noise/ci is absent"
+    },
+    "H2b(ii)": {
+     "sensitive": null,
+     "reason": "results leaf H2b/library_change/verdict is absent"
+    },
+    "H3c": {
+     "sensitive": null,
+     "reason": "results leaf H3c/ci is absent"
+    },
+    "H1a rho=0.01": {
+     "sensitive": null,
+     "reason": "results leaf H1a/by_noise/0.01/verdict is absent"
+    },
+    "H1a rho=0.02": {
+     "sensitive": null,
+     "reason": "results leaf H1a/by_noise/0.02/verdict is absent"
+    },
+    "H2a(i)": {
+     "sensitive": null,
+     "reason": "no influence series for this part (listed as not computable above)"
+    }
+   },
+   "sensitive_parts": [],
+   "n_computable": 0,
+   "n_not_computable": 9,
+   "not_computable_parts": [
+    "H2a(ii) zero",
+    "H2a(ii) interior",
+    "H2a(ii) one",
+    "H2b(i)",
+    "H2b(ii)",
+    "H3c",
+    "H1a rho=0.01",
+    "H1a rho=0.02",
+    "H2a(i)"
+   ],
+   "exit_code_effect": "none"
+  },
   "D3": {
    "E": 2,
    "rules": {
@@ -1442,6 +1499,31 @@
   "uncomputed": [
    "lorenz63 H2a(i)"
   ],
-  "predicted_acf_any": 0.8841961483438685
+  "predicted_acf_any": 0.8841961483438685,
+  "d2_governing": {
+   "reading": "pooled permutation (OF-3)",
+   "n_systems_computed": 1,
+   "fired_systems": [],
+   "not_computed_systems": [],
+   "smallest_p": 0.6274509803921569,
+   "design_question": false
+  },
+  "block_sensitive": {
+   "parts": [],
+   "n_computable": 0,
+   "n_not_computable": 9,
+   "not_computable_parts": [
+    "lorenz63 H2a(ii) zero",
+    "lorenz63 H2a(ii) interior",
+    "lorenz63 H2a(ii) one",
+    "lorenz63 H2b(i)",
+    "lorenz63 H2b(ii)",
+    "lorenz63 H3c",
+    "lorenz63 H1a rho=0.01",
+    "lorenz63 H1a rho=0.02",
+    "lorenz63 H2a(i)"
+   ],
+   "exit_code_effect": "none"
+  }
  }
 }
