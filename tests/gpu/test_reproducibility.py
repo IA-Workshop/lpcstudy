@@ -288,6 +288,11 @@ def gpu_environment() -> dict[str, str]:
         "JAX_ENABLE_COMPILATION_CACHE": "false",
     }
     env.pop("JAX_COMPILATION_CACHE_DIR", None)
+    # compare_runs needs the thread count in the provenance to tell tier T0
+    # from T1. The wrapper sets OMP_NUM_THREADS and its siblings from
+    # LPC_THREADS (default 4) but does not export LPC_THREADS itself, so a
+    # shell without it (the owner's terminal) gave tier "undetermined".
+    env.setdefault("LPC_THREADS", os.environ.get("OMP_NUM_THREADS", "4"))
     return env
 
 
