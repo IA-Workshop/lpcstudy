@@ -761,6 +761,64 @@ def test_text_under_every_table() -> None:
                for tag in TAGS)
 
 
+def test_lm_development_note_under_every_table() -> None:
+    """B7: each table points to the DEV-0 doubling study as development evidence, once, after the
+    iterative-error sentence, with the sqrt(n_full/n_pilot) projection factor of its QoI.
+
+    Reference: the owner ruling of amendments note section 35 (B7), the WU-0005.6 record (line 359:
+    the full-n projection) and the table of section 3 of ``docs/study/lm_doubling_dev0_report_v3.md``,
+    all written out here by hand. The report's LM-row flag is "yes" (the iterative change is below
+    10% of the sampling half-width, class N) for 5 of the 18 parts and "no" for 13, which it
+    describes as "not shown negligible": X (not negligible) 6 and U (not certified) 7; the note
+    must not say that the 13 are found above 10%. Per QoI, class N parts: H2a(i) 0 of 3,
+    H2a(ii) 3 of 6, H2b(i) 0 of 3, H2b(ii) 2 of 3, H3c 0 of 3 (sum 5). The factor is
+    sqrt(1000/500) = 1.41 for H2a(i), H2a(ii), H3c and sqrt(1000/300) = 1.83 for H2b(i), H2b(ii),
+    computed here by arithmetic to the 3 significant digits that are printed; the quoted sizes are
+    cross-checked against ``config.PILOT`` and ``config.FULL`` (n_test, n_test_sweep), so a preset
+    change cannot leave the text stale. Exact sentences and counts; no tolerance.
+    """
+    from lpcstudy.config import FULL, PILOT
+
+    results, systems = budget_results(full_system(), names=("lorenz63",))
+    lines = budget.budget_lines(results, systems, SMOKE)
+    heads = [i for i, ln in enumerate(lines) if ln.startswith("### ")]
+    assert len(heads) == 5
+    sizes = {"H2a(i)": ("n_test", "test"), "H2a(ii)": ("n_test", "test"),
+             "H3c": ("n_test", "test"), "H2b(i)": ("n_test_sweep", "sweep"),
+             "H2b(ii)": ("n_test_sweep", "sweep")}
+    own_counts = {"H2a(i)": (0, 3), "H2a(ii)": (3, 6), "H2b(i)": (0, 3), "H2b(ii)": (2, 3),
+                  "H3c": (0, 3)}
+    assert sum(n for n, _ in own_counts.values()) == 5
+    assert sum(m for _, m in own_counts.values()) == 18 == 3 * 6
+    count_sentence = ("finds the iterative change below 10% of the sampling half-width (class N) "
+                      "for 5 of the 18 parts of the five QoIs and three systems (this QoI: "
+                      "class N in {n} of {m} parts), and does not show it below 10% for the "
+                      "other 13 (X, not negligible, 6; U, not certified, 7).")
+    assert [f"{math.sqrt(getattr(FULL, sizes[q][0]) / getattr(PILOT, sizes[q][0])):.3g}"
+            for q in budget.QOI_TITLES] == ["1.41", "1.41", "1.83", "1.83", "1.41"]
+    for qoi, start, stop in zip(budget.QOI_TITLES, heads, [*heads[1:], len(lines)]):
+        block = lines[start:stop]
+        notes = [ln for ln in block if "lm_doubling_dev0_report_v3.md" in ln]
+        assert len(notes) == 1, qoi
+        note = notes[0]
+        assert block.index(note) == block.index(budget.ITERATIVE_SENTENCE) + 2, qoi
+        attribute, word = sizes[qoi]
+        small, big = getattr(PILOT, attribute), getattr(FULL, attribute)
+        factor = f"{math.sqrt(big / small):.3g}"
+        assert note.startswith("Development evidence on the iterative error, not a sealed result: "), qoi
+        assert "docs/study/lm_doubling_dev0_report_v3.md" in note, qoi
+        assert count_sentence.format(n=own_counts[qoi][0], m=own_counts[qoi][1]) in note, qoi
+        assert "not below it" not in note, qoi
+        assert (f"from the pilot preset to the full preset by about √(n_full/n_pilot), ×{factor} "
+                f"for this QoI ({small} → {big} {word} states in the two presets).") in note, qoi
+        other = {"×1.41", "×1.83"} - {f"×{factor}"}
+        assert not any(o in note for o in other), qoi
+        assert "a 30/60-iteration twin of the full-size run would remove it." in note, qoi
+        assert note.endswith("The iterative row of this report stays not estimated."), qoi
+    table = tables_of(lines)[budget.QOI_TITLES["H3c"]]
+    assert table[4][3].startswith("not estimated: ") and table[4][5] == "not estimated"
+
+
 def test_markdown_has_the_budget_section_between_validation_and_robustness(
         tmp_path: Path) -> None:
     """RESULTS.md holds the budget section once, after the validation gate and before Handling."""
@@ -985,11 +1043,17 @@ def test_f1_uses_the_number_of_long_horizons_of_the_configuration() -> None:
             budget.QOI_TITLES["H2a(i)"]][0][3]
 
     z = norm.ppf(0.975)
-    assert f"F1 = {3 / math.sqrt(math.pi) * 0.01 / z:.3g} (independent draw noise across 3 " \
-        "horizons" in cell(SMOKE)
+    # OF-4 (addendum A3): the superseded wording "indicative worst case <= F1 = x (independent
+    # draw noise across 3 horizons" is replaced by "indicative F1 = x (bias of a zero-range
+    # state, independent draw noise across 3 horizons; not a bound on the median; ...".
+    assert f"indicative F1 = {3 / math.sqrt(math.pi) * 0.01 / z:.3g} (bias of a zero-range " \
+        "state, independent draw noise across 3 horizons; not a bound on the median; V4 at " \
+        "H_ref only)" in cell(SMOKE)
+    assert "worst case" not in cell(SMOKE) and "≤ F1" not in cell(SMOKE)
     two = dataclasses.replace(SMOKE, eval_horizons_lyapunov=(0.5, 1.0, 2.0))
-    assert f"F1 = {2 / math.sqrt(math.pi) * 0.01 / z:.3g} (independent draw noise across 2 " \
-        "horizons" in cell(two)
+    assert f"indicative F1 = {2 / math.sqrt(math.pi) * 0.01 / z:.3g} (bias of a zero-range " \
+        "state, independent draw noise across 2 horizons; not a bound on the median; V4 at " \
+        "H_ref only)" in cell(two)
     four = dataclasses.replace(SMOKE, eval_horizons_lyapunov=(1.0, 2.0, 4.0, 8.0))
     assert cell(four).endswith("F1 not computable: tabulated for 2 or 3 horizons, this "
                                "configuration has 4")
