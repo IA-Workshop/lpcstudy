@@ -277,3 +277,17 @@ Analysis: `docs/agent/notes/2026-10-17-math-block-length.md` (merged 6ec43cb; ap
 ## 32. Process slip: the golden regression test was red on develop from the H1d merge (2026-10-18; main session)
 
 Found by the independent review of WU-0003.8d (R3, `docs/agent/records/work/WU-0003.8d-review.md` on `wu/0003-8d-block`). `test_regression_golden_outputs_are_byte_identical` went red at the develop merge 1ed9e2d (WU-0003.8 fix round 5, 53483c4, changed the printed H1d check line; that branch's base ad25e4e predates the goldens, which came in with e3b2645). The merge of 1ed9e2d into develop was made by me without rerunning the golden test after it (the line gate GATE-2026-10-17 covered the line tip before this fix round); nothing detected it until 8d. Effect: develop's test state was red for that test from 1ed9e2d until 6b04e49 (on `wu/0003-8d-block`, 14 H1d check lines only, numbers and the tolerance unchanged); `main` is untouched. Lesson recorded: a merge that joins a branch whose base predates a golden or test file needs that test in the post-merge radius. The next whole-suite gate (`LPC_GATE=merge`) before any main request will confirm the state.
+
+## 33. Owner answers of 2026-10-18 (third round, question tool; recorded by the main session; not ledger entries)
+
+- **OF-7:** re-tag the four H1a leaves (`fitted_inverse_dim`, `ci_inverse_dim[0..1]`, `floor_rms`) out of the cp chain, under the A6 QoI rule (1e-4 s, class a). Code change (tag table in `tools/compare_pilot.py`/`compare_runs.py`) with a test pinning the tags; the 1e-12 rule stays elsewhere.
+- **OF-1:** keep strict (no licence for H2c, H2d, H3c under T1 to T3 for a fitted-coefficient change beyond 1e-6).
+- **R5 (O3):** information-only on T1 to T3 pairs, confirmed.
+- **Q7, Q8, Q9, handling-count scope:** keep the tool's strict readings (the handling-count licence kept as written).
+- **OF-4:** correct the F1 'worst case' wording of WU-0008 M3 and DEC-0024 point 2 (draft for the owner to enter).
+- **OF-5:** adopt the away-arm TD standard-error form as the failing rule (bound 3.4 over 18 parts); the symmetric form stays printed as information.
+- **OF-F3:** keep N = 24 as written (H1c not counted).
+- **OF-G3:** the margin band governs the H2a(ii) comparison (0.0850 to 0.0933); the wide hw band stays printed, not governing.
+- **WU-0003.6:** reproducibility tolerance: adopt the proposal of section 29 (bitwise/1e-12 at equal contexts; TD statistic at z 2.394, bound 3.4, across devices); sample size: keep the full preset. Decision-entry texts are drafted for the owner to enter (agents do not write ledger entries).
+- **F4 and Q6:** keep both as built; Q6 recorded as a dated plan amendment (planner draft).
+- **Freeze checklist:** prepare now (WU-0004.1, main session).
