@@ -142,3 +142,109 @@ R1, R4, R5 and R6 change the test file. After those fixes the passing run no lon
 - **R6:** fixed in da88bf6 (fails unless the parent has `JAX_PLATFORMS=cuda,cpu`).
 - **R7:** fixed in c82fa16 and the next commit: queue.md note, the main session records the hours (0.238 h in total for the unit), tier-wide gap for the owner.
 - Rerun: `1 passed in 443.39s (0:07:23)`, 4695 leaves, 0 different, tier T0 (unit Log).
+
+## Review, round 2 (re-review of fix round 1)
+
+- **Reviewer:** `reviewer`, claude-opus-5-5, 2026-10-18, fresh context.
+- **Scope:** R1 to R7 only, all marked `fixed`, in `git diff ef345b2..16f1ece`. Fix-round commits: da88bf6, c82fa16, 3efbc2c, 1cc1c38, de1fcc5 and 16f1ece. New findings are limited to what the fix introduced.
+- **Tests:** none run, and no GPU job, as instructed.
+  - I read the rerun log `runs/tests/gpu-20261018T105302Z.log`, which is uncommitted and in the worktree. Its exit file is `0`, its summary line is `1 passed in 443.39s (0:07:23)`, and its measured line matches the Log word for word: 4695 leaves, 3166 floats, 0 different, max abs and rel 0.0, tier T0.
+  - `git diff da88bf6 HEAD -- tests/ lpcstudy/ tools/` is empty, so the rerun covers the test file as committed.
+  - The rerun's pytest temporary directory has rotated away (pytest keeps three), so I could not check its provenance independently. The test's own assertions cover the provenance.
+
+### Findings R1 to R7
+
+- **R1: fixed, with one residual (R8).**
+  - **The classification logic is right.** I read `classify_probe` (`test_reproducibility.py:59-73`) and the probe (`:42-56`):
+    - exit 0 gives `ok`;
+    - exit 3 (a `RuntimeError` from `jax.devices('gpu')` and no CUDA plugin found) gives `skip`;
+    - exit 4 (a `RuntimeError` with a plugin installed) gives `skip` only when the combined stdout and stderr contain `CUDA_ERROR_NO_DEVICE`;
+    - everything else gives `fail`, including exit 1, a non-`RuntimeError` exception, an `ImportError` of jax, and exit 4 without the mark.
+
+    The skip message is printed under `capsys.disabled()` before `pytest.skip` (`:191-195`), so it reaches the log under `-rfE`. The summary line also counts it ("1 skipped").
+  - **The offline evidence is believable.**
+    - `CUDA_VISIBLE_DEVICES=-1` gives exit 4 with the mark (cuInit's `CUresult` name, which XLA logs), so the test skips.
+    - `XLA_PYTHON_CLIENT_ALLOCATOR=bogus` gives exit 4 without the mark, so the test fails. If that error were not a `RuntimeError`, the probe would exit 1, which also fails.
+    - With the plugin names replaced, the probe exits 3. This exercises only the `find_spec` branch, not the `RuntimeError` that a real plugin-less jax raises. If such a jax raised some other exception type, the probe would exit 1 and the test would fail, which is the safe direction.
+    - The plugin names match the venv: `jax_plugins/xla_cuda12` and `jax_cuda12_plugin` 0.11.2.
+    - The scratch script was not committed, so this evidence rests on the Log's description. That is acceptable for a classification that reads as above.
+  - **How fragile the mark is.** `CUDA_ERROR_NO_DEVICE` is the CUDA driver API's enum name, which XLA prints through `cuGetErrorName`. It has been stable for many CUDA releases, so the risk of a wording change is low.
+    - If a future jaxlib or XLA stops logging it, a host with no device fails rather than skips. That is the safe direction, as the Log says.
+    - The risk that matters is the other direction: the mark is present when the GPU host is misconfigured (R8, item b).
+    - The plugin-name tuple has a similar failure mode, but in the unsafe direction (R8, item a).
+- **R2: fixed.** The comment at `:34-35` gives 4,695 leaves and 3,166 floats for the one-system smoke at bd8e168. The correction line in the Log (line 55) is appended and leaves the original line 50 intact.
+- **R3: fixed.** The docstring (`:237-242`) states that the property is measured, for the RTX 4090 and jaxlib 0.11.2, without `--xla_gpu_deterministic_ops` (O3 open). It says the decision is ruled but not entered and is cited as a draft, and that a failure after a change is a DEF finding, not grounds to widen. The Log (line 56) records that the DEC id is to be substituted later.
+- **R4: fixed.**
+  - `gpu_environment()` (`:165-176`) sets `JAX_ENABLE_COMPILATION_CACHE=false` and pops `JAX_COMPILATION_CACHE_DIR`. Both children (`run_smoke`) and the probe use it.
+  - The timing question is closed by the owner's instruction that differences below 2x are immaterial. The appended notes record it, and no cause is claimed.
+- **R5: fixed.** `SAME_SETTINGS` (`:38-39`) adds `python`, `jax_x64` and `jax_matmul_precision`. `jax_x64 is True` is asserted for both runs (`:270`).
+- **R6: fixed.**
+  - The assertion that `JAX_PLATFORMS == "cuda,cpu"` (`:258-261`) is the first statement of the test, before the probe and both children.
+  - Only the wrapper's `gpu` tier exports that value (`tools/run_tests.sh:117-118`). A direct pytest call fails, and does not skip, which is the intended behavior.
+  - Gates call the wrapper once per tier, so a gate on a CPU host still reaches the probe, which exits 3 and skips.
+- **R7: fixed.**
+  - `queue.md` has two appended lines.
+  - The second line names the main session as the one who records the hours, and gives 413 s + 442 s = 855 s = 0.238 h. The arithmetic checks: 855 / 3600 = 0.2375.
+  - The tier-wide gap in `tools/gpu_hours.py` is noted for the owner.
+
+### Records: the append-only check
+
+- `git diff 3efbc2c HEAD` adds 3 lines and deletes none: 2 in the unit file (lines 58 and 76) and 1 in the review file (line 140). `queue.md` is unchanged since 3efbc2c.
+- `git diff --numstat 7b6f6e6..HEAD -- docs/` shows only insertions, in all three record files.
+- Every line that 1cc1c38 replaced is back verbatim:
+  - Log line 57, the R4 warm-up text;
+  - Log line 75, "R4, honest status";
+  - review line 139, the R4 answer.
+- The three later lines are additions. Each is labeled as an owner-instruction note or as "Times as measured", and each names 1cc1c38's in-place edit.
+- Two of these lines (Log 58 and review 140) were inserted in the middle of the earlier entries rather than at the end. No existing line was altered, so this meets the no-deletion and no-alteration rule. However, Log line 58 is placed inside the fix-round entry and cites the rerun times, which postdate that entry. A reader should go by the label, not the position. This does not need a fix.
+
+### The process point (checklist item 6)
+
+- **The record is adequate.**
+  - The fix-round checklist line 68 claimed a `ps` check "just before the start" that had not yet been made.
+  - Line 74 is appended and labeled as a correction. It states the following:
+    - that the line was premature;
+    - that a unit-tier pytest of another lane was active at 06:51 (10:51Z) and again some seconds later;
+    - how the start was gated: a background task checked every 10 s for at most 5 minutes;
+    - the logged `active=0 at 2026-10-18T10:53:02Z`, which matches the log stamp `gpu-20261018T105302Z`.
+  - So the condition held at the start, and the false statement is corrected without being erased.
+- **Observation for the main session, not a finding.**
+  - The bounded 10-second `ps` wait is a poll loop. The rule "never wait or poll in a loop" is written for the GPU lock (exit 75), not for CPU contention from another lane. The wrapper's own `flock -w` is also a bounded wait.
+  - The first run's checklist described its wait as "one check, no loop". The main session may wish to state whether a bounded wait for CPU contention is allowed.
+
+### New findings
+
+**R8 (low; criterion 6 and R1 residual, PRIME.4). Two paths can still turn a broken or misconfigured GPU stack into a skip.**
+- **(a) The plugin names are fixed to CUDA 12.**
+  - `CUDA_PLUGINS = ("jax_plugins.xla_cuda12", "jax_cuda12_plugin")` (`:40`).
+  - If the workstation moves to another CUDA plugin, such as `jax[cuda13]` (which needs a dependency change and owner review), the probe reports "no plugin" on every CUDA initialization failure. It then exits 3, and a broken stack skips. This is the unsafe direction, and nothing would flag it.
+- **(b) `CUDA_ERROR_NO_DEVICE` with a plugin installed also covers the GPU workstation when its GPU is hidden or unreachable.**
+  - Examples: an inherited `CUDA_VISIBLE_DEVICES=""` or `-1` (the wrapper does not clear it, and `tests/unit/test_conftest_markers.py:65` uses exactly that idiom), device-node permissions, or a container without passthrough.
+  - Under `requirements.txt`, the CUDA plugin is installed only on the GPU host. Plain `jax` elsewhere gives exit 3. So exit 4 with the mark is, in practice, mostly the misconfigured-GPU-host case.
+  - Round 1's R1 fix asked for a "failure with `CUDA_VISIBLE_DEVICES=-1`". The fix made that case a skip and did not record why it departed from that.
+  - The skip is now printed and counted, so PRIME.4 is met in letter. However, a freeze-gate `gpu` tier on the workstation could still end "1 skipped", exit 0.
+- **Fix (test file only; no rerun is needed for the classification part if it is checked offline as before, but any test-file change is a code change under 4.4, so the main session decides whether to run it now or at the next gate).**
+  - (a) Detect a CUDA plugin by pattern, not by a fixed list: any module `jax_plugins.xla_cuda*`, or any installed distribution `jax-cuda*-plugin` (`importlib.metadata`).
+  - (b) Choose one of the following:
+    - classify exit 4 with the mark as `fail` when the parent environment sets `CUDA_VISIBLE_DEVICES`, and say so in the docstring;
+    - or append a Log line, and a note for the gate checklist, saying that on the GPU workstation a `gpu`-tier "skipped" is a gate failure;
+    - or record in the Log why skipping on exit 4 with the mark is the intended reading of criterion 6.
+
+**R9 (low; governance, commit trailers). Two fix-round commits lack the `Agent:` trailer.**
+- de1fcc5 and 16f1ece end with `Co-Authored-By` only. CLAUDE.md requires that commit messages "end with `Agent: <model id>`".
+- History cannot be amended (PRIME.5).
+- **Fix.** Append one Log line naming the agent and model id for those two commits. Before it is merged, it is worth noting the 1cc1c38 in-place edit as a process slip for the main session's record; the appended notes already name it.
+
+### Owner checkpoint
+
+Unchanged from round 1: **needs owner review before freeze.**
+- The test encodes the ruled but not yet entered tolerance, and it will serve as the freeze gate's `gpu`-tier check.
+- No verdict, statistics, seed or provenance code changed, and no dependency changed.
+
+### Verdict (round 2)
+
+**Approve with fixes.**
+- R1 to R7 are all verified as fixed.
+- There are 2 new low findings: R8 (the skip classification residual) and R9 (missing trailers, a record-only fix).
+- Neither affects the passed result: 4,695 leaves bitwise equal on the GPU, at the committed test code.
+- **Fit to merge into develop.** R8 should be resolved before the `gpu` tier is relied on at a freeze gate. R9 is an appended Log line.
