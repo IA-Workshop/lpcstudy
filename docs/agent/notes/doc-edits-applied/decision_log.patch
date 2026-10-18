@@ -1,0 +1,13 @@
+--- a/docs/study/decision_log_lpc.md
++++ b/docs/study/decision_log_lpc.md
+@@ -94,3 +94,10 @@
+ | T1 | dropped |
+ 
+ The audit found this inconsistency (planner, `ROADMAP.md` §6).
++
++## 11 October 2026: definitions changed from the pilot's (owner rulings, DEC-0008)
++
++| # | Decision | Reason |
++|---|---|---|
++| D7 | H1a's reference 1/d is the mean of the per-state Levina–Bickel inverse estimates, and the verdict is on the ratio (1/d_fit)/(1/d_LB). | The pilot compared against a pooled estimate; the ratio carries both fits' uncertainty (WU-0014 concordance). |
++| D8 | H2a(ii) and Q-N treat w* = 0 as its own part (indicator), separately from logit w* on 0 < w* < 1. | 22–36% of states sit at w* = 0, where the logit is undefined. |
