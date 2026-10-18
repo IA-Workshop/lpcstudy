@@ -65,6 +65,12 @@ C9 **needs owner review before freeze** (seed registry).
   - R3 (low, owner item): the `note` key, and the README's "never edit" and "fresh" lines. Open.
   - R4 (low): the docstring attributes "shallow" to the paper; reword, or have the researcher confirm. Open.
   - Verdict: **changes required**. Needs owner review before freeze (seed registry).
+- **Round 2** (`reviewer`, claude-opus-5-5, fresh context, 2026-10-18, fix round 1 at tip `8e6906f`; full text in `WU-0004e-review.md`, section "Round 2"):
+  - R1: **fixed**. The notes match the offline-check note and the WU-0003 records. The ids, values, `use`, schema and DEV-0 are unchanged.
+  - R2: **recorded honestly. Open, pending the owner's approval** of the exact registry diff. Do not merge until that approval is a line in this file.
+  - R3: **recorded. Owner item**, for the `note` key and the README.
+  - R4: **fixed**. The change is to the docstring only, and the AST is equal to develop's.
+  - New findings: none. Verdict: **approve**, with the merge conditional on R2's owner approval. Needs owner review before freeze (seed registry).
 
 ## Audit
 

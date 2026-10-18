@@ -96,3 +96,85 @@
 - R4 is a docstring-only fix, or a researcher check.
 
 The core facts of C8 are right, and its no-code-change claim holds. The C9 ids, values, schema and DEV-0 are untouched, and no behaviour depends on `status`. The seed registry change **needs owner review before freeze**.
+
+---
+
+# Round 2 (re-review of fix round 1)
+
+- **Reviewer:** `reviewer`, claude-opus-5-5, fresh context; not the author.
+- **Under review:** fix round 1, `git diff 96d2ecd..8e6906f`, and the net registry diff `git diff e10f65e 8e6906f -- seeds/development_seeds.json`. Scope is limited to R1 to R4.
+- **Date:** 2026-10-18.
+- **Tests:** none run by the reviewer, as instructed. The developer's run on 8e6906f is in the unit Log: unit (8 files), `406 passed in 38.56s`; integration, `test_cli_seeds.py`, `8 passed in 7.69s`. The round changes only a docstring and JSON text, so no rerun is needed.
+- **Web:** not used. **Sealed seed and seal script:** not read or named in any command.
+
+## R1: fixed
+
+- **Notes checked against `docs/agent/notes/2026-10-17-v6-v4-offline-check.md`:**
+  - line 3 assigns the V6 draws to DEV-1 to DEV-4, and V4 to R1 = DEV-1;
+  - line 10 says V6 was run at the pilot and full presets, on CPU;
+  - line 12 says V4 was read from the R1 run;
+  - lines 57-64 list the pilot and full values for each of DEV-1 to DEV-4;
+  - lines 254-256 say DEV-3 and DEV-4 were used for contexts only, and that only V6 was computed.
+- **Each note now matches the record:**
+  - DEV-3 and DEV-4: "V6 context checks only (pilot and full presets, CPU; no V4, no outcome run)". Correct.
+  - DEV-1: R0 (smoke, GPU and CPU), R1 and R2 (pilot, GPU), R3 (pilot, CPU), and V6 context checks (pilot and full, CPU). The parenthetical "its V4 update read R1's outputs" is correct (line 12). The `WU-0003-R*.md` glob matches `WU-0003-R0.md`, `WU-0003-R1R2.md` and `WU-0003-R3R6.md`.
+  - DEV-2: R5 (full, GPU), R6 (full, CPU), and V6 context checks (pilot and full, CPU; lines 58 and 62). Correct. The record globs `WU-0003-R3R6*.md` and `WU-0003-R1R2-R5*` match existing files.
+  - DEV-1 and DEV-2 cite the offline-check note.
+- **Invariants, re-checked by script (python -I) against `e10f65e`:**
+  - the top-level keys other than `seeds` are equal;
+  - the `(id, value, use)` list is equal, in the same order;
+  - DEV-0 has no changed key;
+  - DEV-1 to DEV-4 change only `note` and `status`.
+- **Plan A3 not edited, correction recorded:** the round's diff of the unit file is +8/-0. The correction is appended as a new Log line (Log line 52). The Plan text at line 36 is unchanged.
+- **Append-only:** `git diff --numstat e10f65e 8e6906f -- docs/` shows 0 deleted lines in every record (the unit file, this file and `queue.md`).
+
+## R2: recorded honestly; still open on the owner's approval
+
+- Log line 51 states the following:
+  - the first registry edit (b5e6851) was made by a Python script from Bash;
+  - a script write does not trigger `ask: Edit(/seeds/**)`, so the developer "bypassed the owner's ask rule";
+  - the earlier hand-back understated this;
+  - the owner's approval of the exact diff is **pending**, and nothing claims it;
+  - the branch is not to be merged until the owner approves;
+  - this round's seed edits were made with the Edit tool only.
+- Log line 55 says plainly that the developer did not see the prompt text. It claims no approval. I find no line anywhere on the branch that claims owner approval.
+- I cannot verify the Edit-tool claim from git. I accept it as the author's statement.
+- **What remains:**
+  - Fix item 1 (owner approval of the exact registry diff, recorded as a line in the unit file) is outstanding. It is the owner's action, not the developer's.
+  - Fix item 3 (the main session records the slip in the owner notes) is outstanding. It belongs to the main session.
+- **Merge stays blocked** until the approval line exists.
+
+## R3: recorded as an owner item
+
+Log line 53 records the following:
+- the `note` key goes beyond "status";
+- the README contradicts the registry in two places ("fresh" and "never edit or remove one");
+- the two owner asks, (a) and (b), as stated in round 1.
+
+The README was not edited, which is correct because it is outside the plan. The item is open for the owner and does not block the developer.
+
+## R4: fixed
+
+- The docstring now attributes the shallow shoulder to the researcher's reading of Fig. 5, with the note's values "AMI about 0.65 at tau = 18 against 0.7 near 30". This matches the Conditions column of `2026-10-11-research-ami-delay.md`, line 15. The docstring also says this is "a reading of the figure, not a quotation".
+- The tau_I = 60 sentence ("from this AMI profile, a practitioner would quite likely choose tau_I = 60") paraphrases the verbatim quote faithfully: "based on this AMI profile, it is quite likely that a practitioner would actually choose tau_I = 60".
+- `ast.dump` of `tests/unit/test_embedding.py` with that docstring removed equals the file at develop `e10f65e` (script, python -I): True. The name, body, band [3, 8] and assertion are unchanged. No tolerance was loosened (PRIME.2).
+
+## Other checks of this round
+
+- Commit 8e6906f names the unit and carries `Co-Authored-By` and `Agent: claude-sonnet-5-5`. It is a new commit; no history was rewritten.
+- Record hygiene (not a finding):
+  - Log line 50 says "Answers are under 'Review' below", but the answers are in the Log.
+  - The unit's `## Review` still listed R1 to R4 as "Open".
+  - I have appended the round-2 statuses to the unit's `## Review`.
+
+## New findings
+
+None.
+
+## Verdict (round 2)
+
+**approve.** No new findings (0). R1 and R4 are fixed. R2 and R3 are recorded correctly and are now owner items, not developer fixes.
+
+- **Merge condition (from R2):** do not merge until the owner has approved the exact registry diff `git diff e10f65e 8e6906f -- seeds/development_seeds.json` and that approval is a line in the unit file.
+- **Main session:** record the script-edit slip in the owner notes.
+- **Owner checkpoint:** the seed registry change **needs owner review before freeze**.
