@@ -1,12 +1,38 @@
 """Tests for V7 (estimator efficiency) and the validation gate (WU-0002.10).
 
-Every V7 input is built as an exact product, ``delta = c * rho * nu * (power law)``, so the
-references are hand-computed or come from an expression independent of the code under test
-(``np.polyfit``, ``np.median``, ``1.1 ** 0.2``). Common value tolerance ``abs 1e-12``: the
-ratios and the OLS on at most 4 levels, with values of magnitude at most 6, lose at most about
-1e-14; every decision margin below is at least 1e-4 (measured by the applied mathematician at
-2e-16 for 4 levels and 8e-15 for the two close levels). The bootstrap interval is reported
-only; it enters no assertion except where every state is identical (interval of zero width).
+Why these tests exist
+---------------------
+Before the study trusts its real results, it must pass a *validation gate*:
+a short list of checks (V1, V2, V4, V5, V6 and V7) that show the estimators
+and numerical methods work. V7 asks whether the state estimator is
+*efficient*, that is, whether it reaches the Cramer-Rao scaling (the Cramer-Rao
+bound is the smallest error any unbiased estimator can reach): for each state,
+the estimation error ``delta`` should be close to ``rho * nu``, the noise
+level ``rho`` times the state's oracle factor ``nu``. The ratio
+``delta / (rho * nu)`` is the *efficiency*. V7 passes when the median efficiency lies in the closed band
+[0.9, 1.1] at every noise level AND the median log-log slope of ``delta``
+against ``rho`` lies in [0.9, 1.1] (the error should grow in proportion to
+the noise). ``lpcstudy.analysis.v7_efficiency`` computes this from arrays;
+``v7_noise_scaling`` only pulls the arrays out of the study's result cells and
+calls it; ``gate_status`` combines V7 with the other checks into the flag
+``gate_pass``. This file also holds further tests of the validation module
+(the P2 bound and ``check_cp_horizon``), which are documented where they
+appear.
+
+How the V7 tests get their references
+-------------------------------------
+Every V7 input is built as an exact product,
+``delta = c * rho * nu * (power law)``, so the right answer is known by hand
+or comes from an expression independent of the code under test
+(``np.polyfit``, ``np.median``, ``1.1 ** 0.2``).
+
+Common value tolerance: ``abs 1e-12``. The ratios and the least-squares fit
+(OLS) use at most 4 noise levels and values of size at most 6, so they lose
+at most about 1e-14 to round-off (the applied mathematician measured 2e-16
+for 4 levels and 8e-15 for the two close levels). Every decision margin
+below is at least 1e-4, far above that. The bootstrap interval (a spread
+found by resampling) is only reported; it enters no assertion except where
+every state is identical, which gives an interval of zero width.
 """
 
 from __future__ import annotations
@@ -46,18 +72,27 @@ SYSTEM = "lorenz63"  # the system label of the V7 bootstrap generators
 def _exact(
     levels: np.ndarray, nu: np.ndarray, factor: float = 1.0
 ) -> np.ndarray:
-    """``delta_i(rho) = factor * rho * nu_i``, shape (n_states, n_levels)."""
+    """Build exact test errors ``delta_i(rho) = factor * rho * nu_i``.
+
+    The result has shape (n_states, n_levels). With ``factor = 1`` every
+    state has efficiency exactly 1; any other ``factor`` is the efficiency.
+    """
     return factor * levels[None, :] * nu[:, None]
 
 
 def test_v7_passes_at_unit_efficiency_and_fails_at_085() -> None:
-    """V7 passes when delta/(rho nu) = 1 and fails at 0.85 with the slope still 1.
+    """V7 passes at efficiency 1 and fails at 0.85, with the slope still 1.
 
-    Reference: ROADMAP acceptance (D-28), exact products. With delta = c rho nu_i, every
-    efficiency is c and ln delta has slope 1 exactly. The mean-nu variant (divide by
-    mean(nu)) would give median(nu)/mean(nu) = 0.5824 here (hand value, also computed below),
-    outside the band, so the test is not vacuous: only the per-state oracle nu gives 1.
-    Tolerance: abs 1e-12 (module note); decision margins 0.05 and 0.15.
+    Reference: the ROADMAP acceptance rule (item D-28) and exact
+    products. With delta = c * rho * nu_i, every efficiency
+    equals c, and ln(delta) has slope exactly 1 against ln(rho). A variant
+    that divided by the mean of nu instead of each state's own nu would give
+    median(nu) / mean(nu) = 0.5824 here (a hand value, also computed below).
+    That is outside the band, so the test is not vacuous: only the
+    per-state oracle nu gives 1.
+
+    Tolerance: abs 1e-12 (see the module docstring: round-off is about
+    1e-14); the decision margins are 0.05 and 0.15, far larger.
     """
     out = v7_efficiency(LEVELS, _exact(LEVELS, NU11), NU11, CONFIG, SYSTEM)
     assert out["pass"] is True and out["slope_pass"] is True
@@ -99,14 +134,22 @@ def test_v7_passes_at_unit_efficiency_and_fails_at_085() -> None:
 
 
 def test_v7_slope_band_is_part_of_pass() -> None:
-    """A median slope outside [0.9, 1.1] fails V7 even when every efficiency passes (A2).
+    """A slope outside [0.9, 1.1] fails V7 even if every efficiency passes.
 
-    Reference: two close levels (0.01, 0.011) and delta = nu_i rho (rho/0.01)^b, so
-    ln delta = ln nu + ln rho + b (ln rho - ln 0.01) has slope 1 + b exactly, and the
-    efficiencies are 1 (at 0.01) and 1.1^b (at 0.011). b = 0.2: slope 1.2 (outside), efficiency
-    1.1^0.2 = 1.019245 (inside). b = 0.05: slope 1.05 (inside), efficiency 1.004777.
-    Tolerance: abs 1e-12 against the independent expression 1.1 ** b; abs 1e-6 against the
-    6-digit hand value.
+    This is item A2 of DEC-0008 (the owner's rulings): the slope band is
+    part of the pass rule, not decoration.
+
+    Reference: two close noise levels (0.01 and 0.011) and
+    delta = nu_i * rho * (rho / 0.01)^b. Then
+    ln(delta) = ln(nu) + ln(rho) + b * (ln(rho) - ln(0.01)) has slope exactly
+    1 + b, and the efficiencies are 1 (at 0.01) and 1.1^b (at 0.011).
+    For b = 0.2 the slope is 1.2 (outside the band) while the efficiency
+    1.1^0.2 = 1.019245 is inside. For b = 0.05 the slope 1.05 is inside and
+    the efficiency is 1.004777.
+
+    Tolerance: abs 1e-12 against the independent expression ``1.1 ** b``
+    (round-off level); abs 1e-6 against the six-digit hand values, which are
+    rounded to six digits.
     """
     levels = np.array([0.01, 0.011])
     for b, slope_ok in ((0.2, False), (0.05, True)):
@@ -125,14 +168,22 @@ def test_v7_slope_band_is_part_of_pass() -> None:
 
 
 def test_v7_holds_at_every_noise_level() -> None:
-    """One bad level fails V7 although the slope and the pooled median pass ("at every rho").
+    """One bad noise level fails V7, although the slope and pooled median pass.
 
-    Reference: delta = rho nu_i except x1.15 at rho = 0.05. The efficiency at 0.05 is 1.15
-    (fails); the other three are 1. The slope, by hand: with x = ln rho, d = x - mean(x),
-    sum d^2 = 2.903624, d_4 = 1.207078, the slope is 1 + ln(1.15) d_4 / sum d^2 =
-    1 + 0.139762 * 1.207078 / 2.903624 = 1.0581011, inside the band; np.polyfit is the
-    independent OLS. The pooled median over all (state, rho) is 1 (3/4 of the entries are 1).
-    Tolerance: abs 1e-12 against polyfit; abs 1e-7 against the 8-digit hand slope.
+    The rule says "at every rho", so a single failing level must be enough.
+
+    Reference: delta = rho * nu_i except that it is multiplied by 1.15 at
+    rho = 0.05. The efficiency at 0.05 is then 1.15 (fails); the other three
+    levels have efficiency 1. The slope, by hand: let x = ln(rho) and
+    d = x - mean(x). Then sum of d^2 = 2.903624 and d_4 = 1.207078, so the
+    slope is 1 + ln(1.15) * d_4 / sum(d^2) =
+    1 + 0.139762 * 1.207078 / 2.903624 = 1.0581011, inside the band.
+    ``np.polyfit`` is the independent least-squares fit. The pooled median
+    over all (state, rho) pairs is 1, because three quarters of the entries
+    equal 1, so a pooled rule would wrongly pass.
+
+    Tolerance: abs 1e-12 against ``np.polyfit`` (round-off level); abs 1e-7
+    against the eight-digit hand slope, which is rounded to eight digits.
     """
     deltas = _exact(LEVELS, NU11)
     deltas[:, 3] *= 1.15
@@ -157,15 +208,27 @@ def test_v7_holds_at_every_noise_level() -> None:
 
 
 def test_v7_uses_medians_over_states_not_means_or_ratios_of_medians() -> None:
-    """Efficiency is the median of per-state ratios; the slope is the median of OLS slopes.
+    """Efficiency is a median of per-state ratios, not a mean or a ratio of medians.
 
-    Reference: 5 states with efficiencies (0.80, 0.95, 1.0, 1.05, 2.0) and nu = (2, 4, 0.5, 1,
-    8) at both levels. Median of ratios 1.0 (passes); mean of ratios 1.16 (fails); ratio of
-    medians: median(delta) = 1.6 rho (delta_i = 1.6, 3.8, 0.5, 1.05, 16 times rho), median(nu)
-    = 2, so 0.80 (fails). Slope part: levels (0.01, 0.02), delta = nu rho (rho/0.01)^b_i with
-    b = (-0.5, 0, 0.05, 0.1, 3): per-state slopes 1 + b = (0.5, 1, 1.05, 1.1, 4), median 1.05
-    (passes), mean 1.53 (fails). The efficiencies at 0.02 are 2^b = (0.7071, 1, 1.0353, 1.0718,
-    8), median 2^0.05 = 1.0353. Tolerance: abs 1e-12; margins >= 0.05.
+    The slope is likewise the median of the per-state least-squares slopes.
+    Three tempting but wrong summaries would give different answers, and the
+    test is built so that they do.
+
+    Reference, efficiency part: 5 states with efficiencies
+    (0.80, 0.95, 1.0, 1.05, 2.0) and nu = (2, 4, 0.5, 1, 8) at both levels.
+    The median of the ratios is 1.0 (passes). The mean of the ratios is 1.16
+    (would fail). The ratio of medians would be median(delta) / median(nu):
+    delta_i = (1.6, 3.8, 0.5, 1.05, 16) times rho, so median(delta) = 1.6 rho,
+    and median(nu) = 2, giving 0.80 (would fail).
+
+    Reference, slope part: levels (0.01, 0.02) and
+    delta = nu * rho * (rho / 0.01)^b_i with b = (-0.5, 0, 0.05, 0.1, 3). The
+    per-state slopes are 1 + b = (0.5, 1, 1.05, 1.1, 4); their median 1.05
+    passes, while their mean 1.53 would fail. The efficiencies at 0.02 are
+    2^b = (0.7071, 1, 1.0353, 1.0718, 8), with median 2^0.05 = 1.0353.
+
+    Tolerance: abs 1e-12 (round-off level); the decision margins are at
+    least 0.05.
     """
     nu = np.array([2.0, 4.0, 0.5, 1.0, 8.0])
     eff = np.array([0.80, 0.95, 1.0, 1.05, 2.0])
@@ -196,10 +259,15 @@ def test_v7_uses_medians_over_states_not_means_or_ratios_of_medians() -> None:
 
 
 def test_v7_band_is_closed_and_edges_are_sharp() -> None:
-    """0.9001 and 1.0999 pass; 0.8999 and 1.1001 fail, at every level.
+    """Efficiencies 0.9001 and 1.0999 pass; 0.8999 and 1.1001 fail.
 
-    Reference: delta = c rho nu_i with c set to the edge +- 1e-4 (the slope is 1). The
-    margin 1e-4 is eight orders above the rounding of the ratio (about 1e-16). Exact decisions.
+    This is checked at every noise level, so the band edges are sharp on both
+    sides.
+
+    Reference: delta = c * rho * nu_i with c set to an edge (0.9 or 1.1)
+    plus or minus 1e-4; the slope is then exactly 1. The margin 1e-4 is about
+    twelve orders of magnitude above the round-off of the ratio (about
+    1e-16), so the pass/fail decisions are exact and no tolerance is needed.
     """
     for factor, expected in (
         (1.0999, True),
@@ -218,15 +286,21 @@ def test_v7_band_is_closed_and_edges_are_sharp() -> None:
 
 
 def test_v7_band_edges_are_inside_exactly() -> None:
-    """An efficiency of exactly 1.1 or exactly 0.9 passes: the band [0.9, 1.1] is closed.
+    """An efficiency of exactly 1.1 or exactly 0.9 passes: the band is closed.
 
-    Reference: v3 E0 and DEC-0008 A1 (closed band), written out. Levels (0.25, 0.5) and nu = 1:
-    delta = c rho with c the float64 nearest to 1.1 (or 0.9). Multiplying by 0.25 or 0.5 is
-    exact in binary (a power of two only shifts the exponent), and so is the division by
-    rho nu back, so the ratio is bit-for-bit the double that the literal 1.1 (0.9) denotes in
-    the comparison; the median of identical values is that double. A strict inequality would
-    fail this test. Exact decisions, no tolerance. The slope is 1 up to about 1e-16, far from
-    its edges.
+    Reference: the study's methods document v3 (rule E0) and DEC-0008 item A1
+    (the owner's ruling that the band [0.9, 1.1] includes its end points),
+    written out as a test. Noise levels are (0.25, 0.5) and nu = 1, and
+    delta = c * rho with c the float64 number nearest to 1.1 (or 0.9).
+    Multiplying by 0.25 or 0.5 is exact in binary arithmetic (a power of two
+    only shifts the exponent), and so is dividing by rho * nu again. The
+    ratio is therefore bit for bit the same number that the literal 1.1
+    (or 0.9) means in the code's comparison, and the median of identical
+    values is that number. A strict inequality in the code would fail this
+    test.
+
+    Tolerance: none; the decisions are exact. The slope is 1 up to about
+    1e-16, far from its edges.
     """
     levels = np.array([0.25, 0.5])
     nu = np.ones(5)
@@ -245,13 +319,21 @@ def test_v7_band_edges_are_inside_exactly() -> None:
 
 
 def test_v7_counts_non_finite_input_and_fails() -> None:
-    """A NaN delta, or a non-finite or non-positive nu, is counted and fails V7 (PRIME.4).
+    """Bad input (NaN, infinite or non-positive values) is counted and fails V7.
 
-    Reference: hand counts. One NaN delta in state 2 gives n_nonfinite 1; with nu_5 = -1 as
-    well, 2 (two distinct states); nu = 0, nu = NaN and nu = +inf each count one state. A state
-    with both a NaN delta and a bad nu counts once. The state is not dropped: n_states stays 11,
-    and the NaN propagates to the median so the point statistics are NaN and fail the band.
-    Exact counts and flags.
+    This follows the project rule PRIME.4: never replace or drop bad values
+    silently; count them and report them. A NaN ("not a number") error, or a
+    nu that is not finite and positive, must show up in ``n_nonfinite``.
+
+    Reference: hand counts. One NaN delta in state 2 gives ``n_nonfinite`` 1.
+    With nu_5 = -1 as well, the count is 2 (two distinct states). Each of
+    nu = 0, nu = NaN and nu = +inf counts one state. A state with both a NaN
+    delta and a bad nu counts once. A delta of 0 has no logarithm, so it is
+    counted too. The bad state is not dropped: ``n_states`` stays 11, and the
+    NaN spreads into the median, so the point statistics are NaN and fail the
+    band.
+
+    Tolerance: none; the counts and flags are exact.
     """
     base = _exact(LEVELS, NU11)
 
@@ -286,10 +368,16 @@ def test_v7_counts_non_finite_input_and_fails() -> None:
 
 
 def test_v7_rejects_malformed_arrays() -> None:
-    """Shapes, level count and level sign are checked where the data enter (DSGN.2).
+    """Wrong array shapes or noise levels are refused where the data enter.
 
-    Reference: the contract of ``v7_efficiency``: ``deltas`` is (n_states, n_levels), ``nu``
-    is (n_states,), at least two distinct positive levels. Exact: each case raises ValueError.
+    This follows design rule DSGN.2 (check inputs at the boundary).
+
+    Reference: the stated contract of ``v7_efficiency``. ``deltas`` has shape
+    (n_states, n_levels), ``nu`` has shape (n_states,), and there are at
+    least two distinct positive noise levels. Each broken case must raise
+    ``ValueError``.
+
+    Tolerance: none; raising or not is exact.
     """
     good = _exact(LEVELS, NU11)
     with pytest.raises(ValueError):
@@ -307,6 +395,12 @@ def test_v7_rejects_malformed_arrays() -> None:
 
 
 def _stub_cell(est_seed: np.ndarray, nu: np.ndarray) -> SimpleNamespace:
+    """Build a minimal stand-in for one result cell at one noise level.
+
+    It has only the three attributes ``v7_noise_scaling`` reads: the system
+    label, the test-split moments (``est_seed``, the errors) and the oracle
+    ``nu``.
+    """
     moments = SimpleNamespace(est_seed=est_seed)
     return SimpleNamespace(
         system=SYSTEM,
@@ -316,13 +410,20 @@ def _stub_cell(est_seed: np.ndarray, nu: np.ndarray) -> SimpleNamespace:
 
 
 def test_v7_wrapper_sorts_the_levels_and_only_extracts_arrays() -> None:
-    """``v7_noise_scaling`` on unsorted stub cells equals ``v7_efficiency`` on sorted arrays.
+    """``v7_noise_scaling`` only sorts the levels and extracts the arrays.
 
-    Reference: the plan (item 2, test ix): the wrapper does nothing but extract the arrays.
-    The deltas are exact products times a seeded (default_rng(7)) lognormal factor of sd 0.02,
-    so the output has distinct, non-trivial values. The comparison is a dict equality: same
-    float64 operations in the same order, no tolerance. This is a refactoring guard, not a
-    correctness test of the statistic (those are above).
+    On stub cells inserted in unsorted order, it must return exactly what
+    ``v7_efficiency`` returns on the same arrays sorted by noise level.
+
+    Reference: the plan (item 2, test ix): the wrapper does nothing but
+    extract the arrays. The deltas are exact products times a seeded
+    (``default_rng(7)``) lognormal factor with standard deviation 0.02, so the
+    output has distinct, non-trivial values.
+
+    Tolerance: none. The comparison is a dictionary equality, because both
+    paths perform the same float64 operations in the same order. This is a
+    regression guard against refactoring mistakes, not a correctness test of
+    the statistic (the tests above are).
     """
     rng = np.random.default_rng(7)
     deltas = _exact(LEVELS, NU11) * np.exp(0.02 * rng.standard_normal((11, 4)))
@@ -335,7 +436,11 @@ def test_v7_wrapper_sorts_the_levels_and_only_extracts_arrays() -> None:
 
 
 def _passing_validation() -> dict:
-    """Return validation results in which every check passes."""
+    """Return made-up validation results in which every check passes.
+
+    The numbers are inside the limits of V1 to V6 (the checks other than
+    V7), so a test can break exactly one of them.
+    """
     return {
         "delay_jacobian_rel_err": 1e-6,
         "gain_rel_err": 1e-6,
@@ -347,14 +452,18 @@ def _passing_validation() -> dict:
 
 
 def test_gate_status_requires_and_reports_v7() -> None:
-    """``gate_status`` flags V1, V2, V4, V5, V6 and V7; gate_pass is their AND.
+    """``gate_status`` reports V1, V2, V4, V5, V6 and V7; the gate is their AND.
 
-    Reference: the plan (item 3). V7 is ``v7["pass"]`` and ``gate_pass``
-    requires it (the precedent is V4 with ``convergence["pass"]``). Hand
-    cases: when all checks pass there are exactly seven keys, all true. When
-    V7 fails, V7 and gate_pass flip and nothing else. When one of V1 to V6
-    fails, its flag and gate_pass flip but not V7. Calling without ``v7``
-    raises TypeError.
+    The validation gate passes only if every check passes, so V7 must be
+    both reported and required.
+
+    Reference: the plan (item 3). The V7 flag is ``v7["pass"]`` and
+    ``gate_pass`` requires it (the precedent is V4, which uses
+    ``convergence["pass"]``). Hand cases: when all checks pass there are
+    exactly seven keys, all true. When V7 fails, the V7 flag and ``gate_pass``
+    flip and nothing else. When one of V1 to V6 fails, its flag and
+    ``gate_pass`` flip but not V7. Calling without the ``v7`` argument raises
+    ``TypeError``, so V7 cannot be forgotten.
 
     Tolerance: none; the booleans are exact.
     """
