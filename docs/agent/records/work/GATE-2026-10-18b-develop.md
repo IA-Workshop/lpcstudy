@@ -1,0 +1,7 @@
+# Merge gate on develop, 2026-10-18 (second), main session
+
+Gate: merge (DEVELOPMENT_WORKFLOW.md 4.3), `LPC_GATE=merge`, one call per tier, once. Reason: since GATE-2026-10-18-develop (1e3d726, green: unit 1735, integration 19) develop gained WU-0003.9c (compare_runs OF-7/OF-5), WU-0004a (dirty-tree guard, `provenance.git_state` hardening, `tools/lm_doubling.py` delegation), WU-0004b (budget text), WU-0004c (gpu test and its unit hand cases), WU-0004d (H3a events/censored, report section), the decision drafts and docs. `lpcstudy/` changed (`__main__.py`, `provenance.py`, `analysis.py`, `report.py`, `budget.py`), the integration test driver `tests/integration/test_cli_seeds.py` was edited and has not been run until now. Tip: develop `bec632c`.
+
+Checklist (4.9), one line each: 1. Change set: all changes since 1e3d726. 2. Radius: whole suite, unit and integration tiers (the gate; named role main session). 3. Slow and gpu tiers not part of this gate (the gpu test passed on its own, three runs under the lock). 4. Device: CPU (wrapper). 5. Not rerun without a code change: the code state differs from the previous gate. 6. No GPU. 7. Output: wrapper default. 8. Commands: `LPC_GATE=merge tools/run_tests.sh unit tests/unit`, then `LPC_GATE=merge tools/run_tests.sh integration tests/integration`; then the DEV-0 smoke neutrality check C16 (`tools/run_preset.sh smoke DEV-0 ... --device cpu`, compared with the baseline smoke by `tools/compare_runs.py`, expected: only the six new H3a leaves one-sided).
+
+## Results
