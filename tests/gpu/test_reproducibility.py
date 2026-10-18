@@ -10,6 +10,7 @@ two GPU jobs outside the lock (WU-0004c review R6).
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import json
 import math
 import os
@@ -37,38 +38,62 @@ DECLARED_ABS = 0.0                 # tier T0 of the declared tolerance: bitwise 
 DECLARED_REL = 0.0
 SAME_SETTINGS = ("seed_id", "seed_kind", "preset", "config", "commit", "dirty", "device", "env", "packages",
                  "python", "jax_x64", "jax_matmul_precision")
-CUDA_PLUGINS = ("jax_plugins.xla_cuda12", "jax_cuda12_plugin")
+PLUGIN_MODULE_PREFIX = "xla_cuda"                      # a module of the jax_plugins namespace: xla_cuda12, xla_cuda13, ...
+PLUGIN_DIST_PATTERN = r"jax[-_.]cuda\d*[-_.](plugin|pjrt)"  # a distribution: jax-cuda12-plugin, jax-cuda13-pjrt, ...
+HIDDEN_VARIABLE = "CUDA_VISIBLE_DEVICES"
+
+
+def cuda_plugin_installed(search_path: list[str] | None = None) -> bool:
+    """Whether a jax CUDA plugin is installed on ``search_path`` (default ``sys.path``), by pattern.
+
+    True for a module ``jax_plugins.xla_cuda*`` or a distribution whose name matches
+    ``PLUGIN_DIST_PATTERN``, whatever the CUDA major version (review R8 a: a move to CUDA 13 must not
+    turn every start failure into "no plugin", hence a skip). Nothing is imported, so a broken plugin is
+    still found. The source of this function is embedded in the probe subprocess.
+    """
+    import importlib.metadata as metadata
+    import pkgutil
+    import re
+
+    paths = [str(entry) for entry in (sys.path if search_path is None else search_path)]
+    for entry in paths:
+        if any(m.name.startswith(PLUGIN_MODULE_PREFIX) for m in pkgutil.iter_modules([os.path.join(entry, "jax_plugins")])):
+            return True
+    return any(re.fullmatch(PLUGIN_DIST_PATTERN, dist.metadata["Name"] or "", re.I)
+               for dist in metadata.distributions(path=paths))
+
 
 PROBE = (
-    "import importlib.util, sys\n"
+    "import os, sys\n"
+    f"PLUGIN_MODULE_PREFIX = {PLUGIN_MODULE_PREFIX!r}\n"
+    f"PLUGIN_DIST_PATTERN = {PLUGIN_DIST_PATTERN!r}\n"
+    + inspect.getsource(cuda_plugin_installed) +
     "import jax\n"
     "try:\n"
     "    devices = jax.devices('gpu')\n"
     "except RuntimeError as exc:\n"
-    "    def installed(name):\n"
-    "        try:\n"
-    "            return importlib.util.find_spec(name) is not None\n"
-    "        except ImportError:\n"
-    "            return False\n"
-    f"    plugin = any(installed(name) for name in {CUDA_PLUGINS!r})\n"
+    "    plugin = cuda_plugin_installed()\n"
     "    print('NO_GPU: cuda plugin installed =', plugin, '|', str(exc)[-300:])\n"
     f"    sys.exit({BACKEND_FAILED_EXIT} if plugin else {NO_PLUGIN_EXIT})\n"
     "print('GPU', jax.default_backend(), len(devices), devices[0].device_kind)\n")
 
 
-def classify_probe(returncode: int, text: str) -> str:
-    """Return ``ok``, ``skip`` or ``fail`` for the probe's exit code and its combined output.
+def classify_probe(returncode: int, text: str, devices_hidden: bool) -> str:
+    """Return ``ok``, ``skip`` or ``fail`` for the probe's exit code, its combined output and the parent's environment.
 
-    ``skip`` only when there is no CUDA to start: no CUDA plugin installed (exit 3), or a plugin
-    whose ``cuInit`` reports ``CUDA_ERROR_NO_DEVICE`` (exit 4 and that mark in the output, which jax
-    logs to stderr). Every other failure, including a CUDA backend that is present but will not start,
-    is ``fail`` (PRIME.4: a broken GPU stack must not look like a pass).
+    ``skip`` only when there is no CUDA to start and nothing was configured to hide it:
+    no CUDA plugin installed (exit 3), or a plugin whose ``cuInit`` reports ``CUDA_ERROR_NO_DEVICE``
+    (exit 4 and that mark in the output, which jax logs to stderr) while ``CUDA_VISIBLE_DEVICES`` is
+    **unset** in the parent. With the variable set (``devices_hidden``), a no-device report is a
+    configuration fault of the GPU workstation (an inherited ``CUDA_VISIBLE_DEVICES=-1`` would hide
+    the card), so it is ``fail`` (review R8 b). Every other failure, including a CUDA backend that is
+    present but will not start, is ``fail`` (PRIME.4: a broken GPU stack must not look like a pass).
     """
     if returncode == 0:
         return "ok"
     if returncode == NO_PLUGIN_EXIT:
         return "skip"
-    if returncode == BACKEND_FAILED_EXIT and NO_DEVICE_MARK in text:
+    if returncode == BACKEND_FAILED_EXIT and NO_DEVICE_MARK in text and not devices_hidden:
         return "skip"
     return "fail"
 
@@ -176,25 +201,34 @@ def gpu_environment() -> dict[str, str]:
 
 
 def require_gpu(capsys: pytest.CaptureFixture[str]) -> str:
-    """Skip when there is no CUDA to start; fail when CUDA is present but broken. Returns the probe line.
+    """Skip when there is no CUDA to start; fail when CUDA is present but broken or hidden. Returns the probe line.
 
-    The skip reason is printed with capture disabled, because ``-rfE`` does not report skips (R1).
+    The reason is printed with capture disabled in both cases, because ``-rfE`` does not report skips (R1).
     """
     probe_env = {**gpu_environment(), "JAX_PLATFORMS": WRAPPER_PLATFORMS}
     done = subprocess.run([sys.executable, "-c", PROBE], cwd=REPO_ROOT, env=probe_env, capture_output=True,
                           timeout=PROBE_TIMEOUT_SECONDS)
     out = done.stdout.decode(errors="replace").strip()
     err = done.stderr.decode(errors="replace")
-    verdict = classify_probe(done.returncode, out + "\n" + err)
+    hidden = HIDDEN_VARIABLE in os.environ
+    verdict = classify_probe(done.returncode, out + "\n" + err, hidden)
     if verdict == "skip":
         message = f"SKIPPED: no CUDA backend or device available to jax, so the GPU reproducibility test did not run: {out}"
         with capsys.disabled():
             print("\n" + message)
         pytest.skip(message)
-    assert verdict == "ok", (
-        f"the jax GPU probe failed (exit {done.returncode}) although a CUDA backend is present or the cause is "
-        f"not 'no device': this is a broken GPU stack, not a skip. stdout: {out}\nstderr tail:\n"
-        + "\n".join(err.splitlines()[-15:]))
+    if verdict == "fail":
+        if hidden and NO_DEVICE_MARK in out + err:
+            reason = (f"FAILED: the driver reports no CUDA device while {HIDDEN_VARIABLE}={os.environ[HIDDEN_VARIABLE]!r} "
+                      "is set in the environment: on the GPU workstation a hidden device is a configuration fault, "
+                      "not a skip. Unset the variable, or run on a host without CUDA.")
+        else:
+            reason = (f"FAILED: the jax GPU probe exited {done.returncode} although a CUDA backend is present or the "
+                      "cause is not 'no device': a broken GPU stack, not a skip.")
+        message = reason + f" stdout: {out}\nstderr tail:\n" + "\n".join(err.splitlines()[-15:])
+        with capsys.disabled():
+            print("\n" + message)
+        pytest.fail(message, pytrace=False)
     return out
 
 
@@ -248,9 +282,11 @@ def test_smoke_twice_on_gpu_is_bitwise_reproducible(tmp_path: Path, capsys: pyte
     The parent must have ``JAX_PLATFORMS=cuda,cpu`` (the wrapper's ``gpu`` tier): otherwise the
     test fails at once rather than start GPU jobs outside the lock.
     The test is skipped, not failed, only when there is no CUDA to start: no CUDA plugin
-    installed, or the driver reports ``CUDA_ERROR_NO_DEVICE``; the reason is printed with capture
-    disabled, because ``-rfE`` does not report skips. A CUDA backend that is present but will not
-    start fails the test. The measured maximum differences are printed (capture disabled) and
+    installed (detected by pattern, any CUDA major version), or the driver reports
+    ``CUDA_ERROR_NO_DEVICE`` while ``CUDA_VISIBLE_DEVICES`` is unset; the reason is printed with
+    capture disabled, because ``-rfE`` does not report skips. A CUDA backend that is present but
+    will not start fails the test, and so does a no-device report with ``CUDA_VISIBLE_DEVICES`` set
+    (a hidden device is a configuration fault on the GPU workstation). The measured maximum differences are printed (capture disabled) and
     recorded with ``record_property``.
     Cost: two smoke runs on the GPU, each about 4 times slower than on the CPU, inside the
     1800 s tier timeout.
