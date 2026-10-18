@@ -54,7 +54,7 @@ print("ok:      installed versions match requirements.txt" if not bad else f"BLO
 sys.exit(1 if bad else 0)
 EOF
   if git rev-parse -q --verify refs/tags/freeze-1 >/dev/null; then say "note:    tag freeze-1 exists at $(git rev-parse --short freeze-1)"; fi
-  if ps -eo cmd | grep -E "lpcstudy --preset|run_tests" | grep -v grep >/dev/null; then bad "a run or a test is active"; else ok "no active run or test"; fi
+  if ps -eo args | grep -E "^[^ ]*python[0-9.]* .*-m (lpcstudy|pytest)" | grep -v grep >/dev/null; then bad "a run or a test is active"; else ok "no active run or test"; fi
   [ "$fail" = 0 ] && say "preflight: nothing blocks" || say "preflight: FIX THE ITEMS ABOVE"
   return "$fail"
 }
@@ -150,7 +150,7 @@ missing = [n for n in want if n not in {d.metadata["Name"] for d in m.distributi
 print("ok:      environment matches requirements.lock" if not (bad or missing) else f"BLOCKED: lock mismatch {bad} missing {missing}")
 sys.exit(1 if (bad or missing) else 0)
 EOF
-  ps -eo cmd | grep -E "lpcstudy --preset|run_tests" | grep -v grep >/dev/null && bad "a run or test is active" || ok "no active run or test"
+  ps -eo args | grep -E "^[^ ]*python[0-9.]* .*-m (lpcstudy|pytest)" | grep -v grep >/dev/null && bad "a run or test is active" || ok "no active run or test"
   "$PY" tools/ledger.py verify >/dev/null 2>&1 && ok "ledger verifies" || bad "ledger verify failed"
   if [ "$fail" = 0 ]; then
     say ""
