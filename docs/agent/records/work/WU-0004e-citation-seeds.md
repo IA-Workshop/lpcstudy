@@ -81,3 +81,5 @@ C9 **needs owner review before freeze** (seed registry).
 ## Referral
 
 <only if halted>
+
+- **2026-10-18, owner approval of the exact registry diff (recorded by the main session, claude-sonnet-5-5).** The owner approved `git diff e10f65e 8e6906f -- seeds/development_seeds.json` ("Approve as shown", answer to the question tool, 2026-10-18): status "used" and a `note` key on DEV-1 to DEV-4; ids, values, use, schema and DEV-0 unchanged. Not a ledger entry. The edit of `seeds/README.md` ("fresh", "never edit") is the owner's. Round-2 review (ff88308): approve, no new findings.
