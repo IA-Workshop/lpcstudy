@@ -71,6 +71,7 @@ Needs owner review before freeze (statistics code: `h3a_logrank`; the printed li
 
 - **Reviewer:** <actor, not the author>
 - **Findings and resolution:**
+- Round 1 (2026-10-18, `reviewer`, claude-opus-5-5, fresh context): **approve with fixes**, 3 findings (R1 medium: the exposure sentence points at per-pair p-values that RESULTS.md does not print; R2 low: a half-present key pair is labelled as an old result instead of raising; R3 low: R-a is closed, so do not amend it; instead route the 2 x K_real one-sided leaves against the v3 DEV-0 reference to the planner of the next comparison). Full text: `docs/agent/records/work/WU-0004d-review.md`. Needs owner review before freeze.
 
 ## Audit
 
