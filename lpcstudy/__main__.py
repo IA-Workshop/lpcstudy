@@ -107,6 +107,38 @@ def choose_refine_steps(args: argparse.Namespace) -> int | None:
     return int(text)
 
 
+def choose_clean_tree(args: argparse.Namespace) -> None:
+    """Refuse a sealed run unless the working tree is clean and the commit is known (B8).
+
+    Acts only with the confirmatory flag; a development run is not checked. The state is read
+    with ``provenance.git_state(provenance.ROOT)``, the reader that fills ``commit`` and ``dirty``
+    in the provenance block, so the block of an accepted run records exactly what was checked
+    (``dirty`` is ``bool(git status --porcelain)``: untracked files count). Refused: a commit that
+    is not a full hexadecimal object name (``None``, empty, ``"unknown"``, abbreviated) or an
+    unknown ``dirty`` (git failed, so cleanliness cannot be told), and ``dirty`` true. Git's own
+    error text is not echoed (it can hold newlines and paths); it stays in the provenance block of
+    a development run. This runs before the seed is chosen, so a refused request has not read the
+    sealed seed, and before ``provenance.collect``, so nothing has been written. Needs owner review
+    before freeze (LPC.PC.11): it sits beside the seed guard. Owner ruling B8, 2026-10-18.
+
+    Raises
+    ------
+    SeedRefusal
+        If the confirmatory flag is given and the commit is unknown, git cannot say whether the
+        tree is clean, or the tree is dirty.
+    """
+    if not args.confirmatory:
+        return
+    commit, dirty, _git_error = provenance.git_state(provenance.ROOT)
+    if (commit is None or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit) is None
+            or dirty is None):
+        raise SeedRefusal("the confirmatory flag needs a known commit and a readable git state "
+                          "(commit unknown or git unavailable)")
+    if dirty:
+        raise SeedRefusal("the confirmatory flag needs a clean working tree (git status "
+                          "--porcelain is not empty); commit or remove the changes first")
+
+
 def choose_seed(args: argparse.Namespace, extras: list[str], registry_path: Path,
                 ledger_path: Path = LEDGER_PATH) -> tuple[str, int]:
     """Return ``(seed_id, seed)`` for the parsed arguments or raise ``SeedRefusal``.
@@ -148,7 +180,8 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     Returns
     -------
     int
-        0 on success; 64 after a seed refusal, with exactly one stderr line
+        0 on success; 64 after a seed refusal (including a confirmatory request on a dirty tree
+        or with an unknown commit), with exactly one stderr line
         ``lpcstudy: refused (LPC.PC.7): <reason>`` and before any output is created.
     """
     parser = build_parser()
@@ -156,6 +189,7 @@ def main(argv: list[str] | None = None, *, ledger_path: Path = LEDGER_PATH,
     try:
         refine_steps = choose_refine_steps(args)  # before the seed: a sealed request stops here
         states_dump = choose_states_dump(args)  # the same: refused before the seed is read
+        choose_clean_tree(args)  # B8: a sealed run needs a clean tree and a known commit, first
         seed_id, seed = choose_seed(args, extras, registry_path, ledger_path)
     except SeedRefusal as refusal:
         print(f"lpcstudy: refused (LPC.PC.7): {refusal.reason}", file=sys.stderr)

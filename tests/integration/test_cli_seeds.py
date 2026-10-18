@@ -23,7 +23,13 @@ PREFIX = "lpcstudy: refused (LPC.PC.7):"
 SEED = 123456789012345          # synthetic; never a real confirmatory seed
 SALT = "0f" * 16
 CONFIRMATORY = "--confirmatory"   # only ever with a tmp_path ledger and synthetic values
-DRIVER = ("import sys; from pathlib import Path; from lpcstudy.__main__ import main; "
+# The driver pins the repository state to a clean tree at a known commit (WU-0004a): the sealed
+# flag is refused on a dirty tree before the commitment is looked at, and these cases test the
+# commitment and variable refusals, which must not depend on whether the checkout is clean. The
+# tree guard itself is tested in tests/unit/test___main__.py.
+DRIVER = ("import sys; from pathlib import Path; from lpcstudy import provenance; "
+          "from lpcstudy.__main__ import main; "
+          "provenance.git_state = lambda root: ('a' * 40, False, None); "
           "sys.exit(main(sys.argv[2:], ledger_path=Path(sys.argv[1])))")
 
 
