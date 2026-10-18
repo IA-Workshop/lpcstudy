@@ -764,14 +764,22 @@ def clip_lines(results: dict, systems: list[str]) -> list[str]:
 
 
 # --- WU-0004d begin ---
-H3A_EXPOSURE = (
+_H3A_EXPOSURE_HEAD = (
     "Exposure (DEF-0018; owner ruling B6b: keep as is, report the counts, state the exposure as a "
     "limitation): the H3a log-rank test sets no minimum number of states or events per regime "
     "(DEC-0011 O1; only the full sample needs 50 states), so a regime with few events can give an "
-    "extreme log-rank p-value, for example one event among 99 censored states. Read each p-value "
-    "of the pair table beside the events and censored counts of its two regimes. This is a stated "
-    "limitation of the H3a verdict; the verdict rule is unchanged.")
-"""The limitation sentence of the H3a events/censored section (exact text pinned by a test)."""
+    "extreme log-rank p-value, for example one event among 99 censored states. ")
+_H3A_EXPOSURE_TAIL = ("This is a stated limitation of the H3a verdict; the verdict rule is "
+                      "unchanged.")
+H3A_EXPOSURE = (_H3A_EXPOSURE_HEAD + "Read each p-value of the pair table beside the events and "
+                "censored counts of its two regimes. " + _H3A_EXPOSURE_TAIL)
+H3A_EXPOSURE_NO_COUNTS = (_H3A_EXPOSURE_HEAD + "The events and censored counts are not recorded in "
+                          "this results file, so the exposure cannot be read from it. "
+                          + _H3A_EXPOSURE_TAIL)
+"""The limitation sentence of the H3a events/censored section (exact text pinned by a test).
+
+``H3A_EXPOSURE_NO_COUNTS`` replaces it when no listed system carries the counts (nothing to read the
+p-values beside; R4 of the WU-0004d review)."""
 
 
 def h3a_regime_lines(results: dict, systems: list[str]) -> list[str]:
@@ -850,7 +858,7 @@ def h3a_regime_lines(results: dict, systems: list[str]) -> list[str]:
     blocks += [[f"{s}: events/censored per regime not recorded (results written before WU-0004d)."]
                for s in missing]
     lines = ["## H3a: events/censored per regime (DEF-0018)"]
-    for paragraph in [*blocks, [H3A_EXPOSURE]]:
+    for paragraph in [*blocks, [H3A_EXPOSURE if rows else H3A_EXPOSURE_NO_COUNTS]]:
         lines += ["", *paragraph]
     return lines
 # --- WU-0004d end ---

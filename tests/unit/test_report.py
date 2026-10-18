@@ -1147,6 +1147,16 @@ EXPOSURE_TEXT = (
 """The sentence typed from the ruling (owner packet B6b), independent of ``report.H3A_EXPOSURE``."""
 
 
+EXPOSURE_NO_COUNTS_TEXT = (
+    "Exposure (DEF-0018; owner ruling B6b: keep as is, report the counts, state the exposure as a "
+    "limitation): the H3a log-rank test sets no minimum number of states or events per regime "
+    "(DEC-0011 O1; only the full sample needs 50 states), so a regime with few events can give an "
+    "extreme log-rank p-value, for example one event among 99 censored states. The events and "
+    "censored counts are not recorded in this results file, so the exposure cannot be read from "
+    "it. This is a stated limitation of the H3a verdict; the verdict rule is unchanged.")
+"""The variant sentence for results without the counts, typed from the review R4 (option b)."""
+
+
 def _h3a_markdown(tmp_path: Path, counts: dict | None) -> list[str]:
     """RESULTS.md lines of a one-system fake run whose H3a block gets ``counts`` (or nothing)."""
     results, config = fake_results("DEV-0")
@@ -1198,7 +1208,9 @@ def test_h3a_section_says_not_recorded_for_results_without_the_counts(tmp_path: 
     assert "| lorenz63 |" not in "\n".join(lines[head:head + 6])
     assert ("lorenz63: events/censored per regime not recorded (results written before WU-0004d)."
             in lines[head:head + 6])
-    assert EXPOSURE_TEXT in lines[head:head + 8]
+    # R4: with no counts anywhere the sentence must not point at a pair table or counts
+    assert lines[head + 4] == EXPOSURE_NO_COUNTS_TEXT
+    assert EXPOSURE_TEXT not in lines and "pair table" not in lines[head + 4]
     assert not any(line.startswith("Tested pairs") for line in lines)  # no counts: no pair table
 
 
@@ -1253,3 +1265,10 @@ def test_h3a_section_refuses_a_block_with_only_one_of_the_two_lists() -> None:
                     "logrank_p_holm": []}}
     with pytest.raises(ValueError, match="pairs are inconsistent"):
         report.h3a_regime_lines({"systems": {"lorenz63": both}}, ["lorenz63"])
+    # R5: a regime index outside 0..K-1 would print another regime's counts (a negative index
+    # counts from the end in Python) or fail late; hand cases with K = 2 regimes
+    for pairs in ([[0, 2]], [[-1, 0]]):
+        bad = {"H3a": {**base, "n_events_per_regime": [1, 100], "n_censored_per_regime": [99, 0],
+                       "pairs": pairs}}
+        with pytest.raises(ValueError, match="pairs are inconsistent"):
+            report.h3a_regime_lines({"systems": {"lorenz63": bad}}, ["lorenz63"])
