@@ -303,3 +303,14 @@ Drafts: `docs/agent/notes/2026-10-18-owner-decision-drafts.md` (merged; planner 
 6. The ROADMAP WU-0003.4 definition of done is not met as written (no "one core cell" run, no differences table of that form, `tests/gpu/test_reproducibility.py` absent; the 10x rule is degenerate): the row needs the owner's edit, or the owner requires the gpu test.
 7. OF-4: no criterion depends on the old F1 wording, but `lpcstudy/budget.py` (line 702, docstring 565 and 570) prints "indicative worst case <= F1" into every RESULTS.md (R1, R2, R3, R5, R6 carry it; a sealed run would): correcting it is a report-text code change before the freeze.
 8. Q6: amendment 3 C2 says d3 ran on the unedited S3 pair; it exits 2 there (d3 was shown on scratch copies; the committed test is synthetic). Confirm "keep as built" covers d3 as well as d1.
+
+## 35. Owner answers of 2026-10-18 on the freeze blockers (fourth round, question tool; recorded by the main session; not ledger entries)
+
+Source of the questions: `docs/agent/notes/2026-10-18-freeze-blockers.md` (merged; inventory by a general-purpose agent, branch `wu/0004-blockers`).
+- **B5:** merge `develop` into `main` later, after the owner's code review (B2) and a green full suite at the freeze gate; the freeze and tag then live on `main`. No `main` request is made now.
+- **B6a (DEF-0020):** keep the pre-registered intervals and block length 5; state the undercoverage and the report-only block-sensitive label as limitations.
+- **B6b (DEF-0018):** keep as is; report event counts per regime; state the exposure as a limitation.
+- **B7:** quote the DEV-0 flags with the sqrt(n_full/n_pilot) projection as development evidence; the sealed report keeps "not estimated" plus a pointer (a text and small budget change; no sealed twin run).
+- **B8:** implement the dirty-tree and unknown-commit refusal for the sealed run (code, tests, independent review, then the owner's review); VmHWM recording optional.
+- **B10:** write `tests/gpu/test_reproducibility.py` (smoke twice on the GPU against the declared tolerance, after the WU-0003.6 decision); the owner edits the ROADMAP row to what was done.
+- **B4 (device):** the owner asked why a hardware disagreement poses an issue, given chaos and that the study evaluates performance bounds of the weighting; answer given: the device changes neither the gate risk nor the scientific question (a different realization is expected; R5 vs R6 agree by the TD statistic); it changes only how strongly another actor can verify the sealed run (bitwise on the same device, TD otherwise). Answer to the restated question: "both CPU and GPU as stated": **ambiguous, clarification asked** (see the next section when answered). No code or run depends on it yet.
