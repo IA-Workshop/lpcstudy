@@ -88,3 +88,85 @@
 ## Verdict
 
 **approve with fixes.** 3 findings: R1 medium, R2 low, R3 low. No correctness defect in the guard as specified: placement, the refusal logic and the tests are sound. The unit still **needs owner review before freeze**.
+
+## Round 2
+
+- **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-18.
+- **Scope:** fix round 1, `git diff 8fea300..6c740e6` (commit `6c740e6`), limited to R1 to R3, with an adversarial reading of the new seed and provenance code (LPC.PC.7).
+- **Method:** reading, read-only git, and probes on throwaway repositories in the reviewer's scratchpad (`GIT_CEILING_DIRECTORIES` set). No test was run. No preset, sealed flag or sealed seed was used. The developer's recorded radius stands: `302 passed` (once, 9 unit files, `test_provenance.py` included).
+- **Owner checkpoint:** seed and provenance code. **Needs owner review before freeze** (LPC.PC.11).
+
+### R1: fixed
+
+- **Return value.** `choose_clean_tree` returns the checked commit for a sealed request (`__main__.py:150`). It returns `None` only for a development run; every other sealed path raises.
+- **Every sealed path goes through both checks.** With the flag, `checked_commit` is either a full object name or the `try` at l. 222-229 has already returned 64. So the block at l. 243-250 always runs for a sealed request.
+  - On a run, it compares `block["commit"]` and `block["dirty"]` from `collect` (l. 239).
+  - On `--report-only`, it takes a direct `git_state` read (l. 245).
+  - In both cases this happens before `out_dir.mkdir` (l. 251), the log handler (l. 273) and any `save_json`.
+  - `choose_seed` is still the only production caller of `confirmatory_seed`. No path reaches the seed without the first check, and none reaches output without the second.
+- **The comparison is strict.** `commit != checked or dirty is not False` refuses a moved `HEAD`, a dirty tree, an unreadable state (`None, None`) and an unknown `dirty`. `git_state` returns a real `bool` (`bool(...) or any(...)`), so `is not False` cannot reject a clean read by type. The result is exit 64 with one line, and git's error text is not echoed.
+- **Tests.** The new test covers 4 second-read states for each of run and report-only. It asserts the exact line, the exact call lists (`[git, seed, collect, git]` and `[git, seed, git]`), that no directory exists, and that neither the seed, the salt nor the git text appears in the output.
+  - The stub is installed under `spy_calls`. `collect` reaches it through the module global, so the second read really is the block's read.
+  - The truth-table test covers `(None, False)` and `checked is None`.
+- **Changed round-0 assertions.** Both are stricter: `is None` became `== CLEAN_COMMIT` (A6), and `== <the test's own git rev-parse HEAD>` (real git). PRIME.2 holds.
+- **Docstring.** The `choose_clean_tree` docstring now describes the second read correctly. The `check_tree_unchanged` docstring states honestly that the one-time draw is not undone. One stale line remains in the A6 test docstring: see R6.
+
+### R2: fixed, with residuals R4 and R5
+
+- **Ordinary checkouts read the same.** `ls-files -v` on this worktree and on the main checkout shows only `H` entries (533 and 136). There is no `.gitmodules`, so `--ignore-submodules=none` has no effect here. The block key set is unchanged, and `test_commit_and_dirty_equal_the_tests_own_git_calls` is untouched. Its plain `bool(git status --porcelain)` still equals the hardened value in this checkout.
+- **Tag letters (git 2.56, checked in the scratchpad).**
+  - Without `-t`/`-o`, `ls-files -v` lists cached entries only. Their tags are `H`, `S`, `M` (unmerged), and lowercase when `CE_VALID` is set.
+  - An unmerged path already shows in `status` (`UU`), so missing `M`/`m` from `HIDDEN_TAGS` hides nothing.
+  - The built-in fsmonitor (`core.fsmonitor=true`) did not turn tags lowercase under `-v`; only `-f` does that.
+  - Two settings make a checkout read dirty that read clean before:
+    - `core.ignoreStat=true` sets `h` on files that git updates.
+    - A sparse checkout sets `S`.
+  - Neither is set here, and both cases are conservative, since git does not track changes to those files. **No finding.** The owner should know that a sparse or `ignoreStat` checkout now records `dirty: true` on development runs too.
+- **Other callers.** In production, `git_state` is called only from `collect` (`provenance.py:386`) and `__main__` (l. 142, 245). The test pins in `test_cli_seeds.py` and `test___main__.py` replace it whole, so they are unaffected. One duplicate of its definition has diverged: see R5.
+- **Test safety.**
+  - The new real-git tests build repositories under `tmp_path` with `GIT_CEILING_DIRECTORIES` set.
+  - The `GIT_DIR` test makes the other repository before it sets the variables, and `monkeypatch` restores them afterwards.
+  - Each hazard is established by the test's own plain git call, which is a sound independent reference.
+  - None of them touches the real repository under the project's conditions: there are no git hooks or `core.hooksPath`, and the only `GIT_*` variable in the environment is `GIT_EDITOR`.
+  - *Note, not a finding:* the test helpers' own git calls (`make_repository`, and the round-0 real-git helper) do not strip the redirect variables themselves. A suite run started with `GIT_DIR`/`GIT_INDEX_FILE` set, for example from inside a git hook, would have `add`/`commit` act on the real repository. Passing `env` without `provenance.GIT_REDIRECT_VARIABLES` in those helpers would close this cheaply.
+
+### R3: fixed
+
+- The follow-up U1 is in the unit Log and in a `queue.md` line, with both options and "owner decision before freeze". This is what was asked; no code change.
+
+### New findings
+
+#### R4 (low): untracked files can still be hidden by configuration; two docstrings claim otherwise
+
+- **Where.** `lpcstudy/__main__.py:119-120` ("untracked files count, whatever the git configuration says") and `lpcstudy/provenance.py:79-81` ("a user, global or system setting such as `status.showUntrackedFiles=no` cannot hide a file").
+- **Evidence (scratchpad).**
+  - With an untracked `numpy.py`, `git -c core.excludesFile=<file listing numpy.py> status --porcelain --untracked-files=normal --ignore-submodules=none` prints nothing.
+  - The same happens when the setting arrives through `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_0`/`GIT_CONFIG_VALUE_0`, which `GIT_REDIRECT_VARIABLES` does not strip (nor `GIT_CONFIG_PARAMETERS` or `GIT_CONFIG_GLOBAL`).
+  - It also happens with a line in `.git/info/exclude`.
+  - Adding `-c core.excludesFile=/dev/null` restored `?? numpy.py` even with the environment injection.
+  - Here, global and system `core.excludesFile` are unset, `~/.config/git/ignore` is absent, and `.git/info/exclude` holds only `.venv`. So this is not a present defect, but the documented guarantee is false. That matters because the owner will rely on these docstrings at the B8 review.
+- **Fix (owner's choice; provenance code).** Either:
+  - (a) Pass `-c core.excludesFile=/dev/null` to the status call, and drop `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_COUNT` and its `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` from the environment. Add a real-git test using `core.excludesFile`, with the hazard shown by the test's own plain call. `.git/info/exclude` stays a residual that the docstrings must name.
+  - (b) Correct both docstrings to name the residual (global/system or environment `core.excludesFile`, `.git/info/exclude`). Add a WU-0015.1 pre-run item: `git config --show-origin --get-regexp '^core\.excludesfile'` empty, no `GIT_CONFIG_*` variables, `.git/info/exclude` only `.venv`.
+
+#### R5 (low): `tools/lm_doubling.py` `git_dirty` still claims to be the provenance definition, and no longer is
+
+- **Where.** `tools/lm_doubling.py:1388-1392`. It is used as a refusal gate at l. 1749-1752 and recorded in the probe's provenance (l. 1767).
+- **Evidence.**
+  - The docstring says "``bool(git status --porcelain)`` ..., the definition of ``provenance.git_state``".
+  - After R2, `git_state` has explicit untracked and submodule modes, strips the redirect variables and counts index bits. `git_dirty` does none of these.
+  - So the probe can accept, and record as clean, a tree that the arms' own provenance would record as dirty, under the configurations R2 guards against. Its precondition check compares the arms' `dirty` (new definition) with its own (old definition).
+- **Fix.** Preferred: `git_dirty` returns `provenance.git_state(ROOT)[1]`, and `current_commit` returns `[0]` for the same reason. `test_tools_lm_doubling.py` then joins the radius. Alternative: correct the docstring and record the divergence in the unit Log.
+
+#### R6 (low): two texts now misstate what they describe
+
+- **Where.**
+  - `lpcstudy/__main__.py:148-149`. The dirty refusal says "(git status --porcelain is not empty)". Since R2, `dirty` can be true with an empty status, from a skip-worktree or assume-unchanged entry. The one line would then send the owner to a `git status` that shows nothing (PRIME.4: say why).
+  - `tests/unit/test___main__.py:789`. The A6 reference text still says "with the flag and a clean state it returns ``None``", while the assertion is now `== CLEAN_COMMIT`. A test's stated reference must match what it asserts (LPC.PC.21).
+- **Fix.**
+  - Reword the reason, for example "(git status --porcelain is not empty, or a tracked file is hidden by skip-worktree or assume-unchanged)". Update `DIRTY_LINE` (l. 650-651) to match, and record it in the Log as a deliberate message change, not a loosening.
+  - Correct the A6 docstring line.
+
+### Verdict (round 2)
+
+**approve with fixes.** R1, R2 and R3 are fixed. 3 new findings, all low: R4, R5, R6. No path reaches the sealed seed without the first check or output without the second. The unit still **needs owner review before freeze** (seed and provenance code). One fix round (the second and last) remains before `/refer` (DEVELOPMENT_WORKFLOW.md §2.3).
