@@ -3270,3 +3270,69 @@ def test_wu0003_8d_the_run_level_block_sensitive_line_names_parts_and_gaps() -> 
     assert rep.data["run_level"]["block_sensitive"] == {
         "parts": ["rossler H1a rho=0.02"], "n_computable": 23, "n_not_computable": 1,
         "not_computable_parts": ["chua p23"], "exit_code_effect": "none"}
+
+
+# ------------------------------------------------------------------------------------------ WU-0003.8d fix round 1 (review R1)
+def test_wu0003_8d_r1_a_point_outside_its_interval_is_not_computable_not_a_label() -> None:
+    """H1a point 0.70 with the recorded interval [0.749, 1.10] (inconclusive: 0.749 < 0.75): scaling
+    the sides about the point by f = 1.31445 gives [0.76441, 1.22578], which PASSES the closed band
+    [0.75, 1.25]; widening would then "improve" the verdict. The part is not computable (counted,
+    printed, no exit effect) and no BLOCK-SENSITIVE label is raised.
+
+    Reference: hand arithmetic. lower' = 0.70 + f x 0.049 = 0.76441, upper' = 0.70 + f x 0.40 =
+    1.22578; both strictly inside [0.75, 1.25] by more than 0.014, far above round-off (1e-15).
+    """
+    tree = {"H1a": {"by_noise": {"0.01": {"ratio": 0.70, "ratio_ci": [0.749, 1.10],
+                                          "verdict": "inconclusive"}}}}
+    lo, hi = rd.widen_interval(0.70, 0.749, 1.10, STEP_FACTOR)
+    assert lo == pytest.approx(0.70 + STEP_FACTOR * 0.049, abs=1e-12) and lo == pytest.approx(0.76441, abs=1e-5)
+    assert hi == pytest.approx(1.22578, abs=1e-5)
+    assert rd.criterion_verdict(0.70, lo, hi, *rd.VERDICT_RULES["H1a"], n_states=100)[0] == "pass"
+    s = rd.Series("lorenz63", "H1a", "rho=0.01", STEP, True, 100)
+    ctx = step_context(tree)
+    with pytest.raises(rd.NotComputable, match="lies outside its interval"):
+        rd.block_sensitivity(ctx, s)
+    rd._block_sensitivity_lines(ctx, [s])
+    rep = ctx.rep
+    text = "\n".join(rep.lines)
+    assert "block sensitivity not computable: the point estimate 0.7 lies outside its interval" in text
+    assert "BLOCK-SENSITIVE parts" not in text and "0 of 0 computable primary parts; not computable: 1" in text
+    assert not rep.incomplete and not rep.defects and rep.exit_code() == 0
+    data = rep.data["lorenz63"]["block_sensitivity"]
+    assert data["sensitive_parts"] == [] and data["not_computable_parts"] == ["H1a rho=0.01"]
+
+
+@pytest.mark.parametrize("criterion, tree, widened", [
+    ("H3c", {"H3c": {"A5_over_A4_mse": 1.0, "ci": [0.9, math.inf], "verdict": "inconclusive"}},
+     (1.0 - 0.1 * STEP_FACTOR, math.inf)),
+    ("H2b(i)", {"H2b": {"noise": {"mean_state_spearman": 0.2, "ci": [-math.inf, 0.3],
+                                  "verdict": "inconclusive"}}}, (-math.inf, 0.2 + 0.1 * STEP_FACTOR)),
+], ids=["upper bound infinite", "lower bound infinite"])
+def test_wu0003_8d_r1_an_infinite_bound_stays_infinite_and_inconclusive(criterion, tree, widened) -> None:
+    """A3 failed resamples put an infinite bound in the interval: the baseline is inconclusive, the
+    infinite bound stays infinite after widening, the finite one moves by f, and nothing is labelled.
+
+    Reference: hand arithmetic (H3c [0.9, inf] -> [1 - 0.1 f, inf]; H2b(i) [-inf, 0.3] -> [-inf,
+    0.2 + 0.1 f]); no finite bound crosses an edge that matters, since the other side is infinite.
+    """
+    s = rd.Series("lorenz63", criterion, "", STEP, True, 100)
+    got = rd.block_sensitivity(step_context(tree), s)
+    assert got["verdict"] == "inconclusive" and got["widened_verdict"] == "inconclusive"
+    assert got["sensitive"] is False
+    assert got["widened_interval"] == pytest.approx(list(widened), abs=1e-12)
+
+
+def test_wu0003_8d_r1_a_widened_verdict_that_is_not_baseline_or_inconclusive_is_not_computable(
+        monkeypatch) -> None:
+    """The invariant "widened verdict is the baseline or inconclusive" is checked in code: a rule that
+    returned a different verdict for the widened interval (simulated: pass at the baseline, fail
+    after) is not computable, never a label.
+
+    Reference: the specification (more variance cannot flip pass to fail); the simulation replaces
+    ``criterion_verdict`` by a function that answers "pass" and then "fail".
+    """
+    answers = iter([("pass", None), ("fail", None)])
+    monkeypatch.setattr(rd, "criterion_verdict", lambda *a, **k: next(answers))
+    tree = {"H3c": {"A5_over_A4_mse": 1.0, "ci": [0.9, 1.04], "verdict": "pass"}}
+    with pytest.raises(rd.NotComputable, match="neither the baseline \\(pass\\) nor inconclusive"):
+        rd.block_sensitivity(step_context(tree), rd.Series("lorenz63", "H3c", "", STEP, True, 100))

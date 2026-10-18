@@ -52,9 +52,10 @@ What it computes (plan amendment 2, B1 item 7 as amended; mathematics check
   If the verdict changes, the part is labelled "BLOCK-SENSITIVE" (also in ``--json``). The label
   changes no criterion, no verdict, no number of the report and **no exit code**: it is
   informational. A part for which the inputs are missing (a leaf absent or not finite, V*(5) not
-  positive, a baseline verdict recomputed from the interval that differs from the recorded one, a
-  series that could not be built) is counted "not computable" in the label lines and in the
-  ``--json``, and never skipped; because the label is informational, those rows do not add to the
+  positive, the point estimate outside its interval, a baseline verdict recomputed from the
+  interval that differs from the recorded one, a widened verdict that is neither the baseline nor
+  inconclusive, a series that could not be built) is counted "not computable" in the label lines and
+  in the ``--json``, and never skipped; because the label is informational, those rows do not add to the
   "not computable" list that decides the exit code (a series that could not be built is there
   already).
 * **D3.** The log-SD of the per-state evaluation MSE at H_ref of A1, A2, A3, A4 and A5 (reading:
@@ -96,7 +97,9 @@ reproducible. The run's own seed is never read.
 
 Exit codes: 0 everything computed and no mismatch; 1 at least one MISMATCH; 2 unreadable input, a
 usage error, a refused run, an internal error, or at least one "not computable" (the report is still
-printed in full; 1 takes precedence over 2). The seed and the options are printed prominently and
+printed in full; 1 takes precedence over 2). The not-computable rows of the block-sensitive label
+("block sensitivity not computable") are informational and do not count toward exit 2; a part
+whose series could not be built is in the exit-2 list through the series. The seed and the options are printed prominently and
 recorded in the ``--json`` output: rerunning with other options to change a reading is not allowed
 (an owner question).
 """
@@ -1781,8 +1784,9 @@ def block_sensitivity(ctx: Context, s: Series) -> dict:
     Raises
     ------
     NotComputable
-        If a leaf is absent or not finite, V*(5) is not positive, the part has no verdict rule, or
-        the recomputed baseline verdict differs from the recorded one.
+        If a leaf is absent or not finite, V*(5) is not positive, the part has no verdict rule, the
+        point estimate lies outside its interval, the recomputed baseline verdict differs from the
+        recorded one, or the widened verdict is neither the baseline nor inconclusive.
     """
     rule = VERDICT_RULES.get(s.criterion)
     if rule is None:
@@ -1800,12 +1804,19 @@ def block_sensitivity(ctx: Context, s: Series) -> dict:
     if not math.isfinite(point) or math.isnan(lower) or math.isnan(upper) or lower > upper:
         raise NotComputable(f"point {point!r} or interval [{lower!r}, {upper!r}] of {s.name} is "
                             "not usable")
+    if not lower <= point <= upper:  # a percentile interval can exclude the point (skewed bootstrap)
+        raise NotComputable(f"the point estimate {point!r} lies outside its interval [{lower!r}, "
+                            f"{upper!r}] of {s.name}: widening about the point would move the "
+                            "interval away, so the widening is undefined here")
     base, _ = criterion_verdict(point, lower, upper, band, closed, n_states=s.domain)
     if base != recorded:
         raise NotComputable(f"the verdict recomputed from the interval ({base}) differs from the "
                             f"recorded one ({recorded})")
     wide_lower, wide_upper = widen_interval(point, lower, upper, factor)
     wide, _ = criterion_verdict(point, wide_lower, wide_upper, band, closed, n_states=s.domain)
+    if wide not in (base, "inconclusive"):  # more variance cannot improve a verdict or flip pass/fail
+        raise NotComputable(f"the widened verdict ({wide}) is neither the baseline ({base}) nor "
+                            "inconclusive: the first-order widening does not apply to this part")
     return {"point": point, "interval": [lower, upper], "ratio10": ratio, "factor": factor,
             "verdict": base, "widened_interval": [wide_lower, wide_upper],
             "widened_verdict": wide, "sensitive": bool(wide != base), "reason": None}
