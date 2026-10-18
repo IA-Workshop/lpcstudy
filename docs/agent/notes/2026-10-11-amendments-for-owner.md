@@ -291,3 +291,15 @@ Found by the independent review of WU-0003.8d (R3, `docs/agent/records/work/WU-0
 - **WU-0003.6:** reproducibility tolerance: adopt the proposal of section 29 (bitwise/1e-12 at equal contexts; TD statistic at z 2.394, bound 3.4, across devices); sample size: keep the full preset. Decision-entry texts are drafted for the owner to enter (agents do not write ledger entries).
 - **F4 and Q6:** keep both as built; Q6 recorded as a dated plan amendment (planner draft).
 - **Freeze checklist:** prepare now (WU-0004.1, main session).
+
+## 34. Drafts for the owner's decision entries and where the evidence differs from the rulings as worded (2026-10-18; main session)
+
+Drafts: `docs/agent/notes/2026-10-18-owner-decision-drafts.md` (merged; planner claude-opus-5-5). Points the planner found where the evidence does not match the wording of the rulings (for the owner, and carried into the freeze-blocker list):
+1. Tolerance figures: V1 is absolute 1e-12, V2 1e-10; 1e-12 relative applies only to the cp, oracle, dynamics and fixture chain leaves; QoIs and interval endpoints use 1e-4 max(|lo|,|hi|). The draft states them as the tool implements them (the question text said "1e-12 relative where contexts are equal"; read it as the tool's per-chain rules).
+2. No equal-context non-bitwise pair (tiers T1 to T3) was run in the rehearsal (R4 not run): that part rests on the WU-0003.9 kernel-pair evidence.
+3. The z values quoted (2.73, 2.32) are the symmetric form; away-arm values are 2.72 (R1 vs R3) and 2.26 (R5 vs R6). Both pass. OF-5 is looser per part (away alone gives a lower z on 7 of 18 P0/P1 parts); the code change is with the developer (`wu/0003-9c-ruled`).
+4. A TD pass does not reproduce verdicts or the gate: 52 verdict-type leaves differ, and Chua's gate passes on CPU and fails on GPU for DEV-2.
+5. "O4 per DEC-0027" in the sample-size question mixed two questions: DEC-0027 rules on WU-0002.14's O4 (D3 arm pairing); the confirmatory device choice is plan amendment 1's O4, still open.
+6. The ROADMAP WU-0003.4 definition of done is not met as written (no "one core cell" run, no differences table of that form, `tests/gpu/test_reproducibility.py` absent; the 10x rule is degenerate): the row needs the owner's edit, or the owner requires the gpu test.
+7. OF-4: no criterion depends on the old F1 wording, but `lpcstudy/budget.py` (line 702, docstring 565 and 570) prints "indicative worst case <= F1" into every RESULTS.md (R1, R2, R3, R5, R6 carry it; a sealed run would): correcting it is a report-text code change before the freeze.
+8. Q6: amendment 3 C2 says d3 ran on the unedited S3 pair; it exits 2 there (d3 was shown on scratch copies; the committed test is synthetic). Confirm "keep as built" covers d3 as well as d1.
