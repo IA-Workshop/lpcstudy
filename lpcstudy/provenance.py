@@ -35,6 +35,9 @@ ENV_NAMES = ("JAX_PLATFORMS", "XLA_FLAGS", "XLA_PYTHON_CLIENT_PREALLOCATE", "LPC
              "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "PJRT_NPROC", "NPROC",
              "OPENBLAS_CORETYPE", "NPY_DISABLE_CPU_FEATURES")
 GIT_TIMEOUT_SECONDS = 30
+GIT_REDIRECT_VARIABLES = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                          "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_NAMESPACE")
+HIDDEN_TAGS = ("S", "s", "h")   # ``git ls-files -v``: skip-worktree, assume-unchanged
 CPUINFO = Path("/proc/cpuinfo")
 MAPS = Path("/proc/self/maps")
 ISA_FLAGS = ("sse4_1", "sse4_2", "avx", "avx2", "fma", "f16c", "bmi1", "bmi2", "avx_vnni",
@@ -70,13 +73,38 @@ class RunClock:
 def git_state(root: Path) -> tuple[str | None, bool | None, str | None]:
     """Return ``(commit, dirty, error)`` of the repository at ``root``.
 
-    ``dirty`` is ``bool(git status --porcelain)``, so untracked files count. On any
-    failure the result is ``(None, None, <error text>)``; the error is recorded by the
+    ``dirty`` is true when either of two reads shows a difference from ``HEAD``:
+
+    * ``git status --porcelain`` is non-empty (modified, staged or untracked files);
+    * ``git ls-files -v`` shows a tracked file hidden from status by the skip-worktree or
+      assume-unchanged bit (tags ``S``, ``s``, ``h``).
+
+    Hiding routes closed (WU-0004a, R2 and R4): ``status.showUntrackedFiles`` and the submodule
+    setting (the status call names ``--untracked-files=normal --ignore-submodules=none``);
+    ``core.excludesFile`` from any config file or from the environment (the status call sets it to
+    ``/dev/null`` on the command line, and every ``GIT_CONFIG*`` variable is removed from git's
+    environment, which also drops the user's global ignore file); the skip-worktree and
+    assume-unchanged bits; and the variables that redirect git to another repository (``GIT_DIR``,
+    ``GIT_WORK_TREE``, ``GIT_INDEX_FILE`` and the object-store variables are removed).
+
+    Hiding routes **not** closed (accepted limitations, covered by the WU-0015.1 pre-run checks):
+    a file excluded by a ``.gitignore`` in the tree (the project's own declared ignore list), and
+    a line in ``.git/info/exclude``. The second could be closed by listing untracked files with
+    only the in-tree ``.gitignore`` files applied, but a git worktree shares ``info/exclude`` with
+    its main checkout, and the project's worktrees hold a ``.venv`` symlink that the ``.venv/``
+    pattern of ``.gitignore`` does not match and only ``info/exclude`` hides, so that read would
+    make every such worktree record ``dirty: true`` (a change to ordinary development runs). In an
+    ordinary checkout the value of ``dirty`` is unchanged by the closed routes.
+
+    On any failure the result is ``(None, None, <error text>)``; the error is recorded by the
     caller, never dropped.
     """
+    environment = {name: value for name, value in os.environ.items()
+                   if name not in GIT_REDIRECT_VARIABLES and not name.startswith("GIT_CONFIG")}
+
     def run(*args: str) -> str:
         done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True,
-                              timeout=GIT_TIMEOUT_SECONDS)
+                              timeout=GIT_TIMEOUT_SECONDS, env=environment)
         if done.returncode != 0:
             raise RuntimeError(f"git {' '.join(args)} exited {done.returncode}: "
                                f"{done.stderr.strip()[:200]}")
@@ -84,10 +112,13 @@ def git_state(root: Path) -> tuple[str | None, bool | None, str | None]:
 
     try:
         commit = run("rev-parse", "HEAD").strip()
-        dirty = bool(run("status", "--porcelain").strip())
+        status = run("-c", "core.excludesFile=/dev/null", "status", "--porcelain",
+                     "--untracked-files=normal", "--ignore-submodules=none")
+        listing = run("ls-files", "-v")
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         return None, None, f"{type(exc).__name__}: {exc}"
-    return commit, dirty, None
+    hidden = any(line[:1] in HIDDEN_TAGS for line in listing.splitlines())
+    return commit, bool(status.strip()) or hidden, None
 
 
 def peak_rss_bytes() -> int:

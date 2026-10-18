@@ -126,6 +126,170 @@ def test_git_failure_is_recorded_not_silent(tmp_path: Path,
     assert (commit, dirty) == (None, None) and "FileNotFoundError" in str(error)
 
 
+def own_git_env() -> dict[str, str]:
+    """The environment for the tests' own git calls, without the variables that redirect git.
+
+    A suite started from a git hook has ``GIT_DIR`` or ``GIT_INDEX_FILE`` set; without this the
+    ``add`` and ``commit`` of a throwaway repository would act on the real repository. Only the
+    redirecting variables are removed: a hazard test that needs ``GIT_CONFIG_*`` in the plain
+    call inherits it.
+    """
+    return {k: v for k, v in os.environ.items() if k not in provenance.GIT_REDIRECT_VARIABLES}
+
+
+def make_repository(path: Path, text: str = "one\n") -> Path:
+    """A throwaway repository at ``path`` with one committed file ``tracked.txt`` (test's own git)."""
+    path.mkdir()
+    (path / "tracked.txt").write_text(text)
+    for args in (("init", "-q"), ("add", "tracked.txt"),
+                 ("-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "m")):
+        subprocess.run(["git", "-C", str(path), *args], check=True, capture_output=True,
+                       env=own_git_env())
+    return path
+
+
+@pytest.fixture
+def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A committed throwaway repository; ``GIT_CEILING_DIRECTORIES`` stops git from looking above."""
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    return make_repository(tmp_path / "repo")
+
+
+def plain_status(repo: Path, *extra: str) -> str:
+    """``git status --porcelain`` as a user would run it, plus ``extra`` (the test's own call).
+
+    The environment keeps ``GIT_CONFIG*`` (a hazard test sets them) but not the redirect variables.
+    """
+    return subprocess.run(["git", "-C", str(repo), "status", "--porcelain", *extra], check=True,
+                          capture_output=True, text=True, env=own_git_env()).stdout
+
+
+def test_git_state_in_an_ordinary_repository_is_unchanged_by_the_hardening(
+        repository: Path) -> None:
+    """WU-0004a R2: clean is ``(HEAD, False)``; an untracked or an edited tracked file is dirty.
+
+    Reference: the repository is built by the test, so the state is known by construction, and
+    ``commit`` is the test's own ``git rev-parse HEAD``. Exact.
+    """
+    head = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True, env=own_git_env()).stdout.strip()
+    assert provenance.git_state(repository) == (head, False, None)
+    (repository / "new.txt").write_text("x\n")
+    assert provenance.git_state(repository) == (head, True, None)
+    (repository / "new.txt").unlink()
+    (repository / "tracked.txt").write_text("two\n")
+    assert provenance.git_state(repository) == (head, True, None)
+
+
+def test_git_state_counts_untracked_files_whatever_the_git_configuration_says(
+        repository: Path) -> None:
+    """WU-0004a R2: ``status.showUntrackedFiles=no`` cannot hide an untracked file.
+
+    Reference: the precondition is the test's own plain ``git status --porcelain``, which prints
+    nothing under that setting while the file exists (so the hazard is real); the expected
+    ``dirty`` is true by construction.
+    """
+    subprocess.run(["git", "-C", str(repository), "config", "status.showUntrackedFiles", "no"],
+                   check=True, capture_output=True, env=own_git_env())
+    (repository / "numpy.py").write_text("# would shadow the package\n")
+    assert plain_status(repository) == ""
+    assert provenance.git_state(repository)[1] is True
+
+
+@pytest.mark.parametrize("bit", ["--skip-worktree", "--assume-unchanged"])
+def test_git_state_counts_a_change_hidden_by_an_index_bit(repository: Path, bit: str) -> None:
+    """WU-0004a R2: an edited tracked file hidden by skip-worktree or assume-unchanged is dirty.
+
+    Reference: the precondition is the test's own plain status, which prints nothing after the bit
+    is set (the hazard is real); the file really differs from HEAD by construction (edited text).
+    """
+    subprocess.run(["git", "-C", str(repository), "update-index", bit, "tracked.txt"],
+                   check=True, capture_output=True, env=own_git_env())
+    (repository / "tracked.txt").write_text("hidden edit\n")
+    assert plain_status(repository) == ""
+    assert provenance.git_state(repository)[1] is True
+
+
+def test_git_state_counts_an_untracked_file_hidden_by_core_excludes_file_in_config(
+        repository: Path, tmp_path: Path) -> None:
+    """WU-0004a R4: ``core.excludesFile`` naming the file cannot hide it.
+
+    Reference: the precondition is the test's own status with the modes git_state names
+    (``--untracked-files=normal``), which prints nothing while ``numpy.py`` exists, so the
+    hazard is real; the expected ``dirty`` is true by construction.
+    """
+    ignore = tmp_path / "global_ignore"
+    ignore.write_text("numpy.py\n")
+    subprocess.run(["git", "-C", str(repository), "config", "core.excludesFile", str(ignore)],
+                   check=True, capture_output=True, env=own_git_env())
+    (repository / "numpy.py").write_text("# would shadow the package\n")
+    assert plain_status(repository, "--untracked-files=normal") == ""
+    assert provenance.git_state(repository)[1] is True
+
+
+def test_git_state_counts_an_untracked_file_hidden_by_core_excludes_file_in_environment(
+        repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WU-0004a R4: the same setting arriving as ``GIT_CONFIG_COUNT``/``KEY_0``/``VALUE_0``.
+
+    Reference: as above; the precondition status inherits the injected variables and prints
+    nothing, so the hazard is real. ``GIT_CONFIG_*`` must be removed from git's environment.
+    """
+    ignore = tmp_path / "env_ignore"
+    ignore.write_text("numpy.py\n")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.excludesFile")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(ignore))
+    (repository / "numpy.py").write_text("# would shadow the package\n")
+    assert plain_status(repository, "--untracked-files=normal") == ""
+    assert provenance.git_state(repository)[1] is True
+
+
+def test_git_state_does_not_count_a_file_ignored_by_a_tracked_gitignore(
+        repository: Path) -> None:
+    """Accepted limitation (the project's own ``.gitignore`` is honoured), pinned.
+
+    Reference: construction. After committing a ``.gitignore`` that names ``runs/``, a file in
+    ``runs/`` is not dirty (the repository's real ``runs/`` output directory is ignored this way,
+    so a development run next to its own output stays clean). An untracked file that the
+    ``.gitignore`` does not name is dirty, and so is an untracked ``.gitignore`` itself.
+    """
+    (repository / ".gitignore").write_text("runs/\n")
+    for args in (("add", ".gitignore"),
+                 ("-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "g")):
+        subprocess.run(["git", "-C", str(repository), *args], check=True, capture_output=True,
+                       env=own_git_env())
+    (repository / "runs").mkdir()
+    (repository / "runs" / "results.json").write_text("{}\n")
+    assert provenance.git_state(repository)[1] is False
+    (repository / "other.txt").write_text("x\n")
+    assert provenance.git_state(repository)[1] is True
+    (repository / "other.txt").unlink()
+    (repository / "sub").mkdir()
+    (repository / "sub" / ".gitignore").write_text("*.tmp\n")
+    assert provenance.git_state(repository)[1] is True
+
+
+def test_git_state_ignores_a_git_dir_that_points_elsewhere(
+        repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """WU-0004a R2: ``GIT_DIR`` and ``GIT_INDEX_FILE`` in the environment do not redirect it.
+
+    Reference: a second repository with other content (so another HEAD) is dirty by construction.
+    The precondition is the test's own ``git -C <repository> rev-parse HEAD`` with the variable
+    set, which returns the other repository's HEAD (the hazard is real); ``git_state`` must still
+    return the queried repository's own HEAD and a clean state.
+    """
+    other = make_repository(tmp_path / "other", text="different\n")
+    (other / "dirty.txt").write_text("x\n")
+    own = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], check=True,
+                         capture_output=True, text=True, env=own_git_env()).stdout.strip()
+    monkeypatch.setenv("GIT_DIR", str(other / ".git"))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(other / ".git" / "index"))
+    redirected = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], check=True,
+                                capture_output=True, text=True).stdout.strip()
+    assert redirected != own
+    assert provenance.git_state(repository) == (own, False, None)
+
+
 def test_peak_rss_is_positive_and_bracketed_by_the_kernel_counter() -> None:
     """``peak_rss_bytes`` is positive, a whole number of pages and, on Linux, bracketed by ``VmHWM``.
 
