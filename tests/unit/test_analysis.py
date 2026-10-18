@@ -1,5 +1,19 @@
-"""Tests for lpcstudy.analysis: per-state Spearman trend; H1a, H1b and H1d (WU-0002.4 and .5);
-H2a and Q-N (WU-0002.6)."""
+"""Unit tests for :mod:`lpcstudy.analysis`, the statistics behind each
+hypothesis.
+
+``lpcstudy.analysis`` turns forecast errors into a point estimate, a
+block-bootstrap interval and a verdict (pass, fail or inconclusive) for each
+pre-registered hypothesis. These tests cover the per-state Spearman trend, the
+quadratic-control partial correlations of H2a, the Q-N regressions, H1a to H1d,
+H2a to H2e, H3a to H3c, the gain bound, V7, the counters added for silent cases
+(DEF-0001) and the dump hooks.
+
+How the tests are built: each one names an independent reference (a hand
+calculation, a closed form, scipy or scikit-learn, or a plain Python loop) and
+explains its tolerance. Tests called ``test_regression_*`` only guard against a
+change in behavior; they are not evidence of correctness. Cells and scores are
+small stubs, so the whole file runs in seconds on the CPU.
+"""
 
 from __future__ import annotations
 
@@ -80,7 +94,8 @@ LEVEL = (
 CONFIG = dataclasses.replace(
     SMOKE, bootstrap_resamples=200
 )  # 200 resamples, block 5
-SYSTEM = "lorenz63"  # the system label of the bootstrap generators (the stub cells carry it too)
+# The system label of the bootstrap generators (the stub cells carry it too).
+SYSTEM = "lorenz63"
 
 
 def _stub_cell(
@@ -89,10 +104,12 @@ def _stub_cell(
     cp_constant: np.ndarray | None = None,
     plp_constant: np.ndarray | None = None,
 ) -> Cell:
-    """A cell whose test moments have ``w*(H_ref) = weights`` exactly (H_ref = 30, nH = 1).
+    """Build a cell whose test moments have ``w*(H_ref) = weights`` exactly.
 
-    With ``E_P = w``, ``E_C = 1 - w`` and ``C = 0`` the curvature is 1 and ``w* = E_P / 1 = w``
-    (exact for dyadic ``w``). ``err_corr`` and the masks, when given, are ``(n,)`` columns.
+    There is one horizon (``H_ref = 30``). With ``E_P = w``, ``E_C = 1 - w``
+    and cross moment ``C = 0``, the curvature is 1 and ``w* = E_P / 1 = w``
+    (exact for dyadic ``w``, meaning multiples of a power of two). ``err_corr``
+    and the constant-error masks, when given, are columns of shape ``(n,)``.
     """
     n = len(weights)
     zeros = np.zeros((n, 1))
@@ -124,7 +141,7 @@ def _stub_cell(
 
 
 def _has_nan(obj: object) -> bool:
-    """True if a NaN float occurs anywhere in a nested dict/list result."""
+    """Return True if a NaN float occurs anywhere in a nested dict or list."""
     if isinstance(obj, float):
         return math.isnan(obj)
     if isinstance(obj, dict):
@@ -134,8 +151,9 @@ def _has_nan(obj: object) -> bool:
     return False
 
 
-# Six states by the five library sizes (1000, 3162, 10000, 31623, 100000); every entry is a
-# multiple of 1/8, so w* is exact in the stub cells and the means below are exact in binary.
+# Six states by the five library sizes (1000, 3162, 10000, 31623, 100000).
+# Every entry is a multiple of 1/8, so w* is exact in the stub cells and the
+# means below are exact in binary.
 LIB_SIZES = (1_000, 3_162, 10_000, 31_623, 100_000)
 TABLE = np.array(
     [
@@ -152,7 +170,9 @@ TABLE = np.array(
 def _library_cells(
     table: np.ndarray, rhos: tuple[float, ...] = (0.01,)
 ) -> dict:
-    """Library sweep stub: the same weight table at every rho, one column per library size."""
+    """Library-sweep stub: the same weight table at every ``rho``, one column
+    per size.
+    """
     return {
         (rho, n): _stub_cell(table[:, j])
         for rho in rhos
@@ -161,16 +181,19 @@ def _library_cells(
 
 
 def test_per_state_spearman_handles_ties() -> None:
-    """A state whose weight is clipped to 0 at every level has no trend (rho = 0).
+    """A state whose weight is the same at every level has no trend (rho = 0).
 
-    Reference: hand-derived values. A strictly increasing (decreasing) row has rank
-    correlation +1 (-1) with the increasing levels. The all-tied row has an undefined
-    correlation (zero rank variance); 0 is the documented convention of
-    ``_per_state_spearman`` (analysis.py), not a mathematical value.
-    Tolerance: ``np.allclose`` defaults (rtol 1e-5, atol 1e-8), unchanged. The
-    expected values are exact and the computation is a few float64 operations on
-    small integers and half-integers (round-off below 1e-15), so the defaults are
-    far above round-off.
+    The helper under test is ``_per_state_spearman_counted``, the Spearman
+    correlation of each row of weights with the noise levels.
+
+    Reference: hand-derived values. A strictly increasing (decreasing) row has
+    rank correlation +1 (-1) with the increasing levels. The all-tied row has
+    an undefined correlation (zero rank variance); 0 is the documented
+    convention of the code, not a mathematical value.
+
+    Tolerance: ``np.allclose`` defaults (rtol 1e-5, atol 1e-8). The expected
+    values are exact and the computation is a few float64 operations on small
+    numbers (round-off below 1e-15), so the defaults are far above round-off.
     """
 
     values = np.array(
@@ -183,15 +206,16 @@ def test_per_state_spearman_handles_ties() -> None:
 def test_per_state_spearman_partial_ties_and_non_monotone() -> None:
     """Average ranks for partial ties, and a non-monotone row.
 
-    Reference: Spearman's rho as the Pearson correlation of ranks, worked by hand.
-    Levels 1..4 have ranks 1..4, centered (-1.5, -0.5, 0.5, 1.5), sum of squares 5.
-    Row [0, 0, 0.1, 0.2]: average ranks (1.5, 1.5, 3, 4), centered (-1, -1, 0.5, 1.5),
-    sum of squares 4.5, cross sum 1.5 + 0.5 + 0.25 + 2.25 = 4.5, so
-    rho = 4.5 / sqrt(4.5 * 5) = 3 / sqrt(10).
-    Row [1, 3, 2, 4]: ranks (1, 3, 2, 4), centered (-1.5, 0.5, -0.5, 1.5), cross sum
-    2.25 - 0.25 - 0.25 + 2.25 = 4, sum of squares 5, so rho = 4/5.
-    Tolerance ``atol=1e-12``, ``rtol=0``: a handful of float64 operations on numbers
-    of order 1 (error below 1e-15), so 1e-12 leaves three orders of magnitude.
+    Reference: Spearman's rho as the Pearson correlation of the ranks, worked
+    by hand. Levels 1..4 have ranks 1..4, centered (-1.5, -0.5, 0.5, 1.5), with
+    sum of squares 5. Row [0, 0, 0.1, 0.2] has average ranks (1.5, 1.5, 3, 4),
+    centered (-1, -1, 0.5, 1.5), sum of squares 4.5 and cross sum 1.5 + 0.5 +
+    0.25 + 2.25 = 4.5, so rho = 4.5 / sqrt(4.5 * 5) = 3 / sqrt(10). Row [1, 3,
+    2, 4] has ranks (1, 3, 2, 4), centered (-1.5, 0.5, -0.5, 1.5), cross sum
+    2.25 - 0.25 - 0.25 + 2.25 = 4 and sum of squares 5, so rho = 4/5.
+
+    Tolerance: ``atol=1e-12``. A handful of float64 operations on numbers of
+    order 1 gives an error below 1e-15, so 1e-12 leaves three orders of margin.
     """
 
     values = np.array([[0.0, 0.0, 0.1, 0.2], [1.0, 3.0, 2.0, 4.0]])
@@ -200,17 +224,20 @@ def test_per_state_spearman_partial_ties_and_non_monotone() -> None:
 
 
 def test_h2d_is_the_in_distribution_part_only() -> None:
-    """H2d has no shift part and no point-estimate flag: the key set is the six written out below.
+    """H2d has no shift part and no point-estimate flag: its keys are the six
+    below.
 
-    Reference: hand calculation. With A4 per-state squared error exactly 1.05 (1.2) times A3's,
-    the excess ``mean(A4)/mean(A3) - 1`` is 0.05 (0.2), so the 10% criterion (v1 and v3 H2d part
-    (i), unchanged) passes (fails): the whole 95% interval is that single value to a few ulp. The
-    set of keys is the six below (WU-0002.1 removed part (ii) and its three ``shift_*`` keys;
-    WU-0002.9 removed ``in_distribution_pass``, which lifts DEC-0011 O4, and added
-    ``n_failed_resamples``, ``verdict`` and ``reason``; a plan-listed edit of this test).
-    Tolerance ``abs=1e-12`` on the excess: two means and a quotient of float64 numbers of
-    order 1 (relative round-off a few 1e-16, times about 6 operations), 1e-12 is a margin of
-    three orders. The booleans, the verdict and the key set are exact.
+    Reference: hand calculation. With A4's per-state squared error exactly 1.05
+    (1.2) times A3's, the excess ``mean(A4)/mean(A3) - 1`` is 0.05 (0.2), so
+    the 10% criterion passes (fails). The whole 95% interval is that single
+    value to a few ulp (units in the last place). The key set is the six below:
+    WU-0002.1 removed part (ii) and its three ``shift_*`` keys; WU-0002.9
+    removed ``in_distribution_pass`` (which lifts DEC-0011 O4) and added
+    ``n_failed_resamples``, ``verdict`` and ``reason``.
+
+    Tolerance: ``abs=1e-12`` on the excess (two means and a quotient of numbers
+    of order 1, about 6 operations at a few 1e-16 each, so three orders of
+    margin). The booleans, the verdict and the key set are compared exactly.
     """
 
     base = np.random.default_rng(7).uniform(1.0, 2.0, 60)
@@ -243,16 +270,21 @@ def test_h2d_is_the_in_distribution_part_only() -> None:
         assert out["reason"] is None and out["n_failed_resamples"] == 0
 
 
-# ------------------------------------------------------------------ H2a (WU-0002.6(b))
-# Tests for H2a(i) initial segments and H2a(ii) with quadratic seed controls (DEC-0008 A1, A3,
-# A4(a), A4(a2), A4(b)). Plan checks T4 to T9 of WU-0002.6, with the applied-mathematician's
-# tightenings of docs/agent/notes/2026-10-11-math-wu0002-6.md (T9 at n = 2000, exact targets).
+# --------------------------------------------------------- H2a (WU-0002.6(b))
+# Tests for H2a(i) initial segments and H2a(ii) with quadratic seed controls
+# (DEC-0008 A1, A3, A4(a), A4(a2), A4(b)). Plan checks T4 to T9 of WU-0002.6,
+# with the applied-mathematician's tightenings of
+# docs/agent/notes/2026-10-11-math-wu0002-6.md (T9 at n = 2000, exact targets).
 
 PRIMARY = 1.0 - 0.05 / 3.0
 
 
 def _hand_controls(x: np.ndarray) -> np.ndarray:
-    """Q = [x1, x2, x1^2, x2^2, x1 x2] of a centred (n, 2) array, written out by hand."""
+    """The controls ``Q = [x1, x2, x1^2, x2^2, x1 x2]`` of a centered ``(n,
+    2)`` array.
+
+    Written out by hand, so the test does not reuse the code under test.
+    """
     c = x - x.mean(axis=0)
     return np.column_stack(
         [
@@ -268,7 +300,10 @@ def _hand_controls(x: np.ndarray) -> np.ndarray:
 def _qr_partial_corr(
     target: np.ndarray, variable: np.ndarray, controls: np.ndarray
 ) -> float:
-    """Partial correlation by explicit QR residuals and a hand Pearson (independent reference)."""
+    """Partial correlation by QR residuals and a hand-written Pearson formula.
+
+    An independent reference: it avoids both ``lstsq`` and ``np.corrcoef``.
+    """
     design = np.column_stack([np.ones(len(target)), controls])
     q_mat, _ = np.linalg.qr(design)
     res_t = target - q_mat @ (q_mat.T @ target)
@@ -280,10 +315,11 @@ def _qr_partial_corr(
 
 
 def test_quadratic_controls_columns_and_contract() -> None:
-    """``quadratic_controls`` returns [x1, x2, x1^2, x2^2, x1 x2] of the centred seeds.
+    """``quadratic_controls`` returns the five columns of the centered seeds.
 
-    Reference: the five columns written out by hand from the centred input. Tolerance: exact
-    (``==``): the same float operations. Bad shapes and non-finite input raise (PRIME.4).
+    Reference: the five columns written out by hand from the centered input.
+    Tolerance: exact (``==``), since both sides do the same float operations.
+    Input of the wrong shape or with non-finite entries raises (PRIME.4).
     """
 
     x = np.random.default_rng(3).normal(size=(40, 2)) + 5.0
@@ -297,13 +333,17 @@ def test_quadratic_controls_columns_and_contract() -> None:
 
 
 def test_partial_correlation_with_quadratic_controls_constructed_case() -> None:
-    """T4(a): target q + u and variable p + u + v give exactly 1/sqrt(2).
+    """T4(a): a constructed target and variable give exactly ``1/sqrt(2)``.
 
-    Reference: closed form. q, p are in span[1, Q]; u, v are orthonormal and orthogonal to
-    every column of [1, Q] (from the QR of [1, Q, a, b] at n = 200), so after partialling out
-    the controls the correlation of u and u + v is u.(u + v) / (|u| |u + v|) = 1 / sqrt(2).
-    Tolerance 1e-12: cond([1, Q]) is about 10 after centring, so round-off is about
-    cond * eps = 1e-14, two orders below.
+    Reference: closed form. The vectors ``q`` and ``p`` lie in the span of
+    ``[1, Q]``, while ``u`` and ``v`` are orthonormal and orthogonal to every
+    column of ``[1, Q]`` (taken from the QR factorization of ``[1, Q, a, b]``
+    at n = 200). The target is ``q + u`` and the variable ``p + u + v``. After
+    the controls are removed, the correlation of ``u`` and ``u + v`` is ``u.(u
+    + v) / (|u| |u + v|) = 1 / sqrt(2)``.
+
+    Tolerance: 1e-12. The condition number of ``[1, Q]`` is about 10 after
+    centering, so round-off is about cond * eps = 1e-14, two orders below.
     """
 
     rng = np.random.default_rng(11)
@@ -325,12 +365,16 @@ def test_partial_correlation_with_quadratic_controls_constructed_case() -> None:
 def test_partial_correlation_with_quadratic_controls_matches_qr_reference() -> (
     None
 ):
-    """T4(b): on random data (n = 200) the code equals explicit QR residuals and a hand Pearson.
+    """T4(b): on random data (n = 200) the code equals QR residuals plus a hand
+    Pearson.
 
-    Reference: ``np.linalg.qr`` projection and a hand-written Pearson formula (independent of
-    ``lstsq`` and ``np.corrcoef``). Tolerance 1e-12 (round-off about cond * eps = 1e-14).
-    The same agreement holds for the centring chosen on a resample: T4(c) re-centred controls
-    give the same value, because span[1, Q] does not change under translation.
+    Reference: ``np.linalg.qr`` projection and a hand-written Pearson formula
+    (independent of ``lstsq`` and ``np.corrcoef``). The same agreement holds
+    for the centering chosen on a resample (T4(c)): re-centered controls give
+    the same value, because the span of ``[1, Q]`` does not change under
+    translation.
+
+    Tolerance: 1e-12 (round-off about cond * eps = 1e-14).
     """
 
     rng = np.random.default_rng(12)
@@ -347,22 +391,26 @@ def test_partial_correlation_with_quadratic_controls_matches_qr_reference() -> (
     )
     idx = rng.integers(0, 200, 200)  # a resample with repeats
     resampled = partial_correlation(target[idx], variable[idx], controls[idx])
-    recentred = partial_correlation(
+    recentered = partial_correlation(
         target[idx], variable[idx], _hand_controls(x[idx])
     )
-    assert abs(resampled - recentred) < 1e-12
+    assert abs(resampled - recentered) < 1e-12
 
 
 def _synthetic(
     model: str, n: int, rng: np.random.Generator, tail: float = 0.02
 ) -> dict:
-    """Synthetic H2a models S0, S1, S2, S0n (math note Q-A8); returns the arrays and params.
+    """Synthetic H2a models S0, S1, S2 and S0n; returns the arrays.
 
-    x ~ N(0, [[1, .5], [.5, 1]]); z, e, eta, g iid N(0, 1). With bump = a (x1^2 - 1):
-    Lam = .5 x1 - .3 x2 + z + bump; L = 2 (x2 - x1) + bI z + 1.2 e + bump;
-    h = .8 x1 - .4 x2 + bZ z + eta + bump; w* = 0 iff h > c0 = Phi^-1(.7) sqrt(Var h), with
-    Var h = .48 + bZ^2 + 1 + 2 a^2 (population); else w* = 1 iff g > Phi^-1(1 - tail); else
-    sigmoid(L). S0: bI = bZ = a = 0; S1: bI = .447; S2: bZ = .5; S0n: a = .6.
+    The seeds ``x`` are normal with covariance ``[[1, .5], [.5, 1]]``; ``z, e,
+    eta, g`` are independent standard normals. With ``bump = a (x1^2 - 1)``:
+    ``Lam = .5 x1 - .3 x2 + z + bump``, ``L = 2 (x2 - x1) + bI z + 1.2 e +
+    bump`` and ``h = .8 x1 - .4 x2 + bZ z + eta + bump``. The weight is ``w* =
+    0`` iff ``h > c0 = Phi^-1(.7) sqrt(Var h)``, where ``Var h = .48 + bZ^2 + 1
+    + 2 a^2`` (population); otherwise ``w* = 1`` iff ``g > Phi^-1(1 - tail)``;
+    otherwise ``sigmoid(L)``. The models are S0 (bI = bZ = a = 0), S1 (bI =
+    .447), S2 (bZ = .5) and S0n (a = .6). See the mathematics note, question
+    Q-A8.
     """
 
     b_i, b_z, a = {
@@ -385,7 +433,7 @@ def _synthetic(
 
 
 def _run_part_ii(data: dict, seed: int = 2) -> dict:
-
+    """Run ``h2a_part_ii`` on a synthetic data set with 2000 resamples."""
     return h2a_part_ii(
         data["w"],
         data["lam"],
@@ -398,7 +446,9 @@ def _run_part_ii(data: dict, seed: int = 2) -> dict:
 
 
 def _assert_recovery(result: dict, targets: dict[str, float]) -> None:
-    """Point estimates within 4/sqrt(n_part) of the exact population values."""
+    """Check the point estimates are within ``4/sqrt(n_part)`` of the true
+    values.
+    """
     for name, truth in targets.items():
         part = result["part_ii"][name]
         assert abs(part["partial_corr"] - truth) < 4.0 / np.sqrt(
@@ -407,16 +457,20 @@ def _assert_recovery(result: dict, targets: dict[str, float]) -> None:
 
 
 def test_recovery_under_the_null_models_no_part_fails() -> None:
-    """T9, S0 and S0n: every population value is exactly 0; no part fails; points recovered.
+    """T9, S0 and S0n: every population value is exactly 0, so no part may
+    fail.
 
-    Reference: exact population values (math note Q-A8): with quadratic controls the residual
-    of Lambda_tilde is z (S0) or z (S0n: the bump lies in span[1, Q]), independent of every
-    target and filter, so each part has population value 0. Tolerance: 4/sqrt(n_part) on the
-    point (the SD of r-hat is at most 1.02/sqrt(n_part); 4 SD gives a false-failure probability
-    of about 1e-4 per check). Verdict: no part may fail; the no-fail margins of (ii-b) at
-    n = 2000, R = 2000 (reviewer's measurement, 40 replicates, S0) are 5.3 SD on the upper
-    bound, (E[hi] + 0.1)/SD(hi), and 5.8 SD on the lower bound, (0.1 - E[lo])/SD(lo). Seeds
-    fixed in the test.
+    Reference: exact population values (math note Q-A8). With quadratic
+    controls the residual of Lambda_tilde is ``z`` (for S0n too, since the bump
+    lies in the span of ``[1, Q]``), independent of every target and filter, so
+    each part has population value 0.
+
+    Tolerance: 4/sqrt(n_part) on the point estimate. The standard deviation of
+    the estimate is at most 1.02/sqrt(n_part), so 4 SD gives a false-failure
+    probability of about 1e-4 per check. For the verdict, the reviewer measured
+    the no-fail margins of (ii-b) at n = 2000, R = 2000 (40 replicates, S0) as
+    5.3 SD on the upper bound and 5.8 SD on the lower bound. Seeds are fixed in
+    the test.
     """
     for model, seed in (("S0", 101), ("S0n", 102)):
         data = _synthetic(model, 2000, np.random.default_rng(seed))
@@ -432,13 +486,16 @@ def test_recovery_under_the_null_models_no_part_fails() -> None:
 
 
 def test_recovery_with_three_parts_under_the_null() -> None:
-    """T9, S0 with about 8% at w* = 1: part (ii-c) is added; all targets are 0; none fails.
+    """T9, S0 with about 8% of states at ``w* = 1``: part (ii-c) is added; none
+    fails.
 
-    Reference: exact value 0 for each part (the indicator 1{w* = 1} depends on g only, which is
-    independent of Lambda_tilde given the seeds). Tolerance as in the other null checks.
+    Reference: the exact value 0 for each part (the indicator ``1{w* = 1}``
+    depends on ``g`` only, which is independent of Lambda_tilde given the
+    seeds). Tolerance as in the other null checks.
     """
 
-    tail = 0.115  # P(g > t) among the 70% non-zero states: about 8% of all states at w* = 1
+    # P(g > t) among the 70% non-zero states: about 8% of all states at w* = 1.
+    tail = 0.115
     data = _synthetic("S0", 2000, np.random.default_rng(103), tail=tail)
     assert 0.05 < np.mean(data["w"] == 1.0) < 0.11 and norm.ppf(1.0 - tail) > 0
     result = _run_part_ii(data)
@@ -449,14 +506,17 @@ def test_recovery_with_three_parts_under_the_null() -> None:
 
 
 def test_recovery_s1_interior_part_fails_and_zero_part_does_not() -> None:
-    """T9, S1: (ii-b) population value 0.447 / sqrt(0.447^2 + 1.44) = 0.3490686853 fails.
+    """T9, S1: part (ii-b) has population value 0.3490686853 and must fail.
 
-    Reference: closed form (the partial correlation of z + L's residual): the residual of the
-    logit given the controls is bI z + 1.2 e, so r = bI / sqrt(bI^2 + 1.44), and (ii-a) is 0
-    because the hurdle does not depend on z. Tolerance 4/sqrt(n_part). Fail margin at n = 2000,
-    R = 2000, blocks of 5 (reviewer's measurement, 40 replicates): 6.9 SD of the lower bound,
-    that is (E[lo] - 0.1)/SD(lo) with E[lo] = 0.291 and SD(lo) = 0.0275. The no-fail margin on
-    (ii-a) is the math note's 7.0 SD (15 bootstraps; not re-measured by the reviewer).
+    Reference: closed form. The residual of the logit given the controls is
+    ``bI z + 1.2 e``, so ``r = bI / sqrt(bI^2 + 1.44)``; part (ii-a) is 0
+    because the hurdle does not depend on ``z``.
+
+    Tolerance: 4/sqrt(n_part). The fail margin at n = 2000, R = 2000, blocks of
+    5 (reviewer's measurement, 40 replicates) is 6.9 SD of the lower bound:
+    (E[lo] - 0.1)/SD(lo) with E[lo] = 0.291 and SD(lo) = 0.0275. The no-fail
+    margin on (ii-a) is the math note's 7.0 SD (15 bootstraps; not
+    re-measured).
     """
     result = _run_part_ii(_synthetic("S1", 2000, np.random.default_rng(104)))
     _assert_recovery(result, {"zero": 0.0, "interior": 0.3490686853})
@@ -466,13 +526,16 @@ def test_recovery_s1_interior_part_fails_and_zero_part_does_not() -> None:
 
 
 def test_recovery_s2_zero_part_fails_and_interior_part_does_not() -> None:
-    """T9, S2: (ii-a) population value 0.3157925466 fails; (ii-b) is 0; (ii-c) -0.0225107081.
+    """T9, S2: part (ii-a) has population value 0.3157925466 and must fail.
 
-    Reference: (ii-a) by 2-D Gauss-Hermite quadrature of Cov(1{h > c0}, z) (stable to 10 digits
-    from 40 to 160 nodes; math note Q-A8); (ii-b): the logit residual 1.2 e is independent of
-    the selection; (ii-c) is not triggered at 1.4% of states and is not asserted here.
-    Tolerance 4/sqrt(n_part); fail margin at least 9.1 SD, no-fail margin on (ii-b) at least
-    5.75 SD.
+    Reference: part (ii-a) by 2-D Gauss-Hermite quadrature of ``Cov(1{h > c0},
+    z)`` (stable to 10 digits from 40 to 160 nodes; math note Q-A8). Part
+    (ii-b) is 0 because the logit residual ``1.2 e`` is independent of the
+    selection. Part (ii-c) is not triggered at 1.4% of states and is not
+    asserted.
+
+    Tolerance: 4/sqrt(n_part). The fail margin is at least 9.1 SD and the
+    no-fail margin on (ii-b) at least 5.75 SD.
     """
     result = _run_part_ii(_synthetic("S2", 2000, np.random.default_rng(105)))
     _assert_recovery(result, {"zero": 0.3157925466, "interior": 0.0})
@@ -484,12 +547,19 @@ def test_recovery_s2_zero_part_fails_and_interior_part_does_not() -> None:
 def test_quadratic_controls_remove_the_nonlinear_confound_that_linear_ones_miss() -> (
     None
 ):
-    """T9, S0n: with linear controls (ii-a) is about 0.306 (>= 0.05); with quadratic it is <= 0.0065.
+    """T9, S0n: linear controls leave a false correlation; quadratic ones
+    remove it.
 
-    Reference: independent QR partial correlation (not the code under test) on n = 4e5 states;
-    exact population values 0.306 (Monte Carlo, SE 0.002) with linear controls and 0 with
-    quadratic ones. Tolerance: the quadratic value must be below 0.0065, which is 4 SE of
-    sqrt(1/n) = 0.0016; the linear value must be at least 0.05, about 150 SE below its value.
+    With linear controls part (ii-a) is about 0.306 (at least 0.05); with
+    quadratic controls it is at most 0.0065.
+
+    Reference: an independent QR partial correlation (not the code under test)
+    on n = 4e5 states. The population values are 0.306 (Monte Carlo SE 0.002)
+    with linear controls and 0 with quadratic ones.
+
+    Tolerance: the quadratic value must be below 0.0065, which is 4 SE of
+    ``sqrt(1/n) = 0.0016``; the linear value must be at least 0.05, about 150
+    SE below its true value.
     """
     data = _synthetic("S0n", 400_000, np.random.default_rng(106))
     zero = (data["w"] == 0.0).astype(float)
@@ -502,14 +572,17 @@ def test_quadratic_controls_remove_the_nonlinear_confound_that_linear_ones_miss(
 
 
 def test_parts_share_the_resamples_and_refit_inside_each_one() -> None:
-    """The parts use the same index sets, domain filters are applied inside, fits are redone.
+    """The parts use the same index sets, filter inside each resample and
+    refit.
 
-    Reference: an independent loop over ``block_resample_indices`` (same integer seed) that
-    filters the interior states inside each resample and calls ``_qr_partial_corr`` (QR, not
-    lstsq) with controls centred on the full sample; the intervals of the code equal those of
-    ``percentile_interval`` on the reference values. Tolerance 1e-10: the reference differs
-    from the code only by round-off (QR against lstsq, about 1e-14 per value, quantiles
-    interpolate two of them).
+    Reference: an independent loop over ``block_resample_indices`` (same
+    integer seed) that filters the interior states inside each resample and
+    calls ``_qr_partial_corr`` (QR, not lstsq) with controls centered on the
+    full sample. The intervals of the code must equal ``percentile_interval``
+    of the reference values.
+
+    Tolerance: 1e-10. The reference differs from the code only by round-off (QR
+    against lstsq, about 1e-14 per value; quantiles interpolate two values).
     """
 
     data = _synthetic("S1", 300, np.random.default_rng(107))
@@ -549,13 +622,17 @@ def test_parts_share_the_resamples_and_refit_inside_each_one() -> None:
 
 
 def test_constant_indicator_resamples_are_counted_as_failed() -> None:
-    """A resample whose indicator is constant is a failed resample, counted, not dropped (A3).
+    """A resample with a constant indicator is a counted failure, not dropped
+    (A3).
 
-    Reference: the count of resamples (from ``block_resample_indices``, same integer seed) in
-    which the 1{w* = 0} indicator is constant, computed here by hand. With 3 zeros among 100
-    states, many resamples hold none. Tolerance: exact integer. The failures reach the
-    threshold floor((B - 1) a) + 1, so both bounds are infinite and the part is inconclusive
-    with the reason of ``criterion_verdict`` (never a pass or fail from the finite part).
+    Reference: the number of resamples (from ``block_resample_indices``, same
+    integer seed) in which the ``1{w* = 0}`` indicator is constant, counted
+    here by hand. With 3 zeros among 100 states, many resamples hold none.
+
+    Tolerance: exact integer. The failures reach the threshold ``floor((B - 1)
+    a) + 1``, so both bounds are infinite and the part is inconclusive with the
+    reason from ``criterion_verdict`` (never a pass or fail from the finite
+    part).
     """
 
     rng = np.random.default_rng(108)
@@ -581,11 +658,13 @@ def test_constant_indicator_resamples_are_counted_as_failed() -> None:
 
 
 def test_third_part_triggers_at_six_of_one_hundred_and_not_at_five() -> None:
-    """T5: the indicator is ``w == 0.0``, the interior is ``0 < w < 1``, (ii-c) needs > 5%.
+    """T5: the third part needs more than 5% of states at ``w* = 1``.
 
-    Reference: hand counts on constructed weights (n = 100): 6 states at w* = 1 give
-    20 * 6 > 100 so the third part exists; 5 give 20 * 5 = 100, not strictly more, so it does
-    not. ``np.clip`` returns exact 0.0 and 1.0, so equality tests are exact. Tolerance: exact.
+    Reference: hand counts on constructed weights (n = 100). With 6 states at
+    ``w* = 1``, ``20 * 6 > 100`` so the third part exists; with 5, ``20 * 5 =
+    100`` is not strictly more, so it does not. The zero indicator is ``w ==
+    0.0`` and the interior is ``0 < w < 1``; ``np.clip`` returns exact 0.0 and
+    1.0, so the equality tests are exact. Tolerance: exact.
     """
 
     rng = np.random.default_rng(109)
@@ -606,13 +685,16 @@ def test_third_part_triggers_at_six_of_one_hundred_and_not_at_five() -> None:
 def test_part_ii_verdicts_use_the_open_band_and_the_multi_part_rule(
     monkeypatch,
 ) -> None:
-    """T7: band (-0.1, 0.1) open; (ii) fails iff any part fails, passes iff all pass; n = 49/50.
+    """T7: band (-0.1, 0.1) is open; (ii) fails iff any part fails; n = 49 vs
+    50.
 
-    Reference: hand-enumerated cases on crafted bootstrap values: the patched ``bootstrap_values``
-    returns columns that are half ``lo`` and half ``hi``, so the percentile interval is exactly
-    ``(lo, hi)`` (quantiles at 0.0083 and 0.9917 of a two-valued column). Cases: (-0.0999,
-    0.0999) passes; (-0.1, 0.05) is inconclusive (open edge); (0.1, 0.3) fails; (-0.3, -0.1)
-    fails. Combination enumerated over the 3^2 and 3^3 verdict triples. Tolerance: exact.
+    Reference: hand-enumerated cases on crafted bootstrap values. The patched
+    ``bootstrap_values`` returns columns that are half ``lo`` and half ``hi``,
+    so the percentile interval is exactly ``(lo, hi)`` (quantiles at 0.0083 and
+    0.9917 of a two-valued column). Cases: (-0.0999, 0.0999) passes; (-0.1,
+    0.05) is inconclusive (open edge); (0.1, 0.3) fails; (-0.3, -0.1) fails.
+    The combination is enumerated over all 3^2 and 3^3 triples of verdicts.
+    Tolerance: exact.
     """
 
     import lpcstudy.analysis as an
@@ -664,7 +746,8 @@ def test_part_ii_verdicts_use_the_open_band_and_the_multi_part_rule(
             else "pass" if set(triple) == {"pass"} else "inconclusive"
         )
         assert out["part_ii_verdict"] == want
-    # (-0.3, -0.1) fails at the other edge; n = 49 is inconclusive, n = 50 is computed (A3).
+    # (-0.3, -0.1) fails at the other edge; n = 49 is inconclusive, n = 50 is
+    # computed (A3).
     assert (
         run([(-0.3, -0.1), (0.0, 0.05)], 100, 0)["part_ii"]["zero"]["verdict"]
         == "fail"
@@ -681,9 +764,11 @@ def test_part_ii_verdicts_use_the_open_band_and_the_multi_part_rule(
 
 
 def test_part_ii_rejects_bad_input() -> None:
-    """Bad input raises (PRIME.4): length mismatch, weights outside [0, 1], non-finite weights.
+    """Bad input raises (PRIME.4).
 
-    Reference: the contract of ``h2a_part_ii``. Tolerance: none.
+    The cases are a length mismatch, weights outside [0, 1] and non-finite
+    weights. Reference: the documented contract of ``h2a_part_ii``. Tolerance:
+    none.
     """
 
     rng = np.random.default_rng(111)
@@ -715,12 +800,13 @@ T8_WEIGHT = np.array(
         [0.50, 0.50, 0.50],
     ]
 )
-# Ranges by hand: state 0 over horizons 1, 2, 4: 0.50 - 0.10; state 1 over 1, 2: 0.60 - 0.20.
+# Ranges by hand: state 0 over horizons 1, 2, 4: 0.50 - 0.10; state 1 over
+# horizons 1, 2: 0.60 - 0.20.
 T8_RANGE_0, T8_RANGE_1 = 0.50 - 0.10, 0.60 - 0.20
 
 
 def _t8(**kw):
-
+    """Run ``h2a_initial_segments`` on the hand-built table T8."""
     return h2a_initial_segments(
         T8_WEIGHT,
         T8_SMALL,
@@ -734,15 +820,19 @@ def _t8(**kw):
 
 
 def test_initial_segments_on_a_hand_built_table() -> None:
-    """T8: L = 3, 2, 1, 1, 0, 0; ranges by hand; non-contiguous states counted; complete case.
+    """T8: L = 3, 2, 1, 1, 0, 0; ranges by hand; non-contiguous states;
+    complete case.
 
-    Reference: hand enumeration. Small sets {1,2,4}, {1,2}, {1}, {1,4}, {2,4}, {} give L = 3, 2,
-    1, 1, 0, 0, so states 0 and 1 are eligible (ranges 0.50 - 0.10 over three horizons, and
-    0.60 - 0.20 over the first two; state 1's third horizon is ignored although w* = 0.90 would
-    widen the range). The v1 rule (at least two small horizons) admitted states 0, 1, 3, 4; of
-    these 3 ({1,4}) and 4 ({2,4}) are not initial segments, so 2 are non-contiguous. The
-    complete-case median equals the median of the {1,2,4} span. Tolerance: exact (``==``); the
-    reference uses the same float subtraction.
+    Reference: hand enumeration. The small sets {1,2,4}, {1,2}, {1}, {1,4},
+    {2,4}, {} give L = 3, 2, 1, 1, 0, 0, so states 0 and 1 are eligible. Their
+    ranges are 0.50 - 0.10 over three horizons and 0.60 - 0.20 over the first
+    two (state 1's third horizon is ignored although ``w* = 0.90`` would widen
+    the range). The v1 rule (at least two small horizons) admitted states 0, 1,
+    3 and 4; of these, 3 ({1,4}) and 4 ({2,4}) are not initial segments, so 2
+    are non-contiguous. The complete-case median equals the median of the
+    {1,2,4} span.
+
+    Tolerance: exact (``==``); the reference uses the same float subtraction.
     """
     out = _t8()
     assert out["n_eligible_states"] == 2 and out["n_excluded_states"] == 4
@@ -767,13 +857,14 @@ def test_initial_segments_on_a_hand_built_table() -> None:
 def test_initial_segments_resampled_statistic_on_an_index_array_with_repeats(
     monkeypatch,
 ) -> None:
-    """T8: the resampled statistic on a hand index array with repeats gives the hand median.
+    """T8: the resampled statistic on an index array with repeats gives the
+    hand median.
 
-    Reference: hand medians. The index array [0, 0, 1, 2, 5, 1] holds eligible states 0, 0, 1, 1
-    (median of [r0, r0, r1, r1] = (r0 + r1) / 2 with r0 = 0.4, r1 = 0.4 at the same float
-    values), and complete cases 0, 0 (median r0). With [2, 3, 4, 5] (no eligible state) the
-    statistic is NaN, which the bootstrap counts as failed. Tolerance: exact. The statistic is
-    captured by patching ``bootstrap_values`` in the module under test.
+    Reference: hand medians. The index array [0, 0, 1, 2, 5, 1] holds eligible
+    states 0, 0, 1, 1 (median of [r0, r0, r1, r1] = (r0 + r1) / 2) and complete
+    cases 0, 0 (median r0). With [2, 3, 4, 5] (no eligible state) the statistic
+    is NaN, which the bootstrap counts as failed. The statistic is captured by
+    patching ``bootstrap_values`` in the module under test. Tolerance: exact.
     """
     import lpcstudy.analysis as an
 
@@ -798,13 +889,15 @@ def test_initial_segments_resampled_statistic_on_an_index_array_with_repeats(
 
 
 def test_initial_segments_pass_when_every_range_is_small() -> None:
-    """60 identical eligible states with range 0.02 give interval (0.02, 0.02) and a pass.
+    """Sixty identical eligible states with range 0.02 give a degenerate
+    interval and a pass.
 
-    Reference: hand values. Each state has small set {1,2} and weights (0.30, 0.32, 0.9); its
-    range is taken over the first two horizons only (0.32 - 0.30), not over the third (0.9
-    would give 0.6). The interval is degenerate because every resample holds the same value;
-    the upper bound is below 0.1, so ``criterion_verdict`` gives "pass"; the {1,2,4} span is
-    empty (median NaN, count 0). Tolerance: exact (the same float subtraction).
+    Reference: hand values. Each state has small set {1,2} and weights (0.30,
+    0.32, 0.9). Its range is taken over the first two horizons only (0.32 -
+    0.30), not over the third (0.9 would give 0.6). The interval is degenerate
+    because every resample holds the same value; the upper bound is below 0.1,
+    so ``criterion_verdict`` gives "pass". The {1,2,4} span is empty (median
+    NaN, count 0). Tolerance: exact (the same float subtraction).
     """
 
     weight = np.tile([0.30, 0.32, 0.9], (60, 1))
@@ -829,13 +922,15 @@ def test_initial_segments_pass_when_every_range_is_small() -> None:
 
 
 def test_initial_segments_band_is_open_at_the_upper_edge() -> None:
-    """H2a(i): pass iff the upper bound is below 0.1; fail iff the lower bound is at least 0.1.
+    """H2a(i): pass iff the upper bound is below 0.1; fail iff the lower bound
+    is >= 0.1.
 
-    Reference: hand cases on 60 states: all weights equal give range 0 (upper bound 0 < 0.1:
-    pass); weights (0.125, 0.25, 0.125) give range 0.25 - 0.125 = 0.125 exactly (lower bound
-    0.125 >= 0.1: fail). The edge itself (lower bound exactly 0.1 fails, upper bound exactly 0.1
-    does not pass) is the job of ``criterion_verdict`` and is tested with it in test_statistics.
-    Tolerance: exact.
+    Reference: hand cases on 60 states. All weights equal give range 0 (upper
+    bound 0 < 0.1: pass). Weights (0.125, 0.25, 0.125) give range 0.25 - 0.125
+    = 0.125 exactly (lower bound 0.125 >= 0.1: fail). The edge itself (a lower
+    bound of exactly 0.1 fails, an upper bound of exactly 0.1 does not pass)
+    belongs to ``criterion_verdict`` and is tested with it in
+    ``test_statistics``. Tolerance: exact.
     """
 
     small = np.ones((60, 3), bool)
@@ -856,19 +951,22 @@ def test_initial_segments_band_is_open_at_the_upper_edge() -> None:
     )
 
 
-# ------------------------------------------------------------------ Q-N (WU-0002.6(c))
+# --------------------------------------------------------- Q-N (WU-0002.6(c))
 # Plan checks T1 to T3 of WU-0002.6 (DEC-0008 A4(a), A4(c); v3 section 7 table).
 
 
 def test_qn_reading_returns_each_reading_at_the_table_boundaries() -> None:
-    """T1: ``qn_reading`` follows the v3 section 7 table, exactly, on unrounded float64 bounds.
+    """T1: ``qn_reading`` follows the v3 section 7 table exactly, on unrounded
+    bounds.
 
-    Reference: the table, enumerated by hand: upper < 0.05 and lower <= 0: "reduces"; lower > 0
-    and upper < 0.05: "distinct but small"; lower > 0 and upper >= 0.05: "substantial";
-    otherwise "undetermined". Cases: (0, 0.04) reduces; (0, 0.05) undetermined (an upper bound
-    of exactly 0.05 is "not < 0.05" and a lower bound of exactly 0 is "not > 0");
-    (nextafter(0, 1), nextafter(0.05, 0)) distinct but small; (0.01, 0.05) substantial;
-    (-0.01, 0.06) undetermined; a NaN bound is undetermined. Tolerance: exact strings.
+    Reference: the table, enumerated by hand. Upper < 0.05 and lower <= 0:
+    "reduces". Lower > 0 and upper < 0.05: "distinct but small". Lower > 0 and
+    upper >= 0.05: "substantial". Otherwise: "undetermined". Cases: (0, 0.04)
+    reduces; (0, 0.05) is undetermined (an upper bound of exactly 0.05 is not
+    below 0.05 and a lower bound of exactly 0 is not above 0); (nextafter(0,
+    1), nextafter(0.05, 0)) is distinct but small; (0.01, 0.05) is substantial;
+    (-0.01, 0.06) is undetermined; a NaN bound is undetermined. Tolerance:
+    exact strings.
     """
 
     assert qn_reading(0.0, 0.04) == "reduces"
@@ -887,13 +985,15 @@ def test_qn_reading_returns_each_reading_at_the_table_boundaries() -> None:
 
 
 def test_qn_regressor_parameters_and_seed() -> None:
-    """T2: the regressor has the Methods v2 E3 / DEC-0008 A4(c) parameters and routes the seed.
+    """T2: the regressor has the Methods v2 E3 / DEC-0008 A4(c) parameters and
+    seed.
 
-    Reference: the literal parameter values of Methods v2 section M10 E3 (max_iter 300,
-    learning_rate 0.05, max_leaf_nodes 15, min_samples_leaf 20) and A4(c) (l2_regularization
-    1.0), early_stopping False. The seed is ``sklearn_seed(seed, "qn-regressor")``: the raw
-    seed for DEV-0 and a 32-bit value for a 62-bit seed, so a fit does not raise (DEF-0010; the
-    DEV-1 value is read from the registry by ``json.load``). Tolerance: exact.
+    Reference: the literal parameter values of Methods v2 section M10 E3
+    (max_iter 300, learning_rate 0.05, max_leaf_nodes 15, min_samples_leaf 20)
+    and A4(c) (l2_regularization 1.0), with early_stopping False. The seed is
+    ``sklearn_seed(seed, "qn-regressor")``: the raw seed for DEV-0 and a 32-bit
+    value for a 62-bit seed, so a fit does not raise (DEF-0010). The DEV-1
+    value is read from the seed registry with ``json.load``. Tolerance: exact.
     """
 
     params = qn_regressor(20261005).get_params()
@@ -924,13 +1024,16 @@ def test_qn_regressor_parameters_and_seed() -> None:
 
 
 def test_delta_r2_equals_sklearn_r2_score_difference() -> None:
-    """T3: ``delta_r2`` equals ``r2_score(y, p4) - r2_score(y, p3)`` and handles resampled rows.
+    """T3: ``delta_r2`` equals ``r2_score(y, p4) - r2_score(y, p3)`` and
+    handles resamples.
 
-    Reference: ``sklearn.metrics.r2_score`` on a fixed synthetic case (n = 200, ``make_rng``),
-    for a continuous target and a 0/1 target, on all rows and on a resample with repeats
-    (``r2_score(y[idx], p[idx])``). Tolerance 1e-12: both compute 1 - SS_res/SS_tot in float64
-    with different summation orders; the error is about n eps = 5e-14. A constant target or an
-    empty row set gives NaN (a failed resample).
+    Reference: ``sklearn.metrics.r2_score`` on a fixed synthetic case (n = 200,
+    ``make_rng``), for a continuous target and a 0/1 target, on all rows and on
+    a resample with repeats (``r2_score(y[idx], p[idx])``).
+
+    Tolerance: 1e-12. Both compute ``1 - SS_res/SS_tot`` in float64 with
+    different summation orders; the error is about n eps = 5e-14. A constant
+    target or an empty row set gives NaN (a failed resample).
     """
 
     rng = make_rng(7, "delta-r2")
@@ -954,7 +1057,9 @@ def test_delta_r2_equals_sklearn_r2_score_difference() -> None:
 
 
 def _qn_synthetic(n_train: int, n_test: int, seed: int) -> dict:
-    """Profiles with a known dependence: w* depends on the first coordinates and a little on N."""
+    """Profiles with a known dependence: ``w*`` depends on the first
+    coordinates and a little on N.
+    """
     rng = np.random.default_rng(seed)
 
     def draw(n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -988,7 +1093,8 @@ def _reference_fit_predict(
     y: np.ndarray,
     x_test: np.ndarray,
 ) -> np.ndarray:
-    """Fit a gradient-boosted regressor with literal parameters; predict ``x_test``.
+    """Fit a gradient-boosted regressor with literal parameters; predict
+    ``x_test``.
 
     The parameter values are written out here on purpose, so the tests do not
     reuse ``qn_regressor``, the function under test.
@@ -1008,17 +1114,22 @@ def _reference_fit_predict(
 
 
 def test_qn_profile_block_matches_an_independent_fit_and_scores() -> None:
-    """The Q-N block: targets, training sets, point values, counts and readings are as specified.
+    """The Q-N block: targets, training sets, point values, counts and
+    readings.
 
-    Reference: built independently in the test from the definition (DEC-0008 A4(a)): the logit is
-    fitted on the interior (0 < w* < 1) training states only and scored on the interior test
-    states; the indicator 1{w* = 0} by a squared-loss regressor on all states; the log horizon on
-    all; all with ``HistGradientBoostingRegressor`` built from the literal parameters of T2
-    (not ``qn_regressor``) and ``sklearn.metrics.r2_score``. Tolerance 1e-12 on R^2 and
-    Delta R^2 (same data, same deterministic fits; only the summation order of the R^2
-    differs, about n eps). Counts are exact. The out-of-[0,1] predictions of the indicator are
-    counted, not clipped. Also checks ``reading == qn_reading(*ci)`` for both profiles' interior
-    and indicator targets (T1), and that log_horizon has no reading (D-04).
+    Reference: built independently in the test from the definition (DEC-0008
+    A4(a)). The logit is fitted on the interior (0 < w* < 1) training states
+    only and scored on the interior test states; the indicator ``1{w* = 0}`` is
+    fitted on all states; the log horizon on all. All use
+    ``HistGradientBoostingRegressor`` built from the literal parameters of T2
+    (not ``qn_regressor``) and ``sklearn.metrics.r2_score``. The out-of-[0, 1]
+    predictions of the indicator are counted, not clipped. The test also checks
+    ``reading == qn_reading(*ci)`` for the interior and indicator targets (T1),
+    and that the log horizon has no reading (D-04).
+
+    Tolerance: 1e-12 on R^2 and Delta R^2 (same data, same deterministic fits;
+    only the summation order of the R^2 differs, about n eps). Counts are
+    exact.
     """
 
     d = _qn_synthetic(500, 200, 31)
@@ -1108,13 +1219,17 @@ def test_qn_profile_block_matches_an_independent_fit_and_scores() -> None:
 def test_qn_block_intervals_share_resamples_across_targets_and_profiles() -> (
     None
 ):
-    """The three intervals of one block come from the same index sets as an independent loop.
+    """The intervals of one block come from the same index sets as an
+    independent loop.
 
-    Reference: an independent loop over ``block_resample_indices`` (same integer seed) that
-    evaluates ``sklearn.metrics.r2_score`` differences on the resampled rows, with the interior
-    filter applied inside each resample, using predictions refitted in the test; the intervals
-    equal ``percentile_interval`` of those values. Tolerance 1e-10 (r2_score against the code's
-    sums; quantile interpolation of two values each about 1e-14 apart).
+    Reference: an independent loop over ``block_resample_indices`` (same
+    integer seed) that evaluates ``sklearn.metrics.r2_score`` differences on
+    the resampled rows, with the interior filter applied inside each resample,
+    using predictions refitted in the test. The intervals must equal
+    ``percentile_interval`` of those values.
+
+    Tolerance: 1e-10 (r2_score against the code's sums; quantile interpolation
+    of two values, each about 1e-14 apart).
     """
 
     d = _qn_synthetic(400, 150, 32)
@@ -1167,10 +1282,13 @@ def test_qn_block_intervals_share_resamples_across_targets_and_profiles() -> (
 def test_qn_block_reading_needs_fifty_test_states_and_rejects_bad_input() -> (
     None
 ):
-    """With fewer than 50 test states in a domain the reading is "undetermined" with a reason (A3).
+    """With fewer than 50 test states the reading is "undetermined" with a
+    reason (A3).
 
-    Reference: DEC-0008 A3 (a subset statistic needs at least 50 states) applied to the Q-N
-    reading, and the contract of the function. Tolerance: exact strings. Bad input raises.
+    Reference: DEC-0008 A3 (a subset statistic needs at least 50 states)
+    applied to the Q-N reading, and the documented contract of the function.
+    Tolerance: exact strings. Bad input (wrong column count, weights outside
+    [0, 1], length mismatch) raises.
     """
 
     d = _qn_synthetic(300, 40, 33)
@@ -1224,7 +1342,7 @@ def test_qn_block_reading_needs_fifty_test_states_and_rejects_bad_input() -> (
         )
 
 
-# ----------------------------------------------------------------------------------- H1a
+# ------------------------------------------------------------------------ H1a
 SIZES = np.array(StudyConfig().library_sizes, dtype=float)
 D_TRUE = 2.2
 
@@ -1235,12 +1353,14 @@ def _seed_sq(
     floor_index: int,
     sigma: float = 0.05,
 ) -> np.ndarray:
-    """Per-state squared analog seed error ``(b^2 n^(-2/d) + f^2) LN(0, sigma)`` with heavy tail.
+    """Squared analog seed errors ``(b^2 n^(-2/d) + f^2) LN(0, sigma)`` with a
+    heavy tail.
 
-    ``b^2 = 1``, ``d = 2.2`` and ``f^2 = SIZES[floor_index]^(-2/d)`` (the floor equals the power
-    term at that library size). The log-normal noise and the inflation by 100 of 5% of the
-    entries are drawn independently per (state, n_lib), so the inflation does not cancel as a
-    common factor of a state.
+    Here ``b^2 = 1``, ``d = 2.2`` and ``f^2 = SIZES[floor_index]^(-2/d)`` (the
+    floor equals the power term at that library size). The log-normal noise and
+    the inflation by 100 of 5% of the entries are drawn independently per
+    (state, n_lib), so the inflation does not cancel as a common factor of a
+    state.
     """
     mean = SIZES ** (-2.0 / D_TRUE) + SIZES[floor_index] ** (-2.0 / D_TRUE)
     noise = rng.lognormal(0.0, sigma, size=(n_states, len(SIZES)))
@@ -1251,10 +1371,12 @@ def _seed_sq(
 def _gamma_local_dim(
     rng: np.random.Generator, n_states: int, dim: float
 ) -> np.ndarray:
-    """Levina-Bickel local dimensions ``(k - 2) / S`` under the exact Gamma law, k = 20.
+    """Levina-Bickel local dimensions ``(k - 2) / S`` under the exact Gamma
+    law, k = 20.
 
-    ``S dim ~ Gamma(k - 1, 1)`` (applied-mathematician, WU-0002.4-5 log, Job 1 item 2), so
-    ``S / (k - 1)`` has mean ``1 / dim`` exactly and relative sd ``1 / sqrt(19) = 0.229``.
+    ``S dim ~ Gamma(k - 1, 1)`` (applied-mathematician, WU-0002.4-5 log, Job 1,
+    item 2), so ``S / (k - 1)`` has mean ``1 / dim`` exactly and relative
+    standard deviation ``1 / sqrt(19) = 0.229``.
     """
     return 18.0 * dim / rng.gamma(19.0, size=n_states)
 
@@ -1264,7 +1386,9 @@ def _fake_cells(
     local_dim: np.ndarray,
     system: str = "lorenz63",
 ) -> dict:
-    """Library cells keyed ``(rho, n_lib)``: only what ``h1a_library_scaling`` reads."""
+    """Library cells keyed ``(rho, n_lib)`` with only what
+    ``h1a_library_scaling`` reads.
+    """
     cells = {}
     for rho, sq in sq_by_rho.items():
         for j, size in enumerate(SIZES):
@@ -1283,7 +1407,9 @@ def _fake_cells(
 
 
 def _config(resamples: int = 200) -> StudyConfig:
-    """Full-study settings (block 5, seed) with fewer resamples to keep the unit tests fast."""
+    """Full-study settings (block 5, seed) with fewer resamples so the tests
+    are fast.
+    """
     return dataclasses.replace(StudyConfig(), bootstrap_resamples=resamples)
 
 
@@ -1293,14 +1419,16 @@ def _h1a_ratio(
     sizes: np.ndarray,
     rows: np.ndarray,
 ) -> float:
-    """The H1a ratio on ``rows``: first entry of ``_median_fit_stats``."""
+    """The H1a ratio on ``rows``: the first entry of ``_median_fit_stats``."""
     return float(_median_fit_stats(seed_sq, inverse_dim, sizes, rows)[0])
 
 
 def _hand_ratio(
     seed_sq: np.ndarray, inverse_dim: np.ndarray, rows: np.ndarray
 ) -> float:
-    """Median fit over mean reference on ``rows``, medians and mean formed by hand."""
+    """Median fit over mean reference on ``rows``, with the medians formed by
+    hand.
+    """
 
     medians = []
     for j in range(seed_sq.shape[1]):
@@ -1317,22 +1445,26 @@ def _hand_ratio(
 
 
 def test_h1a_median_fit_recovers_inverse_dimension_with_heavy_tail() -> None:
-    """The median fit recovers 1/d = 1/2.2 within 5% on log-normal data with a heavy tail (T1).
+    """The median fit recovers ``1/d = 1/2.2`` within 5% on heavy-tailed data
+    (T1).
 
-    Reference: the known d of the synthetic law. 300 states at the five ``library_sizes`` of
-    ``StudyConfig``; ``eps^2 = (b^2 n^(-2/d) + f^2) LN(0, 0.05)`` with b^2 = 1, d = 2.2,
-    ``f^2 = 3162^(-2/2.2)`` (the floor equals the power term at the second size), and 5% of the
-    entries inflated by 100, noise and inflation independent per (state, n_lib). Fixed
-    ``default_rng(11002)``, chosen before any output was seen.
+    Reference: the known ``d`` of the synthetic law. There are 300 states at
+    the five ``library_sizes`` of ``StudyConfig``; ``eps^2 = (b^2 n^(-2/d) +
+    f^2) LN(0, 0.05)`` with ``b^2 = 1``, ``d = 2.2``, ``f^2 = 3162^(-2/2.2)``
+    (the floor equals the power term at the second size), and 5% of the entries
+    inflated by 100, noise and inflation independent per (state, n_lib). The
+    generator is ``default_rng(11002)``, chosen before any output was seen.
 
-    Tolerance: ``abs(fitted * d - 1) <= 0.05`` (the ROADMAP). Over 2000 seeds of this design the
-    median fit has relative error with bias +0.0001 and sd 0.0088 (applied-mathematician,
-    WU-0002.4-5 log, Job 1 item 3), so 5% is 5.7 sd and no seed in 2000 left the bound. (The
-    free floor triples the standard error of the plain median-of-log estimate, which is why
-    sigma is 0.05, not 0.5.) The mean fit would miss +-5% with probability 0.92 on this design
-    (a mutation probe, not asserted: one seed would be flaky at power 0.92). The fitted value
-    also equals ``0.5 * _fit_seed_law(sizes, np.median(sq, 0))[0]`` bitwise, which pins the
-    statistic as the fit of the column medians.
+    Tolerance: ``abs(fitted * d - 1) <= 0.05`` (the ROADMAP). Over 2000 seeds
+    of this design the median fit has relative error with bias +0.0001 and SD
+    0.0088 (applied-mathematician, WU-0002.4-5 log, Job 1, item 3), so 5% is
+    5.7 SD and no seed in 2000 left the bound. (The free floor triples the
+    standard error of the plain median-of-log estimate, which is why sigma is
+    0.05, not 0.5.) A mean fit would miss +-5% with probability 0.92 on this
+    design (a mutation probe, not asserted: one seed would be flaky at power
+    0.92). The fitted value also equals ``0.5 * _fit_seed_law(sizes,
+    np.median(sq, 0))[0]`` bitwise, which pins the statistic as the fit of the
+    column medians.
     """
 
     rng = np.random.default_rng(11002)
@@ -1353,18 +1485,25 @@ def test_h1a_median_fit_recovers_inverse_dimension_with_heavy_tail() -> None:
 def test_h1a_ratio_is_the_hand_value_and_the_interval_is_the_joint_bootstrap() -> (
     None
 ):
-    """``h1a_ratio`` is median fit over mean reference on the same rows; the CI is one joint draw.
+    """The ratio is the median fit over the mean reference; its interval is one
+    joint draw.
 
-    Reference: hand computation. (i) On 80 arbitrary rows with repeats of 60 states the ratio
-    equals ``0.5 * fit(medians) / mean(inverse_dim)`` with the medians formed by sorting and the
-    mean by a sum, relative 1e-12 (a median is an order statistic or the mean of two, exact;
-    the fit is the same deterministic function; one division and one sum, a few ulp).
-    (ii) End to end, ``ratio_ci`` equals bitwise the percentile interval that
-    ``block_bootstrap_counted`` gives for the closure ``idx -> _h1a_ratio(sq, inv, sizes, idx)``
-    seeded with ``make_rng(config.seed, system, "bootstrap", "H1a", "0.01")``: one index draw
-    feeds the numerator and the denominator (a mutant with separate draws, or another label,
-    changes the interval), and ``ci_inverse_dim`` equals the interval of the half fit alone with
-    the same seed (same indices). ``n_failed_resamples`` equals the counted failures. Exact.
+    The ratio is computed by ``_median_fit_stats`` (entry 0), here through the
+    helper ``_h1a_ratio``.
+
+    Reference: hand computation. (i) On 80 arbitrary rows with repeats of 60
+    states, the ratio equals ``0.5 * fit(medians) / mean(inverse_dim)`` with
+    the medians formed by sorting and the mean by a sum, to relative 1e-12 (a
+    median is an order statistic or the mean of two, so exact; the fit is the
+    same deterministic function; one division and one sum, a few ulp). (ii) End
+    to end, ``ratio_ci`` equals bitwise the percentile interval that
+    ``block_bootstrap_counted`` gives for the closure ``idx -> _h1a_ratio(sq,
+    inv, sizes, idx)`` seeded with ``make_rng(config.seed, system, "bootstrap",
+    "H1a", "0.01")``. One index draw feeds the numerator and the denominator (a
+    mutant with separate draws, or another label, changes the interval).
+    ``ci_inverse_dim`` equals the interval of the half fit alone with the same
+    seed (same indices). ``n_failed_resamples`` equals the counted failures.
+    All exact.
     """
 
     rng = np.random.default_rng(11003)
@@ -1415,13 +1554,16 @@ def test_h1a_ratio_is_the_hand_value_and_the_interval_is_the_joint_bootstrap() -
 def test_h1a_ratio_is_nan_when_a_median_is_not_positive_or_the_fit_raises(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A resample that cannot be fitted is NaN (a counted failure), never an exception (A3).
+    """A resample that cannot be fitted gives NaN (a counted failure), never an
+    exception (A3).
 
-    Reference: the contract of the applied-mathematician (WU-0002.4-5 log, Job 1 item 5 (iv)).
-    A column median that is zero, negative or non-finite gives NaN before the fit is tried (the
-    fit is replaced by one that fails the test if called); a fit that raises ``ValueError``
-    (``curve_fit`` does for non-finite residuals; ``_fit_seed_law`` catches only
-    ``RuntimeError``) also gives NaN; a fit that returns NaN gives NaN. Exact.
+    Reference: the contract from the applied-mathematician (WU-0002.4-5 log,
+    Job 1, item 5 (iv)). A column median that is zero, negative or non-finite
+    gives NaN before the fit is tried (the fit is replaced by one that fails
+    the test if it is called). A fit that raises ``ValueError`` (``curve_fit``
+    does for non-finite residuals; ``_fit_seed_law`` catches only
+    ``RuntimeError``) also gives NaN, and so does a fit that returns NaN. A
+    reference of 0 gives no ratio. All exact.
     """
     from lpcstudy import analysis
 
@@ -1460,22 +1602,27 @@ def test_h1a_ratio_is_nan_when_a_median_is_not_positive_or_the_fit_raises(
 
 
 def test_h1a_verdicts_on_known_truth_at_both_noise_levels() -> None:
-    """Pass when the ratio is about 1, fail when the reference is wrong, at both rho (T6, D-19).
+    """Pass when the ratio is about 1, fail when the reference is wrong, at
+    both rho (T6, D-19).
 
-    Reference: known truth. Fake cells follow the T1 design (d = 2.2, 300 states) at rho = 0.01
-    and 0.02; the reference ``S / (k - 1)`` is drawn from the exact Gamma law, with dimension
-    2.2 (true ratio 1) or 1.2 (true ratio 0.545). Fixed ``default_rng(11005)``.
+    Reference: known truth. Fake cells follow the T1 design (d = 2.2, 300
+    states) at rho = 0.01 and 0.02. The reference ``S / (k - 1)`` is drawn from
+    the exact Gamma law with dimension 2.2 (true ratio 1) or 1.2 (true ratio
+    0.545). The generator is ``default_rng(11005)``.
 
-    * Ratio 1: both rho pass, overall pass. In the applied-mathematician's simulation (B = 500,
-      40 replications) the interval is 0.971 +- 0.016 to 1.031 +- 0.018, i.e. 12 sd inside
-      [0.75, 1.25] on both sides; B = 200 here widens the endpoint noise slightly, not the
-      margin.
-    * Reference at d = 1.2: the upper bound is 0.562 +- 0.010, 19 sd below 0.75: both fail,
-      overall fail.
-    * Floors *decreasing* in rho (power term at the third size for rho = 0.02, at the second
-      for 0.01), ratio 1: still pass. The v1 criterion "floor increasing in rho" is removed
-      (D-19); the floors are reported only.
-    Exact verdicts, band [0.75, 1.25], level 0.95.
+    * Ratio 1: both rho pass and so does the whole. In the
+      applied-mathematician's simulation (B = 500, 40 replications) the
+      interval is 0.971 +- 0.016 to 1.031 +- 0.018, i.e. 12 SD inside [0.75,
+      1.25] on both sides; B = 200 here widens the endpoint noise slightly, not
+      the margin.
+    * Reference at d = 1.2: the upper bound is 0.562 +- 0.010, 19 SD below
+      0.75, so both fail and the whole fails.
+    * Floors that *decrease* with rho (power term at the third size for rho =
+      0.02, at the second for 0.01), ratio 1: still pass. The v1 criterion
+      "floor increasing in rho" is removed (D-19); the floors are reported
+      only.
+
+    Verdicts are compared exactly, with band [0.75, 1.25] and level 0.95.
     """
 
     rng = np.random.default_rng(11005)
@@ -1524,14 +1671,17 @@ def test_h1a_verdicts_on_known_truth_at_both_noise_levels() -> None:
 def test_h1a_minimum_states_and_uncomputable_fit_are_inconclusive_with_reasons(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Fewer than 50 states, or a fit that cannot be computed, give inconclusive (A3, T6).
+    """Fewer than 50 states, or a fit that cannot be computed, give
+    inconclusive (A3, T6).
 
-    Reference: DEC-0008 A3 and the guard order of ``criterion_verdict``. (i) 49 states: both
-    rho and the whole are inconclusive with the exact reason "n_states < 50"; with 50 states the
-    reason is not that (the verdict itself is not asserted: 50 states give a wide interval).
-    (ii) ``_fit_seed_law`` replaced by a function returning NaN: the point estimate is not
-    computable, every one of the B resamples fails and is counted in ``n_failed_resamples``,
-    and the reason is "not computable" (the guard before the interval). Exact.
+    Reference: DEC-0008 A3 and the guard order of ``criterion_verdict``. (i)
+    With 49 states, both rho and the whole are inconclusive with the exact
+    reason "n_states < 50"; with 50 states the reason is not that (the verdict
+    itself is not asserted: 50 states give a wide interval). (ii) With
+    ``_fit_seed_law`` replaced by a function returning NaN, the point estimate
+    is not computable, every one of the B resamples fails and is counted in
+    ``n_failed_resamples``, and the reason is "not computable" (the guard that
+    comes before the interval). All exact.
     """
     from lpcstudy import analysis
 
@@ -1580,15 +1730,18 @@ def test_h1a_minimum_states_and_uncomputable_fit_are_inconclusive_with_reasons(
 def test_h1a_excludes_and_counts_states_with_nonfinite_inputs_once_for_both_rho() -> (
     None
 ):
-    """A state with a non-finite seed or reference is excluded from every rho and counted (A3).
+    """A state with a non-finite seed or reference is excluded at every rho and
+    counted (A3).
 
-    Reference: the applied-mathematician's conditions (WU-0002.4-5 log, Job 1 item 5 (i)).
-    State 7 has a NaN seed error at rho = 0.02 only, state 11 a NaN local dimension in every
-    cell. Both are removed from the numerator and the denominator at both rho (one state set),
-    in time order; ``n_states`` is 298 and ``n_excluded_nonfinite`` is 2. The ``ratio_ci`` at
-    rho = 0.01 (where state 7 is finite) equals bitwise the interval of the ``h1a_ratio`` closure
-    over the arrays with those two rows deleted, which fails if state 7 is kept at rho = 0.01,
-    and ``inverse_dim_reference`` equals the mean of the kept ``S / (k - 1)``. Exact.
+    Reference: the applied-mathematician's conditions (WU-0002.4-5 log, Job 1,
+    item 5 (i)). State 7 has a NaN seed error at rho = 0.02 only; state 11 has
+    a NaN local dimension in every cell. Both are removed from the numerator
+    and the denominator at both rho (one state set), in time order, so
+    ``n_states`` is 298 and ``n_excluded_nonfinite`` is 2. The ``ratio_ci`` at
+    rho = 0.01 (where state 7 is finite) equals bitwise the interval of the
+    ratio closure over the arrays with those two rows deleted, which fails if
+    state 7 is kept at rho = 0.01. The ``inverse_dim_reference`` equals the
+    mean of the kept ``S / (k - 1)``. All exact.
     """
 
     rng = np.random.default_rng(11007)
@@ -1619,12 +1772,14 @@ def test_h1a_excludes_and_counts_states_with_nonfinite_inputs_once_for_both_rho(
 def test_h1a_rejects_cells_that_do_not_share_the_states_and_has_the_documented_keys() -> (
     None
 ):
-    """Misaligned ``local_dim`` raises; the result has exactly the documented keys (T6, plan).
+    """Misaligned ``local_dim`` raises; the result has exactly the documented
+    keys (T6).
 
-    Reference: the plan's result-key list (WU-0002.4-5). One cell with a different local
-    dimension (a different state set) raises ``ValueError`` rather than pairing the numerator
-    and the denominator of the ratio across states. The key sets of the whole and of a rho are
-    compared exactly with the plan's; ``reference_estimator`` is text; ``pass`` equals
+    Reference: the plan's result-key list (WU-0002.4-5). One cell with a
+    different local dimension (a different state set) raises ``ValueError``
+    rather than pairing the numerator and the denominator of the ratio across
+    states. The key sets of the whole result and of one rho are compared
+    exactly with the plan's; ``reference_estimator`` is text; ``pass`` equals
     ``verdict == "pass"``.
     """
 
@@ -1668,7 +1823,7 @@ def test_h1a_rejects_cells_that_do_not_share_the_states_and_has_the_documented_k
         h1a_library_scaling(cells, _config(50))
 
 
-# ----------------------------------------------------------------------------------- H1b
+# ------------------------------------------------------------------------ H1b
 def _fake_h1b_cell(
     rng: np.random.Generator,
     n_states: int,
@@ -1676,13 +1831,14 @@ def _fake_h1b_cell(
     slope_plp: float,
     log_noise: float = 0.0,
 ) -> SimpleNamespace:
-    """A core cell whose H1b regressions have the stated slopes (power laws, optional noise).
+    """A core cell whose H1b regressions have the stated slopes (power laws).
 
-    The CP regression is ``0.5 ln(sq_cp - noise^2/n_analogs)`` on ``ln(g seed_cp / sqrt(m))``
-    and the PLP one is ``0.5 ln(sq_plp)`` on ``ln(g seed_plp / sqrt(m))``, exactly the
-    construction of ``h1b_seed_amplifier``; the squared errors are built from the stated slope
-    and intercept 0.3 with additive Gaussian noise ``log_noise`` on the log scale (0 gives exact
-    power laws, hence exact slopes).
+    The CP regression is ``0.5 ln(sq_cp - noise^2/n_analogs)`` on ``ln(g
+    seed_cp / sqrt(m))`` and the PLP one is ``0.5 ln(sq_plp)`` on ``ln(g
+    seed_plp / sqrt(m))``, exactly the construction of ``h1b_seed_amplifier``.
+    The squared errors are built from the stated slope and intercept 0.3 with
+    additive Gaussian noise ``log_noise`` on the log scale (0 gives exact power
+    laws, hence exact slopes).
     """
     dim, noise, n_analogs, horizon = 3, 0.01, 20, 30
     gain = np.exp(rng.normal(0.0, 0.5, n_states))
@@ -1715,17 +1871,22 @@ def _fake_h1b_cell(
 
 
 def test_h1b_verdict_uses_the_plp_slope_only() -> None:
-    """CP slope 1.6 with PLP slope 1.0 passes; swapped fails; CP has no verdict (T8).
+    """CP slope 1.6 with PLP slope 1.0 passes; swapped fails; CP has no verdict
+    (T8).
 
-    Reference: the ROADMAP row of WU-0002.4 and DEC-0008 A1. The cells are noise-free power
-    laws, so every resample of the regression has the exact slope (the 100 distinct x values
-    never make a block resample constant), the interval is a point, and the PLP interval lies
-    inside [0.8, 1.2] (pass) or entirely above it (fail). The CP and PLP slopes agree with 1.6
-    and 1.0 to 1e-12 (OLS on 100 values of order 10 after a ``log(sq - floor)`` round trip:
-    relative error a few 1e-16 times the condition number of the design, below 1e-14; 1e-12
-    leaves two orders). The CP entry has only ``slope``, ``ci`` and the exclusion count; the
-    PLP entry adds ``n_failed_resamples``; the top-level keys are the plan's plus the
-    exclusion count (fix R2). Exact verdicts.
+    Reference: the ROADMAP row of WU-0002.4 and DEC-0008 A1. The cells are
+    noise-free power laws, so every resample of the regression has the exact
+    slope (the 100 distinct x values never make a block resample constant), the
+    interval is a point, and the PLP interval lies inside [0.8, 1.2] (pass) or
+    entirely above it (fail).
+
+    Tolerance: the CP and PLP slopes agree with 1.6 and 1.0 to 1e-12 (least
+    squares on 100 values of order 10 after a ``log(sq - floor)`` round trip:
+    relative error a few 1e-16 times the condition number of the design, below
+    1e-14; 1e-12 leaves two orders). The CP entry has only ``slope``, ``ci``
+    and the counters; the PLP entry adds ``n_failed_resamples``; the top-level
+    keys are the plan's plus the exclusion count (fix R2). Verdicts are
+    compared exactly.
     """
 
     config = _config(100)
@@ -1737,7 +1898,8 @@ def test_h1b_verdict_uses_the_plp_slope_only() -> None:
     assert (
         ok["verdict"] == "pass" and ok["pass"] is True and ok["reason"] is None
     )
-    # n_floored and CP.n_dropped_resamples are the WU-0002.11b counters (DEF-0001)
+    # n_floored and CP.n_dropped_resamples are the WU-0002.11b counters
+    # (DEF-0001).
     assert set(ok["CP"]) == {
         "slope",
         "ci",
@@ -1779,18 +1941,22 @@ def test_h1b_verdict_uses_the_plp_slope_only() -> None:
 def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases() -> (
     None
 ):
-    """Regression guard: slopes and intervals of both forecasters are those of ``block_bootstrap``.
+    """Regression guard: both slopes and intervals are those of
+    ``block_bootstrap``.
 
-    This compares with the old function at ``make_rng(config.seed, system, "bootstrap", "H1b")``
-    (WU-0002.14: the label shared by the CP and the PLP; this test used the integer seed
-    ``config.seed`` before), so it is a guard against moving the bootstrap, not evidence of
-    correctness (T8 above is). On noisy data (log-scale noise 0.1) the
-    CP interval equals ``block_bootstrap`` and the PLP interval equals it too, because no
-    resample fails and ``block_bootstrap_counted`` is bitwise equal then. Edge cases (exact): a
-    NaN gain state is excluded and counted (fix R2): the PLP slope and interval equal
-    ``block_bootstrap`` on the arrays with that state deleted; 50 remaining states are enough
-    and 49 give "n_states < 50"; a constant regressor gives a 0/0 slope, "not computable", and
-    every resample counted failed; 40 states give "n_states < 50".
+    This compares with the old function at ``make_rng(config.seed, system,
+    "bootstrap", "H1b")`` (WU-0002.14: the label shared by the CP and the PLP;
+    this test used the integer seed ``config.seed`` before). It guards against
+    moving the bootstrap; it is not evidence of correctness (the test of the
+    verdict above is). On noisy data (log-scale noise 0.1), the CP interval
+    equals ``block_bootstrap`` and the PLP interval equals it too, because no
+    resample fails and ``block_bootstrap_counted`` is then bitwise equal.
+
+    Edge cases (all exact): a NaN gain state is excluded and counted (fix R2),
+    and the PLP slope and interval equal ``block_bootstrap`` on the arrays with
+    that state deleted. Fifty remaining states are enough and 49 give "n_states
+    < 50". A constant regressor gives a 0/0 slope, "not computable", and every
+    resample counted failed. Forty states give "n_states < 50".
     """
 
     config = _config(100)
@@ -1816,7 +1982,8 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
         assert (out[name]["slope"], *out[name]["ci"]) == old
     assert out["PLP"]["n_failed_resamples"] == 0
 
-    # A non-finite gain removes that state from both regressions and counts it (R2, plan (g)).
+    # A non-finite gain removes that state from both regressions and counts it
+    # (R2, plan (g)).
     broken = _fake_h1b_cell(
         np.random.default_rng(21004), 100, 1.0, 1.0, log_noise=0.1
     )
@@ -1847,7 +2014,8 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
         and nan_out["reason"] != "not computable"
     )
 
-    # Fifty remaining states are enough, 49 are not (MIN_STATES applies after exclusion).
+    # Fifty remaining states are enough, 49 are not (MIN_STATES applies after
+    # exclusion).
     for n_bad, reason in ((50, None), (51, "n_states < 50")):
         few = _fake_h1b_cell(np.random.default_rng(21006), 100, 1.0, 1.0)
         few.oracles["test"].gains[:n_bad, :] = np.nan
@@ -1858,8 +2026,8 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
         )
         assert (out["reason"] == "n_states < 50") == (reason is not None)
 
-    # Constant regressor (x = 0 exactly): the slope is 0/0, not computable; every resample
-    # fails and is counted.
+    # Constant regressor (x = 0 exactly): the slope is 0/0, not computable;
+    # every resample fails and is counted.
     flat = _fake_h1b_cell(np.random.default_rng(21007), 100, 1.0, 1.0)
     flat.splits["test"].moments.est_seed = np.full(
         100, np.sqrt(3.0)
@@ -1884,17 +2052,19 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
     )
 
 
-# ----------------------------------------------------------------------------------- H1d
+# ------------------------------------------------------------------------ H1d
 TESTED_ROWS = ("analog_seed", "estimation_seed", "growth")
 
 
 def _pair(
     rng: np.random.Generator, n: int, spearman_target: float
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Bivariate normal pair with Spearman correlation about ``spearman_target``.
+    """Bivariate normal pair with Spearman correlation about
+    ``spearman_target``.
 
-    For a bivariate normal with Pearson ``r``, ``rho_s = (6 / pi) arcsin(r / 2)``, so
-    ``r = 2 sin(pi rho_s / 6)`` (0.9545 for 0.95, 0.2091 for 0.2, 0.8 for ``rho_s = 0.7861``).
+    For a bivariate normal with Pearson correlation ``r``, ``rho_s = (6 / pi)
+    arcsin(r / 2)``, so ``r = 2 sin(pi rho_s / 6)`` (0.9545 for 0.95, 0.2091
+    for 0.2, and 0.8 for ``rho_s = 0.7861``).
     """
     r = 2.0 * np.sin(np.pi * spearman_target / 6.0)
     z = rng.standard_normal((n, 2))
@@ -1904,7 +2074,9 @@ def _pair(
 def _pairs(
     rng: np.random.Generator, n: int, targets: tuple[float, float, float, float]
 ) -> dict:
-    """The four H1d pairs (three tested rows and ``nhat``) with the given Spearman targets."""
+    """The four H1d pairs (three tested rows and ``nhat``) with given Spearman
+    targets.
+    """
     return {
         name: _pair(rng, n, t)
         for name, t in zip((*TESTED_ROWS, "nhat"), targets)
@@ -1912,17 +2084,24 @@ def _pairs(
 
 
 def test_h1d_spearman_equals_scipy_and_the_closed_form_on_500_points() -> None:
-    """Each row's Spearman is ``scipy.stats.spearmanr`` and ``1 - 6 sum d^2 / (n (n^2 - 1))`` (T9).
+    """Each row's Spearman is ``scipy.stats.spearmanr`` and the rank-difference
+    formula (T9).
 
-    Reference: scipy for the point estimate (ROADMAP: 10^-12 on 500 bivariate-normal points,
-    rho = 0.8, fixed seed), plus the closed form on the integer ranks of tie-free data (the code's
-    ``spearman`` *is* scipy's, so the closed form is the independent check; applied-mathematician,
-    WU-0002.4-5 log, Job 1 item 6). 500 draws, ``default_rng(21011)``, four independent pairs.
+    The formula is ``1 - 6 sum d^2 / (n (n^2 - 1))``, with ``d`` the rank
+    differences.
 
-    Tolerance: absolute 1e-12. The closed form is an exact integer sum (Sum d^2 < 5e7, exact in
-    float64) and three operations; scipy's value is the Pearson correlation of the ranks,
-    a few hundred operations on numbers of order 10^2 to 10^5 with relative error a few 1e-16
-    times 500; 1e-12 leaves about three orders.
+    Reference: scipy for the point estimate (ROADMAP: 10^-12 on 500
+    bivariate-normal points, rho = 0.8, fixed seed), plus the closed form on
+    the integer ranks of tie-free data. The code's ``spearman`` *is* scipy's,
+    so the closed form is the independent check (applied-mathematician,
+    WU-0002.4-5 log, Job 1, item 6). There are 500 draws from
+    ``default_rng(21011)``, four independent pairs.
+
+    Tolerance: absolute 1e-12. The closed form is an exact integer sum (sum of
+    d^2 below 5e7, exact in float64) and three operations. Scipy's value is the
+    Pearson correlation of the ranks, a few hundred operations on numbers of
+    order 10^2 to 10^5 with relative error a few 1e-16 times 500; 1e-12 leaves
+    about three orders.
     """
 
     pairs = _pairs(np.random.default_rng(21011), 500, (0.7861,) * 4)
@@ -1938,16 +2117,18 @@ def test_h1d_spearman_equals_scipy_and_the_closed_form_on_500_points() -> None:
 def test_h1d_interval_is_the_seeded_block_bootstrap_at_the_study_settings() -> (
     None
 ):
-    """The interval contains the point and equals ``block_bootstrap_counted`` with the label (T10).
+    """The interval contains the point and equals ``block_bootstrap_counted``
+    (T10).
 
-    Reference: ``StudyConfig()`` has 2000 resamples and blocks of 5 (v3 section 7), and the
-    interval of each row equals bitwise the percentile interval of
+    Reference: ``StudyConfig()`` has 2000 resamples and blocks of 5 (v3 section
+    7). The interval of each row equals bitwise the percentile interval of
     ``block_bootstrap_counted(idx -> spearman(a[idx], b[idx]))`` with
-    ``make_rng(config.seed, system, "bootstrap", "H1d", name)`` at level 0.95. That pins the
-    seed label, the resample count and the block; a different label or count changes the
-    interval. 100 states (the cost is 2 x 4 x 2000 rank correlations), ``default_rng(21012)``.
-    The interval contains the point estimate (the percentile interval of a smooth statistic
-    does, with the observed margin far from the edge). Exact.
+    ``make_rng(config.seed, system, "bootstrap", "H1d", name)`` at level 0.95.
+    That pins the seed label, the resample count and the block; a different
+    label or count changes the interval. There are 100 states (the cost is 2 x
+    4 x 2000 rank correlations), from ``default_rng(21012)``. The interval
+    contains the point estimate (the percentile interval of a smooth statistic
+    does, with the observed margin far from the edge). All exact.
     """
 
     config = StudyConfig()
@@ -1976,16 +2157,20 @@ def test_h1d_interval_is_the_seeded_block_bootstrap_at_the_study_settings() -> (
 def test_h1d_nhat_has_no_verdict_and_does_not_move_the_overall_verdict() -> (
     None
 ):
-    """``nhat`` is reported (Spearman and interval) without a verdict; the three rows decide (T11).
+    """``nhat`` is reported without a verdict; the three tested rows decide
+    (T11).
 
-    Reference: v3 sections 2 and 8 and M2 H1e: N-hat is reported, not tested. Synthetic pairs
-    with n = 500 and Spearman targets 0.95 (three tested rows) or 0.2: on the Fisher-z scale
-    (SE = sqrt((1 + rho^2/2) / (n - 3)), applied-mathematician) the lower bound for 0.95 is
-    16 sd above 0.7 and the upper bound for 0.2 is 15 sd below it, so verdicts are pass and fail
-    with a margin that no bootstrap noise at 200 resamples can cross. Flipping the N-hat pair's
-    correlation from +0.9 to -0.9 leaves the verdict, ``pass`` and the three tested rows
-    unchanged (identical dicts), while ``nhat`` has ``spearman`` and ``interval`` and neither
-    ``pass`` nor ``verdict``. One tested row at 0.2 gives fail overall.
+    Reference: v3 sections 2 and 8 and M2 H1e: N-hat is reported, not tested.
+    Synthetic pairs with n = 500 and Spearman targets 0.95 (three tested rows)
+    or 0.2. On the Fisher-z scale (SE = sqrt((1 + rho^2/2) / (n - 3)),
+    applied-mathematician), the lower bound for 0.95 is 16 SD above 0.7 and the
+    upper bound for 0.2 is 15 SD below it, so the verdicts are pass and fail
+    with a margin that no bootstrap noise at 200 resamples can cross.
+
+    Flipping the N-hat pair's correlation from +0.9 to -0.9 leaves the verdict,
+    ``pass`` and the three tested rows unchanged (identical dicts), while
+    ``nhat`` has ``spearman`` and ``interval`` and neither ``pass`` nor
+    ``verdict``. One tested row at 0.2 gives fail overall.
     """
 
     config = _config(200)
@@ -2019,17 +2204,23 @@ def test_h1d_nhat_has_no_verdict_and_does_not_move_the_overall_verdict() -> (
 
 
 def test_h1d_exclusions_minimum_states_and_uncomputable_rows() -> None:
-    """Non-finite pairs are excluded per row and counted; short or constant rows are inconclusive.
+    """Non-finite pairs are excluded per row and counted; short or constant
+    rows are inconclusive.
 
-    Reference: DEC-0008 A3 and the applied-mathematician's condition (ii) (WU-0002.4-5 log, Job 1
-    item 5): exclusion is per row, so a reported-only ``nhat`` with NaNs does not shrink the
-    tested rows. Exact counts and reasons: (i) two NaN in ``nhat`` only: the tested rows keep all
-    120 states, ``nhat`` has 118 and 2 excluded, top-level ``n_states`` 120 and
-    ``n_excluded_nonfinite`` 0; (ii) one NaN in a tested row: that row has 119 states, the
-    top level reports the smallest (119) and the largest exclusion (1); (iii) 49 states give
-    "n_states < 50" for every tested row and the whole; (iv) a constant proxy makes the
-    correlation undefined: the row is "inconclusive" with reason "not computable" and
-    every resample is counted failed. (The scipy constant-input warning is expected.)
+    Reference: DEC-0008 A3 and the applied-mathematician's condition (ii)
+    (WU-0002.4-5 log, Job 1, item 5). Exclusion is per row, so a reported-only
+    ``nhat`` with NaNs does not shrink the tested rows. Exact counts and
+    reasons:
+
+    * (i) two NaN in ``nhat`` only: the tested rows keep all 120 states,
+      ``nhat`` has 118 and 2 excluded, top-level ``n_states`` is 120 and
+      ``n_excluded_nonfinite`` is 0;
+    * (ii) one non-finite value in a tested row: that row has 119 states, and
+      the top level reports the smallest (119) and the largest exclusion (1);
+    * (iii) 49 states give "n_states < 50" for every tested row and the whole;
+    * (iv) a constant proxy makes the correlation undefined: the row is
+      "inconclusive" with reason "not computable" and every resample is counted
+      failed. (The scipy constant-input warning is expected.)
     """
 
     config = _config(100)
@@ -2079,15 +2270,18 @@ def test_h1d_exclusions_minimum_states_and_uncomputable_rows() -> None:
 def test_h1d_proxies_pairs_each_proxy_with_its_oracle_on_the_first_draw() -> (
     None
 ):
-    """``h1d_proxies`` maps the cell onto the four pairs and keeps the Cramer-Rao comparison.
+    """``h1d_proxies`` maps the cell onto the four pairs and keeps the
+    Cramer-Rao comparison.
 
-    Reference: the definitions of v3 H1d (and the pre-existing code): (eps-hat, eps_s),
-    (delta-hat, delta), (Lambda-hat, Lambda-bar), (N-hat, N), all on the first evaluation draw
-    (column 0; column 1 is deliberately different noise), and the reported Spearman of the
-    estimation seed with ``rho nu``. Each value is compared with ``scipy.stats.spearmanr`` of
-    the pair built in the test, at 1e-12 absolute (ranks of 80 distinct values; round-off
-    below 1e-14). Different Spearman targets per pair (0.9, 0.7, 0.5, 0.3, 0.1) make a swapped
-    pair visible. The result carries ``estimation_seed_vs_cramer_rao`` with no interval.
+    Reference: the definitions of v3 H1d (and the pre-existing code): (eps-hat,
+    eps_s), (delta-hat, delta), (Lambda-hat, Lambda-bar) and (N-hat, N), all on
+    the first evaluation draw (column 0; column 1 is deliberately different
+    noise), plus the reported Spearman correlation of the estimation seed with
+    ``rho nu``. Each value is compared with ``scipy.stats.spearmanr`` of the
+    pair built in the test, at 1e-12 absolute (ranks of 80 distinct values;
+    round-off below 1e-14). Different Spearman targets per pair (0.9, 0.7, 0.5,
+    0.3, 0.1) make a swapped pair visible. The result carries
+    ``estimation_seed_vs_cramer_rao`` with no interval.
     """
 
     rng = np.random.default_rng(21015)
@@ -2160,20 +2354,25 @@ def test_h1d_proxies_pairs_each_proxy_with_its_oracle_on_the_first_draw() -> (
     }
 
 
-# ---------------------------------------------------------------- WU-0002.7: H2b and H2e
+# ----------------------------------------------------- WU-0002.7: H2b and H2e
 def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> (
     None
 ):
-    """H2b(ii) is the mean over states of ``w*(10^4) - w*(10^3)`` at rho = 1%, level 1 - 0.05/3.
+    """H2b(ii) is the mean of ``w*(10^4) - w*(10^3)`` at rho = 1%, level 1 -
+    0.05/3.
 
-    Reference: the six-state table ``TABLE`` (values in [0, 1], multiples of 1/8). Hand differences
-    (column 10^4 minus column 10^3): 0.25, 0.25, 0, 0.125, 0.25, 0.25, sum 1.125, mean 0.1875.
-    The interval is compared with ``statistics.block_bootstrap`` (the pre-existing, separately
-    tested function) at the same generator ``make_rng(seed, system, "h2b-library-change", "0.01")``, 200
-    resamples, block 5, level 1 - 0.05/3, by exact equality (the counted helper is bitwise equal
-    without failed resamples). Six states are below the 50-state minimum of DEC-0008 A3, so the
-    verdict is inconclusive with that reason (pass False).
-    Tolerance: mean ``abs=1e-12`` (the stub weights are exact, the mean is one division).
+    Reference: the six-state table ``TABLE`` (values in [0, 1], multiples of
+    1/8). Hand differences (column 10^4 minus column 10^3) are 0.25, 0.25, 0,
+    0.125, 0.25, 0.25, with sum 1.125 and mean 0.1875. The interval is compared
+    with ``statistics.block_bootstrap`` (the pre-existing, separately tested
+    function) at the same generator ``make_rng(seed, system,
+    "h2b-library-change", "0.01")``, 200 resamples, block 5, level 1 - 0.05/3,
+    by exact equality (the counted helper is bitwise equal without failed
+    resamples). Six states are below the 50-state minimum of DEC-0008 A3, so
+    the verdict is inconclusive with that reason (pass False).
+
+    Tolerance: mean ``abs=1e-12`` (the stub weights are exact, and the mean is
+    one division).
     """
 
     noise_cells = {
@@ -2204,7 +2403,8 @@ def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> (
         change["n_failed_resamples"] == 0 and change["n_zero_difference"] == 1
     )
     assert "fail" not in change and "fail" not in out
-    # both parts rest on 6 states: the combined verdict is inconclusive and names both parts
+    # Both parts rest on 6 states: the combined verdict is inconclusive and
+    # names both parts.
     assert out["verdict"] == "inconclusive" and out["pass"] is False
     assert (
         out["reason"] == "noise: n_states < 50; library_change: n_states < 50"
@@ -2212,15 +2412,17 @@ def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> (
 
 
 def test_regression_h2b_noise_part_uses_its_own_generator() -> None:
-    """The noise part of H2b: ``make_rng(seed, system, "bootstrap", "H2b-noise")``, level 1 - 0.05/3.
+    """Regression guard: H2b(i) uses its own generator, at level 1 - 0.05/3.
 
-    A regression guard (WU-0002.14: the integer seed ``config.seed + 3`` of this test became the
+    The generator is ``make_rng(seed, system, "bootstrap", "H2b-noise")``
+    (WU-0002.14: the integer seed ``config.seed + 3`` of this test became the
     generator).
 
-    Reference: ``statistics.block_bootstrap`` of the mean of the per-state Spearman correlation
-    (hand values: states whose weight rises with rho have +1, a flat state 0) at that generator.
-    This is a regression guard on the pre-existing statistic, not new correctness evidence.
-    Exact equality (same function, same generator).
+    Reference: ``statistics.block_bootstrap`` of the mean of the per-state
+    Spearman correlation (hand values: states whose weight rises with rho have
+    +1, a flat state 0) at that generator. This guards the pre-existing
+    statistic and is not new correctness evidence. Tolerance: exact equality
+    (same function, same generator).
     """
 
     low = np.array([0.0, 0.125, 0.25, 0.5, 0.5, 0.75])
@@ -2248,17 +2450,25 @@ def test_regression_h2b_noise_part_uses_its_own_generator() -> None:
 def test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing() -> (
     None
 ):
-    """With 60 states the strict lower bound > 0 decides; zero change and missing cells do not pass.
+    """With 60 states the strict lower bound > 0 decides; zero change and
+    missing cells do not pass.
 
-    Reference: hand-built outcomes. (a) The six-state table tiled ten times (60 states): every
-    difference is >= 0, and any 5 consecutive differences of the period-6 pattern sum to at least
-    1.125 - 0.25 = 0.875 (the total less the largest), so every block mean and hence every
-    resample mean is at least 0.175 and the lower bound is above 0: pass True, reason None. (b) Identical columns for 10^3 and 10^4: every
-    resample mean is exactly 0.0, the interval is [0, 0], which is not above 0 (strict;
-    DEC-0008 A1) and lies entirely below the open band: pass False and, since this is a fail and
-    not an inconclusive, ``reason`` is None. (c) The 10^3 cell missing at rho = 1%:
-    ``mean_change`` None, ``ci`` None, pass False, the reason names the cell, and the result has no
-    NaN. Exact comparisons of booleans, None and strings.
+    Reference: hand-built outcomes.
+
+    * (a) The six-state table tiled ten times (60 states): every difference is
+      >= 0, and any 5 consecutive differences of the period-6 pattern sum to at
+      least 1.125 - 0.25 = 0.875 (the total less the largest). Every block mean
+      and hence every resample mean is at least 0.175, so the lower bound is
+      above 0: pass True, reason None.
+    * (b) Identical columns for 10^3 and 10^4: every resample mean is exactly
+      0.0, the interval is [0, 0], which is not above 0 (strict; DEC-0008 A1)
+      and lies entirely below the open band. So pass is False and, since this
+      is a fail and not an inconclusive result, ``reason`` is None.
+    * (c) The 10^3 cell missing at rho = 1%: ``mean_change`` is None, ``ci`` is
+      None, pass is False, the reason names the cell, and the result has no
+      NaN.
+
+    Tolerance: booleans, None and strings are compared exactly.
     """
 
     noise_cells = {
@@ -2296,14 +2506,17 @@ def test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing() 
 
 
 def test_h2b_curves_and_the_reported_change_at_two_percent() -> None:
-    """The M2 curves hold the mean and median of w* per library size; the 2% change is reported.
+    """The M2 curves hold the mean and median of ``w*`` per library size; the
+    2% change is reported.
 
-    Reference: ``np.mean`` and ``np.median`` of each table column (independent of the code, which
-    takes them inside the bootstrap statistic), ``abs=1e-12`` (one reduction of exact binary
-    fractions). Every size has a 2-element interval at level 0.95 with ``lo <= hi``. The change at
-    rho = 2% (same table) is the hand mean 0.1875 at level 0.95, role "reported", and equals
-    ``block_bootstrap`` at ``make_rng(seed, system, "h2b-library-change", "0.02")`` exactly. The library
-    Spearman keys of v1 and the saturation rule are gone.
+    Reference: ``np.mean`` and ``np.median`` of each table column (independent
+    of the code, which takes them inside the bootstrap statistic),
+    ``abs=1e-12`` (one reduction of exact binary fractions). Every size has a
+    2-element interval at level 0.95 with ``lo <= hi``. The change at rho = 2%
+    (same table) is the hand mean 0.1875 at level 0.95, role "reported", and
+    equals ``block_bootstrap`` at ``make_rng(seed, system,
+    "h2b-library-change", "0.02")`` exactly. The library Spearman keys of v1
+    and the saturation rule are gone.
     """
 
     noise_cells = {
@@ -2355,7 +2568,9 @@ def test_h2b_curves_and_the_reported_change_at_two_percent() -> None:
 def _h2e_cells(
     low: np.ndarray, high: np.ndarray, rhos=(0.01, 0.02), cp_low=None
 ) -> dict:
-    """Library cells for H2e: correlation ``low`` at 10^3, ``high`` at 10^5 (and 0.5 at 10^4)."""
+    """Library cells for H2e: correlation ``low`` at 10^3, ``high`` at 10^5,
+    0.5 at 10^4.
+    """
     n = len(low)
     none = np.zeros(n, dtype=bool)
     cells = {}
@@ -2370,18 +2585,24 @@ def _h2e_cells(
 
 
 def test_h2e_median_change_with_a_cp_constant_state_and_the_counts() -> None:
-    """H2e: the median of per-state correlation changes, with the zero-variance counts reported.
+    """H2e: the median change of per-state correlation, with the zero-variance
+    counts.
 
-    Reference: a hand-built table of 50 states. Correlation at 10^3: ``i/100`` for state ``i``
-    (0.00 to 0.49), except state 7, which is CP-constant and has correlation 0.0 exactly (as
-    ``draw_correlation`` sets it). Change ``d_i = 0.25 + 0.01 (i mod 5)`` for every state, so
-    ``high = low + d``; ten states each have 0.25, 0.26, 0.27, 0.28, 0.29, and the median of the 50
-    values is the mean of the 25th and 26th sorted values, both 0.27. The CP-constant state keeps
-    its change (its correlation at 10^5 is 0 + d_7). Expected: median change 0.27 (``abs=1e-12``:
-    one subtraction of numbers of order 1 per state), pass True at both rho (every resample median
-    is at least 0.25 > 0), ``zero_variance_corr`` shows exactly one CP-constant state at 10^3
-    (rho = 1% and 2%) and none at 10^5, and the interval equals ``block_bootstrap`` of the median
-    at ``make_rng(seed, system, "h2e", "0.01")``, level 0.95, exactly.
+    Reference: a hand-built table of 50 states. The correlation at 10^3 is
+    ``i/100`` for state ``i`` (0.00 to 0.49), except state 7, which is
+    CP-constant and has correlation 0.0 exactly (as ``draw_correlation`` sets
+    it). The change is ``d_i = 0.25 + 0.01 (i mod 5)`` for every state, so
+    ``high = low + d``. Ten states each have 0.25, 0.26, 0.27, 0.28 and 0.29,
+    and the median of the 50 values is the mean of the 25th and 26th sorted
+    values, both 0.27. The CP-constant state keeps its change (its correlation
+    at 10^5 is 0 + d_7).
+
+    Expected: median change 0.27 (``abs=1e-12``: one subtraction of numbers of
+    order 1 per state); pass True at both rho (every resample median is at
+    least 0.25 > 0); ``zero_variance_corr`` shows exactly one CP-constant state
+    at 10^3 (rho = 1% and 2%) and none at 10^5; and the interval equals
+    ``block_bootstrap`` of the median at ``make_rng(seed, system, "h2e",
+    "0.01")``, level 0.95, exactly.
     """
 
     n = 50
@@ -2425,14 +2646,21 @@ def test_h2e_median_change_with_a_cp_constant_state_and_the_counts() -> None:
 
 
 def test_h2e_no_change_is_not_a_pass_and_missing_cells_are_named() -> None:
-    """A median change of exactly 0 is not a pass (strict); missing 10^5 or 2% cells are named.
+    """A median change of exactly 0 is not a pass (strict); missing cells are
+    named.
 
-    Reference: hand-built outcomes. (a) ``high == low`` at both rho: every resample median is 0,
-    the interval is [0, 0], not above 0 and entirely below the open band: pass False, reason None
-    (a fail, not an inconclusive), ``n_zero_difference`` = 50. (b) The ``SMOKE`` library sweep (no
-    10^5, no rho = 2%): both rho are missing, ``median_change`` None, ``ci`` None, pass False, the
-    reason names n_lib=100000 at rho=0.01 and rho=0.02, and the dict has no NaN. (c) Moments
-    without ``err_corr`` raise ``ValueError``. Exact.
+    Reference: hand-built outcomes.
+
+    * (a) ``high == low`` at both rho: every resample median is 0, the interval
+      is [0, 0], not above 0 and entirely below the open band. So pass is False
+      and the reason is None (a fail, not an inconclusive result), with
+      ``n_zero_difference`` = 50.
+    * (b) The ``SMOKE`` library sweep (no 10^5, no rho = 2%): both rho are
+      missing, ``median_change`` and ``ci`` are None, pass is False, the reason
+      names n_lib=100000 at rho=0.01 and rho=0.02, and the dict has no NaN.
+    * (c) Moments without ``err_corr`` raise ``ValueError``.
+
+    Tolerance: all exact.
     """
 
     low = np.linspace(0.0, 0.4, 50)
@@ -2475,11 +2703,13 @@ def test_h2e_no_change_is_not_a_pass_and_missing_cells_are_named() -> None:
         h2e_noise_matching({(0.01, 1_000): _stub_cell(np.full(50, 0.5))}, SMOKE)
 
 
-# ---------------------------------------------------------------- WU-0002.8: H3a
+# ------------------------------------------------------------- WU-0002.8: H3a
 def _regime_data(
     hazards: tuple[float, ...], n_each: int, seed: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """First-draw regime labels, geometric durations (all events) and a linear horizon target."""
+    """First-draw regime labels, geometric durations (all events) and a linear
+    target.
+    """
     rng = np.random.default_rng(seed)
     regime = np.repeat(np.arange(len(hazards)), n_each)
     durations = np.concatenate([rng.geometric(h, n_each) for h in hazards])
@@ -2490,21 +2720,30 @@ def _regime_data(
 
 
 def test_h3a_holm_and_raw_p_match_independent_references() -> None:
-    """H3a on three separated regimes: scipy raw p, hand Holm, pass, stable order, IQR.
+    """H3a on three separated regimes: scipy raw p, hand Holm, pass, stable
+    order, IQR.
 
-    Reference: three regimes of 60 states with geometric hazards 0.05, 0.45, 0.15 (labels 0, 1,
-    2; no censoring), from ``np.random.default_rng(3)``. The Kaplan-Meier medians given to the
-    function are 14, 2, 5 steps, so the test order is regime 1, 2, 0 and the pairs are (1, 2)
-    and (2, 0). Raw p: ``scipy.stats.logrank`` on each pair, ``rel=1e-10`` (the tolerance of
-    ``test_logrank_matches_scipy``: the two codes sum per-time terms in a different order, p
-    about 1e-4 to 1e-15 here). Holm for two p-values by hand: adjusted ``min(1, 2 p_small)`` and
-    ``max(that, p_large)``, ``atol=1e-15`` (one multiplication and a comparison); and equal to
-    ``holm_adjust`` exactly. ``pass`` is True because both adjusted p are below 0.01 (asserted
-    from the scipy p as a premise). The horizon target of regime ``k`` is ``arange(60) (k+1)``
-    steps, whose interquartile range is 29.5 (k+1) steps (linear interpolation: 44.25 - 14.75),
-    so ``iqr_lt`` is 29.5 (k+1)/30 (``abs=1e-12``, a few operations on numbers of order 1) and
-    ``iqr_lt_mean`` their size-weighted mean (equal sizes: the plain mean). There is no key with
-    "regret" or "fail" in it, and no ``iqr_pass`` (D-08, DEC-0008 A3).
+    Reference: three regimes of 60 states with geometric hazards 0.05, 0.45 and
+    0.15 (labels 0, 1, 2; no censoring), from ``np.random.default_rng(3)``. The
+    Kaplan-Meier medians given to the function are 14, 2 and 5 steps, so the
+    test order is regime 1, 2, 0 and the pairs are (1, 2) and (2, 0).
+
+    * Raw p: ``scipy.stats.logrank`` on each pair, ``rel=1e-10`` (the tolerance
+      of ``test_logrank_matches_scipy``: the two codes sum per-time terms in a
+      different order; p is about 1e-4 to 1e-15 here).
+    * Holm for two p-values by hand: adjusted ``min(1, 2 p_small)`` and
+      ``max(that, p_large)``, ``atol=1e-15`` (one multiplication and a
+      comparison); and equal to ``holm_adjust`` exactly.
+    * ``pass`` is True because both adjusted p are below 0.01 (asserted from
+      the scipy p as a premise).
+    * The horizon target of regime ``k`` is ``arange(60) (k+1)`` steps, whose
+      interquartile range is 29.5 (k+1) steps (linear interpolation: 44.25 -
+      14.75), so ``iqr_lt`` is 29.5 (k+1)/30 (``abs=1e-12``, a few operations
+      on numbers of order 1) and ``iqr_lt_mean`` is their size-weighted mean
+      (equal sizes: the plain mean).
+
+    There is no key with "regret" or "fail" in it, and no ``iqr_pass`` (D-08,
+    DEC-0008 A3).
     """
 
     regime, durations, target = _regime_data((0.05, 0.45, 0.15), 60, 3)
@@ -2542,20 +2781,29 @@ def test_h3a_holm_and_raw_p_match_independent_references() -> None:
 
 
 def test_h3a_inconclusive_paths_and_small_regimes() -> None:
-    """H3a is inconclusive, never a fail, when a pair is not separated, empty or degenerate.
+    """H3a is inconclusive, never a fail, when a pair is not separated, empty
+    or degenerate.
 
-    Reference: hand-built situations. (a) Two regimes with the same hazard (0.1; 60 states each,
-    seed 5): the raw p is the scipy p (large; premise p > 0.01), the Holm p equals it, and the
-    result is pass False with a reason naming the largest Holm p. (b) Regime 1 has no state (labels
-    0 and 2 only, K = 3): the pair containing it has raw p None, enters Holm at 1, pass False
-    with reason "empty regime". (c) Two regimes in which no event occurs (all censored): the
-    log-rank variance is 0, raw p None (not 1.0), reason "zero log-rank variance". (d) DEC-0011
-    O1: three regimes of 20 states each (60 in all), hazards 0.5, 0.15 and 0.04, are not rejected
-    for the size of a regime: pass when scipy's p of both pairs is below 0.005 (premise). Review
-    R3: the full-sample minimum of 50 states (DEC-0008 A3) still applies: 20 + 20 states with
-    p < 0.01 are inconclusive with reason "n_states < 50". (e) One regime (60 states): no pair,
-    inconclusive. All results have ``verdict`` (only pass or inconclusive: no equivalence margin
-    is set), ``reason`` and ``pass``, and no ``fail`` key. Exact comparisons.
+    Reference: hand-built situations. All comparisons are exact.
+
+    * (a) Two regimes with the same hazard (0.1; 60 states each, seed 5): the
+      raw p is the scipy p (large; premise p > 0.01), the Holm p equals it, and
+      the result is pass False with a reason naming the largest Holm p.
+    * (b) Regime 1 has no state (labels 0 and 2 only, K = 3): the pair
+      containing it has raw p None, enters Holm at 1, and gives pass False with
+      reason "empty regime".
+    * (c) Two regimes in which no event occurs (all censored): the log-rank
+      variance is 0, the raw p is None (not 1.0), and the reason is "zero
+      log-rank variance".
+    * (d) DEC-0011 O1: three regimes of 20 states each (60 in all), with
+      hazards 0.5, 0.15 and 0.04, are not rejected for the size of a regime:
+      pass when scipy's p of both pairs is below 0.005 (premise). Review R3:
+      the full-sample minimum of 50 states (DEC-0008 A3) still applies: 20 + 20
+      states with p < 0.01 are inconclusive with reason "n_states < 50".
+    * (e) One regime (60 states): no pair, inconclusive.
+
+    All results have ``verdict`` (only pass or inconclusive: no equivalence
+    margin is set), ``reason`` and ``pass``, and no ``fail`` key.
     """
 
     regime, durations, target = _regime_data((0.1, 0.1), 60, 5)
@@ -2634,8 +2882,9 @@ def test_h3a_inconclusive_paths_and_small_regimes() -> None:
             "inconclusive",
         )  # H3a has no fail side (A3)
 
-    # Review R3: the 50-state minimum of the full sample (DEC-0008 A3, DEC-0011 O1) applies even
-    # when the p-values are tiny: 20 + 20 states, hazards 0.5 and 0.05, p < 0.01 (premise).
+    # Review R3: the 50-state minimum of the full sample (DEC-0008 A3,
+    # DEC-0011 O1) applies even when the p-values are tiny: 20 + 20 states,
+    # hazards 0.5 and 0.05, p < 0.01 (premise).
     forty_regime, forty_dur, forty_target = _regime_data((0.5, 0.05), 20, 8)
     assert sps.logrank(forty_dur[:20], forty_dur[20:]).pvalue < 0.01
     forty = h3a_logrank(
@@ -2654,14 +2903,16 @@ def test_h3a_inconclusive_paths_and_small_regimes() -> None:
 
 
 def test_h3a_orders_tied_and_missing_horizons_by_regime_index() -> None:
-    """Regimes with equal (or missing) Kaplan-Meier medians are ordered by regime index (DEF-0013).
+    """Regimes with equal or missing Kaplan-Meier medians are ordered by index
+    (DEF-0013).
 
-    Reference: the documented rule (``np.argsort(kind="stable")`` with NaN mapped to infinity, ties
-    by index), written out by hand: medians [7, 7, 3, 7, nan, 7, nan] give the order 2, 0, 1, 3, 5,
-    4, 6, hence the consecutive pairs below. NumPy's default sort is not stable on tied arrays on
-    some CPUs (the defect), so the expected pairs are fixed by hand, not computed. The data are
-    7 regimes of 5 states with identical durations (the p-values are irrelevant; only the pairs are
-    checked). Exact.
+    Reference: the documented rule (``np.argsort(kind="stable")`` with NaN
+    mapped to infinity, ties by index), written out by hand. The medians [7, 7,
+    3, 7, nan, 7, nan] give the order 2, 0, 1, 3, 5, 4, 6, hence the
+    consecutive pairs below. NumPy's default sort is not stable on tied arrays
+    on some CPUs (the defect), so the expected pairs are fixed by hand, not
+    computed. The data are 7 regimes of 5 states with identical durations (the
+    p-values are irrelevant; only the pairs are checked). Tolerance: exact.
     """
 
     regime = np.repeat(np.arange(7), 5)
@@ -2696,24 +2947,32 @@ PRE_EXISTING_H3A_KEYS = {
     "reason",
     "pass",
 }
-"""The 14 keys of the H3a result before WU-0004d, typed from ``h3a_logrank``'s docstring of
-develop ``dfd656f``; the unit adds two and changes none of these."""
+"""The 14 keys of the H3a result before WU-0004d.
+
+Typed from the docstring of ``h3a_logrank`` at develop ``dfd656f``; the unit
+added two keys and changed none of these.
+"""
 
 
 def test_h3a_one_event_among_a_hundred_states_is_visible_in_the_counts() -> (
     None
 ):
-    """DEF-0018 / ruling B6b: a regime of 100 states with ONE event is shown as 1 event, 99 censored.
+    """DEF-0018 / ruling B6b: a regime of 100 states with ONE event shows 1
+    event, 99 censored.
 
-    Reference: a hand-built case. Regime 0 has 100 states with durations 1..100, censored except the
-    state of duration 37 (one event); regime 1 has 100 states with durations 1..100, all events.
-    Expected by hand: ``n_per_regime == [100, 100]``, events ``[1, 100]``, censored ``[99, 0]``. The
-    counts are integers, so the comparison is exact. The raw p of the (only) pair is checked
-    against ``scipy.stats.logrank`` on the same arrays (an independent code; ``rel=1e-10``, the
-    tolerance of ``test_h3a_holm_and_raw_p_match_independent_references``: the two codes sum the
-    per-time terms in a different order) and is extreme (below 1e-10, premise from the defect
-    record DEF-0018), so the counts are what tells the reader that the p rests on one event. The
-    keys other than the two new ones are exactly the 14 of the previous output.
+    Reference: a hand-built case. Regime 0 has 100 states with durations
+    1..100, all censored except the state of duration 37 (one event). Regime 1
+    has 100 states with durations 1..100, all events. By hand, ``n_per_regime``
+    is [100, 100], the events are [1, 100] and the censored counts [99, 0]. The
+    counts are integers, so the comparison is exact.
+
+    The raw p of the only pair is checked against ``scipy.stats.logrank`` on
+    the same arrays (an independent code; ``rel=1e-10``, the tolerance of
+    ``test_h3a_holm_and_raw_p_match_independent_references``: the two codes sum
+    the per-time terms in a different order). It is extreme (below 1e-10, a
+    premise from the defect record DEF-0018), so the counts are what tells the
+    reader that the p rests on one event. The keys other than the two new ones
+    are exactly the 14 of the previous output.
     """
 
     regime = np.repeat([0, 1], 100)
@@ -2748,14 +3007,16 @@ def test_h3a_one_event_among_a_hundred_states_is_visible_in_the_counts() -> (
 
 
 def test_h3a_event_counts_match_a_python_loop_and_add_up() -> None:
-    """The event and censored counts equal a plain loop over the states, in every case.
+    """The event and censored counts equal a plain loop over the states, in
+    every case.
 
-    Reference: a pure-Python count (``sum(1 for l, e in zip(labels, flags) if l == k and e)``),
-    independent of the NumPy masking in the code under test. Cases: (a) 5 regimes, 400 random
-    states with random labels and event flags (``np.random.default_rng(7)``), regime 3 forced
-    empty; (b) all states censored; (c) all events; (d) a single regime. Invariant in each:
-    events + censored == ``n_per_regime`` for every regime, and an empty regime is 0, 0, 0.
-    Integers: exact.
+    Reference: a pure-Python count (``sum(1 for l, e in zip(labels, flags) if l
+    == k and e)``), independent of the NumPy masking in the code under test.
+    Cases: (a) 5 regimes, 400 random states with random labels and event flags
+    (``np.random.default_rng(7)``), regime 3 forced empty; (b) all states
+    censored; (c) all events; (d) a single regime. In each case events plus
+    censored equal ``n_per_regime`` for every regime, and an empty regime is 0,
+    0, 0. Integers: exact.
     """
 
     rng = np.random.default_rng(7)
@@ -2805,14 +3066,17 @@ def test_h3a_event_counts_match_a_python_loop_and_add_up() -> None:
 
 
 def test_regression_h3a_new_keys_change_no_pre_existing_number() -> None:
-    """Regression guard (not correctness evidence): the verdict, p-values and counts are unchanged.
+    """Regression guard (not correctness evidence): verdict, p-values and
+    counts are unchanged.
 
-    The input is that of ``test_h3a_holm_and_raw_p_match_independent_references``. This test pins
-    the structure: the pre-existing keys are exactly the 14 of the previous output, and the
-    verdict-bearing values are the ones the earlier test asserts (pass, the pairs,
-    ``n_per_regime``). The numerical independence of the p-values
-    is in the scipy comparisons of the tests above and below (bitwise neutrality of the whole
-    results.json is the DEV-0 smoke comparison of WU-0004d). Exact.
+    The input is that of
+    ``test_h3a_holm_and_raw_p_match_independent_references``. This test pins
+    the structure: the pre-existing keys are exactly the 14 of the previous
+    output, and the verdict-bearing values are the ones the earlier test
+    asserts (pass, the pairs, ``n_per_regime``). The numerical independence of
+    the p-values is in the scipy comparisons of the tests above and below
+    (bitwise neutrality of the whole results.json is the DEV-0 smoke comparison
+    of WU-0004d). Tolerance: exact.
     """
 
     regime, durations, target = _regime_data((0.05, 0.45, 0.15), 60, 3)
@@ -2840,12 +3104,14 @@ def test_regression_h3a_new_keys_change_no_pre_existing_number() -> None:
     ] == [0, 0, 0]
 
 
-# ---------------------------------------------------------------- WU-0002.8: H3b
+# ------------------------------------------------------------- WU-0002.8: H3b
 def _h3b_data(seed: int, n: int = 600):
-    """Profile ``(n, 2, 4)`` with ``x`` drawn per state and repeated over the 2 draws, and weights.
+    """Profile ``(n, 2, 4)`` with ``x`` drawn per state and repeated over 2
+    draws.
 
-    The curvature weights are integers 1..4 and the profile is uniform on [0, 1]^4, from
-    ``np.random.default_rng(seed)``. Column 2 is ``lambda_tilde``.
+    Returns ``x``, the repeated profile and the curvature weights. The
+    curvature weights are integers 1..4 and the profile is uniform on [0, 1]^4,
+    from ``np.random.default_rng(seed)``. Column 2 is ``lambda_tilde``.
     """
     rng = np.random.default_rng(seed)
     x = rng.uniform(size=(n, 4))
@@ -2856,21 +3122,29 @@ def _h3b_data(seed: int, n: int = 600):
 def test_h3b_known_ordering_lambda_irrelevant_for_the_weight_and_first_for_the_horizon() -> (
     None
 ):
-    """H3b passes where ``Lambda_tilde`` is irrelevant to the weight and dominates the horizon.
+    """H3b passes where ``Lambda_tilde`` is irrelevant to the weight and leads
+    the horizon.
 
-    Reference: manufactured truth, 600 states x 2 draws, ``x ~ U[0, 1]^4`` drawn per state and
-    repeated over its draws (the targets are per state). Column 2 is Lambda_tilde. Weight
-    ``w* = 0.5 1{x0 > 0.5} + 0.25 1{x1 > 0.3}`` (dyadic, depends on x0 and x1 only), curvature
-    weights integers 1..4, ``ln T = 3 x2 + 0.5 x0``. After the splits on x0 and x1 every leaf of
-    the weight tree is pure with an exactly zero impurity (dyadic values and integer weights make
-    the leaf mean and squared mean exact), so no split on x2 can improve it: the importance of
-    Lambda_tilde is exactly 0.0 in the full fit and in every resample, and the interval is
-    [0.0, 0.0], inside the band [0, 0.2). In the horizon tree the first three splits are on x2
-    (impurity decrease 0.703 of 0.771 of the total, a 9-fold margin over any x0 split, which
-    gains at most 0.0039), so ``D`` is about 0.96 and positive in every resample: stability is
-    exactly 1.0 and the lower bound of D is at least 0.9 (the plan's bound; the applied-
-    mathematician observed at least 0.982 over 8 seeds). The tolerances are exact equalities for
-    the zeros and ``>= 0.9`` for D, fixed before the run.
+    Reference: manufactured truth, 600 states x 2 draws, ``x ~ U[0, 1]^4``
+    drawn per state and repeated over its draws (the targets are per state).
+    Column 2 is Lambda_tilde. The weight is ``w* = 0.5 1{x0 > 0.5} + 0.25 1{x1
+    > 0.3}`` (dyadic; it depends on x0 and x1 only), the curvature weights are
+    integers 1..4, and ``ln T = 3 x2 + 0.5 x0``.
+
+    After the splits on x0 and x1, every leaf of the weight tree is pure with
+    an exactly zero impurity (dyadic values and integer weights make the leaf
+    mean and squared mean exact), so no split on x2 can improve it. The
+    importance of Lambda_tilde is therefore exactly 0.0 in the full fit and in
+    every resample, and the interval is [0.0, 0.0], inside the band [0, 0.2).
+    In the horizon tree the first three splits are on x2 (impurity decrease
+    0.703 of 0.771 of the total, a 9-fold margin over any x0 split, which gains
+    at most 0.0039), so ``D`` is about 0.96 and positive in every resample:
+    stability is exactly 1.0 and the lower bound of D is at least 0.9 (the
+    plan's bound; the applied-mathematician observed at least 0.982 over 8
+    seeds).
+
+    Tolerance: exact equalities for the zeros and ``>= 0.9`` for D, fixed
+    before the run.
     """
 
     x, profile, curvature = _h3b_data(31)
@@ -2903,16 +3177,20 @@ def test_h3b_known_ordering_lambda_irrelevant_for_the_weight_and_first_for_the_h
 
 
 def test_h3b_reversed_ordering_fails_both_parts() -> None:
-    """With Lambda_tilde carrying the weight and not the horizon, both parts fail.
+    """With Lambda_tilde carrying the weight and not the horizon, both parts
+    fail.
 
-    Reference: manufactured truth on the data of the previous test with the roles reversed:
-    ``w* = 0.5 1{x2 > 0.5}`` (so the weight tree's only split is on Lambda_tilde = x2) and
-    ``ln T = 3 x0 + 0.5 x2`` (x0 dominates the horizon tree). The weight importance of x2 is then
-    exactly 1.0 in every resample (a single feature carries all the impurity decrease, 1.0 / 1.0),
-    so the interval is [1.0, 1.0] (the plan asked for >= 0.2; tightened by the applied-
-    mathematician, who verified it), which misses the band [0, 0.2): ``pass`` False and, as a fail,
-    no inconclusive reason. D is about -0.95, so its upper bound is at most -0.9 (observed at most
-    -0.978 over 8 seeds), stability is exactly 0.0, and the combined result is not a pass.
+    Reference: manufactured truth on the data of the previous test with the
+    roles reversed: ``w* = 0.5 1{x2 > 0.5}`` (so the weight tree's only split
+    is on Lambda_tilde = x2) and ``ln T = 3 x0 + 0.5 x2`` (x0 dominates the
+    horizon tree). The weight importance of x2 is then exactly 1.0 in every
+    resample (a single feature carries all the impurity decrease, 1.0 / 1.0),
+    so the interval is [1.0, 1.0] (the plan asked for >= 0.2; tightened by the
+    applied-mathematician, who verified it). That misses the band [0, 0.2):
+    ``pass`` is False and, as a fail, there is no inconclusive reason. D is
+    about -0.95, so its upper bound is at most -0.9 (observed at most -0.978
+    over 8 seeds), stability is exactly 0.0, and the combined result is not a
+    pass.
     """
 
     x, profile, curvature = _h3b_data(31)
@@ -2937,16 +3215,19 @@ def test_h3b_reversed_ordering_fails_both_parts() -> None:
 
 
 def test_h3b_construction_leaf_count_row_expansion_and_point_fit() -> None:
-    """The trees have 8 leaves, a state's draws stay together, and the point fit is the plain fit.
+    """The trees have 8 leaves, a state's draws stay together, and the point
+    fit is plain.
 
-    Reference: (a) the estimator parameters, read from ``DecisionTreeRegressor.max_leaf_nodes``.
-    (b) The state-to-row expansion of the states [2, 0] at 3 draws each is rows
-    [6, 7, 8, 0, 1, 2] (state i owns rows 3i..3i+2), worked by hand. (c) The reported full-data
-    importances equal those of a ``DecisionTreeRegressor(max_leaf_nodes=8, random_state=seed)``
-    fitted in the test on the flattened rows, with the curvature as sample weight for the weight
-    tree (scikit-learn is the independent implementation), by exact equality: both fits run
-    the same deterministic algorithm on identical inputs (the seed 20261005 is below 2**32, so
-    ``sklearn_seed`` is the identity).
+    Reference: (a) the estimator parameters, read from
+    ``DecisionTreeRegressor.max_leaf_nodes``. (b) The state-to-row expansion of
+    the states [2, 0] at 3 draws each is rows [6, 7, 8, 0, 1, 2] (state i owns
+    rows 3i..3i+2), worked by hand. (c) The reported full-data importances
+    equal those of a ``DecisionTreeRegressor(max_leaf_nodes=8,
+    random_state=seed)`` fitted in the test on the flattened rows, with the
+    curvature as sample weight for the weight tree (scikit-learn is the
+    independent implementation). The comparison is by exact equality: both fits
+    run the same deterministic algorithm on identical inputs (the seed 20261005
+    is below 2**32, so ``sklearn_seed`` is the identity).
     """
 
     tree_w, tree_t = _h3b_trees(CONFIG.seed)
@@ -2980,19 +3261,25 @@ def test_h3b_construction_leaf_count_row_expansion_and_point_fit() -> None:
 def test_h3b_degenerate_fits_are_counted_failed_resamples_and_not_zeros() -> (
     None
 ):
-    """A single-leaf tree has no importance: NaN in a resample (counted), inconclusive if full-data.
+    """A single-leaf tree has no importance: NaN in a resample (counted),
+    inconclusive if full-data.
 
-    Reference: (a) a constant ``w*``: the full-data weight tree has one leaf (checked with the
-    independent scikit-learn fit's ``get_n_leaves() == 1`` as a premise), so the weight part is
-    "not computable" (importance None, pass False, reason naming the degenerate full-data fit),
-    ``degenerate_fits.weight_tree`` equals the number of resamples (200: every resample is
-    constant too), ``nan_resamples`` is 200, and the whole result is not a pass. (b) A weight
-    target that is non-zero only on states 20..24 (60 states): a resample whose blocks miss all
-    five states has a constant target and a single-leaf tree. The expected number of such
-    resamples is replayed with ``block_resample_indices`` on the same generator (an independent
-    use of the tested helper), and must equal ``degenerate_fits.weight_tree`` and the weight
-    interval's ``n_failed_resamples``. (c) A constant ``ln T`` makes D not computable and
-    stability 0.0. Exact comparisons.
+    Reference, all compared exactly:
+
+    * (a) A constant ``w*``: the full-data weight tree has one leaf (checked
+      with the independent scikit-learn fit's ``get_n_leaves() == 1`` as a
+      premise), so the weight part is "not computable" (importance None, pass
+      False, reason naming the degenerate full-data fit).
+      ``degenerate_fits.weight_tree`` equals the number of resamples (200:
+      every resample is constant too), ``nan_resamples`` is 200, and the whole
+      result is not a pass.
+    * (b) A weight target that is non-zero only on states 20..24 (60 states): a
+      resample whose blocks miss all five states has a constant target and a
+      single-leaf tree. The expected number of such resamples is replayed with
+      ``block_resample_indices`` on the same generator (an independent use of
+      the tested helper), and must equal ``degenerate_fits.weight_tree`` and
+      the weight interval's ``n_failed_resamples``.
+    * (c) A constant ``ln T`` makes D not computable and stability 0.0.
     """
 
     x, profile, curvature = _h3b_data(33, n=60)
@@ -3046,22 +3333,28 @@ def test_h3b_degenerate_fits_are_counted_failed_resamples_and_not_zeros() -> (
     )
 
 
-# ---------------------------------------------------------------- WU-0002.8: H3c, H2c, wiring
+# ------------------------------------------------ WU-0002.8: H3c, H2c, wiring
 def test_h3c_ratio_of_means_paired_resampling_and_closed_bound() -> None:
-    """H3c is ``mean(A5) / mean(A4)`` with one index array, level 1 - 0.05/3, pass iff hi <= 1.05.
+    """H3c is ``mean(A5) / mean(A4)`` with one index array, level 1 - 0.05/3;
+    pass iff hi <= 1.05.
 
-    Reference: (a) hand ratios: A5 = A4 gives exactly 1 in every resample (x / x = 1 in IEEE),
-    so ``ci == [1, 1]`` and pass; A5 = 1.2 A4 gives 1.2 in every resample to within a few
-    ulp, ``ci == [1.2, 1.2]`` to 1e-12 and no pass (the bound 1.2 exceeds 1.05). (b) A random
-    pair (60 states, ``default_rng(21)``, A4 uniform on [1, 2], A5 = A4 (1 + 0.1 u) with u
-    uniform): the point ratio equals ``np.mean(a5) / np.mean(a4)`` (abs 1e-12) and the
-    interval equals ``statistics.block_bootstrap`` of the ratio at
-    ``make_rng(seed, system, "h3c-ratio")``, level 1 - 0.05/3, exactly (the same index array in the
-    numerator and the denominator). (c) The closed bound: a ratio interval whose upper
-    bound is exactly 1.05 passes; this is tested through the verdict helper
-    ``criterion_verdict``, which has its own tests, by the resample-constant case A5 = 1.05 A4 only up to
-    round-off, so it is not asserted exactly. (d) Fewer than 50 states: pass False with the
-    reason "n_states < 50".
+    Reference:
+
+    * (a) Hand ratios. A5 = A4 gives exactly 1 in every resample (x / x = 1 in
+      IEEE arithmetic), so ``ci == [1, 1]`` and pass. A5 = 1.2 A4 gives 1.2 in
+      every resample to within a few ulp, so ``ci == [1.2, 1.2]`` to 1e-12 and
+      no pass (the bound 1.2 exceeds 1.05).
+    * (b) A random pair (60 states, ``default_rng(21)``, A4 uniform on [1, 2],
+      A5 = A4 (1 + 0.1 u) with u uniform): the point ratio equals ``np.mean(a5)
+      / np.mean(a4)`` (abs 1e-12) and the interval equals
+      ``statistics.block_bootstrap`` of the ratio at ``make_rng(seed, system,
+      "h3c-ratio")``, level 1 - 0.05/3, exactly (the same index array in the
+      numerator and the denominator).
+    * (c) The closed bound (an upper bound of exactly 1.05 passes) is tested
+      through ``criterion_verdict``, which has its own tests; the case A5 =
+      1.05 A4 is exact only up to round-off, so it is not asserted exactly here
+      (see ``test_h3c_closed_edge_at_exactly_1_05_passes`` for an exact case).
+    * (d) Fewer than 50 states: pass False with the reason "n_states < 50".
     """
 
     rng = np.random.default_rng(21)
@@ -3101,7 +3394,9 @@ def test_h3c_ratio_of_means_paired_resampling_and_closed_bound() -> None:
 
 
 def _scores(**state_mse: np.ndarray) -> dict[str, RuleScores]:
-    """Rule scores that carry only ``state_mse_ref`` (the field H2c and H3c read)."""
+    """Rule scores that carry only ``state_mse_ref`` (the field H2c and H3c
+    read).
+    """
     return {
         name: RuleScores(
             mse=np.zeros(1),
@@ -3118,7 +3413,12 @@ def _scores(**state_mse: np.ndarray) -> dict[str, RuleScores]:
 def _calibration(
     cp_sq: float, plp_sq: float, n: int = 6, draws: int = 2
 ) -> SplitData:
-    """A calibration split whose errors at H_ref (second of horizons 8, 30) have fixed squares."""
+    """A calibration split whose errors at H_ref (second of horizons 8, 30) are
+    fixed.
+
+    The CP squared error is ``cp_sq`` and the PLP squared error is ``plp_sq``.
+    The other horizon holds a large value (100) that must never be read.
+    """
     cp = np.zeros((n, draws, 2))
     plp = np.zeros((n, draws, 2))
     cp[:, :, 1] = np.sqrt(cp_sq) * np.where(
@@ -3148,20 +3448,27 @@ def _calibration(
 def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o() -> (
     None
 ):
-    """The better single forecaster comes from the calibration split; A4o - A2 is reported only.
+    """The better single forecaster comes from the calibration split; A4o - A2
+    is reported only.
 
-    Reference: hand-built data. Calibration squared errors at H_ref are 0.25 for CP (A0) and 4.0
-    for PLP (A1), so the realized calibration MSEs are 0.25 and 4.0 and the choice is A0, although
-    on the test scores A1 has the smaller per-state MSE (0.1 against 0.2), which the old rule would
-    have picked. A tie (equal squares) goes to A0. ``A4o_minus_A2.mean`` is the hand mean of
-    ``a4o - a2`` (``abs=1e-12``: one reduction of 60 numbers, the six hand values tiled ten times, each of order 1, so round-off is below 60 * 1.1e-16 * 1 ~ 7e-15, two orders under the tolerance); its interval is at level 0.95, it
-    carries ``role == "reported"`` and no ``pass``. The value at the other horizon (100) must not
-    be read: the column is located by the horizon value, not by position. The entry
-    ``A4_minus_A0`` exists and ``A4_minus_A1`` does not.
+    Reference: hand-built data. The calibration squared errors at H_ref are
+    0.25 for CP (A0) and 4.0 for PLP (A1), so the realized calibration MSEs are
+    0.25 and 4.0 and the choice is A0, although on the test scores A1 has the
+    smaller per-state MSE (0.1 against 0.2), which the old rule would have
+    picked. A tie (equal squares) goes to A0. The value at the other horizon
+    (100) must not be read: the column is located by the horizon value, not by
+    position. The entry ``A4_minus_A0`` exists and ``A4_minus_A1`` does not.
+
+    ``A4o_minus_A2.mean`` is the hand mean of ``a4o - a2``. Tolerance
+    ``abs=1e-12``: one reduction of 60 numbers (the six hand values tiled ten
+    times, each of order 1), so round-off is below 60 * 1.1e-16 * 1 = 7e-15,
+    two orders under the tolerance. Its interval is at level 0.95, it carries
+    ``role == "reported"`` and no ``pass``.
     """
 
-    # WU-0002.9 plan-listed edit: the six hand states are tiled ten times (60 states), because
-    # each part now carries the 50-state minimum of DEC-0008 A3; every mean is unchanged.
+    # WU-0002.9 plan-listed edit: the six hand states are tiled ten times (60
+    # states), because each part now carries the 50-state minimum of DEC-0008
+    # A3; every mean is unchanged.
     a2 = np.tile(np.array([1.0, 1.5, 2.0, 2.5, 3.0, 3.5]), 10)
     a4 = a2 - 0.5
     a4o = a2 - np.tile(np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]), 10)
@@ -3179,9 +3486,10 @@ def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o
     assert reported["mean"] == pytest.approx(
         -0.35, abs=1e-12
     )  # mean of -0.1 .. -0.6
-    # Review R4: counted bootstrap, same resamples as the other H2c parts (the generator
-    # make_rng(seed, system, "bootstrap", "H2c")), bitwise equal to the pre-existing
-    # block_bootstrap when nothing fails; failures would be counted.
+    # Review R4: counted bootstrap, same resamples as the other H2c parts (the
+    # generator make_rng(seed, system, "bootstrap", "H2c")), bitwise equal to
+    # the pre-existing block_bootstrap when nothing fails; failures would be
+    # counted.
     reference = block_bootstrap(
         lambda idx: float(np.mean((a4o - a2)[idx])),
         60,
@@ -3222,16 +3530,21 @@ def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o
 def test_h3_regimes_wiring_keys_and_arguments(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``h3_regimes`` returns exactly H3a, H3b, H3c and regime_curve, calling the three helpers.
+    """``h3_regimes`` returns exactly H3a, H3b, H3c and regime_curve, calling
+    the helpers.
 
-    Reference: the key sets of the plan (D4), written out below; no ``p_eff`` key anywhere. The
-    helpers are checked against direct calls on the same arrays: H3c equals ``h3c_ratio`` of the
-    scores, H3b equals ``h3b_importances`` of the construction arrays, and H3a uses the first
-    evaluation draw (its ``n_per_regime`` counts the states of ``regime[:, 0]``). The profile
-    function is replaced by a lookup of fixed arrays (the unit under test is the wiring, not the
-    proxies), and the regime map is a real tree. Exact equality of dicts (same deterministic code
-    on the same inputs: a wiring check, not independent evidence of the statistics, which the
-    tests above check).
+    Reference: the key sets of the plan (D4), written out below; no ``p_eff``
+    key anywhere. The helpers are checked against direct calls on the same
+    arrays: H3c equals ``h3c_ratio`` of the scores, H3b equals
+    ``h3b_importances`` of the construction arrays, and H3a uses the first
+    evaluation draw (its ``n_per_regime`` counts the states of ``regime[:,
+    0]``). The profile function is replaced by a lookup of fixed arrays (the
+    unit under test is the wiring, not the proxies), and the regime map is a
+    real tree.
+
+    Tolerance: exact equality of dicts (the same deterministic code on the same
+    inputs). This is a wiring check, not independent evidence of the
+    statistics, which the tests above check.
     """
     from lpcstudy import analysis
     from lpcstudy.oracle import curvature, oracle_weight
@@ -3395,16 +3708,19 @@ def test_h3_regimes_wiring_keys_and_arguments(
 
 
 def test_h2c_a4o_minus_a2_counts_failed_resamples() -> None:
-    """A non-finite state in A4o - A2 makes resamples fail; they are counted, not dropped (R4).
+    """A non-finite state in A4o - A2 makes resamples fail; they are counted,
+    not dropped (R4).
 
-    Reference: hand-built situation. One of 60 states has a NaN squared error for A4o, so every
-    resample that contains it has a NaN mean. With blocks of 5 over 60 states a resample misses
-    it with probability about (1 - 5/56)^12 = 0.33, so many of the 200 resamples fail. The counted
-    helper puts failures at the unfavourable tail (``percentile_interval``): the bounds become
-    infinite once the count reaches floor((B - 1) a) + 1 = 5 at B = 200, level 0.95 (a = 0.025).
-    The point estimate is NaN. The number of failures equals a replay of the same resamples with
-    ``block_resample_indices`` at ``make_rng(config.seed, system, "bootstrap", "H2c")``
-    (independent use of the tested helper). Exact.
+    Reference: a hand-built situation. One of 60 states has a NaN squared error
+    for A4o, so every resample that contains it has a NaN mean. With blocks of
+    5 over 60 states a resample misses it with probability about (1 - 5/56)^12
+    = 0.33, so many of the 200 resamples fail. The counted helper puts failures
+    at the unfavorable tail (``percentile_interval``): the bounds become
+    infinite once the count reaches ``floor((B - 1) a) + 1 = 5`` at B = 200,
+    level 0.95 (a = 0.025). The point estimate is NaN. The number of failures
+    equals a replay of the same resamples with ``block_resample_indices`` at
+    ``make_rng(config.seed, system, "bootstrap", "H2c")`` (an independent use
+    of the tested helper). Tolerance: exact.
     """
 
     n = 60
@@ -3429,19 +3745,27 @@ def test_h2c_a4o_minus_a2_counts_failed_resamples() -> None:
 
 
 def test_h2b_combined_verdict_uses_both_parts() -> None:
-    """H2b combines (i) and (ii): a straddling (i) is inconclusive, a failing (i) fails (R2).
+    """H2b combines (i) and (ii): a straddling (i) is inconclusive, a failing
+    (i) fails (R2).
 
-    Reference: hand-built outcomes with 60 states (above the 50-state minimum). The library part
-    (ii) is the tiled six-state table (every resample mean at least 0.175: a pass, see
-    ``test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing``). Part (i):
-    (a) all states fixed at 0.5 for rho = 1% and 0.5 +- 0.125 (alternating by state) at 2%: the
-    per-state Spearman is +1/-1 alternately, every block of 5 has mean +-0.2 and the resample
-    means straddle 0, so (i) is inconclusive ("interval meets band edge") although ``pass`` was
-    False before the fix; the combined verdict is inconclusive, ``pass`` False, and the reason
-    names ``noise`` and not ``library_change``. (b) All states fall with rho: Spearman -1 in
-    every resample, interval [-1, -1], entirely below the open band: (i) fails; with (ii) missing
-    (inconclusive) one fail still fails the criterion (v3 section 7): verdict "fail", reason
-    None. (c) (i) rising in every state and (ii) passing: verdict pass. Exact comparisons.
+    Reference: hand-built outcomes with 60 states (above the 50-state minimum).
+    Part (ii) is the tiled six-state table (every resample mean is at least
+    0.175: a pass, as in the library-change test of a clear rise). For part
+    (i):
+
+    * (a) All states fixed at 0.5 for rho = 1% and 0.5 +- 0.125 (alternating by
+      state) at 2%: the per-state Spearman is +1/-1 alternately, every block of
+      5 has mean +-0.2 and the resample means straddle 0, so (i) is
+      inconclusive ("interval meets band edge") although ``pass`` was False
+      before the fix. The combined verdict is inconclusive, ``pass`` False, and
+      the reason names ``noise`` and not ``library_change``.
+    * (b) All states fall with rho: Spearman -1 in every resample, interval
+      [-1, -1], entirely below the open band, so (i) fails. With (ii) missing
+      (inconclusive), one fail still fails the criterion (v3 section 7):
+      verdict "fail", reason None.
+    * (c) (i) rising in every state and (ii) passing: verdict pass.
+
+    Tolerance: all exact.
     """
 
     n = 60
@@ -3489,13 +3813,14 @@ def test_h2b_combined_verdict_uses_both_parts() -> None:
 
 
 def test_h3c_closed_edge_at_exactly_1_05_passes() -> None:
-    """The H3c bound is closed: an interval whose upper bound is exactly 1.05 passes (R5).
+    """The H3c bound is closed: an upper bound of exactly 1.05 passes (R5).
 
-    Reference: DEC-0008 A1 (H3c closed, v3 section 2) and exact arithmetic. With A4 = 20.0 and
-    A5 = 21.0 in all 60 states every resample mean is an exact integer, so every resample ratio
-    is the correctly rounded 21/20, which is the float literal 1.05 (both are the nearest double
-    to the real number 1.05). The interval is [1.05, 1.05]: pass. A5 = 21.000001 gives a ratio
-    above the bound: not a pass (a fail, no reason). Exact comparisons.
+    Reference: DEC-0008 A1 (H3c closed, v3 section 2) and exact arithmetic.
+    With A4 = 20.0 and A5 = 21.0 in all 60 states, every resample mean is an
+    exact integer, so every resample ratio is the correctly rounded 21/20,
+    which is the float literal 1.05 (both are the nearest double to the real
+    number 1.05). The interval is [1.05, 1.05]: pass. A5 = 21.000001 gives a
+    ratio above the bound: not a pass (a fail, no reason). Tolerance: exact.
     """
 
     edge = h3c_ratio(np.full(60, 21.0), np.full(60, 20.0), CONFIG, SYSTEM)
@@ -3516,15 +3841,18 @@ def test_h3c_closed_edge_at_exactly_1_05_passes() -> None:
 def test_h3b_weight_band_is_open_at_0_2(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The weight-importance band is [0, 0.2): an interval with upper bound exactly 0.2 is no pass (R5).
+    """The weight-importance band is [0, 0.2): an upper bound of exactly 0.2 is
+    no pass (R5).
 
-    Reference: DEC-0008 A1 (H3b weight band strict at 0.2, v3 section 2). The interval of the
-    weight column is replaced by the hand value (0.0, 0.2, 0) through a wrapper around
-    ``percentile_interval`` (first call, the weight column; the second call, for D, is the real
-    function), on the data of the known-ordering test, where the real interval is [0, 0]. The unit
-    under test is the edge convention passed to ``criterion_verdict``. With upper 0.2: not inside
-    the open band and not entirely outside it, so inconclusive ("interval meets band edge"); with
-    upper 0.19999999999999998 (the float below): pass. Exact.
+    Reference: DEC-0008 A1 (H3b weight band strict at 0.2, v3 section 2). The
+    interval of the weight column is replaced by the hand value (0.0, 0.2, 0)
+    through a wrapper around ``percentile_interval`` (first call, the weight
+    column; the second call, for D, is the real function), on the data of the
+    known-ordering test, where the real interval is [0, 0]. The unit under test
+    is the edge convention passed to ``criterion_verdict``. With upper 0.2 the
+    interval is not inside the open band and not entirely outside it, so the
+    result is inconclusive ("interval meets band edge"); with upper
+    0.19999999999999998 (the float below) it passes. Tolerance: exact.
     """
     from lpcstudy import analysis
 
@@ -3556,24 +3884,33 @@ def test_h3b_weight_band_is_open_at_0_2(
             assert out["weight_lambda"]["reason"] == "interval meets band edge"
 
 
-# ------------------------------------------------ WU-0002.9: H1c, H2c, H2d and gain-bound verdicts
-# Plan checks V3 to V7 of WU-0002.9 with the main-session amendments (B1, N3, N5). Every
-# reference is a hand table, a closed-form value, a polyfit slope, or the pre-existing
-# ``block_bootstrap`` (an independent code path); nothing is classified by the code under test.
+# --------------------------- WU-0002.9: H1c, H2c, H2d and gain-bound verdicts
+# Plan checks V3 to V7 of WU-0002.9 with the main-session amendments (B1, N3,
+# N5). Every reference is a hand table, a closed-form value, a polyfit slope,
+# or the pre-existing ``block_bootstrap`` (an independent code path); nothing
+# is classified by the code under test.
 
 
 def test_h1c_ratio_block_closed_band_edges_and_state_minimum() -> None:
-    """H1c band [0.8, 1.25] is closed; fewer than 50 states is inconclusive; fewer than 10 no number.
+    """H1c band [0.8, 1.25] is closed; fewer than 50 states is inconclusive;
+    fewer than 10 gives no number.
 
-    Reference: hand cases (plan V4). 60 ratios equal to 1.25 (0.8) give the interval [1.25, 1.25]
-    ([0.8, 0.8]): the median of 60 equal floats is that float exactly (an even count averages
-    x and x, which is x), so the interval touches the closed edge and passes. 1.5 is outside:
-    fail. Values alternating 0.7 and 1.0 (60 states) have resample medians in [0.7, 1.0] and
-    the 95% interval straddles 0.8: inconclusive "interval meets band edge". 49 equal ratios
-    give inconclusive "n_states < 50" although the interval would pass, and still report it; 9
-    ratios give no median and no interval (None), with the same reason; ``with_verdict=False``
-    (the CP) adds no verdict key. Two non-finite ratios among 60 finite ones are excluded and
-    counted (N3). Exact comparisons.
+    Reference: hand cases (plan V4).
+
+    * 60 ratios equal to 1.25 (0.8) give the interval [1.25, 1.25] ([0.8,
+      0.8]): the median of 60 equal floats is that float exactly (an even count
+      averages x and x, which is x), so the interval touches the closed edge
+      and passes. 1.5 is outside: fail.
+    * Values alternating 0.7 and 1.0 (60 states) have resample medians in [0.7,
+      1.0] and the 95% interval straddles 0.8: inconclusive "interval meets
+      band edge".
+    * 49 equal ratios give inconclusive "n_states < 50" although the interval
+      would pass, and the interval is still reported. Nine ratios give no
+      median and no interval (None), with the same reason.
+    * ``with_verdict=False`` (the CP) adds no verdict key.
+    * Two non-finite ratios among 60 finite ones are excluded and counted (N3).
+
+    Tolerance: all exact.
     """
 
     def block(value: float, n: int = 60) -> dict:
@@ -3638,14 +3975,17 @@ def test_h1c_ratio_block_closed_band_edges_and_state_minimum() -> None:
 def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_generator(
     n_states: int,
 ) -> None:
-    """The counted intervals equal the earlier ``block_bootstrap`` bitwise (plan V7).
+    """Regression guard: the counted intervals equal the earlier
+    ``block_bootstrap`` bitwise (V7).
 
-    This is a regression guard against the previous code path, which stays in
-    ``lpcstudy.statistics``: with no failed resample the estimate and both bounds of the H1c
-    median (generator ``make_rng(seed, system, "bootstrap", "H1c")``), the H2c mean differences
-    (``... "H2c"``) and the H2d excess (``... "H2d"``) are the same floats. 51 is the smoke size of the H1c PLP ratios. Synthetic
-    data from ``default_rng(11)``. Exact (``==``) on floats; non-finite ratios are excluded
-    before the median, so the reference runs on the finite ones.
+    This guards against the previous code path, which stays in
+    ``lpcstudy.statistics``. With no failed resample, the estimate and both
+    bounds of the H1c median (generator ``make_rng(seed, system, "bootstrap",
+    "H1c")``), the H2c mean differences (``... "H2c"``) and the H2d excess
+    (``... "H2d"``) are the same floats. The size 51 is the smoke size of the
+    H1c PLP ratios. The synthetic data come from ``default_rng(11)``.
+    Tolerance: exact (``==``) on floats; non-finite ratios are excluded before
+    the median, so the reference runs on the finite ones.
     """
 
     rng = np.random.default_rng(11)
@@ -3697,12 +4037,14 @@ def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_genera
 def _horizon_stub(
     tables: dict[str, np.ndarray], growth: np.ndarray, h_max: int = 40
 ) -> Cell:
-    """A cell whose first-passage horizons at thresholds (0.1, 0.2, 0.3, 0.5) are the tables.
+    """A cell whose first-passage horizons at thresholds (0.1, 0.2, 0.3, 0.5)
+    are the tables.
 
-    ``tables["PLP"]`` and ``tables["CP"]`` are ``(n, 4)`` integer first horizons (0 = never). The
-    r.m.s. error is a step function: 0.05 up to the first passage, then the midpoint between the
-    crossed threshold and the next one (1.0 above the last), so the first horizon above
-    threshold k is exactly the table entry (noise 0).
+    ``tables["PLP"]`` and ``tables["CP"]`` are ``(n, 4)`` integer first
+    horizons (0 = never). The root-mean-square error is a step function: 0.05
+    up to the first passage, then the midpoint between the crossed threshold
+    and the next one (1.0 above the last), so the first horizon above threshold
+    k is exactly the table entry (noise 0).
     """
     thetas = np.array([0.1, 0.2, 0.3, 0.5])
     levels = np.append((thetas[:-1] + thetas[1:]) / 2.0, 1.0)
@@ -3739,57 +4081,65 @@ def _horizon_stub(
     )
 
 
+def _h1c_stub_world(n_good: int) -> tuple[Cell, float]:
+    """Build the H1c stub world; return the cell and the CP/PLP slope ratio.
+
+    There are ``n_good`` good states (PLP horizons [10, 14, 17, 21] plus a
+    shift 0..4, growth set to 1/slope). Six more states follow: one with the
+    same horizon at every threshold (zero range), two censored with two events,
+    two with growth 0 and -0.1 (ineligible), and one with infinite growth
+    (whose ratio is inf). The CP horizons [6, 12, 16, 24] give the ratio
+    ``slope_cp / slope_plp``, about 1.6.
+    """
+    thetas = np.log([0.1, 0.2, 0.3, 0.5])
+
+    def slope(row: np.ndarray) -> float:
+        return np.polyfit(thetas, row, 1)[0]
+
+    plp_row, cp_row = np.array([10, 14, 17, 21]), np.array([6, 12, 16, 24])
+    shifts = np.arange(n_good) % 5
+    constant, censored = np.array([12, 12, 12, 12]), np.array([10, 14, 0, 0])
+    extra = [constant, censored, censored]
+    plp = [plp_row + s for s in shifts] + extra + [plp_row] * 3
+    cp = [cp_row + s for s in shifts] + extra + [cp_row] * 3
+    growth = [1.0 / slope(plp_row)] * n_good + [
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        -0.1,
+        np.inf,
+    ]
+    cell = _horizon_stub(
+        {"PLP": np.array(plp), "CP": np.array(cp)}, np.array(growth)
+    )
+    return cell, slope(cp_row) / slope(plp_row)
+
+
 def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_without_verdict() -> (
     None
 ):
-    """H1c end to end on a stub cell: PLP verdict from the interval; CP reported; exclusions counted.
+    """H1c end to end on a stub cell: PLP verdict from the interval; CP
+    reported; exclusions counted.
 
-    Reference: hand-built first-passage tables and ``np.polyfit`` of T on ln(theta) (independent
-    of ``ols_slope``). Good states have PLP horizons [10, 14, 17, 21] + a shift 0..4 (a shift
-    does not change the slope) and growth set to 1/slope, so every PLP ratio is 1 to round-off
-    (abs 1e-12: a few operations of order 1). Their CP horizons [6, 12, 16, 24] give the ratio
-    slope_cp/slope_plp, about 1.6, outside the band, and the CP must carry no verdict. Extra
-    states (N3 count rules): two with growth <= 0, one with the same horizon at every threshold
-    (zero range), two censored with two events (under three), all ineligible (5), and one with
-    infinite growth, whose ratio is inf: excluded as non-finite (1). With 60 good states the PLP
-    passes; with 40 good states it is inconclusive "n_states < 50" although the numbers are
-    reported. Counts are exact; the keys of CP are exactly those of the helper without a verdict.
+    Reference: hand-built first-passage tables and ``np.polyfit`` of T on
+    ln(theta) (independent of ``ols_slope``). Good states have PLP horizons
+    [10, 14, 17, 21] plus a shift 0..4 (a shift does not change the slope),
+    with growth set to 1/slope, so every PLP ratio is 1 to round-off (abs
+    1e-12: a few operations of order 1). Their CP horizons [6, 12, 16, 24] give
+    the ratio slope_cp/slope_plp, about 1.6, outside the band, and the CP must
+    carry no verdict.
+
+    Extra states (the N3 count rules): two with growth <= 0, one with the same
+    horizon at every threshold (zero range) and two censored with two events
+    (under three), all ineligible (5 in all); and one with infinite growth,
+    whose ratio is inf and is excluded as non-finite (1). With 60 good states
+    the PLP passes; with 40 good states it is inconclusive "n_states < 50"
+    although the numbers are reported. Counts are exact; the keys of CP are
+    exactly those of the helper without a verdict.
     """
 
-    thetas = np.log([0.1, 0.2, 0.3, 0.5])
-    slope = lambda row: np.polyfit(thetas, row, 1)[0]
-    plp_row, cp_row = np.array([10, 14, 17, 21]), np.array([6, 12, 16, 24])
-
-    def build(n_good: int) -> tuple[Cell, float]:
-        shifts = np.arange(n_good) % 5
-        constant, censored = np.array([12, 12, 12, 12]), np.array(
-            [10, 14, 0, 0]
-        )
-        plp = (
-            [plp_row + s for s in shifts]
-            + [constant, censored, censored]
-            + [plp_row] * 3
-        )
-        cp = (
-            [cp_row + s for s in shifts]
-            + [constant, censored, censored]
-            + [cp_row] * 3
-        )
-        # the last three: growth 0, growth -0.1 (ineligible) and infinite growth (inf ratio)
-        growth = [1.0 / slope(plp_row)] * n_good + [
-            1.0,
-            1.0,
-            1.0,
-            0.0,
-            -0.1,
-            np.inf,
-        ]
-        cell = _horizon_stub(
-            {"PLP": np.array(plp), "CP": np.array(cp)}, np.array(growth)
-        )
-        return cell, slope(cp_row) / slope(plp_row)
-
-    cell, cp_ratio = build(60)
+    cell, cp_ratio = _h1c_stub_world(60)
     out = h1c_horizon_law(cell, CONFIG)
     assert out["thresholds"] == [0.1, 0.2, 0.3, 0.5] and out["threshold"] == [
         0.8,
@@ -3816,7 +4166,7 @@ def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_with
     assert cp["n_states"] == 60 and cp["n_excluded_nonfinite"] == 1
     assert cp["n_ineligible_states"] == 5
     assert not {"verdict", "reason", "pass"} & set(cp)
-    small, _ = build(40)
+    small, _ = _h1c_stub_world(40)
     out = h1c_horizon_law(small, CONFIG)
     assert (
         out["PLP"]["n_states"] == 40 and out["PLP"]["median_ratio"] is not None
@@ -3832,40 +4182,30 @@ def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_with
 def test_h1c_horizon_law_capture_holds_the_per_state_ratios_and_reproduces_the_leaves() -> (
     None
 ):
-    """``capture`` (the dump's hook) gets the per-state ratios; ``h1c_ratio_block`` on them is the leaf.
+    """``capture`` (the dump's hook) gets the per-state ratios; the block on
+    them is the leaf.
 
-    Reference: the stub world of the test above, decided by hand. States 0..59 are good and
-    eligible; then a zero-range state, two censored states with two events and two states with
-    growth <= 0 are ineligible; the last state has infinite growth, so its ratio is inf and it is
-    eligible. (i) ``eligible`` is that mask, ``ratio`` is NaN exactly where it is False and the
-    ratio of the good states is 1 to 1e-12 (the tolerance of the test above: a few operations of
-    order 1); ``thresholds`` is [0.1, 0.2, 0.3, 0.5]. (ii) The returned block is the same with and
-    without ``capture`` (JSON text). (iii) **Dump-fidelity check** (reference: the production
-    statistic itself; not an independent verification of H1c): ``h1c_ratio_block`` applied to
-    ``ratio[eligible]`` equals the PLP and CP leaves, bitwise (same function, same array, same
-    generator label), apart from ``n_ineligible_states``. The independent parts are the hand-built
-    mask and NaN placement and the ratio 1 to 1e-12. Exact except the 1e-12 above.
+    Reference: the stub world of the test above, decided by hand. States 0..59
+    are good and eligible; then a zero-range state, two censored states with
+    two events and two states with growth <= 0 are ineligible; the last state
+    has infinite growth, so its ratio is inf and it is eligible.
+
+    * (i) ``eligible`` is that mask, ``ratio`` is NaN exactly where it is
+      False, and the ratio of the good states is 1 to 1e-12 (a few operations
+      of order 1); ``thresholds`` is [0.1, 0.2, 0.3, 0.5].
+    * (ii) The returned block is the same with and without ``capture`` (JSON
+      text).
+    * (iii) **Dump-fidelity check** (reference: the production statistic
+      itself; not an independent verification of H1c). ``h1c_ratio_block``
+      applied to ``ratio[eligible]`` equals the PLP and CP leaves bitwise (same
+      function, same array, same generator label), apart from
+      ``n_ineligible_states``.
+
+    The independent parts are the hand-built mask and NaN placement and the
+    ratio 1 to 1e-12. Everything else is exact.
     """
 
-    thetas = np.log([0.1, 0.2, 0.3, 0.5])
-    slope = lambda row: np.polyfit(thetas, row, 1)[0]
-    plp_row, cp_row = np.array([10, 14, 17, 21]), np.array([6, 12, 16, 24])
-    shifts = np.arange(60) % 5
-    constant, censored = np.array([12, 12, 12, 12]), np.array([10, 14, 0, 0])
-    plp = (
-        [plp_row + s for s in shifts]
-        + [constant, censored, censored]
-        + [plp_row] * 3
-    )
-    cp = (
-        [cp_row + s for s in shifts]
-        + [constant, censored, censored]
-        + [cp_row] * 3
-    )
-    growth = [1.0 / slope(plp_row)] * 60 + [1.0, 1.0, 1.0, 0.0, -0.1, np.inf]
-    cell = _horizon_stub(
-        {"PLP": np.array(plp), "CP": np.array(cp)}, np.array(growth)
-    )
+    cell, _ = _h1c_stub_world(60)
     plain = h1c_horizon_law(cell, CONFIG)
     capture: dict = {}
     out = h1c_horizon_law(cell, CONFIG, capture=capture)
@@ -3905,23 +4245,32 @@ def test_h1c_horizon_law_capture_holds_the_per_state_ratios_and_reproduces_the_l
 def test_h1a_library_scaling_capture_holds_the_seed_errors_and_reproduces_the_statistics() -> (
     None
 ):
-    """``capture`` gets the squared seed errors, the sizes, the levels and the inverse dimension.
+    """``capture`` gets the squared seed errors, sizes, levels and inverse
+    dimension.
 
-    Reference: the synthetic world of the H1a tests (two noise levels, 300 states, the five
-    library sizes, the Gamma law of the local dimension, fixed ``default_rng``), the
-    squared seed errors written into the cells by the helper (``analog_seed = sqrt(sq)``; the
-    dumped array is ``analog_seed ** 2`` as production forms it, so it is compared to that, not to
-    ``sq``). (i) The returned block is the same with and without ``capture`` (JSON text).
-    (ii) ``inverse_dim`` equals ``18 / (19 local_dim)`` (the formula of the Levina-Bickel
-    correction, ``(k - 2) / ((k - 1) local_dim)`` at k = 20, written here). (iii) The medians and
-    the reference of the leaf are reproduced from the dumped arrays by the production formulas:
-    **Dump-fidelity check** (reference: the production statistic itself; not an independent
-    verification of H1a; the independent parts are the formula ``18 / (19 local_dim)`` and the
-    hand-written filter, median and mean): ``sqrt(median(seed_sq[keep], 0))`` equals ``median_seed_by_n_lib`` and ``mean(inverse_dim[keep])``
-    equals ``inverse_dim_reference``, bitwise, with ``keep`` the states where every ``seed_sq`` and
-    ``inverse_dim`` is finite (one state is made non-finite to exercise the filter); the fit
-    statistics ``ratio`` and ``fitted_inverse_dim`` equal ``_median_fit_stats`` on the dumped
-    arrays with the production generator label, bitwise. Exact.
+    Reference: the synthetic world of the H1a tests (two noise levels, 300
+    states, the five library sizes, the Gamma law of the local dimension, fixed
+    ``default_rng``). The squared seed errors are written into the cells by the
+    helper (``analog_seed = sqrt(sq)``); the dumped array is ``analog_seed **
+    2`` as production forms it, so it is compared to that, not to ``sq``.
+
+    * (i) The returned block is the same with and without ``capture`` (JSON
+      text).
+    * (ii) ``inverse_dim`` equals ``18 / (19 local_dim)`` (the Levina-Bickel
+      correction ``(k - 2) / ((k - 1) local_dim)`` at k = 20, written here).
+    * (iii) The medians and the reference of the leaf are reproduced from the
+      dumped arrays. This is a **dump-fidelity check** (reference: the
+      production statistic itself; not an independent verification of H1a). The
+      independent parts are the formula ``18 / (19 local_dim)`` and the
+      hand-written filter, median and mean. ``sqrt(median(seed_sq[keep], 0))``
+      equals ``median_seed_by_n_lib`` and ``mean(inverse_dim[keep])`` equals
+      ``inverse_dim_reference``, bitwise, with ``keep`` the states where every
+      ``seed_sq`` and ``inverse_dim`` is finite (one state is made non-finite
+      to exercise the filter). The fit statistics ``ratio`` and
+      ``fitted_inverse_dim`` equal ``_median_fit_stats`` on the dumped arrays
+      with the production generator label, bitwise.
+
+    Tolerance: all exact.
     """
 
     rng = np.random.default_rng(11031)
@@ -3993,7 +4342,11 @@ def test_h1a_library_scaling_capture_holds_the_seed_errors_and_reproduces_the_st
 def _h2c_stub_scores(
     d_a2: np.ndarray, d_best: np.ndarray
 ) -> dict[str, RuleScores]:
-    """Scores for 60 states with A4 - A2 = d_a2 and A4 - A0 = d_best exactly (small integers)."""
+    """Scores for 60 states with A4 - A2 = ``d_a2`` and A4 - A0 = ``d_best``
+    exactly.
+
+    The differences are small integers, so the arithmetic is exact.
+    """
     n = len(d_a2)
     base = 5.0 + (np.arange(n) % 7)
     a4 = base + d_a2
@@ -4005,18 +4358,23 @@ def _h2c_stub_scores(
 def test_h2c_multi_part_verdicts_all_nine_combinations_and_the_open_edge() -> (
     None
 ):
-    """H2c: each part is pass (diff -1), fail (+1) or inconclusive (straddling); 9 combinations.
+    """H2c: each part is pass (diff -1), fail (+1) or inconclusive
+    (straddling); 9 combinations.
 
-    Reference (plan V3, V5): the hand table of v3 section 7 for two parts, classified by counting
-    labels: fail if either fails, pass if both pass, else inconclusive; the reason lists the
-    inconclusive parts and is None otherwise. A part with a constant difference -1 (+1) has the
-    interval [-1, -1] ([1, 1]) in every resample, so pass (fail); the alternating -1/+1
-    difference (60 states, block 5) has resample means S/60 with S even, so its 2.5% quantile is
-    strictly negative and its 97.5% quantile strictly positive: inconclusive "interval meets band
-    edge" at any seed. Open edge (V5, DEC-0008 A1): a difference identically 0 has the interval
-    [0, 0], which is not inside the open band (-inf, 0) and lies in its closed complement:
-    **fail**, for both parts. The best single forecaster is A0 (calibration 0.25 against 4.0).
-    The top-level ``n_failed_resamples`` is 0. Exact.
+    Reference (plan V3, V5): the hand table of v3 section 7 for two parts,
+    classified by counting labels: fail if either fails, pass if both pass,
+    else inconclusive; the reason lists the inconclusive parts and is None
+    otherwise. A part with a constant difference -1 (+1) has the interval [-1,
+    -1] ([1, 1]) in every resample, so pass (fail). The alternating -1/+1
+    difference (60 states, block 5) has resample means S/60 with S even, so its
+    2.5% quantile is strictly negative and its 97.5% quantile strictly
+    positive: inconclusive "interval meets band edge" at any seed.
+
+    Open edge (V5, DEC-0008 A1): a difference identically 0 has the interval
+    [0, 0], which is not inside the open band (-inf, 0) and lies in its closed
+    complement: **fail**, for both parts. The best single forecaster is A0
+    (calibration 0.25 against 4.0). The top-level ``n_failed_resamples`` is 0.
+    Tolerance: exact.
     """
 
     n = 60
@@ -4093,21 +4451,29 @@ def test_h2c_multi_part_verdicts_all_nine_combinations_and_the_open_edge() -> (
 def test_h2d_closed_edge_at_one_tenth_through_the_real_percentile_interval(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """H2d band (-inf, 0.10] is closed at 0.10, tested on the real interval code (plan V6, B1).
+    """H2d band (-inf, 0.10] is closed at 0.10, tested on the real interval
+    code (V6, B1).
 
-    Reference: hand cases and the mathematician's exact construction. (a) A4 = A3 gives the
-    excess 0 in every resample, so [0, 0] inside the band: pass; A4 = 2 A3 gives exactly 1:
-    [1, 1] above 0.10: fail. (b) No single resample value can equal 0.10 (fl(0.1) is not a
-    multiple of 2**-52, and y - 1.0 is exact there), but the interpolated 97.5% quantile can: with
-    1950 values of lo = 0.09999999999999987 and 50 of lo + k * 2**-52 returned in place of the
-    bootstrap (``bootstrap_values`` is replaced; ``block_bootstrap_counted`` and
-    ``percentile_interval`` are the real code), the upper bound is 0.1 exactly for k = 25 (index
-    1999 * 0.975 = 1949.025, weight 0.025 on the step, 0.025 * 25 * 2**-52 = 0.625 * 2**-52, which
-    lifts lo to fl(0.1)): pass. For k = 27 it is 0.10000000000000002, one ulp above the edge:
-    inconclusive "interval meets band edge". The values were checked once by running
-    ``percentile_interval`` before this test was relied on (k = 23: 0.09999999999999999, 24..26:
-    0.1, 27: 0.10000000000000002). (c) A spy on ``criterion_verdict`` records the band and the
-    closedness that the function passes. Exact comparisons.
+    Reference: hand cases and the mathematician's exact construction.
+
+    * (a) A4 = A3 gives the excess 0 in every resample, so [0, 0] is inside the
+      band: pass. A4 = 2 A3 gives exactly 1: [1, 1] is above 0.10: fail.
+    * (b) No single resample value can equal 0.10 (fl(0.1) is not a multiple of
+      2**-52, and y - 1.0 is exact there), but the interpolated 97.5% quantile
+      can. With 1950 values of lo = 0.09999999999999987 and 50 of lo + k *
+      2**-52 returned in place of the bootstrap (``bootstrap_values`` is
+      replaced; ``block_bootstrap_counted`` and ``percentile_interval`` are the
+      real code), the upper bound is 0.1 exactly for k = 25 (index 1999 * 0.975
+      = 1949.025, weight 0.025 on the step, 0.025 * 25 * 2**-52 = 0.625 *
+      2**-52, which lifts lo to fl(0.1)): pass. For k = 27 it is
+      0.10000000000000002, one ulp above the edge: inconclusive "interval meets
+      band edge". The values were checked once by running
+      ``percentile_interval`` before this test was relied on (k = 23:
+      0.09999999999999999, 24..26: 0.1, 27: 0.10000000000000002).
+    * (c) A spy on ``criterion_verdict`` records the band and the closedness
+      that the function passes.
+
+    Tolerance: exact comparisons.
     """
     import lpcstudy.analysis as analysis
     import lpcstudy.statistics as statistics_module
@@ -4175,18 +4541,23 @@ def test_h2d_closed_edge_at_one_tenth_through_the_real_percentile_interval(
 
 
 def test_gain_bound_has_no_bar_and_reports_each_screen() -> None:
-    """The gain bound is reported with no ``pass`` or ``threshold``; the screens' counts are given.
+    """The gain bound has no ``pass`` or ``threshold``; the screens' counts are
+    reported.
 
-    Reference: hand-built stub with cross = 0 and zero means, so the oracle hybrid is
-    V = E_C E_P / (E_C + E_P) (closed form). Both forecasters have E = 0.05 from step T0 (r.m.s.
-    0.2236 > theta 0.2: first passage T0) and E = 0.09 from T1 (V = 0.045 > 0.04 = theta^2, while
-    at 0.05 V = 0.025 < 0.04): the hybrid crosses at T1 and the gain is T1 - T0. Growth 0.05 gives
-    the bound ln2 / 0.1 = 6.93 and the +1 step tolerance 7.93: gains 5 and 3 are within, 10 is
-    not. Seven states: three good (gains 5, 10, 3), a CP-censored one, one with a negative cross
-    moment, one with growth 0, and one with growth -1 and CP censored (overlap). So n_states = 3,
-    the fraction is 2/3 (two of three), growth screen 2, censored screen 2, covariance screen 1,
-    median gain 5 steps and maximum 10 over 30 steps per Lyapunov time. Exact up to the division
-    by 30 (abs 1e-12).
+    Reference: a hand-built stub with cross moment 0 and zero means, so the
+    oracle hybrid error is ``V = E_C E_P / (E_C + E_P)`` (closed form). Both
+    forecasters have E = 0.05 from step T0 (r.m.s. 0.2236 > theta 0.2: first
+    passage T0) and E = 0.09 from T1 (V = 0.045 > 0.04 = theta^2, while at
+    0.05, V = 0.025 < 0.04): the hybrid crosses at T1 and the gain is T1 - T0.
+    Growth 0.05 gives the bound ln2 / 0.1 = 6.93 and, with the +1 step
+    tolerance, 7.93: gains 5 and 3 are within, 10 is not.
+
+    Seven states: three good (gains 5, 10, 3), one with CP censored, one with a
+    negative cross moment, one with growth 0, and one with growth -1 and CP
+    censored (an overlap). So n_states = 3, the fraction is 2/3, the growth
+    screen excludes 2, the censored screen 2, the covariance screen 1, the
+    median gain is 5 steps and the maximum 10, over 30 steps per Lyapunov time.
+    Tolerance: exact up to the division by 30 (abs 1e-12).
     """
 
     h_max = 20
@@ -4256,20 +4627,23 @@ def test_gain_bound_has_no_bar_and_reports_each_screen() -> None:
     assert out["max_gain_lyapunov"] == pytest.approx(10.0 / 30.0, abs=1e-12)
 
 
-# ----------------------------------------------------------------------------------------
-# WU-0002.11b: counters for the cases that were handled silently (DEF-0001, inventory rows
-# T3, N2, N3, N4, N6, N7). Every count is an exact integer from a hand-built input; the values
-# the counters sit beside are the earlier code's (bitwise), checked in the older tests of this
-# file and again below where a closure of the old expression is available.
-# ----------------------------------------------------------------------------------------
+# ------------------------------------------------------------
+# WU-0002.11b: counters for the cases that were handled silently (DEF-0001,
+# inventory rows T3, N2, N3, N4, N6, N7). Every count is an exact integer from
+# a hand-built input; the values the counters sit beside are the earlier
+# code's (bitwise), checked in the older tests of this file and again below
+# where a closure of the old expression is available.
+# ------------------------------------------------------------
 def test_boot_returns_the_old_interval_and_the_dropped_count() -> None:
-    """B1 at the call site: ``_boot`` is ``block_bootstrap`` at its generator plus the NaN count.
+    """B1 at the call site: ``_boot`` is ``block_bootstrap`` plus the NaN
+    count.
 
-    Reference: ``statistics.block_bootstrap`` (separately tested against a verbatim pre-refactor
-    copy) at a fresh ``make_rng(CONFIG.seed, SYSTEM, "bootstrap", "B1")`` (the integer seed
-    ``CONFIG.seed + 3`` before WU-0002.14), with a statistic that is NaN on calls 4, 11
-    and 25 of the 200 resamples (a fresh closure per function: the call order is resamples, then
-    the point). Count 3 by construction. Tolerance: none (``==``).
+    Reference: ``statistics.block_bootstrap`` (separately tested against a
+    verbatim pre-refactor copy) at a fresh ``make_rng(CONFIG.seed, SYSTEM,
+    "bootstrap", "B1")`` (the integer seed ``CONFIG.seed + 3`` before
+    WU-0002.14), with a statistic that is NaN on calls 4, 11 and 25 of the 200
+    resamples (a fresh closure per function: the call order is the resamples,
+    then the point). The count is 3 by construction. Tolerance: none (``==``).
     """
 
     x_values = np.random.default_rng(31).standard_normal(60)
@@ -4303,12 +4677,14 @@ def test_boot_returns_the_old_interval_and_the_dropped_count() -> None:
 def test_v7_reports_the_dropped_resamples_of_each_bootstrap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Wiring check: ``V7.n_dropped_resamples`` maps the counts of the slope and each level.
+    """Wiring check: ``V7.n_dropped_resamples`` maps the counts of the slope
+    and each level.
 
-    This is a wiring test, not numerical evidence: ``block_bootstrap_dropped`` is replaced by a
-    stub returning the counts 5, 6, 7 in call order (slope, then rho = 0.01 and 0.02, the order
-    of the code), and the result must carry them under the right keys. With a bad state (a
-    non-finite delta) no bootstrap runs and the counts are 0. On ordinary data (medians of finite
+    This is a wiring test, not numerical evidence. ``block_bootstrap_dropped``
+    is replaced by a stub returning the counts 5, 6 and 7 in call order (slope,
+    then rho = 0.01 and 0.02, the order of the code), and the result must carry
+    them under the right keys. With a bad state (a non-finite delta) no
+    bootstrap runs and the counts are 0. On ordinary data (medians of finite
     numbers cannot be NaN) the real counts are 0.
     """
     from lpcstudy import analysis
@@ -4347,7 +4723,9 @@ def test_v7_reports_the_dropped_resamples_of_each_bootstrap(
 
 
 def _stats_with_fit(monkeypatch: pytest.MonkeyPatch, fit) -> np.ndarray:
-    """``_median_fit_stats`` on a benign table with ``_fit_seed_law`` replaced by ``fit``."""
+    """``_median_fit_stats`` on a benign table with ``_fit_seed_law`` replaced
+    by ``fit``.
+    """
     from lpcstudy import analysis
 
     monkeypatch.setattr(analysis, "_fit_seed_law", fit)
@@ -4360,17 +4738,23 @@ def _stats_with_fit(monkeypatch: pytest.MonkeyPatch, fit) -> np.ndarray:
 def test_h1a_fit_at_a_bound_and_covariance_warnings_are_counted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """B2: ``_median_fit_stats`` flags a 2/d at a bound of ``curve_fit`` and counts OptimizeWarnings.
+    """B2: a 2/d at a bound of ``curve_fit`` is flagged and ``OptimizeWarning``
+    are counted.
 
-    Reference: hand-built fits. ``_fit_seed_law`` is replaced by stubs that return a chosen 2/d
-    and emit a chosen number of ``OptimizeWarning`` (the class scipy's ``curve_fit`` uses), so the
-    expected counts are known by construction. The bounds are [0.01, 10.0] (``H1A_EXPONENT_BOUNDS``)
-    and "at a bound" means within 1e-6 (``H1A_BOUND_TOL``): 0.01, 0.010000099 (distance 9.9e-8)
-    and 10.0, 9.9999995 are flagged; 0.01001 (distance 1e-5), 9.99 and 0.5 are not. The tolerance
-    comes from the solver, which keeps iterates strictly inside the bounds: an exponent
-    constrained at 0.01 returned 0.0100000000250 (a distance of 2.5e-11), four orders below 1e-6.
-    A different warning class is re-issued (not swallowed), and a fit that returns NaN is not
-    at a bound. The first three entries (ratio, fitted 1/d, floor) are those of the fit, bitwise.
+    Reference: hand-built fits. ``_fit_seed_law`` is replaced by stubs that
+    return a chosen 2/d and emit a chosen number of ``OptimizeWarning`` (the
+    class scipy's ``curve_fit`` uses), so the expected counts are known by
+    construction. The bounds are [0.01, 10.0] (``H1A_EXPONENT_BOUNDS``) and "at
+    a bound" means within 1e-6 (``H1A_BOUND_TOL``): 0.01, 0.010000099 (distance
+    9.9e-8), 10.0 and 9.9999995 are flagged; 0.01001 (distance 1e-5), 9.99 and
+    0.5 are not.
+
+    Tolerance: it comes from the solver, which keeps iterates strictly inside
+    the bounds: an exponent constrained at 0.01 returned 0.0100000000250 (a
+    distance of 2.5e-11), four orders below 1e-6. A different warning class is
+    re-issued (not swallowed), and a fit that returns NaN is not at a bound.
+    The first three entries (ratio, fitted 1/d, floor) are those of the fit,
+    bitwise.
     """
 
     def make_fit(two_over_d: float, n_optimize: int, n_other: int = 0):
@@ -4428,15 +4812,18 @@ def test_h1a_fit_at_a_bound_and_covariance_warnings_are_counted(
 def test_h1a_real_fit_at_the_lower_bound_is_flagged_and_matches_the_warning_record() -> (
     None
 ):
-    """B2 on the real ``curve_fit``: data whose least-squares 2/d is below 0.01 is flagged.
+    """B2 on the real ``curve_fit``: data whose least-squares 2/d is below 0.01
+    is flagged.
 
-    Reference: the medians ``n^(-0.001) + 1e-8`` (a true exponent 2/d = 0.001, below the lower
-    bound 0.01) on the three library sizes 1e3, 1e4, 1e5. The constrained fit ends at the bound
-    (probe: 0.0100000000250), so the flag is 1. The warning count is compared with an
-    independent record of the warnings of the same ``_fit_seed_law`` call made here with
-    ``warnings.catch_warnings(record=True)`` (three data points for three parameters leave no
-    degrees of freedom, so scipy warns that the covariance cannot be estimated: expected 1).
-    A well-determined data set (exponent 0.5 over 5 sizes) is not at a bound.
+    Reference: the medians ``n^(-0.001) + 1e-8`` (a true exponent 2/d = 0.001,
+    below the lower bound 0.01) on the three library sizes 1e3, 1e4, 1e5. The
+    constrained fit ends at the bound (probe: 0.0100000000250), so the flag is
+    1. The warning count is compared with an independent record of the warnings
+    of the same ``_fit_seed_law`` call made here with
+    ``warnings.catch_warnings(record=True)`` (three data points for three
+    parameters leave no degrees of freedom, so scipy warns that the covariance
+    cannot be estimated: expected 1). A well-determined data set (exponent 0.5
+    over 5 sizes) is not at a bound.
     """
 
     sizes = np.array([1e3, 1e4, 1e5])
@@ -4466,20 +4853,24 @@ def test_h1a_real_fit_at_the_lower_bound_is_flagged_and_matches_the_warning_reco
 def test_h1a_library_scaling_reports_the_bound_and_warning_counts_per_noise(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Wiring and regression guard (LPC.PC.21), not value evidence: ``by_noise[rho]`` carries point
-    and resample counts, and the old keys are still those of the earlier bootstrap.
+    """Wiring and regression guard (LPC.PC.21), not value evidence.
 
-    The counts are exact by construction: a fit stub that always returns the lower bound (0.01)
-    and emits one OptimizeWarning per call, so the point fit counts 1 and the ``B = 200`` resamples
-    count 200 each. The comparison of ``ratio``, ``ratio_ci`` and ``n_failed_resamples`` with
-    ``block_bootstrap_counted`` of ``analysis.h1a_ratio`` compares the code with itself
-    (``h1a_ratio`` is ``_median_fit_stats(...)[0]``, and under the stub the ratio is constant), so
-    it only guards the wiring of the joint bootstrap. The evidence that the H1a numbers are
-    unchanged is the DEV-0 smoke comparison (V1: 0 leaves changed) together with the older tests of
-    this file, which compare with an independent hand ratio and the hand median fit
-    (``test_h1a_ratio_is_the_hand_value_and_the_interval_is_the_joint_bootstrap``,
-    ``test_h1a_median_fit_recovers_inverse_dimension_with_heavy_tail``). Without the stub, on
-    ordinary data, the real result has the same keys with nonnegative ints.
+    Checks that ``by_noise[rho]`` carries point and resample counts, and that
+    the old keys are still those of the earlier bootstrap.
+
+    The counts are exact by construction: a fit stub always returns the lower
+    bound (0.01) and emits one OptimizeWarning per call, so the point fit
+    counts 1 and the ``B = 200`` resamples count 200 each. The comparison of
+    ``ratio``, ``ratio_ci`` and ``n_failed_resamples`` with
+    ``block_bootstrap_counted`` of the ratio helper compares the code with
+    itself (the helper is ``_median_fit_stats(...)[0]``, and under the stub the
+    ratio is constant), so it only guards the wiring of the joint bootstrap.
+    The evidence that the H1a numbers are unchanged is the DEV-0 smoke
+    comparison (V1: 0 leaves changed) together with the older tests of this
+    file, which compare with an independent hand ratio and the hand median fit
+    (the hand-value ratio test and the heavy-tail recovery test of H1a).
+    Without the stub, on ordinary data, the real result has the same keys with
+    nonnegative integers.
     """
 
     from lpcstudy import analysis
@@ -4531,18 +4922,23 @@ def test_h1a_library_scaling_reports_the_bound_and_warning_counts_per_noise(
 def test_h1b_counts_floored_states_among_the_regression_states_and_dropped_cp_resamples() -> (
     None
 ):
-    """B3: ``n_floored`` counts regression states with ``E e^2 - floor < 1e-12``; CP drops are counted.
+    """B3: ``n_floored`` counts regression states with ``E e^2 - floor <
+    1e-12``; CP drops are counted.
 
-    Reference: hand-built squared errors. PLP (floor 0): states 0, 1, 2 have E e^2 = 0.0,
-    5e-13 and exactly 1e-12; the first two are below the floor and count, the third equals it
-    and does not (the floor ``max(., 1e-12)`` changes nothing there). State 9 has a NaN gain,
-    so it is excluded from both regressions and not counted even though its E e^2 is 0
-    (the count is over the states of the regression). CP (floor ``copied = rho^2/k``): states 5
-    and 6 have E e^2 equal to ``copied``, a difference of exactly 0.0, and count. Expected
-    PLP = 2, CP = 2, exact. The slopes and intervals equal ``block_bootstrap`` of the earlier
-    expressions on the same arrays (the floored y values are finite, so no resample fails and the
-    counted PLP bootstrap is bitwise equal), and the other states are untouched. A constant CP
-    regressor (all x = 0) makes every CP resample NaN: ``CP.n_dropped_resamples == B``.
+    Reference: hand-built squared errors. PLP (floor 0): states 0, 1 and 2 have
+    E e^2 = 0.0, 5e-13 and exactly 1e-12; the first two are below the floor and
+    count, the third equals it and does not (the floor ``max(., 1e-12)``
+    changes nothing there). State 9 has a NaN gain, so it is excluded from both
+    regressions and not counted even though its E e^2 is 0 (the count is over
+    the states of the regression). CP (floor ``copied = rho^2/k``): states 5
+    and 6 have E e^2 equal to ``copied``, a difference of exactly 0.0, and
+    count. Expected: PLP = 2, CP = 2, exact.
+
+    The slopes and intervals equal ``block_bootstrap`` of the earlier
+    expressions on the same arrays (the floored y values are finite, so no
+    resample fails and the counted PLP bootstrap is bitwise equal), and the
+    other states are untouched. A constant CP regressor (all x = 0) makes every
+    CP resample NaN: ``CP.n_dropped_resamples == B``.
     """
 
     config = _config(100)
@@ -4596,16 +4992,18 @@ def test_h1b_counts_floored_states_among_the_regression_states_and_dropped_cp_re
 def test_per_state_spearman_counted_reports_the_constant_states_and_h2b_carries_them() -> (
     None
 ):
-    """B3: states whose weight is the same at every noise level get 0 and are counted.
+    """B3: states whose weight is the same at every noise level get 0 and are
+    counted.
 
-    Reference: the count is formed by hand as the number of rows with a single distinct value
-    (an independent definition of "zero rank denominator"); rows 0, 1 and 4 are constant, row 5
-    is tied only in part (not constant). The correlations of the other rows are
-    ``scipy.stats.spearmanr`` (independent), the constant rows 0 by the stated convention;
-    ``abs=1e-12`` (a rank computation and one division). The counted function returns the same
-    array as ``_per_state_spearman`` bitwise. In ``h2b_knob_response`` the key
-    ``noise.n_constant_states`` is 3 and ``noise.n_dropped_resamples`` is 0 (a mean of finite
-    correlations cannot fail), and the mean of the per-state values is the hand mean.
+    Reference: the count is formed by hand as the number of rows with a single
+    distinct value (an independent definition of "zero rank denominator"). Rows
+    0, 1 and 4 are constant; row 5 is tied only in part (not constant). The
+    correlations of the other rows are ``scipy.stats.spearmanr`` (independent),
+    the constant rows 0 by the stated convention; ``abs=1e-12`` (a rank
+    computation and one division). In ``h2b_knob_response`` the key
+    ``noise.n_constant_states`` is 3 and ``noise.n_dropped_resamples`` is 0 (a
+    mean of finite correlations cannot fail), and the mean of the per-state
+    values is the hand mean.
     """
 
     levels = np.array([0.01, 0.02, 0.04])
@@ -4646,17 +5044,20 @@ def test_per_state_spearman_counted_reports_the_constant_states_and_h2b_carries_
 
 
 def test_h3a_counts_empty_regimes_and_degenerate_pairs() -> None:
-    """B3: ``n_empty_regimes`` (no test state) and ``n_degenerate_pairs`` (zero log-rank variance).
+    """B3: ``n_empty_regimes`` (no test state) and ``n_degenerate_pairs`` (zero
+    log-rank variance).
 
-    Reference: hand-built situation, K = 4. Regime 0 has 30 states with events (geometric
-    hazard 0.1, seed 41), regimes 2 and 3 have 30 states each, all censored at 40, and regime 1
-    has no state. Kaplan-Meier medians [5, nan, 10, 20] give the order 0, 2, 3, 1 and the pairs
-    (0, 2), (2, 3), (3, 1): the first has events in one group (variance positive), the second has
-    no event at all (variance exactly 0, a degenerate pair), the third contains the empty regime
-    (counted as empty, not as degenerate). So ``n_empty_regimes == 1`` (K minus the regimes that
-    occur, an independent definition), ``n_degenerate_pairs == 1`` and ``n_km_not_reached == 1``.
-    A well-populated example has both counts 0. The raw p-values and reasons are those of the
-    earlier code (the zero-variance and empty pairs are None).
+    Reference: a hand-built situation, K = 4. Regime 0 has 30 states with
+    events (geometric hazard 0.1, seed 41); regimes 2 and 3 have 30 states
+    each, all censored at 40; regime 1 has no state. Kaplan-Meier medians [5,
+    nan, 10, 20] give the order 0, 2, 3, 1 and the pairs (0, 2), (2, 3), (3,
+    1). The first has events in one group (variance positive); the second has
+    no event at all (variance exactly 0, a degenerate pair); the third contains
+    the empty regime (counted as empty, not as degenerate). So
+    ``n_empty_regimes == 1`` (K minus the regimes that occur, an independent
+    definition), ``n_degenerate_pairs == 1`` and ``n_km_not_reached == 1``. A
+    well-populated example has both counts 0. The raw p-values and reasons are
+    those of the earlier code (the zero-variance and empty pairs are None).
     """
 
     rng = np.random.default_rng(41)
@@ -4704,8 +5105,11 @@ def _old_boot(
     rng: np.random.Generator,
     level: float = 0.95,
 ):
-    """Body of ``analysis._boot`` before WU-0002.9b (the independent reference), taking the
-    generator that WU-0002.14 gave it in place of the integer ``config.seed + salt``.
+    """Body of ``analysis._boot`` before WU-0002.9b (the independent
+    reference).
+
+    It takes the generator that WU-0002.14 gave it in place of the integer
+    ``config.seed + salt``.
     """
     return block_bootstrap_dropped(
         stat,
@@ -4720,11 +5124,15 @@ def _old_boot(
 def _inject_first_call(
     monkeypatch: pytest.MonkeyPatch, failing: set[int], value: float
 ) -> None:
-    """Make the statistic of the FIRST ``analysis.bootstrap_values`` call return ``value``
-    on the calls numbered ``failing`` (0-based; calls 0..B-1 are the resamples, call B is the
-    point estimate). Later calls (part ii) are untouched. WU-0008.2a: H2b(i) calls
-    ``bootstrap_values`` (the body of ``block_bootstrap_counted``) to keep the resample values,
-    so the injection point moved from the wrapper to its body; the semantics are unchanged.
+    """Make the first ``analysis.bootstrap_values`` call fail on chosen
+    resamples.
+
+    The statistic of the FIRST call returns ``value`` on the calls numbered
+    ``failing`` (0-based; calls 0..B-1 are the resamples, call B is the point
+    estimate). Later calls (part ii) are untouched. WU-0008.2a: H2b(i) calls
+    ``bootstrap_values`` (the body of ``block_bootstrap_counted``) to keep the
+    resample values, so the injection point moved from the wrapper to its body;
+    the semantics are unchanged.
     """
     from lpcstudy import analysis
 
@@ -4750,15 +5158,20 @@ def _inject_first_call(
 def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails() -> (
     None
 ):
-    """WU-0002.9b (1): with all-finite resamples the new H2b(i) interval equals the old one bitwise.
+    """WU-0002.9b (1): with all-finite resamples the H2b(i) interval equals the
+    old one bitwise.
 
     Reference: a copy of the old ``_boot`` body (``block_bootstrap_dropped`` at
-    ``make_rng(config.seed, system, "bootstrap", "H2b-noise")``, ``PRIMARY_LEVEL``), and a hand loop (``block_resample_indices`` then
+    ``make_rng(config.seed, system, "bootstrap", "H2b-noise")``,
+    ``PRIMARY_LEVEL``), and a hand loop (``block_resample_indices`` then
     ``np.nanquantile``). Both use the per-state correlations of the unchanged
-    ``_per_state_spearman_counted`` (the changed part is only the bootstrap path). Tolerance: none,
-    exact; with no failed resample the percentile computation is the same ``np.quantile``
-    (``block_bootstrap_counted`` is documented bitwise equal to ``block_bootstrap``). The failure
-    count and its alias ``n_dropped_resamples`` are 0.
+    ``_per_state_spearman_counted`` (the changed part is only the bootstrap
+    path).
+
+    Tolerance: none, exact. With no failed resample the percentile computation
+    is the same ``np.quantile`` (``block_bootstrap_counted`` is documented
+    bitwise equal to ``block_bootstrap``). The failure count and its alias
+    ``n_dropped_resamples`` are 0.
     """
 
     levels = np.array([0.01, 0.02, 0.04])
@@ -4807,20 +5220,30 @@ def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails(
 def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_inconclusive(
     monkeypatch: pytest.MonkeyPatch, bad: float
 ) -> None:
-    """WU-0002.9b (2): a non-finite resample is counted, widens the interval, and at the tail
-    threshold turns the verdict inconclusive (DEC-0008 A3, DEC-0012).
+    """WU-0002.9b (2): a failed resample is counted, widens the interval, and
+    can force inconclusive.
 
-    Reference: the threshold ``floor((B - 1) a) + 1`` with ``a = (1 - level)/2`` is formed in the
-    test (B = 200, level ``1 - 0.05/3``: a = 0.008333, threshold 2). Part A, ``F = threshold - 1``
-    failures injected into random-looking data: the bounds equal ``np.quantile`` of the hand-built
-    resample values with the failed ones set to -inf (lower) and +inf (upper), the definition of
-    the unfavourable tail (no quantile index reaches the failure, so both stay finite and exact);
-    ``n_failed_resamples == F``; the alias ``n_dropped_resamples`` carries the same value. Part B,
-    states that all rise (Spearman +1, every resample mean exactly 1, interval [1, 1]): with
-    ``F = threshold - 1`` the verdict is still a pass, with ``F = threshold`` both bounds are
-    infinite and the verdict is inconclusive with the reason of ``criterion_verdict`` (the old code
-    dropped the failures and passed). Exact comparisons: the injected values are in the
-    resamples, not in a computation.
+    A non-finite resample goes to the unfavorable tail; at the tail threshold
+    the verdict turns inconclusive (DEC-0008 A3, DEC-0012).
+
+    Reference: the threshold ``floor((B - 1) a) + 1`` with ``a = (1 -
+    level)/2`` is formed in the test (B = 200, level ``1 - 0.05/3``: a =
+    0.008333, threshold 2).
+
+    * Part A: ``F = threshold - 1`` failures injected into random-looking data.
+      The bounds equal ``np.quantile`` of the hand-built resample values with
+      the failed ones set to -inf (lower) and +inf (upper), the definition of
+      the unfavorable tail (no quantile index reaches the failure, so both stay
+      finite and exact). ``n_failed_resamples == F``, and the alias
+      ``n_dropped_resamples`` carries the same value.
+    * Part B: states that all rise (Spearman +1, every resample mean exactly 1,
+      interval [1, 1]). With ``F = threshold - 1`` the verdict is still a pass;
+      with ``F = threshold`` both bounds are infinite and the verdict is
+      inconclusive with the reason of ``criterion_verdict`` (the old code
+      dropped the failures and passed).
+
+    Tolerance: exact comparisons; the injected values are in the resamples, not
+    in a computation.
     """
 
     n_res = CONFIG.bootstrap_resamples
@@ -4828,7 +5251,8 @@ def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_incon
     threshold = int(np.floor((n_res - 1) * alpha)) + 1
     assert threshold == 2  # premise of the cases below
 
-    # Part A: F = threshold - 1 = 1 failure, in a resample that is not the point estimate.
+    # Part A: F = threshold - 1 = 1 failure, in a resample that is not the
+    # point estimate.
     levels = np.array([0.01, 0.02, 0.04])
     weights = np.random.default_rng(90203).uniform(0.0, 1.0, (60, 3))
     corr, _ = _per_state_spearman_counted(levels, weights)
@@ -4900,24 +5324,29 @@ def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_incon
             assert result["reason"].startswith("noise: ")
 
 
-# ------------------------------------------------------ WU-0008.2a: ci_mc_se at the five primary sites
+# ----------------------------- WU-0008.2a: ci_mc_se at the five primary sites
 
 
 def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A2: ``ci_mc_se`` equals ``endpoint_mc_error`` of the same resample values, exactly.
+    """A2: ``ci_mc_se`` equals ``endpoint_mc_error`` of the same resample
+    values, exactly.
 
-    Reference: the values are recomputed in the test with ``statistics.bootstrap_values`` at the
-    documented generators (H3c ``make_rng(seed, system, "h3c-ratio")``; H2b(i)
-    ``make_rng(seed, system, "bootstrap", "H2b-noise")``; H2b(ii)
-    ``make_rng(seed, system, "h2b-library-change", "0.01")``), and ``endpoint_mc_error`` is the helper
-    tested in ``test_statistics`` (E1 to E3). H2a(i) and H2a(ii) are checked by spying on the
-    helper: the array it receives for each part is the one the reported interval is the percentile
-    interval of (``percentile_interval`` of that array equals ``ci``), and the key equals the
-    helper's output on it. The sites that are not primary carry no such key: asserted for the
-    reported H2b change and for each H2e noise level (H2c is not exercised here). Exact equality;
-    no tolerance.
+    The key reports the Monte Carlo standard error of the interval endpoints.
+
+    Reference: the values are recomputed in the test with
+    ``statistics.bootstrap_values`` at the documented generators (H3c
+    ``make_rng(seed, system, "h3c-ratio")``; H2b(i) ``make_rng(seed, system,
+    "bootstrap", "H2b-noise")``; H2b(ii) ``make_rng(seed, system,
+    "h2b-library-change", "0.01")``), and ``endpoint_mc_error`` is the helper
+    tested in ``test_statistics`` (E1 to E3). H2a(i) and H2a(ii) are checked by
+    spying on the helper: the array it receives for each part is the one the
+    reported interval is the percentile interval of (``percentile_interval`` of
+    that array equals ``ci``), and the key equals the helper's output on it.
+    The sites that are not primary carry no such key: this is asserted for the
+    reported H2b change and for each H2e noise level (H2c is not exercised
+    here). Tolerance: exact equality.
     """
     from lpcstudy import analysis as an
 
@@ -5021,15 +5450,18 @@ def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
 
 
 def test_stored_levels_are_found_on_real_producer_output() -> None:
-    """R8: ``budget.stored_levels`` is non-empty on the output of each producer (not a fake).
+    """R8: ``budget.stored_levels`` is non-empty on the output of each real
+    producer.
 
-    Reference: the producers are called on small synthetic inputs of this file (H1a, H1d, H2b, H2e,
-    H3b, H3c) and the expected counts of levels are written out from the plan: one for H1a, H1d,
-    H2b (``library_change``) and H3c, two for H3b (``weight_lambda`` and ``D``) and one per noise
-    level for H2e (two). A producer that renamed a key on a path of ``STORED_LEVEL_PATHS`` would
-    make ``stored_levels`` return nothing and silently disable the label's level cross-check
-    (PRIME.4); every key of ``STORED_LEVEL_PATHS`` must be covered here. Each level equals the
-    level of the row's role. Exact.
+    Reference: the producers are called on small synthetic inputs of this file
+    (H1a, H1d, H2b, H2e, H3b, H3c) and the expected number of levels is written
+    out from the plan: one for H1a, H1d, H2b (``library_change``) and H3c, two
+    for H3b (``weight_lambda`` and ``D``), and one per noise level for H2e
+    (two). A producer that renamed a key on a path of ``STORED_LEVEL_PATHS``
+    would make ``stored_levels`` return nothing and silently disable the
+    label's level cross-check (PRIME.4); every key of ``STORED_LEVEL_PATHS``
+    must be covered here. Each level equals the level of the row's role.
+    Tolerance: exact counts, levels within 1e-12.
     """
     from lpcstudy import analysis as an
     from lpcstudy import budget
@@ -5078,16 +5510,19 @@ def test_stored_levels_are_found_on_real_producer_output() -> None:
             ), row.key
 
 
-# ------------------------------------------------------- WU-0002.14: the pairings are kept (P9)
+# ------------------------------------- WU-0002.14: the pairings are kept (P9)
 def test_h2c_parts_resample_with_identical_index_arrays() -> None:
-    """P9: the three H2c differences use the same resamples (a fresh generator per part).
+    """P9: the three H2c differences use the same resamples (a fresh generator
+    per part).
 
-    Reference: with the A2 scores equal to the best single's (A0) and A4o equal to A4, the three
-    differences ``A4 - A2``, ``A4 - A0`` and ``A4o - A2`` are the same array, so their intervals
-    must be bitwise equal when every part draws from its own fresh generator of the same labels
-    (M4); a generator shared across the parts would advance and give different intervals. The
-    premise that the test can see the difference is checked: the same statistic on a generator
-    that has already drawn gives another interval. Tolerance: none (``==``).
+    Reference: with the A2 scores equal to the best single's (A0) and A4o equal
+    to A4, the three differences ``A4 - A2``, ``A4 - A0`` and ``A4o - A2`` are
+    the same array, so their intervals must be bitwise equal when every part
+    draws from its own fresh generator with the same labels (M4); a generator
+    shared across the parts would advance and give different intervals. The
+    premise that the test can see the difference is checked: the same statistic
+    on a generator that has already drawn gives another interval. Tolerance:
+    none (``==``).
     """
 
     rng = np.random.default_rng(14021)
@@ -5119,13 +5554,15 @@ def test_h2c_parts_resample_with_identical_index_arrays() -> None:
 def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(
     monkeypatch,
 ) -> None:
-    """P9: the oracle and the deployable profile of Q-N bootstrap from identical generator states.
+    """P9: the oracle and deployable Q-N profiles bootstrap from identical
+    generator states.
 
-    Reference: ``qn_profile_block`` is replaced by a recorder (its numerical content is tested
-    elsewhere); the ``boot_seed`` it receives for each profile must be a generator in the initial
-    state of ``make_rng(seed, system, "bootstrap", "Q-N")``: the same state for both profiles,
-    equal to a fresh one (a shared generator would have advanced). The data stubs only supply
-    shapes. Tolerance: none (bit-generator state equality).
+    Reference: ``qn_profile_block`` is replaced by a recorder (its numerical
+    content is tested elsewhere). The ``boot_seed`` it receives for each
+    profile must be a generator in the initial state of ``make_rng(seed,
+    system, "bootstrap", "Q-N")``: the same state for both profiles, equal to a
+    fresh one (a shared generator would have advanced). The data stubs only
+    supply shapes. Tolerance: none (bit-generator state equality).
     """
     from lpcstudy import analysis as an
 
@@ -5169,16 +5606,19 @@ def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(
 def test_qn_noise_redundancy_records_the_dump_keys_without_a_key_that_is_also_a_prefix(
     monkeypatch,
 ) -> None:
-    """With a dump, ``qn_noise_redundancy`` records ``x_test``, ``w_star`` and ``log_t`` per kind (R6, R10).
+    """With a dump, ``qn_noise_redundancy`` records ``x_test``, ``w_star`` and
+    ``log_t`` per kind (R6, R10).
 
-    Reference: the schema of ``lpcstudy/dump.py`` (written by hand in the test): per kind
-    (``oracle``, ``deployable``) the keys ``x_test``, ``w_star``, ``log_t`` and, per target
-    (``logit_w_interior``, ``w_zero_indicator``, ``log_horizon``), ``pred3``, ``pred4``, ``y``,
-    ``domain``. ``qn_profile_block`` is a stub that fills ``capture`` with those target keys, so
-    only the wiring of ``qn_noise_redundancy`` is under test. The key set is exact, and no key is
-    also the ``/`` prefix of another (a tree built from the keys must not collide: R6 renamed the
-    input ``log_horizon`` to ``log_t`` because it was also the folder of the target's keys), so
-    reverting the rename fails here. Exact.
+    Reference: the schema of ``lpcstudy/dump.py`` (written by hand in the
+    test). Per kind (``oracle``, ``deployable``) the keys are ``x_test``,
+    ``w_star``, ``log_t`` and, per target (``logit_w_interior``,
+    ``w_zero_indicator``, ``log_horizon``), ``pred3``, ``pred4``, ``y`` and
+    ``domain``. ``qn_profile_block`` is a stub that fills ``capture`` with
+    those target keys, so only the wiring of ``qn_noise_redundancy`` is under
+    test. The key set is exact, and no key is also the ``/`` prefix of another
+    (a tree built from the keys must not collide: R6 renamed the input
+    ``log_horizon`` to ``log_t`` because it was also the folder of the target's
+    keys), so reverting the rename fails here. Tolerance: exact.
     """
     from lpcstudy import analysis as an
 
@@ -5246,16 +5686,24 @@ def test_qn_noise_redundancy_records_the_dump_keys_without_a_key_that_is_also_a_
 def test_qn_profile_block_capture_holds_the_predictions_and_changes_nothing() -> (
     None
 ):
-    """``capture`` (the state dump's hook) gets both models' predictions, the targets and the domains.
+    """``capture`` (the state dump's hook) gets both models' predictions,
+    targets and domains.
 
-    Reference: independent fits in the test with the literal parameters of T2 (as in the test
-    above; not ``qn_regressor``) on the same data: ``pred3`` and ``pred4`` equal them exactly (the
-    same deterministic fit of the same library on the same arrays: no tolerance is claimed beyond
-    equality). (i) The returned block is the same with and without ``capture`` (JSON text). (ii) The
-    target ``y`` is the logit of ``w*`` inside the interior, the placeholder 0.0 outside it, the
-    indicator, and the log horizon; ``domain`` is the interior mask for the logit and all-True for
-    the others. (iii) ``analysis.delta_r2`` of the captured arrays on the domain rows reproduces
-    the ``delta_r2`` leaf bitwise (it is the same call on the same arrays; b3 of the plan).
+    Reference: independent fits in the test with the literal parameters of T2
+    (as in the Q-N test above; not ``qn_regressor``) on the same data.
+    ``pred3`` and ``pred4`` equal them exactly (the same deterministic fit of
+    the same library on the same arrays: no tolerance is claimed beyond
+    equality).
+
+    * (i) The returned block is the same with and without ``capture`` (JSON
+      text).
+    * (ii) The target ``y`` is the logit of ``w*`` inside the interior and the
+      placeholder 0.0 outside it, the indicator, and the log horizon;
+      ``domain`` is the interior mask for the logit and all-True for the
+      others.
+    * (iii) ``analysis.delta_r2`` of the captured arrays on the domain rows
+      reproduces the ``delta_r2`` leaf bitwise (it is the same call on the same
+      arrays; b3 of the plan).
     """
 
     d = _qn_synthetic(500, 200, 31)
