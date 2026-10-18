@@ -3,9 +3,13 @@
 The block is report-only (OD6), so a defect in it must be recorded and shown, never end the run.
 Two smoke runs on DEV-0 in fresh interpreters: a normal one, and one in which
 ``lpcstudy.clip_sensitivity._compute`` is replaced by a function that raises. The second must exit 0,
-leave every leaf outside the ``clip_sensitivity`` subtree bitwise equal to the first (every verdict
-intact), and show the failure: ``status = not_computed`` with the error in the block, in the RESULTS.md
-table and note, and as a WARNING line in the run log.
+leave every leaf outside the ``clip_sensitivity`` subtree and its mirrors bitwise equal to the first
+(every verdict intact), and show the failure: ``status = not_computed`` with the error in the block, in the RESULTS.md
+table and note, and as a WARNING line in the run log, and as a count: the mirror of
+``clip_sensitivity.n_caught_exceptions`` in ``handling.result_counts`` is at least 1 in the failed
+run (0 in the normal one). Since WU-0004f the counters of the clip subtree are mirrored there under
+keys that start with ``clip_sensitivity/``; they are the subtree's own leaves and are dropped from the
+comparison with it (WU-0004g).
 """
 
 from __future__ import annotations
@@ -52,10 +56,13 @@ def leaves(node: object, prefix: tuple = ()):
 
 
 def comparable(results: dict) -> dict:
-    """Leaves without the provenance, every ``seconds`` and the ``clip_sensitivity`` subtrees."""
+    """Leaves without the provenance, every ``seconds``, the ``clip_sensitivity`` subtrees and their
+    mirrors (the ``clip_sensitivity/...`` keys of ``handling.result_counts``)."""
     return {path: value for path, value in leaves(results)
             if path[0] != "provenance" and path[-1] not in ("seconds", "wall_seconds")
-            and not (path[0] == "systems" and path[2:3] == ("clip_sensitivity",))}
+            and not (path[0] == "systems" and path[2:3] == ("clip_sensitivity",))
+            and not (path[0] == "systems" and path[2:4] == ("handling", "result_counts")
+                     and path[4].startswith("clip_sensitivity/"))}
 
 
 def test_a_failure_in_the_clip_block_is_visible_and_costs_no_verdict(tmp_path: Path) -> None:
@@ -77,6 +84,9 @@ def test_a_failure_in_the_clip_block_is_visible_and_costs_no_verdict(tmp_path: P
         assert all(p["status"] == "not_computed" and p["flag"] is None
                    for e in block["by_hypothesis"].values() for p in e["parts"].values()), name
         assert ok["systems"][name]["clip_sensitivity"]["status"] == "computed", name
+        mirror = "clip_sensitivity/n_caught_exceptions"  # the failure is counted, not only shown
+        assert bad["systems"][name]["handling"]["result_counts"][mirror] >= 1, name
+        assert ok["systems"][name]["handling"]["result_counts"][mirror] == 0, name
     report = (failed / "RESULTS.md").read_text()
     assert f"clip sensitivity not computed: {reason}." in report
     assert f"not computed ({reason})" in report
