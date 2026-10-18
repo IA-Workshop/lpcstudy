@@ -408,6 +408,7 @@ def test_xla_thread_cap_is_exported_from_lpc_threads(
             expected,
         )
         assert call["env"]["OMP_NUM_THREADS"] == expected
+        assert call["env"]["LPC_THREADS"] == expected
     assert json.loads(meta_path(fake, "smoke").read_text())[
         "lpc_threads"
     ] == int(expected)

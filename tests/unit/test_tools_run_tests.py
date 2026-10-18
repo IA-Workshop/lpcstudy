@@ -140,6 +140,7 @@ def test_xla_thread_cap_is_exported_from_lpc_threads(
     got = only_call(fake)["env"]
     assert (got["PJRT_NPROC"], got["NPROC"]) == (expected, expected)
     assert got["OMP_NUM_THREADS"] == expected
+    assert got["LPC_THREADS"] == expected
 
 
 @pytest.mark.parametrize("threads", ["0", "100", "four", "-1", "2.5"])

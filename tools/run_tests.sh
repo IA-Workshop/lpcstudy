@@ -115,6 +115,9 @@ else
 fi
 
 export OMP_NUM_THREADS="$threads" MKL_NUM_THREADS="$threads" OPENBLAS_NUM_THREADS="$threads"
+# LPC_THREADS itself is exported too: the run provenance records it, and compare_runs needs it
+# to tell tier T0 from T1 (a shell without it gave tier "undetermined").
+export LPC_THREADS="$threads"
 # XLA's CPU client sizes its thread pools from PJRT_NPROC, then NPROC (plain environment variables
 # read by getenv, not XLA flags, so they cannot abort XLA); unset it uses every schedulable CPU.
 # Verified for jaxlib 0.11.2 in WU-0012.4. Never put a thread cap in XLA_FLAGS: an unknown entry aborts.
