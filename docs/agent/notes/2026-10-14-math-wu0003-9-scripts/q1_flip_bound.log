@@ -1,0 +1,9 @@
+5-size point    n= 12 stop on ['ftol']: flip 1/d / s median 0.00e+00 p99 1.34e-06 max 1.44e-06; floor rel median 0.00e+00 max 6.26e-07; nfev changed in 2
+5-size resample n=480 stop on ['ftol', 'gtol', 'xtol']: flip 1/d / s median 0.00e+00 p99 5.02e-06 max 7.37e-06; floor rel median 0.00e+00 max 4.89e-06; nfev changed in 120
+2-size smoke point: stop on gtol; flip 1/d / s 0.00e+00; floor rel 0.00e+00; nfev changed False
+2-size smoke resample-like n=200: flip 1/d / s median 7.61e-10 max 1.09e-08; floor rel max 1.08e-06
+ulp amplification p0 lorenz63 0.01: 2-point jac 7.91e-09 s, analytic jac 3.61e-14 s
+ulp amplification p0 lorenz63 0.02: 2-point jac 1.13e-08 s, analytic jac 4.35e-14 s
+ulp amplification p0 rossler 0.01: 2-point jac 5.71e-08 s, analytic jac 3.94e-14 s
+ulp amplification p0 rossler 0.02: 2-point jac 3.05e-08 s, analytic jac 6.95e-14 s
+ulp amplification smoke: 2-point jac 3.11e-08 s, analytic jac 7.48e-14 s

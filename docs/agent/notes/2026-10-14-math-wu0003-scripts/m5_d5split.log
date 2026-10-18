@@ -1,0 +1,12 @@
+c=0.0 sep=0.2: truth +0.0002 | n=320: mean +0.0048 sd 0.0096 | n=650: mean +0.0047 sd 0.0068 | n=930: mean +0.0045 sd 0.0058
+c=0.0 sep=0.6: truth +0.0394 | n=320: mean +0.0339 sd 0.0061 | n=650: mean +0.0343 sd 0.0044 | n=930: mean +0.0342 sd 0.0036
+c=0.5 sep=0.2: truth -0.0016 | n=320: mean +0.0006 sd 0.0083 | n=650: mean +0.0003 sd 0.0057 | n=930: mean +0.0002 sd 0.0050
+c=0.5 sep=0.6: truth +0.0291 | n=320: mean +0.0259 sd 0.0049 | n=650: mean +0.0260 sd 0.0034 | n=930: mean +0.0261 sd 0.0029
+c=0.9 sep=0.2: truth -0.0025 | n=320: mean -0.0020 sd 0.0058 | n=650: mean -0.0024 sd 0.0044 | n=930: mean -0.0024 sd 0.0037
+c=0.9 sep=0.6: truth +0.0136 | n=320: mean +0.0130 sd 0.0027 | n=650: mean +0.0129 sd 0.0018 | n=930: mean +0.0129 sd 0.0015
+D2 union trigger n=300 phi=0.0: 0.210
+D2 union trigger n=300 phi=0.3: 0.401
+D2 union trigger n=500 phi=0.0: 0.164
+D2 union trigger n=500 phi=0.3: 0.425
+D2 union trigger n=1000 phi=0.0: 0.094
+D2 union trigger n=1000 phi=0.3: 0.400

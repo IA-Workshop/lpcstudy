@@ -1,0 +1,55 @@
+== lorenz63: law rebuilt from 1000000 states, 995725 windows; P(V6>=1e-3) = 1.0766e-03; median 3.77e-05; 99.9% 1.03e-03; matches law.log: True
+  P0 (DEV-0, a5cd75b, CPU)                 V6 3.925e-05  pass  margin x 25.48  rank F 0.5307 (+-0.0040)  P(V6 >= value) 4.693e-01
+  P1 (DEV-0, 5b3fd8f, CPU)                 V6 4.833e-04  pass  margin x  2.07  rank F 0.9945 (+-0.0006)  P(V6 >= value) 5.502e-03
+  DEV-1 pilot (CPU, offline)               V6 2.603e-05  pass  margin x 38.42  rank F 0.1965 (+-0.0034)  P(V6 >= value) 8.035e-01
+  DEV-2 pilot (CPU, offline)               V6 4.642e-05  pass  margin x 21.54  rank F 0.6427 (+-0.0046)  P(V6 >= value) 3.573e-01
+  DEV-3 pilot (CPU, offline)               V6 2.956e-05  pass  margin x 33.83  rank F 0.2963 (+-0.0036)  P(V6 >= value) 7.037e-01
+  DEV-4 pilot (CPU, offline)               V6 2.827e-05  pass  margin x 35.37  rank F 0.2598 (+-0.0038)  P(V6 >= value) 7.402e-01
+  DEV-1 full (CPU, offline)                V6 4.451e-05  pass  margin x 22.47  rank F 0.6179 (+-0.0046)  P(V6 >= value) 3.821e-01
+  DEV-2 full (CPU, offline)                V6 2.180e-05  pass  margin x 45.87  rank F 0.0626 (+-0.0023)  P(V6 >= value) 9.374e-01
+  DEV-3 full (CPU, offline)                V6 3.091e-05  pass  margin x 32.35  rank F 0.3333 (+-0.0040)  P(V6 >= value) 6.667e-01
+  DEV-4 full (CPU, offline)                V6 3.285e-05  pass  margin x 30.44  rank F 0.3857 (+-0.0052)  P(V6 >= value) 6.143e-01
+  R1 DEV-1 pilot (GPU lambda; other law)   V6 3.773e-05  pass  margin x 26.50  rank F 0.5007 (+-0.0033)  P(V6 >= value) 4.993e-01
+== rossler: law rebuilt from 1000000 states, 985750 windows; P(V6>=1e-3) = 0.0000e+00; median 3.72e-05; 99.9% 4.45e-05; matches law.log: True
+  P0 (DEV-0, a5cd75b, CPU)                 V6 3.305e-05  pass  margin x 30.25  rank F 0.1493 (+-0.0013)  P(V6 >= value) 8.507e-01
+  P1 (DEV-0, 5b3fd8f, CPU)                 V6 4.253e-05  pass  margin x 23.51  rank F 0.7869 (+-0.0034)  P(V6 >= value) 2.131e-01
+  DEV-1 pilot (CPU, offline)               V6 3.073e-05  pass  margin x 32.54  rank F 0.0853 (+-0.0005)  P(V6 >= value) 9.147e-01
+  DEV-2 pilot (CPU, offline)               V6 3.380e-05  pass  margin x 29.59  rank F 0.1822 (+-0.0015)  P(V6 >= value) 8.178e-01
+  DEV-3 pilot (CPU, offline)               V6 3.854e-05  pass  margin x 25.95  rank F 0.5494 (+-0.0016)  P(V6 >= value) 4.506e-01
+  DEV-4 pilot (CPU, offline)               V6 3.429e-05  pass  margin x 29.16  rank F 0.2065 (+-0.0018)  P(V6 >= value) 7.935e-01
+  DEV-1 full (CPU, offline)                V6 3.698e-05  pass  margin x 27.04  rank F 0.4884 (+-0.0027)  P(V6 >= value) 5.116e-01
+  DEV-2 full (CPU, offline)                V6 3.060e-05  pass  margin x 32.68  rank F 0.0807 (+-0.0005)  P(V6 >= value) 9.193e-01
+  DEV-3 full (CPU, offline)                V6 2.763e-05  pass  margin x 36.19  rank F 0.0219 (+-0.0009)  P(V6 >= value) 9.781e-01
+  DEV-4 full (CPU, offline)                V6 4.369e-05  pass  margin x 22.89  rank F 0.9197 (+-0.0019)  P(V6 >= value) 8.028e-02
+  R1 DEV-1 pilot (GPU lambda; other law)   V6 4.307e-05  pass  margin x 23.22  rank F 0.8460 (+-0.0022)  P(V6 >= value) 1.540e-01
+== chua: law rebuilt from 1000000 states, 985750 windows; P(V6>=1e-3) = 4.4793e-02; median 1.96e-04; 99.9% 1.09e-02; matches law.log: True
+  P0 (DEV-0, a5cd75b, CPU)                 V6 7.545e-05  pass  margin x 13.25  rank F 0.0749 (+-0.0045)  P(V6 >= value) 9.251e-01
+  P1 (DEV-0, 5b3fd8f, CPU)                 V6 2.925e-04  pass  margin x  3.42  rank F 0.6990 (+-0.0064)  P(V6 >= value) 3.010e-01
+  DEV-1 pilot (CPU, offline)               V6 1.089e-04  pass  margin x  9.18  rank F 0.1955 (+-0.0061)  P(V6 >= value) 8.045e-01
+  DEV-2 pilot (CPU, offline)               V6 7.915e-05  pass  margin x 12.63  rank F 0.0870 (+-0.0041)  P(V6 >= value) 9.130e-01
+  DEV-3 pilot (CPU, offline)               V6 1.354e-04  pass  margin x  7.39  rank F 0.2955 (+-0.0053)  P(V6 >= value) 7.045e-01
+  DEV-4 pilot (CPU, offline)               V6 1.184e-04  pass  margin x  8.44  rank F 0.2306 (+-0.0068)  P(V6 >= value) 7.694e-01
+  DEV-1 full (CPU, offline)                V6 1.530e-03  FAIL  margin x  0.65  rank F 0.9785 (+-0.0023)  P(V6 >= value) 2.149e-02
+  DEV-2 full (CPU, offline)                V6 3.340e-04  pass  margin x  2.99  rank F 0.7551 (+-0.0063)  P(V6 >= value) 2.449e-01
+  DEV-3 full (CPU, offline)                V6 2.949e-04  pass  margin x  3.39  rank F 0.7026 (+-0.0068)  P(V6 >= value) 2.974e-01
+  DEV-4 full (CPU, offline)                V6 1.695e-04  pass  margin x  5.90  rank F 0.4215 (+-0.0040)  P(V6 >= value) 5.785e-01
+  R1 DEV-1 pilot (GPU lambda; other law)   V6 3.358e-05  pass  margin x 29.78  rank F 0.0017 (+-0.0004)  P(V6 >= value) 9.983e-01
+
+== Tests of the law on the CPU draws (P0, P1, DEV-1..4 pilot, DEV-1..4 full)
+  lorenz63  n=10 ranks [0.063 0.196 0.26  0.296 0.333 0.386 0.531 0.618 0.643 0.994]  KS D=0.257 p=0.448
+  rossler   n=10 ranks [0.022 0.081 0.085 0.149 0.182 0.207 0.488 0.549 0.787 0.92 ]  KS D=0.393 p=0.066
+  chua      n=10 ranks [0.075 0.087 0.196 0.231 0.295 0.421 0.699 0.703 0.755 0.979]  KS D=0.205 p=0.725
+  all       n=30 KS D=0.204 p=0.144; mean rank 0.408 (uniform: 0.5 +- 0.053)
+  upper-tail Fisher statistic 50.62 on 60 df, p = 0.801
+  lower-tail Fisher statistic 74.85 on 60 df, p = 0.094
+
+== Failure counts against the law (binomial; draws independent, see note)
+  chua      P0,P1 + DEV-1..4 pilot   n= 6 failures k=0  direct 0.000 [Clopper-Pearson 95% 0.0000, 0.459]  law 0.0448: P(K>=0) = 1.000, P(K=0) = 0.760
+  chua      + DEV-1..4 full          n=10 failures k=1  direct 0.100 [Clopper-Pearson 95% 0.0025, 0.445]  law 0.0448: P(K>=1) = 0.368, P(K=0) = 0.632
+  chua      + R1 (GPU)               n=11 failures k=1  direct 0.091 [Clopper-Pearson 95% 0.0023, 0.413]  law 0.0448: P(K>=1) = 0.396, P(K=0) = 0.604
+  lorenz63  P0,P1 + DEV-1..4 pilot   n= 6 failures k=0  direct 0.000 [Clopper-Pearson 95% 0.0000, 0.459]  law 0.0011: P(K>=0) = 1.000, P(K=0) = 0.994
+  lorenz63  + DEV-1..4 full          n=10 failures k=0  direct 0.000 [Clopper-Pearson 95% 0.0000, 0.308]  law 0.0011: P(K>=0) = 1.000, P(K=0) = 0.989
+  lorenz63  + R1 (GPU)               n=11 failures k=0  direct 0.000 [Clopper-Pearson 95% 0.0000, 0.285]  law 0.0011: P(K>=0) = 1.000, P(K=0) = 0.988
+  rossler   P0,P1 + DEV-1..4 pilot   n= 6 failures k=0  direct 0.000 [Clopper-Pearson 95% 0.0000, 0.459]  law 0.0000: P(K>=0) = 1.000, P(K=0) = 1.000
+  rossler   + DEV-1..4 full          n=10 failures k=0  direct 0.000 [Clopper-Pearson 95% 0.0000, 0.308]  law 0.0000: P(K>=0) = 1.000, P(K=0) = 1.000
+  rossler   + R1 (GPU)               n=11 failures k=0  direct 0.000 [Clopper-Pearson 95% 0.0000, 0.285]  law 0.0000: P(K>=0) = 1.000, P(K=0) = 1.000

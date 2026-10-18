@@ -1,0 +1,12 @@
+C3 phi0        p_ref 0.9807 (0.001) shortfall +0.0232 +- 0.0085
+C3 phi0.3      p_ref 0.9732 (0.0011) shortfall +0.0811 +- 0.0078
+C7 phi0        p_ref 0.9794 (0.001) shortfall +0.0340 +- 0.0082
+C7 phi0.3      p_ref 0.9762 (0.0011) shortfall +0.0591 +- 0.0083
+C1 phi0        p_ref 0.9800 (0.0007) shortfall +0.0291 +- 0.0058
+C1 phi0.3      p_ref 0.9695 (0.0009) shortfall +0.1065 +- 0.0060
+C8 phi0        p_ref 0.9806 (0.0007) shortfall +0.0241 +- 0.0059
+C8 phi0.3      p_ref 0.9682 (0.0009) shortfall +0.1151 +- 0.0059
+C4 phi0        p_ref 0.9772 (0.0007) shortfall +0.0515 +- 0.0054
+C4 phi0.3      p_ref 0.9715 (0.0008) shortfall +0.0930 +- 0.0055
+C4h s1.5 phi0  p_ref 0.9744 (0.0011) shortfall +0.0725 +- 0.0080
+C4h s2 phi0    p_ref 0.9669 (0.0013) shortfall +0.1235 +- 0.0083

@@ -1,0 +1,56 @@
+== V4 and gate flags per run (read-only)
+  P0 (DEV-0, 1b20db9b) lorenz63  used_M 200  V4 = median half-width M=50: 0.0726 M=200: 0.0370 M=800: 0.0206  mean|w_M - w_800| 0.0505 0.0303 0.0000  pass True  margin x1.35
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 0.954 [min 0.908, max 0.984]  V5 0.0058  V6 3.925e-05  V7 slope 1.0015
+  P0 (DEV-0, 1b20db9b) rossler   used_M 200  V4 = median half-width M=50: 0.0731 M=200: 0.0390 M=800: 0.0214  mean|w_M - w_800| 0.0368 0.0167 0.0000  pass True  margin x1.28
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 0.982 [min 0.922, max 1.007]  V5 0.0058  V6 3.305e-05  V7 slope 1.0002
+  P0 (DEV-0, 1b20db9b) chua      used_M 200  V4 = median half-width M=50: 0.0549 M=200: 0.0308 M=800: 0.0145  mean|w_M - w_800| 0.0478 0.0159 0.0000  pass True  margin x1.62
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 0.950 [min 0.936, max 1.007]  V5 0.0058  V6 7.545e-05  V7 slope 1.0007
+  P1 (DEV-0, 5b3fd8fd) lorenz63  used_M 200  V4 = median half-width M=50: 0.0308 M=200: 0.0187 M=800: 0.0114  mean|w_M - w_800| 0.0380 0.0201 0.0000  pass True  margin x2.68
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 1.011 [min 0.838, max 1.078]  V5 0.0058  V6 4.833e-04  V7 slope 1.0012
+  P1 (DEV-0, 5b3fd8fd) rossler   used_M 200  V4 = median half-width M=50: 0.0546 M=200: 0.0334 M=800: 0.0211  mean|w_M - w_800| 0.0290 0.0175 0.0000  pass True  margin x1.50
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 0.976 [min 0.943, max 0.985]  V5 0.0058  V6 4.253e-05  V7 slope 1.0000
+  P1 (DEV-0, 5b3fd8fd) chua      used_M 200  V4 = median half-width M=50: 0.0632 M=200: 0.0420 M=800: 0.0196  mean|w_M - w_800| 0.0334 0.0273 0.0000  pass True  margin x1.19
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 1.019 [min 0.916, max 1.051]  V5 0.0058  V6 2.925e-04  V7 slope 1.0013
+  R1 (DEV-1, 01d9fc72) lorenz63  used_M 200  V4 = median half-width M=50: 0.0659 M=200: 0.0349 M=800: 0.0157  mean|w_M - w_800| 0.0281 0.0133 0.0000  pass True  margin x1.43
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 1.039 [min 0.861, max 1.066]  V5 0.0058  V6 3.773e-05  V7 slope 1.0016
+  R1 (DEV-1, 01d9fc72) rossler   used_M 200  V4 = median half-width M=50: 0.0616 M=200: 0.0439 M=800: 0.0228  mean|w_M - w_800| 0.0319 0.0177 0.0000  pass True  margin x1.14
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 0.964 [min 0.923, max 0.985]  V5 0.0058  V6 4.307e-05  V7 slope 1.0000
+  R1 (DEV-1, 01d9fc72) chua      used_M 200  V4 = median half-width M=50: 0.0516 M=200: 0.0272 M=800: 0.0136  mean|w_M - w_800| 0.0359 0.0212 0.0000  pass True  margin x1.83
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 0.979 [min 0.939, max 1.035]  V5 0.0058  V6 3.358e-05  V7 slope 1.0006
+  R2 (DEV-1, 01d9fc72) lorenz63  used_M 200  V4 = median half-width M=50: 0.0659 M=200: 0.0349 M=800: 0.0157  mean|w_M - w_800| 0.0281 0.0133 0.0000  pass True  margin x1.43
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 1.039 [min 0.861, max 1.066]  V5 0.0058  V6 3.773e-05  V7 slope 1.0016
+  R2 (DEV-1, 01d9fc72) rossler   used_M 200  V4 = median half-width M=50: 0.0616 M=200: 0.0439 M=800: 0.0228  mean|w_M - w_800| 0.0319 0.0177 0.0000  pass True  margin x1.14
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 0.964 [min 0.923, max 0.985]  V5 0.0058  V6 4.307e-05  V7 slope 1.0000
+  R2 (DEV-1, 01d9fc72) chua      used_M 200  V4 = median half-width M=50: 0.0516 M=200: 0.0272 M=800: 0.0136  mean|w_M - w_800| 0.0359 0.0212 0.0000  pass True  margin x1.83
+      gate {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}  V2 median 0.979 [min 0.939, max 1.035]  V5 0.0058  V6 3.358e-05  V7 slope 1.0006
+
+== R1 per-state half-widths (states dump, M = 200, H_ref)
+  lorenz63  median 0.0349 (== gated V4: True); quartiles 0.0051 / 0.0470; min 0.0000 max 0.1696; states with half-width 0: 8; w_hat at the clip (0 or 1): 13 of 40; states above 0.05: 7
+      distribution-free 0.962 CI of the population median [x(14), x(27)] = [0.0144, 0.0433] -> log-SE 0.266; Maritz-Jarrett SE 0.0074 -> log-SE 0.211
+      state-resampling P(median of 40 > 0.05) in [0.000, 0.000] (exact binomial bounds, F(0.05) = 0.825)
+  rossler   median 0.0439 (== gated V4: True); quartiles 0.0178 / 0.0641; min 0.0000 max 0.1104; states with half-width 0: 6; w_hat at the clip (0 or 1): 8 of 40; states above 0.05: 17
+      distribution-free 0.962 CI of the population median [x(14), x(27)] = [0.0230, 0.0546] -> log-SE 0.209; Maritz-Jarrett SE 0.0083 -> log-SE 0.190
+      state-resampling P(median of 40 > 0.05) in [0.132, 0.211] (exact binomial bounds, F(0.05) = 0.575)
+  chua      median 0.0272 (== gated V4: True); quartiles 0.0000 / 0.0560; min 0.0000 max 0.2016; states with half-width 0: 11; w_hat at the clip (0 or 1): 14 of 40; states above 0.05: 13
+      distribution-free 0.962 CI of the population median [x(14), x(27)] = [0.0089, 0.0458] -> log-SE 0.396; Maritz-Jarrett SE 0.0088 -> log-SE 0.321
+      state-resampling P(median of 40 > 0.05) in [0.007, 0.016] (exact binomial bounds, F(0.05) = 0.675)
+
+== Between-seed spread of log V4 (P0, P1, R1; one value per run)
+  per-system SD: lorenz63 0.380, rossler 0.137, chua 0.223
+  pooled log-SD s = 0.266 on 6 df, 95% CI [0.172, 0.586] (2026-10-13, n = 2: 0.314 on 3 df, CI [0.178, 1.169])
+  Bartlett test of a common SD: stat 1.59, p = 0.452 (2 df each; low power)
+  state-sampling log-SE from the R1 dump (RMS over systems) 0.301; ratio s / within = 0.89; F-type check: (s/within)^2 = 0.79, P(chi2_6/6 >= that) = 0.581
+
+== Per-seed P(V4 fails) (log-normal model, common SD; as v4v2.py)
+  lorenz63  values 0.0370 0.0187 0.0349  geo-mean 0.0289 margin x1.73  plug-in 0.020  predictive (t6) 0.062  over the SD CI [0.001, 0.175]  (state-sampling SD only: 0.034)
+  rossler   values 0.0390 0.0334 0.0439  geo-mean 0.0385 margin x1.30  plug-in 0.164  predictive (t6) 0.214  over the SD CI [0.064, 0.328]  (state-sampling SD only: 0.193)
+  chua      values 0.0308 0.0420 0.0272  geo-mean 0.0328 margin x1.53  plug-in 0.056  predictive (t6) 0.109  over the SD CI [0.007, 0.236]  (state-sampling SD only: 0.080)
+  any system: plug-in 0.226, predictive 0.344, over the SD CI [0.071, 0.576], state-sampling SD only 0.282
+
+== Full preset (convergence_states = 100, pilot 40): V4 is a median of 100 states. If the
+   between-seed spread is state sampling (section 2.2), sigma scales by sqrt(40/100); the
+   location is carried over from the pilot values (assumption: same per-state law at full)
+  lorenz63  sigma_full 0.168  plug-in 0.001  predictive 0.027  over the CI [0.000, 0.070]
+  rossler   sigma_full 0.168  plug-in 0.061  predictive 0.148  over the CI [0.008, 0.241]
+  chua      sigma_full 0.168  plug-in 0.006  predictive 0.057  over the CI [0.000, 0.127]
+  any system: plug-in 0.067, predictive 0.218, over the CI [0.008, 0.384]

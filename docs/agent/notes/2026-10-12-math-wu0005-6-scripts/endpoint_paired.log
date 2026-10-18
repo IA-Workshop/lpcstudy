@@ -1,0 +1,14 @@
+
+== mean, n = 300, 40 data sets; reference B = 20000
+   Lipschitz bound |d endpoint| <= max_b |d T_b| held in all: True
+   B = 500: MC noise of the endpoint change / hw: RMS lo 0.0202, hi 0.0217;  endpoint MC SE / hw (median) 0.0868
+   B = 2000: MC noise of the endpoint change / hw: RMS lo 0.0127, hi 0.0124;  endpoint MC SE / hw (median) 0.0401
+   |r_pt| median 0.0216; |r_lo - r_pt| median 0.0062; |r_hi - r_pt| median 0.0043; SD_b(dT_b)/hw median 0.0302
+   d1 (three) / |r_pt|: median 1.26
+
+== median, n = 500, 20 data sets; reference B = 8000
+   Lipschitz bound |d endpoint| <= max_b |d T_b| held in all: True
+   B = 500: MC noise of the endpoint change / hw: RMS lo 0.0389, hi 0.0894;  endpoint MC SE / hw (median) 0.0926
+   B = 2000: MC noise of the endpoint change / hw: RMS lo 0.0377, hi 0.0371;  endpoint MC SE / hw (median) 0.0505
+   |r_pt| median 0.0477; |r_lo - r_pt| median 0.0471; |r_hi - r_pt| median 0.0461; SD_b(dT_b)/hw median 0.1063
+   d1 (three) / |r_pt|: median 1.72

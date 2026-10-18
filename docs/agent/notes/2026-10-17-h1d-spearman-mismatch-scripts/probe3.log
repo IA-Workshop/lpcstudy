@@ -1,0 +1,6 @@
+lorenz63: ties per profile column (draw 1): [0, 9, 0, 33]; states with raw N-hat below ~1e-12: 211 of 500 (float64 resolution of log(x + c) in x: ulp(c)=1.7e-18 and ulp(log c)*c=8.9e-18)
+   states inside a tied group: 60; groups 27
+rossler: ties per profile column (draw 1): [0, 7, 0, 33]; states with raw N-hat below ~1e-12: 156 of 500 (float64 resolution of log(x + c) in x: ulp(c)=1.7e-18 and ulp(log c)*c=8.9e-18)
+   states inside a tied group: 56; groups 23
+chua: ties per profile column (draw 1): [0, 61, 54, 47]; states with raw N-hat below ~1e-12: 134 of 500 (float64 resolution of log(x + c) in x: ulp(c)=1.7e-18 and ulp(log c)*c=8.9e-18)
+   states inside a tied group: 71; groups 24

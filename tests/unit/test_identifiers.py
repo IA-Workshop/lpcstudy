@@ -1,9 +1,14 @@
-"""Tests for lpcstudy.identifiers: the identifier table and the v1 key map (WU-0002.2).
+"""Tests for ``lpcstudy.identifiers``: the identifier table and the v1 key map
+(WU-0002.2).
 
-Every check is an exact comparison of strings, tuples or sets; there is no tolerance. The
-references are the study documents, parsed here by code that shares nothing with the module:
-``docs/study/decision_log_lpc.md`` (the "v3 ID | v2 ID | Role" map and the correction table) and
-``docs/study/proposal_and_methods_v3.md`` (section 2 tables, section 7 primaries).
+``identifiers`` holds the one table of hypothesis ids, roles and pass rules that
+the rest of the code reads. These tests make sure the table says what the study
+documents say. Every check is an exact comparison of strings, tuples or sets;
+there is no tolerance. The references are the study documents, parsed here by
+code that shares nothing with the module: ``docs/study/decision_log_lpc.md``
+(the "v3 ID | v2 ID | Role" map and the correction table) and
+``docs/study/proposal_and_methods_v3.md`` (section 2 tables, section 7
+primaries).
 """
 
 from __future__ import annotations
@@ -14,25 +19,51 @@ from pathlib import Path
 
 import pytest
 
-from lpcstudy.identifiers import HYPOTHESIS_TABLE, V1_KEY_MAP, check_keys
+from lpcstudy.identifiers import (
+    HYPOTHESIS_TABLE,
+    QOI_DECLARATIONS,
+    QOI_FIELDS,
+    V1_KEY_MAP,
+    check_keys,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 DECISION_LOG = ROOT / "docs" / "study" / "decision_log_lpc.md"
 PROPOSAL = ROOT / "docs" / "study" / "proposal_and_methods_v3.md"
 PACKAGE = ROOT / "lpcstudy"
 
+# The v1/v2 ids that left the code, matched as whole tokens (WU-0011.5, DEC-0026
+# item 7): an id inside a longer alphanumeric token (a timestamp such as
+# 20261011T165447Z) is not an id. The two lowercase prefixes keep their
+# substring matching. Underscore is a separator, so ``H3d_median`` and
+# ``kaplan_meier_T1`` are flagged.
+STALE_ID = re.compile(
+    r"(?<![A-Za-z0-9])(?:H1e|H1f|H2f|H3d|T1)(?![A-Za-z0-9])|h1e_|h1f_"
+)
+# The unanchored regex the test used before WU-0011.5, kept to show that nothing
+# real is lost.
+OLD_STALE_ID = re.compile(r"H1e|H1f|H2f|H3d|T1|h1e_|h1f_")
+
 
 def unescape(text: str) -> str:
     """Remove Markdown escapes and bold markers from a table cell."""
-    return re.sub(r"\\([\\`*_{}\[\]()#+\-.!|<>])", r"\1", text).replace("**", "").strip()
+    return (
+        re.sub(r"\\([\\`*_{}\[\]()#+\-.!|<>])", r"\1", text)
+        .replace("**", "")
+        .strip()
+    )
 
 
 def table_rows(path: Path, header: str) -> list[list[str]]:
-    """Cells of the Markdown table whose header line starts with ``header`` (separator skipped)."""
+    """Return the cells of the Markdown table whose header line starts with
+    ``header``.
+
+    The separator line is skipped.
+    """
     lines = path.read_text(encoding="utf-8").splitlines()
     start = next(i for i, line in enumerate(lines) if line.startswith(header))
     rows = []
-    for line in lines[start + 2:]:
+    for line in lines[start + 2 :]:
         if not line.startswith("|"):
             break
         rows.append([c.strip() for c in line.strip().strip("|").split(" | ")])
@@ -40,57 +71,104 @@ def table_rows(path: Path, header: str) -> list[list[str]]:
 
 
 def test_rows_equal_the_decision_log_map() -> None:
-    """The 14 rows ``(v3_id, v2_id, role)`` equal the "v3 ID | v2 ID | Role" block, in order.
+    """The 14 rows ``(v3_id, v2_id, role)`` equal the decision log's map, in
+    order.
 
-    Reference: the table in the decision log, parsed from the file. The log's role text for
-    the gain bound is "gain bound, no pass/fail"; the table's role word for it is ``reported``
-    (the ROADMAP row of WU-0002.2), the one mapping written out below.
+    The map is the "v3 ID | v2 ID | Role" block.
+
+    Reference: the table in the decision log, parsed from the file. The log's
+    role text for the gain bound is "gain bound, no pass/fail"; the table's role
+    word for it is ``reported`` (the ROADMAP row of WU-0002.2), the one mapping
+    written out below.
     """
-    parsed = [(v3, v2, "reported" if role.startswith("gain bound") else role)
-              for v3, v2, role in table_rows(DECISION_LOG, "| v3 ID | v2 ID | Role |")]
+    parsed = [
+        (v3, v2, "reported" if role.startswith("gain bound") else role)
+        for v3, v2, role in table_rows(DECISION_LOG, "| v3 ID | v2 ID | Role |")
+    ]
     assert len(parsed) == 14
     assert [(h.v3_id, h.v2_id, h.role) for h in HYPOTHESIS_TABLE] == parsed
     assert len({h.key for h in HYPOTHESIS_TABLE}) == 14
-    assert [h.key for h in HYPOTHESIS_TABLE if h.key != h.v3_id] == ["gain_bound"]
+    assert [h.key for h in HYPOTHESIS_TABLE if h.key != h.v3_id] == [
+        "gain_bound"
+    ]
 
 
 def test_v1_key_map_equals_the_correction_table() -> None:
-    """``V1_KEY_MAP`` equals a hand transcription of the decision log's correction table.
+    """``V1_KEY_MAP`` equals a hand transcription of the decision log's
+    correction table.
 
-    Reference: "v1 / code | v3" table of the log's 10 October correction (lines 78 to 94),
-    transcribed here by hand: H1a became V7, H1b to H1f shift down by one (H1f is Q-N), H2a to
-    H2d are kept, the v1 gain bound H2e is "reported" (key ``gain_bound``), H3b and T1 are
-    dropped, v1 H3c becomes H3b and v1 H3d becomes H3c. The row "-- | H2e (noise matching)" has no
-    v1 key. The check also reads the log to make sure the transcribed v1 column is its v1 column.
+    Reference: the "v1 / code | v3" table of the log's 10 October correction
+    (lines 78 to 94), transcribed here by hand:
+
+    * H1a became V7;
+    * H1b to H1f shift down by one (H1f is Q-N);
+    * H2a to H2d are kept;
+    * the v1 gain bound H2e is "reported" (key ``gain_bound``);
+    * H3b and T1 are dropped;
+    * v1 H3c becomes H3b and v1 H3d becomes H3c.
+
+    The row "-- | H2e (noise matching)" has no v1 key. The check also reads the
+    log to make sure the transcribed v1 column is its v1 column.
     """
-    transcription = {"H1a": "V7", "H1b": "H1a", "H1c": "H1b", "H1d": "H1c", "H1e": "H1d",
-                     "H1f": "Q-N", "H2a": "H2a", "H2b": "H2b", "H2c": "H2c", "H2d": "H2d",
-                     "H2e": "gain_bound", "H3a": "H3a", "H3b": None, "H3c": "H3b",
-                     "H3d": "H3c", "T1": None}
+    transcription = {
+        "H1a": "V7",
+        "H1b": "H1a",
+        "H1c": "H1b",
+        "H1d": "H1c",
+        "H1e": "H1d",
+        "H1f": "Q-N",
+        "H2a": "H2a",
+        "H2b": "H2b",
+        "H2c": "H2c",
+        "H2d": "H2d",
+        "H2e": "gain_bound",
+        "H3a": "H3a",
+        "H3b": None,
+        "H3c": "H3b",
+        "H3d": "H3c",
+        "T1": None,
+    }
     assert V1_KEY_MAP == transcription
     log_rows = table_rows(DECISION_LOG, "| v1 / code | v3 |")
-    v1_ids = [i for row in log_rows if not row[0].startswith("—")
-              for i in re.findall(r"\b(?:H\d[a-f]|T1)\b", row[0])]
+    v1_ids = [
+        i
+        for row in log_rows
+        if not row[0].startswith("—")
+        for i in re.findall(r"\b(?:H\d[a-f]|T1)\b", row[0])
+    ]
     assert sorted(v1_ids) == sorted(transcription)
     assert len(v1_ids) == len(set(v1_ids)) == 16
 
 
 def test_criterion_text_is_the_v3_section_2_row() -> None:
-    """Each ``criterion`` is ``"<statistic>; pass if <rule>"`` of its v3 section 2 row.
+    """Each ``criterion`` is ``"<statistic>; pass if <rule>"`` of its v3 section
+    2 row.
 
-    Reference: the hypothesis tables of section 2 of the proposal and methods v3, parsed from
-    the file (columns ID, Hypothesis, Statistic, Pass if; the markers ``**`` and the Markdown
-    escapes removed; ``Q-N (estimate)`` is the id ``Q-N``). For the gain bound the reference is
-    the sentence after the RQ3 table.
+    Reference: the hypothesis tables of section 2 of the proposal and methods
+    v3, parsed from the file (columns ID, Hypothesis, Statistic, Pass if; the
+    markers ``**`` and the Markdown escapes removed; ``Q-N (estimate)`` is the
+    id ``Q-N``). For the gain bound the reference is the sentence after the RQ3
+    table. Tolerance: none (exact strings). The code follows the documents, so
+    when the documents change, the table text changes with them.
     """
     text = PROPOSAL.read_text(encoding="utf-8")
-    section = text[text.index("## 2. Research questions"):text.index("## 3. Mathematical")]
+    section = text[
+        text.index("## 2. Research questions") : text.index(
+            "## 3. Mathematical"
+        )
+    ]
     expected = {}
     for line in section.splitlines():
         if line.startswith("|") and not line.startswith(("| ID", "| ---")):
-            ident, _, statistic, rule = [unescape(c) for c in line.strip().strip("|").split(" | ")]
-            expected[ident.replace(" (estimate)", "")] = f"{statistic}; pass if {rule}"
-    (sentence,) = [line for line in section.splitlines() if line.startswith("The hybrid's")]
+            ident, _, statistic, rule = [
+                unescape(c) for c in line.strip().strip("|").split(" | ")
+            ]
+            expected[ident.replace(" (estimate)", "")] = (
+                f"{statistic}; pass if {rule}"
+            )
+    (sentence,) = [
+        line for line in section.splitlines() if line.startswith("The hybrid's")
+    ]
     expected["(reported)"] = unescape(sentence)
     assert len(expected) == 14
     assert {h.v3_id: h.criterion for h in HYPOTHESIS_TABLE} == expected
@@ -99,42 +177,64 @@ def test_criterion_text_is_the_v3_section_2_row() -> None:
 def test_primaries_and_roles() -> None:
     """The primaries are H2a, H2b and H3c; the roles are the four allowed words.
 
-    Reference: v3 section 7 (the three primary endpoints are H2a, H2b and H3c, at level
-    1 - 0.05/3) and the ROADMAP row of WU-0002.2 (roles primary, secondary, estimate, reported),
-    written out here.
+    Reference: v3 section 7 (the three primary endpoints are H2a, H2b and H3c,
+    at level 1 - 0.05/3) and the ROADMAP row of WU-0002.2 (roles primary,
+    secondary, estimate, reported), written out here.
     """
-    assert {h.v3_id for h in HYPOTHESIS_TABLE if h.role == "primary"} == {"H2a", "H2b", "H3c"}
-    assert {h.role for h in HYPOTHESIS_TABLE} <= {"primary", "secondary", "estimate", "reported"}
-    assert [h.v3_id for h in HYPOTHESIS_TABLE if h.role in ("estimate", "reported")] == \
-        ["Q-N", "(reported)"]
+    assert {h.v3_id for h in HYPOTHESIS_TABLE if h.role == "primary"} == {
+        "H2a",
+        "H2b",
+        "H3c",
+    }
+    assert {h.role for h in HYPOTHESIS_TABLE} <= {
+        "primary",
+        "secondary",
+        "estimate",
+        "reported",
+    }
+    assert [
+        h.v3_id for h in HYPOTHESIS_TABLE if h.role in ("estimate", "reported")
+    ] == ["Q-N", "(reported)"]
 
 
 def test_pending_names_the_roadmap_rows() -> None:
-    """``pending`` is the list of ROADMAP sub-tasks whose row names the id.
+    """``pending`` marks the rows whose statistic is known to be incomplete: the
+    gain bound only.
 
-    Reference: ROADMAP rows WU-0002.4 to .8, read by hand: .4 names H1a and H1b; .5 H1d; .6 Q-N;
-    .7 H2b and H2e; .8 H3a, H3c and H2d. No other row of .3 to .13 names a table id, so the other
-    rows have no pending sub-task, with one exception added in the fix round (review R1): the
-    gain bound keeps its v1 0.9 pass bar although v3 says "without a pass/fail bar", and the
-    concordance (D-21 (a)) proposes removing it in WU-0002.9, so that row is pending on .9.
+    Reference: ROADMAP rows WU-0002.4 to .9, read by hand, and DEC-0016 O2.
+    WU-0002.4 to .8 are implemented, and WU-0002.9 decides H2d by its interval
+    (DEC-0011 O4 lifted), so H2d is no longer pending (a plan edit of this test,
+    which expected ``{"H2d": ("WU-0002.9",), "(reported)": ("WU-0002.9",)}``).
+
+    The gain bound is reported with no bar, but concordance D-21(b) and (c) (the
+    covariance screen at every horizon and the P1 subset) have no ROADMAP row.
+    It stays pending on that gap, named in words (amendments note section 11;
+    the owner opens the row), so the report still marks it "computed with the v1
+    statistic". Exactly one row, one marker.
     """
-    expected = {"H1a": ("WU-0002.4",), "H1b": ("WU-0002.4",), "H1d": ("WU-0002.5",),
-                "Q-N": ("WU-0002.6",), "H2b": ("WU-0002.7",), "H2e": ("WU-0002.7",),
-                "H2d": ("WU-0002.8",), "H3a": ("WU-0002.8",), "H3c": ("WU-0002.8",),
-                "(reported)": ("WU-0002.9",)}
-    assert {h.v3_id: h.pending for h in HYPOTHESIS_TABLE if h.pending} == expected
+    pending = {h.v3_id: h.pending for h in HYPOTHESIS_TABLE if h.pending}
+    assert list(pending) == ["(reported)"] and len(pending["(reported)"]) == 1
+    assert "gain-bound screen row" in pending["(reported)"][0]
+    assert "amendments note section 11" in pending["(reported)"][0]
 
 
 def test_no_stale_identifier_in_the_package() -> None:
-    """No module but ``identifiers`` holds a v1 or v2 id as a name or a string constant.
+    """No module but ``identifiers`` holds a v1 or v2 id as a name or a string
+    constant.
 
-    Reference: the ROADMAP grep of WU-0002.2 (``H1e|H1f|H2f|H3d|T1``, ``h1e_|h1f_``), done on the
-    syntax tree (names, attributes, function and argument names, string constants including
-    docstrings). Every string constant that is exactly an identifier (``H1a`` ... ``Q-N``, ``T1``)
-    must be a ``key`` of the table.
+    Why: an old identifier left in the code would silently label a result with a
+    retired hypothesis name.
+
+    Reference: the ROADMAP grep of WU-0002.2 (``H1e|H1f|H2f|H3d|T1``,
+    ``h1e_|h1f_``), done on the syntax tree (names, attributes, function and
+    argument names, string constants including docstrings). Every string
+    constant that is exactly an identifier (``H1a`` ... ``Q-N``, ``T1``) must be
+    a ``key`` of the table. Stale ids match as whole tokens (``STALE_ID``; the
+    cases below pin what it flags), so a timestamp such as ``20261011T165447Z``
+    is not a stale ``T1``.
     """
     keys = {h.key for h in HYPOTHESIS_TABLE}
-    stale = re.compile(r"H1e|H1f|H2f|H3d|T1|h1e_|h1f_")
+    stale = STALE_ID
     exact = re.compile(r"^(H\d[a-f]|Q-N|T1)$")
     found = []
     for path in sorted(PACKAGE.glob("*.py")):
@@ -154,18 +254,199 @@ def test_no_stale_identifier_in_the_package() -> None:
                 names.append(node.value)
                 if exact.match(node.value) and node.value not in keys:
                     found.append((path.name, "not a table key", node.value))
-            found += [(path.name, "stale", n[:60]) for n in names if stale.search(n)]
+            found += [
+                (path.name, "stale", n[:60]) for n in names if stale.search(n)
+            ]
     assert found == []
 
 
 def test_check_keys_accepts_table_keys_and_refuses_stale_ids() -> None:
-    """``check_keys`` passes the 14 table keys, V7 and ordinary keys; it raises on v1/v2 ids.
+    """``check_keys`` passes the table keys and ordinary keys, and raises on
+    v1/v2 ids.
 
-    Reference: the decision-log map. The ids that left the code are the v1/v2 ids that are not
-    v3 keys: H1e, H1f, H2f, H3d, T1 (and a made-up H9f of the same shape). Exact: ``ValueError`` naming the keys.
+    It accepts the 14 table keys, ``V7`` and ordinary keys.
+
+    Reference: the decision-log map. The ids that left the code are the v1/v2
+    ids that are not v3 keys: H1e, H1f, H2f, H3d, T1 (and a made-up H9f of the
+    same shape). Tolerance: none (exact): ``ValueError`` naming the keys.
     """
-    fine = {h.key: 1 for h in HYPOTHESIS_TABLE} | {"V7": 1, "scores": 2, "H2a_median_range": 3}
+    fine = {h.key: 1 for h in HYPOTHESIS_TABLE} | {
+        "V7": 1,
+        "scores": 2,
+        "H2a_median_range": 3,
+    }
     check_keys(fine)
     for stale in ("H1e", "H1f", "H2f", "H3d", "T1", "H9f"):
         with pytest.raises(ValueError, match=stale):
             check_keys({"H1a": 1, stale: 2})
+
+
+def test_declarations_cover_the_table_keys_with_nonempty_fields() -> None:
+    """``QOI_DECLARATIONS`` has exactly the table keys, each with five non-empty
+    fields (Q1).
+
+    The fields are the ones listed in ``QOI_FIELDS``.
+
+    Reference: ``HYPOTHESIS_TABLE`` (the keys) and NVVUQ.3 (definition, units
+    and conventions, error that would change a decision, decision informed; the
+    criterion is the table's own text) with the status of NVVUQ.22. Tolerance:
+    none (exact set and string checks).
+    """
+    assert set(QOI_DECLARATIONS) == {row.key for row in HYPOTHESIS_TABLE}
+    assert len(QOI_DECLARATIONS) == 14
+    assert QOI_FIELDS == (
+        "definition",
+        "units",
+        "decision_error",
+        "decision",
+        "status",
+    )
+    for key, declared in QOI_DECLARATIONS.items():
+        assert set(declared) == set(QOI_FIELDS), key
+        assert all(text.strip() for text in declared.values()), key
+
+
+# (text, is_flagged). Hand-written: a standalone token IS flagged; the same
+# letters inside a longer alphanumeric token (a timestamp, a longer word) are
+# not.
+STALE_CASES = [
+    ("T1", True),
+    (" T1 ", True),
+    ("T1,", True),
+    ("(T1)", True),
+    ("inventory row T1", True),
+    ("kaplan_meier T1", True),
+    ("kaplan_meier_T1", True),
+    ("H1e", True),
+    ("H1f", True),
+    ("H2f", True),
+    ("H3d", True),
+    ("H3d_median", True),
+    ("use H2f.", True),
+    ("h1e_x", True),
+    ("h1f_y", True),
+    ("key=H1e;", True),
+    ("20261011T165447Z", False),
+    ("slow-20261011T165447Z.log", False),
+    ("xT1", False),
+    ("T10", False),
+    ("kaplan_meierT1", False),
+    ("H1ex", False),
+    ("ABH3d", False),
+    ("H2a", False),
+    ("H1a", False),
+    ("kaplan_meier", False),
+    ("", False),
+]
+
+
+def token_reference(text: str) -> bool:
+    """Say whether a text holds a stale id, by a rule that shares no code with
+    ``STALE_ID``.
+
+    The rule splits the text into alphanumeric tokens and looks for a stale id
+    among them, or for one of the two lowercase prefixes.
+    """
+    stale_ids = {"H1e", "H1f", "H2f", "H3d", "T1"}
+    return (
+        any(token in stale_ids for token in re.findall(r"[A-Za-z0-9]+", text))
+        or "h1e_" in text
+        or "h1f_" in text
+    )
+
+
+def test_stale_id_regex_matches_whole_tokens_only() -> None:
+    """S1: ``STALE_ID`` flags a standalone stale id, not the same letters inside
+    a longer token.
+
+    Reference: the hand-written ``STALE_CASES`` (a timestamp
+    ``20261011T165447Z`` is not ``T1``; a standalone ``T1`` is, including
+    ``kaplan_meier T1``), and ``token_reference``, a token split on
+    non-alphanumerics that shares no code with the regex. Tolerance: none (exact
+    booleans). This corrects a false positive (DEC-0026 item 7); it does not
+    loosen what the test is for.
+    """
+    for text, flagged in STALE_CASES:
+        assert bool(STALE_ID.search(text)) is flagged, text
+        assert token_reference(text) is flagged, text
+
+
+def test_stale_id_regex_loses_nothing_real() -> None:
+    """S2: every stale id the old regex flagged in a real context is still
+    flagged.
+
+    Reference: the v1/v2 ids of the decision-log correction (H1e, H1f, H2f, H3d,
+    T1) and the two lowercase prefixes, each in the contexts the package can
+    hold (a bare string, a docstring phrase, a dict key, a function-name stem, a
+    trailing punctuation mark). The two regexes may differ only on a string
+    whose old match lay inside a longer alphanumeric token: on the case table
+    the difference is exactly the strings below. Tolerance: none (exact sets).
+    """
+    real = []
+    for ident in ("H1e", "H1f", "H2f", "H3d", "T1"):
+        real += [
+            ident,
+            f" {ident} ",
+            f"{ident}.",
+            f"({ident})",
+            f"row {ident}, per v1",
+            f"{ident}_median",
+            f"'{ident}'",
+            f"{ident}\n",
+        ]
+    real += ["h1e_ratio", "h1f_slope", "def h1e_check", "x.h1f_"]
+    for text in real:
+        assert OLD_STALE_ID.search(text) and STALE_ID.search(text), text
+    texts = [text for text, _ in STALE_CASES] + real
+    differing = {
+        t
+        for t in texts
+        if bool(OLD_STALE_ID.search(t)) != bool(STALE_ID.search(t))
+    }
+    assert differing == {
+        "20261011T165447Z",
+        "slow-20261011T165447Z.log",
+        "xT1",
+        "T10",
+        "kaplan_meierT1",
+        "H1ex",
+        "ABH3d",
+    }
+    assert all(
+        not STALE_ID.search(t) and OLD_STALE_ID.search(t) for t in differing
+    )
+
+
+def test_stale_id_regex_mutants_are_caught() -> None:
+    """S3: a weakened or over-tightened ``STALE_ID`` gives a wrong verdict on
+    the case table.
+
+    Reference: ``STALE_CASES``. Each mutant is built from ``STALE_ID.pattern``
+    by one edit: drop the lookbehind, drop the lookahead, drop the ``T1`` or the
+    ``H3d`` alternative, drop the ``h1f_`` prefix, or require whitespace
+    boundaries. Expected: the mutant text differs from the pattern (the edit
+    applied) and at least one case gets a verdict other than the hand-written
+    one, so the table fails if the regex is changed in any of these ways.
+    Tolerance: none (exact).
+    """
+    pattern = STALE_ID.pattern
+    mutants = {
+        "no lookbehind": pattern.replace("(?<![A-Za-z0-9])", ""),
+        "no lookahead": pattern.replace("(?![A-Za-z0-9])", ""),
+        "no T1": pattern.replace("|T1", ""),
+        "no H3d": pattern.replace("|H3d", ""),
+        "no h1f_ prefix": pattern.replace("|h1f_", ""),
+        "whitespace boundaries": pattern.replace(
+            "(?<![A-Za-z0-9])",
+            r"(?<!\S)",
+        ).replace("(?![A-Za-z0-9])", r"(?!\S)"),
+    }
+    for name, text in mutants.items():
+        assert text != pattern, name
+        regex = re.compile(text)
+        wrong = [
+            case
+            for case, flagged in STALE_CASES
+            if bool(regex.search(case)) is not flagged
+        ]
+        assert wrong, f"mutant '{name}' passes the case table"

@@ -1,0 +1,30 @@
+P0 lorenz63  h50/h200/h800 = 0.0726/0.0370/0.0206 (obs. order in M: 0.49, 0.42); hw pilot 0.0371, full 0.0266
+   M=200: F1 = 0.0320 = 0.86 hw_pilot = 1.20 hw_full; L2/M = 0.5000
+   M=300: F1 = 0.0261 = 0.70 hw_pilot = 0.98 hw_full; L2/M = 0.3333
+   M=399: F1 = 0.0226 = 0.61 hw_pilot = 0.85 hw_full; L2/M = 0.2506
+   M needed for F1 < 0.1 hw_full: 28,868
+P0 rossler   h50/h200/h800 = 0.0731/0.0390/0.0214 (obs. order in M: 0.45, 0.43); hw pilot 0.0596, full 0.0427
+   M=200: F1 = 0.0337 = 0.57 hw_pilot = 0.79 hw_full; L2/M = 0.5000
+   M=300: F1 = 0.0275 = 0.46 hw_pilot = 0.64 hw_full; L2/M = 0.3333
+   M=399: F1 = 0.0239 = 0.40 hw_pilot = 0.56 hw_full; L2/M = 0.2506
+   M needed for F1 < 0.1 hw_full: 12,432
+P0 chua      h50/h200/h800 = 0.0549/0.0308/0.0145 (obs. order in M: 0.42, 0.54); hw pilot 0.0611, full 0.0438
+   M=200: F1 = 0.0266 = 0.43 hw_pilot = 0.61 hw_full; L2/M = 0.5000
+   M=300: F1 = 0.0217 = 0.36 hw_pilot = 0.50 hw_full; L2/M = 0.3333
+   M=399: F1 = 0.0188 = 0.31 hw_pilot = 0.43 hw_full; L2/M = 0.2506
+   M needed for F1 < 0.1 hw_full: 7,357
+P1 lorenz63  h50/h200/h800 = 0.0308/0.0187/0.0114 (obs. order in M: 0.36, 0.35); hw pilot 0.0420, full 0.0301
+   M=200: F1 = 0.0161 = 0.38 hw_pilot = 0.54 hw_full; L2/M = 0.5000
+   M=300: F1 = 0.0132 = 0.31 hw_pilot = 0.44 hw_full; L2/M = 0.3333
+   M=399: F1 = 0.0114 = 0.27 hw_pilot = 0.38 hw_full; L2/M = 0.2506
+   M needed for F1 < 0.1 hw_full: 5,739
+P1 rossler   h50/h200/h800 = 0.0546/0.0334/0.0211 (obs. order in M: 0.36, 0.33); hw pilot 0.0449, full 0.0322
+   M=200: F1 = 0.0288 = 0.64 hw_pilot = 0.90 hw_full; L2/M = 0.5000
+   M=300: F1 = 0.0235 = 0.52 hw_pilot = 0.73 hw_full; L2/M = 0.3333
+   M=399: F1 = 0.0204 = 0.45 hw_pilot = 0.63 hw_full; L2/M = 0.2506
+   M needed for F1 < 0.1 hw_full: 16,032
+P1 chua      h50/h200/h800 = 0.0632/0.0420/0.0196 (obs. order in M: 0.30, 0.55); hw pilot 0.0519, full 0.0372
+   M=200: F1 = 0.0362 = 0.70 hw_pilot = 0.97 hw_full; L2/M = 0.5000
+   M=300: F1 = 0.0296 = 0.57 hw_pilot = 0.79 hw_full; L2/M = 0.3333
+   M=399: F1 = 0.0257 = 0.49 hw_pilot = 0.69 hw_full; L2/M = 0.2506
+   M needed for F1 < 0.1 hw_full: 18,955

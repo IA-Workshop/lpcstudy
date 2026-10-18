@@ -1,0 +1,39 @@
+exit code: 2
+--- stdout ---
+DEVELOPMENT (DEV-0): conditional on one realization; not a hypothesis test
+rehearsal_diagnostics (WU-0003.8): D1 to D6; needs owner review before freeze (statistics feeding the block-length and M decisions)
+NOTICE: every reading below is computed with tool seed 20261018 (a literal scratch seed, not a development or confirmatory seed), 100 bootstrap resamples and 50 permutations -- NON-DEFAULT OPTIONS (defaults: seed 20261018, 2000, 1000). Rerunning with other --seed, --resamples or --permutations to change a reading is not allowed; the seed and the options are an owner question (review R9).
+run: <ROOT>/tests/unit/fixtures/rehearsal_report/p0_pilot.json; preset pilot; commit 1b20db9b2b7e1e6034f6aef3c8d7373eb67e3ce0
+Analysis stack against the run's provenance (a7): DIFFERENT stack (fit-derived leaves: within 4e-5 s is not computable, beyond is a MISMATCH)
+  python: <values>: unusable
+  packages.numpy: <values>: unusable
+  packages.scipy: <values>: unusable
+  cpu.model: <values>: unusable
+  cpu.isa: <values>: unusable
+  blas.libraries: <values>: unusable
+  numpy_simd.found: <values>: unusable
+  env.OPENBLAS_CORETYPE: <values>: unusable
+  env.NPY_DISABLE_CPU_FEATURES: <values>: unusable
+
+=== lorenz63 ===
+C4 Levenberg-Marquardt readings, lorenz63 (bands of note M6; a value outside is a FINDING, not a failure)
+  not computable: lorenz63 C4: results leaf handling/cells is absent
+  not computable: lorenz63 (D1 to D6): <ROOT>/tests/unit/fixtures/rehearsal_report/states/lorenz63.npz not found (run without --states-dump?)
+
+=== rossler ===
+C4 Levenberg-Marquardt readings, rossler (bands of note M6; a value outside is a FINDING, not a failure)
+  not computable: rossler C4: results leaf handling/cells is absent
+  not computable: rossler (D1 to D6): <ROOT>/tests/unit/fixtures/rehearsal_report/states/rossler.npz not found (run without --states-dump?)
+
+=== chua ===
+C4 Levenberg-Marquardt readings, chua (bands of note M6; a value outside is a FINDING, not a failure)
+  not computable: chua C4: results leaf handling/cells is absent
+  not computable: chua (D1 to D6): <ROOT>/tests/unit/fixtures/rehearsal_report/states/chua.npz not found (run without --states-dump?)
+
+Run level (all systems)
+  not computable: run-level D1 and D2: no series had an autocorrelation
+
+Summary
+  not computable: 7 item(s) (listed above); never skipped
+  NON-DEFAULT OPTION: seed 20261018, resamples 100, permutations 50 (defaults 20261018, 2000, 1000); this report is not the rehearsal record (plan amendment 5, E8)
+--- stderr ---

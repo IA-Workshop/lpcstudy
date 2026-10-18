@@ -1,34 +1,57 @@
 #!/usr/bin/env bash
-# Run an lpcstudy preset on a registered DEVELOPMENT seed under the limits of LPC.AUTH.3.
+# Start a study run (a "preset") safely, on a registered DEVELOPMENT seed, within the limits
+# of LPC.AUTH.3 (the rules on compute use).
+#
+# Why this script exists: a study run can take hours and may use the one shared GPU, and
+# the sealed seed must never be touched by an agent. So every run goes through here. The
+# script checks the seed, takes the GPU lock, checks the weekly GPU-hour budget, starts the
+# run, and records who ran what and when in a small file, run.meta.json.
 #
 # Usage: tools/run_preset.sh <preset> <seed-id> <out-dir> [--device cpu|gpu]
-#                            [--systems S...] [--skip-robustness]
+#                            [--systems S...] [--skip-robustness] [--estimator-refine-steps N]
+#                            [--states-dump]
 #
 #   preset   smoke | pilot | full
 #   seed-id  a DEV-n id listed in seeds/development_seeds.json (never a raw integer)
 #   out-dir  must lie under <repo>/runs/, so that the weekly GPU tally sees every run
 #
 # Refusals (exit 64, one line on stderr, nothing started): any argument containing
-# "confirmatory" (any case), a raw integer seed, an id not in the registry (or a registry with
-# another schema), an unknown preset or argument, an out-dir outside runs/, an existing
-# <out-dir>/<preset>/run.meta.json (it would erase GPU hours), or a seed the CLI cannot take.
+# "confirmatory" (any letter case), a raw integer seed, an id not in the registry (or a
+# registry with another schema), an unknown preset or argument, an out-dir outside runs/, an
+# existing <out-dir>/<preset>/run.meta.json (it would erase GPU hours), or a seed the command
+# line cannot take.
+# --estimator-refine-steps N (WU-0005.6, the iteration-doubling study) is passed to the study
+# command as it is: N is a canonical decimal integer from 1 to 999 (no sign, no leading zero),
+# given once, else the wrapper refuses before the lock. The study command itself refuses it
+# together with the sealed-run flag, which this wrapper never accepts. The meta file records it
+# in "command".
+# --states-dump (WU-0003.7b, WU-0003.11: the per-state dump of the rehearsal runs R1 and R5) is a
+# bare flag, given once and passed to the study command unchanged; with an argument
+# (--states-dump X, or --states-dump=X) or given twice the wrapper refuses before the lock. The
+# study command itself refuses it together with the sealed-run flag (which this wrapper never
+# accepts) and with --report-only (which this wrapper never passes). The meta file records it in
+# "command". Nothing else changes with it.
 #
 # Device: cpu for smoke, gpu for pilot and full (JAX_PLATFORMS cpu or cuda); thread variables
-# are set from LPC_THREADS (1..99, default 4); XLA_PYTHON_CLIENT_PREALLOCATE=false.
+# are set from LPC_THREADS (1..99, default 4), as are PJRT_NPROC and NPROC (the XLA CPU thread
+# pools); XLA_PYTHON_CLIENT_PREALLOCATE=false. XLA_FLAGS is never set or altered.
 # Lock: pilot, full and any gpu run take `flock -n` on ${LPC_GPU_LOCK:-/tmp/lpcstudy-gpu.lock} at
-# once (exit 75 if held, never wait). A smoke run on CPU takes no lock (4.5).
+# once (exit 75 if held, never wait). A smoke run on CPU takes no lock (section 4.5).
 # Tally: pilot, full and any gpu run call `python3 -I tools/gpu_hours.py check --hours H` while
-# holding the lock (H = 12 for gpu, 0 for cpu); exit 64 or 65 is propagated, any other failure
-# or a missing tool gives 65 (fail closed).
-# Seed: the CLI is probed with `--help`. If it has --seed-id the flag is passed. If not, only
-# DEV-0 runs (the CLI default 20261005 is the registry's DEV-0), with a note; any other id is
-# refused (needs --seed-id, WU-0001.1).
-# Meta: <out-dir>/<preset>/run.meta.json (schema lpcstudy.run-meta/1) is written atomically at
-# the start (end_utc, wall_seconds, exit_code null) and again at the end.
+# holding the lock (H = 12 for gpu, 0 for cpu); exit 64 or 65 is passed on, any other failure
+# or a missing tool gives 65 (fail closed: if the check cannot be made, the run is refused).
+# Seed: the study command is probed with `--help`. If it has --seed-id the flag is passed. If
+# not, only DEV-0 runs (the command's default 20261005 is the registry's DEV-0), with a note;
+# any other id is refused (needs --seed-id, WU-0001.1).
+# Meta: <out-dir>/<preset>/run.meta.json (schema lpcstudy.run-meta/1) is written atomically (a
+# temporary file, then a replace) at the start (end_utc, wall_seconds, exit_code null) and
+# again at the end.
 # Run: `timeout --kill-after=300 12h <python> -m lpcstudy --preset P --out OUT [...]`. Smoke runs
-# in the foreground and returns the CLI's exit code. Pilot and full always start in the
-# background (a subshell that ignores SIGHUP, console.log) and print "started pid=... console=... run_log=... meta=...".
-# Exit codes: 64 refusal, 65 weekly GPU hours (or tally failure), 75 lock busy, else the CLI's.
+# in the foreground and returns the study command's exit code. Pilot and full always start in
+# the background (a subshell that ignores SIGHUP like nohup, console.log) and print
+# "started pid=... console=... run_log=... meta=...".
+# Exit codes: 64 refusal, 65 weekly GPU hours (or tally failure), 75 lock busy, else the study
+# command's.
 # LPC_PYTHON selects the interpreter (else <root>/.venv/bin/python, else python3).
 
 set -u
@@ -128,7 +151,7 @@ for arg in "$@"; do
     [[ "$lower" != *confirmatory* ]] || refuse "an argument names the confirmatory path, which is owner-only (LPC.PC.7)"
 done
 
-[ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-robustness]"
+[ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-robustness] [--estimator-refine-steps N] [--states-dump]"
 preset="$1"
 seed="$2"
 out_arg="$3"
@@ -137,6 +160,8 @@ shift 3
 device=""
 systems=()
 passthrough=()
+refine_given=0
+dump_given=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --device)
@@ -158,6 +183,22 @@ while [ "$#" -gt 0 ]; do
             passthrough+=("$1")
             shift
             ;;
+        --estimator-refine-steps)
+            [ "$refine_given" = 0 ] || refuse "--estimator-refine-steps is given twice"
+            [ "$#" -ge 2 ] && [[ "$2" =~ ^[1-9][0-9]{0,2}$ ]] || refuse "--estimator-refine-steps needs an integer from 1 to 999"
+            refine_given=1
+            passthrough+=("$1" "$2")
+            shift 2
+            ;;
+        --states-dump)
+            [ "$dump_given" = 0 ] || refuse "--states-dump is given twice"
+            dump_given=1
+            shift
+            # A bare flag: a following word that is not another option is an argument (refused).
+            [ "$#" -eq 0 ] || [[ "$1" == --* ]] || refuse "--states-dump takes no argument"
+            passthrough+=(--states-dump)
+            ;;
+        --states-dump=*) refuse "--states-dump takes no argument" ;;
         *) refuse "unexpected argument ${1@Q}" ;;
     esac
 done
@@ -214,6 +255,13 @@ fi
 
 cd "$root" || exit 64
 export OMP_NUM_THREADS="$threads" MKL_NUM_THREADS="$threads" OPENBLAS_NUM_THREADS="$threads"
+# LPC_THREADS itself is exported too: the run provenance records it, and compare_runs needs it
+# to tell tier T0 from T1 (a shell without it gave tier "undetermined").
+export LPC_THREADS="$threads"
+# XLA's CPU client sizes its thread pools from PJRT_NPROC, then NPROC (plain environment variables
+# read by getenv, not XLA flags, so they cannot abort XLA); unset it uses every schedulable CPU.
+# Verified for jaxlib 0.11.2 in WU-0012.4. Never put a thread cap in XLA_FLAGS: an unknown entry aborts.
+export PJRT_NPROC="$threads" NPROC="$threads"
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 # Lock first (cheap, exit 75 at once), then the tally while holding it, then the probe.

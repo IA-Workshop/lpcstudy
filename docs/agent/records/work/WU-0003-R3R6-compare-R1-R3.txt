@@ -1,0 +1,382 @@
+DEVELOPMENT: comparison of two runs, not a hypothesis test
+NOTE: needs owner review before freeze (tolerance and verdict-comparison code; CSQ2 use in WU-0016)
+REF: /home/brianm/projects/physics/chaos/lpcstudy-wt/run/r1-c9bb981/runs/r1-gpu-dev1/pilot
+NEW: runs/r3-cpu-dev1/pilot
+tier: TD (chua/state_mean_digest differs; chua/lambda_max differs; chua/interval differs; chua/start_state/main differs; chua/start_state/estimator differs; chua/main_digest differs; chua/estimator_digest differs; lorenz63/state_mean_digest differs; lorenz63/lambda_max differs; lorenz63/interval differs; lorenz63/start_state/main differs; lorenz63/start_state/estimator differs; lorenz63/main_digest differs; lorenz63/estimator_digest differs; rossler/state_mean_digest differs; rossler/lambda_max differs; rossler/interval differs; rossler/start_state/main differs; rossler/start_state/estimator differs; rossler/main_digest differs; rossler/estimator_digest differs)
+  evidence chua/state_mean_digest: differs
+  evidence chua/lambda_max: differs
+  evidence chua/interval: differs
+  evidence chua/start_state/main: differs
+  evidence chua/start_state/estimator: differs
+  evidence chua/main_digest: differs
+  evidence chua/estimator_digest: differs
+  evidence chua/cov_digest: differs
+  evidence chua/whiten_digest: differs
+  evidence chua/unwhiten_digest: differs
+  evidence chua/allocator_digest: differs
+  evidence chua/validation_weights: differs
+  evidence lorenz63/state_mean_digest: differs
+  evidence lorenz63/lambda_max: differs
+  evidence lorenz63/interval: differs
+  evidence lorenz63/start_state/main: differs
+  evidence lorenz63/start_state/estimator: differs
+  evidence lorenz63/main_digest: differs
+  evidence lorenz63/estimator_digest: differs
+  evidence lorenz63/cov_digest: differs
+  evidence lorenz63/whiten_digest: differs
+  evidence lorenz63/unwhiten_digest: differs
+  evidence lorenz63/allocator_digest: differs
+  evidence lorenz63/validation_weights: differs
+  evidence rossler/state_mean_digest: differs
+  evidence rossler/lambda_max: differs
+  evidence rossler/interval: differs
+  evidence rossler/start_state/main: differs
+  evidence rossler/start_state/estimator: differs
+  evidence rossler/main_digest: differs
+  evidence rossler/estimator_digest: differs
+  evidence rossler/cov_digest: differs
+  evidence rossler/whiten_digest: differs
+  evidence rossler/unwhiten_digest: differs
+  evidence rossler/allocator_digest: differs
+  evidence rossler/validation_weights: differs
+  evidence (top level)/estimators/*/weights_digest: differs
+  TD between two devices triggers O4 (owner choice of confirmatory device)
+leaves: REF 20533, NEW 20521, union 20545, common 20509, equal 10158, different 10351, one-sided 36
+excluded (ref): provenance 149 leaves, timing 23 leaves
+excluded (new): provenance 147 leaves, timing 23 leaves
+chain tags of the float leaves (config included; untagged leaves are NOT COMPUTABLE, exit 2): REF: compare_pilot table 8127, tightened 3, override 2841, untagged 0; NEW: compare_pilot table 8125, tightened 3, override 2837, untagged 0
+  override handling/robustness/*/cells/*/lm/by_kind/*/fraction_above_chi2: chain network, 19 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override handling/robustness/*/cells/*/lm/by_kind/*/fraction_late_progress: chain network, 19 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override handling/robustness/*/cells/*/lm/by_kind/*/fraction_no_decrease: chain network, 4 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override handling/robustness/*/cells/*/lm/by_kind/*/median_residual: chain network, 20 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override handling/robustness/*/cells/*/lm/by_kind/*/p95_residual: chain network, 20 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override handling/robustness/*/cells/*/lm/fraction_above_chi2: chain network, 10 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override handling/robustness/*/cells/*/lm/fraction_late_progress: chain network, 10 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override handling/robustness/*/cells/*/lm/fraction_no_decrease: chain network, 4 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override handling/robustness/*/cells/*/lm/median_residual: chain network, 10 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override handling/robustness/*/cells/*/lm/p95_residual: chain network, 10 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override robustness/*/*/H2a_partial_corr_interior: chain network, 12 differing leaves; reason: experiments.py:_variant_summary and _perturbation_scale_variant: analysis.py:h2a_part_ii on w* and the PLP seed (w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator))
+  override robustness/*/*/H2a_partial_corr_interior_fin: chain network, 4 differing leaves; reason: experiments.py:_variant_summary and _perturbation_scale_variant: analysis.py:h2a_part_ii on w* and the PLP seed (w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator))
+  override robustness/*/*/H2a_partial_corr_zero: chain network, 12 differing leaves; reason: experiments.py:_variant_summary and _perturbation_scale_variant: analysis.py:h2a_part_ii on w* and the PLP seed (w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator))
+  override robustness/*/*/H2a_partial_corr_zero_fin: chain network, 4 differing leaves; reason: experiments.py:_variant_summary and _perturbation_scale_variant: analysis.py:h2a_part_ii on w* and the PLP seed (w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator))
+  override robustness/*/*/ci_interior/[]: chain network, 8 differing leaves; reason: experiments.py:_variant_summary and _perturbation_scale_variant: analysis.py:h2a_part_ii on w* and the PLP seed (w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator))
+  override robustness/*/*/ci_zero/[]: chain network, 8 differing leaves; reason: experiments.py:_variant_summary and _perturbation_scale_variant: analysis.py:h2a_part_ii on w* and the PLP seed (w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator))
+  override systems/*/H1a/by_noise/*/median_seed_by_n_lib/*: chain cp, 30 differing leaves; reason: analysis.py:h1a_library_scaling: direct arithmetic (a median, a mean of log ratios) on the CP seed errors (ensemble.py:forecast_draws analog_seed: analog retrieval against the true states, no estimator) and on the oracle local dimension (oracle.py:local_dimension_counted); adopted tightening of note 2026-10-14-math-wu0003-9-q1 section Q1.4
+  override systems/*/H1a/by_noise/*/ratio: chain cp, 6 differing leaves; reason: analysis.py:_median_fit_stats via h1a_library_scaling: depends on the CP seed errors and the oracle local dimension only (cp). It is an output of the tolerance-stopped curve_fit, like the four sibling fit leaves, so cp 1e-12 may fail on correct code at a T2 pair: OF-7 (not adopted; working default cp 1e-12 with the pointer to note 2026-10-14-math-wu0003-9-q1, which also covers these two leaves)
+  override systems/*/H1a/by_noise/*/ratio_ci/[]: chain cp, 12 differing leaves; reason: analysis.py:_median_fit_stats via h1a_library_scaling: depends on the CP seed errors and the oracle local dimension only (cp). It is an output of the tolerance-stopped curve_fit, like the four sibling fit leaves, so cp 1e-12 may fail on correct code at a T2 pair: OF-7 (not adopted; working default cp 1e-12 with the pointer to note 2026-10-14-math-wu0003-9-q1, which also covers these two leaves)
+  override systems/*/H1a/inverse_dim_reference: chain cp, 3 differing leaves; reason: analysis.py:h1a_library_scaling: direct arithmetic (a median, a mean of log ratios) on the CP seed errors (ensemble.py:forecast_draws analog_seed: analog retrieval against the true states, no estimator) and on the oracle local dimension (oracle.py:local_dimension_counted); adopted tightening of note 2026-10-14-math-wu0003-9-q1 section Q1.4
+  override systems/*/H1d/rows/analog_seed/interval/[]: chain network, 6 differing leaves; reason: analysis.py:h1d_proxies: the proxies come from allocation.py:ProfileProxies.fit on the estimated nu and the model growth at the estimated state (ensemble.py:evaluation_draws est_nu, growth_proxy)
+  override systems/*/H1d/rows/estimation_seed/interval/[]: chain network, 6 differing leaves; reason: analysis.py:h1d_proxies: the proxies come from allocation.py:ProfileProxies.fit on the estimated nu and the model growth at the estimated state (ensemble.py:evaluation_draws est_nu, growth_proxy)
+  override systems/*/H1d/rows/growth/interval/[]: chain network, 6 differing leaves; reason: analysis.py:h1d_proxies: the proxies come from allocation.py:ProfileProxies.fit on the estimated nu and the model growth at the estimated state (ensemble.py:evaluation_draws est_nu, growth_proxy)
+  override systems/*/H1d/rows/nhat/interval/[]: chain cp, 6 differing leaves; reason: analysis.py:h1d_proxies: the pair (nhat, N) is ev.noise_sens against moments.noise_sens, both from analog retrieval on the noisy library (ensemble.py:evaluation_draws, ensemble_moments, retrieval_spread): no estimator and no PLP; the bootstrap is analysis.py:h1d_correlations. The sibling rows/nhat/spearman is tagged network in compare_pilot (looser than this leaf)
+  override systems/*/H2a/ci_mc_se/[]: chain network, 6 differing leaves; reason: analysis.py:h2a_initial_segments and h2a_part_ii: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), and the PLP seed est_seed (ci_mc_se: statistics.py:endpoint_mc_error of the same bootstrap values)
+  override systems/*/H2a/complete_case/median_range: chain network, 3 differing leaves; reason: analysis.py:h2a_initial_segments and h2a_part_ii: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), and the PLP seed est_seed (ci_mc_se: statistics.py:endpoint_mc_error of the same bootstrap values)
+  override systems/*/H2a/complete_case/range_ci/[]: chain network, 6 differing leaves; reason: analysis.py:h2a_initial_segments and h2a_part_ii: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), and the PLP seed est_seed (ci_mc_se: statistics.py:endpoint_mc_error of the same bootstrap values)
+  override systems/*/H2a/part_ii/*/ci/[]: chain network, 12 differing leaves; reason: analysis.py:h2a_initial_segments and h2a_part_ii: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), and the PLP seed est_seed (ci_mc_se: statistics.py:endpoint_mc_error of the same bootstrap values)
+  override systems/*/H2a/part_ii/*/ci_mc_se/[]: chain network, 12 differing leaves; reason: analysis.py:h2a_initial_segments and h2a_part_ii: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), and the PLP seed est_seed (ci_mc_se: statistics.py:endpoint_mc_error of the same bootstrap values)
+  override systems/*/H2a/part_ii/*/partial_corr: chain network, 6 differing leaves; reason: analysis.py:h2a_initial_segments and h2a_part_ii: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), and the PLP seed est_seed (ci_mc_se: statistics.py:endpoint_mc_error of the same bootstrap values)
+  override systems/*/H2a/range_by_span/*/median: chain network, 6 differing leaves; reason: analysis.py:h2a_initial_segments and h2a_part_ii: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), and the PLP seed est_seed (ci_mc_se: statistics.py:endpoint_mc_error of the same bootstrap values)
+  override systems/*/H2a/range_ci/[]: chain network, 6 differing leaves; reason: analysis.py:h2a_initial_segments and h2a_part_ii: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), and the PLP seed est_seed (ci_mc_se: statistics.py:endpoint_mc_error of the same bootstrap values)
+  override systems/*/H2b/library_change/ci/[]: chain network, 6 differing leaves; reason: analysis.py:h2b_knob_response: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/H2b/library_change/ci_mc_se/[]: chain network, 6 differing leaves; reason: analysis.py:h2b_knob_response: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/H2b/library_change/mean_change: chain network, 3 differing leaves; reason: analysis.py:h2b_knob_response: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/H2b/library_change_reported/*/ci/[]: chain network, 6 differing leaves; reason: analysis.py:h2b_knob_response: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/H2b/library_change_reported/*/mean_change: chain network, 3 differing leaves; reason: analysis.py:h2b_knob_response: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/H2b/library_curves/*/*/mean: chain network, 30 differing leaves; reason: analysis.py:h2b_knob_response: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/H2b/library_curves/*/*/mean_ci/[]: chain network, 60 differing leaves; reason: analysis.py:h2b_knob_response: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/H2b/library_curves/*/*/median: chain network, 30 differing leaves; reason: analysis.py:h2b_knob_response: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/H2b/library_curves/*/*/median_ci/[]: chain network, 60 differing leaves; reason: analysis.py:h2b_knob_response: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/H2b/noise/ci_mc_se/[]: chain network, 6 differing leaves; reason: analysis.py:h2b_knob_response: w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/H2c/A4o_minus_A2/ci/[]: chain network, 6 differing leaves; reason: analysis.py:h2c_state_dependence: per-state MSE at H_ref of A4 and A4o (closed-form weights from the fitted proxies and from est_seed) against A2 or a single forecaster (pipeline.py:score_rules); calibration_mse/A1 is the mean of evals.plp_err**2 (PLP)
+  override systems/*/H2c/A4o_minus_A2/mean: chain network, 3 differing leaves; reason: analysis.py:h2c_state_dependence: per-state MSE at H_ref of A4 and A4o (closed-form weights from the fitted proxies and from est_seed) against A2 or a single forecaster (pipeline.py:score_rules); calibration_mse/A1 is the mean of evals.plp_err**2 (PLP)
+  override systems/*/H2c/A4o_minus_A2/relative: chain network, 3 differing leaves; reason: analysis.py:h2c_state_dependence: per-state MSE at H_ref of A4 and A4o (closed-form weights from the fitted proxies and from est_seed) against A2 or a single forecaster (pipeline.py:score_rules); calibration_mse/A1 is the mean of evals.plp_err**2 (PLP)
+  override systems/*/H2c/calibration_mse/A0: chain cp, 3 differing leaves; reason: analysis.py:h2c_state_dependence: mean of evals.cp_err**2 at H_ref on the calibration split (ensemble.py:forecast_draws cp_err: analog retrieval, no estimator)
+  override systems/*/H2c/calibration_mse/A1: chain network, 3 differing leaves; reason: analysis.py:h2c_state_dependence: per-state MSE at H_ref of A4 and A4o (closed-form weights from the fitted proxies and from est_seed) against A2 or a single forecaster (pipeline.py:score_rules); calibration_mse/A1 is the mean of evals.plp_err**2 (PLP)
+  override systems/*/H2e/by_noise/*/ci/[]: chain network, 12 differing leaves; reason: analysis.py:h2e_noise_matching: the CP-PLP error correlation over the oracle draws (ensemble.py:draw_correlation of cp_err and plp_err)
+  override systems/*/H2e/by_noise/*/median_change: chain network, 6 differing leaves; reason: analysis.py:h2e_noise_matching: the CP-PLP error correlation over the oracle draws (ensemble.py:draw_correlation of cp_err and plp_err)
+  override systems/*/H2e/corr_curve/*/*: chain network, 25 differing leaves; reason: analysis.py:h2e_noise_matching: the CP-PLP error correlation over the oracle draws (ensemble.py:draw_correlation of cp_err and plp_err)
+  override systems/*/H3a/iqr_lt/[]: chain network, 11 differing leaves; reason: analysis.py:h3a_logrank: regimes of the deployable profile (allocation.py:RegimeMap.assign, fitted by pipeline.py:fit_rules), realized horizons of A5 and the horizon target of the oracle hybrid (allocation.py:state_horizon_target)
+  override systems/*/H3a/logrank_p_raw/[]: chain network, 8 differing leaves; reason: analysis.py:h3a_logrank: regimes of the deployable profile (allocation.py:RegimeMap.assign, fitted by pipeline.py:fit_rules), realized horizons of A5 and the horizon target of the oracle hybrid (allocation.py:state_horizon_target)
+  override systems/*/H3b/D/ci/[]: chain network, 6 differing leaves; reason: analysis.py:h3b_importances: trees fitted on the deployable profile (proxies from the estimated nu) with targets w* and the oracle-hybrid horizon
+  override systems/*/H3b/D/value: chain network, 3 differing leaves; reason: analysis.py:h3b_importances: trees fitted on the deployable profile (proxies from the estimated nu) with targets w* and the oracle-hybrid horizon
+  override systems/*/H3b/stability: chain network, 2 differing leaves; reason: analysis.py:h3b_importances: trees fitted on the deployable profile (proxies from the estimated nu) with targets w* and the oracle-hybrid horizon
+  override systems/*/H3b/weight_lambda/ci/[]: chain network, 5 differing leaves; reason: analysis.py:h3b_importances: trees fitted on the deployable profile (proxies from the estimated nu) with targets w* and the oracle-hybrid horizon
+  override systems/*/H3b/weight_lambda/importance: chain network, 3 differing leaves; reason: analysis.py:h3b_importances: trees fitted on the deployable profile (proxies from the estimated nu) with targets w* and the oracle-hybrid horizon
+  override systems/*/H3c/ci/[]: chain network, 6 differing leaves; reason: analysis.py:h3c_ratio: ratio of the per-state MSE of A5 over A4 (pipeline.py:score_rules, PLP errors)
+  override systems/*/H3c/ci_mc_se/[]: chain network, 6 differing leaves; reason: analysis.py:h3c_ratio: ratio of the per-state MSE of A5 over A4 (pipeline.py:score_rules, PLP errors)
+  override systems/*/Q-N/deployable/logit_w_interior/ci/[]: chain network, 6 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/deployable/logit_w_interior/delta_r2: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/deployable/logit_w_interior/r2_four: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/deployable/logit_w_interior/r2_three: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/deployable/w_zero_indicator/ci/[]: chain network, 6 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/deployable/w_zero_indicator/delta_r2: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/deployable/w_zero_indicator/r2_four: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/deployable/w_zero_indicator/r2_three: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/oracle/logit_w_interior/ci/[]: chain network, 6 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/oracle/logit_w_interior/delta_r2: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/oracle/logit_w_interior/r2_four: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/oracle/logit_w_interior/r2_three: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/oracle/w_zero_indicator/ci/[]: chain network, 6 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/oracle/w_zero_indicator/delta_r2: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/oracle/w_zero_indicator/r2_four: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/oracle/w_zero_indicator/r2_three: chain network, 3 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/V7/efficiency_ci_by_noise/*/[]: chain network, 24 differing leaves; reason: analysis.py:v7_efficiency: bootstrap of the median efficiency of the PLP estimation seed (moments.est_seed: the psi state estimate)
+  override systems/*/fitted/regime_horizons_km_lyapunov/*/[]: chain network, 118 differing leaves; reason: experiments.py:fitted_record from pipeline.py:fit_rules and allocation.py:calibrate_regimes: regime weights and Kaplan-Meier horizons from the calibration moments and draws (PLP)
+  override systems/*/fitted/regime_weights_href/*/[]: chain network, 119 differing leaves; reason: experiments.py:fitted_record from pipeline.py:fit_rules and allocation.py:calibrate_regimes: regime weights and Kaplan-Meier horizons from the calibration moments and draws (PLP)
+  override systems/*/handling/cells/*/lm/by_kind/*/fraction_above_chi2: chain network, 43 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/by_kind/*/fraction_late_progress: chain network, 44 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/by_kind/*/fraction_no_decrease: chain network, 7 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/by_kind/*/median_iterations: chain network, 3 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/by_kind/*/median_residual: chain network, 45 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/by_kind/*/p95_residual: chain network, 45 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/fraction_above_chi2: chain network, 40 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/fraction_late_progress: chain network, 42 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/fraction_no_decrease: chain network, 7 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/median_iterations: chain network, 3 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/median_residual: chain network, 42 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/handling/cells/*/lm/p95_residual: chain network, 42 differing leaves; reason: estimation.py:lm_summary of the Levenberg-Marquardt refinement in StateEstimator.estimate_counted (ensemble.py:forecast_draws), started from the trained psi (networks.py:train_estimator)
+  override systems/*/km_curves/A5/[]: chain network, 650 differing leaves; reason: pipeline.py:score_rules for A5: regime weights from fit_rules, err = w cp_err + (1 - w) plp_err
+  override systems/*/oracle_recovery/A5_vs_Astar: chain network, 3 differing leaves; reason: pipeline.py:score_rules for A5: regime weights from fit_rules, err = w cp_err + (1 - w) plp_err
+  override systems/*/oracle_recovery/mse_at_href/A5: chain network, 3 differing leaves; reason: pipeline.py:score_rules for A5: regime weights from fit_rules, err = w cp_err + (1 - w) plp_err
+  override systems/*/scores/A5/agreement_href: chain network, 3 differing leaves; reason: pipeline.py:score_rules for A5: regime weights from fit_rules, err = w cp_err + (1 - w) plp_err
+  override systems/*/scores/A5/km_median_lyapunov: chain network, 3 differing leaves; reason: pipeline.py:score_rules for A5: regime weights from fit_rules, err = w cp_err + (1 - w) plp_err
+  override systems/*/scores/A5/mse/*: chain network, 15 differing leaves; reason: pipeline.py:score_rules for A5: regime weights from fit_rules, err = w cp_err + (1 - w) plp_err
+  override systems/*/scores/A5/mse_href: chain network, 3 differing leaves; reason: pipeline.py:score_rules for A5: regime weights from fit_rules, err = w cp_err + (1 - w) plp_err
+  override systems/*/scores/A5/regret/*: chain network, 15 differing leaves; reason: pipeline.py:score_rules for A5: regime weights from fit_rules, err = w cp_err + (1 - w) plp_err
+  override systems/*/scores/A5/rmst_lyapunov: chain network, 3 differing leaves; reason: pipeline.py:score_rules for A5: regime weights from fit_rules, err = w cp_err + (1 - w) plp_err
+  override systems/*/verification/P2c/fraction_switching_draws: chain cp, 3 differing leaves; reason: validation.py:p2_bound_summary on the terms of p2_bound_terms: the analog library, the clean queries and the noise draws only (experiments.py:p2c_verification), no estimator and no PLP
+  override systems/*/verification/P2c/population/*: chain cp, 6 differing leaves; reason: validation.py:p2_bound_summary on the terms of p2_bound_terms: the analog library, the clean queries and the noise draws only (experiments.py:p2c_verification), no estimator and no PLP
+  override systems/*/verification/P2c/tightness/*: chain cp, 9 differing leaves; reason: validation.py:p2_bound_summary on the terms of p2_bound_terms: the analog library, the clean queries and the noise draws only (experiments.py:p2c_verification), no estimator and no PLP
+  override systems/*/verification/P2c/tightness/N_over_sqrt_B/*: chain cp, 9 differing leaves; reason: validation.py:p2_bound_summary on the terms of p2_bound_terms: the analog library, the clean queries and the noise draws only (experiments.py:p2c_verification), no estimator and no PLP
+  override systems/*/verification/P2c/tolerances/tau_N_max: chain cp, 3 differing leaves; reason: validation.py:p2_bound_summary on the terms of p2_bound_terms: the analog library, the clean queries and the noise draws only (experiments.py:p2c_verification), no estimator and no PLP
+  tightening systems/*/H1d/rows/nhat/spearman: chain cp, 3 differing leaves; reason: analysis.py:h1d_proxies: the pair (nhat, N) is ev.noise_sens against moments.noise_sens, both from analog retrieval on the noisy library (ensemble.py:evaluation_draws, ensemble_moments, retrieval_spread): no estimator and no PLP, like its interval rows/nhat/interval (finding of review R2; compare_pilot's table says network, which is looser than the code shows)
+discrete counts that differ (scope of the 0.1 hw exception): chua/*, chua/H1c, chua/H2a, chua/K, chua/gain_bound, chua/verification, lorenz63/*, lorenz63/H1c, lorenz63/H2a, lorenz63/K, lorenz63/gain_bound, lorenz63/robustness/D=10, lorenz63/robustness/D=5, lorenz63/robustness/base, lorenz63/robustness/k=5, lorenz63/robustness/misspec=0.1, lorenz63/verification, rossler/*, rossler/H1c, rossler/H2a, rossler/K, rossler/gain_bound, rossler/robustness/D=10, rossler/robustness/base, rossler/robustness/k=5, rossler/verification
+differences by rule (every FAIL, FINDING and DEF is listed; a pass group lists its first 20):
+  [reported] TD: no per-leaf tolerance (class -): 706 leaves
+      estimators/('chua', 7, 5, 0.005)/weights_digest: db0a66c7c26659bd613d8fb0ea5af29f64557555f648cf4d381c67cf8e0c1b6c -> 528004cd9eb3851e608b6bfce52def62b4aa2ccc787d67eeb39e7370551c285d
+      estimators/('chua', 7, 5, 0.01)/weights_digest: e937209ee9621576108b294ad038e56c6ca1f3d4e93b6cadccf7af3a258254e2 -> a27e582681bc240da8f548f9c1ee215f1470620bddbaa56d92bf8decc1f3ed42
+      estimators/('chua', 7, 5, 0.02)/weights_digest: fb6b13d828087a1e4c85acc3e0015b3633170e571e5d51eafbf86c272b6ea398 -> b330cd58371149e9e9379f7d185dd27cf17b14f573c5226cc8462d5e9d2af3e3
+      estimators/('chua', 7, 5, 0.05)/weights_digest: e870d2b3831abc1f4ef2f1605797688bd85cbbee769e11194116f9ed3ead499b -> 3000923a45c7d745649075892bf9491fa642d4475ab8d6aa8a27f1cc24c7d8e5
+      estimators/('lorenz63', 10, 3, 0.01)/weights_digest: 1c811bc434c4b81f517b6f595893802f5491d7067b85d82f3b4f15c71282f8c1 -> 40ee019614947351443e97ea7444834454c5763af8869892d5fc0f0e7d482770
+      estimators/('lorenz63', 5, 5, 0.01)/weights_digest: f511d6a4ffbfd408030c0661ea5029b738c6c1de6b5de8f5d3b25bc2cce45f71 -> 7ad6e8b2a998adca131ab9c7387bde05b22f4bdb74ca04d73c0dca497663201e
+      estimators/('lorenz63', 7, 5, 0.005)/chosen_width: 128 -> 64
+      estimators/('lorenz63', 7, 5, 0.005)/weights_digest: 9d6a2415a1534fd9ab1d62f21eef700d96325043cd0ffe671e6268318a9a1612 -> 57efab7b398e8b29dab076001c8d0fcd47f584768a3a92931e08f3fd580b241a
+      estimators/('lorenz63', 7, 5, 0.01)/weights_digest: ddef3368e2aa80e7c2acd8de7d719a39d4a89d3b6d8220d5e3998c16b0ae7660 -> 6efab415c773426dd4170b727dbd00dfb12ed4c718be10aae8e8003e5a5b1a60
+      estimators/('lorenz63', 7, 5, 0.02)/weights_digest: 0f0a28c223b415316afb1a8ac6080efad6bf564269e2f605bc5c17a6c7ae17a0 -> 2e3971737bc71d5096988225037a12c47ac8693006a6389c636ed6d54b3c5eff
+      estimators/('lorenz63', 7, 5, 0.05)/weights_digest: 01de5ba3cf2d60bde90db0a8b2742fa4900275e7c22769a4e7345294099012cd -> 731d7b1989a61df74753fc7f6fddab570dc31ad548061ab50a9fa587f08c69dc
+      estimators/('rossler', 10, 3, 0.01)/weights_digest: 81768faec15fbd9bcba66bfa8e5f1fcd2c85e77d3b1c7877f760fc983c3d5207 -> 0c7274654293c86e42dd4971594735a20c4a0606c46e36ad65afae98bfa4f508
+      estimators/('rossler', 5, 3, 0.01)/weights_digest: 3df571024a8c4cabf6c6034e30645fba044b63d5e376497e38de669765174adc -> 90b59ce8ab2620c3991bc89f55c3d91fd277d2f359feb12f59997279f07ba1cd
+      estimators/('rossler', 7, 3, 0.005)/weights_digest: 9b3fe2661e747b9b8c85bc0fa9dc442f993403fd998b98ab87237911a060b9fc -> 44f664ffb382f1e8217a99190fc8c84b839b14f51f144f8b0f3a221ad067e3a8
+      estimators/('rossler', 7, 3, 0.01)/weights_digest: 91dfed5a15d671cd6a68ef5532623770b6177a340da39a66831a81342bf375d2 -> 84c63f2aad3696bb58199c284d5ee1c3f7ed04b73d53d741c387a638c97cdefd
+      estimators/('rossler', 7, 3, 0.02)/weights_digest: c64e39bdb949ae63164c71c71787ee269a41ecd7b174bc7aeeba6652b113a8b1 -> 24c2020f8c9029bf5df79b852000aaf48652e8cecb854b467aa6e7ca01593732
+      estimators/('rossler', 7, 3, 0.05)/weights_digest: 7a808f614d46d07669a7ac67e5ad7017c31330fa4300b22724534b8f496f664c -> 911bc3cb425f9118da660e52eacf294d5a6195bcab0a00fb21ea554788f11d4d
+      handling/by_system/chua/error_clips: 0 -> 11
+      handling/by_system/chua/error_clips_plp: 0 -> 11
+      handling/by_system/chua/nu_cap_clips: 41 -> 39
+  [reported] TD: no per-leaf tolerance (class a): 590 leaves, max metric 3.68 at systems/chua/H2c/A4_minus_A1/ci/[0]
+      robustness/lorenz63/D=10/H1b/CP/ci/[0]: 0.928 -> 1.07 rel 0.106
+      robustness/lorenz63/D=10/H1b/CP/ci/[1]: 1.33 -> 1.48 rel 0.119
+      robustness/lorenz63/D=10/H1b/CP/slope: 1.12 -> 1.28 rel 0.125
+      robustness/lorenz63/D=10/H1b/PLP/ci/[0]: 0.828 -> 0.835 rel 0.00723
+      robustness/lorenz63/D=10/H1b/PLP/ci/[1]: 0.955 -> 0.959 rel 0.00377
+      robustness/lorenz63/D=10/H1b/PLP/slope: 0.887 -> 0.898 rel 0.011
+      robustness/lorenz63/D=5/H1b/CP/ci/[0]: 0.955 -> 0.839 rel 0.0846
+      robustness/lorenz63/D=5/H1b/CP/ci/[1]: 1.37 -> 1.19 rel 0.13
+      robustness/lorenz63/D=5/H1b/CP/slope: 1.16 -> 1.01 rel 0.109
+      robustness/lorenz63/D=5/H1b/PLP/ci/[0]: 0.76 -> 0.779 rel 0.0206
+      robustness/lorenz63/D=5/H1b/PLP/ci/[1]: 0.91 -> 0.891 rel 0.0209
+      robustness/lorenz63/D=5/H1b/PLP/slope: 0.836 -> 0.836 rel 0.000233
+      robustness/lorenz63/base/H1b/CP/ci/[0]: 1.03 -> 0.918 rel 0.0723
+      robustness/lorenz63/base/H1b/CP/ci/[1]: 1.51 -> 1.33 rel 0.121
+      robustness/lorenz63/base/H1b/CP/slope: 1.26 -> 1.13 rel 0.0856
+      robustness/lorenz63/base/H1b/PLP/ci/[0]: 0.743 -> 0.773 rel 0.033
+      robustness/lorenz63/base/H1b/PLP/ci/[1]: 0.894 -> 0.885 rel 0.0106
+      robustness/lorenz63/base/H1b/PLP/slope: 0.82 -> 0.827 rel 0.00782
+      robustness/lorenz63/k=5/H1b/CP/ci/[0]: 0.462 -> 0.591 rel 0.176
+      robustness/lorenz63/k=5/H1b/CP/ci/[1]: 0.731 -> 0.94 rel 0.286
+  [reported] TD: no per-leaf tolerance (class b): 2144 leaves, max metric 59.4 at systems/chua/fitted/regime_weights_href/12/[9]
+      systems/chua/H2b/noise/median_w_by_noise/0.005: 0.0232 -> 0.0496 rel 1.13
+      systems/chua/H2b/noise/median_w_by_noise/0.01: 0.0439 -> 0.08 rel 0.821
+      systems/chua/H2b/noise/median_w_by_noise/0.02: 0.0671 -> 0.0869 rel 0.294
+      systems/chua/H2b/noise/median_w_by_noise/0.05: 0.182 -> 0.168 rel 0.076
+      systems/chua/fitted/regime_weights_href/12/[0]: 0.358 -> 0.219 rel 0.388
+      systems/chua/fitted/regime_weights_href/12/[10]: 0.0566 -> 0.137 rel 1.41
+      systems/chua/fitted/regime_weights_href/12/[11]: 0.0326 -> 0.401 rel 11.3
+      systems/chua/fitted/regime_weights_href/12/[1]: 0 -> 0.0125 rel 1.25
+      systems/chua/fitted/regime_weights_href/12/[2]: 0.0131 -> 0.0456 rel 2.47
+      systems/chua/fitted/regime_weights_href/12/[3]: 0.232 -> 0.229 rel 0.0145
+      systems/chua/fitted/regime_weights_href/12/[4]: 0.00129 -> 0 rel 0.129
+      systems/chua/fitted/regime_weights_href/12/[5]: 0.0404 -> 0 rel 1
+      systems/chua/fitted/regime_weights_href/12/[6]: 0.272 -> 0.0245 rel 0.91
+      systems/chua/fitted/regime_weights_href/12/[8]: 0.135 -> 0.0916 rel 0.321
+      systems/chua/fitted/regime_weights_href/12/[9]: 0 -> 0.594 rel 59.4
+      systems/chua/fitted/regime_weights_href/2/[0]: 0.0131 -> 0.0213 rel 0.624
+      systems/chua/fitted/regime_weights_href/2/[1]: 0.0947 -> 0.201 rel 1.12
+      systems/chua/fitted/regime_weights_href/3/[0]: 0.0947 -> 0.201 rel 1.12
+      systems/chua/fitted/regime_weights_href/3/[1]: 0.0539 -> 0.0233 rel 0.568
+      systems/chua/fitted/regime_weights_href/3/[2]: 0.00975 -> 0.0203 rel 1.06
+  [reported] TD: no per-leaf tolerance (class c): 5609 leaves, max metric 118 at systems/lorenz63/handling/cells/V4-convergence/lm/by_kind/check/fraction_late_progress
+      handling/robustness/lorenz63/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress: 0.0161 -> 0.0171 rel 0.0667
+      handling/robustness/lorenz63/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2: 0.0133 -> 0.0148 rel 0.117
+      handling/robustness/lorenz63/cells/D=10|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress: 0.0152 -> 0.0165 rel 0.0849
+      handling/robustness/lorenz63/cells/D=10|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2: 0.0133 -> 0.0148 rel 0.115
+      handling/robustness/lorenz63/cells/D=10|rho=0.01|n_lib=10000|core/lm/fraction_late_progress: 0.0152 -> 0.0165 rel 0.0847
+      handling/robustness/lorenz63/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2: 0.0104 -> 0.0107 rel 0.0345
+      handling/robustness/lorenz63/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress: 0.0204 -> 0.0239 rel 0.175
+      handling/robustness/lorenz63/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2: 0.0105 -> 0.0135 rel 0.283
+      handling/robustness/lorenz63/cells/D=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress: 0.0177 -> 0.0254 rel 0.437
+      handling/robustness/lorenz63/cells/D=5|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2: 0.0105 -> 0.0134 rel 0.28
+      handling/robustness/lorenz63/cells/D=5|rho=0.01|n_lib=10000|core/lm/fraction_late_progress: 0.0177 -> 0.0254 rel 0.434
+      handling/robustness/lorenz63/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2: 0.025 -> 0.0246 rel 0.0143
+      handling/robustness/lorenz63/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress: 0.0261 -> 0.0257 rel 0.0137
+      handling/robustness/lorenz63/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2: 0.0267 -> 0.0237 rel 0.112
+      handling/robustness/lorenz63/cells/k=5|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress: 0.0268 -> 0.0245 rel 0.085
+      handling/robustness/lorenz63/cells/k=5|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2: 0.0267 -> 0.0237 rel 0.111
+      handling/robustness/lorenz63/cells/k=5|rho=0.01|n_lib=10000|core/lm/fraction_late_progress: 0.0268 -> 0.0245 rel 0.0843
+      handling/robustness/lorenz63/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2: 0.469 -> 0.456 rel 0.0259
+      handling/robustness/lorenz63/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress: 0.0811 -> 0.0661 rel 0.185
+      handling/robustness/lorenz63/cells/misspec=0.05|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2: 0.467 -> 0.454 rel 0.0283
+  [reported] TD: no per-leaf tolerance (class d): 64 leaves, max metric 2.87 at robustness/rossler/D=10/H2a_partial_corr_interior
+      robustness/lorenz63/D=10/H2a_partial_corr_interior: 0.0886 -> 0.233 rel 1.63
+      robustness/lorenz63/D=10/H2a_partial_corr_zero: -0.0291 -> -0.0151 rel 0.312
+      robustness/lorenz63/D=5/H2a_partial_corr_interior: 0.154 -> 0.0847 rel 0.449
+      robustness/lorenz63/D=5/H2a_partial_corr_zero: 0.0164 -> -0.0433 rel 1.33
+      robustness/lorenz63/Lambda_fin(eps=1rho)/H2a_partial_corr_interior_fin: 0.184 -> 0.146 rel 0.209
+      robustness/lorenz63/Lambda_fin(eps=1rho)/H2a_partial_corr_zero_fin: 0.0653 -> -0.0794 rel 2.22
+      robustness/lorenz63/Lambda_fin(eps=1rho)/corr_fin_vs_linear: 0.996 -> 0.992 rel 0.00382
+      robustness/lorenz63/Lambda_fin(eps=3rho)/H2a_partial_corr_interior_fin: 0.182 -> 0.124 rel 0.318
+      robustness/lorenz63/Lambda_fin(eps=3rho)/H2a_partial_corr_zero_fin: 0.0896 -> -0.0624 rel 1.7
+      robustness/lorenz63/Lambda_fin(eps=3rho)/corr_fin_vs_linear: 0.975 -> 0.967 rel 0.0081
+      robustness/lorenz63/base/H2a_partial_corr_interior: 0.184 -> 0.144 rel 0.215
+      robustness/lorenz63/base/H2a_partial_corr_zero: 0.0617 -> -0.0832 rel 2.35
+      robustness/lorenz63/k=5/H2a_partial_corr_interior: 0.101 -> 0.159 rel 0.574
+      robustness/lorenz63/k=5/H2a_partial_corr_zero: -0.037 -> -0.16 rel 2.75
+      robustness/lorenz63/misspec=0.05/H2a_partial_corr_interior: -0.0419 -> -0.088 rel 1.03
+      robustness/lorenz63/misspec=0.05/H2a_partial_corr_zero: 0.0912 -> 0.0929 rel 0.0191
+      robustness/lorenz63/misspec=0.1/H2a_partial_corr_interior: -0.279 -> -0.288 rel 0.0344
+      robustness/lorenz63/misspec=0.1/H2a_partial_corr_zero: 0.202 -> 0.103 rel 0.492
+      robustness/rossler/D=10/H2a_partial_corr_interior: -0.0243 -> 0.104 rel 2.87
+      robustness/rossler/D=10/H2a_partial_corr_zero: -0.102 -> -0.065 rel 0.366
+  [reported] TD: no per-leaf tolerance (class e): 16 leaves, max metric 361 at systems/rossler/H3a/logrank_p_holm/[1]
+      systems/chua/H3a/logrank_p_holm/[0]: 0.339 -> 6.61e-33 rel 1
+      systems/chua/H3a/logrank_p_raw/[0]: 0.339 -> 6.61e-33 rel 1
+      systems/lorenz63/H3a/logrank_p_holm/[0]: 0.00696 -> 0.000767 rel 0.89
+      systems/lorenz63/H3a/logrank_p_holm/[1]: 1 -> 0.303 rel 0.697
+      systems/lorenz63/H3a/logrank_p_holm/[2]: 1 -> 0.0147 rel 0.985
+      systems/lorenz63/H3a/logrank_p_holm/[3]: 1 -> 0.858 rel 0.142
+      systems/lorenz63/H3a/logrank_p_raw/[0]: 0.00139 -> 0.000192 rel 0.862
+      systems/lorenz63/H3a/logrank_p_raw/[1]: 0.517 -> 0.152 rel 0.707
+      systems/lorenz63/H3a/logrank_p_raw/[2]: 0.301 -> 0.0049 rel 0.984
+      systems/lorenz63/H3a/logrank_p_raw/[3]: 0.59 -> 0.858 rel 0.455
+      systems/rossler/H3a/logrank_p_holm/[0]: 0.285 -> 0.421 rel 0.476
+      systems/rossler/H3a/logrank_p_holm/[1]: 0.00116 -> 0.421 rel 361
+      systems/rossler/H3a/logrank_p_holm/[2]: 0.0102 -> 0.00177 rel 0.826
+      systems/rossler/H3a/logrank_p_raw/[0]: 0.285 -> 0.152 rel 0.465
+      systems/rossler/H3a/logrank_p_raw/[1]: 0.000388 -> 0.14 rel 140
+      systems/rossler/H3a/logrank_p_raw/[2]: 0.00508 -> 0.000442 rel 0.913
+  [reported] TD: no per-leaf tolerance (class f): 42 leaves, max metric 17.6 at systems/lorenz63/Q-N/deployable/log_horizon/r2_three
+      systems/chua/Q-N/deployable/log_horizon/r2_four: 0.299 -> 0.366 rel 0.223
+      systems/chua/Q-N/deployable/log_horizon/r2_three: 0.282 -> 0.36 rel 0.275
+      systems/chua/Q-N/deployable/logit_w_interior/r2_four: -0.0318 -> -0.00224 rel 0.929
+      systems/chua/Q-N/deployable/logit_w_interior/r2_three: -0.0156 -> -0.0149 rel 0.049
+      systems/chua/Q-N/deployable/noise_sens_r2_from_three: -0.0966 -> -0.0508 rel 0.474
+      systems/chua/Q-N/deployable/w_zero_indicator/r2_four: 0.00096 -> -0.0279 rel 2.89
+      systems/chua/Q-N/deployable/w_zero_indicator/r2_three: -0.0763 -> -0.102 rel 0.34
+      systems/chua/Q-N/oracle/log_horizon/r2_four: 0.288 -> 0.39 rel 0.353
+      systems/chua/Q-N/oracle/log_horizon/r2_three: 0.295 -> 0.383 rel 0.297
+      systems/chua/Q-N/oracle/logit_w_interior/r2_four: 0.0331 -> 0.116 rel 2.49
+      systems/chua/Q-N/oracle/logit_w_interior/r2_three: -0.0129 -> 0.0916 rel 8.11
+      systems/chua/Q-N/oracle/noise_sens_r2_from_three: -0.000836 -> 0.0311 rel 3.19
+      systems/chua/Q-N/oracle/w_zero_indicator/r2_four: 0.186 -> 0.139 rel 0.254
+      systems/chua/Q-N/oracle/w_zero_indicator/r2_three: -0.00326 -> -0.0249 rel 2.17
+      systems/lorenz63/Q-N/deployable/log_horizon/r2_four: -0.00647 -> 0.12 rel 12.6
+      systems/lorenz63/Q-N/deployable/log_horizon/r2_three: -0.00243 -> 0.174 rel 17.6
+      systems/lorenz63/Q-N/deployable/logit_w_interior/r2_four: 0.0767 -> -0.0955 rel 2.25
+      systems/lorenz63/Q-N/deployable/logit_w_interior/r2_three: 0.054 -> -0.127 rel 3.35
+      systems/lorenz63/Q-N/deployable/noise_sens_r2_from_three: -0.0736 -> -0.0835 rel 0.135
+      systems/lorenz63/Q-N/deployable/w_zero_indicator/r2_four: -0.00159 -> 0.0292 rel 3.08
+  [reported] TD: no per-leaf tolerance (class g): 1180 leaves, max metric inf at systems/chua/H3b/horizon_tree_importance/log_eps_tilde
+      estimators/('chua', 7, 5, 0.005)/val_loss_by_width/128: 0.00128 -> 0.00128 rel 0.00148
+      estimators/('chua', 7, 5, 0.005)/val_loss_by_width/64: 0.00196 -> 0.00223 rel 0.139
+      estimators/('chua', 7, 5, 0.01)/val_loss_by_width/128: 0.00267 -> 0.00289 rel 0.0855
+      estimators/('chua', 7, 5, 0.01)/val_loss_by_width/64: 0.00489 -> 0.0056 rel 0.144
+      estimators/('chua', 7, 5, 0.02)/val_loss_by_width/128: 0.00617 -> 0.00653 rel 0.0576
+      estimators/('chua', 7, 5, 0.02)/val_loss_by_width/64: 0.00856 -> 0.00842 rel 0.0155
+      estimators/('chua', 7, 5, 0.05)/val_loss_by_width/128: 0.0213 -> 0.0218 rel 0.0223
+      estimators/('chua', 7, 5, 0.05)/val_loss_by_width/64: 0.0273 -> 0.0268 rel 0.019
+      estimators/('lorenz63', 10, 3, 0.01)/val_loss_by_width/128: 0.00254 -> 0.00237 rel 0.0683
+      estimators/('lorenz63', 10, 3, 0.01)/val_loss_by_width/64: 0.00438 -> 0.00486 rel 0.109
+      estimators/('lorenz63', 5, 5, 0.01)/val_loss_by_width/128: 0.00495 -> 0.00718 rel 0.452
+      estimators/('lorenz63', 5, 5, 0.01)/val_loss_by_width/64: 0.00765 -> 0.00764 rel 0.00156
+      estimators/('lorenz63', 7, 5, 0.005)/val_loss_by_width/128: 0.00348 -> 0.00411 rel 0.184
+      estimators/('lorenz63', 7, 5, 0.005)/val_loss_by_width/64: 0.00392 -> 0.00385 rel 0.0179
+      estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/128: 0.0038 -> 0.00502 rel 0.321
+      estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/64: 0.00638 -> 0.00764 rel 0.198
+      estimators/('lorenz63', 7, 5, 0.02)/val_loss_by_width/128: 0.00729 -> 0.00762 rel 0.0459
+      estimators/('lorenz63', 7, 5, 0.02)/val_loss_by_width/64: 0.00846 -> 0.0103 rel 0.214
+      estimators/('lorenz63', 7, 5, 0.05)/val_loss_by_width/128: 0.0216 -> 0.0204 rel 0.0518
+      estimators/('lorenz63', 7, 5, 0.05)/val_loss_by_width/64: 0.0264 -> 0.0295 rel 0.118
+  [reported] present on both runs (class structure): 36 leaves
+      systems/chua/H3a/iqr_lt/[2]: 1.54 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/iqr_lt/[3]: 0.917 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/iqr_lt/[4]: 1 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/logrank_p_holm/[1]: 0.0169 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/logrank_p_holm/[2]: 0.00173 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/logrank_p_holm/[3]: 2.95e-06 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/logrank_p_raw/[1]: 0.00845 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/logrank_p_raw/[2]: 0.000576 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/logrank_p_raw/[3]: 7.39e-07 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/n_per_regime/[2]: 50 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/n_per_regime/[3]: 39 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/n_per_regime/[4]: 13 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/pairs/[1]/[0]: 3 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/pairs/[1]/[1]: 2 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/pairs/[2]/[0]: 2 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/pairs/[2]/[1]: 1 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/pairs/[3]/[0]: 1 -> None (TD: no per-leaf rule)
+      systems/chua/H3a/pairs/[3]/[1]: 0 -> None (TD: no per-leaf rule)
+      systems/lorenz63/H3a/iqr_lt/[5]: 1.33 -> None (TD: no per-leaf rule)
+      systems/lorenz63/H3a/logrank_p_holm/[4]: 1 -> None (TD: no per-leaf rule)
+TD: 30 verdict-type leaves differ (reported, no failure):
+      systems/chua/H2a/part_ii/interior/verdict: 'inconclusive' -> 'fail'
+      systems/chua/H2a/part_ii_verdict: 'inconclusive' -> 'fail'
+      systems/chua/H2b/library_change/pass: False -> True
+      systems/chua/H2b/library_change/verdict: 'inconclusive' -> 'pass'
+      systems/chua/H2b/pass: False -> True
+      systems/chua/H2b/verdict: 'inconclusive' -> 'pass'
+      systems/chua/H3a/pass: False -> True
+      systems/chua/H3a/verdict: 'inconclusive' -> 'pass'
+      systems/chua/Q-N/deployable/logit_w_interior/reading: 'reduces' -> 'undetermined'
+      systems/chua/Q-N/deployable/w_zero_indicator/reading: 'substantial' -> 'undetermined'
+      systems/chua/clip_sensitivity/by_hypothesis/H2a/parts/interior/verdict_2L: 'inconclusive' -> 'fail'
+      systems/chua/clip_sensitivity/by_hypothesis/H2b/parts/library_change/verdict_2L: 'inconclusive' -> 'pass'
+      systems/lorenz63/H2d/verdict: 'fail' -> 'inconclusive'
+      systems/lorenz63/clip_sensitivity/by_hypothesis/H2d/parts/A4_over_A3/verdict_2L: 'fail' -> 'inconclusive'
+      systems/rossler/H1a/by_noise/0.01/verdict: 'inconclusive' -> 'pass'
+      systems/rossler/H1a/pass: False -> True
+      systems/rossler/H1a/verdict: 'inconclusive' -> 'pass'
+      systems/rossler/H1d/pass: False -> True
+      systems/rossler/H1d/rows/analog_seed/verdict: 'inconclusive' -> 'pass'
+      systems/rossler/H1d/verdict: 'inconclusive' -> 'pass'
+TD statistic: z_level 2.3940, bound 3.4 on max(|z_sym|, |z_away|) per part
+  system    part                      d   z_sym  z_away  hw1/hw0  status
+  chua      H2a(i)               0.0552    2.00    2.35    1.377  ok
+  chua      H2a(ii) zero         0.0236    0.39    0.41    0.981  ok
+  chua      H2a(ii) interior     0.0891    1.13    1.14    0.846  ok
+  chua      H2b(i)              -0.0233    0.49    0.46    1.087  ok
+  chua      H2b(ii)              0.0368    1.50    1.46    0.852  ok
+  chua      H3c                  0.0068    0.08    0.08    1.564  ok
+  lorenz63  H2a(i)               0.0148    0.57    0.74    0.745  ok
+  lorenz63  H2a(ii) zero        -0.1449    2.73    2.72    0.912  ok
+  lorenz63  H2a(ii) interior    -0.0395    0.57    0.55    1.033  ok
+  lorenz63  H2b(i)               0.0166    0.31    0.32    0.891  ok
+  lorenz63  H2b(ii)             -0.0165    0.68    0.70    1.030  ok
+  lorenz63  H3c                  0.2524    1.66    1.54    1.595  ok
+  rossler   H2a(i)              -0.0020    0.08    0.08    0.957  ok
+  rossler   H2a(ii) zero         0.0553    0.96    0.91    1.068  ok
+  rossler   H2a(ii) interior    -0.1481    1.70    1.70    1.045  ok
+  rossler   H2b(i)              -0.0327    0.55    0.54    0.910  ok
+  rossler   H2b(ii)              0.0096    0.39    0.43    0.760  ok
+  rossler   H3c                  0.0201    0.39    0.41    0.854  ok
+  parts computed 18 of 18 expected (cannot be computed: 0); sum z^2 symmetric 23.77, away 24.89; max |z| symmetric 2.73, away 2.72; failing parts 0
+RESULT: PASS (exit 0)

@@ -1,7 +1,14 @@
-"""Report header and output files for a fake results dict (WU-0001.4; LPC.PC.13, LPC.PC.18).
+"""Tests of the report: verdicts, the RESULTS.md text and the figures.
 
-The fake dict has ``systems: {}`` and a ``verdicts`` stub per hypothesis, so no study is run.
-The confirmatory value below is synthetic (LPC.PC.7). Checks are exact string checks.
+The report (``lpcstudy/report.py``) turns the study's results dictionary into
+verdicts, a Markdown file and four figures. These tests feed it small,
+hand-built ("fake") results, so no study is run and every expected string can be
+written out by hand from the rules in the proposal. Most checks are exact string
+checks: the report only formats numbers that the analysis already stored, so
+there is nothing to approximate and no tolerance is needed.
+
+The confirmatory seed value used below is synthetic and made up for the test
+(LPC.PC.7); the real sealed seed is never read.
 """
 
 from __future__ import annotations
@@ -17,8 +24,15 @@ from lpcstudy import provenance
 from lpcstudy.config import SMOKE, StudyConfig
 from lpcstudy.identifiers import HYPOTHESIS_TABLE
 from lpcstudy import report
-from lpcstudy.report import (HYPOTHESES, _key_number, header_lines, make_figures, save_json,
-                             verdicts, write_markdown)
+from lpcstudy.report import (
+    HYPOTHESES,
+    _key_number,
+    header_lines,
+    make_figures,
+    save_json,
+    verdicts,
+    write_markdown,
+)
 from lpcstudy.seeds import with_seed
 
 SYNTHETIC_SEED = 987654321987654321
@@ -29,28 +43,41 @@ ABSENT = "**UNPROMOTED** · provenance absent (output written before WU-0001)"
 
 @pytest.fixture(autouse=True)
 def _clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """No test sees a confirmatory seed or salt (LPC.PC.7)."""
+    """Make sure no test can see a confirmatory seed or salt (LPC.PC.7)."""
     monkeypatch.delenv("LPC_CONF_SEED", raising=False)
     monkeypatch.delenv("LPC_CONF_SALT", raising=False)
 
 
 def fake_results(seed_id: str) -> tuple[dict, StudyConfig]:
-    """Return a fake results dict with a finished provenance block, and its config."""
+    """Return fake results with a finished provenance block, and its config.
+
+    ``seed_id`` picks a development or a confirmatory label. A confirmatory id
+    gets the synthetic seed defined at the top of this file.
+    """
     seed = SYNTHETIC_SEED if seed_id.startswith("CONF-") else SMOKE.seed
     config = with_seed(SMOKE, seed_id, seed)
     clock = provenance.RunClock()
-    block = provenance.finish(provenance.collect(config, seed_id, ["--preset", "smoke"], clock),
-                              clock)
-    results = {"config": provenance.config_record(config), "systems": {}, "provenance": block,
-               "verdicts": {h: {"by_system": {}, "verdict": "supported"} for h in HYPOTHESES}}
+    block = provenance.finish(
+        provenance.collect(config, seed_id, ["--preset", "smoke"], clock), clock
+    )
+    results = {
+        "config": provenance.config_record(config),
+        "systems": {},
+        "provenance": block,
+        "verdicts": {
+            h: {"by_system": {}, "verdict": "supported"} for h in HYPOTHESES
+        },
+    }
     return results, config
 
 
 def test_confirmatory_value_is_in_neither_output_file(tmp_path: Path) -> None:
-    """The synthetic confirmatory seed appears in neither ``results.json`` nor ``RESULTS.md``.
+    """The synthetic confirmatory seed is written to neither output file.
 
-    Reference: ``str(seed)`` searched in both files written by ``save_json`` and
-    ``write_markdown`` (the roadmap criterion). The id ``CONF-1`` and the label are present.
+    Reference: a plain text search for ``str(seed)`` in both ``results.json``
+    and ``RESULTS.md`` (the roadmap criterion). The id ``CONF-1`` must be
+    present, and the stored seed must be ``None``. Exact checks, so no
+    tolerance.
     """
     results, config = fake_results("CONF-1")
     save_json(results, tmp_path / "results.json")
@@ -59,45 +86,65 @@ def test_confirmatory_value_is_in_neither_output_file(tmp_path: Path) -> None:
         text = (tmp_path / name).read_text()
         assert str(SYNTHETIC_SEED) not in text, name
         assert "CONF-1" in text and "LPC_CONF" not in text, name
-    assert json.loads((tmp_path / "results.json").read_text())["config"]["seed"] is None
+    assert (
+        json.loads((tmp_path / "results.json").read_text())["config"]["seed"]
+        is None
+    )
 
 
 def test_header_labels_are_exact_in_the_markdown_file(tmp_path: Path) -> None:
-    """Line 3 of ``RESULTS.md`` is the exact label line for a DEV and a CONF run.
+    """Line 3 of ``RESULTS.md`` is the exact DEV or CONF label.
 
-    Reference: the strings fixed by the plan (Q3): development prints the DEV label and
-    UNPROMOTED; confirmatory prints ``CONFIRMATORY: UNPROMOTED``. Exact.
+    Reference: the strings fixed by the plan (Q3). A development run prints the
+    DEV label and "UNPROMOTED"; a confirmatory run prints "CONFIRMATORY:
+    UNPROMOTED". Exact checks.
     """
     for seed_id, label in (("DEV-0", DEV_LABEL), ("CONF-1", CONF_LABEL)):
         results, config = fake_results(seed_id)
         write_markdown(results, config, tmp_path / f"{seed_id}.md")
         lines = (tmp_path / f"{seed_id}.md").read_text().splitlines()
-        assert lines[0].startswith("# Results") and lines[1] == "" and lines[2] == label
+        assert (
+            lines[0].startswith("# Results")
+            and lines[1] == ""
+            and lines[2] == label
+        )
 
 
 def test_header_table_has_every_key_except_config_and_the_config_json() -> None:
-    """The table has a row per provenance key except ``config``; the details block parses.
+    """The header table has one row per provenance key except ``config``.
 
-    Reference: the block's own keys (the table is a view of them). The JSON in the
-    ``<details>`` block equals the block's ``config`` after a JSON round trip. Exact.
+    Reference: the provenance block's own keys (the table is only a view of
+    them). The JSON inside the ``<details>`` block must equal the block's
+    ``config`` after a JSON round trip. Exact checks.
     """
     results, _ = fake_results("DEV-0")
     block = results["provenance"]
     lines = header_lines(block)
-    rows = [ln for ln in lines if ln.startswith("| ") and not ln.startswith("| Provenance")]
-    assert [ln.split(" | ")[0][2:] for ln in rows] == [k for k in block if k != "config"]
+    rows = [
+        ln
+        for ln in lines
+        if ln.startswith("| ") and not ln.startswith("| Provenance")
+    ]
+    assert [ln.split(" | ")[0][2:] for ln in rows] == [
+        k for k in block if k != "config"
+    ]
     assert "| promoted | false |" in rows and "| complete | true |" in rows
     start = lines.index("```json") + 1
     end = lines.index("```", start)
-    assert json.loads("\n".join(lines[start:end])) == json.loads(json.dumps(block["config"]))
-    assert lines[start - 3].startswith("<details>") and lines[-1] == "</details>"
+    assert json.loads("\n".join(lines[start:end])) == json.loads(
+        json.dumps(block["config"])
+    )
+    assert (
+        lines[start - 3].startswith("<details>") and lines[-1] == "</details>"
+    )
 
 
 def test_missing_provenance_is_flagged_and_stored_block_is_used_as_is() -> None:
-    """No block gives the 'provenance absent' line; a stored block renders the same after JSON.
+    """No provenance block gives the "provenance absent" line.
 
-    Reference: the plan's ``--report-only`` rule. A block that went through ``json`` (as when
-    read back from ``results.json``) renders identical lines. Exact.
+    A block that went through ``json`` (as when ``--report-only`` reads it back
+    from ``results.json``) must render the same lines as the original.
+    Reference: the plan's ``--report-only`` rule. Exact checks.
     """
     assert header_lines(None) == [ABSENT]
     results, _ = fake_results("DEV-0")
@@ -105,8 +152,10 @@ def test_missing_provenance_is_flagged_and_stored_block_is_used_as_is() -> None:
     assert header_lines(json.loads(json.dumps(block))) == header_lines(block)
 
 
-def test_markdown_without_provenance_has_the_absent_line(tmp_path: Path) -> None:
-    """``write_markdown`` on results with no ``provenance`` key prints the absent line."""
+def test_markdown_without_provenance_has_the_absent_line(
+    tmp_path: Path,
+) -> None:
+    """A results file with no ``provenance`` key prints the absent line."""
     results, config = fake_results("DEV-0")
     del results["provenance"]
     write_markdown(results, config, tmp_path / "RESULTS.md")
@@ -114,153 +163,618 @@ def test_markdown_without_provenance_has_the_absent_line(tmp_path: Path) -> None
 
 
 def test_a_pipe_in_a_value_cannot_break_the_table() -> None:
-    """A value containing ``|`` is escaped so each row keeps two cells.
+    """A ``|`` in a value is escaped so its table row keeps two cells.
 
-    Reference: Markdown table syntax (an unescaped pipe adds a cell). Exact.
+    Reference: Markdown table syntax (an unescaped pipe adds a cell). Exact
+    check.
     """
     results, _ = fake_results("DEV-0")
     block = dict(results["provenance"], platform="Linux|odd\nname")
-    row = next(ln for ln in header_lines(block) if ln.startswith("| platform |"))
+    row = next(
+        ln for ln in header_lines(block) if ln.startswith("| platform |")
+    )
     assert row == "| platform | Linux\\|odd name |"
 
 
-def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
-    """One system's results with the minimal content ``verdicts`` and ``write_markdown`` read.
+def test_header_has_the_platform_line_under_the_label_a8() -> None:
+    """The header prints one ``Platform:`` line under the label (A8, WU-0001.6).
 
-    Every table key has a result with ``pass`` true and the sub-keys ``_key_number`` reads,
-    except the keys in ``skip``. The numbers are arbitrary small values chosen by hand.
+    Reference: the exact string fixed by the plan, for a hand-built block (not
+    the live probe): ``Platform: CPU <model> · BLAS <library> <corename>, ...``.
+    The per-key table is unchanged: it still has a row for every key (including
+    ``cpu`` and ``blas``) except ``config``. A library whose probe failed prints
+    ``unknown (<error>)`` (R1). A failed BLAS probe prints ``BLAS probe failed
+    (<error>)``, and a working probe that found no library prints ``BLAS none
+    mapped``. Exact checks.
+    """
+    results, _ = fake_results("DEV-0")
+    block = dict(results["provenance"])
+    block["cpu"] = {
+        "model": "Test CPU @ 1GHz",
+        "source": "/proc/cpuinfo",
+        "isa": ["avx"],
+        "error": None,
+    }
+    block["blas"] = {
+        "libraries": [
+            {
+                "library": "numpy.libs/libx.so",
+                "corename": "Haswell",
+                "config": "c",
+                "error": None,
+            },
+            {
+                "library": "scipy.libs/liby.so",
+                "corename": None,
+                "config": None,
+                "error": "E: x",
+            },
+        ],
+        "error": None,
+    }
+    lines = header_lines(block)
+    assert lines[2] == (
+        "Platform: CPU Test CPU @ 1GHz · BLAS numpy.libs/libx.so Haswell, "
+        "scipy.libs/liby.so unknown (E: x)"
+    )
+    assert (
+        lines[1] == ""
+        and lines[3] == ""
+        and lines[4] == "| Provenance | Value |"
+    )
+    rows = [
+        ln
+        for ln in lines
+        if ln.startswith("| ") and not ln.startswith("| Provenance")
+    ]
+    assert [ln.split(" | ")[0][2:] for ln in rows] == [
+        k for k in block if k != "config"
+    ]
+    block["blas"] = {"libraries": [], "error": "OSError: no maps"}
+    assert header_lines(block)[2] == (
+        "Platform: CPU Test CPU @ 1GHz · BLAS probe failed (OSError: no maps)"
+    )
+    block["blas"] = {"libraries": [], "error": None}
+    assert (
+        header_lines(block)[2]
+        == "Platform: CPU Test CPU @ 1GHz · BLAS none mapped"
+    )
+
+
+def test_platform_line_never_shows_a_failed_probe_as_a_value_r1() -> None:
+    """A failed probe is named in the platform line, never shown as a value.
+
+    Reference: hand-written expected strings from the review finding R1. A
+    library entry with an error prints ``<library> unknown (<error>)``. An
+    unknown CPU model prints its source and the read error. A model taken from
+    ``platform.processor`` prints its source. Exact checks.
+    """
+    results, _ = fake_results("DEV-0")
+    block = dict(results["provenance"])
+    block["blas"] = {
+        "libraries": [
+            {
+                "library": "numpy.libs/a.so",
+                "corename": None,
+                "config": None,
+                "error": "AttributeError: none of x is defined",
+            }
+        ],
+        "error": None,
+    }
+    block["cpu"] = {
+        "model": "unknown",
+        "source": "none",
+        "isa": [],
+        "error": "FileNotFoundError: gone",
+    }
+    assert header_lines(block)[2] == (
+        "Platform: CPU unknown (source none, FileNotFoundError: gone) · BLAS "
+        "numpy.libs/a.so unknown (AttributeError: none of x is defined)"
+    )
+    block["cpu"] = {
+        "model": "test-cpu",
+        "source": "platform.processor",
+        "isa": [],
+        "error": None,
+    }
+    assert header_lines(block)[2].startswith(
+        "Platform: CPU test-cpu (source platform.processor) · "
+    )
+
+
+def test_platform_line_says_not_recorded_for_an_older_block_a8() -> None:
+    """An old block without ``cpu`` and ``blas`` is flagged (A8).
+
+    This is the old ``/1`` block that ``--report-only`` can read.
+
+    Reference: the plan. The line reads "Platform: not recorded", and the table
+    rows are those of the block's own keys. Exact checks.
+    """
+    results, _ = fake_results("DEV-0")
+    old = {
+        k: v
+        for k, v in results["provenance"].items()
+        if k not in ("cpu", "blas", "numpy_simd")
+    }
+    lines = header_lines(old)
+    assert lines[2] == "Platform: not recorded" and lines[3] == ""
+    rows = [
+        ln
+        for ln in lines
+        if ln.startswith("| ") and not ln.startswith("| Provenance")
+    ]
+    assert [ln.split(" | ")[0][2:] for ln in rows] == [
+        k for k in old if k != "config"
+    ]
+
+
+def fake_system(config: StudyConfig, skip: tuple[str, ...] = ()) -> dict:
+    """Return one system's results with the minimal content the report reads.
+
+    Every table key has a result with verdict "pass" (and ``pass`` true) and the
+    sub-keys that ``_key_number`` reads, except the keys in ``skip``. Q-N is an
+    estimate and the gain bound is reported with no bar (v3 sections 2 and 7),
+    so neither carries a verdict. The numbers are arbitrary small values chosen
+    by hand so that the expected strings are easy to work out.
     """
     hours = ["0.25", "0.5", "1", "2", "4"]
     results = {
-        "H1a": {"by_noise": {"0.01": {"fitted_inverse_dim": 0.5}}, "local_dimension_median": 2.0},
-        "H1b": {"CP": {"slope": 1.0}, "PLP": {"slope": 0.9}},
-        "H1c": {"PLP": {"median_ratio": 1.0}, "CP": {"median_ratio": 0.5}},
-        "H1d": {"spearman": {"analog_seed": 0.8, "estimation_seed": 0.9, "growth": 0.7,
-                             "noise_sensitivity": 0.6}},
-        "Q-N": {"deployable": {"verdict": "redundant", "logit_w": {"delta_r2": 0.01,
-                                                                    "ci": [0.0, 0.02]},
-                               "log_horizon": {"delta_r2": 0.02, "ci": [0.01, 0.03]}},
-                "oracle": {"verdict": "adds information"}},
-        "H2a": {"median_range": 0.05, "range_ci": [0.01, 0.08], "partial_corr": 0.02},
-        "H2b": {"noise": {"mean_state_spearman": 0.9},
-                "library": {"0.01": {"median_at_largest_n_lib": 0.8,
-                                         "median_w_by_n_lib": {"1000": 0.7, "10000": 0.8}}}},
-        "H2c": {"A4_minus_A2": {"relative": -0.1}, "best_single": "A1",
-                "A4_minus_A1": {"relative": -0.05}},
-        "H2d": {"in_distribution_excess": 0.05},
-        "H2e": {"median_change": 0.1},
-        "gain_bound": {"fraction_within_bound": 0.95, "n_states": 40, "max_gain_lyapunov": 1.5},
-        "H3a": {"chosen_K": 3, "regret_ratio": 0.04, "mean_iqr_lyapunov": 0.4},
-        "H3b": {"weight_tree_importance": {"lambda_tilde": 0.1},
-                "horizon_tree_importance": {"lambda_tilde": 0.6}},
-        "H3c": {"A5_over_A4_mse": 1.0123},
+        "H1a": {
+            "by_noise": {
+                "0.01": {
+                    "fitted_inverse_dim": 0.5,
+                    "ratio": 1.02,
+                    "ratio_ci": [0.9, 1.1],
+                    "verdict": "pass",
+                }
+            },
+            "inverse_dim_reference": 0.5,
+        },
+        "H1b": {
+            "CP": {"slope": 1.0},
+            "PLP": {"slope": 0.9, "ci": [0.85, 0.95]},
+            "verdict": "pass",
+            "reason": None,
+        },
+        "H1c": {
+            "PLP": {"median_ratio": 1.0, "ci": [0.95, 1.05]},
+            "CP": {"median_ratio": 0.5, "ci": [0.4, 0.6]},
+        },
+        "H1d": {
+            "rows": {
+                "analog_seed": {"spearman": 0.8},
+                "estimation_seed": {"spearman": 0.9},
+                "growth": {"spearman": 0.7},
+                "nhat": {"spearman": 0.6},
+            },
+            "verdict": "pass",
+            "reason": None,
+        },
+        "Q-N": {
+            "role": "estimate",
+            "primary": "oracle",
+            "n_w_zero": 30,
+            "n_w_one": 4,
+            "n_test": 120,
+            "oracle": {
+                "logit_w_interior": {
+                    "reading": "reduces",
+                    "delta_r2": 0.01,
+                    "ci": [0.0, 0.02],
+                },
+                "w_zero_indicator": {
+                    "reading": "distinct but small",
+                    "delta_r2": 0.02,
+                    "ci": [0.01, 0.03],
+                },
+                "log_horizon": {"delta_r2": 0.02, "ci": [0.01, 0.03]},
+            },
+            "deployable": {
+                "logit_w_interior": {"reading": "undetermined"},
+                "w_zero_indicator": {"reading": "substantial"},
+            },
+        },
+        "H2a": {
+            "median_range": 0.05,
+            "range_ci": [0.01, 0.08],
+            "n_eligible_states": 120,
+            "part_i_verdict": "pass",
+            "part_ii_verdict": "pass",
+            "n_w_zero": 30,
+            "n_w_one": 4,
+            "part_ii": {
+                "zero": {"partial_corr": 0.02, "ci": [-0.05, 0.08]},
+                "interior": {"partial_corr": -0.03, "ci": [-0.09, 0.04]},
+            },
+        },
+        "H2b": {
+            "noise": {"mean_state_spearman": 0.9},
+            "library_change": {"mean_change": 0.2, "ci": [0.1, 0.3]},
+            "library_curves": {
+                "0.01": {"1000": {"median": 0.7}, "10000": {"median": 0.8}}
+            },
+            "verdict": "pass",
+            "reason": None,
+        },
+        # mean, interval and relative are consistent: relative = mean
+        # / (mean of the reference), with reference means 1.5 (A2) and
+        # 1.0 (A1), so -0.15 / 1.5 = -10% and -0.05 / 1.0 = -5%
+        "H2c": {
+            "A4_minus_A2": {
+                "mean": -0.15,
+                "relative": -0.1,
+                "ci": [-0.2, -0.05],
+                "verdict": "pass",
+                "reason": None,
+            },
+            "best_single": "A1",
+            "A4_minus_A1": {
+                "mean": -0.05,
+                "relative": -0.05,
+                "ci": [-0.1, -0.01],
+                "verdict": "pass",
+                "reason": None,
+            },
+            "A4o_minus_A2": {"relative": -0.2},
+        },
+        "H2d": {"in_distribution_excess": 0.05, "ci": [0.04, 0.06]},
+        "H2e": {
+            "by_noise": {
+                "0.01": {"median_change": 0.1, "ci": [0.05, 0.15]},
+                "0.02": {"median_change": None, "ci": None},
+            },
+            "verdict": "pass",
+            "reason": None,
+        },
+        "gain_bound": {
+            "fraction_within_bound": 0.95,
+            "n_states": 40,
+            "n_total_states": 100,
+            "n_screened_out": {
+                "growth_nonpositive": 3,
+                "censored_single_forecaster": 5,
+                "negative_covariance": 52,
+            },
+            "max_gain_lyapunov": 1.5,
+        },
+        "H3a": {
+            "chosen_K": 3,
+            "logrank_p_holm": [0.004, 0.001],
+            "iqr_lt_mean": 0.4,
+            "verdict": "pass",
+            "reason": None,
+        },
+        "H3b": {
+            "weight_lambda": {"importance": 0.1, "ci": [0.0, 0.15]},
+            "D": {"value": 0.6, "ci": [0.3, 0.8]},
+            "stability": 0.97,
+            "verdict": "pass",
+            "reason": None,
+        },
+        "H3c": {
+            "A5_over_A4_mse": 1.0123,
+            "ci": [0.99, 1.04],
+            "verdict": "pass",
+            "reason": None,
+        },
     }
-    system = {key: dict(value, **{"pass": True}) for key, value in results.items()
-              if key not in skip}
+    system = {
+        key: (
+            value
+            if key == "gain_bound"
+            else (
+                dict(value, **{"pass": True})
+                if key == "Q-N"
+                else {"verdict": "pass", "reason": None, **value, "pass": True}
+            )
+        )
+        for key, value in results.items()
+        if key not in skip
+    }
     system["validation"] = {
-        "delay_jacobian_rel_err": 1e-6, "gain_rel_err": 1e-6, "crlb_ratio_median": 1.0,
-        "cp_median_vpt_lyapunov": 2.0, "km_max_abs_dev": 1e-3, "integrator_max_dev_sigma": 1e-5,
-        "convergence": {str(config.n_oracle_draws): {"median_half_width": 0.01}},
-        "gate": {"gate_pass": True}}
-    system["scores"] = {"A0": {"mse": {h: 1.0 for h in hours}, "regret": {h: 0.1 for h in hours},
-                               "agreement_href": 0.5, "km_median_lyapunov": 1.0,
-                               "rmst_lyapunov": 1.0}}
+        "delay_jacobian_rel_err": 1e-6,
+        "gain_rel_err": 1e-6,
+        "crlb_ratio_median": 1.0,
+        "cp_median_vpt_lyapunov": 2.0,
+        "km_max_abs_dev": 1e-3,
+        "integrator_max_dev_sigma": 1e-5,
+        "convergence": {
+            str(config.n_oracle_draws): {"median_half_width": 0.01}
+        },
+        "gate": {"gate_pass": True},
+    }
+    system["scores"] = {
+        "A0": {
+            "mse": {h: 1.0 for h in hours},
+            "regret": {h: 0.1 for h in hours},
+            "agreement_href": 0.5,
+            "km_median_lyapunov": 1.0,
+            "rmst_lyapunov": 1.0,
+        }
+    }
     system["oracle_recovery"] = {"A4_vs_A4o": 0.5, "A5_vs_Astar": 0.5}
-    system["weight_profile"] = {"horizons": [30, 60], "q25": [0.2, 0.3], "median": [0.4, 0.5],
-                                "q75": [0.6, 0.7]}
+    system["weight_profile"] = {
+        "horizons": [30, 60],
+        "q25": [0.2, 0.3],
+        "median": [0.4, 0.5],
+        "q75": [0.6, 0.7],
+    }
     system["km_curves"] = {"A0": [1.0, 0.8, 0.5]}
-    system["regime_curve"] = {"regret_ratio_by_K": {"2": 0.1, "3": 0.05},
-                              "realized_K": {"2": 2, "3": 3}}
+    system["regime_curve"] = {
+        "regret_ratio_by_K": {"2": 0.1, "3": 0.05},
+        "realized_K": {"2": 2, "3": 3},
+    }
     return system
 
 
-def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(tmp_path: Path) -> None:
-    """The verdict table has one row per table id, in table order; pending rows say so.
+def test_markdown_lists_the_table_ids_in_order_and_marks_pending_rows(
+    tmp_path: Path,
+) -> None:
+    """The verdict table has one row per id, in order; pending rows say so.
 
-    Reference: the 14 rows of the identifier table (decision-log map, order of v3 section 2) and
-    the ROADMAP pending sub-tasks, written out below. The fake results have no ``H2e``, so that
-    row reads "[not computed until WU-0002.7]", its cell "n/a: no result" and its verdict
-    "no result"; the rows with a result and a pending sub-task read "computed with the v1
-    statistic". Exact string checks.
+    Reference: the 14 rows of the identifier table (the decision-log map, in the
+    order of v3 section 2) and the pending markers, written out below. WU-0002.7
+    and .8 computed H2b, H2e, H3a and H3c, and WU-0002.9 decides H2d by its
+    interval, so none of those rows is pending. Q-N is done (WU-0002.6). The
+    gain bound stays pending on the gain-bound screen row (DEC-0016 O2).
+
+    The example with no result is H2d: the fake results leave it out, so its row
+    reads its criterion with no pending note, its cell "n/a: no result" and its
+    verdict "no result". The row with a result and a pending marker
+    ("(reported)") reads "computed with the v1 statistic until the gain-bound
+    screen row". Exact string checks.
     """
     results, config = fake_results("DEV-0")
-    system = fake_system(config, skip=("H2e",))
+    system = fake_system(config, skip=("H2d",))
     results["systems"] = {"lorenz63": system}
     results["verdicts"] = verdicts(results, config)
     write_markdown(results, config, tmp_path / "RESULTS.md")
     lines = (tmp_path / "RESULTS.md").read_text().splitlines()
     start = lines.index("## Hypothesis verdicts")
-    rows = [line for line in lines[start:] if line.startswith("| ") and "---" not in line][1:15]
+    rows = [
+        line
+        for line in lines[start:]
+        if line.startswith("| ") and "---" not in line
+    ][1:15]
     ids = [row.split(" | ")[0][2:] for row in rows]
-    assert ids == ["H1a", "H1b", "H1c", "H1d", "Q-N", "H2a", "H2b", "H2c", "H2d", "H2e",
-                   "(reported)", "H3a", "H3b", "H3c"]
+    assert ids == [
+        "H1a",
+        "H1b",
+        "H1c",
+        "H1d",
+        "Q-N",
+        "H2a",
+        "H2b",
+        "H2c",
+        "H2d",
+        "H2e",
+        "(reported)",
+        "H3a",
+        "H3b",
+        "H3c",
+    ]
     assert ids == [h.v3_id for h in HYPOTHESIS_TABLE]
-    marked = {row.split(" | ")[0][2:]: "[computed with the v1 statistic until " in row
-              for row in rows}
-    assert {i for i, m in marked.items() if m} == {"H1a", "H1b", "H1d", "Q-N", "H2b", "H2d",
-                                                   "H3a", "H3c", "(reported)"}
-    h2e = rows[ids.index("H2e")]
-    assert h2e.endswith("[not computed until WU-0002.7] | n/a: no result | no result |")
+    marked = {
+        row.split(" | ")[0][2:]: "[computed with the v1 statistic until " in row
+        for row in rows
+    }
+    assert {i for i, m in marked.items() if m} == {"(reported)"}
+    qn = rows[
+        ids.index("Q-N")
+    ]  # an estimate: read, never PASS or FAIL (v3 section 7)
+    assert (
+        "reduces: oracle: interior reduces" in qn
+        and "PASS" not in qn
+        and "FAIL" not in qn
+    )
+    assert qn.endswith("| estimate (read, no pass/fail) |")
+    h2d = rows[ids.index("H2d")]
+    assert h2d.endswith(
+        "MSE ratio minus 1 at H_ref; pass if upper bound ≤ 0.10 | n/a: no "
+        "result | no result |"
+    )
     gain = rows[ids.index("(reported)")]
-    assert "within bound 0.95 (n=40, max gain 1.5 LT)" in gain and "PASS" in gain
+    assert (
+        "[computed with the v1 statistic until the gain-bound screen row "
+        "(amendments note "
+        "section 11; ROADMAP row not yet opened)]" in gain
+    )
+    assert (
+        "within bound 0.95 (n=40 of 100; screened out: growth<=0 3, censored "
+        "5, "
+        "covariance<0 52, max gain 1.5 LT)" in gain
+    )
+    assert (
+        "PASS" not in gain
+        and "FAIL" not in gain
+        and gain.endswith("| reported (no pass/fail) |")
+    )
 
 
-def test_verdicts_skip_a_row_without_results_and_raise_on_a_partial_one() -> None:
-    """``verdicts`` has no entry (and no ``KeyError``) for a key absent in every system.
+def test_verdicts_skip_a_row_without_results_and_raise_on_a_partial_one() -> (
+    None
+):
+    """``verdicts`` skips a key absent everywhere and raises on a partial key.
 
-    Reference: the plan for WU-0002.2 (v3 H2e has no result until WU-0002.7, so it is skipped,
-    not an error; V7 is not a hypothesis). With every other row true on every system, the
-    verdict is "supported" for the other 13 keys. A key present in one system only still raises
-    ``KeyError`` (a missing result is not silently dropped). Exact.
+    Reference: the plan for WU-0002.2. H2e has no result in this example, so it
+    is skipped rather than an error (V7 is not a hypothesis). With every other
+    row passing on both systems, the overall verdict is "inconclusive" for the
+    11 decided keys, because chua was not run (v3 section 7 and DEC-0016 O1: a
+    missing system is not a pass). The result lists ``missing_systems ==
+    ["chua"]`` and the verdict strings in ``by_system``.
+
+    Q-N (an estimate) carries the oracle interior reading and no pass/fail
+    verdict, and the gain bound is "reported". A key present in one system only
+    still raises ``KeyError``, so a missing result is never silently dropped.
+    Exact checks.
     """
     config = dataclasses.replace(SMOKE, core_systems=("lorenz63", "rossler"))
-    two = {"lorenz63": fake_system(config, skip=("H2e",)),
-           "rossler": fake_system(config, skip=("H2e",))}
+    two = {
+        "lorenz63": fake_system(config, skip=("H2e",)),
+        "rossler": fake_system(config, skip=("H2e",)),
+    }
     out = verdicts({"systems": two}, config)
     assert "H2e" not in out and "V7" not in out
     assert list(out) == [h.key for h in HYPOTHESIS_TABLE if h.key != "H2e"]
-    assert {v["verdict"] for v in out.values()} == {"supported"}
-    assert all(v["by_system"] == {"lorenz63": True, "rossler": True} for v in out.values())
-    partial = {"lorenz63": fake_system(config), "rossler": fake_system(config, skip=("H2e",))}
+    pass_fail = {
+        key: v for key, v in out.items() if key not in ("Q-N", "gain_bound")
+    }
+    assert len(pass_fail) == 11
+    assert {v["verdict"] for v in pass_fail.values()} == {"inconclusive"}
+    assert all(
+        v["by_system"] == {"lorenz63": "pass", "rossler": "pass"}
+        and v["missing_systems"] == ["chua"]
+        for v in pass_fail.values()
+    )
+    assert out["gain_bound"] == {
+        "by_system": {"lorenz63": "reported", "rossler": "reported"},
+        "verdict": "reported (no pass/fail)",
+    }
+    # Q-N is an estimate (WU-0002.6(c)): the interior reading of the
+    # oracle profile, no pass/fail.
+    assert out["Q-N"] == {
+        "by_system": {"lorenz63": "reduces", "rossler": "reduces"},
+        "verdict": "estimate (read, no pass/fail)",
+    }
+    partial = {
+        "lorenz63": fake_system(config),
+        "rossler": fake_system(config, skip=("H2e",)),
+    }
     with pytest.raises(KeyError):
         verdicts({"systems": partial}, config)
 
 
 def test_key_numbers_are_exact_for_every_v3_key() -> None:
-    """``_key_number`` returns the formatted numbers of each result, keyed by the table key.
+    """``_key_number`` formats the numbers of every v3 table key exactly.
 
-    Reference: hand formatting of the synthetic values of ``fake_system`` with the ``.3g`` rule of
-    ``_fmt`` (``.2g`` where the report asks for two digits, ``.4g`` for A5/A4), worked out from
-    the values, e.g. 100 * 0.05 = 5 so "5%". The H1a and H2b strings name ``n_lib``. Exact.
-    The v3 H2e has no number yet (it is not computed), so it is not in the table below.
+    Reference: hand formatting of the synthetic values of ``fake_system`` with
+    the three-significant-digit rule of ``_fmt`` (two digits where the report
+    asks for two, four for A5/A4). For example 100 * 0.05 = 5 gives "5%", 100 *
+    -0.1 = -10 gives "-10%", and the H2d interval [0.04, 0.06] gives "[4, 6]%".
+    The H1a and H2b strings name ``n_lib``. H2e shows a missing 2% value as
+    ``n/a``. Exact checks.
     """
     system = fake_system(SMOKE)
     expected = {
-        "H1a": "rho=0.01: 1/d (n_lib fit)=0.5 (1/d_LB=0.5)",
-        "H1b": "CP 1, PLP 0.9",
-        "H1c": "PLP 1, CP 0.5",
-        "H1d": "eps 0.8, delta 0.9, Lambda 0.7, N 0.6",
-        "Q-N": "redundant: dR2 w 0.01 [0, 0.02], T 0.02 [0.01, 0.03]; oracle: adds information",
-        "H2a": "range 0.05 (CI hi 0.08); partial r 0.02",
-        "H2b": "rho rank corr 0.9; n_lib@0.01: w*(n_lib max)=0.8",
-        "H2c": "A4-A2 -10%; A4-A1 -5%",
-        "H2d": "A4/A3-1 = 5%",
-        "gain_bound": "within bound 0.95 (n=40, max gain 1.5 LT)",
-        "H3a": "K=3: regret 4%, IQR 0.4 LT",
-        "H3b": "Lambda imp: weight 0.1, horizon 0.6",
-        "H3c": "A5/A4 1.012",
+        "H1a": "rho=0.01: 1/d (n_lib fit)=0.5, ratio 1.02 [0.9, 1.1] pass "
+        "(1/d_LB=0.5)",
+        "H1b": "CP 1, PLP 0.9 [0.85, 0.95]: pass",
+        "H1c": "PLP 1 [0.95, 1.05]: pass; CP 0.5 [0.4, 0.6] (reported, no "
+        "verdict)",
+        "H1d": "eps 0.8, delta 0.9, Lambda 0.7, N 0.6: pass",
+        "Q-N": "oracle: interior reduces (dR2 0.01 [0, 0.02]), w*=0 distinct "
+        "but small (dR2 0.02 [0.01, 0.03]), log T dR2 0.02 [0.01, 0.03]; "
+        "deployable interior undetermined, w*=0 substantial (w*=0: 30, w*=1: "
+        "4)",
+        "H2a": "(i) pass: range 0.05 (CI hi 0.08, n=120); (ii) pass: partial r "
+        "zero 0.02 [-0.05, 0.08], interior -0.03 [-0.09, 0.04] (w*=0: 30, "
+        "w*=1: 4)",
+        "H2b": "rho rank corr 0.9; n_lib 10^3->10^4 change 0.2 [0.1, 0.3]: "
+        "pass",
+        "H2c": "A4-A2 -0.15 [-0.2, -0.05] (-10%) pass; A4-A1 -0.05 [-0.1, "
+        "-0.01] (-5%) pass; A4o-A2 -20% (reported): pass",
+        "H2d": "A4/A3-1 = 5% [4, 6]%: pass",
+        "H2e": "rho=0.01: median change 0.1 [0.05, 0.15]; rho=0.02: median "
+        "change n/a n/a: pass",
+        "gain_bound": "within bound 0.95 (n=40 of 100; screened out: growth<=0 "
+        "3, censored 5, covariance<0 52, max gain 1.5 LT)",
+        "H3a": "K=3: largest Holm p 0.004, IQR 0.4 LT: pass",
+        "H3b": "Lambda imp: weight 0.1 [0, 0.15], D 0.6 [0.3, 0.8], stability "
+        "0.97: pass",
+        "H3c": "A5/A4 1.012 [0.99, 1.04]: pass",
     }
     assert {key: _key_number(key, system) for key in expected} == expected
-    assert set(expected) == {h.key for h in HYPOTHESIS_TABLE} - {"H2e"}
+    assert set(expected) == {h.key for h in HYPOTHESIS_TABLE}
 
 
-def test_library_figure_axis_reads_n_lib(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The library-size figure's x-label is "Library size n_lib" and the regime figure is drawn.
+def test_key_numbers_h1_show_fail_and_inconclusive_with_reason() -> None:
+    """The H1 key numbers show fail and inconclusive, with the reason (R1).
 
-    Reference: the WU-0002.2 acceptance (every figure axis for library size reads ``n_lib``). The
-    figures are kept open by replacing ``plt.close`` for the call (restored by ``monkeypatch``),
-    then read through matplotlib's ``get_xlabel``. The regret-vs-K figure reads ``regime_curve``,
-    so it exists and is labelled "Number of regimes K". Exact string checks.
+    Reference: v3 section 7 (pass, fail and inconclusive are separate
+    categories) and the strings of review fix R1, written out by hand. An
+    inconclusive row must not read as a fail. The H1b string for the smoke's PLP
+    slope 0.801 [0.744, 0.95] says "inconclusive (interval meets band edge)", an
+    H1d with a failing row says "fail", and an H1a rho with fewer than 50 states
+    says "n_states < 50". Exact string checks.
+    """
+    system = fake_system(SMOKE)
+    system["H1b"] = {
+        "CP": {"slope": 1.51},
+        "PLP": {"slope": 0.801, "ci": [0.744, 0.95]},
+        "verdict": "inconclusive",
+        "reason": "interval meets band edge",
+    }
+    system["H1d"] = dict(system["H1d"], verdict="fail", reason=None)
+    system["H1a"] = {
+        "by_noise": {
+            "0.01": {
+                "fitted_inverse_dim": 0.5,
+                "ratio": 1.0,
+                "ratio_ci": [0.9, 1.1],
+                "verdict": "inconclusive",
+                "reason": "n_states < 50",
+            }
+        },
+        "inverse_dim_reference": 0.5,
+    }
+    assert (
+        _key_number("H1b", system) == "CP 1.51, PLP 0.801 [0.744, 0.95]: "
+        "inconclusive (interval meets band edge)"
+    )
+    assert (
+        _key_number("H1d", system)
+        == "eps 0.8, delta 0.9, Lambda 0.7, N 0.6: fail"
+    )
+    assert _key_number("H1a", system) == (
+        "rho=0.01: 1/d (n_lib fit)=0.5, ratio 1 [0.9, 1.1] inconclusive "
+        "(n_states < 50) (1/d_LB=0.5)"
+    )
+
+
+def test_key_numbers_of_wu_0002_7_8_rows_show_the_verdict_and_the_reason() -> (
+    None
+):
+    """The H2b, H3a and H3b key numbers end with the verdict and any reason.
+
+    Reference: hand strings built with the same number-format rule as the H1
+    test above (the DEC-0012 contract of ``verdict`` and ``reason``, review R1).
+    An inconclusive result must read as such, not as a fail. Exact string
+    checks.
+    """
+    system = fake_system(SMOKE)
+    system["H3b"] = dict(
+        system["H3b"],
+        verdict="inconclusive",
+        reason="D: interval meets band edge",
+    )
+    system["H3a"] = dict(
+        system["H3a"], verdict="inconclusive", reason="n_states < 50"
+    )
+    system["H2b"] = dict(system["H2b"], verdict="fail", reason=None)
+    assert _key_number("H3b", system) == (
+        "Lambda imp: weight 0.1 [0, 0.15], D 0.6 [0.3, 0.8], stability 0.97: "
+        "inconclusive (D: interval meets band edge)"
+    )
+    assert (
+        _key_number("H3a", system)
+        == "K=3: largest Holm p 0.004, IQR 0.4 LT: inconclusive (n_states < 50)"
+    )
+    assert _key_number("H2b", system).endswith("[0.1, 0.3]: fail")
+
+
+def test_library_figure_axis_reads_n_lib(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The library-size figure's x-label reads "Library size n_lib".
+
+    The regret-versus-K figure must also be drawn.
+
+    Reference: the WU-0002.2 acceptance rule (every figure axis for library size
+    reads ``n_lib``). The figures are kept open by replacing ``plt.close`` for
+    the call (``monkeypatch`` restores it), then read through matplotlib's
+    ``get_xlabel``. The regret-versus-K figure reads ``regime_curve``, so it
+    must exist and be labeled "Number of regimes K". Exact string checks.
     """
     real_close = plt.close
     monkeypatch.setattr(report.plt, "close", lambda fig=None: None)
@@ -268,26 +782,1542 @@ def test_library_figure_axis_reads_n_lib(tmp_path: Path, monkeypatch: pytest.Mon
     results["systems"] = {"lorenz63": fake_system(config)}
     try:
         written = make_figures(results, config, tmp_path)
-        labels = [fig.axes[0].get_xlabel() for fig in map(plt.figure, plt.get_fignums())]
+        labels = [
+            fig.axes[0].get_xlabel()
+            for fig in map(plt.figure, plt.get_fignums())
+        ]
     finally:
         real_close("all")
     assert [path.name for path in written] == [
-        "separation_weight_vs_horizon.png", "kaplan_meier_by_rule.png",
-        "regret_vs_regimes.png", "knob_response_library.png"]
-    assert labels[2] == "Number of regimes K" and labels[3] == "Library size n_lib"
+        "separation_weight_vs_horizon.png",
+        "kaplan_meier_by_rule.png",
+        "regret_vs_regimes.png",
+        "knob_response_library.png",
+    ]
+    assert (
+        labels[2] == "Number of regimes K" and labels[3] == "Library size n_lib"
+    )
 
 
 def test_verdicts_refuse_a_results_file_older_than_the_v3_identifiers() -> None:
-    """A system with v1 keys (H1e, H1f, H3d) makes ``verdicts`` raise before any flag is read.
+    """``verdicts`` refuses results that use the old v1 keys.
 
-    Reference: the decision-log correction table (v1 keys H1e, H1f and H3d no longer exist; the
-    same keys H1a to H1d, H3b and H3c now mean other statistics, so relabelling would be a
-    silent mislabel). The synthetic stale system is a current one plus the v1 keys. A current
-    system passes. Exact: the exception type and the key names in the message.
+    A system with the keys H1e, H1f and H3d makes ``verdicts`` raise before any
+    flag is read.
+
+    Reference: the decision-log correction table. The v1 keys H1e, H1f and H3d
+    no longer exist, and the keys H1a to H1d, H3b and H3c now mean other
+    statistics, so relabeling them would silently mislabel old results. The
+    stale test system is a current one plus the v1 keys. A current system
+    passes. Exact: the exception type and the key names in the message.
     """
     config = SMOKE
     stale = fake_system(config)
-    stale.update({"H1e": {"pass": True}, "H1f": {"pass": True}, "H3d": {"pass": True}})
-    with pytest.raises(ValueError, match="H1e.*H1f.*H3d|schema older than WU-0002.2"):
+    stale.update(
+        {"H1e": {"pass": True}, "H1f": {"pass": True}, "H3d": {"pass": True}}
+    )
+    with pytest.raises(
+        ValueError, match="H1e.*H1f.*H3d|schema older than WU-0002.2"
+    ):
         verdicts({"systems": {"lorenz63": stale}}, config)
-    assert len(verdicts({"systems": {"lorenz63": fake_system(config)}}, config)) == 14
+    assert (
+        len(verdicts({"systems": {"lorenz63": fake_system(config)}}, config))
+        == 14
+    )
+
+
+def test_markdown_validation_table_has_the_two_v7_rows(tmp_path: Path) -> None:
+    """The validation table lists the two V7 rows, with PASS or FAIL, or "n/a".
+
+    The rows are the efficiency at every rho and the slope.
+
+    Reference: the WU-0002.10 plan, with hand strings built from the fake V7
+    dictionaries. System A passes everywhere (efficiencies 0.95 and 1.04, slope
+    1.05). System B fails one level (0.9 to 1.3) and the slope (1.2). System C
+    has no V7 result and must render "n/a" without raising. The rows read the
+    flags in the dictionary, not the numbers. Exact checks.
+    """
+    # WU-0002.9 plan-listed edit (R4): the config is a pilot one, because
+    # at the smoke preset the V7 row names carry the plumbing label
+    # (tested in test_markdown_labels_v7_as_plumbing_at_smoke).
+    config = dataclasses.replace(
+        SMOKE, name="pilot", core_systems=("lorenz63", "rossler", "chua")
+    )
+    results, _ = fake_results("DEV-0")
+    systems = {name: fake_system(config) for name in config.core_systems}
+    systems["lorenz63"]["V7"] = {
+        "median_slope": 1.05,
+        "slope_pass": True,
+        "pass": True,
+        "efficiency_median_by_noise": {"0.01": 0.95, "0.02": 1.04},
+        "efficiency_pass_by_noise": {"0.01": True, "0.02": True},
+    }
+    systems["rossler"]["V7"] = {
+        "median_slope": 1.2,
+        "slope_pass": False,
+        "pass": False,
+        "efficiency_median_by_noise": {"0.01": 0.9, "0.02": 1.3},
+        "efficiency_pass_by_noise": {"0.01": True, "0.02": False},
+    }
+    results["systems"] = systems
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    table = lines[lines.index("## Validation gate") :]
+    assert (
+        "| V7 median δ/(ρν), every ρ | [0.9, 1.1] | 0.95–1.04 PASS | 0.9–1.3 "
+        "FAIL | n/a |" in table
+    )
+    assert (
+        "| V7 median slope of ln δ on ln ρ | [0.9, 1.1] | 1.05 PASS | 1.2 FAIL "
+        "| n/a |" in table
+    )
+    names = [row.split(" | ")[0][2:6] for row in table if row.startswith("| V")]
+    assert names == [
+        "V1 d",
+        "V1 a",
+        "V2 l",
+        "V3 C",
+        "V4 w",
+        "V5 K",
+        "V6 R",
+        "V7 m",
+        "V7 m",
+    ]
+
+
+def test_markdown_lyapunov_section_has_comparisons_convention_and_referent(
+    tmp_path: Path,
+) -> None:
+    """The validation section compares lambda_max with published values.
+
+    Reference: hand strings (WU-0007.3 plan and amendment A6). Fake lambda_max
+    for lorenz63 is 0.9, which gives 0.9 / 0.90563 - 1 = -0.00622, shown as
+    "-0.62%", inside 1% (PASS). Rossler 0.08 gives 0.08 / 0.0714 - 1 = +0.12045
+    ("+12.04%") and 0.08 / 0.07062 - 1 = +0.13282 ("+13.28%"), both outside 3%
+    (FAIL, with the LPC.NV.1 phrase). Chua 0.43 has no reference, so the row
+    shows the limitation text and no difference.
+
+    The memo row names the unit test and says the parameter set is a different
+    one. The LPC.NV.1 convention sentence, the NVVUQ.13 real-world-referent
+    sentence and the report-only sentence are checked word for word. A lorenz63
+    result without ``context`` gives "n/a" cells, not a skipped row (PRIME.4).
+
+    Tolerance: none, because the strings are exact. The percentages are rounded
+    to 2 decimals by the format, and the hand values 12.0448 and 13.2822 are far
+    from any rounding edge.
+    """
+    config = dataclasses.replace(
+        SMOKE, core_systems=("lorenz63", "rossler", "chua")
+    )
+    results, _ = fake_results("DEV-0")
+    values = {"lorenz63": 0.9, "rossler": 0.08, "chua": 0.43}
+    systems = {name: fake_system(config) for name in config.core_systems}
+    for name, value in values.items():
+        systems[name]["context"] = {"lambda_max": value}
+    results["systems"] = systems
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    start = lines.index(
+        "### Largest Lyapunov exponent against published values"
+    )
+    assert start > lines.index("## Validation gate")
+    section = lines[start:]
+    assert (
+        "| lorenz63 | 0.9 | 0.9056 | Sprott, "
+        "sprott.physics.wisc.edu/chaos/lespec.htm "
+        "(confirmed) | -0.62% | PASS: within 1% |" in section
+    )
+    assert (
+        "| rossler | 0.08 | 0.0714 | Sprott as cited by Bogdanov and "
+        "Bogdanova, arXiv:1412.2242 (secondary) | +12.04% | FAIL: outside 3%; "
+        "step size suspected "
+        "(LPC.NV.1), reported, not tuned |" in section
+    )
+    assert (
+        "| rossler | 0.08 | 0.07062 | Bogdanov and Bogdanova, arXiv:1412.2242, "
+        "own estimate 0.07062 ± 0.00066 (primary) | +13.28% | FAIL: outside "
+        "3%; step size suspected "
+        "(LPC.NV.1), reported, not tuned |" in section
+    )
+    assert (
+        "| chua | 0.43 | none | no confirmed published value | n/a | not "
+        "validated: no published reference at these parameters (known "
+        "limitation, NVVUQ.13, DEC-0010) |" in section
+    )
+    memo = next(
+        row for row in section if row.startswith("| chua, memo parameter set")
+    )
+    assert (
+        "| 0.3286 |" in memo
+        and "within 10% is asserted by `tests/unit/test_data.py::"
+        "test_lyapunov_cached_matches_published_reference[chua_memo]`" in memo
+    )
+    assert (
+        "a different parameter set from the study's: validates the routine and "
+        "the field "
+        "form, not the study's Chua parameters |" in memo
+    )
+    assert (
+        "Every quantity is defined for the fixed-step RK4 flow map at the "
+        "configured observation interval, not for the continuous ODE "
+        "(LPC.NV.1). λ_max is estimated on that map by Benettin's method and "
+        "compared in natural time units with published values for the "
+        "continuous systems."
+    ) in section
+    assert (
+        "Validation against a real-world referent does not apply: the three "
+        "systems are mathematical models (NVVUQ.13)."
+    ) in section
+    assert (
+        "Chua at the study's own parameters (α=15.6, β=28, m0=−1.143, "
+        "m1=−0.714) has no confirmed published value (known limitation, "
+        "NVVUQ.13, DEC-0010): its λ_max is reported but not validated."
+    ) in section
+    assert (
+        "This comparison is report-only: it does not enter the validation gate "
+        "or any verdict."
+    ) in section
+
+    bare_config = dataclasses.replace(SMOKE, core_systems=("lorenz63",))
+    bare, _ = fake_results("DEV-0")
+    bare["systems"] = {"lorenz63": fake_system(bare_config)}
+    bare["verdicts"] = verdicts(bare, bare_config)
+    write_markdown(bare, bare_config, tmp_path / "BARE.md")
+    rows = (tmp_path / "BARE.md").read_text().splitlines()
+    assert (
+        "| lorenz63 | n/a | 0.9056 | Sprott, "
+        "sprott.physics.wisc.edu/chaos/lespec.htm "
+        "(confirmed) | n/a | n/a: no λ_max in the results |" in rows
+    )
+
+
+THREE = ("lorenz63", "rossler", "chua")
+INTRO_TEXT = (
+    "Generated by `python -m lpcstudy`. Each criterion is decided per system "
+    "by its interval against the pre-registered band of the proposal (v3 §2): "
+    "pass, fail or inconclusive. A hypothesis is *supported* if it passes on "
+    "all three systems, *not supported* if it fails on at least one, and "
+    "*inconclusive* otherwise; a system that was not run counts as "
+    "inconclusive (v3 §7). A validation-gate FAIL marks that system's results "
+    "provisional (v3 §6 E0); it does not change the verdicts."
+)
+V7_LABEL = " (smoke: plumbing-size numbers, judged at pilot size; DEC-0015)"
+SMOKE_NOTE = (
+    "Note: at the smoke preset a gate FAIL is expected. V7 is a plumbing check "
+    "there, judged at pilot size and above (DEC-0015)."
+)
+
+
+# WU-0002.11b: the Handling section of RESULTS.md (DEF-0001: nothing silent).
+# (A delimited block, kept away from the end of the file.)
+def _handling_results(tmp_path: Path) -> tuple[list[str], dict]:
+    """Build a fake ``handling`` block and return its Handling section.
+
+    The function returns the lines of the section and the results dictionary
+    used.
+
+    The second returned value is the results dictionary used.
+    """
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    zero = {
+        "invariant_mean_replacements": 0,
+        "error_clips_cp": 1,
+        "curvature_floor": 0,
+        "zero_variance_corr": 5,
+        "zero_variance_corr_cp": 5,
+    }
+    system["handling"] = {
+        "schema": "lpcstudy.handling/1",
+        "cells": {
+            "base|rho=0.01|n_lib=10000|core": {
+                "counts": dict(zero),
+                "by_kind": {},
+                "denominators": {"estimates": 100, "moment_entries": 40},
+                "evaluation": {
+                    "counts": {"nu_cap_clips": 8, "closed_form_floor_a4": 0},
+                    "by_split": {"nu_cap_clips": {"test": 8}},
+                    "denominators": {"nu_cap_estimates": 260},
+                },
+            },
+            "V3-cp-horizon": {
+                "counts": dict.fromkeys(zero, 0),
+                "by_kind": {},
+                "denominators": {"estimates": 7},
+            },
+        },
+        "oracles": {
+            "test": {
+                "counts": {"oracle_nonfinite": 0, "local_dim_zero_distance": 2},
+                "denominators": {"states": 80},
+            }
+        },
+        "fitting": {
+            "counts": {"empty_regime_fallback": 0, "pooled_curvature_floor": 0},
+            "denominators": {"regimes": 9},
+        },
+        "result_counts": {
+            "H1b/PLP/n_floored": 2,
+            "H1b/CP/n_floored": 3,
+            "H2b/noise/n_dropped_resamples": 0,
+            "H1a/by_noise/0.01/n_exponent_at_bound/point": 1,
+        },
+        "totals": {},
+    }
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    results["handling"] = {
+        "schema": "lpcstudy.handling/1",
+        "totals": {
+            "zero_variance_corr": 5,
+            "error_clips_cp": 1,
+            "nu_cap_clips": 8,
+            "curvature_floor": 0,
+        },
+        "by_system": {},
+        "robustness": {},
+        "failed_variants": 2,
+    }
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    return (
+        lines[lines.index("## Handling (DEF-0001: nothing silent)") :],
+        results,
+    )
+
+
+def test_handling_section_lists_only_nonzero_counters(
+    tmp_path: Path,
+) -> None:
+    """The Handling section lists only nonzero counters, by block and path.
+
+    Reference: the hand-built block of ``_handling_results``, whose nonzero
+    entries are written out in the expected lines below. A zero counter, the V3
+    block that holds only zeros, and the zero result count must not appear.
+    Pipes in a block id are escaped so each table row keeps its cells. Sentinels
+    (counters that should be 0 by a theorem hypothesis or by construction:
+    ``error_clips_cp``, ``local_dim_zero_distance``, ``H1b/PLP/n_floored``) are
+    labeled; rate counters are not. Exact string checks.
+    """
+    section, _ = _handling_results(tmp_path)
+    text = "\n".join(section)
+    assert section[0] == "## Handling (DEF-0001: nothing silent)"
+    assert "### lorenz63" in section
+    assert (
+        "| `base\\|rho=0.01\\|n_lib=10000\\|core` | error_clips_cp = 1 "
+        "(sentinel); zero_variance_corr = 5; zero_variance_corr_cp = 5 | "
+        "estimates 100; moment_entries 40 |"
+    ) in section  # counters in the block's own order
+    assert (
+        "| `base\\|rho=0.01\\|n_lib=10000\\|core/evaluation` | nu_cap_clips = "
+        "8 | nu_cap_estimates 260 |"
+    ) in section
+    assert (
+        "| `oracles/test` | local_dim_zero_distance = 2 (sentinel) | states 80 "
+        "|" in section
+    )
+    assert "| `H1b/PLP/n_floored` (sentinel) | 2 |" in section
+    assert "| `H1b/CP/n_floored` | 3 |" in section
+    assert "| `H1a/by_noise/0.01/n_exponent_at_bound/point` | 1 |" in section
+    for absent in (
+        "V3-cp-horizon",
+        "n_dropped_resamples",
+        "pooled_curvature_floor",
+        "empty_regime_fallback",
+        "curvature_floor",
+        "oracle_nonfinite",
+        "invariant_mean_replacements",
+    ):
+        assert absent not in text, absent
+    assert (
+        "Run totals (main systems): zero_variance_corr = 5; error_clips_cp = 1 "
+        "(sentinel); "
+        "nu_cap_clips = 8." in section
+    )
+    assert "Robustness variants that raised (`failed_variants`): 2." in section
+
+
+def test_handling_section_marks_nothing_provisional_and_says_so(
+    tmp_path: Path,
+) -> None:
+    """The Handling section only reports; no result is marked provisional.
+
+    This is the ruling of Q6, DEC-0017.
+
+    Reference: the plan (Q6 proposed "report only"; the rule for sentinels and a
+    collapsed nu cap is the owner's to make). The text must say both facts. The
+    validation-gate sentence of the verdict table is unchanged: the section adds
+    no "provisional" mark anywhere else.
+    """
+    section, _ = _handling_results(tmp_path)
+    text = "\n".join(section)
+    assert "none marks a result provisional" in text and "owner" in text
+    # fix R3 of WU-0002.11b: the two statements about what is not listed
+    # or not logged
+    assert "result counts have no log line" in text
+    assert (
+        "counters of the robustness variants are there too, under "
+        "`handling.robustness`, "
+        "and are not listed here" in text
+    )
+    assert "`run.log` has one line per nonzero counter." not in text
+    assert (
+        "FAIL (results provisional)" not in text
+    )  # the gate's mark is not added here
+
+
+def test_handling_section_all_zero_and_absent_block(tmp_path: Path) -> None:
+    """All-zero counters read "none nonzero"; a missing block is stated.
+
+    Results with no handling block say so; nothing is silent.
+
+    Reference: the two branches written out by hand. Exact lines.
+    """
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    system["handling"] = {
+        "schema": "lpcstudy.handling/1",
+        "cells": {
+            "core": {
+                "counts": {"error_clips_cp": 0},
+                "denominators": {"estimates": 3},
+            }
+        },
+        "oracles": {},
+        "fitting": {"counts": {"empty_regime_fallback": 0}, "denominators": {}},
+        "result_counts": {"H2b/noise/n_dropped_resamples": 0},
+        "totals": {},
+    }
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    results["handling"] = {
+        "schema": "lpcstudy.handling/1",
+        "totals": {"error_clips_cp": 0},
+        "by_system": {},
+        "robustness": {},
+        "failed_variants": 0,
+    }
+    write_markdown(results, config, tmp_path / "ZERO.md")
+    zero = (tmp_path / "ZERO.md").read_text().splitlines()
+    zero = zero[zero.index("## Handling (DEF-0001: nothing silent)") :]
+    assert "Run totals (main systems): no counter is nonzero." in zero
+    assert "No counter of any block is nonzero." in zero
+    assert "No result count is nonzero." in zero
+    assert not any(line.startswith("| `") for line in zero)
+
+    del results["handling"]
+    del system["handling"]
+    write_markdown(results, config, tmp_path / "OLD.md")
+    old = (tmp_path / "OLD.md").read_text().splitlines()
+    old = old[old.index("## Handling (DEF-0001: nothing silent)") :]
+    assert (
+        old[-1]
+        == "No `handling` block in these results (written before WU-0002.11)."
+    )
+
+
+def _three_systems(config: StudyConfig, h2a: tuple[str, str, str]) -> dict:
+    """Return results of three systems with the given H2a verdicts.
+
+    All other rows pass.
+    """
+    systems = {name: fake_system(config) for name in THREE}
+    for name, verdict in zip(THREE, h2a):
+        systems[name]["H2a"] = dict(
+            systems[name]["H2a"], verdict=verdict, reason=None
+        )
+    return {"systems": systems}
+
+
+def test_verdicts_overall_rule_over_the_three_v3_systems() -> None:
+    """``verdicts`` applies the overall rule of v3 section 7 to three systems.
+
+    It returns the verdict strings per system and the overall verdict.
+
+    Reference (plan R1): v3 section 7 ("supported: pass on all three systems;
+    not supported: fail on at least one; inconclusive: otherwise") and DEC-0016
+    O1, as a hand table over the H2a verdicts of three systems. (pass, pass,
+    pass) is supported. Any fail is not supported, whatever the others are. All
+    inconclusive, or two pass and one inconclusive, is inconclusive and never
+    "not supported". ``missing_systems`` is empty for three systems.
+
+    With the smoke config (``core_systems == ("lorenz63",)``) a lone pass reads
+    inconclusive with ``missing_systems == ["rossler", "chua"]`` (the required
+    systems are the three v3 systems, not whatever the config lists), and a lone
+    fail reads not supported. A system outside the three raises. A decided row
+    with ``pass`` and no ``verdict``, or an unknown verdict, also raises (stale
+    schema, R3). Exact checks.
+    """
+    config = dataclasses.replace(SMOKE, name="pilot", core_systems=THREE)
+    table = [
+        (("pass", "pass", "pass"), "supported"),
+        (("pass", "fail", "pass"), "not supported"),
+        (("fail", "inconclusive", "pass"), "not supported"),
+        (("inconclusive", "inconclusive", "inconclusive"), "inconclusive"),
+        (("pass", "pass", "inconclusive"), "inconclusive"),
+        (("pass", "inconclusive", "fail"), "not supported"),
+    ]
+    for flags, want in table:
+        out = verdicts(_three_systems(config, flags), config)["H2a"]
+        assert out == {
+            "by_system": dict(zip(THREE, flags)),
+            "verdict": want,
+            "missing_systems": [],
+        }, flags
+    lone = lambda verdict: {
+        "systems": {
+            "lorenz63": dict(
+                fake_system(SMOKE),
+                H2a=dict(fake_system(SMOKE)["H2a"], verdict=verdict),
+            )
+        }
+    }
+    assert SMOKE.core_systems == ("lorenz63",)
+    assert verdicts(lone("pass"), SMOKE)["H2a"] == {
+        "by_system": {"lorenz63": "pass"},
+        "verdict": "inconclusive",
+        "missing_systems": ["rossler", "chua"],
+    }
+    assert verdicts(lone("fail"), SMOKE)["H2a"]["verdict"] == "not supported"
+    assert (
+        verdicts(lone("inconclusive"), SMOKE)["H2a"]["verdict"]
+        == "inconclusive"
+    )
+
+    odd = dataclasses.replace(SMOKE, core_systems=("lorenz96",))
+    with pytest.raises(ValueError, match="lorenz96"):
+        verdicts({"systems": {"lorenz96": fake_system(odd)}}, odd)
+    old = fake_system(SMOKE)
+    old["H2a"] = {"pass": True}
+    with pytest.raises(ValueError, match="no verdict.*WU-0002.9"):
+        verdicts({"systems": {"lorenz63": old}}, SMOKE)
+    old["H2a"] = {"pass": True, "verdict": "maybe"}
+    with pytest.raises(ValueError, match="no verdict"):
+        verdicts({"systems": {"lorenz63": old}}, SMOKE)
+
+
+def test_markdown_flags_inconclusive_rows_gain_bound_has_none(
+    tmp_path: Path,
+) -> None:
+    """Flags read PASS, FAIL or INCONCLUSIVE; the gain bound has none.
+
+    The intro sentence must also be exact.
+
+    The intro sentence must also be exact.
+
+    The intro sentence must also be exact.
+
+    Reference (plan R2): hand strings. With H2a inconclusive on all three
+    systems the row has three "INCONCLUSIVE" cells, no "FAIL", no "not
+    supported", and ends "| inconclusive |". With one fail (and the rest
+    passing) it has one "FAIL" and ends "| not supported |". With only two
+    systems run, the overall cell names the missing one: "inconclusive (missing:
+    chua)".
+
+    The gain-bound row has no PASS, FAIL or INCONCLUSIVE and ends "| reported
+    (no pass/fail) |". Q-N keeps "| estimate (read, no pass/fail) |". The intro
+    sentence equals the hand string ``INTRO_TEXT`` exactly, and the old wording
+    ("§M9", "partially supported") is gone. Exact checks.
+    """
+    config = dataclasses.replace(SMOKE, name="pilot", core_systems=THREE)
+
+    def rows_of(results: dict) -> tuple[dict[str, str], list[str]]:
+        """Write the report for ``results``; return the verdict rows."""
+        results = dict(results, config={}, verdicts=None)
+        results["verdicts"] = verdicts(results, config)
+        results["provenance"] = None
+        write_markdown(results, config, tmp_path / "R.md")
+        lines = (tmp_path / "R.md").read_text().splitlines()
+        start = lines.index("## Hypothesis verdicts")
+        table = [
+            ln
+            for ln in lines[start:]
+            if ln.startswith("| ") and "---" not in ln
+        ][1:15]
+        return {row.split(" | ")[0][2:]: row for row in table}, lines
+
+    rows, lines = rows_of(_three_systems(config, ("inconclusive",) * 3))
+    h2a = rows["H2a"]
+    assert (
+        h2a.count("INCONCLUSIVE") == 3
+        and "FAIL" not in h2a
+        and "not supported" not in h2a
+    )
+    assert h2a.endswith("| inconclusive |")
+    assert INTRO_TEXT in lines and "§M9" not in "\n".join(lines)
+    assert "partially supported" not in "\n".join(lines)
+    gain = rows["(reported)"]
+    assert not any(word in gain for word in ("PASS", "FAIL", "INCONCLUSIVE"))
+    assert gain.endswith("| reported (no pass/fail) |")
+    assert rows["Q-N"].endswith("| estimate (read, no pass/fail) |")
+    rows, _ = rows_of(_three_systems(config, ("pass", "fail", "pass")))
+    assert rows["H2a"].count("FAIL") == 1 and rows["H2a"].count("PASS") == 2
+    assert rows["H2a"].endswith("| not supported |")
+    assert rows["H1a"].endswith("| supported |")
+
+    two = dataclasses.replace(config, core_systems=("lorenz63", "rossler"))
+    results = {
+        "config": {},
+        "provenance": None,
+        "systems": {n: fake_system(two) for n in two.core_systems},
+    }
+    results["verdicts"] = verdicts(results, two)
+    write_markdown(results, two, tmp_path / "TWO.md")
+    row = next(
+        ln
+        for ln in (tmp_path / "TWO.md").read_text().splitlines()
+        if ln.startswith("| H2a ")
+    )
+    assert row.endswith("| inconclusive (missing: chua) |")
+
+
+def test_markdown_labels_v7_as_plumbing_at_smoke_and_adds_the_gate_note(
+    tmp_path: Path,
+) -> None:
+    """At the smoke preset the V7 rows carry the DEC-0015 label and a gate note.
+
+    Reference (plan R4, DEC-0015): hand strings. The smoke config gives both V7
+    row names the label ``V7_LABEL`` and prints ``SMOKE_NOTE`` after the
+    "Validation gate:" line; a pilot config gives neither. The V7 numbers and
+    PASS/FAIL text are the same at both (the smoke row with the label removed
+    equals the pilot row). The gate line still reads "FAIL (results
+    provisional)" for a false ``gate_pass``, and the other validation rows are
+    unchanged. Exact checks.
+    """
+
+    def render(name: str, gate_pass: bool) -> list[str]:
+        """Write the report for one preset name and return its lines."""
+        config = dataclasses.replace(
+            SMOKE, name=name, core_systems=("lorenz63",)
+        )
+        system = fake_system(config)
+        system["validation"]["gate"] = {"gate_pass": gate_pass}
+        system["V7"] = {
+            "median_slope": 1.2,
+            "slope_pass": False,
+            "pass": False,
+            "efficiency_median_by_noise": {"0.01": 0.9, "0.02": 1.3},
+            "efficiency_pass_by_noise": {"0.01": True, "0.02": False},
+        }
+        results = {
+            "config": {},
+            "provenance": None,
+            "systems": {"lorenz63": system},
+        }
+        results["verdicts"] = verdicts(results, config)
+        write_markdown(results, config, tmp_path / f"{name}.md")
+        return (tmp_path / f"{name}.md").read_text().splitlines()
+
+    smoke, pilot = render("smoke", False), render("pilot", False)
+    v7 = lambda lines: [ln for ln in lines if ln.startswith("| V7 ")]
+    assert len(v7(smoke)) == 2 and all(V7_LABEL in ln for ln in v7(smoke))
+    assert not any(V7_LABEL in ln for ln in v7(pilot))
+    assert [ln.replace(V7_LABEL, "") for ln in v7(smoke)] == v7(pilot)
+    assert "0.9–1.3 FAIL" in v7(pilot)[0] and "1.2 FAIL" in v7(pilot)[1]
+    gate = smoke.index("Validation gate: lorenz63 FAIL (results provisional)")
+    assert smoke[gate + 1 : gate + 3] == ["", SMOKE_NOTE]
+    assert SMOKE_NOTE not in pilot
+    assert (
+        pilot[
+            pilot.index("Validation gate: lorenz63 FAIL (results provisional)")
+            + 1
+        ]
+        == ""
+    )
+    assert [
+        ln
+        for ln in smoke
+        if ln.startswith("| V") and not ln.startswith("| V7 ")
+    ] == [
+        ln
+        for ln in pilot
+        if ln.startswith("| V") and not ln.startswith("| V7 ")
+    ]
+
+
+def test_key_numbers_show_inconclusive_h1c_h2c_h2d_with_their_reasons() -> None:
+    """The H1c, H2c and H2d key numbers carry the verdict and the reason.
+
+    Absent numbers read "n/a".
+
+    Reference (plan R5): hand strings built with the three-significant-digit
+    rule of ``_fmt``. An H1c PLP with fewer than 10 states has no median and no
+    interval ("n/a n/a"), and the reason names the 50-state minimum. An H2c with
+    one inconclusive part and one fail shows each part's verdict, the failing
+    whole, and no reason. An H2d that is inconclusive at the band edge shows its
+    reason in parentheses. A gain-bound result without the screen counts fails
+    loudly with ``KeyError`` (R3, PRIME.4). Exact checks.
+    """
+    system = fake_system(SMOKE)
+    system["H1c"] = {
+        "PLP": {"median_ratio": None, "ci": None},
+        "CP": {"median_ratio": 1.6, "ci": [1.5, 1.7]},
+        "verdict": "inconclusive",
+        "reason": "n_states < 50",
+    }
+    assert _key_number("H1c", system) == (
+        "PLP n/a n/a: inconclusive (n_states < 50); CP 1.6 [1.5, 1.7] "
+        "(reported, no verdict)"
+    )
+    system["H2c"] = dict(system["H2c"], verdict="fail", reason=None)
+    system["H2c"]["A4_minus_A2"] = dict(
+        system["H2c"]["A4_minus_A2"],
+        verdict="inconclusive",
+        reason="interval meets band edge",
+    )
+    system["H2c"]["A4_minus_A1"] = dict(
+        system["H2c"]["A4_minus_A1"], verdict="fail", reason=None
+    )
+    assert _key_number("H2c", system) == (
+        "A4-A2 -0.15 [-0.2, -0.05] (-10%) inconclusive (interval meets band "
+        "edge); A4-A1 -0.05 [-0.1, -0.01] (-5%) fail; A4o-A2 -20% (reported): "
+        "fail"
+    )
+    # R3: a gain-bound result without the screen counts fails loudly
+    # (PRIME.4), not silently
+    bare = {
+        key: value
+        for key, value in system["gain_bound"].items()
+        if key != "n_screened_out"
+    }
+    with pytest.raises(KeyError, match="n_screened_out"):
+        _key_number("gain_bound", dict(system, gain_bound=bare))
+    system["H2d"] = dict(
+        system["H2d"], verdict="inconclusive", reason="interval meets band edge"
+    )
+    assert (
+        _key_number("H2d", system)
+        == "A4/A3-1 = 5% [4, 6]%: inconclusive (interval meets band edge)"
+    )
+
+
+def _p2c_block(
+    violations: int, chain: tuple[int, ...], spread: dict, same: bool | None
+) -> dict:
+    """Return the fields of ``verification.P2c`` that the report reads.
+
+    The values are planned by hand.
+    """
+    return {
+        "n_states": 1400,
+        "n_violations": violations,
+        "n_chain_violations": dict(
+            zip(("N_le_A", "A_le_B", "p2a", "triangle", "consistency"), chain)
+        ),
+        "n_switching_states": 1052,
+        "n_zero_bound_states": 12,
+        "tightness": {"N_over_sqrt_B": spread},
+        "same_draws_identical": same,
+    }
+
+
+def test_markdown_p2c_section_is_labeled_report_only_and_shows_defects(
+    tmp_path: Path,
+) -> None:
+    """The Theorem P2(c) subsection is report-only and shows defects in bold.
+
+    It has one row per system.
+
+    Reference: hand strings (WU-0005.5 plan, ``results.json`` and the report
+    paragraph). Lorenz has no violation and the draws match ("yes"). Rossler has
+    3 violating states, a chain count per item, no state with B > 0 (a median of
+    ``None`` gives "n/a") and a bitwise mismatch ("NO: DEFECT"). Chua has no
+    block and must show "n/a", not a skipped row (PRIME.4). The label sentence
+    is word for word from the plan. The numbers use the three-significant-digit
+    rule of ``_fmt``. Exact strings, no tolerance.
+    """
+    config = dataclasses.replace(
+        SMOKE, core_systems=("lorenz63", "rossler", "chua")
+    )
+    results, _ = fake_results("DEV-0")
+    systems = {name: fake_system(config) for name in config.core_systems}
+    systems["lorenz63"]["verification"] = {
+        "P2c": _p2c_block(
+            0,
+            (0, 0, 0, 0, 0),
+            {"n_states": 1388, "median": 0.1724, "p90": 0.3312, "max": 0.4611},
+            True,
+        )
+    }
+    systems["rossler"]["verification"] = {
+        "P2c": _p2c_block(
+            3,
+            (1, 2, 0, 0, 1),
+            {"n_states": 0, "median": None, "p90": None, "max": None},
+            False,
+        )
+    }
+    results["systems"] = systems
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    start = lines.index(
+        "### Theorem P2(c) bound (verification check, not a hypothesis)"
+    )
+    assert start > lines.index(
+        "### Largest Lyapunov exponent against published values"
+    )
+    section = lines[start:]
+    assert (
+        "| lorenz63 | 1400 | 0 | 0, 0, 0, 0, 0 | 1052 | 12 | 0.172, 0.331, "
+        "0.461 | yes |" in section
+    )
+    assert (
+        "| rossler | 1400 | **3: DEFECT** | 1, 2, 0, 0, 1 | 1052 | 12 | n/a | "
+        "**NO: DEFECT** |" in section
+    )
+    assert "| chua | n/a: no P2(c) result | | | | | | |" in section
+    assert any(
+        row.startswith(
+            "Verification check (NVVUQ.14, v3 Theorem P2(c)); not a hypothesis "
+            "test; no verdict; not in the validation gate."
+        )
+        for row in section
+    )
+    paragraph = next(
+        row for row in section if row.startswith("Verification check (NVVUQ.14")
+    )
+    assert (
+        "every state must satisfy N² ≤ A ≤ B, where A = mean ‖Y_r − X₁‖² / "
+        "(ρ²D) is the "
+        "spread of the retrieved analogs Y_r about the clean-query analog X₁ "
+        "and B = 4 mean "
+        "(r₁ + ‖η_r‖)² 1{‖η_r‖ ≥ Δ/2} / (ρ²D) is the bound, both over the M "
+        "draws, in the "
+        "units of N²."
+    ) in paragraph
+    assert "P2c" not in "".join(
+        lines[: lines.index("## Validation gate")]
+    )  # no verdict row
+
+
+# WU-0005.4 (L7): the Levenberg-Marquardt diagnostics subsection of RESULTS.md.
+def _lm_part(n: int, noise: float, **kwargs) -> dict:
+    """Return a hand-written ``lm`` summary.
+
+    The keys are those of ``lm_summary``; unspecified values are None.
+    """
+    out = {
+        "n_estimates": n,
+        "noise": noise,
+        "gof_dof": 4,
+        "median_residual": None,
+        "p95_residual": None,
+        "median_iterations": None,
+        "fraction_no_decrease": None,
+        "nonfinite_residuals": 0,
+        "fraction_late_progress": None,
+        "fraction_above_chi2": None,
+    }
+    out.update(kwargs)
+    return out
+
+
+def _lm_results() -> tuple[dict, StudyConfig]:
+    """Return fake results with an oracle and an eval LM summary.
+
+    The summaries are in the lorenz63 core cell and are written by hand.
+    """
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    oracle = _lm_part(
+        8,
+        0.01,
+        median_residual=3.36e-4,
+        p95_residual=9.49e-4,
+        median_iterations=8.0,
+        fraction_no_decrease=0.0,
+        fraction_late_progress=0.125,
+        fraction_above_chi2=0.001,
+    )
+    evaluation = _lm_part(
+        4,
+        0.01,
+        median_residual=1e-3,
+        p95_residual=None,
+        median_iterations=7.5,
+        fraction_no_decrease=0.25,
+        nonfinite_residuals=2,
+        fraction_late_progress=0.0,
+        fraction_above_chi2=0.5,
+    )
+    empty = _lm_part(0, 0.01)
+    pooled = {
+        **_lm_part(12, 0.01),
+        "by_kind": {"oracle": oracle, "eval": evaluation, "check": empty},
+    }
+    system["handling"] = {
+        "schema": "lpcstudy.handling/2",
+        "cells": {
+            "base|rho=0.01|n_lib=10000|core": {
+                "counts": {},
+                "denominators": {},
+                "lm": pooled,
+            },
+            "V3-cp-horizon": {"counts": {}, "denominators": {}},
+        },
+        "oracles": {},
+        "fitting": {},
+        "result_counts": {},
+        "totals": {},
+    }
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    return results, config
+
+
+def test_lm_lines_exact_rows_note_and_missing_block() -> None:
+    """L7: the LM table has one row per cell and kind with n > 0.
+
+    A missing block gives one line.
+
+    (LM is the Levenberg-Marquardt fit that estimates the starting state.)
+    Reference: the hand-written ``lm`` summaries of ``_lm_results``, formatted
+    by hand to three significant digits. For the oracle kind: c = 3.36e-4 prints
+    as 0.000336 and the 95th percentile 9.49e-4 as 0.000949; c/rho^2 with rho =
+    0.01 gives 3.36 and 9.49; accepted steps 8, no decrease 0, late progress
+    0.125, above the chi-square quantile 0.001, and 0 infinite residuals. For
+    the eval kind: median 1e-3 prints as 0.001 (ratio 10), the 95th percentile
+    None prints as "n/a", then 7.5, 0.25, 0, 0.5 and 2 infinite residuals.
+
+    The check kind (n = 0) and the cell without an ``lm`` block (V3 here) have
+    no row. The note states the fixed 15 iterations with no tolerance stop, the
+    units of c, the chi-square reference with 4 degrees of freedom, that
+    accepted steps include round-off accepts, and that the fraction above 18.47
+    is a diagnostic with no gate or verdict role. Exact strings.
+    """
+    results, config = _lm_results()
+    lines = report._lm_lines(results, ["lorenz63"], config)
+    cell = "`base\\|rho=0.01\\|n_lib=10000\\|core`"
+    assert lines[0].startswith(
+        "| System | Cell | Kind | n | dof (D − m) | median c | p95 c | median "
+        "c/ρ² | p95 c/ρ² | median accepted steps (of 15) |"
+    )
+    assert lines[2] == (
+        f"| lorenz63 | {cell} | oracle | 8 | 4 | 0.000336 | 0.000949 | 3.36 | "
+        "9.49 | 8 | 0 | 0.125 | 0.001 | 0 |"
+    )
+    assert lines[3] == (
+        f"| lorenz63 | {cell} | eval | 4 | 4 | 0.001 | n/a | 10 | n/a | 7.5 | "
+        "0.25 | 0 | 0.5 | 2 |"
+    )
+    assert len([x for x in lines if x.startswith("| lorenz63")]) == 2
+    note = lines[-1]
+    for phrase in (
+        "fixed 15 Levenberg–Marquardt iterations with no tolerance stop",
+        "sum of D squared terms in the units of σ_x",
+        "χ²(dof)",
+        "median 3.36, p95 9.49",
+        "round-off accepts after convergence included",
+        "printed as a diagnostic, with no gate or verdict role",
+        "not a hypothesis test",
+        "is 0.001 under the reference",
+        "and model error (a misspecified model gives a " "non-central χ²",
+        "100% exceeded at ρ = 0.01 and 23% at ρ = 0.05",
+        "Infinite residuals count in this fraction and also in the non-finite "
+        "residuals column, so the two overlap",
+    ):
+        assert phrase in note, phrase
+    old, config = fake_results("DEV-0")
+    old["systems"] = {"lorenz63": fake_system(config)}
+    assert len(report._lm_lines(old, ["lorenz63"], config)) == 1
+    assert report._lm_lines(old, ["lorenz63"], config)[0].startswith(
+        "No Levenberg-Marquardt estimates in these results"
+    )
+
+
+def test_write_markdown_places_the_lm_subsection_after_p2c_and_before_handling(
+    tmp_path: Path,
+) -> None:
+    """L7: the LM subsection comes after P2(c) and before Handling.
+
+    Reference: the heading strings and their order in the written file (list
+    indices). The section is also present, with its one-line message, for
+    results without any ``lm`` block. Exact checks.
+    """
+    heading = (
+        "### Levenberg–Marquardt diagnostics (verification, NVVUQ.10; not a "
+        "hypothesis)"
+    )
+    results, config = _lm_results()
+    results["handling"] = {
+        "schema": "lpcstudy.handling/2",
+        "totals": {},
+        "by_system": {},
+        "robustness": {},
+        "failed_variants": 0,
+    }
+    results["robustness"] = {}  # the empty section still has its heading
+    write_markdown(results, config, tmp_path / "LM.md")
+    lines = (tmp_path / "LM.md").read_text().splitlines()
+    p2c = lines.index(
+        "### Theorem P2(c) bound (verification check, not a hypothesis)"
+    )
+    # Ordering rule for the merger: the LM subsection follows P2(c) and
+    # precedes every later `##` section (Robustness, Handling, and the
+    # WU-0008 Uncertainty budget once it is merged).
+    assert (
+        p2c
+        < lines.index(heading)
+        < lines.index("## Robustness (core cell)")
+        < lines.index("## Handling (DEF-0001: nothing silent)")
+    )
+    assert any(x.startswith("| lorenz63 | `base") for x in lines)
+    plain, config = fake_results("DEV-0")
+    plain["systems"] = {"lorenz63": fake_system(config)}
+    plain["verdicts"] = verdicts(plain, config)
+    write_markdown(plain, config, tmp_path / "NO_LM.md")
+    text = (tmp_path / "NO_LM.md").read_text()
+    assert (
+        heading in text
+        and "No Levenberg-Marquardt estimates in these results" in text
+    )
+
+
+def _clip_part(
+    n_clipped: int, delta, ratio, flag, verdict_2l: str = "pass"
+) -> dict:
+    """Return a computed entry of the ``clip_sensitivity`` block.
+
+    The keys are those that ``clip_sensitivity.part_entry`` writes.
+    """
+    return {
+        "status": "computed",
+        "reason": None,
+        "delta": delta,
+        "ratio": ratio,
+        "flag": flag,
+        "verdict_2L": verdict_2l,
+        "n_clipped_inputs": n_clipped,
+    }
+
+
+def _clip_missing(reason: str, bound: bool = False) -> dict:
+    """Return a ``clip_sensitivity`` entry that was not computed."""
+    return {
+        "status": "not_computed",
+        "reason": reason,
+        "delta_bound" if bound else "delta": None,
+        "ratio": None,
+        "flag": None,
+        "n_clipped_inputs": 0,
+    }
+
+
+def _clip_block() -> dict:
+    """Return a computed block in which every kind of clip text occurs.
+
+    The block is written by hand.
+    """
+    parts = lambda **p: {
+        "parts": p,
+        "flag": any(v["flag"] for v in p.values() if v["flag"]),
+    }
+    return {
+        "clip_level": 10.0,
+        "perturbed_level": 20.0,
+        "status": "computed",
+        "reason": None,
+        "href_clipped_draws": {"test_eval": 3},
+        "held_fixed_entries": 7,
+        "test_eval_clipped_entries": 3,
+        "share_test": {},
+        "weight_shift": {},
+        "by_hypothesis": {
+            "H1b": parts(PLP=_clip_part(0, 0.0, 0.0, False)),
+            "H2a": {
+                **parts(
+                    zero=_clip_part(2, 0.01, 0.1, False),
+                    interior=_clip_part(2, 0.2, 2.0, True, "fail"),
+                ),
+                "parts_2L": ["zero", "interior"],
+            },
+            "H2c": {
+                **parts(
+                    A4_minus_A2=_clip_part(5, -0.5, 0.5, False),
+                    A4_minus_A1={
+                        **_clip_part(4, None, None, True),
+                        "reason": "best single changes at 2L",
+                        "verdict_2L": None,
+                    },
+                ),
+                "best_single_2L": "A0",
+            },
+            "H2d": parts(A4_over_A3=_clip_part(3, 0.07, 0.35, True, "fail")),
+            "H2e": parts(
+                **{
+                    "0.01": _clip_missing("missing cell(s)", True),
+                    "0.02": _clip_part(0, 0.0, None, False),
+                }
+            ),
+            "H3c": parts(A5_over_A4=_clip_part(3, 0.001, 0.04, False)),
+        },
+        "invariance": {
+            "H1c": "exact",
+            "H2a_i": "exact",
+            "H3a": "not guaranteed: calibration oracle: 3 clipped entries (2 "
+            "at H_ref; A5 weights, A5_max shift 0.252)",
+        },
+        "affected_states": {"Q-N": 4, "H3b": 0},
+    }
+
+
+def _clip_rows(tmp_path: Path, block: dict | None) -> tuple[dict, list[str]]:
+    """Return the verdict-table rows of ``RESULTS.md`` by id, and all lines.
+
+    The results have one system and the given ``clip_sensitivity`` block.
+    """
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    if block is not None:
+        system["clip_sensitivity"] = block
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    lines = (tmp_path / "RESULTS.md").read_text().splitlines()
+    start = lines.index("## Hypothesis verdicts")
+    table = [
+        line
+        for line in lines[start:]
+        if line.startswith("| ") and "---" not in line
+    ][:15]
+    return {row.split(" | ")[0][2:]: row for row in table[1:]}, lines
+
+
+def test_clip_column_texts_per_criterion(tmp_path: Path) -> None:
+    """The ``clip`` column has one cell per verdict row, with the right text.
+
+    Reference: the plan's section 4 (it shows "—" when no input is clipped, "ok
+    (|Δ|/hw = x)", or "CLIP-SENSITIVE (|Δ|/hw = x; at 20 σ_x: verdict)") and its
+    tier table, applied to a hand-written block. Pipes in "|Δ|" are escaped for
+    the Markdown table. H1b has no clipped input, so "—". H2a shows (i)
+    invariant and (ii) one fired part with ratio 2 and verdict "fail". H2c,
+    whose best single forecaster changes, says so. H2d fired at 0.35 with
+    "fail". H2e has parts that are not computed or have no clipped inputs (the
+    mixed text keeps the reason). H3c is "ok" with ratio 0.04.
+
+    Q-N and H3b show the counts only. H1c and H3a show the invariance statement
+    (H3a with its cause, Amendment 1). Rows with no analysis show "n/a". Exact
+    strings.
+    """
+    rows, lines = _clip_rows(tmp_path, _clip_block())
+    header = next(
+        line for line in lines if line.startswith("| ID | Hypothesis |")
+    )
+    assert header == "| ID | Hypothesis | lorenz63 | Verdict | clip |"
+    esc = lambda text: text.replace("|", "\\|")
+    cell = lambda key: rows[key].rsplit(" | ", 1)[1].removesuffix(" |")
+    assert cell("H1b") == "lorenz63: —"
+    assert cell("H2a") == esc(
+        "lorenz63: (i) invariant; (ii) **CLIP-SENSITIVE** interior (|Δ|/hw = "
+        "2; at 20 σ_x: fail)"
+    )
+    assert cell("H2c") == esc(
+        "lorenz63: **CLIP-SENSITIVE** A4_minus_A1 (|Δ|/hw = n/a; at 20 σ_x: "
+        "best single changes at 2L)"
+    )
+    assert cell("H2d") == esc(
+        "lorenz63: **CLIP-SENSITIVE** A4_over_A3 (|Δ|/hw = 0.35; at 20 σ_x: "
+        "fail)"
+    )
+    assert cell("H2e") == "lorenz63: —; not computed (0.01: missing cell(s))"
+    assert cell("H3c") == esc("lorenz63: ok (|Δ|/hw = 0.04)")
+    assert (
+        cell("Q-N")
+        == "lorenz63: 4 states with a clipped H_ref draw (count only)"
+    )
+    assert cell("H3b") == "lorenz63: —"
+    assert cell("H1c") == "lorenz63: invariant"
+    assert cell("H3a") == (
+        "lorenz63: not guaranteed: calibration oracle: 3 clipped entries (2 at "
+        "H_ref; A5 weights, A5_max shift 0.252)"
+    )
+    assert cell("H1a") == "lorenz63: n/a" and cell("H1d") == "lorenz63: n/a"
+    assert (
+        cell("(reported)") == "lorenz63: n/a"
+    )  # the gain bound has no verdict
+    text = "\n".join(lines)
+    assert (
+        "lorenz63: tree, A3 and KM inputs contain 7 clipped entries; not "
+        "recomputed." in text
+    )
+    assert (
+        "lorenz63: H3a invariance not guaranteed: calibration oracle: 3 "
+        "clipped entries (2 at H_ref; A5 weights, A5_max shift 0.252)."
+    ) in text
+    assert (
+        "it marks no result provisional" in text
+    )  # OD6, stated next to the column
+    # the verdict cells are untouched by the column (a fired flag changes
+    # no verdict)
+    plain, _ = _clip_rows(tmp_path, None)
+    for key, row in rows.items():
+        assert row.rsplit(" | ", 1)[0] == plain[key].removesuffix(" |"), key
+
+
+def test_clip_column_says_not_computed_and_is_absent_without_a_block(
+    tmp_path: Path,
+) -> None:
+    """A block that was not computed shows its reason in every row.
+
+    Results with no block have no ``clip`` column. A block that was not computed
+    never reads "—" or "ok".
+
+    Never "—" or "ok" for a block that was not computed. Reference: the plan's
+    section 4 ("not_computed with a reason ... never False") and the
+    backward-compatibility rule that results written before WU-0002.11e render
+    as before. Exact strings.
+    """
+    block = {
+        "clip_level": 10.0,
+        "perturbed_level": 20.0,
+        "status": "not_computed",
+        "reason": "CP clip sentinel nonzero (2 entries)",
+        "by_hypothesis": {},
+        "invariance": {},
+        "affected_states": {},
+    }
+    rows, lines = _clip_rows(tmp_path, block)
+    for key, row in rows.items():
+        assert row.endswith(
+            "| lorenz63: not computed (CP clip sentinel nonzero (2 entries)) |"
+        ), key
+    assert (
+        "lorenz63: clip sensitivity not computed: CP clip sentinel nonzero (2 "
+        "entries)." in "\n".join(lines)
+    )
+    rows, lines = _clip_rows(tmp_path, None)
+    header = next(
+        line for line in lines if line.startswith("| ID | Hypothesis |")
+    )
+    assert header == "| ID | Hypothesis | lorenz63 | Verdict |"
+    assert not any("clip" in row.rsplit(" | ", 1)[-1] for row in rows.values())
+    assert not any(
+        "Clip sensitivity (the `clip` column" in line for line in lines
+    )
+
+
+# The exposure sentence, typed from the owner's ruling (packet B6b) and
+# independent of ``report.H3A_EXPOSURE``.
+EXPOSURE_TEXT = (
+    "Exposure (DEF-0018; owner ruling B6b: keep as is, report the counts, "
+    "state the exposure as a limitation): the H3a log-rank test sets no "
+    "minimum number of states or events per regime (DEC-0011 O1; only the full "
+    "sample needs 50 states), so a regime with few events can give an extreme "
+    "log-rank p-value, for example one event among 99 censored states. Read "
+    "each p-value of the pair table beside the events and censored counts of "
+    "its two regimes. This is a stated limitation of the H3a verdict; the "
+    "verdict rule is unchanged."
+)
+
+
+# The variant for results without the counts, typed from review R4 (option b).
+EXPOSURE_NO_COUNTS_TEXT = (
+    "Exposure (DEF-0018; owner ruling B6b: keep as is, report the counts, "
+    "state the exposure as a limitation): the H3a log-rank test sets no "
+    "minimum number of states or events per regime (DEC-0011 O1; only the full "
+    "sample needs 50 states), so a regime with few events can give an extreme "
+    "log-rank p-value, for example one event among 99 censored states. The "
+    "events and censored counts are not recorded in this results file, so the "
+    "exposure cannot be read from it. This is a stated limitation of the H3a "
+    "verdict; the verdict rule is unchanged."
+)
+
+
+def _h3a_markdown(tmp_path: Path, counts: dict | None) -> list[str]:
+    """Return the RESULTS.md lines of a one-system fake run.
+
+    The H3a block of the system gets ``counts`` (or nothing).
+    """
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    system["H3a"].update(n_per_regime=[100, 100], **(counts or {}))
+    system["H3a"].update(
+        pairs=[[1, 0]], logrank_p_raw=[0.002], logrank_p_holm=[0.004]
+    )
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    return (tmp_path / "RESULTS.md").read_text().splitlines()
+
+
+def test_h3a_section_prints_one_event_among_100_states_and_the_exposure(
+    tmp_path: Path,
+) -> None:
+    """RESULTS.md shows regime counts and the exposure sentence (A4).
+
+    Reference: a hand-typed expectation for a regime of 100 states with ONE
+    event (99 censored) and a regime of 100 states with all events: the rows ``|
+    lorenz63 | 0 | 100 | 1 | 99 |`` and ``| lorenz63 | 1 | 100 | 100 | 0 |``.
+    The exposure sentence is typed in this test from the owner's ruling, not
+    read from the code. The verdict table row of H3a is unchanged by the
+    section. Exact string checks.
+    """
+    lines = _h3a_markdown(
+        tmp_path,
+        {"n_events_per_regime": [1, 100], "n_censored_per_regime": [99, 0]},
+    )
+    head = lines.index("## H3a: events/censored per regime (DEF-0018)")
+    assert lines[head + 2 : head + 6] == [
+        "| System | Regime | States | Events | Censored |",
+        "|---|---|---|---|---|",
+        "| lorenz63 | 0 | 100 | 1 | 99 |",
+        "| lorenz63 | 1 | 100 | 100 | 0 |",
+    ]
+    # R1 of the review: the pair table puts each p beside the counts of
+    # its two regimes (pair (1, 0): regime 1 has 100 events / 0 censored,
+    # regime 0 has 1 event / 99 censored)
+    assert lines[head + 7 : head + 12] == [
+        "Tested pairs, in test order (regime indices as above; events/censored "
+        "of each regime of the pair):",
+        "",
+        "| System | Pair (a, b) | Events/censored a | Events/censored b | Raw "
+        "p | Holm p |",
+        "|---|---|---|---|---|---|",
+    ] + ["| lorenz63 | 1, 0 | 100/0 | 1/99 | 0.002 | 0.004 |"]
+    assert lines[head + 13] == EXPOSURE_TEXT
+    row = next(line for line in lines if line.startswith("| H3a | "))
+    assert (
+        "K=3: largest Holm p 0.004, IQR 0.4 LT: pass" in row
+    )  # the verdict cell is untouched
+    assert "not recorded" not in "\n".join(lines[head : head + 14])
+
+
+def test_h3a_section_says_not_recorded_for_results_without_the_counts(
+    tmp_path: Path,
+) -> None:
+    """Old results print "not recorded", not a gap, an error or a zero (A4).
+
+    This covers results written before WU-0004d.
+
+    Reference: the backward-compatibility rule (PRIME.4: a missing input is
+    stated). Exact strings.
+    """
+    lines = _h3a_markdown(tmp_path, None)
+    head = lines.index("## H3a: events/censored per regime (DEF-0018)")
+    assert "| lorenz63 |" not in "\n".join(lines[head : head + 6])
+    assert (
+        "lorenz63: events/censored per regime not recorded (results written "
+        "before WU-0004d)." in lines[head : head + 6]
+    )
+    # R4: with no counts anywhere the sentence must not point at a pair
+    # table or counts
+    assert lines[head + 4] == EXPOSURE_NO_COUNTS_TEXT
+    assert EXPOSURE_TEXT not in lines and "pair table" not in lines[head + 4]
+    assert not any(
+        line.startswith("Tested pairs") for line in lines
+    )  # no counts: no pair table
+
+
+def test_h3a_section_refuses_inconsistent_counts() -> None:
+    """Events plus censored must equal the states of each regime (A4).
+
+    The lists must also have one common length.
+
+    Reference: the definition (a state is either an event or censored). Hand
+    cases: 1 + 98 != 100, and a list one entry short. Both raise ``ValueError``
+    naming the system.
+    """
+    base = {
+        "H3a": {
+            "n_per_regime": [100, 100],
+            "n_events_per_regime": [1, 100],
+            "n_censored_per_regime": [98, 0],
+        }
+    }
+    with pytest.raises(
+        ValueError, match="lorenz63: H3a counts are inconsistent"
+    ):
+        report.h3a_regime_lines({"systems": {"lorenz63": base}}, ["lorenz63"])
+    short = {
+        "H3a": {
+            "n_per_regime": [100, 100],
+            "n_events_per_regime": [1],
+            "n_censored_per_regime": [99],
+        }
+    }
+    with pytest.raises(ValueError, match="inconsistent"):
+        report.h3a_regime_lines({"systems": {"lorenz63": short}}, ["lorenz63"])
+    assert (
+        report.h3a_regime_lines({"systems": {}}, []) == []
+    )  # no system: no section
+
+
+def test_h3a_pair_table_prints_not_computed_and_stored_p_unchanged() -> None:
+    """A raw p of None reads "not computed"; stored p-values are unchanged.
+
+    Reference: a hand-typed K = 3 block. Pairs (0, 1) and (1, 2) are in test
+    order. The first has raw p None (as for an empty regime) and Holm p 1.0. The
+    second has raw 0.0123456 and Holm 0.0123456, printed to 3 significant digits
+    ("0.0123") by the report's own ``_fmt`` rule. Counts per regime: events 5,
+    0, 7 and censored 10, 0, 3. Exact strings.
+    """
+    block = {
+        "H3a": {
+            "n_per_regime": [15, 0, 10],
+            "n_events_per_regime": [5, 0, 7],
+            "n_censored_per_regime": [10, 0, 3],
+            "pairs": [[0, 1], [1, 2]],
+            "logrank_p_raw": [None, 0.0123456],
+            "logrank_p_holm": [1.0, 0.0123456],
+        }
+    }
+    lines = report.h3a_regime_lines(
+        {"systems": {"lorenz63": block}}, ["lorenz63"]
+    )
+    assert "| lorenz63 | 0, 1 | 5/10 | 0/0 | not computed | 1 |" in lines
+    assert "| lorenz63 | 1, 2 | 0/0 | 7/3 | 0.0123 | 0.0123 |" in lines
+    assert lines[-1] == EXPOSURE_TEXT
+
+
+def test_h3a_section_refuses_a_block_with_only_one_of_the_two_lists() -> None:
+    """A block with only one of the two count lists is corrupt and raises (R2).
+
+    The error is ``ValueError`` and it names the system.
+
+    Reference: no results file written before WU-0004d can hold one list without
+    the other, so "not recorded (written before WU-0004d)" would state a false
+    cause. Hand cases: events only, censored only. A pairs list of a different
+    length than the p lists also raises. A regime index outside 0 to K-1 (R5)
+    would print another regime's counts (a negative index counts from the end in
+    Python) or fail late, so hand cases with K = 2 regimes must raise too.
+    """
+    base = {
+        "n_per_regime": [100, 100],
+        "pairs": [[1, 0]],
+        "logrank_p_raw": [0.01],
+        "logrank_p_holm": [0.01],
+    }
+    for key in ("n_events_per_regime", "n_censored_per_regime"):
+        block = {"H3a": {**base, key: [1, 100]}}
+        with pytest.raises(
+            ValueError, match="lorenz63: H3a block has only one of"
+        ):
+            report.h3a_regime_lines(
+                {"systems": {"lorenz63": block}}, ["lorenz63"]
+            )
+    both = {
+        "H3a": {
+            **base,
+            "n_events_per_regime": [1, 100],
+            "n_censored_per_regime": [99, 0],
+            "logrank_p_holm": [],
+        }
+    }
+    with pytest.raises(ValueError, match="pairs are inconsistent"):
+        report.h3a_regime_lines({"systems": {"lorenz63": both}}, ["lorenz63"])
+    # R5: a regime index outside 0..K-1 would print another regime's
+    # counts (a negative index counts from the end in Python) or fail
+    # late; hand cases with K = 2 regimes
+    for pairs in ([[0, 2]], [[-1, 0]]):
+        bad = {
+            "H3a": {
+                **base,
+                "n_events_per_regime": [1, 100],
+                "n_censored_per_regime": [99, 0],
+                "pairs": pairs,
+            }
+        }
+        with pytest.raises(ValueError, match="pairs are inconsistent"):
+            report.h3a_regime_lines(
+                {"systems": {"lorenz63": bad}}, ["lorenz63"]
+            )
+
+
+# WU-0004f: skipped_variants and the clip-sensitivity counters in the Handling
+# section. (A delimited block.)
+def _handling_section_for(
+    tmp_path: Path, run_extra: dict, counts: dict
+) -> list[str]:
+    """Return the ``## Handling`` lines of a hand-built results dict.
+
+    The dict has one system and one block of counts.
+    """
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    system["handling"] = {
+        "schema": "lpcstudy.handling/2",
+        "cells": {},
+        "oracles": {},
+        "fitting": {},
+        "result_counts": counts,
+        "totals": {},
+    }
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    results["handling"] = {
+        "schema": "lpcstudy.handling/2",
+        "totals": {},
+        "by_system": {},
+        "robustness": {},
+        "failed_variants": 0,
+        **run_extra,
+    }
+    write_markdown(results, config, tmp_path / "H.md")
+    lines = (tmp_path / "H.md").read_text().splitlines()
+    return lines[lines.index("## Handling (DEF-0001: nothing silent)") :]
+
+
+def test_handling_section_prints_skipped_variants_and_older_results_say_so_a7(
+    tmp_path: Path,
+) -> None:
+    """A7 (WU-0004f): the Handling section states ``skipped_variants``.
+
+    Reference: the lines written out by hand. With the key present (3), the
+    exact line sits next to the ``failed_variants`` line, which is unchanged.
+    Without it (results written before WU-0004f) there is one line saying it is
+    not recorded, and no number. Exact strings.
+    """
+    section = _handling_section_for(tmp_path, {"skipped_variants": 3}, {})
+    assert "Robustness variants that raised (`failed_variants`): 0." in section
+    assert "Robustness variants not run (`skipped_variants`): 3." in section
+    assert (
+        section.index("Robustness variants not run (`skipped_variants`): 3.")
+        == section.index(
+            "Robustness variants that raised (`failed_variants`): 0."
+        )
+        + 1
+    )
+    zero = _handling_section_for(tmp_path, {"skipped_variants": 0}, {})
+    assert "Robustness variants not run (`skipped_variants`): 0." in zero
+    older = _handling_section_for(tmp_path, {}, {})
+    assert (
+        "Robustness variants not run (`skipped_variants`): not recorded in "
+        "these results (written before WU-0004f)."
+    ) in older
+
+
+def test_handling_section_labels_the_clip_sensitivity_sentinels_a7(
+    tmp_path: Path,
+) -> None:
+    """A7 (WU-0004f): nonzero clip-sensitivity counters are listed as sentinels.
+
+    Reference: hand rows. ``n_floored`` of the H1b part and ``n_floored_2L``
+    (floors that should never bind) and ``n_caught_exceptions`` (an exception
+    inside a report-only block is a defect) are labeled; a zero count is not
+    listed. Exact table rows.
+    """
+    base = "clip_sensitivity/by_hypothesis/H1b/parts/PLP"
+    counts = {
+        f"{base}/n_floored": 2,
+        f"{base}/n_floored_2L": 1,
+        "clip_sensitivity/n_caught_exceptions": 3,
+        "H1b/PLP/n_floored": 0,
+    }
+    section = _handling_section_for(tmp_path, {"skipped_variants": 0}, counts)
+    assert f"| `{base}/n_floored` (sentinel) | 2 |" in section
+    assert f"| `{base}/n_floored_2L` (sentinel) | 1 |" in section
+    assert (
+        "| `clip_sensitivity/n_caught_exceptions` (sentinel) | 3 |" in section
+    )
+    assert not any(
+        "H1b/PLP/n_floored`" in line and "clip" not in line for line in section
+    )
+    assert report.SENTINEL_RESULT_PATHS == {
+        "H1b/PLP/n_floored",
+        f"{base}/n_floored",
+        f"{base}/n_floored_2L",
+        "clip_sensitivity/n_caught_exceptions",
+    }

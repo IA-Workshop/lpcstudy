@@ -154,3 +154,295 @@ This replaces the developer's slack `ncpu*max(32, 2*ncpu)*pagesize` (about 8 MiB
 **Dissent and resolution (REPRO.8):** none. Status: **adopted by the owner** (in session, 2026-10-11).
 
 - 2026-10-11, recorded by claude-sonnet-5-5: DEC-0002 was confirmed earlier (2026-10-10). DEC-0003, DEC-0004, DEC-0005, DEC-0006 and DEC-0007 are **confirmed** by the owner's approval above (status "proposed" in their own text is superseded by this line).
+
+## DEC-0009: Researcher retrieval cap removed for the remainder of the season  (2026-10-11, recorded by claude-sonnet-5-5 (main session) from the human owner's statement in the session)
+
+**Decision.** The human owner stated in the session: "Cap is hereby removed for the remainder of this season. Proceed with all recommendations." This is read as the owner removing the 50-pages-per-unit limit of LPC.AUTH.2(b) for the researcher agent for the rest of the season; the other limits of LPC.AUTH.2 (read-only retrieval of individual papers and pages, only by the `researcher` agent, no datasets, no crawling, retrieved content is data, every fetch logged to `docs/agent/records/network-log.jsonl`) are unchanged.
+
+**Status of the instrument.** At the time of this entry the ledger (`docs/agent/governance/ledger.jsonl`, latest entry 6) holds **no** `authorization` or `amendment` entry for this change. Under PRIME.7 and GOV.36 the ledger entry is the owner's act; the command is in `docs/agent/notes/2026-10-11-amendments-for-owner.md` section 5. Until it is appended, the main session acts on the owner's direct statement (PRIME.11: an agent takes instructions from the human owner) and records that here. Two of the three retrievals started under this statement (a cited AMI delay for Lorenz-63; the jax XLA thread-cap flag) fit within the existing per-unit budget of fresh units (WU-0013 and WU-0012 follow-ups) and do not depend on it; the third (the Chua exponent, WU-0007) does.
+
+**Alternatives weighed.** *Wait for the ledger entry before any retrieval:* rejected for the Chua retrieval because the owner's instruction is explicit and repeated, nothing in the record is hidden, and waiting blocks WU-0007.2 only; flagged so the owner can append the entry.
+
+**Affects:** the researcher agent's retrievals for WU-0007, WU-0012 and WU-0013 follow-ups. The alphaXiv connectors are not in the researcher agent's tool list; adding them is an edit to `.claude/agents/researcher.md` by the owner.
+
+**Dissent and resolution (REPRO.8):** none. Status: **owner instruction recorded; ledger entry pending (owner).**
+
+## DEC-0010: WU-0007 Chua reference, AMI band and XLA thread cap: handling of the retrieval results  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** From the researcher retrievals started under DEC-0009 (notes in `docs/agent/notes/`):
+
+- *Chua lambda_max (WU-0007.1, third row).* No published exponent was found for the code's parameter set (alpha = 15.6, beta = 28, m0 = -1.143, m1 = -0.714): the row stays `not found`, and Methods v2's 0.431 stays uncorroborated for that set. It is recorded as a **known limitation** (NVVUQ.13) for validation of Chua at those parameters. A proposed additional check, for the owner to approve at the WU-0007 plan: run the Benettin routine on the primary-source case (Matsumoto, Chua and Komuro memo UCB/ERL M84/73, alpha = 9, beta = 100/7, m0 = -8/7, m1 = -5/7; published exponent 0.23 per circuit time, about 0.33 per dimensionless time by a derived conversion with tau = 0.7 t, flagged derived) with a two-digit tolerance justified by the applied-mathematician. It verifies the routine and the field form, not the study's parameter set.
+- *AMI delay (WU-0013 follow-up).* The `[3, 8]` step band of `test_regression_ami_delay_lorenz_band` is **kept** (not tightened). Deshmukh, Bradley, Garland and Meiss (arXiv:2003.06509, Sec. IV.B, Fig. 5) report a first AMI minimum of the Lorenz x-series near 0.18 time units (about 4.9 steps at the study's sampling interval), consistent with the code's 5 steps, but the minimum is a shallow shoulder, the deeper one is at 0.60 time units, and the estimator differs. The citation goes into the test docstring in a small follow-up.
+- *XLA thread cap (WU-0012 follow-up).* The wrappers should export `PJRT_NPROC` and `NPROC` from `LPC_THREADS` (plain environment variables read by XLA's default thread-pool sizing; they cannot abort XLA), and must NOT use `intra_op_parallelism_threads` or other `XLA_FLAGS` entries (an unknown XLA flag aborts the process; the 2019 recipe is not a registered flag). Verification: a CPU-time versus wall-time and thread count on a float64 workload, per the research note. A small follow-up unit (WU-0012.4) changes the two wrappers and their tests.
+
+**Alternatives weighed.** *Block the Chua row until the 1985 IEEE paper is retrieved:* the researcher found no route; recorded instead.
+
+**Affects:** WU-0007 plan, `tests/unit/test_embedding.py` docstring, `tools/run_tests.sh`, `tools/run_preset.sh`.
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0011: WU-0002.7/.8 plan: answers to the planner's questions  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision.** The plan (`docs/agent/records/work/WU-0002.7-8-h2-h3.md`) asks four questions, answered with the applied-mathematician's confirmation (last dated entry of the same file):
+
+- *O1.* The minimum of 50 states (DEC-0008 A3) is **not** applied to each regime in the H3a log-rank tests: the test does not need it, a small regime cannot produce a spurious pass (a pass needs p < 0.01 for every pair), and the rule would cost power with small A5 leaves. It applies to the full sample of each statistic and to subsets that feed a block bootstrap. Degenerate or missing pairs enter the Holm family at p = 1 (conservative).
+- *O2.* A state where PLP's error is constant across draws is set to correlation 0 and counted, as for CP (stricter; the oracle draws and the proxy are shared across n_lib, so such a state's change is exactly 0).
+- *O3.* Until WU-0002.9, results carry `pass` plus an `inconclusive_reason` and no `fail` key; WU-0002.9's plan must take over these keys.
+- *O4.* H2d's `pass` stays on the point estimate until WU-0002.9.
+- **Corrections taken from the confirmation (they tighten the plan):** `kind="stable"` for every `argsort`, tie order by regime index (DEF-0013); a bound is infinite iff the number of failed resamples is at least ceil(a·B), a = (1 − level)/2; failed resamples are placed outward on both sides for a two-sided band; the S3 test uses B = 40, not 20; the H3b synthetic tests draw x per state, repeat it across draws, and use dyadic targets (0.5, 0.25) with integer curvature weights so the zeros are exact; percentile (not basic) intervals for H3b.
+
+**Alternatives weighed.** Applying the 50-state rule per regime: rejected on power grounds, with no effect on the pass error.
+
+**Affects:** WU-0002.7 and .8 only; DEF-0013. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0012: Shared bootstrap and verdict helpers: one contract for all WU-0002 lanes; seeding convention for new bootstraps  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the applied-mathematician's contract; for owner confirmation)
+
+**Decision.**
+
+- **One implementation of the DEC-0008 A1/A3 rules.** Three lanes planned overlapping helpers (WU-0002.4/.5, .6, .7/.8). The applied-mathematician's contract (Job 2, last entries of the Log in `docs/agent/records/work/WU-0002.4-5-h1.md`) governs: all helpers live in `lpcstudy/statistics.py`: `block_resample_indices`, `bootstrap_values` (vector statistics allowed), `percentile_interval(values, level) -> (lo, hi, n_failed)`, `BootstrapInterval` / `block_bootstrap_counted`, `interval_verdict(lo, hi, band, closed)`, `combine_verdicts`, `criterion_verdict` (the A3 guard order) and `MIN_STATES = 50`. Failed (non-finite) resamples are placed at -inf for the lower bound and +inf for the upper bound; a bound is infinite iff the number of failures is at least floor((B-1)·a)+1 with a = (1 - level)/2; there is no one-sided `unfavourable` argument (it would be anti-conservative for the opposite verdict). `block_bootstrap` is refactored onto `block_resample_indices` and stays **bitwise unchanged**. Result keys use `reason` and `n_failed_resamples`.
+- **Implementing lane: WU-0002.4/.5**, as one commit group merged to `develop` first; the other lanes (.6, .7/.8) merge `develop` and reuse it, and do not write their own.
+- **Seeding convention.** The existing bootstraps keep their `config.seed + salt` integer seeds unchanged (changing them would change numbers). New bootstraps introduced by WU-0002.4 to .8 take their randomness from `make_rng(config.seed, <label>)` (the project rule "randomness only via `make_rng`"); the helpers accept an integer or a `Generator`; when several parts of one criterion must share resample indices, pass the same integer or a fresh generator built with the same labels per part (a shared `Generator` would advance between calls). Whether to convert the existing integer-salt bootstraps is for the audit under DEF-0011.
+
+**Alternatives weighed.** Each lane with its own helpers: rejected (divergent semantics, three names for one function). Converting all existing salts now: rejected (changes the regression numbers, and the pilot comparison is the anchor).
+
+**Affects:** WU-0002.4 to .8, .9, .11; the shared helper semantics for the verdict logic. Marked "needs owner review before freeze" (statistics and verdict code).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0013: WU-0002.3: the horizon of the K rule, and the two-stage grid in check (b)  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the WU-0002.3 review; for owner confirmation)
+
+**Decision.** Two points of WU-0002.3 are **open questions for the owner** that DEC-0008 does not answer (the developer's log wrongly said the first was answered by DEC-0008 A5; the reviewer caught it; the log is corrected):
+
+- *Horizon of the K rule.* DEC-0008 A5 fixes the quantity (calibration excess MSE within 5% of the minimum, tie inside) but neither v3 §5 nor Methods v2 §M7 names the horizon at which the excess is evaluated. The implementation evaluates it at the reference horizon H_ref (30 steps = 1 LT), as the code did before, locating the column by `horizons == reference_horizon`. Proposal: confirm H_ref, and have the owner state the horizon in v3 §5 (the amendments document lists it).
+- *Check (b) of the ROADMAP row.* The row says the regime weight is checked against a brute-force minimizer "on the same grid" within 1e-6; one 10^4-point grid locates the minimizer only to about 5e-5, so the check cannot pass as worded. The unit uses a two-stage grid (a second grid of 10^4 points around the first minimum) with the 1e-6 tolerance kept, which the applied-mathematician approved as a strengthening of the check's form, not a loosening. Proposal: confirm, and amend the ROADMAP wording (amendments document, section 1).
+
+**Alternatives weighed.** *Evaluate the K rule at every horizon and take the maximum:* not in either document and a different rule; rejected. *Keep the single grid and loosen the tolerance:* rejected (PRIME.2).
+
+**Affects:** WU-0002.3 (merged to `develop` with these two points flagged); the K choice in every run. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+- 2026-10-11 (claude-sonnet-5-5, main session; status of DEC-0010 itself is still **proposed**): update to DEC-0010 after the researcher's re-read of the Chua memo (`docs/agent/notes/2026-10-10-research-lyapunov.md`, 'Chua memo re-read'). The memo's quoted mu3 and sum of exponents are internally inconsistent with its own Jacobian, so they are NOT used. The memo case enters WU-0007.2 for **lambda_max only**: reference 0.23 per circuit time divided by 0.7 = 0.3286 per dimensionless time (conversion tau = 0.7 t confirmed from the memo's parameters and equation (1.3); a weak second source states 0.33), tolerance 10% (the mathematician's computation: combined sigma about 3.9%), with the orbit-boundedness guard (DEF-0015). Chua at the study's own parameters (alpha = 15.6, beta = 28) remains `not found`: a recorded known limitation.
+
+## DEC-0014: WU-0002.6: the 50-state minimum applies to the Q-N reading  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the WU-0002.6 review R4; for owner confirmation)
+
+**Decision.** The Q-N reading (interior logit w* and the indicator 1{w* = 0}) applies the 50-state minimum (`MIN_STATES`): a part with fewer than 50 states is inconclusive with the reason recorded. The developer chose this; the plan did not state it. It follows DEC-0008 A3 (subset statistics with fewer than 50 states are inconclusive) and DEC-0011 O1, and is the conservative side (it can only turn a verdict into inconclusive).
+
+**Alternatives weighed.** No minimum for Q-N: rejected (DEC-0008 A3 names no exemption, and an R² on a handful of states is unstable).
+
+**Affects:** WU-0002.6; v3 Q-N wording (add to the owner's amendment list, `docs/agent/notes/2026-10-11-amendments-for-owner.md` section 2). Marked "needs owner review before freeze" (verdict and statistics code).
+
+**Dissent and resolution (REPRO.8):** none. Status: proposed.
+
+- 2026-10-11 (claude-sonnet-5-5, main session; DEC-0010 still **proposed**): correction on the memo case's 10% tolerance, from the WU-0007.2 review R2. The 10% was proposed by the planner before any code value was computed (commit 431a482, 07:58). The applied-mathematician measured the code's lambda_max = 0.3235 afterwards (8e1dc9e, 08:06) and then confirmed the 10% from the error budget (combined sigma about 3.9%). So the 10% was confirmed after the value was seen; it was not changed after seeing it. The measured gap is -1.53% (0.323544 against 0.3286), well inside the bound. Also note: the memo row is in the test and in every RESULTS.md while DEC-0010 is unconfirmed (review R3); if the owner rejects it, the row is removed from both.
+
+- 2026-10-11 (claude-sonnet-5-5, main session; DEC-0012 still **proposed**): ruling on result-key names, from the WU-0002.7/.8 review R1. DEC-0012 governs: every criterion result emits `verdict` ("pass", "fail" or "inconclusive"), `reason` (when inconclusive) and `n_failed_resamples`, plus `pass` as the boolean for the pass case, as the H1 lane (91c31f7) does. DEC-0011 O3's names (`inconclusive_reason`) are superseded for key names only; its content stands. H3a's `verdict` is only pass or inconclusive. The report reads these keys. Also (R7): ROADMAP line 115's expected `handling.zero_variance_corr` count sits in the result under `zero_variance_corr[rho][n_lib]` (a dict of counts); WU-0002.11 picks it up, and the amendments note section 1 records the wording change.
+
+## DEC-0015: DEF-0014: V7 is a plumbing check; the smoke preset does not have to pass it  (2026-10-11, owner ruling relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner ruled in the session on 2026-10-11, in these words: "V7 is plumbing only and may be retired once superseded." The main session reads this as option 1 of the DEF-0014 referral (WU-0002.10 `## Referral`): V7 is a plumbing check, not a scientific criterion; `gate_pass` is false at smoke by design; V7 is judged at pilot size and above (WU-0002.12 on DEV-0, WU-0003 on DEV-1); and V7 may be retired (removed from the gate) once something supersedes it. Nothing is retired now: no superseding check exists, so V7 stays in the code and the gate.
+
+**Consequences.**
+- No threshold, band, sample size or preset changes (PRIME.2 stands).
+- The smoke `gate_pass` of false is expected; regression comparisons at smoke exclude it or expect false; the report labels V7's smoke values as plumbing-size numbers (planned inside WU-0002.9, which edits the report's gate and verdict rows).
+- WU-0002.12 must show that V7 passes at pilot size on DEV-0 with this code (the v1 pilot already did). If it fails there, that is a real finding to open and refer.
+- 'Fully green' (the owner's condition for merging to `main`, 2026-10-11) is read as: V7 evaluated and passing at pilot size, not at smoke.
+- Open for the owner: what 'superseded' means (which check retires V7) and whether a ledger `ruling` entry should state it. The ROADMAP's smoke wording ('smoke passes the gate') should become 'smoke lists V1 to V7' (amendments note section 1).
+
+**Dissent and resolution (REPRO.8):** none. Status: ruled by the owner in conversation; recorded here pending the owner's ledger entry.
+
+## DEC-0016: WU-0002.9: the overall verdict, H1c on PLP only, the gain-bound row, and gate_pass  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the planner's questions O1 to O4 and the applied-mathematician's answers; for owner confirmation)
+
+**Decision.**
+- **O1.** The overall verdict is "supported" only if all three v3 systems pass; it is "not supported" if any system fails; otherwise "inconclusive", with the missing systems listed. `required` is a fixed constant list of the three v3 systems (not `config.core_systems`), so a one-system smoke or development run can never read "supported". A system name outside `required` raises. Consequence: every smoke and development run reads inconclusive at best.
+- **O2.** The gain bound (D-21(b) covariance screen, D-21(c) subset satisfying P1) is a gap with no ROADMAP row. The unit keeps a `pending` marker that names it. A ROADMAP row is to be opened by the owner (amendments note): "screen on the raw C >= 0 at every horizon, report the subset and the per-screen counts, no bar".
+- **O3.** H1c is decided on PLP only (v3 section 2 says "(PLP)"); CP is reported without a verdict, as for H1b.
+- **O4.** Verdicts are not conditioned on `gate_pass`; a gate failure marks that system's results provisional (v3 section 6 E0), which the report shows as "FAIL (results provisional)".
+- **Error rate (for the owner, not a code change).** The intersection-union argument of v3 section 7 controls only the error of "supported". "Not supported" can be wrong with probability up to about 7.3% over three systems at 95% (and up to about 14% for H2c's two parts); this should be stated in v3 section 7.
+
+**Alternatives weighed.** Treating missing systems as not counted: rejected (a one-system run would read "supported"). Deciding H1c on both forecasters: rejected (v3 says PLP).
+
+**Affects:** WU-0002.9, the report's verdict rows, WU-0002.12's `compare_pilot` and WU-0008 (they read the verdict values, which become strings). Marked "needs owner review before freeze" (verdict code).
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+## DEC-0017: WU-0002.11: counting only, the split into lanes, and the answers to the planner's questions Q1 to Q7  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the planner's questions and the applied-mathematician's answers; for owner confirmation)
+
+**Decision.**
+- **Q1 (blocks .11c only).** A diverging Lyapunov orbit **refuses the run** (a flagged run would have a wrong time unit), with the WU-0007 bounds on |x| plus a finiteness check: Lorenz-63 40, Rössler 25, Chua 3, applied to the Benettin orbit and the three `build_context` trajectories; the cache is recomputed once and asserted bitwise equal. Lane .11c waits for the owner's ruling on DEF-0017 (seed-dependent start states change the same code).
+- **Q2.** DEF-0012 (`workers=LPC_THREADS`) is a separate small unit. **Q3.** The Levenberg–Marquardt internal sites go to WU-0005.4.
+- **Q4.** `regime_count_fallback` is renamed `empty_regime_fallback` (it now counts empty calibration regimes), and a count of the chosen K is added; the ROADMAP key wording is amended by the owner.
+- **Q5.** This unit only counts: it excludes nothing and changes no number. Exclusions, moving dropped resamples to the A3 tail and failing on bound hits are WU-0002.9 or a later ruling.
+- **Q6.** Rate counters are report-only. A nonzero counter that should be zero under the theorems, or a collapsed ν cap (more than about 1% of construction ν̂ replaced), marks results provisional; that rule is for the owner. A clip-sensitivity flag (3s against one tenth of the interval half-width) is reported next to each MSE- or weight-based verdict in .11b.
+- **Q7.** The fixed seeds of the V2 (`validation.py:107`) and V5 (`:147`) checks stay as verification fixtures; the rest of the DEF-0011 conversions follow WU-0002.12 and need the owner's ruling (they change numbers). The shared stream `default_rng(config.seed)` across four consumers and the shared bootstrap indices across systems are not an inference problem (intersection–union and Holm are valid under any dependence); hygiene only.
+- **Plan fixes D1 to D8** from the mathematician's review are part of the plan (the developer applies each before the commit that implements it).
+
+**Alternatives weighed.** Flag-and-count a diverging orbit: rejected (wrong time unit). Convert all `default_rng` sites now: rejected (changes the pilot comparison anchor, DEC-0008 B).
+
+**Affects:** WU-0002.11 (.11a to .11d), WU-0002.9 hand-off, WU-0005.4, DEF-0012. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed.
+
+- 2026-10-11 (claude-sonnet-5-5, main session; DEC-0017 still **proposed**): status of the clip-sensitivity flag of DEC-0017 Q6, from the WU-0002.11b review R5. The flag (3s against one tenth of the interval half-width, s the clipped share of the pooled second moment) is **deferred out of WU-0002.11b**: the share s and the scale per verdict (H2c, H2d, H3c, A2, A5) are undefined and it would add result leaves. Follow-up unit WU-0002.11e: the applied-mathematician defines s and the scale per verdict; the owner then rules whether nonzero should-be-zero counters and a collapsed nu cap mark results provisional. Listed as an open owner question (Q6).
+
+## DEC-0018: WU-0006: the simulation studies: what is asserted, and the owner's open choice (Option C or K)  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the applied-mathematician's review of the WU-0006 plan; for owner decision)
+
+**Finding.** The applied-mathematician's simulation of the real procedure (blocks of 5, B = 2000, an independent implementation matching production to 4e-16) shows the block-5 percentile intervals undercover even with independent states (coverage 0.938 to 0.947 at 95%, 0.977 to 0.981 at 98.3%; the log-normal cases lowest) and at lag-1 0.3 reach only 0.923 to 0.931 / 0.968 to 0.974. A correct implementation is therefore expected to fail about 16 to 17 of the 82 probabilistic assertions against the ROADMAP's bounds (about 1 to 2 at lag-1 0, about 11 at lag-1 0.3). These are real properties of the method at the pilot sample sizes, not code defects. The planner's "5 to 10% chance of one spurious failure" is replaced by this. The per-state MSE tails may be heavier than the plan's log-normal sigma = 1 (a dynamics proxy gives a log-SD of 1.7 to 2.0): at sigma = 1.5 to 2 the H2c, H2d and H3c-type intervals cover only 0.920 to 0.933 at 95% even with independent states. This bears on how much weight the study's interval-versus-band verdicts can carry (WU-0008, the owner).
+
+**Decision (main session, proposed).**
+- Implement everything the mathematician recommends as a *tightening*: integer-count bounds, corrections (N2 bound 0.045946; the H1 lag-1 standard error is sqrt((1 - phi^2)/N)), A4 (verdict equality) per replication, a pre-registered consistency range for each observed count from the reference (70 ranges, family-wise false alarm at most 3.5%; this is the defect test), the added characterization rows C2h and C4h (sigma = 1.5 and 2), the generator specifications of the note, the C7 and C6 choices.
+- **The ROADMAP-bound assertions stay asserted** (Option K) behind one constant `ASSERT_ROADMAP_BOUNDS = True` until the owner rules; their outcomes are always computed and recorded in the unit Log and for WU-0008. Neither bound, level nor R is changed.
+- **Open for the owner: Option C or K.** C: the ROADMAP-bound rows become labelled characterization rows (outcome reported, not asserted; the consistency ranges are the defect test); K: keep the assertions, about 13 predicted DEFs that recur at every gate. The mathematician recommends C, decided before the run. Changing the status of a ROADMAP criterion is the owner's (LPC.AI.12).
+- **O5 (null delta-R2).** The interval covers the conditional gain of the two fitted models with training held fixed, so the ROADMAP criterion N1 ('interval contains 0') is predicted to fail (an estimand mismatch). N2 (false 'distinct' rate) and N3 (coverage of the conditional gain) are the right criteria. Proposed: N2 and N3 are asserted; N1 is computed and reported, and asserted only under `ASSERT_ROADMAP_BOUNDS`. The owner amends the ROADMAP row if C is chosen.
+- **O1.** The spawned worker pool is approved (single-thread workers inside the LPC_THREADS = 4 budget; thread variables set to 1 in the parent environment before the pool is created; B = 500 is not an equivalent fallback). **O2.** The test files are named so that `test_impact` selects them: `test_statistics_coverage.py`, `test_analysis_coverage.py`, `test_analysis_logrank_size.py`, `test_analysis_null_delta_r2.py`. **O3.** 3000 training / 1000 test states for the delta-R2 study with the pool. **O4.** The per-state series' lag-1 autocorrelation cannot be measured from the existing development outputs (no per-state dump); a proxy gives -0.06 to +0.13, so lag-1 0.3 is very likely a stress case; add a per-state dump to the DEV-1 pilot in WU-0003.
+
+**Alternatives weighed.** Loosening the ROADMAP bounds to pass: rejected (PRIME.2). Reducing R or B to fit the time budget: rejected (it would loosen the bounds).
+
+**Affects:** WU-0006.1 to .4, WU-0008 (interval labels and the uncertainty budget), WU-0003 (per-state dump), and the owner's reading of every interval-versus-band verdict. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none so far. Status: proposed; the Option C or K choice is the owner's.
+
+## DEC-0019: WU-0002.12: the fallback criterion for the DEV-0 pilot regression, the re-reference run, and the run's resources  (2026-10-11, owner approval relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner approved, in the session on 2026-10-11 ("All 3 are approved"), the three items put to them:
+1. **The criterion.** The final fallback criterion text of the applied-mathematician's review, in `docs/agent/records/work/WU-0002.12-pilot-regression.md` (branch `wu/0002-12-pilot-regression`, section 'Proposed fallback criterion: final text for the owner (O1)', commit a3783d5): branch selection B (bitwise), N (context bitwise equal, networks differ: N1 to N5) or D (any other context difference: D1 to D3), with R1 and R4 to R7 in every branch and the divergence-locus table. The text is in force from this entry; changing it after the run's result is seen is a new owner decision.
+2. **The extra run.** Branch D1: if the first run lands in branch D, run tag `v1-baseline` at the pilot preset on DEV-0 on the same machine with the same `LPC_THREADS`, on CPU under the lock (about one more CPU pilot), and apply branches B then N against that local run.
+3. **Resources.** `LPC_THREADS=8`, and the wrapper may take the GPU lock for the CPU pilot run (DEC-0005 Q6).
+
+**Conditions the main session applies (from the plan and the review):** the run starts with an empty cache directory (the cached `lyapunov.json` would hide a platform difference), from a clean detached worktree whose tree no agent writes to during the run; the order of work puts the DEF-0017 seed-dependent start states and the WU-0002.11d seed conversions strictly after this run (they change every number).
+
+**Affects:** WU-0002.12, WU-0004.3 (the regression is its evidence). Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none. Status: approved by the owner in conversation; recorded here pending the owner's ledger entry.
+
+- 2026-10-11 (claude-sonnet-5-5, main session; DEC-0018 still **proposed**; **needs owner review before freeze**): update to DEC-0018 from the WU-0006 review R4. (1) After the delta-R2 reference was replaced (bd21e76, addendum A9: 1000 replications at the study's 3000/1000 sizes; the earlier 200-replication N2/N3 failure probabilities 0.25 and 0.42 were retracted as noise), the nominal N2 and N3 bounds (N2 <= 22/500, N3 >= 461/500) moved **under the `ASSERT_ROADMAP_BOUNDS` switch** with the A1 to A3 rows (default True, so nothing is weaker today); this supersedes the sentence of O5 that N2 and N3 are always asserted. (2) The 12 consistency ranges of A9 are the always-asserted defect test for the delta-R2 rows (family-wise false alarm at most 0.6%). (3) The A9 reference was fixed after run 2 had shown the counts (VV.3): its derivation uses reference replications only and the run-7 re-evaluation reproduced run 2's counts (same design and seeds), so its passing is a regression guard, not independent confirmation. Under Option C the always-asserted rows are therefore: the 70 + 12 consistency ranges, the exact checks (identity with the production functions, verdict equality, bitwise refit, zero failed resamples) and the log-rank and delta-R2 consistency ranges; the nominal-bound rows (A1 to A3, L, N1 to N3) become recorded characterization rows.
+
+## DEC-0020: WU-0002.12: how the main session reads four points of the approved pilot-regression criterion (DEC-0019)  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the developer's readings and the reviewer's confirmation; for owner confirmation)
+
+**Decision.** Where DEC-0019's text needed a reading to be implemented, the tool uses these (each confirmed by the independent review of `tools/compare_pilot.py`, WU-0002.12 `## Review`):
+1. **K and `best_single` are not chain-head events** of N3, although they are discrete quantities: they change by design (WU-0002.3, WU-0002.8), so every leaf that depends on K is classified `changed`, and the dependence on `best_single` goes through the rule condition (`when`). Stricter than the literal text (it licenses fewer leaves).
+2. **The `fixture` chain** (the V1, V2, V5 and V6 leaves: no trained network) counts as network-independent (compared bitwise in N1).
+3. **The cache check:** `lyapunov.json` is written during the run, so the results alone cannot show whether it pre-existed; the tool takes `--cache-preexisted no` from the launch record. For the DEV-0 run started on commit a5cd75b into `runs/dev/wu0002-12/pilot`, the evidence is the directory timestamps (`runs/`, `runs/dev/`, `runs/dev/wu0002-12/` created at 13:33:52, six seconds after the commit time, in a freshly created worktree, and the wrapper refuses an existing `run.meta.json`).
+4. **D1 compares through the v1-named rule table** (the local `v1-baseline` run has the v1 schema and no `provenance`).
+- **Open (not decided):** D3's `SE_new` arm (the arm facing away from the pilot estimate, as implemented, or the arm facing the other estimate); relevant only with `--no-reference`; for the mathematician and the owner.
+- **Limit noted:** the N5 `curvature_floor` attribution reads the core cell's sum over the three splits (no per-split counter exists); the mathematician to confirm this is acceptable for AM3 H3.
+
+**Affects:** WU-0002.12 step 3, WU-0004.3. Marked "needs owner review before freeze".
+
+**Dissent and resolution (REPRO.8):** none. Status: proposed.
+
+## DEC-0021: WU-0008: defaults for the planner's questions O1 to O6 (declaration table, ninth budget row, constants, figures, secondaries, slow nodes)  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision (defaults, so the work can proceed; none is irreversible).**
+- **O1.** The QoI declaration table has **14 rows** (the gain bound included, as NVVUQ.22 asks), not the ROADMAP's 13; the ROADMAP row is amended by the owner.
+- **O2.** The budget has the **ninth row 'Interval procedure (coverage)'** (DEF-0020); adding it to the `uq-budget` skill is the owner's edit.
+- **O3.** The WU-0006 coverage numbers are **constants with provenance** in `budget.COVERAGE_WU0006` (the run-2 analysis tables were overwritten, WU-0006 R2), with a unit test that parses the WU-0006 Log table as the independent reference.
+- **O4.** **Captions only** for figures (no interval drawn; LPC.PC.1).
+- **O5.** Budget tables for the secondaries and Q-N: **later** (a follow-up), the ROADMAP limits .1 to the five primaries.
+- **O6.** For the endpoint-error change (.2a): the unit tiers of `statistics` and its dependants, the integration tier, and the slow `test_exact_checks` nodes for C4, C7 and C8 at both phi, once.
+
+**Affects:** WU-0008. Marked "needs owner review before freeze". **Status:** proposed.
+
+## DEC-0022: WU-0002.12: the local v1 re-reference becomes the new baseline; N1 kept as written; the platform record is added  (2026-10-11, owner instructions relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner instructed, in the session on 2026-10-11, in these words: "Redo the v1 baseline and make that the new baseline. The old platform is not available. N1 I agree with the recommendation. Explain N3. Do 4, since this is our reference platform." Recorded as:
+1. **New baseline.** The v1 code (tag `v1-baseline`, commit f01360d) is re-run at the pilot preset on DEV-0 on this host (CPU, `LPC_THREADS=8`, same wrapper settings as the v3 pilot run) and its results become the regression baseline of this platform (the 'Pilot v1' row of the results manifest gets a dated line, the original pilot file is kept unmodified as the historical record). The v3 run (commit a5cd75b) is compared against it with branches B and N of DEC-0019, which also settles N1 and N3. The old platform is unavailable, so the original v1 pilot is no longer a bitwise target.
+2. **N1** is kept as written (the mathematician's recommendation); any cross-host tolerance is fixed before the results it applies to exist (WU-0003.4, WU-0016.3); the 69 differing leaves are DEF-0024.
+3. **N3** is explained to the owner (the licensing scope, the weakness found by the mathematician); a decision on its scope is pending the owner's reading of the explanation.
+4. **Item 4 (the platform record)**: add a digest of the whitening matrices W and U to `context` and record the CPU model and the BLAS kernel in the provenance block, as a unit (WU-0001.6) with planner, mathematician, developer and independent review; marked "needs owner review before freeze" (provenance code).
+
+**Affects:** WU-0002.12, WU-0004.3, WU-0001.6 (new), WU-0003.4, WU-0016.3. **Status:** owner instruction; recorded pending the owner's ledger entry.
+
+## DEC-0023: WU-0001.6 (platform record): defaults for the planner's questions O1 to O3  (2026-10-11, proposed by claude-sonnet-5-5 (main session); for owner confirmation)
+
+**Decision (defaults).** **O1:** the provenance schema is bumped to `lpcstudy.provenance/2` (the top-level key set changes; only `test_provenance.py` pins the string; a `/2` block distinguishes a never-recorded platform, as in the a5cd75b pilot, from a failed probe). **O2:** the unit keeps the name WU-0001.6 given in DEC-0022; ROADMAP section 2 already uses WU-0001.6 for the WU-0001 review sub-task (done), so the owner appends a ROADMAP line naming this unit WU-0001.6b or renumbers (amendments note). **O3:** the local v1 re-run has no provenance block (v1 code), so the main session appends this host's probe output (CPU model, BLAS kernels, package versions) to the manifest's dated line for the new baseline. **F1** (once both sides of a comparison carry digests, DEC-0019's literal 'any context difference means branch D' would send a digest difference to D) needs an owner ruling before such a comparison exists (WU-0003.4, a cross-host regeneration).
+
+**Affects:** WU-0001.6a/b. Marked "needs owner review before freeze" (provenance code). **Status:** proposed.
+
+## DEC-0024: WU-0008: the budget design (M1 to M9) and two points for the owner  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the applied-mathematician's design; for owner confirmation)
+
+**Decision.** The mathematician's design (WU-0008 Log, block 'WU-0008 mathematician design (M1-M9)', commit 28dfbd1) is accepted as the plan for WU-0008.1 and .2: its amendments are tightenings (E1 tolerance 3% to 2%; E2 replaced by 'the median over the 100 bootstraps within a factor of 1.4 of the reference SD, per endpoint', because the planned single-SE test would fail a correct helper with probability 0.13; E3 failed-resample case F = 13 gives None and F = 12 finite; the coverage constants use the WU-0006 reference rates (SE <= 0.0013) with the run-2 counts beside them; row and flag wording; two sentences under every table: results are conditional on one trajectory, library and network realization, and H3c is conditional on the fitted A4 and A5). Row decisions: oracle draws (M3) state the finite-M bias and its direction per QoI; LM row (M4) 'not estimated' even after WU-0005.4 (the residual bounds the error in observation space only, cond(J'J) about 1e7), with each primary's label stating its iterative error is unverified; round-off row (M5) 1e-4 times max(|lo|, |hi|), from the DEV-0 against v1 cross-host comparison; discretization (M6) 0 by LPC.NV.1 with V6 printed; interval procedure (M7) from WU-0006 with H2b(i) mapped to C8; proxy row (M8) 0 for H2a and H2b, 'not estimated' for H3c; the 10% rule is strict (M9).
+
+**For the owner.**
+1. **Estimator convention.** Whether to adopt a convention like LPC.NV.1 for the estimator ('PLP is the fixed 15-iteration LM'), which would make the LM row 0 by definition; otherwise an LM iteration-doubling study (15 to 30) is the way to size it.
+2. **The Chua pilot H2a(i) fail is not robust to the finite-M bias bound.** The mathematician's indicative worst-case bound for the finite-M (oracle draws) bias in the H2a(i) median range is 0.86 of the V4 median half-width, i.e. 43 to 86% of the interval half-width on the DEV-0 pilot: the Chua pilot's fail does not survive it (a pass is not certified either). This is a development-run observation (DEV-0, not a hypothesis test); it bears on how many oracle draws M the full preset needs and on whether H2a(i) should be reported with that bias.
+
+**Follow-ups proposed:** V4 signed mean deviation and a run at 1, 2 and 4 LT; a split-half check of logit-weight noise in WU-0003; the LM iteration-doubling study; a direct cross-host check of the primaries in WU-0003.4.
+
+**Affects:** WU-0008, WU-0003 (M for the full preset). Marked "needs owner review before freeze". **Status:** proposed.
+
+## DEC-0025: WU-0005.4: the mathematician's corrections accepted; three scope questions (D1 to D3) with defaults  (2026-10-11, proposed by claude-sonnet-5-5 (main session) on the applied-mathematician's check, commit 9b4ab35 on `wu/0005-4-lm-diagnostics`; for owner confirmation)
+
+**Decision (accepted as the plan, before any code exists, VV.3).** The corrections of the 'Mathematics check' section: the residual is reported as c and c/rho^2 (first order chi-square with 4 degrees of freedom; RMS, if printed, is sqrt(c/(D-m))/rho); the L2 non-increase tolerance is replaced by |c_k - J(u_k)| <= eta(2 sqrt(J) + eta) with eta = 1e-12 max(1, ||X||_inf), perturbation norm 0.01, refine_steps = 15 explicit (the plan's relative 1e-12 is not a valid round-off bound as J falls to about 1e-31); M3 final residual <= D eta^2 with a test target built through the same `step` object, tau <= 5, normalized X, at least 8 states; the p95 uses `method="inverted_cdf"` (the linear quantile returns NaN when the order statistic is finite); `median_iterations` is documented as including round-off null-step accepts; the NaN stub is `lambda s: s * jnp.nan`; L4 has at least 4 rows started at u_true plus one call on the NaN-stub estimator; the trace variant is built from the same `body` closure; refine_steps = 0 has a defined diagnostics value. WU-0003.4 gets two tolerance tiers (1e-8 relative if the network weights are bitwise equal; distribution-free 99% order-statistic bands otherwise). Nothing is loosened: the replacements are tighter or correct an invalid bound.
+
+**Scope questions, with defaults (all owner-confirmable).**
+- **D1** (integer flag `lm_late_progress`: an accepted step in the last 3 iterations that lowers the cost by more than 1e-6 relative). Default: **include**, as an additive, report-only integer, with no float added to the carry; kept only if the estimates and all existing leaves stay bitwise unchanged, otherwise dropped and reported.
+- **D2** (a 15-against-30 iteration study on DEV-0 smoke cells, the 'LM iteration-doubling study' of DEC-0024). Default: **not started now**; listed as a follow-up unit after the pilot regression closes (it needs CPU and a fixed protocol). Until then the LM row in WU-0008 stays 'not estimated' (DEC-0024).
+- **D3** (whether the unit's O3 measures both wrong-basin and still-unconverged estimates, using c/rho^2 > 18.47, the chi-square 0.999 quantile). Default: **report it, not decide on it**: the fraction above 18.47 is printed as a diagnostic with no gate or verdict role, since v3 section 4 covers about 2% wrong-basin estimates but not estimates unconverged at the budget; whether v3 should say so is the owner's.
+
+**Finding for the owner.** In test configurations, 2 to 13% of estimates were still moving by more than 10% of their error at iteration 15 (worst in whitened coordinates with large start errors). The production rate is unknown, and nothing in the unit measures it (the unit meets NVVUQ.10 literally, not NVVUQ.9). It bears on the estimator-convention point of DEC-0024.
+
+**Affects:** WU-0005.4, WU-0008 (LM row), WU-0003.4. Marked "needs owner review before freeze". **Status:** proposed.
+
+## DEC-0024 addendum A1: WU-0008 wording amendments from review round 1 (2026-10-11, recorded by claude-sonnet-5-5 (main session) from the applied-mathematician's reply; for owner confirmation)
+
+Amends M1 (a), M7 and the row-9 text of the accepted design (DEC-0024). The mathematician's finding: decision (a) of M1, 'the finite-M variance is inside every primary interval', is false for H3c (the test-state M draws do not enter the H3c quantity; the fit-stage M-draw noise is conditioned on). It holds, with the finite-M bias outside, for the other four.
+
+**Row 1 'Included' cells (each at most 140 characters).**
+- H2a(i): `variance: yes (states resampled with their M-draw w*; eligibility redone in each resample; asymptotic for a median); finite-M bias: no`
+- H2a(ii), all parts: `variance: yes in every part (target, domain and seed controls resampled with the states; asymptotic); finite-M bias: no` (caveat in the notes: whether the 'one' part is added at all is decided once on the full sample and is not resampled)
+- H2b(i): `variance: yes (mean of per-state Spearman values, each from that state's own draws); finite-M bias: no`
+- H2b(ii): `variance: yes (mean of per-state paired changes; same unit draws at both N_lib); finite-M clip-boundary bias: no`
+- H3c: `no: test-state M draws do not enter the QoI; fit-stage M-draw noise (A4 proxies; A5 tree, leaf weights, K) is conditioned on`
+
+**Row 9 (DEF-0020).** `DEF-0020: Option C or K (DEC-0018; owner, pending; K in force by default via ASSERT_ROADMAP_BOUNDS = True) decides only whether the WU-0006 ROADMAP-bound coverage rows stay asserted (K) or become recorded characterization rows with the consistency ranges as the defect test (C); neither changes a bound, level or R. Whether the study widens its intervals or uses another procedure (longer block, studentized, BCa) is a separate, undecided design question for the owner and the applied-mathematician.` The widening sentence cites the uq-budget rule ('widen the interval or refine') only: neither DEF-0020 nor DEC-0018 decides widening.
+
+**M7 constants.** Reference rates: scratch seed 20261011 (`m2_coverage.py`; `m7b.py` only transcribes them); run-2 counts: seed 6006 (`make_rng(6006, "wu0006", ...)`); neither registered. R_ref (98.3% column): C1, C4, C8 at both phi: 40000; C3 and C7: 20000 (C7's pooled 60000 applies to the C7 verdict counts only; the coverage constants 0.9794 and 0.9762 are the 20000 values); C4h1.5 and C4h2 (c 0.8): 20000. The range '10^4 to 4 10^4' belongs to C6, which no QoI uses; the cases used span 2 10^4 to 4 10^4.
+
+**Status:** proposed, with DEC-0024.
+
+## DEC-0026: The owner ratifies the recommendations on the table; scope, what stays open, and the order of work  (2026-10-12, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling`/`adoption` entries are the owner's to append)
+
+**Decision.** After the second merge gate (tip a74d6b0: unit 902, integration 11, `GATE-2026-10-11-develop-2.md`) and a restatement of the study's goal, the owner instructed, in the session on 2026-10-12, in these words: "Ok good, please proceed with all recommendations, which are hereby ratified". The main session reads 'all recommendations' as **every item for which a recommendation or a default is written in the records** (listed below), and nothing for which no recommendation exists; those stay open and are listed again. The ratification is recorded here, not as a ledger entry (GOV.49: ledger entries and edits to ROADMAP.md, v3, Methods v2, DEVELOPMENT_WORKFLOW.md and `.claude/` are the owner's; drafts are in the amendments note, sections 1 to 14).
+
+**Ratified (status changes from 'proposed' to 'owner-ratified, 2026-10-12, in chat'):**
+1. The defaults and answers of DEC-0002 to DEC-0014, DEC-0016 to DEC-0021, DEC-0023, DEC-0024 (design M1 to M9 and addendum A1), DEC-0025 (D1 include; D2 follow-up study; D3 diagnostic only); DEC-0015, DEC-0019, DEC-0022 were already owner decisions. DEC-0020's four readings of the regression criterion stand.
+2. **DEC-0018, Option C** (the mathematician's recommendation, decided before the WU-0006 run): the ROADMAP-bound coverage rows of WU-0006 become labelled characterization rows (outcome reported, not asserted; the pre-registered consistency ranges stay asserted and are the defect test); `ASSERT_ROADMAP_BOUNDS` is set to False. N2 and N3 are the criteria of the null delta-R2 study and N1 is reported (DEF-0021; the ROADMAP row amendment is the owner's edit). No bound, level, R or B is changed (PRIME.2).
+3. **DEF-0017:** seed-dependent start states (the mathematician's recommendation: start points drawn with `make_rng(seed, "start", system)` near the attractor, burn-in unchanged) and **DEC-0017 Q1:** a diverging Lyapunov orbit refuses the run (bounds Lorenz-63 40, Rössler 25, Chua 3; cache recomputed once and asserted bitwise equal). WU-0002.11c goes first; the start-state change follows as its own unit (planner, mathematician, developer, independent review) and, because it changes every number, ends with a regenerated pilot that becomes the next reference (compare against the 2026-10-11 local baseline with the DEC-0019/0020 criterion).
+4. **DEC-0017 Q7 / WU-0002.11d:** the remaining `default_rng` conversions to `make_rng` are done together with the start-state change (one numbers-changing step, one new reference), not separately.
+5. **DEF-0019:** the WU-0002.9b fix (H2b(i) uses the counted bootstrap) is confirmed.
+6. **DEF-0025:** the robustness filter becomes `d > spec.dim`.
+7. **DEF-0016:** WU-0011.5 (the direct-import rule and the scan-the-source rule in `tools/test_impact.py`, with regression tests and the fixture) is done; the stale-identifier test (`test_no_stale_identifier_in_the_package`) is amended to match whole tokens only, with cases that '20261011T165447Z' is not flagged and a standalone 'T1' still is (a false-positive fix, not a loosening: PRIME.2 checked by a case that fails on the old and new regex for a real stale id); the WU-0008 text then restores the exact log filename.
+8. **WU-0002.11e (clip sensitivity):** the mathematician's recommendations OD1 (doubling the clip to 20 sigma_x as the definition), OD2 (flag when 10 |Delta_T| exceeds the half-width of the verdict's own interval, or the verdict at 20 sigma_x differs), OD3 (scope: MSE- and weight-based verdicts, with Q-N and H3b as counts only), OD4, OD5, OD6 (a fired flag never marks results provisional), OD7 (no flag on robustness variants); the unit is implemented. OD8 (a ROADMAP row) is the owner's edit.
+9. **DEC-0024 point 1 (estimator convention)** is **not** ratified as a convention (no recommendation was made): the **LM iteration-doubling study (15 against 30)** is started (WU-0005.6, DEC-0025 D2) and the LM row of the budget stays 'not estimated' until it reports.
+10. The next unit planned is the **WU-0003 rehearsal on DEV-1** (the recommendation of the 2026-10-11 closing report): planning first, with the per-state dump, cross-host tolerances (fixed before the results exist) and the dependency on WU-0005.5.
+
+**Not ratified, still open (no recommendation exists):** DEF-0018 (H3a log-rank extreme p for tiny regimes); N3's licence scope and the D3 SE_new arm (DEC-0020); the estimator convention itself (DEC-0024 point 1); the Chua pilot H2a(i) reading under the finite-M bias (DEC-0024 point 2); `main` (reserved for fully green configurations: the open items and the owner's ledger entries remain; no request is made).
+
+**Order of work.** (a) Small lanes in parallel: DEF-0025 and the test-tooling fixes; Option C switch; WU-0002.11e implementation; planning of WU-0002.11c plus the start-state unit, of WU-0005.6 and of the WU-0003 rehearsal. (b) Every lane keeps the process: planner, mathematician where mathematics, developer, independent review, at most two fix rounds, blast radius only, merge to develop. (c) Any change that moves numbers needs its own before/after comparison; a new gate on `develop` after the batch.
+
+**Affects:** everything listed. Marked "needs owner review before freeze" where the underlying record is. **Status:** owner instruction; recorded pending the owner's ledger entry.
+
+## DEC-0024 addendum A2: row 9 under Option C, and the predicted consequence for WU-0006 (2026-10-12, recorded by claude-sonnet-5-5 (developer, WU-0006.5) from DEC-0026 item 2; for owner confirmation of the wording)
+
+Amends the row-9 text of addendum A1 (A1 is left as written, append-only). The sentence of A1 'Option C or K (DEC-0018; owner, pending; K in force by default via ASSERT_ROADMAP_BOUNDS = True)' is no longer true: the owner ratified Option C on 2026-10-12 (DEC-0026 item 2, recorded in this file) and WU-0006.5 sets `ASSERT_ROADMAP_BOUNDS = False`. The rest of A1 (the five row-1 cells, M7 constants, the widening sentence) stands.
+
+**Row 9 (DEF-0020), replacing the A1 text.** `DEF-0020: Option C in force (owner-ratified 2026-10-12, DEC-0026; ASSERT_ROADMAP_BOUNDS = False): the WU-0006 ROADMAP-bound coverage rows are recorded characterization rows (outcome reported, not asserted) and the consistency ranges are the defect test; no bound, level or R is changed. Whether the study widens its intervals or uses another procedure (longer block, studentized, BCa) is a separate, undecided design question for the owner and the applied-mathematician.`
+
+**What remains open.** The widening question: whether the study widens its intervals or uses another procedure (a longer block, studentized or BCa intervals) is still undecided and is not decided by Option C or by DEF-0020; the `uq-budget` rule ('widen the interval or refine') is the only text it cites. Option C changes what the slow tests assert, not the intervals the study reports.
+
+**Predicted consequence for DEC-0018 and WU-0006 (recorded before any run under Option C).** With `ASSERT_ROADMAP_BOUNDS = False` the ROADMAP-bound outcomes of A1, A2, A3, L1, L2, N1, N2 and N3 stay computed, written to the `runs/tests/wu0006_*.json` tables and shown as a labelled `UserWarning` in the pytest output, but are never asserted. The about 13 nominal-bound outcomes predicted in DEC-0018 for correct code (run 2 observed 16 failed coverage and edge-rate rows and N1 in 2 delta-R2 rows, DEF-0020 and DEF-0021) therefore become **reported findings, not test failures**, and no longer recur as failing nodes at gates. The pre-registered consistency ranges (70 coverage, A3 and log-rank, and 12 delta-R2) and the exact checks stay asserted in both switch positions; a count outside a range is the defect candidate. No bound, level, R, B or seed changes (PRIME.2).
+
+**Status:** the content is the owner's ruling (DEC-0026 item 2); this addendum's wording is proposed, with DEC-0024.
+
+- 2026-10-12 (claude-sonnet-5-5, main session), clarification of DEC-0026 item 2 from the WU-0006.5 review R1: 'N2 and N3 are the criteria of the null delta-R2 study and N1 is reported' says which rows the ROADMAP row names as the study's criteria (DEF-0021; the amendment is the owner's edit). It does **not** say that N2 and N3 stay asserted: DEC-0018's update of 2026-10-11 (item 1 and its closing sentence) is part of the Option C that was ratified, and it makes **all** the nominal-bound rows (A1 to A3, L, N1 to N3) recorded characterization rows under C. If the owner reads it the other way, N2 and N3 (or N2 alone) come out from under `ASSERT_ROADMAP_BOUNDS`: a code change in `tests/slow/` with a mathematician's note on the N3 false-alarm rate. For owner confirmation before freeze.
+- 2026-10-12 (claude-sonnet-5-5, main session), process note from the WU-0011.5 review R2: the main session authorized WU-0011.5 as a 'planner-free small lane' (the developer wrote the acceptance criteria into the unit file in a first commit before any code, and the independent review judged them adequate). DEC-0026 (b) says every lane keeps the planner step, and DEVELOPMENT_WORKFLOW 2.1 says the planner writes the plan: this is a departure by the main session, recorded here, not an agent's. For owner awareness; later small lanes keep the planner step.
+- 2026-10-12 (claude-sonnet-5-5, main session): the plans for WU-0002.11c, WU-0002.14 (seed-dependent start states plus the `make_rng` conversions) and WU-0003 (plan amendment 1) were written on branches `wu/0002-11c-start-states` (d6568dd) and `wu/0003-rehearsal` (c52a5b2). Their owner questions (11c Q1, Q2; .14 O1 to O8; WU-0003 O1 to O8) are listed in the amendments note, section 14. The planners' recommendations are adopted as working defaults so that the work can proceed; they are **not** covered by the 2026-10-12 ratification (made before they existed) and need the owner's confirmation before freeze. Marked "needs owner review before freeze".
+
+## DEC-0027: WU-0002.14 O4: the D3 criterion for a redrawn-state run uses both arms facing away; the triage order  (2026-10-13, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The main session asked the owner for a ruling on O4 of WU-0002.14 (the D3 criterion of the DEC-0019/0020 regression when every value moves because the start states are redrawn by design), with the applied-mathematician's recommendation (Mathematics check M5, WU-0002.14 unit file): "take both arms facing away from the other estimate, since the two runs are exchangeable; the current mixed rule is not symmetric under swapping them", with the proposed triage order (an excess beyond 2 z_B is a defect candidate, an excess below it is reported with the undercoverage of DEC-0018 in mind). The owner answered, in the session on 2026-10-13, in these words: "O4 take the recommendation". Recorded as: (1) `compare_pilot --redrawn-states` applies D3 with **both SE arms facing away** (`REDRAWN_D3_ARMS = "away"`; SE_new as implemented, which closes the DEC-0020 item; SE_old changes from the side of Delta to the side facing away); the options `--d3-arms half-width|delta-side` stay available only to reproduce other readings; (2) the **triage order** of M5(a) is adopted (excess beyond 2 z_B: defect candidate, referred; otherwise reported, not tuned); (3) a V4 failure at P1 (indicatively 5 to 15% for correct code) is **referred to the owner, never retuned**. The 'working default pending the owner' wording of the tool's report text is replaced by this record in a later commit of WU-0002.14 (text only).
+
+**Affects:** WU-0002.14 (P1 may be judged), WU-0003.4. Marked "needs owner review before freeze". **Status:** owner instruction; recorded pending the owner's ledger entry.

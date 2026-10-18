@@ -1,0 +1,52 @@
+#### R1
+  lorenz63  H2a(i)             [+0.0800, +0.1795] inconclusive | b10 f=1.000 inconclusive | b20 f=1.000 inconclusive | plateau f=1.000 inconclusive
+  lorenz63  H2a(ii) zero       [-0.0250, +0.1629] inconclusive | b10 f=1.000 inconclusive | b20 f=1.000 inconclusive | plateau f=1.000 inconclusive
+  lorenz63  H2a(ii) interior   [+0.0714, +0.3023] inconclusive | b10 f=1.026 inconclusive | b20 f=1.028 inconclusive | plateau f=1.034 inconclusive
+  lorenz63  H2b(i)             [+0.1063, +0.2945] pass         | b10 f=1.000 pass | b20 f=1.000 pass | plateau f=1.000 pass
+  lorenz63  H2b(ii)            [+0.0474, +0.1287] pass         | b10 f=1.005 pass | b20 f=1.000 pass | plateau f=1.005 pass
+  lorenz63  H3c                [+0.1392, +0.5255] pass         | b10 f=1.000 pass | b20 f=1.000 pass | plateau f=1.000 pass
+  lorenz63  H1a rho=0.01       [+0.9991, +1.3914] inconclusive | b10 f=1.000 inconclusive | b20 f=1.000 inconclusive | plateau f=1.000 inconclusive
+  lorenz63  H1a rho=0.02       [+1.0245, +1.6081] inconclusive | b10 f=1.018 inconclusive | b20 f=1.000 inconclusive | plateau f=1.031 inconclusive
+  rossler   H2a(i)             [+0.2402, +0.3239] fail         | b10 f=1.000 fail | b20 f=1.000 fail | plateau f=1.000 fail
+  rossler   H2a(ii) zero       [-0.1439, +0.0449] inconclusive | b10 f=1.000 inconclusive | b20 f=1.000 inconclusive | plateau f=1.007 inconclusive
+  rossler   H2a(ii) interior   [-0.0377, +0.2500] inconclusive | b10 f=1.037 inconclusive | b20 f=1.046 inconclusive | plateau f=1.046 inconclusive
+  rossler   H2b(i)             [+0.0391, +0.2497] pass         | b10 f=1.000 pass | b20 f=1.000 pass | plateau f=1.005 pass
+  rossler   H2b(ii)            [+0.0157, +0.1090] pass         | b10 f=1.062 pass | b20 f=1.065 pass | plateau f=1.081 pass
+  rossler   H3c                [+0.8747, +1.0644] inconclusive | b10 f=1.000 inconclusive | b20 f=1.000 inconclusive | plateau f=1.031 inconclusive
+  rossler   H1a rho=0.01       [+0.9464, +1.2600] inconclusive | b10 f=1.008 inconclusive | b20 f=1.063 inconclusive | plateau f=1.063 inconclusive
+  rossler   H1a rho=0.02       [+0.7594, +1.1793] pass         | b10 f=1.067 inconclusive | b20 f=1.099 inconclusive | plateau f=1.100 inconclusive  <-- CHANGES
+  chua      H2a(i)             [+0.1155, +0.1930] fail         | b10 f=1.000 fail | b20 f=1.000 fail | plateau f=1.000 fail
+  chua      H2a(ii) zero       [-0.1891, +0.0190] inconclusive | b10 f=1.061 inconclusive | b20 f=1.098 inconclusive | plateau f=1.099 inconclusive
+  chua      H2a(ii) interior   [+0.0071, +0.2966] inconclusive | b10 f=1.000 inconclusive | b20 f=1.000 inconclusive | plateau f=1.001 inconclusive
+  chua      H2b(i)             [+0.1741, +0.3299] pass         | b10 f=1.013 pass | b20 f=1.036 pass | plateau f=1.036 pass
+  chua      H2b(ii)            [-0.0174, +0.0721] inconclusive | b10 f=1.000 inconclusive | b20 f=1.000 inconclusive | plateau f=1.000 inconclusive
+  chua      H3c                [+0.9063, +1.1235] inconclusive | b10 f=1.000 inconclusive | b20 f=1.003 inconclusive | plateau f=1.032 inconclusive
+  chua      H1a rho=0.01       [+0.8017, +1.0865] pass         | b10 f=1.039 pass | b20 f=1.171 pass | plateau f=1.317 pass
+  chua      H1a rho=0.02       [+0.6526, +1.0686] inconclusive | b10 f=1.000 inconclusive | b20 f=1.000 inconclusive | plateau f=1.015 inconclusive
+  verdict changes (over 3 widenings x 24 parts): 3
+#### R5
+  lorenz63  H2a(i)             [+0.0971, +0.1528] inconclusive | b10 f=1.010 inconclusive | b20 f=1.015 inconclusive | plateau f=1.015 inconclusive
+  lorenz63  H2a(ii) zero       [-0.0843, +0.0702] pass         | b10 f=1.048 pass | b20 f=1.060 pass | plateau f=1.061 pass
+  lorenz63  H2a(ii) interior   [+0.1273, +0.3083] fail         | b10 f=1.001 fail | b20 f=1.000 fail | plateau f=1.007 fail
+  lorenz63  H2b(i)             [+0.1806, +0.2811] pass         | b10 f=1.000 pass | b20 f=1.000 pass | plateau f=1.000 pass
+  lorenz63  H2b(ii)            [+0.0506, +0.1020] pass         | b10 f=1.040 pass | b20 f=1.082 pass | plateau f=1.147 pass
+  lorenz63  H3c                [+0.5092, +0.9196] pass         | b10 f=1.000 pass | b20 f=1.000 pass | plateau f=1.000 pass
+  lorenz63  H1a rho=0.01       [+0.9124, +1.1235] pass         | b10 f=1.092 pass | b20 f=1.157 pass | plateau f=1.181 pass
+  lorenz63  H1a rho=0.02       [+0.9113, +1.1849] pass         | b10 f=1.012 pass | b20 f=1.027 pass | plateau f=1.030 pass
+  rossler   H2a(i)             [+0.2514, +0.3285] fail         | b10 f=1.000 fail | b20 f=1.000 fail | plateau f=1.000 fail
+  rossler   H2a(ii) zero       [-0.1443, +0.0207] inconclusive | b10 f=1.038 inconclusive | b20 f=1.105 inconclusive | plateau f=1.146 inconclusive
+  rossler   H2a(ii) interior   [-0.0900, +0.1335] inconclusive | b10 f=1.000 inconclusive | b20 f=1.005 inconclusive | plateau f=1.015 inconclusive
+  rossler   H2b(i)             [+0.1621, +0.2630] pass         | b10 f=1.018 pass | b20 f=1.122 pass | plateau f=1.185 pass
+  rossler   H2b(ii)            [+0.0363, +0.0786] pass         | b10 f=1.000 pass | b20 f=1.000 pass | plateau f=1.000 pass
+  rossler   H3c                [+0.9094, +0.9994] pass         | b10 f=1.000 pass | b20 f=1.000 pass | plateau f=1.000 pass
+  rossler   H1a rho=0.01       [+0.8572, +0.9958] pass         | b10 f=1.029 pass | b20 f=1.050 pass | plateau f=1.120 pass
+  rossler   H1a rho=0.02       [+0.7193, +0.9139] inconclusive | b10 f=1.021 inconclusive | b20 f=1.012 inconclusive | plateau f=1.029 inconclusive
+  chua      H2a(i)             [+0.1451, +0.2337] fail         | b10 f=1.000 fail | b20 f=1.005 fail | plateau f=1.018 fail
+  chua      H2a(ii) zero       [-0.1310, +0.0321] inconclusive | b10 f=1.026 inconclusive | b20 f=1.043 inconclusive | plateau f=1.046 inconclusive
+  chua      H2a(ii) interior   [+0.1568, +0.3460] fail         | b10 f=1.004 fail | b20 f=1.008 fail | plateau f=1.022 fail
+  chua      H2b(i)             [+0.1789, +0.2840] pass         | b10 f=1.000 pass | b20 f=1.000 pass | plateau f=1.000 pass
+  chua      H2b(ii)            [+0.0076, +0.0567] pass         | b10 f=1.001 pass | b20 f=1.000 pass | plateau f=1.003 pass
+  chua      H3c                [+0.9011, +1.0440] pass         | b10 f=1.000 pass | b20 f=1.000 pass | plateau f=1.000 pass
+  chua      H1a rho=0.01       [+0.7736, +0.9253] pass         | b10 f=1.032 pass | b20 f=1.060 pass | plateau f=1.060 pass
+  chua      H1a rho=0.02       [+0.6557, +0.8549] inconclusive | b10 f=1.000 inconclusive | b20 f=1.000 inconclusive | plateau f=1.000 inconclusive
+  verdict changes (over 3 widenings x 24 parts): 0

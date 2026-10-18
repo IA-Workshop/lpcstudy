@@ -1,0 +1,72 @@
+{
+ "label": "DEVELOPMENT (DEV-0): conditional on one realization; not a hypothesis test",
+ "options": {
+  "seed": 20261018,
+  "resamples": 100,
+  "permutations": 50,
+  "default": false
+ },
+ "stack": {
+  "same": false,
+  "rows": [
+   [
+    "python",
+    "<value>",
+    "<value>",
+    "unusable"
+   ],
+   [
+    "packages.numpy",
+    "<value>",
+    "<value>",
+    "unusable"
+   ],
+   [
+    "packages.scipy",
+    "<value>",
+    "<value>",
+    "unusable"
+   ],
+   [
+    "cpu.model",
+    "<value>",
+    "<value>",
+    "unusable"
+   ],
+   [
+    "cpu.isa",
+    "<value>",
+    "<value>",
+    "unusable"
+   ],
+   [
+    "blas.libraries",
+    "<value>",
+    "<value>",
+    "unusable"
+   ],
+   [
+    "numpy_simd.found",
+    "<value>",
+    "<value>",
+    "unusable"
+   ],
+   [
+    "env.OPENBLAS_CORETYPE",
+    "<value>",
+    "<value>",
+    "unusable"
+   ],
+   [
+    "env.NPY_DISABLE_CPU_FEATURES",
+    "<value>",
+    "<value>",
+    "unusable"
+   ]
+  ]
+ },
+ "run_level": {
+  "n_series": 0,
+  "uncomputed": []
+ }
+}

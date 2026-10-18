@@ -1,0 +1,135 @@
+DEVELOPMENT (DEV-2): conditional on one realization; not a hypothesis test
+rehearsal_diagnostics (WU-0003.8): D1 to D6; needs owner review before freeze (statistics feeding the block-length and M decisions)
+NOTICE: every reading below is computed with tool seed 20261018 (a literal scratch seed, not a development or confirmatory seed), 2000 bootstrap resamples and 1000 permutations (defaults: seed 20261018, 2000, 1000). Rerunning with other --seed, --resamples or --permutations to change a reading is not allowed; the seed and the options are an owner question (review R9).
+run: runs/r6-cpu-dev2/full/results.json; preset full; commit 059dc84f7a958b82bedcea7a5f3ed7ff5a6e1091
+Analysis stack against the run's provenance (a7): SAME stack (fit-derived leaves are reproduced bitwise)
+  python: run '3.13.16'; here '3.13.16': same
+  packages.numpy: run '2.5.3'; here '2.5.3': same
+  packages.scipy: run '1.18.1'; here '1.18.1': same
+  cpu.model: run 'Intel(R) Core(TM) i9-14900K'; here 'Intel(R) Core(TM) i9-14900K': same
+  cpu.isa: run ('avx', 'avx2', 'avx_vnni', 'bmi1', 'bmi2', 'f16c', 'fma', 'sse4_1', 'sse4_2'); here ('avx', 'avx2', 'avx_vnni', 'bmi1', 'bmi2', 'f16c', 'fma', 'sse4_1', 'sse4_2'): same
+  blas.libraries: run (('numpy.libs/libscipy_openblas64_-f48b354e.so', 'Haswell'), ('scipy.libs/libscipy_openblas-5f890258.so', 'Haswell')); here (('numpy.libs/libscipy_openblas64_-f48b354e.so', 'Haswell'), ('scipy.libs/libscipy_openblas-5f890258.so', 'Haswell')): same
+  numpy_simd.found: run ('X86_V3',); here ('X86_V3',): same
+  env.OPENBLAS_CORETYPE: run None; here None: same
+  env.NPY_DISABLE_CPU_FEATURES: run None; here None: same
+
+=== lorenz63 ===
+C4 Levenberg-Marquardt readings, lorenz63 (bands of note M6; a value outside is a FINDING, not a failure)
+  base|rho=0.01|n_lib=10000|core [oracle] n=800000, median c/rho^2 3.4026
+      fraction_above_chi2 0.014019 vs [0.0005, 0.047]: in band
+      fraction_late_progress 0.016905 vs [0, 0.049]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 7 vs [0, 9]: in band
+      relation: median c/rho^2 3.4026 vs Q 3.3990 (SE_iid 0.0036, z +1.02): within 4 SE
+  base|rho=0.01|n_lib=10000|core [eval] n=16000, median c/rho^2 3.3909
+      fraction_above_chi2 0.01425 vs [0.0005, 0.047] -> count 228 in 99% Poisson [2, 824] of 16000: in band
+      fraction_late_progress 0.017 vs [0, 0.049] -> count 272 in 99% Poisson [0, 857] of 16000: in band
+      fraction_no_decrease 0 vs [0, 0.0001] -> count 0 in 99% Poisson [0, 6] of 16000: in band
+      median_iterations 7 vs [0, 9]: in band
+      relation: median c/rho^2 3.3909 vs Q 3.3997 (SE_iid 0.0255, z -0.35): within 4 SE
+  base|rho=0.005|n_lib=10000|sweep [oracle] n=200000, median c/rho^2 3.3897
+      fraction_above_chi2 0.009965 vs [0.0005, 0.041]: in band
+      fraction_late_progress 0.011885 vs [0, 0.043]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 7 vs [0, 9]: in band
+      relation: median c/rho^2 3.3897 vs Q 3.3857 (SE_iid 0.0072, z +0.56): within 4 SE
+  base|rho=0.02|n_lib=10000|sweep [oracle] n=200000, median c/rho^2 3.4209
+      fraction_above_chi2 0.018385 vs [0.0005, 0.066]: in band
+      fraction_late_progress 0.025395 vs [0, 0.07]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 7 vs [0, 10]: in band
+      relation: median c/rho^2 3.4209 vs Q 3.4135 (SE_iid 0.0072, z +1.02): within 4 SE
+  base|rho=0.05|n_lib=10000|sweep [oracle] n=200000, median c/rho^2 3.4530
+      fraction_above_chi2 0.02734 vs [0.0005, 0.092]: in band
+      fraction_late_progress 0.038005 vs [0, 0.105]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 8 vs [0, 10]: in band
+      relation: median c/rho^2 3.4530 vs Q 3.4438 (SE_iid 0.0073, z +1.26): within 4 SE
+  eval kind of the 3 sweep cell(s): not part of the design (n_estimates 0), skipped
+  N_lib check (rho=0.01: n_lib 1000, 3162, 31623, 100000): lm summaries bitwise equal
+  N_lib check (rho=0.02: n_lib 1000, 3162, 10000, 31623, 100000): lm summaries bitwise equal
+  0 finding(s) in the bands and the relation (information; exit code unaffected)
+  not computable: lorenz63 (D1 to D6): runs/r6-cpu-dev2/full/states/lorenz63.npz not found (run without --states-dump?)
+
+=== rossler ===
+C4 Levenberg-Marquardt readings, rossler (bands of note M6; a value outside is a FINDING, not a failure)
+  base|rho=0.01|n_lib=10000|core [oracle] n=800000, median c/rho^2 3.3518
+      fraction_above_chi2 0.0009625 vs [0.0005, 0.0021]: in band
+      fraction_late_progress 0.0017613 vs [0, 0.0045]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 8 vs [0, 10]: in band
+      relation: median c/rho^2 3.3518 vs Q 3.3566 (SE_iid 0.0036, z -1.34): within 4 SE
+  base|rho=0.01|n_lib=10000|core [eval] n=16000, median c/rho^2 3.3919
+      fraction_above_chi2 0.0010625 vs [0.0005, 0.0021] -> count 17 in 99% Poisson [2, 49] of 16000: in band
+      fraction_late_progress 0.0016875 vs [0, 0.0045] -> count 27 in 99% Poisson [0, 95] of 16000: in band
+      fraction_no_decrease 0 vs [0, 0.0001] -> count 0 in 99% Poisson [0, 6] of 16000: in band
+      median_iterations 8 vs [0, 10]: in band
+      relation: median c/rho^2 3.3919 vs Q 3.3569 (SE_iid 0.0252, z +1.39): within 4 SE
+  base|rho=0.005|n_lib=10000|sweep [oracle] n=200000, median c/rho^2 3.3501
+      fraction_above_chi2 0.00089 vs [0.0005, 0.0023]: in band
+      fraction_late_progress 0.0013 vs [0, 0.0034]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 7 vs [0, 9]: in band
+      relation: median c/rho^2 3.3501 vs Q 3.3563 (SE_iid 0.0071, z -0.88): within 4 SE
+  base|rho=0.02|n_lib=10000|sweep [oracle] n=200000, median c/rho^2 3.3526
+      fraction_above_chi2 0.00098 vs [0.0005, 0.0027]: in band
+      fraction_late_progress 0.00267 vs [0, 0.0065]: in band
+      fraction_no_decrease 8.5e-05 vs [0, 0.00067]: in band
+      median_iterations 8 vs [0, 10]: in band
+      relation: median c/rho^2 3.3526 vs Q 3.3566 (SE_iid 0.0071, z -0.57): within 4 SE
+  base|rho=0.05|n_lib=10000|sweep [oracle] n=200000, median c/rho^2 3.3577
+      fraction_above_chi2 0.00262 vs [0.0005, 0.0031]: in band
+      fraction_late_progress 0.00667 vs [0, 0.014]: in band
+      fraction_no_decrease 0.0017 vs [0, 0.0013]: FINDING (outside)
+      median_iterations 8 vs [0, 10]: in band
+      relation: median c/rho^2 3.3577 vs Q 3.3619 (SE_iid 0.0071, z -0.59): within 4 SE
+  eval kind of the 3 sweep cell(s): not part of the design (n_estimates 0), skipped
+  N_lib check (rho=0.01: n_lib 1000, 3162, 31623, 100000): lm summaries bitwise equal
+  N_lib check (rho=0.02: n_lib 1000, 3162, 10000, 31623, 100000): lm summaries bitwise equal
+  1 finding(s) in the bands and the relation (information; exit code unaffected)
+  not computable: rossler (D1 to D6): runs/r6-cpu-dev2/full/states/rossler.npz not found (run without --states-dump?)
+
+=== chua ===
+C4 Levenberg-Marquardt readings, chua (bands of note M6; a value outside is a FINDING, not a failure)
+  base|rho=0.01|n_lib=10000|core [oracle] n=800000, median c/rho^2 3.3640
+      fraction_above_chi2 0.00252 vs [0.0005, 0.0093]: in band
+      fraction_late_progress 0.008505 vs [0, 0.019]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 6 vs [0, 8]: in band
+      relation: median c/rho^2 3.3640 vs Q 3.3616 (SE_iid 0.0036, z +0.70): within 4 SE
+  base|rho=0.01|n_lib=10000|core [eval] n=16000, median c/rho^2 3.3736
+      fraction_above_chi2 0.001875 vs [0.0005, 0.0093] -> count 30 in 99% Poisson [2, 181] of 16000: in band
+      fraction_late_progress 0.0085625 vs [0, 0.019] -> count 137 in 99% Poisson [0, 350] of 16000: in band
+      fraction_no_decrease 0 vs [0, 0.0001] -> count 0 in 99% Poisson [0, 6] of 16000: in band
+      median_iterations 6 vs [0, 8]: in band
+      relation: median c/rho^2 3.3736 vs Q 3.3595 (SE_iid 0.0252, z +0.56): within 4 SE
+  base|rho=0.005|n_lib=10000|sweep [oracle] n=200000, median c/rho^2 3.3745
+      fraction_above_chi2 0.00203 vs [0.0005, 0.016]: in band
+      fraction_late_progress 0.004465 vs [0, 0.021]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 6 vs [0, 8]: in band
+      relation: median c/rho^2 3.3745 vs Q 3.3600 (SE_iid 0.0071, z +2.03): within 4 SE
+  base|rho=0.02|n_lib=10000|sweep [oracle] n=200000, median c/rho^2 3.3758
+      fraction_above_chi2 0.003515 vs [0.0005, 0.013]: in band
+      fraction_late_progress 0.016375 vs [0, 0.044]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 6 vs [0, 8]: in band
+      relation: median c/rho^2 3.3758 vs Q 3.3647 (SE_iid 0.0071, z +1.55): within 4 SE
+  base|rho=0.05|n_lib=10000|sweep [oracle] n=200000, median c/rho^2 3.3794
+      fraction_above_chi2 0.004865 vs [0.0005, 0.029]: in band
+      fraction_late_progress 0.03958 vs [0, 0.113]: in band
+      fraction_no_decrease 0 vs [0, 0.0001]: in band
+      median_iterations 6 vs [0, 8]: in band
+      relation: median c/rho^2 3.3794 vs Q 3.3691 (SE_iid 0.0072, z +1.44): within 4 SE
+  eval kind of the 3 sweep cell(s): not part of the design (n_estimates 0), skipped
+  N_lib check (rho=0.01: n_lib 1000, 3162, 31623, 100000): lm summaries bitwise equal
+  N_lib check (rho=0.02: n_lib 1000, 3162, 10000, 31623, 100000): lm summaries bitwise equal
+  0 finding(s) in the bands and the relation (information; exit code unaffected)
+  not computable: chua (D1 to D6): runs/r6-cpu-dev2/full/states/chua.npz not found (run without --states-dump?)
+
+Run level (all systems)
+  not computable: run-level D1 and D2: no series had an autocorrelation
+
+Summary
+  not computable: 4 item(s) (listed above); never skipped
+  C4 findings: 1 reading(s) outside a band or the relation (information for the owner; not a failure)

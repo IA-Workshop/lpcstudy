@@ -89,7 +89,9 @@ Here m is the state dimension.
 
 - **statistics:** 2×10⁵ steps, giving normalization, the invariant mean and covariance C_μ, τ_d and the autocorrelation time;
 - **main:** library and evaluation segments;
-- **separate:** from a perturbed start; used only to train the learned initial guess of the state estimator.
+- **separate:** used only to train the learned initial guess of the state estimator.
+
+The statistics orbit and the Lyapunov (Benettin) orbit start from the system's fixed registry state and define its units (σ_x, the mean and covariance, τ_d, the spacing, λ_max); they are identical for every seed. The main and separate trajectories each start from a seed-drawn point of the statistics orbit, perturbed by 10⁻⁶ in whitened units (start = stats[k] + 10⁻⁶ C^(1/2) u, k uniform on the 2×10⁵ post-burn-in states, u standard normal, one generator make_rng(seed, "start", system) in the order k_main, u_main, k_est, u_est), and each discards a 100-LT burn-in. The raw start states and indices are recorded in the results.
 
 **Coordinates.** Latent quantities are whitened, s̄ = C_μ^(−1/2)(s − μ). Seeds, ν, g_H and the profile are therefore dimensionless and comparable across systems.
 
@@ -503,6 +505,37 @@ Dated amendment log (all 10 October 2026 unless noted). Changes marked † were 
 | Robustness reduced to D, k, model perturbation and Λ_fin | Scope |
 | M = 200 oracle draws (v1, 5 Oct)† | V4: at M = 50 the half-width was 0.055–0.073; at M = 200 it was 0.031–0.039 (criterion ≤ 0.05). *v1 wrongly said M = 100 had been tried.* |
 | Analog proxy built from R·ν̂ (v1, 5 Oct)† | Chosen on pilot data: Spearman with ε_s rose from 0.50–0.64 to 0.71–0.73. The confirmatory run on fresh seeds tests it. |
+
+**Amendments after the v3 export (code v3, 11 to 18 October 2026).** The code follows v3 and these entries; where they differ from §M1 to §M13 above, these entries govern.
+
+| # | Date | Change | Reason and source |
+|---|---|---|---|
+| 1 | 11 Oct | Hypothesis identifiers in code, results and report are v3's (map in the decision log); this document keeps the v2 ids | One table, `lpcstudy/identifiers.py` (WU-0002.2; DEF-0005) |
+| 2 | 11 Oct | E5 (interventional shift) removed; v2 E6 Regimes is v3 E5, v2 E7 Robustness is v3 E6 | v3 drops it (WU-0002.1; DEC-0008 A2) |
+| 3 | 11 Oct | H1a (H1b): the reference 1/d_LB is the mean over states of the per-state Levina–Bickel inverse estimates; the verdict is on the ratio (1/d_fit)/(1/d_LB), joint block bootstrap, pass iff inside [0.75, 1.25] (closed), at both ρ; the floor f is reported, never a pass condition† | Concordance D-19; changes the pilot's reference estimator (DEC-0008 A4(h), A5; WU-0002.4) |
+| 4 | 11 Oct | Q-N: two parts, ΔR² for logit w* on 0 < w* < 1 and for the indicator 1{w* = 0}, each read by the table; a part with fewer than 50 states is undetermined; the boosted regressors use l2_regularization = 1.0 (as in the pilot code)† | 22–36% of states have w* = 0 (§M13 item 2) (DEC-0008 A4(a), (c); DEC-0014; WU-0002.6) |
+| 5 | 11 Oct | H2a(i): the range is over initial segments {1, 2} or {1, 2, 4} LT up to the last horizon in the small-error regime (both r.m.s. errors ≤ 0.5 σ_x); states with fewer than two horizons excluded and counted; eligibility re-evaluated in each resample; complete-case {1, 2, 4} reported as a sensitivity | DEC-0008 A4(b) (WU-0002.6) |
+| 6 | 11 Oct | H2a(ii): two parts, the partial correlation with Λ̃ of 1{w* = 0} (all states) and of logit w* (0 < w* < 1); controls x₁, x₂, x₁², x₂², x₁x₂ with x = (ln(ε_s/ρ), ln(δ/ρ)); both intervals inside (−0.1, 0.1); a third part 1{w* = 1} if w* = 1 exceeds 5% of states† | Changes the pilot's treatment of w* = 0 (DEC-0008 A4(a), (a2); WU-0002.6) |
+| 7 | 11 Oct | H2c: the better single forecaster is chosen on the calibration split; A4o − A2 has a block-bootstrap interval | Concordance D-20 (DEC-0008 A4(i); WU-0002.8) |
+| 8 | 11 Oct | H2e (H2f): a state where PLP's error is constant across draws also gets correlation 0, counted (stricter) | DEC-0011 O2 (WU-0002.7) |
+| 9 | 11 Oct | H3a: one observation per state (the first evaluation draw); regimes ordered by KM median with a stable sort; at least 50 test states in total, no per-regime minimum; an uncomputable pair enters Holm at p = 1; pass or inconclusive only (no margin, so H3a cannot fail); events and censored states per regime reported (18 Oct) | DEC-0008 A3, A4(f); DEC-0011 O1; DEF-0013; DEF-0018 and owner ruling B6b (WU-0002.8, WU-0004d) |
+| 10 | 11 Oct | H3b (H3c): weight and horizon trees with a fixed 8 leaves; block bootstrap (blocks of 5, 2000, 95%, percentile) over construction states, refitting both trees; weight-tree importance of Λ̃ in [0, 0.2); D = imp_t(Λ̃) − max other > 0; stability fraction reported | DEC-0008 A3, A4(e); DEC-0011 (WU-0002.8) |
+| 11 | 11 Oct | A5 tree: two-output CART (squared error) on the construction profile over all draws, targets w*(H_ref) and log characteristic horizon standardized; min_samples_leaf = max(10, n_states·n_draws/50); random_state from make_rng | Documented as required (DEC-0008 A4(d)) |
+| 12 | 11 Oct | K rule: mean calibration excess MSE at H_ref, K the smallest with excess ≤ 1.05 × minimum (a value at 1.05 counts as within) | §M7 names no horizon (DEC-0013; DEC-0008 A1, A5; WU-0002.3) |
+| 13 | 11 Oct | Verdicts: bands strict for H2a, H2b, H2c, H2e (v2 H2f), H3a, closed for the others; endpoints unrounded; percentile intervals; a failed resample is counted at the unfavourable tail, the bound infinite iff failures ≥ ⌊(B − 1)a⌋ + 1, a = (1 − level)/2; an uncomputable statistic or one on fewer than 50 states is inconclusive with the reason; overall verdict over the three fixed systems, a missing system inconclusive; verdicts are not conditioned on the gate, a gate failure shows "results provisional" | DEC-0008 A1, A3; DEC-0012; DEC-0016 O1, O4; DEF-0019 (WU-0002.9, .9b) |
+| 14 | 11 Oct | V7 is a plumbing check: the smoke preset need not pass it; it is judged at pilot size and above and may be retired once superseded | Owner ruling DEC-0015 (DEF-0014) |
+| 15 | 11 Oct | E6 (E7) robustness: parameters scaled by (1 + p·s), one sign s ∈ {−1, +1} per parameter from make_rng(seed, system, "misspec"); a variant with D not above the state dimension is skipped and counted | DEC-0008 A4(g); DEF-0025 |
+| 16 | 11–14 Oct | Randomness: every stream comes from make_rng(seed, labels); scikit-learn seeds are the raw seed below 2³² and a derived 32-bit value otherwise; the oracle pool is seed-labelled† | DEF-0010, DEF-0011; DEC-0008 B; DEC-0012 (WU-0002.6, WU-0002.14) |
+| 17 | 14 Oct | Start states of the main and separate trajectories are seed-dependent (text in §M2) | DEF-0017; DEC-0026 item 3 (WU-0002.14) |
+| 18 | 12 Oct | A Lyapunov orbit that leaves a fixed bound (Lorenz-63 40, Rössler 25, Chua 3) stops the run | DEF-0015; DEC-0017 Q1 (WU-0002.11c) |
+| 19 | 11–17 Oct | Every silent handling of a bad value (replacement, clip, fallback, zero variance) is counted in the results under `handling` | DEF-0001 (WU-0002.11) |
+| 20 | 12 Oct | Clip sensitivity: MSE- and weight-based verdicts are recomputed with the clip at 20 σ_x; a flag marks a moved verdict; report only, never provisional | DEC-0026 item 8 (WU-0002.11e) |
+| 21 | 11–18 Oct | PLP: 15 LM iterations stay the design value, not a convention; the final residual c and c/ρ² and the fraction above 18.47 (χ²(4), 0.999) are reported as diagnostics; the iteration sensitivity measured on DEV-0 (15, 30, 60) is reported per primary part as a flag, and the budget's LM row reads "not estimated" with a pointer† | DEC-0025 D1, D3; DEF-0027; owner rulings O5 and B7 (WU-0005.4, WU-0005.6, WU-0004b) |
+| 22 | 11–18 Oct | An uncertainty budget per primary QoI with the Monte Carlo error of the interval endpoints is reported; F1 is an indicative value, not a worst case | DEC-0024 with addenda A1, A2 and A3 (draft) (WU-0008, WU-0004b) |
+| 23 | 17–18 Oct | Block length 5 and percentile intervals kept; their undercoverage is a stated limitation; a report-only "block-sensitive" label† | DEF-0020; owner ruling of 17 Oct and B6a (WU-0003.8d) |
+| 24 | 18 Oct | The confirmatory run is on the CPU at LPC_THREADS = 8; a GPU run of the same seed is a cross-check judged by the away-arm TD statistic (bound 3.4) and informs only; the regeneration is on the CPU, bitwise at equal contexts, else by the declared tolerances† | Owner rulings B4 and WU-0003.6 (DEC-0031, DEC-0028 drafts); OF-5 (WU-0003.9c) |
+| 25 | 18 Oct | A confirmatory run is refused on a dirty tree or an unknown commit | Owner ruling B8 (WU-0004a) |
+| 26 | — | H2e (gain bound, v3 "reported"): the screen is the raw C ≥ 0 at every horizon, with the per-screen counts (WU-0002.15) | DEC-0016 O2; concordance D-21; owner ruling (pending) |
 
 Changes from the proposal's §6 that v1 introduced, and that remain (ψ refinement, deployable proxies, delay cap, Chua step, θ rule), are listed in Methods v1 §M12.
 

@@ -1,0 +1,24 @@
+kappa [0.6, 1.075, 1.55, 2.025, 2.5]  g_j (density of log X at its median) [0.2452, 0.3629, 0.4535, 0.5296, 0.5963]
+p0 lorenz63 0.01  theta [3.1768, 1.0425, -7.1807] |1/d leaf - tight| 8.7e-09  cond(H) 7.44e+03 eig_min 2.084e-02  A_j [0.2816, -0.0943, -0.2652, -0.108, 0.186]  max|psi| 3.122  sd(psi_an over x) 1.446  rel err h=1e-3 6.82e-06  order 2.00
+p0 lorenz63 0.02  theta [3.9642, 1.1396, -5.9253] |1/d leaf - tight| 2.5e-08  cond(H) 9.20e+03 eig_min 8.745e-03  A_j [0.4087, -0.3733, -0.3824, 0.0291, 0.3179]  max|psi| 4.407  sd(psi_an over x) 2.291  rel err h=1e-3 9.42e-06  order 2.00
+p0 rossler  0.01  theta [0.019, 0.8081, -8.1908] |1/d leaf - tight| 1.5e-07  cond(H) 8.66e+03 eig_min 1.864e-02  A_j [0.2877, -0.0884, -0.2556, -0.1286, 0.1849]  max|psi| 2.484  sd(psi_an over x) 1.255  rel err h=1e-3 7.95e-06  order 2.00
+p0 rossler  0.02  theta [-0.1335, 0.7786, -6.8993] |1/d leaf - tight| 3.2e-09  cond(H) 1.02e+04 eig_min 7.558e-03  A_j [0.4339, -0.3253, -0.4222, -0.0586, 0.3722]  max|psi| 4.120  sd(psi_an over x) 2.344  rel err h=1e-3 1.23e-05  order 2.00
+p0 chua     0.01  theta [3.1219, 1.0032, -6.3868] |1/d leaf - tight| 1.5e-08  cond(H) 7.90e+03 eig_min 1.567e-02  A_j [0.3199, -0.1594, -0.3085, -0.0789, 0.2269]  max|psi| 3.301  sd(psi_an over x) 1.557  rel err h=1e-3 8.24e-06  order 2.00
+p0 chua     0.02  theta [2.0481, 0.8332, -5.2677] |1/d leaf - tight| 1.9e-08  cond(H) 1.03e+04 eig_min 7.927e-03  A_j [0.4343, -0.33, -0.4275, -0.0509, 0.374]  max|psi| 4.476  sd(psi_an over x) 2.249  rel err h=1e-3 1.05e-05  order 2.00
+p1 lorenz63 0.01  theta [2.1085, 0.8707, -7.406] |1/d leaf - tight| 1.1e-08  cond(H) 9.04e+03 eig_min 2.438e-02  A_j [0.2452, -0.0353, -0.2027, -0.1475, 0.1403]  max|psi| 2.581  sd(psi_an over x) 1.198  rel err h=1e-3 4.16e-06  order 2.00
+p1 lorenz63 0.02  theta [2.6988, 0.9578, -5.9094] |1/d leaf - tight| 4.4e-08  cond(H) 8.81e+03 eig_min 1.069e-02  A_j [0.3744, -0.263, -0.3644, -0.0422, 0.2951]  max|psi| 3.626  sd(psi_an over x) 1.909  rel err h=1e-3 8.25e-06  order 2.00
+p1 rossler  0.01  theta [2.5076, 1.1113, -7.9833] |1/d leaf - tight| 3.9e-08  cond(H) 7.37e+03 eig_min 1.684e-02  A_j [0.3081, -0.1563, -0.2992, -0.0635, 0.2108]  max|psi| 3.126  sd(psi_an over x) 1.537  rel err h=1e-3 8.68e-06  order 2.00
+p1 rossler  0.02  theta [2.8301, 1.1641, -6.6672] |1/d leaf - tight| 1.8e-06  cond(H) 1.34e+04 eig_min 4.176e-03  A_j [0.5663, -0.765, -0.5012, 0.1659, 0.534]  max|psi| 6.676  sd(psi_an over x) 3.118  rel err h=1e-3 2.15e-05  order 2.00
+p1 chua     0.01  theta [2.9432, 0.9748, -6.3866] |1/d leaf - tight| 4.3e-08  cond(H) 7.58e+03 eig_min 1.705e-02  A_j [0.3044, -0.1344, -0.2851, -0.088, 0.2031]  max|psi| 2.962  sd(psi_an over x) 1.440  rel err h=1e-3 4.56e-06  order 2.00
+p1 chua     0.02  theta [2.1188, 0.8595, -5.1263] |1/d leaf - tight| 8.3e-08  cond(H) 1.10e+04 eig_min 6.008e-03  A_j [0.4808, -0.4459, -0.4751, -0.0049, 0.445]  max|psi| 5.068  sd(psi_an over x) 2.573  rel err h=1e-3 1.53e-05  order 2.00
+
+== tight fit, central difference: max over 12 cells x 60 points of |num - IF| / max|IF| (ratio; 1/d in brackets)
+  h = 4e-03: 3.43e-04  [3.39e-04]
+  h = 2e-03: 8.58e-05  [8.46e-05]
+  h = 1e-03: 2.15e-05  [2.12e-05]
+  h = 1e-05: 2.17e-09  [2.14e-09]
+  observed order (h = 4e-3, 2e-3, 1e-3): min 2.00 median 2.00 max 2.00
+== production fit (curve_fit defaults, 2-point Jacobian), same difference, 20 points per cell: |num - IF| / max|IF|
+  h = 1e-05: median 1.07e-04  p95 5.39e-04  max 1.12e-03
+  h = 1e-03: median 2.53e-06  p95 2.25e-05  max 5.39e-05
+  h = 1e-02: median 7.61e-05  p95 8.42e-04  max 2.17e-03

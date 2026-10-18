@@ -1,0 +1,13 @@
+p0 lorenz63 0.01: ||r|| 0.0652 sigma_min 0.147 | stop err obs 1.49e-08 s, sqrt(ftol) scale 4.50e-06 s (ratio 0.00) | FD fixed-point scale 6.87e-08 s
+p0 lorenz63 0.02: ||r|| 0.0535 sigma_min 0.0962 | stop err obs 3.12e-08 s, sqrt(ftol) scale 4.89e-06 s (ratio 0.01) | FD fixed-point scale 8.79e-08 s
+p0 rossler  0.01: ||r|| 0.103 sigma_min 0.132 | stop err obs 2.62e-07 s, sqrt(ftol) scale 9.75e-06 s (ratio 0.03) | FD fixed-point scale 1.93e-07 s
+p0 rossler  0.02: ||r|| 0.0242 sigma_min 0.0863 | stop err obs 5.16e-09 s, sqrt(ftol) scale 3.81e-06 s (ratio 0.00) | FD fixed-point scale 9.99e-08 s
+p0 chua     0.01: ||r|| 0.0272 sigma_min 0.126 | stop err obs 2.66e-08 s, sqrt(ftol) scale 2.36e-06 s (ratio 0.01) | FD fixed-point scale 3.89e-08 s
+p0 chua     0.02: ||r|| 0.0585 sigma_min 0.0916 | stop err obs 2.51e-08 s, sqrt(ftol) scale 8.33e-06 s (ratio 0.00) | FD fixed-point scale 1.58e-07 s
+p1 lorenz63 0.01: ||r|| 0.17 sigma_min 0.155 | stop err obs 3.92e-08 s, sqrt(ftol) scale 1.23e-05 s (ratio 0.00) | FD fixed-point scale 1.84e-07 s
+p1 lorenz63 0.02: ||r|| 0.0651 sigma_min 0.104 | stop err obs 6.23e-08 s, sqrt(ftol) scale 6.64e-06 s (ratio 0.01) | FD fixed-point scale 1.23e-07 s
+p1 rossler  0.01: ||r|| 0.0911 sigma_min 0.131 | stop err obs 5.68e-08 s, sqrt(ftol) scale 6.88e-06 s (ratio 0.01) | FD fixed-point scale 1.25e-07 s
+p1 rossler  0.02: ||r|| 0.157 sigma_min 0.0729 | stop err obs 2.38e-06 s, sqrt(ftol) scale 1.92e-05 s (ratio 0.12) | FD fixed-point scale 5.07e-07 s
+p1 chua     0.01: ||r|| 0.0557 sigma_min 0.128 | stop err obs 7.23e-08 s, sqrt(ftol) scale 4.93e-06 s (ratio 0.01) | FD fixed-point scale 7.97e-08 s
+p1 chua     0.02: ||r|| 0.103 sigma_min 0.0803 | stop err obs 1.42e-07 s, sqrt(ftol) scale 1.44e-05 s (ratio 0.01) | FD fixed-point scale 3.03e-07 s
+max obs/pred (stop) 0.12; max sqrt(ftol) scale 1.92e-05 s; max FD scale 5.07e-07 s

@@ -1,0 +1,117 @@
+== lorenz63
+  context/lambda_max: DIFFER  rel=0.000193  gpu=0.905668542691417 cpu=0.9054940534657817
+  context/interval: DIFFER  rel=0.000193  gpu=0.03680522372376447 cpu=0.03681231611157454
+  context/delay: equal
+  context/ami_delay: equal
+  context/embed_dim: equal
+  context/acf_time: equal
+  context/spacing: equal
+  context/obs_scale: DIFFER  rel=5.36e-05  gpu=7.924482883275749 cpu=7.924907899372742
+  context/trajectory_len: equal
+  context/library_len: equal
+  context/theiler: equal
+  context/lyapunov_orbit_max_abs: DIFFER  rel=0.0172  gpu=18.942631074757067 cpu=19.267721702218743
+  context/trajectory_max_abs/statistics: DIFFER  rel=0.000155  gpu=19.190850201248107 cpu=19.193823483829128
+  context/trajectory_max_abs/main: DIFFER  rel=0.0213  gpu=19.152071393142453 cpu=18.744856884678224
+  context/trajectory_max_abs/estimator: DIFFER  rel=0.0195  gpu=18.896743937359993 cpu=18.528504639065748
+  context/start_index/main: equal
+  context/start_index/estimator: equal
+  context/start_state/main[0]: DIFFER  rel=10.3  gpu=0.4511905622382038 cpu=5.107074542187314
+  context/start_state/main[1]: DIFFER  rel=6.67  gpu=0.8423276132766055 cpu=6.461944131976772
+  context/start_state/main[2]: DIFFER  rel=1.33  gpu=8.73442608903764 cpu=20.378263252513513
+  context/start_state/estimator[0]: DIFFER  rel=1.02  gpu=5.9744612755834 cpu=12.071048123267571
+  context/start_state/estimator[1]: DIFFER  rel=1.08  gpu=9.066191529026002 cpu=-0.7433582151669814
+  context/start_state/estimator[2]: DIFFER  rel=1.27  gpu=18.49260564872708 cpu=41.90191951380649
+  context/main_digest: DIFFER
+  context/estimator_digest: DIFFER
+  context/state_mean_digest: DIFFER
+  context/cov_digest: DIFFER
+  context/whiten_digest: DIFFER
+  context/unwhiten_digest: DIFFER
+  V delay_jacobian_rel_err: gpu=1.3647419395795148e-08 cpu=1.7278160868705508e-09 |d|=1.19e-08 rel=0.873
+  V gain_rel_err: gpu=1.6457003545146796e-08 cpu=1.3453177547810946e-09 |d|=1.51e-08 rel=0.918
+  V crlb_ratio_median: gpu=1.0439154922470506 cpu=0.9605015498580108 |d|=0.0834 rel=0.0799
+  V crlb_ratio_min: gpu=0.8729608163226918 cpu=0.8629463045199864 |d|=0.01 rel=0.0115
+  V crlb_ratio_max: gpu=1.1201163512604368 cpu=1.0690338488383426 |d|=0.0511 rel=0.0456
+  validation estimator ('lorenz63', 7, 5, 0.01) weights_digest DIFFER
+  fitted/allocator_digest DIFFER
+== rossler
+  context/lambda_max: DIFFER  rel=0.00308  gpu=0.07171891954365615 cpu=0.07193978510879935
+  context/interval: DIFFER  rel=0.00307  gpu=0.46477740525696204 cpu=0.4633504712715099
+  context/delay: equal
+  context/ami_delay: equal
+  context/embed_dim: equal
+  context/acf_time: equal
+  context/spacing: equal
+  context/obs_scale: DIFFER  rel=0.00188  gpu=5.1596518151848025 cpu=5.149956526819005
+  context/trajectory_len: equal
+  context/library_len: equal
+  context/theiler: equal
+  context/lyapunov_orbit_max_abs: DIFFER  rel=6.23e-05  gpu=11.432999923289387 cpu=11.432287285529059
+  context/trajectory_max_abs/statistics: DIFFER  rel=6.16e-06  gpu=11.433062819737746 cpu=11.433133265324681
+  context/trajectory_max_abs/main: DIFFER  rel=4.04e-05  gpu=11.432762014603844 cpu=11.432299796074483
+  context/trajectory_max_abs/estimator: DIFFER  rel=3.45e-05  gpu=11.431766756030507 cpu=11.432161001785317
+  context/start_index/main: equal
+  context/start_index/estimator: equal
+  context/start_state/main[0]: DIFFER  rel=1.83  gpu=9.8717499007412 cpu=-8.178410314052636
+  context/start_state/main[1]: DIFFER  rel=8.61  gpu=-0.33368297746648135 cpu=-3.208336524776406
+  context/start_state/main[2]: DIFFER  rel=0.997  gpu=4.59941530602463 cpu=0.014225250783887842
+  context/start_state/estimator[0]: DIFFER  rel=4.8  gpu=0.8550275566654133 cpu=4.962808568561256
+  context/start_state/estimator[1]: DIFFER  rel=0.0675  gpu=-10.458838871012526 cpu=-9.75244909111703
+  context/start_state/estimator[2]: DIFFER  rel=1.08  gpu=0.03207102110295273 cpu=0.0665748551396686
+  context/main_digest: DIFFER
+  context/estimator_digest: DIFFER
+  context/state_mean_digest: DIFFER
+  context/cov_digest: DIFFER
+  context/whiten_digest: DIFFER
+  context/unwhiten_digest: DIFFER
+  V delay_jacobian_rel_err: gpu=2.2170757705270658e-09 cpu=8.496359378082037e-10 |d|=1.37e-09 rel=0.617
+  V gain_rel_err: gpu=2.848981100275043e-09 cpu=1.2079436442601863e-09 |d|=1.64e-09 rel=0.576
+  V crlb_ratio_median: gpu=0.9853957355917498 cpu=0.9888103911047393 |d|=0.00341 rel=0.00347
+  V crlb_ratio_min: gpu=0.9601560157395423 cpu=0.8917524671500034 |d|=0.0684 rel=0.0712
+  V crlb_ratio_max: gpu=1.0687274882199205 cpu=1.0700131749292625 |d|=0.00129 rel=0.0012
+  validation estimator ('rossler', 7, 3, 0.01) weights_digest DIFFER
+  fitted/allocator_digest DIFFER
+== chua
+  context/lambda_max: DIFFER  rel=0.022  gpu=0.4408520035546001 cpu=0.43113260161336364
+  context/interval: DIFFER  rel=0.0225  gpu=0.0756111644374209 cpu=0.07731573350889016
+  context/delay: equal
+  context/ami_delay: equal
+  context/embed_dim: equal
+  context/acf_time: DIFFER  gpu=78 cpu=76
+  context/spacing: equal
+  context/obs_scale: DIFFER  rel=0.00205  gpu=1.421888122370662 cpu=1.4189768372671627
+  context/trajectory_len: equal
+  context/library_len: equal
+  context/theiler: equal
+  context/lyapunov_orbit_max_abs: DIFFER  rel=2.2e-05  gpu=2.2630037897523576 cpu=2.2630536344327434
+  context/trajectory_max_abs/statistics: DIFFER  rel=1.9e-06  gpu=2.263067064181655 cpu=2.26307137050988
+  context/trajectory_max_abs/main: DIFFER  rel=3.8e-05  gpu=2.2629920500346627 cpu=2.2629061514259865
+  context/trajectory_max_abs/estimator: DIFFER  rel=0.000158  gpu=2.262455867899049 cpu=2.262813387758552
+  context/start_index/main: equal
+  context/start_index/estimator: equal
+  context/start_state/main[0]: DIFFER  rel=1.84  gpu=2.1036436429368535 cpu=-1.7584501741603167
+  context/start_state/main[1]: DIFFER  rel=1.47  gpu=0.25656732839015445 cpu=-0.12087917625444532
+  context/start_state/main[2]: DIFFER  rel=1.79  gpu=-2.2247982542058025 cpu=1.7468258220847248
+  context/start_state/estimator[0]: DIFFER  rel=0.516  gpu=2.2483796520105086 cpu=1.0878028145713468
+  context/start_state/estimator[1]: DIFFER  rel=1.29  gpu=0.2583395770020935 cpu=-0.07405554189652504
+  context/start_state/estimator[2]: DIFFER  rel=0.861  gpu=-2.848619615591304 cpu=-0.39599418558044563
+  context/main_digest: DIFFER
+  context/estimator_digest: DIFFER
+  context/state_mean_digest: DIFFER
+  context/cov_digest: DIFFER
+  context/whiten_digest: DIFFER
+  context/unwhiten_digest: DIFFER
+  V delay_jacobian_rel_err: gpu=3.4558000027629747e-09 cpu=7.705782971108978e-09 |d|=4.25e-09 rel=1.23
+  V gain_rel_err: gpu=1.6022788148176095e-09 cpu=1.2507180393135073e-09 |d|=3.52e-10 rel=0.219
+  V crlb_ratio_median: gpu=0.9470568465739809 cpu=0.9456095523102289 |d|=0.00145 rel=0.00153
+  V crlb_ratio_min: gpu=0.8661885702957124 cpu=0.8867606726317652 |d|=0.0206 rel=0.0238
+  V crlb_ratio_max: gpu=1.0942451520978032 cpu=1.033794949760066 |d|=0.0605 rel=0.0552
+  validation estimator ('chua', 7, 5, 0.01) weights_digest DIFFER
+  fitted/allocator_digest DIFFER
+estimator ('lorenz63', 7, 5, 0.01) weights_digest DIFFER
+estimator ('lorenz63', 7, 5, 0.02) weights_digest DIFFER
+estimator ('rossler', 7, 3, 0.01) weights_digest DIFFER
+estimator ('rossler', 7, 3, 0.02) weights_digest DIFFER
+estimator ('chua', 7, 5, 0.01) weights_digest DIFFER
+estimator ('chua', 7, 5, 0.02) weights_digest DIFFER
