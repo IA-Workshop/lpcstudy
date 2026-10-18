@@ -2080,3 +2080,44 @@ def test_a_tree_with_the_ci_mc_se_leaves_compares_without_an_unclassified_leaf()
     results = by_path(sides(old_tree(), new)[2])
     for path in [x for x in CI_MC_SE_PATHS if "lorenz63" in x]:
         assert results[path].status == "new", path
+
+
+# ------------------------------------------------------------------ WU-0004f: DEF-0001 residues
+WU_0004F_PATHS = (
+    "systems/lorenz63/clip_sensitivity/n_caught_exceptions",
+    "systems/rossler/clip_sensitivity/by_hypothesis/H1b/parts/PLP/n_floored",
+    "systems/chua/clip_sensitivity/by_hypothesis/H1b/parts/PLP/n_floored_2L",
+    "systems/lorenz63/handling/result_counts/clip_sensitivity%2Fn_caught_exceptions",
+    "systems/lorenz63/handling/result_counts/clip_sensitivity%2Fby_hypothesis%2FH1b%2Fparts"
+    "%2FPLP%2Fn_floored",
+    "handling/skipped_variants",
+)
+
+
+@pytest.mark.parametrize("path", WU_0004F_PATHS)
+def test_wu_0004f_leaves_match_exactly_one_new_rule(path: str) -> None:
+    """Each leaf WU-0004f adds matches exactly one rule, of class ``new`` (never exit 2 'no rule').
+
+    Reference: the table's own contract (``Table.classify`` raises on no match and on two matches,
+    the tool's exit code 2). The paths are the new leaves of the unit's plan, written out by hand.
+    Exact.
+    """
+    found = cp.TABLE.matches(p(path))
+    assert len(found) == 1, [r.pattern for r in found]
+    assert found[0].cls == "new"
+
+
+def test_look_at_lists_skipped_variants_next_to_failed_variants(tmp_path) -> None:
+    """The 'things to look at' section has a 'Skipped robustness variants' table with the count.
+
+    Reference: the report lines written out by hand (the precedent is the ``nu_cap_clips`` row of
+    ``test_bulk_changed_rows_are_summarized_and_look_at_lists_counters``). Exact lines.
+    """
+    new = new_tree()
+    new["handling"] = {"failed_variants": 0, "skipped_variants": 3}
+    done, report, _ = run_cli(tmp_path, old_tree(), new)
+    assert done.returncode == 0, done.stderr
+    lines = report.read_text().splitlines()
+    start = lines.index("### Skipped robustness variants")
+    assert lines[start + 1:start + 5] == ["", "| path | value |", "| --- | --- |",
+                                           "| handling/skipped_variants | 3 |"]

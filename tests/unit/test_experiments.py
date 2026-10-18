@@ -595,9 +595,11 @@ def test_run_handling_warns_of_skipped_variants_and_keeps_its_keys_def_0025(
     """D4: one aggregate WARNING when variants were skipped; the handling block keeps its keys.
 
     Reference: the ``failed_variants`` precedent in ``run_handling`` (one WARNING, count in the
-    block). Here only the log line is new: expected exactly one WARNING naming the count and the
-    label, and the returned keys exactly ``schema, totals, by_system, robustness,
-    failed_variants`` (no schema change). Exact.
+    block). Expected exactly one WARNING naming the count and the label, and the returned keys
+    exactly ``schema, totals, by_system, robustness, failed_variants, skipped_variants``. WU-0004f
+    appended ``skipped_variants`` (the count, as for ``failed_variants``) to the block: the key list
+    below was ``... failed_variants`` only (D4 of WU-0011.5, "no schema change"), and the new list is
+    equally exact, so no assertion was loosened. Exact.
     """
     import logging
 
@@ -610,7 +612,9 @@ def test_run_handling_warns_of_skipped_variants_and_keeps_its_keys_def_0025(
         run = run_handling(study, {"systems": {}})
     warned = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warned) == 1 and "skipped_variants = 1" in warned[0] and "D=3" in warned[0]
-    assert list(run) == ["schema", "totals", "by_system", "robustness", "failed_variants"]
+    assert list(run) == ["schema", "totals", "by_system", "robustness", "failed_variants",
+                         "skipped_variants"]
+    assert run["skipped_variants"] == 1 and type(run["skipped_variants"]) is int
 
 
 def test_convergence_check_resamples_come_from_the_v4_generator(monkeypatch, tmp_path) -> None:
@@ -1034,3 +1038,56 @@ def test_convergence_check_dump_counts_and_logs_the_clips_of_its_second_forecast
     # R4: the line says what it counts: all three horizons (H_ref, 2 and 4 LT) of 10 x 30 draws
     assert "H_ref, 2 and 4 LT" in lines[0] and " of 900;" in lines[0]
     assert off._records == on._records
+
+
+# ------------------------------------------------------------- WU-0004f: skipped_variants in results
+def test_run_handling_writes_the_skipped_variants_count_a6(tmp_path, caplog) -> None:
+    """A6 (WU-0004f): ``handling.skipped_variants`` is the number of labels over all systems.
+
+    Reference: hand counts. Two systems with 1 and 2 skipped labels give 3; no skipped label gives 0
+    (the key is present, an ``int``, and no WARNING is written); the other keys are the same as
+    without skips; ``failed_variants`` is independent; the block survives ``json.dumps``. Exact.
+    """
+    import json
+    import logging
+
+    from lpcstudy.experiments import run_handling
+    from lpcstudy.pipeline import Study
+
+    study = Study(SMOKE, tmp_path)
+    study.skipped_variants = {"lorenz63": ["D=3"], "rossler": ["D=2", "D=3"]}
+    study.failed_variants = {"chua": ["misspec=0.05"]}
+    run = run_handling(study, {"systems": {}})
+    assert run["skipped_variants"] == 3 and run["failed_variants"] == 1
+    assert type(run["skipped_variants"]) is int
+    assert json.loads(json.dumps(run)) == run
+    clean = Study(SMOKE, tmp_path)
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="lpcstudy"):
+        none = run_handling(clean, {"systems": {}})
+    assert none["skipped_variants"] == 0 and type(none["skipped_variants"]) is int
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert list(none) == list(run)
+
+
+def test_result_count_keys_include_the_clip_sensitivity_counters_a8() -> None:
+    """A8 (WU-0004f): the walker mirrors the three new clip-sensitivity counters.
+
+    Reference: a hand ``clip_sensitivity`` block and the expected path map written out. The mirrored
+    ints are ``n_caught_exceptions`` (block level), and ``n_floored`` and ``n_floored_2L`` of the H1b
+    part; ``n_clipped_inputs`` and the other ints (sizes of the clipped sets) are not copied. Also
+    the guard of WU-0002.11 A13 for these names: a key that starts like a count key is in the set.
+    """
+    from lpcstudy.experiments import RESULT_COUNT_KEYS, collect_result_counts
+
+    block = {"clip_sensitivity": {
+        "status": "computed", "n_caught_exceptions": 2,
+        "href_clipped_draws": {"test_eval": 5},
+        "by_hypothesis": {"H1b": {"parts": {"PLP": {
+            "status": "computed", "n_clipped_inputs": 9, "n_floored": 4, "n_floored_2L": 1}},
+            "flag": False}}}}
+    assert collect_result_counts(block) == {
+        "clip_sensitivity/n_caught_exceptions": 2,
+        "clip_sensitivity/by_hypothesis/H1b/parts/PLP/n_floored": 4,
+        "clip_sensitivity/by_hypothesis/H1b/parts/PLP/n_floored_2L": 1}
+    assert {"n_caught_exceptions", "n_floored", "n_floored_2L"} <= RESULT_COUNT_KEYS

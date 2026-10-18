@@ -1830,6 +1830,7 @@ LOOK_AT: list[tuple[str, object]] = [
     ("Handling counts by system (clips, replacements, floors, zero variance, fallbacks, nu cap)",
      lambda p: p[:2] == ("handling", "by_system")),
     ("Failed robustness variants", lambda p: p[:2] == ("handling", "failed_variants")),
+    ("Skipped robustness variants", lambda p: p[:2] == ("handling", "skipped_variants")),
     ("w* at 0 and at 1 (H2a, Q-N)",
      lambda p: p[0] == "systems" and len(p) == 4 and p[3] in ("n_w_zero", "n_w_one")
      and p[2] in ("H2a", "Q-N")),

@@ -338,11 +338,11 @@ def v7_replacements(noise_cells: dict[float, Cell]) -> dict[str, int]:
 
 
 RESULT_COUNT_KEYS: frozenset[str] = frozenset({
-    "degenerate_fits", "n_covariance_warnings", "n_constant_states", "n_degenerate_pairs",
-    "n_dropped_resamples", "n_empty_regimes", "n_excluded_nonfinite", "n_excluded_states",
-    "n_exponent_at_bound", "n_failed_resamples", "n_floored", "n_ineligible_states",
-    "n_km_not_reached", "n_nonfinite", "n_screened_out", "n_zero_difference", "nan_resamples",
-    "range_n_failed_resamples", "zero_variance_corr"})
+    "degenerate_fits", "n_caught_exceptions", "n_covariance_warnings", "n_constant_states",
+    "n_degenerate_pairs", "n_dropped_resamples", "n_empty_regimes", "n_excluded_nonfinite",
+    "n_excluded_states", "n_exponent_at_bound", "n_failed_resamples", "n_floored", "n_floored_2L",
+    "n_ineligible_states", "n_km_not_reached", "n_nonfinite", "n_screened_out",
+    "n_zero_difference", "nan_resamples", "range_n_failed_resamples", "zero_variance_corr"})
 """Result keys that are counts of excluded, failed, replaced, dropped or constant cases (DEF-0001);
 the walker copies every integer below such a key into ``handling.result_counts``. The result key
 stays the authority. Lane .11b added the keys of the statistics counters (``n_dropped_resamples``,
@@ -350,7 +350,9 @@ stays the authority. Lane .11b added the keys of the statistics counters (``n_dr
 ``n_empty_regimes``, ``n_degenerate_pairs``), the WU-0002.9 counts that were not copied yet
 (``n_ineligible_states``, ``n_screened_out``) and ``n_zero_difference`` (the states whose paired
 change is exactly 0; in H2e a product of the zero-variance convention, since a state that is
-zero-variance in both cells has difference 0). Left out: ``n_states`` (a size) and ``n_noncontiguous_states`` (a
+zero-variance in both cells has difference 0). WU-0004f added ``n_floored_2L`` (the H1b floor under
+the clip perturbation) and ``n_caught_exceptions`` (the exceptions swallowed by the clip-sensitivity
+block). Left out: ``n_states`` (a size) and ``n_noncontiguous_states`` (a
 property of the H2a(i) statistic)."""
 
 
@@ -479,7 +481,9 @@ def run_handling(study: Study, results: dict) -> dict:
         ``schema``; ``totals`` (every counter, the sum over the main systems); ``by_system`` (each
         system's totals); ``robustness`` (per system: ``cells``, ``oracles``, ``result_counts``,
         ``totals``, kept apart from the totals); ``failed_variants`` (robustness variants that
-        raised; their result entries read ``{"error": ...}``).
+        raised; their result entries read ``{"error": ...}``); ``skipped_variants`` (robustness
+        variants not run, because the configured dimension is not above the state dimension; an
+        ``int`` over all systems, added by WU-0004f, DEF-0025 follow-up).
     """
     by_system = {s: dict(r["handling"]["totals"]) for s, r in results["systems"].items()}
     totals = {name: sum(t[name] for t in by_system.values()) for name in ALL_COUNTERS}
@@ -494,11 +498,11 @@ def run_handling(study: Study, results: dict) -> dict:
         LOG.warning("handling run: failed_variants = %d of %d variants (%s)", failed, n_variants,
                     "; ".join(f"{s}: {', '.join(v)}" for s, v in study.failed_variants.items()))
     skipped = sum(len(labels) for labels in study.skipped_variants.values())
-    if skipped:  # not in the results block: no schema change (DEF-0025); the log carries it
+    if skipped:  # also in the results block since WU-0004f (DEF-0025 follow-up)
         LOG.warning("handling run: skipped_variants = %d (%s)", skipped,
                     "; ".join(f"{s}: {', '.join(v)}" for s, v in study.skipped_variants.items()))
     return {"schema": HANDLING_SCHEMA, "totals": totals, "by_system": by_system,
-            "robustness": robustness, "failed_variants": failed}
+            "robustness": robustness, "failed_variants": failed, "skipped_variants": skipped}
 
 
 def context_record(ctx: SystemContext) -> dict:

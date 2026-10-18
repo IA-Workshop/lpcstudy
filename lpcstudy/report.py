@@ -340,9 +340,15 @@ SENTINEL_COUNTERS: frozenset[str] = frozenset({
 applied-mathematician's table (3), WU-0002.11): a nonzero one is a finding. The Handling section
 labels them; it marks no result provisional (Q6 of DEC-0017 is the owner's ruling)."""
 
-SENTINEL_RESULT_PATHS: frozenset[str] = frozenset({"H1b/PLP/n_floored"})
+_CLIP_H1B = "clip_sensitivity/by_hypothesis/H1b/parts/PLP"
+
+SENTINEL_RESULT_PATHS: frozenset[str] = frozenset({
+    "H1b/PLP/n_floored", f"{_CLIP_H1B}/n_floored", f"{_CLIP_H1B}/n_floored_2L",
+    "clip_sensitivity/n_caught_exceptions"})
 """Result-count paths that are sentinels (the PLP regression of H1b has floor 0, so its squared
-error floors only below 1e-12, which is unreachable for rho >= 0.005)."""
+error floors only below 1e-12, which is unreachable for rho >= 0.005; the clip-sensitivity copies
+of that floor count, WU-0004f, read 0 for the same reason; an exception swallowed by the
+report-only clip-sensitivity block is a defect)."""
 
 
 def _handling_blocks(handling: dict) -> list[tuple[str, dict]]:
@@ -368,8 +374,8 @@ def _counter_text(name: str, value: int) -> str:
 def handling_lines(results: dict, systems: list[str]) -> list[str]:
     """The ``## Handling`` section of RESULTS.md (DEF-0001, WU-0002.11b): every nonzero counter.
 
-    It reads ``results["handling"]`` (the run totals and the count of robustness variants that
-    raised) and each system's ``handling`` (cells with their ``evaluation`` and ``fitting``
+    It reads ``results["handling"]`` (the run totals and the counts of robustness variants that
+    raised or were not run) and each system's ``handling`` (cells with their ``evaluation`` and ``fitting``
     sub-blocks, oracle splits, the fit, and ``result_counts``), and lists only what is nonzero:
     the full block, zeros included, stays in ``results.json``. Counters in ``SENTINEL_COUNTERS``
     (and the result paths in ``SENTINEL_RESULT_PATHS``) are labelled. The section is a report:
@@ -406,7 +412,10 @@ def handling_lines(results: dict, systems: list[str]) -> list[str]:
              "one is a finding.", "",
              "Run totals (main systems): "
              + ("; ".join(totals) + "." if totals else "no counter is nonzero."), "",
-             f"Robustness variants that raised (`failed_variants`): {run['failed_variants']}."]
+             f"Robustness variants that raised (`failed_variants`): {run['failed_variants']}.",
+             "Robustness variants not run (`skipped_variants`): "
+             + (f"{run['skipped_variants']}." if "skipped_variants" in run else
+                "not recorded in these results (written before WU-0004f).")]
     for system in systems:
         handling = results["systems"][system].get("handling")
         lines += ["", f"### {system}", ""]

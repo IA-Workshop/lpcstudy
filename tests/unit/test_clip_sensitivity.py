@@ -1306,3 +1306,251 @@ def test_an_exception_inside_the_block_is_recorded_not_raised(monkeypatch, caplo
     worse = cs.clip_sensitivity_block(SimpleNamespace(splits={}), None, None, None, {}, {},
                                       {"H2c": {}}, world.config)
     assert worse["status"] == "not_computed" and worse["by_hypothesis"] == {}
+
+
+# ---------------------------------------------------------------------------------------------
+# WU-0004f: the DEF-0001 residues of this module (the H1b floor and the swallowed exceptions).
+# (A delimited block.)
+# ---------------------------------------------------------------------------------------------
+_NEW_PART_KEYS = {"n_floored", "n_floored_2L"}
+
+
+def _h1b_hand_inputs():
+    """Twelve regression states for ``h1b_part``: the squared errors, the clipped-draw counts q (M = 20).
+
+    ``sq`` has two states at 0.0 and two at 5e-13 (the floor binds), one at exactly 1e-12 (it does
+    not: the test is ``<``), one NaN (out of the regression, so not counted), the rest ordinary.
+    States 5 and 6 are floored in the original and carry one clipped draw, which lifts them by
+    3 L^2 q / M = 15 under P2.
+    """
+    sq = np.array([0.0, 5e-13, 1e-12, 2.0, np.nan, 0.0, 5e-13, 3.0, 1.5, 0.7, 2.5, 1.1])
+    q = np.array([0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0])
+    sq_2 = sq + 3.0 * 10.0**2 * q / 20.0  # the increment of the module docstring, written out
+    seed_err = 0.5 + 0.1 * np.arange(len(sq))
+    return sq, q, sq_2, np.ones(len(sq)), seed_err
+
+
+def _h1b_original() -> dict:
+    return {"PLP": {"slope": 1.0, "ci": [0.8, 1.2]}, "verdict": "pass"}
+
+
+def _floor_counts_by_loop(sq, sq_2, gain, seed_err, dim) -> tuple[int, int]:
+    """Reference (an explicit loop, no array expression of the code under test): the regression
+    states where ``sq < 1e-12`` and where ``sq_2 < 1e-12``; a state is in the regression if its x and
+    its floored y are finite (a NaN squared error is out)."""
+    n_orig = n_p2 = 0
+    for s, s2, g, e in zip(sq, sq_2, gain, seed_err):
+        x = math.log(g * e / math.sqrt(dim))
+        if math.isnan(s) or math.isinf(s) or not math.isfinite(x):
+            continue
+        n_orig += s < 1e-12
+        n_p2 += s2 < 1e-12
+    return int(n_orig), int(n_p2)
+
+
+def test_h1b_part_counts_the_floor_exactly_a1() -> None:
+    """A1 (WU-0004f): ``n_floored`` and ``n_floored_2L`` count the states where the 1e-12 floor binds.
+
+    Reference: an explicit loop (``_floor_counts_by_loop``) and the hand count: states 0, 1, 5, 6 are
+    floored in the original (0.0, 5e-13, 0.0, 5e-13); 1e-12 itself is not (strict ``<``); the NaN is
+    out of the regression. Under P2 states 5 and 6 are lifted by 15 (q = 1, M = 20) and states 0 and
+    1 stay, so 4 and 2. Exact integers. Also: ``n_floored_2L <= n_floored``.
+    """
+    sq, q, sq_2, gain, seed_err = _h1b_hand_inputs()
+    part = cs.h1b_part(_h1b_original(), sq, sq_2, gain, seed_err, 3, _config(), "mini", int(q.sum()))
+    assert part["status"] == "computed"
+    assert (part["n_floored"], part["n_floored_2L"]) == (4, 2)
+    assert _floor_counts_by_loop(sq, sq_2, gain, seed_err, 3) == (4, 2)
+    assert type(part["n_floored"]) is int and type(part["n_floored_2L"]) is int
+    assert part["n_floored_2L"] <= part["n_floored"]
+    # the strict edge: a lone state at exactly 1e-12 is not floored
+    edge = np.array([1e-12, 2.0, 3.0, 4.0, 5.0, 6.0])
+    got = cs.h1b_part(_h1b_original(), edge, edge, np.ones(6), 0.5 + 0.1 * np.arange(6), 3,
+                      _config(), "mini", 0)
+    assert (got["n_floored"], got["n_floored_2L"]) == (0, 0)
+
+
+def _h1b_before(original, sq_plp, sq_plp_2, gain, seed_err, dim, config, system, n_clipped):
+    """``h1b_part`` as it was before WU-0004f (copied from c89ebe5), the regression reference."""
+    from lpcstudy.data import make_rng
+    from lpcstudy.statistics import block_bootstrap_counted, criterion_verdict, ols_slope
+
+    x_all = np.log(gain * seed_err / np.sqrt(dim))
+    keep = np.isfinite(x_all) & np.isfinite(0.5 * np.log(np.maximum(sq_plp, 1e-12)))
+    y_2 = 0.5 * np.log(np.maximum(sq_plp_2, 1e-12))
+    if not np.array_equal(keep, np.isfinite(x_all) & np.isfinite(y_2)):
+        return cs.not_computed("regression states change at 20 sigma_x", n_clipped)
+    x, y = x_all[keep], y_2[keep]
+    if len(x) == 0:
+        return cs.not_computed("no regression state", n_clipped)
+    boot = block_bootstrap_counted(lambda idx: ols_slope(x[idx], y[idx]), len(x),
+                                   config.bootstrap_resamples, config.bootstrap_block,
+                                   make_rng(config.seed, system, "bootstrap", "H1b"), an.H1_LEVEL)
+    verdict_2, _ = criterion_verdict(boot.estimate, boot.lower, boot.upper, an.H1B_BAND,
+                                     n_states=len(x))
+    plp = original["PLP"]
+    return cs.part_entry(plp["slope"], plp["ci"], original["verdict"], boot.estimate,
+                         [boot.lower, boot.upper], verdict_2, n_clipped)
+
+
+def test_regression_h1b_part_values_are_unchanged_by_the_counters_a3() -> None:
+    """A3 (WU-0004f): every key ``h1b_part`` returned before the counters is bitwise the same.
+
+    A regression guard (the reference is the pre-change function copied above), not value evidence:
+    the value evidence is the DEV-0 smoke comparison of the unit. Three paths: computed; not computed
+    because the regression set changes under P2 (a finite squared error becomes NaN); not computed
+    because no state is in the regression (an infinite seed error). The comparison is of the JSON text
+    of the entries (``repr`` of a float round-trips exactly), restricted to the old keys; the new keys
+    are exactly ``n_floored`` and ``n_floored_2L``.
+    """
+    import json
+
+    sq, q, sq_2, gain, seed_err = _h1b_hand_inputs()
+    changing = sq_2.copy()
+    changing[2] = np.nan  # finite in the original, not finite under P2
+    cases = {"computed": (sq, sq_2, gain, seed_err),
+             "set changes": (sq, changing, gain, seed_err),
+             "no state": (sq, sq_2, np.full(len(sq), np.inf), seed_err)}
+    statuses = {}
+    for name, (a, b, g, e) in cases.items():
+        args = (_h1b_original(), a, b, g, e, 3, _config(), "mini", 7)
+        old, new = _h1b_before(*args), cs.h1b_part(*args)
+        assert set(new) - set(old) == _NEW_PART_KEYS, name
+        assert json.dumps({k: new[k] for k in old}, sort_keys=True) == json.dumps(old, sort_keys=True)
+        statuses[name] = new["status"]
+    assert statuses == {"computed": "computed", "set changes": "not_computed",
+                        "no state": "not_computed"}
+
+
+def test_h1b_part_counts_survive_a_part_that_is_not_computed_a4() -> None:
+    """A4 (WU-0004f): a ``not_computed`` H1b part still carries the two counts (ints).
+
+    Reference: hand counts of the inputs of A1. When the regression set changes under P2 (state 2's
+    squared error becomes NaN) the original count is still 4 (the original regression states) and the
+    P2 count is taken over those same states (2 here: the lifted states 5 and 6 are not floored, and
+    state 2 is not below 1e-12 under NaN). With no regression state both are 0.
+    """
+    sq, q, sq_2, gain, seed_err = _h1b_hand_inputs()
+    changing = sq_2.copy()
+    changing[2] = np.nan
+    part = cs.h1b_part(_h1b_original(), sq, changing, gain, seed_err, 3, _config(), "mini", 7)
+    assert part["status"] == "not_computed" and part["n_clipped_inputs"] == 7
+    assert (part["n_floored"], part["n_floored_2L"]) == (4, 2)
+    empty = cs.h1b_part(_h1b_original(), sq, sq_2, np.full(len(sq), np.inf), seed_err, 3,
+                        _config(), "mini", 0)
+    assert empty["status"] == "not_computed" and empty["reason"] == "no regression state"
+    assert (empty["n_floored"], empty["n_floored_2L"]) == (0, 0)
+
+
+def _world_with_floored_h1b(seed: int, floored: bool):
+    """A mini-world (no reference) whose test oracle has floored PLP squared errors at H_ref.
+
+    Returns ``(world, cell, moments, column, indices)``: with ``floored`` the first state with a
+    clipped H_ref draw gets ``sq_plp = 0`` and two states with none get 5e-13 and 0.0 (the moments
+    object is replaced in a copy of the cell; nothing else in the world changes).
+    """
+    world = _world(seed, with_reference=False)
+    split = world.cell.splits["test"]
+    moments = split.moments
+    col = moments.at(world.config.reference_horizon)
+    q = cs.clipped_draws(moments.handled)
+    picks = [int(np.nonzero(q > 0)[0][0]), *(int(i) for i in np.nonzero(q == 0)[0][:2])]
+    if floored:
+        sq = moments.sq_plp.copy()
+        sq[picks, col] = [0.0, 5e-13, 0.0]
+        moments = dataclasses.replace(moments, sq_plp=sq)
+    cell = SimpleNamespace(**{**vars(world.cell), "splits": {
+        **world.cell.splits, "test": SplitData(moments, split.evals)}})
+    return world, cell, moments, col, picks
+
+
+def test_n_floored_equals_the_h1b_verdict_count_a2() -> None:
+    """A2 (WU-0004f): ``n_floored`` equals ``results["H1b"]["PLP"]["n_floored"]`` (row N4), also at 0.
+
+    Reference: the production ``analysis.h1b_seed_amplifier`` run on the same moments (its count is
+    ``((sq - 0) < 1e-12)[keep].sum()``, a different code path), on a world with three floored states
+    (one with a clipped draw) and on the world as built (no floored state). With the floored states
+    the answers are 3 and 2: the state with the clipped draw is lifted by 15 under P2 and leaves the
+    count. Exact integers.
+    """
+    for floored, expected in ((True, (3, 2)), (False, (0, 0))):
+        world, cell, moments, col, _ = _world_with_floored_h1b(2024, floored)
+        original = an.h1b_seed_amplifier(cell, world.config)
+        perturbed = cs.perturb_moments(moments, col, world.config.n_oracle_draws)
+        part = cs.h1b_part(original, moments.sq_plp[:, col], perturbed.sq_plp[:, col],
+                           cell.oracles["test"].gains[:, world.config.reference_horizon - 1],
+                           moments.est_seed, cell.ctx.spec.dim, world.config, "mini", 0)
+        assert original["PLP"]["n_floored"] == part["n_floored"] == expected[0]
+        assert part["n_floored_2L"] == expected[1]
+
+
+def test_block_counts_caught_exceptions_a5(monkeypatch, caplog) -> None:
+    """A5 (WU-0004f): ``n_caught_exceptions`` counts what the three broad ``except`` clauses swallow.
+
+    Reference: hand counts of injected failures (each injection raises exactly where stated).
+    * no injection: 0, and the H1b part carries ints equal to the production count;
+    * ``_compute`` raising: the block-level clause, 1;
+    * a cell without splits and malformed results (``_part_names`` raises inside ``_failed``): the
+      block-level clause and the clause of the listing, 2, and the listing failure now writes a
+      traceback (it wrote nothing before);
+    * ``h2d_part`` raising: one criterion clause, 1, the block still computed, its parts read
+      ``not_computed`` with the error; with ``h3c_part`` as well, 2;
+    * a criterion raising followed by a forced P-c failure (a ``_BaselineMismatch``, which carries
+      its reason and is not itself counted): the block is not computed and the count 1 is kept.
+    """
+    world = _world(1101, with_reference=False)
+    block = _run(world)
+    assert block["status"] == "computed" and block["n_caught_exceptions"] == 0
+    part = block["by_hypothesis"]["H1b"]["parts"]["PLP"]
+    assert type(part["n_floored"]) is int and part["n_floored"] == world.results["H1b"]["PLP"]["n_floored"]
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("injected")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(cs, "_compute", boom)
+        assert _run(world)["n_caught_exceptions"] == 1
+    worse = cs.clip_sensitivity_block(SimpleNamespace(splits={}), None, None, None, {}, {},
+                                      {"H2c": {}}, world.config)
+    assert worse["n_caught_exceptions"] == 2
+    caplog.clear()
+    with caplog.at_level(logging.ERROR, logger="lpcstudy"):
+        cs.clip_sensitivity_block(SimpleNamespace(splits={}), None, None, None, {}, {},
+                                  {"H2c": {}}, world.config)
+    logged = [(r.levelno, r.getMessage()) for r in caplog.records]
+    assert [m.split(":")[0] for _, m in logged] == [
+        "clip sensitivity", "clip sensitivity"] and len(logged) == 2  # one record per clause
+    assert "block not computed" in logged[0][1] and "could not be listed" in logged[1][1]
+    assert all(r.exc_info is not None for r in caplog.records)  # LOG.exception: with a traceback
+    with monkeypatch.context() as patch:
+        patch.setattr(cs, "h2d_part", boom)
+        one = _run(world)
+        patch.setattr(cs, "h3c_part", boom)
+        two = _run(world)
+        patch.setattr(cs, "invariance", lambda *a, **k: dict.fromkeys(("H1c", "H2a_i", "H3a"), "exact"))
+        forced = _run(world)
+    assert one["status"] == "computed" and one["n_caught_exceptions"] == 1
+    assert all(p["status"] == "not_computed" and p["reason"] == "error: RuntimeError('injected')"
+               for p in one["by_hypothesis"]["H2d"]["parts"].values())
+    assert two["n_caught_exceptions"] == 2 and two["status"] == "computed"
+    assert forced["status"] == "not_computed" and forced["reason"].startswith("P-c failed")
+    assert forced["n_caught_exceptions"] == 2
+
+
+def test_failed_blocks_without_an_exception_count_zero() -> None:
+    """A refusal that carries its own reason (arrays absent) is not an exception: count 0 (A5).
+
+    Reference: hand. A world whose test moments lack ``handled`` gives ``status = "not_computed"``
+    with the reason, and the count is present and 0.
+    """
+    world = _world(1103, with_reference=False)
+    test = world.cell.splits["test"]
+    bare = dataclasses.replace(test.moments, handled=None)
+    cell = SimpleNamespace(**{**vars(world.cell), "splits": {
+        **world.cell.splits, "test": SplitData(bare, test.evals)}})
+    block = cs.clip_sensitivity_block(cell, world.rules, world.weights, world.scores,
+                                      world.noise_cells, world.library_cells, world.results,
+                                      world.config)
+    assert block["status"] == "not_computed" and "clip arrays absent" in block["reason"]
+    assert block["n_caught_exceptions"] == 0
+# ------------------------------------------------------------ end of the WU-0004f block
