@@ -55,7 +55,6 @@
       "Bash(python3 tools/ledger.py append *)",
       "Bash(rm -rf *)",
       "Bash(git clean *)",
-      "Bash(git merge *)",
       "Edit(/docs/agent/governance/**)",
       "Edit(/docs/study/**)",
       "Edit(/seeds/**)",
