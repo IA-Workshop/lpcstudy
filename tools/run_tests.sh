@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# Run pytest for one tier under the test and compute discipline of DEVELOPMENT_WORKFLOW.md 4.5.
+# Run the study's tests for one tier, safely: a thin wrapper around pytest.
+#
+# Why this script exists: the tests share one machine with long study runs and one GPU.
+# So every test run goes through here. The script limits the threads, keeps quick tiers off
+# the GPU, applies a time limit per tier, takes the GPU lock for the gpu tier, and refuses
+# requests that would run the whole suite by accident (DEVELOPMENT_WORKFLOW.md section 4.5).
 #
 # Usage: tools/run_tests.sh <tier> [--lf] [--tb=long] [--durations=N] [--background] <path>...
 #
 #   tier   unit | integration | slow | gpu
-#   path   a file or directory under tests/<tier>, optionally with a ::node id.
-#          Relative paths are taken from the caller's directory.
+#   path   a file or folder under tests/<tier>, optionally with a ::test id.
+#          Relative paths are read from the caller's folder.
 #
 # Refusals (exit 64, one line on stderr): an unknown tier, a missing or wrong-tier path,
 # no path, a whole-suite path (tests, tests/, .), any other flag (-n, -s, -v, ...), a bad
@@ -19,7 +24,8 @@
 # LPC_PYTHON selects the interpreter (else <root>/.venv/bin/python, else python3).
 # LPC_GPU_LOCK is the lock file (default /tmp/lpcstudy-gpu.lock); LPC_GPU_WAIT shortens the wait.
 #
-# Timeouts (4.5): unit 300 s, integration 900 s, slow 3600 s, gpu 1800 s, then SIGKILL after 30 s.
+# Time limits (section 4.5): unit 300 s, integration 900 s, slow 3600 s, gpu 1800 s, then
+# SIGKILL (a forced stop) after 30 s more.
 # Exit codes: 64 usage or refusal, 75 GPU lock busy, 124 timeout (137 if it had to be killed),
 # otherwise pytest's code. PYTEST_ADDOPTS and PYTEST_PLUGINS must be unset (64).
 #

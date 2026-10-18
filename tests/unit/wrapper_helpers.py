@@ -1,17 +1,25 @@
-"""Shared helper for the wrapper tests (WU-0012): a synthetic repository root with fake tools.
+"""Shared test helper: a throwaway repository folder with fake programs in it.
 
-The wrappers ``tools/run_tests.sh`` and ``tools/run_preset.sh`` are copied into a root built in
-``tmp_path`` together with the seed registry, so the real ``runs/`` and the real GPU lock are never
-touched. Fakes stand in for the programs the wrappers start:
+The shell wrappers ``tools/run_tests.sh`` and ``tools/run_preset.sh`` start
+Python, ``timeout`` and a GPU tally tool. Testing them against the real programs
+would start real study runs and could touch the real ``runs/`` folder and the
+real GPU lock. Instead, the tests in ``test_tools_run_tests.py``,
+``test_tools_run_preset.py`` and ``test_tools_gpu_hours.py`` use ``FakeRoot``,
+which copies the wrappers and the seed registry into a temporary folder and puts
+fakes in place of the programs the wrappers start. The fakes only record how
+they were called, so a test can check what a wrapper did.
 
-* ``fakepy`` (used through ``LPC_PYTHON``) records its argv and environment as one JSON line in
-  ``$FAKE_DIR/python.jsonl``; answers ``--help`` with or without ``--seed-id`` (``FAKE_HELP_SEED``);
-  for ``-m lpcstudy`` it writes ``<out>/<preset>/results.json``, waits for the sentinel file
-  ``$FAKE_DIR/go`` (only if ``FAKE_WAIT=1``, capped at 10 s) and exits ``$FAKE_EXIT`` (default 0).
-* ``tools/gpu_hours.py`` in the root is a fake that records its argv in ``$FAKE_DIR/tally.jsonl``
-  and exits ``$FAKE_TALLY_EXIT`` (default 0), unless ``real_tally=True`` copies the real tool.
-* ``bin/timeout`` records its argv in ``$FAKE_DIR/timeout.log`` and runs the command that follows
-  the duration.
+* ``fakepy`` (used through ``LPC_PYTHON``) records its arguments and environment
+  as one JSON line in ``$FAKE_DIR/python.jsonl``. It answers ``--help`` with or
+  without ``--seed-id`` (``FAKE_HELP_SEED``). For ``-m lpcstudy`` it writes
+  ``<out>/<preset>/results.json``, waits for the sentinel file ``$FAKE_DIR/go``
+  (only if ``FAKE_WAIT=1``, capped at 10 s) and exits with ``$FAKE_EXIT``
+  (default 0).
+* ``tools/gpu_hours.py`` in the root is a fake that records its arguments in
+  ``$FAKE_DIR/tally.jsonl`` and exits with ``$FAKE_TALLY_EXIT`` (default 0),
+  unless ``real_tally=True`` copies the real tool.
+* ``bin/timeout`` records its arguments in ``$FAKE_DIR/timeout.log`` and runs
+  the command that follows the duration.
 """
 
 from __future__ import annotations
@@ -65,14 +73,9 @@ with open(os.path.join(os.environ["FAKE_DIR"], "tally.jsonl"), "a") as handle:
 sys.exit(int(os.environ.get("FAKE_TALLY_EXIT", "0")))
 """
 
-FAKE_FLOCK = """#!/usr/bin/env bash
-echo "$*" >>"$FAKE_DIR/flock.log"
-exit 0
-"""
-
 
 def write_script(path: Path, text: str) -> Path:
-    """Write an executable script."""
+    """Write ``text`` to ``path`` (creating folders) and make it executable."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
@@ -80,14 +83,16 @@ def write_script(path: Path, text: str) -> Path:
 
 
 class FakeRoot:
-    """A synthetic repository root with the wrappers, a seed registry and fake programs.
+    """A throwaway repository root with the wrappers, a seed registry and fakes.
 
     Parameters
     ----------
     base : Path
-        Empty directory (``tmp_path``) that holds ``root/``, ``fake/``, ``bin/`` and ``lock``.
+        Empty folder (``tmp_path``) that will hold ``root/``, ``fake/``,
+        ``bin/`` and ``lock``.
     real_tally : bool
-        Keep the real ``tools/gpu_hours.py`` (default: replace it with the recording fake).
+        Keep the real ``tools/gpu_hours.py`` (default: replace it with the
+        recording fake).
     """
 
     def __init__(self, base: Path, real_tally: bool = False) -> None:
@@ -104,7 +109,9 @@ class FakeRoot:
                 shutil.copy2(REPO / "tools" / name, self.root / "tools" / name)
         if not real_tally:
             write_script(self.root / "tools" / "gpu_hours.py", FAKE_TALLY)
-        shutil.copy2(REPO / "seeds" / "development_seeds.json", self.root / "seeds")
+        shutil.copy2(
+            REPO / "seeds" / "development_seeds.json", self.root / "seeds"
+        )
         for tier in TIERS:
             test_dir = self.root / "tests" / tier
             test_dir.mkdir(parents=True)
@@ -113,36 +120,85 @@ class FakeRoot:
         write_script(self.bin / "timeout", FAKE_TIMEOUT)
 
     def environment(self, **extra: str) -> dict[str, str]:
-        """Return a clean environment: real PATH behind the fakes, no inherited LPC_*/JAX_*/XLA_*/PJRT_*/NPROC values."""
-        env = {k: v for k, v in os.environ.items()
-               if not k.startswith(("LPC_", "FAKE_", "JAX_", "XLA_", "OMP_", "MKL_", "OPENBLAS_", "PYTEST_",
-                                       "PJRT_", "NPROC"))}
-        env.update(PATH=f"{self.bin}:{env['PATH']}", FAKE_DIR=str(self.fake_dir),
-                   LPC_PYTHON=str(self.python), LPC_GPU_LOCK=str(self.lock),
-                   GIT_CEILING_DIRECTORIES=str(self.base.parent))
+        """Return a clean environment for running a wrapper.
+
+        The real ``PATH`` stays behind the fakes. Variables that the wrappers
+        read (``LPC_*``, ``JAX_*``, ``XLA_*``, ``PJRT_*``, ``NPROC``, thread
+        counts) are dropped, so a developer's own settings cannot change a test.
+        """
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if not k.startswith(
+                (
+                    "LPC_",
+                    "FAKE_",
+                    "JAX_",
+                    "XLA_",
+                    "OMP_",
+                    "MKL_",
+                    "OPENBLAS_",
+                    "PYTEST_",
+                    "PJRT_",
+                    "NPROC",
+                )
+            )
+        }
+        env.update(
+            PATH=f"{self.bin}:{env['PATH']}",
+            FAKE_DIR=str(self.fake_dir),
+            LPC_PYTHON=str(self.python),
+            LPC_GPU_LOCK=str(self.lock),
+            GIT_CEILING_DIRECTORIES=str(self.base.parent),
+        )
         env.update(extra)
         return env
 
-    def run(self, tool: str, *args: str, env: dict[str, str] | None = None,
-            timeout: float = 20.0) -> subprocess.CompletedProcess[str]:
-        """Run ``<root>/tools/<tool>`` from the root with the clean environment."""
-        return subprocess.run([str(self.root / "tools" / tool), *args], cwd=self.root,
-                              env=self.environment() if env is None else env,
-                              capture_output=True, text=True, timeout=timeout, check=False)
+    def run(
+        self,
+        tool: str,
+        *args: str,
+        env: dict[str, str] | None = None,
+        timeout: float = 20.0,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run ``<root>/tools/<tool>`` from the root; return the finished
+        process.
+        """
+        return subprocess.run(
+            [str(self.root / "tools" / tool), *args],
+            cwd=self.root,
+            env=self.environment() if env is None else env,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
 
     def calls(self) -> list[dict]:
-        """Return the JSON records of the fake python, in order (empty if it never ran)."""
+        """Return the fake Python's JSON records, in order (empty if it never
+        ran).
+        """
         path = self.fake_dir / "python.jsonl"
         if not path.exists():
             return []
         return [json.loads(line) for line in path.read_text().splitlines()]
 
     def tally_calls(self) -> list[list[str]]:
-        """Return the argv of each call of the fake ``gpu_hours.py`` (empty if never called)."""
+        """Return the arguments of each fake ``gpu_hours.py`` call (empty if
+        none).
+        """
         path = self.fake_dir / "tally.jsonl"
-        return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+        return (
+            [json.loads(line) for line in path.read_text().splitlines()]
+            if path.exists()
+            else []
+        )
 
     def timeout_calls(self) -> list[list[str]]:
-        """Return the argv of each fake ``timeout`` call (empty if never called)."""
+        """Return the arguments of each fake ``timeout`` call (none: empty)."""
         path = self.fake_dir / "timeout.log"
-        return [line.split() for line in path.read_text().splitlines()] if path.exists() else []
+        return (
+            [line.split() for line in path.read_text().splitlines()]
+            if path.exists()
+            else []
+        )
