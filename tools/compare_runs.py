@@ -892,12 +892,14 @@ def _build_retags() -> list[Retag]:
     leaf (``chain_source`` does not read this table): it only selects the tolerance rule of a leaf that already has
     its chain. The H1a ``ratio`` and ``ratio_ci`` are deliberately absent (not named in the ruling).
     """
-    why = ("OF-7 ruled 2026-10-18: output of the tolerance-stopped curve_fit in analysis.py:_fit_seed_law "
-           "(TRF, ftol = xtol = gtol = 1e-8, 2-point Jacobian), for which the 1e-12 premise of N1 (direct arithmetic) "
-           "fails; a-priori bound 4.0e-5 s, so the A6 rule %s holds with a factor 2.5 (note "
-           "2026-10-14-math-wu0003-9-q1 sections Q1.3 and Q1.4)")
-    qoi = why % "for QoIs (class (a), 1e-4 s)"
-    cls_g = why % "of class (g) (1e-4 |ref|)"
+    common = ("OF-7 ruled 2026-10-18: output of the tolerance-stopped curve_fit in analysis.py:_fit_seed_law "
+              "(TRF, ftol = xtol = gtol = 1e-8, 2-point Jacobian), for which the 1e-12 premise of N1 (direct arithmetic) "
+              "fails; ")
+    qoi = (common + "a-priori bound 4.0e-5 s, so the A6 rule for QoIs (class (a), 1e-4 s) holds with a factor 2.5 "
+           "(note 2026-10-14-math-wu0003-9-q1 sections Q1.3 and Q1.4)")
+    cls_g = (common + "no interval, so relative to |ref|: measured flip <= 6.3e-7 and stopping error <= 6.8e-7 relative, "
+             "so the A6 rule of class (g) (1e-4 |ref|) holds with a factor >= 70 (note 2026-10-14-math-wu0003-9-q1 "
+             "sections Q1.3, last row of the table, and Q1.4)")
     return [Retag(pattern, "unchanged", reason=reason, chain="cp", scale=scale)
             for pattern, scale, reason in (
                 ("systems/*/H1a/by_noise/*/fitted_inverse_dim", "a", qoi),

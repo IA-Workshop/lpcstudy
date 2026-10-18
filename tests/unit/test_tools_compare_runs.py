@@ -1887,6 +1887,15 @@ def test_of7_retag_table_is_pinned_to_the_four_named_leaves_and_leaves_the_rest_
     assert {r.pattern: r.scale for r in cr.RETAGS.rules} == OF7_RETAGS
     for r in cr.RETAGS.rules:
         assert r.chain == "cp" and "2026-10-14-math-wu0003-9-q1" in r.reason and "OF-7" in r.reason, r.pattern
+    # R1 of the review: each row prints the basis of its own class (note Q1.3: class (a) rests on the a-priori bound
+    # 4.0e-5 s, factor 2.5; floor_rms on the measured flip <= 6.3e-7 and stopping error <= 6.8e-7 relative, factor >= 70)
+    for r in cr.RETAGS.rules:
+        if r.scale == "a":
+            assert "4.0e-5 s" in r.reason and "factor 2.5" in r.reason, r.pattern
+        else:
+            assert r.pattern.endswith("floor_rms")
+            assert "6.3e-7" in r.reason and "6.8e-7" in r.reason and "factor >= 70" in r.reason
+            assert "4.0e-5" not in r.reason and "factor 2.5" not in r.reason
     for name, shapes in ALL_SHAPES.items():
         hit = {s for s in shapes if cr.retag_of(concrete(s)) is not None}
         assert hit == OF7_SHAPES, name
