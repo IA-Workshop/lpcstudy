@@ -1994,6 +1994,55 @@ def test_wu0003_7a_leaves_are_new_and_change_no_other_status_and_the_tool_exits_
     assert done.returncode == 0, done.stdout[-600:] + done.stderr[-600:]
 
 
+# ----------------------------------------------------- WU-0004d: H3a events/censored per regime
+H3A_COUNT_PATHS = [f"systems/{system}/H3a/{key}/[{i}]"
+                   for system in ("chua", "lorenz63", "rossler")
+                   for key in ("n_events_per_regime", "n_censored_per_regime") for i in (0, 2, 7)]
+
+
+@pytest.mark.parametrize("path", H3A_COUNT_PATHS)
+def test_wu0004d_h3a_count_leaves_match_exactly_one_new_rule(path: str) -> None:
+    """Each leaf of the two H3a count lists matches exactly one rule, of class ``new`` (WU-0004d).
+
+    Reference: the table's own contract (a leaf with no rule or two rules is exit 2 of the tool,
+    "never classified silently") and the plan (the two lists are additive results leaves of the
+    H3a block, one entry per regime, so ``.../[i]`` for any i). The paths are typed here from the
+    plan, for the three systems and for regime indices 0, 2 and 7 (K runs to 8 at Lorenz-63).
+    Exact.
+    """
+    found = cp.TABLE.matches(p(path))
+    assert len(found) == 1, [r.pattern for r in found]
+    assert found[0].cls == "new" and found[0].sub == "WU-0004d"
+
+
+def test_wu0004d_h3a_count_leaves_are_new_and_the_tool_exits_zero(tmp_path: Path) -> None:
+    """A tip tree with the two H3a count lists against the v1-named old tree: the leaves are ``new``,
+    every other leaf keeps its status, and the tool exits 0 (not 2) on the pair.
+
+    Reference: the same trees without the lists (hand-decided in the tests above) and the exit
+    codes of the tool's docstring (0 pass, 2 an unclassified leaf). A leaf of the existing
+    ``n_per_regime`` list, present on both sides of the tip and base trees, keeps the status it
+    has without the new lists. Exact.
+    """
+    old, base = old_tree(), new_tree()
+    base["systems"]["lorenz63"]["H3a"] = {"chosen_K": 2, "n_per_regime": [30, 30]}
+    tip = copy.deepcopy(base)
+    tip["systems"]["lorenz63"]["H3a"].update(n_events_per_regime=[20, 25],
+                                              n_censored_per_regime=[10, 5])
+    found = by_path(sides(old, tip)[2])
+    plain = by_path(sides(old, base)[2])
+    added = {"systems/lorenz63/H3a/n_events_per_regime/[0]",
+             "systems/lorenz63/H3a/n_events_per_regime/[1]",
+             "systems/lorenz63/H3a/n_censored_per_regime/[0]",
+             "systems/lorenz63/H3a/n_censored_per_regime/[1]"}
+    assert {k for k, v in found.items() if v.status == "new"} - \
+        {k for k, v in plain.items() if v.status == "new"} == added
+    assert {k: v.status for k, v in found.items() if k not in added} == \
+        {k: v.status for k, v in plain.items()}
+    done, _, _ = run_cli(tmp_path, old, tip)
+    assert done.returncode == 0, done.stdout[-600:] + done.stderr[-600:]
+
+
 # --------------------------------------- WU-0008.2a ci_mc_se leaves at pilot size (fix round 3)
 CI_MC_SE_PATHS = [f"systems/{system}/{where}/ci_mc_se/[{i}]"
                   for system in ("chua", "lorenz63", "rossler")

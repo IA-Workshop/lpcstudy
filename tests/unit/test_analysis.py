@@ -1874,6 +1874,99 @@ def test_h3a_orders_tied_and_missing_horizons_by_regime_index() -> None:
     assert out["n_km_not_reached"] == 2  # the two NaN medians are counted, not hidden
 
 
+PRE_EXISTING_H3A_KEYS = {"chosen_K", "pairs", "logrank_p_raw", "logrank_p_holm", "n_per_regime",
+                         "n_km_not_reached", "n_empty_regimes", "n_degenerate_pairs", "iqr_lt",
+                         "iqr_lt_mean", "threshold", "verdict", "reason", "pass"}
+"""The 14 keys of the H3a result before WU-0004d, typed from ``h3a_logrank``'s docstring of
+develop ``dfd656f``; the unit adds two and changes none of these."""
+
+
+def test_h3a_one_event_among_a_hundred_states_is_visible_in_the_counts() -> None:
+    """DEF-0018 / ruling B6b: a regime of 100 states with ONE event is shown as 1 event, 99 censored.
+
+    Reference: a hand-built case. Regime 0 has 100 states with durations 1..100, censored except the
+    state of duration 37 (one event); regime 1 has 100 states with durations 1..100, all events.
+    Expected by hand: ``n_per_regime == [100, 100]``, events ``[1, 100]``, censored ``[99, 0]``. The
+    counts are integers, so the comparison is exact. The raw p of the (only) pair is checked
+    against ``scipy.stats.logrank`` on the same arrays (an independent code; ``rel=1e-10``, the
+    tolerance of ``test_h3a_holm_and_raw_p_match_independent_references``: the two codes sum the
+    per-time terms in a different order) and is extreme (below 1e-10, premise from the defect
+    record DEF-0018), so the counts are what tells the reader that the p rests on one event. The
+    keys other than the two new ones are exactly the 14 of the previous output.
+    """
+    from lpcstudy.analysis import h3a_logrank
+
+    regime = np.repeat([0, 1], 100)
+    durations = np.concatenate([np.arange(1, 101), np.arange(1, 101)])
+    events = np.concatenate([np.arange(1, 101) == 37, np.ones(100, dtype=bool)])
+    out = h3a_logrank(regime, durations, events, np.array([30.0, 10.0]), np.ones(200), 30, 2)
+    assert out["n_per_regime"] == [100, 100]
+    assert out["n_events_per_regime"] == [1, 100]
+    assert out["n_censored_per_regime"] == [99, 0]
+    assert out["pairs"] == [[1, 0]]  # medians 30, 10: regime 1 first
+    ref = sps.logrank(sps.CensoredData(uncensored=durations[regime == 1]),
+                      sps.CensoredData(uncensored=durations[regime == 0][events[regime == 0]],
+                                       right=durations[regime == 0][~events[regime == 0]])).pvalue
+    assert out["logrank_p_raw"] == pytest.approx([ref], rel=1e-10)
+    assert out["logrank_p_raw"][0] < 1e-10  # premise: an extreme p from one event (DEF-0018)
+    assert set(out) == PRE_EXISTING_H3A_KEYS | {"n_events_per_regime", "n_censored_per_regime"}
+    assert type(out["n_events_per_regime"][0]) is int and type(out["n_censored_per_regime"][0]) is int
+
+
+def test_h3a_event_counts_match_a_python_loop_and_add_up() -> None:
+    """The event and censored counts equal a plain loop over the states, in every case.
+
+    Reference: a pure-Python count (``sum(1 for l, e in zip(labels, flags) if l == k and e)``),
+    independent of the NumPy masking in the code under test. Cases: (a) 5 regimes, 400 random
+    states with random labels and event flags (``np.random.default_rng(7)``), regime 3 forced
+    empty; (b) all states censored; (c) all events; (d) a single regime. Invariant in each:
+    events + censored == ``n_per_regime`` for every regime, and an empty regime is 0, 0, 0.
+    Integers: exact.
+    """
+    from lpcstudy.analysis import h3a_logrank
+
+    rng = np.random.default_rng(7)
+    labels = rng.choice([0, 1, 2, 4], size=400)  # regime 3 never occurs
+    flags = rng.random(400) < 0.6
+    durations = rng.integers(1, 80, 400)
+    cases = [(5, labels, flags), (5, labels, np.zeros(400, dtype=bool)),
+             (5, labels, np.ones(400, dtype=bool)), (1, np.zeros(400, dtype=int), flags)]
+    for k_real, lab, flg in cases:
+        out = h3a_logrank(lab, durations, flg, np.linspace(5.0, 25.0, k_real), np.ones(400), 30,
+                          k_real)
+        ev = [sum(1 for lbl, e in zip(lab, flg) if lbl == k and e) for k in range(k_real)]
+        n = [sum(1 for lbl in lab if lbl == k) for k in range(k_real)]
+        assert out["n_events_per_regime"] == ev and out["n_per_regime"] == n
+        assert out["n_censored_per_regime"] == [a - b for a, b in zip(n, ev)]
+        assert all(e + c == m for e, c, m in zip(out["n_events_per_regime"],
+                                                 out["n_censored_per_regime"],
+                                                 out["n_per_regime"]))
+    first = h3a_logrank(labels, durations, flags, np.linspace(5.0, 25.0, 5), np.ones(400), 30, 5)
+    assert first["n_per_regime"][3] == first["n_events_per_regime"][3] == \
+        first["n_censored_per_regime"][3] == 0
+
+
+def test_regression_h3a_new_keys_change_no_pre_existing_number() -> None:
+    """Regression guard (not correctness evidence): the verdict, p-values and counts are unchanged.
+
+    The input is that of ``test_h3a_holm_and_raw_p_match_independent_references``. This test pins
+    the structure: the pre-existing keys are exactly the 14 of the previous output, and the
+    verdict-bearing values are the ones the earlier test asserts (pass, the pairs,
+    ``n_per_regime``). The numerical independence of the p-values
+    is in the scipy comparisons of the tests above and below (bitwise neutrality of the whole
+    results.json is the DEV-0 smoke comparison of WU-0004d). Exact.
+    """
+    from lpcstudy.analysis import h3a_logrank
+
+    regime, durations, target = _regime_data((0.05, 0.45, 0.15), 60, 3)
+    out = h3a_logrank(regime, durations, np.ones(len(durations), dtype=bool),
+                      np.array([14.0, 2.0, 5.0]), target, 30, 3)
+    assert set(out) - {"n_events_per_regime", "n_censored_per_regime"} == PRE_EXISTING_H3A_KEYS
+    assert out["pairs"] == [[1, 2], [2, 0]] and out["pass"] is True and out["verdict"] == "pass"
+    assert out["n_per_regime"] == [60, 60, 60]
+    assert out["n_events_per_regime"] == [60, 60, 60] and out["n_censored_per_regime"] == [0, 0, 0]
+
+
 # ---------------------------------------------------------------- WU-0002.8: H3b
 def _h3b_data(seed: int, n: int = 600):
     """Profile ``(n, 2, 4)`` with ``x`` drawn per state and repeated over the 2 draws, and weights.
@@ -2192,7 +2285,8 @@ def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -
     assert set(out["H3a"]) == {"chosen_K", "pairs", "logrank_p_raw", "logrank_p_holm",
                                "n_per_regime", "n_km_not_reached", "n_empty_regimes",
                                "n_degenerate_pairs", "iqr_lt", "iqr_lt_mean",
-                               "threshold", "verdict", "pass", "reason"}
+                               "threshold", "verdict", "pass", "reason",
+                               "n_events_per_regime", "n_censored_per_regime"}  # WU-0004d, additive
     assert set(out["H3b"]) == {"weight_lambda", "D", "stability", "weight_tree_importance",
                                "horizon_tree_importance", "degenerate_fits", "nan_resamples",
                                "n_states", "n_resamples", "max_leaf_nodes", "threshold", "verdict",

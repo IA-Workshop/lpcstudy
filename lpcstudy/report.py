@@ -763,6 +763,77 @@ def clip_lines(results: dict, systems: list[str]) -> list[str]:
 # --- WU-0002.11e end ---
 
 
+# --- WU-0004d begin ---
+H3A_EXPOSURE = (
+    "Exposure (DEF-0018; owner ruling B6b: keep as is, report the counts, state the exposure as a "
+    "limitation): the H3a log-rank test sets no minimum number of states or events per regime "
+    "(DEC-0011 O1; only the full sample needs 50 states), so a regime with few events can give an "
+    "extreme log-rank p-value, for example one event among 99 censored states. Read each p-value "
+    "beside the events and censored counts above. This is a stated limitation of the H3a verdict; "
+    "the verdict rule is unchanged.")
+"""The limitation sentence of the H3a events/censored section (exact text pinned by a test)."""
+
+
+def h3a_regime_lines(results: dict, systems: list[str]) -> list[str]:
+    """The ``## H3a: events/censored per regime`` section of RESULTS.md (WU-0004d, DEF-0018), or ``[]``.
+
+    One row per (system, regime), the regime index being the one used in ``H3a.pairs``: the states,
+    events and censored states of the first evaluation draw, from ``n_per_regime``,
+    ``n_events_per_regime`` and ``n_censored_per_regime``; then the exposure sentence
+    (``H3A_EXPOSURE``). A system whose H3a block lacks the two new lists (results written before
+    WU-0004d) gets a line saying so, never a silent gap (PRIME.4). The section reads the counts
+    only; it changes no verdict.
+
+    Parameters
+    ----------
+    results : dict
+        Study results.
+    systems : list[str]
+        The systems to show.
+
+    Returns
+    -------
+    list[str]
+        Markdown lines, from the ``##`` heading to the exposure sentence (no blank line before or
+        after), or ``[]`` if no listed system has an H3a result.
+
+    Raises
+    ------
+    ValueError
+        If the three lists of a system differ in length, or events plus censored differ from the
+        states of a regime (a corrupt result is not printed).
+    """
+    shown = [s for s in systems if "H3a" in results["systems"][s]]
+    if not shown:
+        return []
+    rows: list[str] = []
+    missing: list[str] = []
+    for s in shown:
+        block = results["systems"][s]["H3a"]
+        if "n_events_per_regime" not in block or "n_censored_per_regime" not in block:
+            missing.append(s)
+            continue
+        states, events, censored = (block["n_per_regime"], block["n_events_per_regime"],
+                                    block["n_censored_per_regime"])
+        if not len(states) == len(events) == len(censored) or any(
+                e + c != n for n, e, c in zip(states, events, censored)):
+            raise ValueError(f"{s}: H3a counts are inconsistent: n_per_regime {states}, "
+                             f"n_events_per_regime {events}, n_censored_per_regime {censored}")
+        rows += [f"| {s} | {k} | {n} | {e} | {c} |"
+                 for k, (n, e, c) in enumerate(zip(states, events, censored))]
+    blocks: list[list[str]] = []  # paragraphs, each preceded by a blank line
+    if rows:
+        blocks.append(["| System | Regime | States | Events | Censored |", "|---|---|---|---|---|",
+                       *rows])
+    blocks += [[f"{s}: events/censored per regime not recorded (results written before WU-0004d)."]
+               for s in missing]
+    lines = ["## H3a: events/censored per regime (DEF-0018)"]
+    for paragraph in [*blocks, [H3A_EXPOSURE]]:
+        lines += ["", *paragraph]
+    return lines
+# --- WU-0004d end ---
+
+
 def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
     """Write the human-readable results report.
 
@@ -842,6 +913,11 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
         lines += ["", f"Oracle recovery: A4 recovers {_fmt(100 * rec['A4_vs_A4o'], 3)}% of the "
                   f"oracle-seed closed form's gain over A2; A5 recovers "
                   f"{_fmt(100 * rec['A5_vs_Astar'], 3)}% of A*'s.", ""]
+
+    # WU-0004d: after the Allocation rules, so that the verdict table's interval label lines still
+    # come before the next heading (test_budget L1)
+    h3a_section = h3a_regime_lines(results, systems)
+    lines += [*h3a_section, ""] if h3a_section else []
 
     lines += ["## Validation gate", "", "| Check | Criterion | " + " | ".join(systems) + " |",
               "|---|---|" + "---|" * len(systems)]

@@ -1689,6 +1689,29 @@ def test_an_untagged_float_leaf_is_not_computable_in_every_tier_even_when_equal(
     assert res.tier.name == "TD" and res.exit_code == 2 and res.untagged_leaves
 
 
+def test_wu0004d_h3a_count_lists_need_no_tag_and_are_one_sided_against_an_older_run() -> None:
+    """WU-0004d: ``n_events_per_regime`` and ``n_censored_per_regime`` are integer lists, so they are
+    never untagged (only float leaves are), and against a reference without them they are exactly the
+    one-sided leaves (T0: a structure FAIL by the tool's own rule, nothing else differs).
+
+    Reference: the tool's rules, read in ``decide_one_sided`` and ``untagged_leaves`` (a leaf is untagged
+    only if it is a float without a chain tag) and the hand-built lists below (three regimes: 6 leaves).
+    Exact.
+    """
+    ref, new = make(), make()
+    edit(new, f"{S}/H3a/n_events_per_regime", [20, 25, 3])
+    edit(new, f"{S}/H3a/n_censored_per_regime", [10, 5, 17])
+    assert cr.untagged_leaves(cr.flatten(new)) == []
+    res = run(ref, new)
+    assert res.untagged_leaves == [] and res.untagged == 0
+    assert res.tier.name == "T0" and res.rows == []
+    expected = sorted(f"{S}/H3a/{key}/[{i}]" for key in ("n_censored_per_regime", "n_events_per_regime")
+                      for i in range(3))
+    assert sorted("/".join(r.path) for r in res.one_sided) == expected
+    assert all(r.kind == "only_new" and r.outcome == "FAIL" for r in res.one_sided)
+    assert res.exit_code == 1
+
+
 def test_a_config_float_is_tagged_and_still_compared_exactly() -> None:
     """The ``config`` floats get an override (so that the census is 0), but ``config`` stays compared for identity:
     a differing config float is a failure in T1 exactly as before."""

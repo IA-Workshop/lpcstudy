@@ -1134,3 +1134,77 @@ def test_clip_column_says_not_computed_and_is_absent_without_a_block(tmp_path: P
     assert header == "| ID | Hypothesis | lorenz63 | Verdict |"
     assert not any("clip" in row.rsplit(" | ", 1)[-1] for row in rows.values())
     assert not any("Clip sensitivity (the `clip` column" in line for line in lines)
+
+
+# ---------------------------------------------------------------- WU-0004d: H3a events/censored
+EXPOSURE_TEXT = (
+    "Exposure (DEF-0018; owner ruling B6b: keep as is, report the counts, state the exposure as a "
+    "limitation): the H3a log-rank test sets no minimum number of states or events per regime "
+    "(DEC-0011 O1; only the full sample needs 50 states), so a regime with few events can give an "
+    "extreme log-rank p-value, for example one event among 99 censored states. Read each p-value "
+    "beside the events and censored counts above. This is a stated limitation of the H3a verdict; "
+    "the verdict rule is unchanged.")
+"""The sentence typed from the ruling (owner packet B6b), independent of ``report.H3A_EXPOSURE``."""
+
+
+def _h3a_markdown(tmp_path: Path, counts: dict | None) -> list[str]:
+    """RESULTS.md lines of a one-system fake run whose H3a block gets ``counts`` (or nothing)."""
+    results, config = fake_results("DEV-0")
+    system = fake_system(config)
+    system["H3a"].update(n_per_regime=[100, 100], **(counts or {}))
+    results["systems"] = {"lorenz63": system}
+    results["verdicts"] = verdicts(results, config)
+    write_markdown(results, config, tmp_path / "RESULTS.md")
+    return (tmp_path / "RESULTS.md").read_text().splitlines()
+
+
+def test_h3a_section_prints_one_event_among_100_states_and_the_exposure(tmp_path: Path) -> None:
+    """RESULTS.md shows states, events and censored per regime, and the exposure sentence (A4).
+
+    Reference: hand-typed expectation for a regime of 100 states with ONE event (99 censored) and a
+    regime of 100 states, all events: rows ``| lorenz63 | 0 | 100 | 1 | 99 |`` and
+    ``| lorenz63 | 1 | 100 | 100 | 0 |``. The sentence is typed in this test from the ruling, not
+    read from the code. The verdict table row of H3a is unchanged by the section (the cell text is
+    the old one). Exact string checks.
+    """
+    lines = _h3a_markdown(tmp_path, {"n_events_per_regime": [1, 100],
+                                     "n_censored_per_regime": [99, 0]})
+    head = lines.index("## H3a: events/censored per regime (DEF-0018)")
+    assert lines[head + 2:head + 6] == ["| System | Regime | States | Events | Censored |",
+                                        "|---|---|---|---|---|",
+                                        "| lorenz63 | 0 | 100 | 1 | 99 |",
+                                        "| lorenz63 | 1 | 100 | 100 | 0 |"]
+    assert lines[head + 7] == EXPOSURE_TEXT
+    row = next(line for line in lines if line.startswith("| H3a | "))
+    assert "K=3: largest Holm p 0.004, IQR 0.4 LT: pass" in row  # the verdict cell is untouched
+    assert "not recorded" not in "\n".join(lines[head:head + 8])
+
+
+def test_h3a_section_says_not_recorded_for_results_without_the_counts(tmp_path: Path) -> None:
+    """Results written before WU-0004d print "not recorded", not a gap, an error or a zero (A4).
+
+    Reference: the backward-compatibility rule (PRIME.4: a missing input is stated). Exact strings.
+    """
+    lines = _h3a_markdown(tmp_path, None)
+    head = lines.index("## H3a: events/censored per regime (DEF-0018)")
+    assert "| lorenz63 |" not in "\n".join(lines[head:head + 6])
+    assert ("lorenz63: events/censored per regime not recorded (results written before WU-0004d)."
+            in lines[head:head + 6])
+    assert EXPOSURE_TEXT in lines[head:head + 8]
+
+
+def test_h3a_section_refuses_inconsistent_counts() -> None:
+    """Events plus censored must equal the states of each regime, and the lists must have one length (A4).
+
+    Reference: the invariant of the definition (a state is an event or censored). Hand cases:
+    1 + 98 != 100, and a list one entry short. Both raise ``ValueError`` naming the system.
+    """
+    base = {"H3a": {"n_per_regime": [100, 100], "n_events_per_regime": [1, 100],
+                    "n_censored_per_regime": [98, 0]}}
+    with pytest.raises(ValueError, match="lorenz63: H3a counts are inconsistent"):
+        report.h3a_regime_lines({"systems": {"lorenz63": base}}, ["lorenz63"])
+    short = {"H3a": {"n_per_regime": [100, 100], "n_events_per_regime": [1],
+                     "n_censored_per_regime": [99]}}
+    with pytest.raises(ValueError, match="inconsistent"):
+        report.h3a_regime_lines({"systems": {"lorenz63": short}}, ["lorenz63"])
+    assert report.h3a_regime_lines({"systems": {}}, []) == []  # no system: no section
