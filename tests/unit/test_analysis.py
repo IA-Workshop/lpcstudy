@@ -74,14 +74,21 @@ from lpcstudy.statistics import (
 )
 from unit_helpers import realizable_triples
 
-LEVEL = 1.0 - 0.05 / 3.0  # the primary level of v3 section 7, written out again here
-CONFIG = dataclasses.replace(SMOKE, bootstrap_resamples=200)  # 200 resamples, block 5
+LEVEL = (
+    1.0 - 0.05 / 3.0
+)  # the primary level of v3 section 7, written out again here
+CONFIG = dataclasses.replace(
+    SMOKE, bootstrap_resamples=200
+)  # 200 resamples, block 5
 SYSTEM = "lorenz63"  # the system label of the bootstrap generators (the stub cells carry it too)
 
 
-def _stub_cell(weights: np.ndarray, err_corr: np.ndarray | None = None,
-               cp_constant: np.ndarray | None = None, plp_constant: np.ndarray | None = None
-               ) -> Cell:
+def _stub_cell(
+    weights: np.ndarray,
+    err_corr: np.ndarray | None = None,
+    cp_constant: np.ndarray | None = None,
+    plp_constant: np.ndarray | None = None,
+) -> Cell:
     """A cell whose test moments have ``w*(H_ref) = weights`` exactly (H_ref = 30, nH = 1).
 
     With ``E_P = w``, ``E_C = 1 - w`` and ``C = 0`` the curvature is 1 and ``w* = E_P / 1 = w``
@@ -91,12 +98,29 @@ def _stub_cell(weights: np.ndarray, err_corr: np.ndarray | None = None,
     zeros = np.zeros((n, 1))
     col = lambda a: None if a is None else np.asarray(a)[:, None]
     moments = EnsembleMoments(
-        horizons=np.array([30]), mean_cp=zeros, mean_plp=zeros, sq_cp=(1.0 - weights)[:, None],
-        sq_plp=weights[:, None], cross=zeros, analog_seed=np.ones(n), est_seed=np.ones(n),
-        noise_sens=np.zeros(n), err_corr=col(err_corr), cp_constant=col(cp_constant),
-        plp_constant=col(plp_constant))
-    return Cell(system="lorenz63", noise=0.01, library_size=0, label="stub", setup=None,
-                splits={"test": SplitData(moments, None)}, oracles={}, horizons=np.array([30]))
+        horizons=np.array([30]),
+        mean_cp=zeros,
+        mean_plp=zeros,
+        sq_cp=(1.0 - weights)[:, None],
+        sq_plp=weights[:, None],
+        cross=zeros,
+        analog_seed=np.ones(n),
+        est_seed=np.ones(n),
+        noise_sens=np.zeros(n),
+        err_corr=col(err_corr),
+        cp_constant=col(cp_constant),
+        plp_constant=col(plp_constant),
+    )
+    return Cell(
+        system="lorenz63",
+        noise=0.01,
+        library_size=0,
+        label="stub",
+        setup=None,
+        splits={"test": SplitData(moments, None)},
+        oracles={},
+        horizons=np.array([30]),
+    )
 
 
 def _has_nan(obj: object) -> bool:
@@ -113,17 +137,27 @@ def _has_nan(obj: object) -> bool:
 # Six states by the five library sizes (1000, 3162, 10000, 31623, 100000); every entry is a
 # multiple of 1/8, so w* is exact in the stub cells and the means below are exact in binary.
 LIB_SIZES = (1_000, 3_162, 10_000, 31_623, 100_000)
-TABLE = np.array([[0.0, 0.125, 0.25, 0.375, 0.5],
-                  [0.25, 0.25, 0.5, 0.5, 0.75],
-                  [0.0, 0.0, 0.0, 0.125, 0.125],
-                  [0.5, 0.625, 0.625, 0.75, 1.0],
-                  [0.125, 0.25, 0.375, 0.375, 0.5],
-                  [0.75, 0.75, 1.0, 1.0, 1.0]])
+TABLE = np.array(
+    [
+        [0.0, 0.125, 0.25, 0.375, 0.5],
+        [0.25, 0.25, 0.5, 0.5, 0.75],
+        [0.0, 0.0, 0.0, 0.125, 0.125],
+        [0.5, 0.625, 0.625, 0.75, 1.0],
+        [0.125, 0.25, 0.375, 0.375, 0.5],
+        [0.75, 0.75, 1.0, 1.0, 1.0],
+    ]
+)
 
 
-def _library_cells(table: np.ndarray, rhos: tuple[float, ...] = (0.01,)) -> dict:
+def _library_cells(
+    table: np.ndarray, rhos: tuple[float, ...] = (0.01,)
+) -> dict:
     """Library sweep stub: the same weight table at every rho, one column per library size."""
-    return {(rho, n): _stub_cell(table[:, j]) for rho in rhos for j, n in enumerate(LIB_SIZES)}
+    return {
+        (rho, n): _stub_cell(table[:, j])
+        for rho in rhos
+        for j, n in enumerate(LIB_SIZES)
+    }
 
 
 def test_per_state_spearman_handles_ties() -> None:
@@ -139,7 +173,9 @@ def test_per_state_spearman_handles_ties() -> None:
     far above round-off.
     """
 
-    values = np.array([[0.0, 0.0, 0.0, 0.0], [0.1, 0.2, 0.3, 0.4], [0.4, 0.3, 0.2, 0.1]])
+    values = np.array(
+        [[0.0, 0.0, 0.0, 0.0], [0.1, 0.2, 0.3, 0.4], [0.4, 0.3, 0.2, 0.1]]
+    )
     rho, _ = _per_state_spearman_counted(np.array([1.0, 2.0, 3.0, 4.0]), values)
     assert np.allclose(rho, [0.0, 1.0, -1.0])
 
@@ -177,20 +213,33 @@ def test_h2d_is_the_in_distribution_part_only() -> None:
     three orders. The booleans, the verdict and the key set are exact.
     """
 
-
     base = np.random.default_rng(7).uniform(1.0, 2.0, 60)
 
     def scores(factor: float) -> dict[str, RuleScores]:
-        make = lambda e: RuleScores(mse=np.zeros(1), state_mse_ref=e, regret=np.zeros(1),
-                                    agreement=0.0, km_median=0.0, rmst=0.0)
+        make = lambda e: RuleScores(
+            mse=np.zeros(1),
+            state_mse_ref=e,
+            regret=np.zeros(1),
+            agreement=0.0,
+            km_median=0.0,
+            rmst=0.0,
+        )
         return {"A3": make(base), "A4": make(factor * base)}
 
     for factor, excess, ok in ((1.05, 0.05, True), (1.2, 0.2, False)):
         out = h2d_empirical_comparison(scores(factor), SMOKE, SYSTEM)
-        assert set(out) == {"in_distribution_excess", "ci", "n_failed_resamples", "verdict",
-                            "reason", "pass"}
+        assert set(out) == {
+            "in_distribution_excess",
+            "ci",
+            "n_failed_resamples",
+            "verdict",
+            "reason",
+            "pass",
+        }
         assert out["in_distribution_excess"] == pytest.approx(excess, abs=1e-12)
-        assert out["pass"] is ok and out["verdict"] == ("pass" if ok else "fail")
+        assert out["pass"] is ok and out["verdict"] == (
+            "pass" if ok else "fail"
+        )
         assert out["reason"] is None and out["n_failed_resamples"] == 0
 
 
@@ -205,18 +254,29 @@ PRIMARY = 1.0 - 0.05 / 3.0
 def _hand_controls(x: np.ndarray) -> np.ndarray:
     """Q = [x1, x2, x1^2, x2^2, x1 x2] of a centred (n, 2) array, written out by hand."""
     c = x - x.mean(axis=0)
-    return np.column_stack([c[:, 0], c[:, 1], c[:, 0] * c[:, 0], c[:, 1] * c[:, 1],
-                            c[:, 0] * c[:, 1]])
+    return np.column_stack(
+        [
+            c[:, 0],
+            c[:, 1],
+            c[:, 0] * c[:, 0],
+            c[:, 1] * c[:, 1],
+            c[:, 0] * c[:, 1],
+        ]
+    )
 
 
-def _qr_partial_corr(target: np.ndarray, variable: np.ndarray, controls: np.ndarray) -> float:
+def _qr_partial_corr(
+    target: np.ndarray, variable: np.ndarray, controls: np.ndarray
+) -> float:
     """Partial correlation by explicit QR residuals and a hand Pearson (independent reference)."""
     design = np.column_stack([np.ones(len(target)), controls])
     q_mat, _ = np.linalg.qr(design)
     res_t = target - q_mat @ (q_mat.T @ target)
     res_v = variable - q_mat @ (q_mat.T @ variable)
     res_t, res_v = res_t - res_t.mean(), res_v - res_v.mean()
-    return float(np.sum(res_t * res_v) / np.sqrt(np.sum(res_t**2) * np.sum(res_v**2)))
+    return float(
+        np.sum(res_t * res_v) / np.sqrt(np.sum(res_t**2) * np.sum(res_v**2))
+    )
 
 
 def test_quadratic_controls_columns_and_contract() -> None:
@@ -226,13 +286,14 @@ def test_quadratic_controls_columns_and_contract() -> None:
     (``==``): the same float operations. Bad shapes and non-finite input raise (PRIME.4).
     """
 
-
     x = np.random.default_rng(3).normal(size=(40, 2)) + 5.0
     assert np.array_equal(quadratic_controls(x), _hand_controls(x))
     with pytest.raises(ValueError):
         quadratic_controls(x[:, :1])
     with pytest.raises(ValueError):
-        quadratic_controls(np.where(np.arange(80).reshape(40, 2) == 7, np.nan, x))
+        quadratic_controls(
+            np.where(np.arange(80).reshape(40, 2) == 7, np.nan, x)
+        )
 
 
 def test_partial_correlation_with_quadratic_controls_constructed_case() -> None:
@@ -249,15 +310,21 @@ def test_partial_correlation_with_quadratic_controls_constructed_case() -> None:
     x = rng.multivariate_normal([0.0, 0.0], [[1.0, 0.5], [0.5, 1.0]], size=200)
     controls = _hand_controls(x)
     design = np.column_stack([np.ones(200), controls])
-    q_mat, _ = np.linalg.qr(np.column_stack([design, rng.normal(size=200),
-                                              rng.normal(size=200)]))
+    q_mat, _ = np.linalg.qr(
+        np.column_stack([design, rng.normal(size=200), rng.normal(size=200)])
+    )
     u, v = q_mat[:, 6], q_mat[:, 7]
     target = design @ np.array([0.3, 1.0, -2.0, 0.5, 0.2, 0.7]) + u
     variable = design @ np.array([-1.0, 0.4, 0.1, 0.9, -0.5, 0.3]) + u + v
-    assert abs(partial_correlation(target, variable, controls) - 1 / np.sqrt(2)) < 1e-12
+    assert (
+        abs(partial_correlation(target, variable, controls) - 1 / np.sqrt(2))
+        < 1e-12
+    )
 
 
-def test_partial_correlation_with_quadratic_controls_matches_qr_reference() -> None:
+def test_partial_correlation_with_quadratic_controls_matches_qr_reference() -> (
+    None
+):
     """T4(b): on random data (n = 200) the code equals explicit QR residuals and a hand Pearson.
 
     Reference: ``np.linalg.qr`` projection and a hand-written Pearson formula (independent of
@@ -268,17 +335,27 @@ def test_partial_correlation_with_quadratic_controls_matches_qr_reference() -> N
 
     rng = np.random.default_rng(12)
     x = rng.normal(size=(200, 2)) @ np.array([[1.0, 0.4], [0.0, 0.9]]) + 3.0
-    target, variable = rng.normal(size=200), rng.normal(size=200) + 0.3 * x[:, 0] ** 2
+    target, variable = (
+        rng.normal(size=200),
+        rng.normal(size=200) + 0.3 * x[:, 0] ** 2,
+    )
     controls = quadratic_controls(x)
     ours = partial_correlation(target, variable, controls)
-    assert abs(ours - _qr_partial_corr(target, variable, _hand_controls(x))) < 1e-12
+    assert (
+        abs(ours - _qr_partial_corr(target, variable, _hand_controls(x)))
+        < 1e-12
+    )
     idx = rng.integers(0, 200, 200)  # a resample with repeats
     resampled = partial_correlation(target[idx], variable[idx], controls[idx])
-    recentred = partial_correlation(target[idx], variable[idx], _hand_controls(x[idx]))
+    recentred = partial_correlation(
+        target[idx], variable[idx], _hand_controls(x[idx])
+    )
     assert abs(resampled - recentred) < 1e-12
 
 
-def _synthetic(model: str, n: int, rng: np.random.Generator, tail: float = 0.02) -> dict:
+def _synthetic(
+    model: str, n: int, rng: np.random.Generator, tail: float = 0.02
+) -> dict:
     """Synthetic H2a models S0, S1, S2, S0n (math note Q-A8); returns the arrays and params.
 
     x ~ N(0, [[1, .5], [.5, 1]]); z, e, eta, g iid N(0, 1). With bump = a (x1^2 - 1):
@@ -288,8 +365,12 @@ def _synthetic(model: str, n: int, rng: np.random.Generator, tail: float = 0.02)
     sigmoid(L). S0: bI = bZ = a = 0; S1: bI = .447; S2: bZ = .5; S0n: a = .6.
     """
 
-    b_i, b_z, a = {"S0": (0.0, 0.0, 0.0), "S1": (0.447, 0.0, 0.0), "S2": (0.0, 0.5, 0.0),
-                   "S0n": (0.0, 0.0, 0.6)}[model]
+    b_i, b_z, a = {
+        "S0": (0.0, 0.0, 0.0),
+        "S1": (0.447, 0.0, 0.0),
+        "S2": (0.0, 0.5, 0.0),
+        "S0n": (0.0, 0.0, 0.6),
+    }[model]
     x = rng.multivariate_normal([0.0, 0.0], [[1.0, 0.5], [0.5, 1.0]], size=n)
     z, e, eta, g = (rng.normal(size=n) for _ in range(4))
     bump = a * (x[:, 0] ** 2 - 1.0)
@@ -305,15 +386,24 @@ def _synthetic(model: str, n: int, rng: np.random.Generator, tail: float = 0.02)
 
 def _run_part_ii(data: dict, seed: int = 2) -> dict:
 
-    return h2a_part_ii(data["w"], data["lam"], data["x"], n_resamples=2000, block=5,
-                       seed=seed, level=PRIMARY)
+    return h2a_part_ii(
+        data["w"],
+        data["lam"],
+        data["x"],
+        n_resamples=2000,
+        block=5,
+        seed=seed,
+        level=PRIMARY,
+    )
 
 
 def _assert_recovery(result: dict, targets: dict[str, float]) -> None:
     """Point estimates within 4/sqrt(n_part) of the exact population values."""
     for name, truth in targets.items():
         part = result["part_ii"][name]
-        assert abs(part["partial_corr"] - truth) < 4.0 / np.sqrt(part["n_states"]), name
+        assert abs(part["partial_corr"] - truth) < 4.0 / np.sqrt(
+            part["n_states"]
+        ), name
 
 
 def test_recovery_under_the_null_models_no_part_fails() -> None:
@@ -332,9 +422,13 @@ def test_recovery_under_the_null_models_no_part_fails() -> None:
         data = _synthetic(model, 2000, np.random.default_rng(seed))
         result = _run_part_ii(data)
         _assert_recovery(result, {"zero": 0.0, "interior": 0.0})
-        assert all(p["verdict"] != "fail" for p in result["part_ii"].values()), model
+        assert all(
+            p["verdict"] != "fail" for p in result["part_ii"].values()
+        ), model
         assert result["part_ii_verdict"] != "fail"
-        assert "one" not in result["part_ii"]  # 1.4% of states: below the 5% trigger
+        assert (
+            "one" not in result["part_ii"]
+        )  # 1.4% of states: below the 5% trigger
 
 
 def test_recovery_with_three_parts_under_the_null() -> None:
@@ -387,7 +481,9 @@ def test_recovery_s2_zero_part_fails_and_interior_part_does_not() -> None:
     assert result["part_ii_verdict"] == "fail"
 
 
-def test_quadratic_controls_remove_the_nonlinear_confound_that_linear_ones_miss() -> None:
+def test_quadratic_controls_remove_the_nonlinear_confound_that_linear_ones_miss() -> (
+    None
+):
     """T9, S0n: with linear controls (ii-a) is about 0.306 (>= 0.05); with quadratic it is <= 0.0065.
 
     Reference: independent QR partial correlation (not the code under test) on n = 4e5 states;
@@ -398,7 +494,9 @@ def test_quadratic_controls_remove_the_nonlinear_confound_that_linear_ones_miss(
     data = _synthetic("S0n", 400_000, np.random.default_rng(106))
     zero = (data["w"] == 0.0).astype(float)
     linear = abs(_qr_partial_corr(zero, data["lam"], data["x"]))
-    quadratic = abs(_qr_partial_corr(zero, data["lam"], _hand_controls(data["x"])))
+    quadratic = abs(
+        _qr_partial_corr(zero, data["lam"], _hand_controls(data["x"]))
+    )
     assert linear >= 0.05
     assert quadratic <= 0.0065
 
@@ -418,19 +516,34 @@ def test_parts_share_the_resamples_and_refit_inside_each_one() -> None:
     controls = _hand_controls(data["x"])
     zero = (data["w"] == 0.0).astype(float)
     interior = (data["w"] > 0.0) & (data["w"] < 1.0)
-    inner = np.where(interior, data["w"], 0.5)  # placeholder outside the interior, never read
+    inner = np.where(
+        interior, data["w"], 0.5
+    )  # placeholder outside the interior, never read
     logit = np.log(inner / (1.0 - inner))
     ref = {"zero": [], "interior": []}
     for idx in block_resample_indices(300, 100, 5, 9):
-        ref["zero"].append(_qr_partial_corr(zero[idx], data["lam"][idx], controls[idx]))
+        ref["zero"].append(
+            _qr_partial_corr(zero[idx], data["lam"][idx], controls[idx])
+        )
         sel = idx[interior[idx]]
-        ref["interior"].append(_qr_partial_corr(logit[sel], data["lam"][sel], controls[sel]))
-    result = h2a_part_ii(data["w"], data["lam"], data["x"], n_resamples=100, block=5, seed=9,
-                         level=PRIMARY)
+        ref["interior"].append(
+            _qr_partial_corr(logit[sel], data["lam"][sel], controls[sel])
+        )
+    result = h2a_part_ii(
+        data["w"],
+        data["lam"],
+        data["x"],
+        n_resamples=100,
+        block=5,
+        seed=9,
+        level=PRIMARY,
+    )
     for name in ("zero", "interior"):
         lo, hi, n_failed = percentile_interval(np.array(ref[name]), PRIMARY)
         assert result["part_ii"][name]["n_failed_resamples"] == n_failed == 0
-        assert np.allclose(result["part_ii"][name]["ci"], [lo, hi], atol=1e-10, rtol=0)
+        assert np.allclose(
+            result["part_ii"][name]["ci"], [lo, hi], atol=1e-10, rtol=0
+        )
     assert result["part_ii"]["interior"]["n_states"] == int(interior.sum())
     assert result["part_ii"]["zero"]["n_states"] == 300
 
@@ -450,14 +563,21 @@ def test_constant_indicator_resamples_are_counted_as_failed() -> None:
     weight = rng.uniform(0.1, 0.9, n)
     weight[[10, 11, 60]] = 0.0
     seeds, lam = rng.normal(size=(n, 2)), rng.normal(size=n)
-    expected = sum(1 for idx in block_resample_indices(n, 200, 5, 4)
-                   if np.ptp((weight[idx] == 0.0).astype(float)) == 0.0)
+    expected = sum(
+        1
+        for idx in block_resample_indices(n, 200, 5, 4)
+        if np.ptp((weight[idx] == 0.0).astype(float)) == 0.0
+    )
     assert 20 < expected < 200
-    part = h2a_part_ii(weight, lam, seeds, n_resamples=200, block=5, seed=4,
-                       level=PRIMARY)["part_ii"]["zero"]
+    part = h2a_part_ii(
+        weight, lam, seeds, n_resamples=200, block=5, seed=4, level=PRIMARY
+    )["part_ii"]["zero"]
     assert part["n_failed_resamples"] == expected
     assert part["ci"] == [-np.inf, np.inf]
-    assert part["verdict"] == "inconclusive" and part["reason"] == "failed resamples >= threshold"
+    assert (
+        part["verdict"] == "inconclusive"
+        and part["reason"] == "failed resamples >= threshold"
+    )
 
 
 def test_third_part_triggers_at_six_of_one_hundred_and_not_at_five() -> None:
@@ -473,15 +593,19 @@ def test_third_part_triggers_at_six_of_one_hundred_and_not_at_five() -> None:
     for n_one, expected in ((6, True), (5, False)):
         weight = rng.uniform(0.2, 0.8, 100)
         weight[:20] = 0.0
-        weight[20:20 + n_one] = 1.0
-        result = h2a_part_ii(weight, lam, seeds, n_resamples=20, block=5, seed=1, level=PRIMARY)
+        weight[20 : 20 + n_one] = 1.0
+        result = h2a_part_ii(
+            weight, lam, seeds, n_resamples=20, block=5, seed=1, level=PRIMARY
+        )
         assert ("one" in result["part_ii"]) is expected
         assert result["n_w_zero"] == 20 and result["n_w_one"] == n_one
         assert result["part_ii"]["interior"]["n_states"] == 80 - n_one
         assert result["part_ii"]["zero"]["n_states"] == 100
 
 
-def test_part_ii_verdicts_use_the_open_band_and_the_multi_part_rule(monkeypatch) -> None:
+def test_part_ii_verdicts_use_the_open_band_and_the_multi_part_rule(
+    monkeypatch,
+) -> None:
     """T7: band (-0.1, 0.1) open; (ii) fails iff any part fails, passes iff all pass; n = 49/50.
 
     Reference: hand-enumerated cases on crafted bootstrap values: the patched ``bootstrap_values``
@@ -493,36 +617,67 @@ def test_part_ii_verdicts_use_the_open_band_and_the_multi_part_rule(monkeypatch)
 
     import lpcstudy.analysis as an
 
-    cases = {"pass": (-0.0999, 0.0999), "inconclusive": (-0.1, 0.05), "fail": (0.1, 0.3)}
+    cases = {
+        "pass": (-0.0999, 0.0999),
+        "inconclusive": (-0.1, 0.05),
+        "fail": (0.1, 0.3),
+    }
     assert an.combine_verdicts(["fail", "pass"]) == "fail"
     rng = np.random.default_rng(110)
 
     def run(bounds: list[tuple[float, float]], n: int, n_one: int) -> dict:
         weight = rng.uniform(0.2, 0.8, n)
         weight[: n // 3] = 0.0
-        weight[n // 3: n // 3 + n_one] = 1.0
+        weight[n // 3 : n // 3 + n_one] = 1.0
         seeds, lam = rng.normal(size=(n, 2)), rng.normal(size=n)
-        values = np.column_stack([np.repeat([lo, hi], 100) for lo, hi in bounds])
-        monkeypatch.setattr(an, "bootstrap_values", lambda *a, **k: (np.full(len(bounds), 0.0),
-                                                                     values))
-        return an.h2a_part_ii(weight, lam, seeds, n_resamples=200, block=5, seed=0,
-                              level=PRIMARY)
+        values = np.column_stack(
+            [np.repeat([lo, hi], 100) for lo, hi in bounds]
+        )
+        monkeypatch.setattr(
+            an,
+            "bootstrap_values",
+            lambda *a, **k: (np.full(len(bounds), 0.0), values),
+        )
+        return an.h2a_part_ii(
+            weight, lam, seeds, n_resamples=200, block=5, seed=0, level=PRIMARY
+        )
 
     for triple in itertools.product(cases, repeat=2):
         out = run([cases[t] for t in triple], 100, 0)
-        assert [out["part_ii"][k]["verdict"] for k in ("zero", "interior")] == list(triple)
-        want = "fail" if "fail" in triple else "pass" if set(triple) == {"pass"} else "inconclusive"
+        assert [
+            out["part_ii"][k]["verdict"] for k in ("zero", "interior")
+        ] == list(triple)
+        want = (
+            "fail"
+            if "fail" in triple
+            else "pass" if set(triple) == {"pass"} else "inconclusive"
+        )
         assert out["part_ii_verdict"] == want
     for triple in itertools.product(cases, repeat=3):
         out = run([cases[t] for t in triple], 100, 10)
-        assert [out["part_ii"][k]["verdict"] for k in ("zero", "interior", "one")] == list(triple)
-        want = "fail" if "fail" in triple else "pass" if set(triple) == {"pass"} else "inconclusive"
+        assert [
+            out["part_ii"][k]["verdict"] for k in ("zero", "interior", "one")
+        ] == list(triple)
+        want = (
+            "fail"
+            if "fail" in triple
+            else "pass" if set(triple) == {"pass"} else "inconclusive"
+        )
         assert out["part_ii_verdict"] == want
     # (-0.3, -0.1) fails at the other edge; n = 49 is inconclusive, n = 50 is computed (A3).
-    assert run([(-0.3, -0.1), (0.0, 0.05)], 100, 0)["part_ii"]["zero"]["verdict"] == "fail"
+    assert (
+        run([(-0.3, -0.1), (0.0, 0.05)], 100, 0)["part_ii"]["zero"]["verdict"]
+        == "fail"
+    )
     small = run([(-0.05, 0.05), (-0.05, 0.05)], 49, 0)["part_ii"]["zero"]
-    assert small["verdict"] == "inconclusive" and small["reason"] == "n_states < 50"
-    assert run([(-0.05, 0.05), (-0.05, 0.05)], 50, 0)["part_ii"]["zero"]["verdict"] == "pass"
+    assert (
+        small["verdict"] == "inconclusive"
+        and small["reason"] == "n_states < 50"
+    )
+    assert (
+        run([(-0.05, 0.05), (-0.05, 0.05)], 50, 0)["part_ii"]["zero"]["verdict"]
+        == "pass"
+    )
 
 
 def test_part_ii_rejects_bad_input() -> None:
@@ -531,9 +686,12 @@ def test_part_ii_rejects_bad_input() -> None:
     Reference: the contract of ``h2a_part_ii``. Tolerance: none.
     """
 
-
     rng = np.random.default_rng(111)
-    w, lam, x = rng.uniform(0.2, 0.8, 60), rng.normal(size=60), rng.normal(size=(60, 2))
+    w, lam, x = (
+        rng.uniform(0.2, 0.8, 60),
+        rng.normal(size=60),
+        rng.normal(size=(60, 2)),
+    )
     kwargs = {"n_resamples": 5, "block": 5, "seed": 0}
     with pytest.raises(ValueError):
         h2a_part_ii(w, lam[:-1], x, **kwargs)
@@ -544,17 +702,35 @@ def test_part_ii_rejects_bad_input() -> None:
 
 
 # H2a(i) on the hand-built table of T8: horizons 1, 2, 4 LT.
-T8_SMALL = np.array([[1, 1, 1], [1, 1, 0], [1, 0, 0], [1, 0, 1], [0, 1, 1], [0, 0, 0]], bool)
-T8_WEIGHT = np.array([[0.10, 0.50, 0.30], [0.20, 0.60, 0.90], [0.40, 0.70, 0.80],
-                      [0.05, 0.45, 0.95], [0.30, 0.10, 0.90], [0.50, 0.50, 0.50]])
+T8_SMALL = np.array(
+    [[1, 1, 1], [1, 1, 0], [1, 0, 0], [1, 0, 1], [0, 1, 1], [0, 0, 0]], bool
+)
+T8_WEIGHT = np.array(
+    [
+        [0.10, 0.50, 0.30],
+        [0.20, 0.60, 0.90],
+        [0.40, 0.70, 0.80],
+        [0.05, 0.45, 0.95],
+        [0.30, 0.10, 0.90],
+        [0.50, 0.50, 0.50],
+    ]
+)
 # Ranges by hand: state 0 over horizons 1, 2, 4: 0.50 - 0.10; state 1 over 1, 2: 0.60 - 0.20.
 T8_RANGE_0, T8_RANGE_1 = 0.50 - 0.10, 0.60 - 0.20
 
 
 def _t8(**kw):
 
-    return h2a_initial_segments(T8_WEIGHT, T8_SMALL, ["1", "2", "4"], n_resamples=10, block=2,
-                                seed=3, level=PRIMARY, **kw)
+    return h2a_initial_segments(
+        T8_WEIGHT,
+        T8_SMALL,
+        ["1", "2", "4"],
+        n_resamples=10,
+        block=2,
+        seed=3,
+        level=PRIMARY,
+        **kw,
+    )
 
 
 def test_initial_segments_on_a_hand_built_table() -> None:
@@ -573,13 +749,24 @@ def test_initial_segments_on_a_hand_built_table() -> None:
     assert out["n_noncontiguous_states"] == 2
     assert out["median_range"] == np.median([T8_RANGE_0, T8_RANGE_1])
     assert out["range_by_span"]["1-2"] == {"median": T8_RANGE_1, "n_states": 1}
-    assert out["range_by_span"]["1-2-4"] == {"median": T8_RANGE_0, "n_states": 1}
-    assert out["complete_case"]["median_range"] == out["range_by_span"]["1-2-4"]["median"]
+    assert out["range_by_span"]["1-2-4"] == {
+        "median": T8_RANGE_0,
+        "n_states": 1,
+    }
+    assert (
+        out["complete_case"]["median_range"]
+        == out["range_by_span"]["1-2-4"]["median"]
+    )
     assert out["complete_case"]["n_states"] == 1
-    assert out["part_i_verdict"] == "inconclusive" and out["part_i_reason"] == "n_states < 50"
+    assert (
+        out["part_i_verdict"] == "inconclusive"
+        and out["part_i_reason"] == "n_states < 50"
+    )
 
 
-def test_initial_segments_resampled_statistic_on_an_index_array_with_repeats(monkeypatch) -> None:
+def test_initial_segments_resampled_statistic_on_an_index_array_with_repeats(
+    monkeypatch,
+) -> None:
     """T8: the resampled statistic on a hand index array with repeats gives the hand median.
 
     Reference: hand medians. The index array [0, 0, 1, 2, 5, 1] holds eligible states 0, 0, 1, 1
@@ -600,9 +787,13 @@ def test_initial_segments_resampled_statistic_on_an_index_array_with_repeats(mon
     monkeypatch.setattr(an, "bootstrap_values", spy)
     _t8()
     stat = captured["stat"]
-    assert np.array_equal(stat(np.array([0, 0, 1, 2, 5, 1])),
-                          [np.median([T8_RANGE_0, T8_RANGE_0, T8_RANGE_1, T8_RANGE_1]),
-                           T8_RANGE_0])
+    assert np.array_equal(
+        stat(np.array([0, 0, 1, 2, 5, 1])),
+        [
+            np.median([T8_RANGE_0, T8_RANGE_0, T8_RANGE_1, T8_RANGE_1]),
+            T8_RANGE_0,
+        ],
+    )
     assert np.all(np.isnan(stat(np.array([2, 3, 4, 5]))))
 
 
@@ -618,9 +809,19 @@ def test_initial_segments_pass_when_every_range_is_small() -> None:
 
     weight = np.tile([0.30, 0.32, 0.9], (60, 1))
     small = np.tile([True, True, False], (60, 1))
-    out = h2a_initial_segments(weight, small, ["1", "2", "4"], n_resamples=50, block=5, seed=1,
-                               level=PRIMARY)
-    assert out["median_range"] == 0.32 - 0.30 and out["range_ci"] == [out["median_range"]] * 2
+    out = h2a_initial_segments(
+        weight,
+        small,
+        ["1", "2", "4"],
+        n_resamples=50,
+        block=5,
+        seed=1,
+        level=PRIMARY,
+    )
+    assert (
+        out["median_range"] == 0.32 - 0.30
+        and out["range_ci"] == [out["median_range"]] * 2
+    )
     assert out["n_eligible_states"] == 60 and out["part_i_verdict"] == "pass"
     assert out["range_by_span"]["1-2"]["n_states"] == 60
     assert out["range_by_span"]["1-2-4"]["n_states"] == 0
@@ -641,8 +842,18 @@ def test_initial_segments_band_is_open_at_the_upper_edge() -> None:
     flat = np.zeros((60, 3))
     wide = np.tile([0.125, 0.25, 0.125], (60, 1))
     kw = {"n_resamples": 30, "block": 5, "seed": 2, "level": PRIMARY}
-    assert h2a_initial_segments(flat, small, ["1", "2", "4"], **kw)["part_i_verdict"] == "pass"
-    assert h2a_initial_segments(wide, small, ["1", "2", "4"], **kw)["part_i_verdict"] == "fail"
+    assert (
+        h2a_initial_segments(flat, small, ["1", "2", "4"], **kw)[
+            "part_i_verdict"
+        ]
+        == "pass"
+    )
+    assert (
+        h2a_initial_segments(wide, small, ["1", "2", "4"], **kw)[
+            "part_i_verdict"
+        ]
+        == "fail"
+    )
 
 
 # ------------------------------------------------------------------ Q-N (WU-0002.6(c))
@@ -663,7 +874,10 @@ def test_qn_reading_returns_each_reading_at_the_table_boundaries() -> None:
     assert qn_reading(0.0, 0.04) == "reduces"
     assert qn_reading(-0.2, 0.0499) == "reduces"
     assert qn_reading(0.0, 0.05) == "undetermined"
-    assert qn_reading(np.nextafter(0.0, 1.0), np.nextafter(0.05, 0.0)) == "distinct but small"
+    assert (
+        qn_reading(np.nextafter(0.0, 1.0), np.nextafter(0.05, 0.0))
+        == "distinct but small"
+    )
     assert qn_reading(0.01, 0.05) == "substantial"
     assert qn_reading(0.2, 0.9) == "substantial"
     assert qn_reading(-0.01, 0.06) == "undetermined"
@@ -682,18 +896,31 @@ def test_qn_regressor_parameters_and_seed() -> None:
     DEV-1 value is read from the registry by ``json.load``). Tolerance: exact.
     """
 
-
     params = qn_regressor(20261005).get_params()
-    expected = {"max_iter": 300, "learning_rate": 0.05, "max_leaf_nodes": 15,
-                "min_samples_leaf": 20, "l2_regularization": 1.0, "early_stopping": False,
-                "random_state": 20261005}
+    expected = {
+        "max_iter": 300,
+        "learning_rate": 0.05,
+        "max_leaf_nodes": 15,
+        "min_samples_leaf": 20,
+        "l2_regularization": 1.0,
+        "early_stopping": False,
+        "random_state": 20261005,
+    }
     assert {k: params[k] for k in expected} == expected
     with REGISTRY_PATH.open() as handle:
-        dev1 = next(e["value"] for e in json.load(handle)["seeds"] if e["id"] == "DEV-1")
+        dev1 = next(
+            e["value"] for e in json.load(handle)["seeds"] if e["id"] == "DEV-1"
+        )
     model = qn_regressor(dev1)
-    assert model.get_params()["random_state"] == sklearn_seed(dev1, "qn-regressor") < 2**32
+    assert (
+        model.get_params()["random_state"]
+        == sklearn_seed(dev1, "qn-regressor")
+        < 2**32
+    )
     rng = np.random.default_rng(21)
-    model.fit(rng.normal(size=(60, 3)), rng.normal(size=60))  # would raise for a raw 62-bit seed
+    model.fit(
+        rng.normal(size=(60, 3)), rng.normal(size=60)
+    )  # would raise for a raw 62-bit seed
 
 
 def test_delta_r2_equals_sklearn_r2_score_difference() -> None:
@@ -706,13 +933,18 @@ def test_delta_r2_equals_sklearn_r2_score_difference() -> None:
     empty row set gives NaN (a failed resample).
     """
 
-
     rng = make_rng(7, "delta-r2")
-    for y in (rng.normal(size=200), (rng.uniform(size=200) < 0.3).astype(float)):
+    for y in (
+        rng.normal(size=200),
+        (rng.uniform(size=200) < 0.3).astype(float),
+    ):
         p3 = y + rng.normal(scale=0.8, size=200)
         p4 = y + rng.normal(scale=0.5, size=200)
         full = np.arange(200)
-        assert abs(delta_r2(y, p3, p4, full) - (r2_score(y, p4) - r2_score(y, p3))) < 1e-12
+        assert (
+            abs(delta_r2(y, p3, p4, full) - (r2_score(y, p4) - r2_score(y, p3)))
+            < 1e-12
+        )
         idx = rng.integers(0, 200, 200)
         ref = r2_score(y[idx], p4[idx]) - r2_score(y[idx], p3[idx])
         assert abs(delta_r2(y, p3, p4, idx) - ref) < 1e-12
@@ -727,19 +959,34 @@ def _qn_synthetic(n_train: int, n_test: int, seed: int) -> dict:
 
     def draw(n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         x = rng.normal(size=(n, 4))
-        score = 1.2 * x[:, 0] - 0.8 * x[:, 1] + 0.6 * x[:, 3] + 0.5 * rng.normal(size=n)
+        score = (
+            1.2 * x[:, 0]
+            - 0.8 * x[:, 1]
+            + 0.6 * x[:, 3]
+            + 0.5 * rng.normal(size=n)
+        )
         weight = 1.0 / (1.0 + np.exp(-score))
         weight = np.where(score < -1.5, 0.0, np.where(score > 2.2, 1.0, weight))
         return x, weight, x[:, 0] + 0.3 * x[:, 3] + 0.3 * rng.normal(size=n)
 
     x_tr, w_tr, t_tr = draw(n_train)
     x_te, w_te, t_te = draw(n_test)
-    return {"x_train": x_tr, "w_train": w_tr, "log_t_train": t_tr,
-            "x_test": x_te, "w_test": w_te, "log_t_test": t_te}
+    return {
+        "x_train": x_tr,
+        "w_train": w_tr,
+        "log_t_train": t_tr,
+        "x_test": x_te,
+        "w_test": w_te,
+        "log_t_test": t_te,
+    }
 
 
 def _reference_fit_predict(
-    data: dict, cols: list[int], rows: np.ndarray, y: np.ndarray, x_test: np.ndarray
+    data: dict,
+    cols: list[int],
+    rows: np.ndarray,
+    y: np.ndarray,
+    x_test: np.ndarray,
 ) -> np.ndarray:
     """Fit a gradient-boosted regressor with literal parameters; predict ``x_test``.
 
@@ -755,7 +1002,9 @@ def _reference_fit_predict(
         early_stopping=False,
         random_state=5,
     )
-    return model.fit(data["x_train"][rows][:, cols], y[rows]).predict(x_test[:, cols])
+    return model.fit(data["x_train"][rows][:, cols], y[rows]).predict(
+        x_test[:, cols]
+    )
 
 
 def test_qn_profile_block_matches_an_independent_fit_and_scores() -> None:
@@ -772,36 +1021,74 @@ def test_qn_profile_block_matches_an_independent_fit_and_scores() -> None:
     and indicator targets (T1), and that log_horizon has no reading (D-04).
     """
 
-
     d = _qn_synthetic(500, 200, 31)
 
     int_tr = (d["w_train"] > 0) & (d["w_train"] < 1)
     int_te = (d["w_test"] > 0) & (d["w_test"] < 1)
-    logit_tr = np.log(np.where(int_tr, d["w_train"], 0.5) / (1 - np.where(int_tr, d["w_train"], 0.5)))
-    logit_te = np.log(np.where(int_te, d["w_test"], 0.5) / (1 - np.where(int_te, d["w_test"], 0.5)))
+    logit_tr = np.log(
+        np.where(int_tr, d["w_train"], 0.5)
+        / (1 - np.where(int_tr, d["w_train"], 0.5))
+    )
+    logit_te = np.log(
+        np.where(int_te, d["w_test"], 0.5)
+        / (1 - np.where(int_te, d["w_test"], 0.5))
+    )
     everyone = np.ones(500, bool)
     ref = {}
     for name, rows, y_tr, y_te, keep in (
-            ("logit_w_interior", int_tr, logit_tr, logit_te, int_te),
-            ("w_zero_indicator", everyone, (d["w_train"] == 0).astype(float),
-             (d["w_test"] == 0).astype(float), np.ones(200, bool)),
-            ("log_horizon", everyone, d["log_t_train"], d["log_t_test"], np.ones(200, bool))):
+        ("logit_w_interior", int_tr, logit_tr, logit_te, int_te),
+        (
+            "w_zero_indicator",
+            everyone,
+            (d["w_train"] == 0).astype(float),
+            (d["w_test"] == 0).astype(float),
+            np.ones(200, bool),
+        ),
+        (
+            "log_horizon",
+            everyone,
+            d["log_t_train"],
+            d["log_t_test"],
+            np.ones(200, bool),
+        ),
+    ):
         p3 = _reference_fit_predict(d, [0, 1, 2], rows, y_tr, d["x_test"])
         p4 = _reference_fit_predict(d, [0, 1, 2, 3], rows, y_tr, d["x_test"])
-        ref[name] = (r2_score(y_te[keep], p3[keep]), r2_score(y_te[keep], p4[keep]),
-                     int(rows.sum()), int(keep.sum()), p3, p4)
-    out = qn_profile_block(d["x_train"], d["x_test"], d["w_train"], d["w_test"],
-                           d["log_t_train"], d["log_t_test"], seed=5, n_resamples=100, block=5,
-                           boot_seed=11)
+        ref[name] = (
+            r2_score(y_te[keep], p3[keep]),
+            r2_score(y_te[keep], p4[keep]),
+            int(rows.sum()),
+            int(keep.sum()),
+            p3,
+            p4,
+        )
+    out = qn_profile_block(
+        d["x_train"],
+        d["x_test"],
+        d["w_train"],
+        d["w_test"],
+        d["log_t_train"],
+        d["log_t_test"],
+        seed=5,
+        n_resamples=100,
+        block=5,
+        boot_seed=11,
+    )
     for name, (r2_3, r2_4, n_train, n_test, p3, p4) in ref.items():
         got = out[name]
-        assert abs(got["r2_three"] - r2_3) < 1e-12 and abs(got["r2_four"] - r2_4) < 1e-12
+        assert (
+            abs(got["r2_three"] - r2_3) < 1e-12
+            and abs(got["r2_four"] - r2_4) < 1e-12
+        )
         assert abs(got["delta_r2"] - (r2_4 - r2_3)) < 1e-12
         assert got["n_train"] == n_train and got["n_test"] == n_test
         assert got["ci"][0] <= got["delta_r2"] or got["n_failed_resamples"] > 0
         assert ("reading" in got) == (name != "log_horizon")
         if "reading" in got:
-            assert got["reading"] == qn_reading(*got["ci"]) and got["reason"] is None
+            assert (
+                got["reading"] == qn_reading(*got["ci"])
+                and got["reason"] is None
+            )
     outside = out["w_zero_indicator"]["n_pred_outside_unit"]
     p3z, p4z = ref["w_zero_indicator"][4], ref["w_zero_indicator"][5]
     assert outside["three"] == int(np.sum((p3z < 0) | (p3z > 1)))
@@ -809,10 +1096,18 @@ def test_qn_profile_block_matches_an_independent_fit_and_scores() -> None:
     n_pred = _reference_fit_predict(
         d, [0, 1, 2], np.ones(500, bool), d["x_train"][:, 3], d["x_test"]
     )
-    assert abs(out["noise_sens_r2_from_three"] - r2_score(d["x_test"][:, 3], n_pred)) < 1e-12
+    assert (
+        abs(
+            out["noise_sens_r2_from_three"]
+            - r2_score(d["x_test"][:, 3], n_pred)
+        )
+        < 1e-12
+    )
 
 
-def test_qn_block_intervals_share_resamples_across_targets_and_profiles() -> None:
+def test_qn_block_intervals_share_resamples_across_targets_and_profiles() -> (
+    None
+):
     """The three intervals of one block come from the same index sets as an independent loop.
 
     Reference: an independent loop over ``block_resample_indices`` (same integer seed) that
@@ -822,7 +1117,6 @@ def test_qn_block_intervals_share_resamples_across_targets_and_profiles() -> Non
     sums; quantile interpolation of two values each about 1e-14 apart).
     """
 
-
     d = _qn_synthetic(400, 150, 32)
 
     def predict(cols, rows, y):
@@ -830,7 +1124,9 @@ def test_qn_block_intervals_share_resamples_across_targets_and_profiles() -> Non
 
     int_tr = (d["w_train"] > 0) & (d["w_train"] < 1)
     int_te = (d["w_test"] > 0) & (d["w_test"] < 1)
-    safe = lambda w, m: np.log(np.where(m, w, 0.5) / (1 - np.where(m, w, 0.5)))  # noqa: E731
+    safe = lambda w, m: np.log(
+        np.where(m, w, 0.5) / (1 - np.where(m, w, 0.5))
+    )  # noqa: E731
     y_logit_te = safe(d["w_test"], int_te)
     p3 = predict([0, 1, 2], int_tr, safe(d["w_train"], int_tr))
     p4 = predict([0, 1, 2, 3], int_tr, safe(d["w_train"], int_tr))
@@ -839,42 +1135,93 @@ def test_qn_block_intervals_share_resamples_across_targets_and_profiles() -> Non
     ref_logit, ref_hor = [], []
     for idx in block_resample_indices(150, 80, 5, 11):
         sel = idx[int_te[idx]]
-        ref_logit.append(r2_score(y_logit_te[sel], p4[sel]) - r2_score(y_logit_te[sel], p3[sel]))
-        ref_hor.append(r2_score(d["log_t_test"][idx], p4h[idx])
-                       - r2_score(d["log_t_test"][idx], p3h[idx]))
-    out = qn_profile_block(d["x_train"], d["x_test"], d["w_train"], d["w_test"],
-                           d["log_t_train"], d["log_t_test"], seed=5, n_resamples=80, block=5,
-                           boot_seed=11)
-    for name, values in (("logit_w_interior", ref_logit), ("log_horizon", ref_hor)):
+        ref_logit.append(
+            r2_score(y_logit_te[sel], p4[sel])
+            - r2_score(y_logit_te[sel], p3[sel])
+        )
+        ref_hor.append(
+            r2_score(d["log_t_test"][idx], p4h[idx])
+            - r2_score(d["log_t_test"][idx], p3h[idx])
+        )
+    out = qn_profile_block(
+        d["x_train"],
+        d["x_test"],
+        d["w_train"],
+        d["w_test"],
+        d["log_t_train"],
+        d["log_t_test"],
+        seed=5,
+        n_resamples=80,
+        block=5,
+        boot_seed=11,
+    )
+    for name, values in (
+        ("logit_w_interior", ref_logit),
+        ("log_horizon", ref_hor),
+    ):
         lo, hi, n_failed = percentile_interval(np.array(values), 0.95)
         assert out[name]["n_failed_resamples"] == n_failed == 0
         assert np.allclose(out[name]["ci"], [lo, hi], atol=1e-10, rtol=0)
 
 
-def test_qn_block_reading_needs_fifty_test_states_and_rejects_bad_input() -> None:
+def test_qn_block_reading_needs_fifty_test_states_and_rejects_bad_input() -> (
+    None
+):
     """With fewer than 50 test states in a domain the reading is "undetermined" with a reason (A3).
 
     Reference: DEC-0008 A3 (a subset statistic needs at least 50 states) applied to the Q-N
     reading, and the contract of the function. Tolerance: exact strings. Bad input raises.
     """
 
-
     d = _qn_synthetic(300, 40, 33)
-    out = qn_profile_block(d["x_train"], d["x_test"], d["w_train"], d["w_test"],
-                           d["log_t_train"], d["log_t_test"], seed=5, n_resamples=20, block=5,
-                           boot_seed=1)
+    out = qn_profile_block(
+        d["x_train"],
+        d["x_test"],
+        d["w_train"],
+        d["w_test"],
+        d["log_t_train"],
+        d["log_t_test"],
+        seed=5,
+        n_resamples=20,
+        block=5,
+        boot_seed=1,
+    )
     for name in ("logit_w_interior", "w_zero_indicator"):
-        assert out[name]["reading"] == "undetermined" and out[name]["reason"] == "n_states < 50"
+        assert (
+            out[name]["reading"] == "undetermined"
+            and out[name]["reason"] == "n_states < 50"
+        )
     kw = {"seed": 5, "n_resamples": 5, "block": 5, "boot_seed": 1}
     with pytest.raises(ValueError):
-        qn_profile_block(d["x_train"][:, :3], d["x_test"], d["w_train"], d["w_test"],
-                         d["log_t_train"], d["log_t_test"], **kw)
+        qn_profile_block(
+            d["x_train"][:, :3],
+            d["x_test"],
+            d["w_train"],
+            d["w_test"],
+            d["log_t_train"],
+            d["log_t_test"],
+            **kw,
+        )
     with pytest.raises(ValueError):
-        qn_profile_block(d["x_train"], d["x_test"], d["w_train"] + 0.5, d["w_test"],
-                         d["log_t_train"], d["log_t_test"], **kw)
+        qn_profile_block(
+            d["x_train"],
+            d["x_test"],
+            d["w_train"] + 0.5,
+            d["w_test"],
+            d["log_t_train"],
+            d["log_t_test"],
+            **kw,
+        )
     with pytest.raises(ValueError):
-        qn_profile_block(d["x_train"], d["x_test"], d["w_train"][:-1], d["w_test"],
-                         d["log_t_train"], d["log_t_test"], **kw)
+        qn_profile_block(
+            d["x_train"],
+            d["x_test"],
+            d["w_train"][:-1],
+            d["w_test"],
+            d["log_t_train"],
+            d["log_t_test"],
+            **kw,
+        )
 
 
 # ----------------------------------------------------------------------------------- H1a
@@ -882,8 +1229,12 @@ SIZES = np.array(StudyConfig().library_sizes, dtype=float)
 D_TRUE = 2.2
 
 
-def _seed_sq(rng: np.random.Generator, n_states: int, floor_index: int, sigma: float = 0.05
-             ) -> np.ndarray:
+def _seed_sq(
+    rng: np.random.Generator,
+    n_states: int,
+    floor_index: int,
+    sigma: float = 0.05,
+) -> np.ndarray:
     """Per-state squared analog seed error ``(b^2 n^(-2/d) + f^2) LN(0, sigma)`` with heavy tail.
 
     ``b^2 = 1``, ``d = 2.2`` and ``f^2 = SIZES[floor_index]^(-2/d)`` (the floor equals the power
@@ -897,7 +1248,9 @@ def _seed_sq(rng: np.random.Generator, n_states: int, floor_index: int, sigma: f
     return mean * noise * inflate
 
 
-def _gamma_local_dim(rng: np.random.Generator, n_states: int, dim: float) -> np.ndarray:
+def _gamma_local_dim(
+    rng: np.random.Generator, n_states: int, dim: float
+) -> np.ndarray:
     """Levina-Bickel local dimensions ``(k - 2) / S`` under the exact Gamma law, k = 20.
 
     ``S dim ~ Gamma(k - 1, 1)`` (applied-mathematician, WU-0002.4-5 log, Job 1 item 2), so
@@ -906,17 +1259,26 @@ def _gamma_local_dim(rng: np.random.Generator, n_states: int, dim: float) -> np.
     return 18.0 * dim / rng.gamma(19.0, size=n_states)
 
 
-def _fake_cells(sq_by_rho: dict[float, np.ndarray], local_dim: np.ndarray,
-                system: str = "lorenz63") -> dict:
+def _fake_cells(
+    sq_by_rho: dict[float, np.ndarray],
+    local_dim: np.ndarray,
+    system: str = "lorenz63",
+) -> dict:
     """Library cells keyed ``(rho, n_lib)``: only what ``h1a_library_scaling`` reads."""
     cells = {}
     for rho, sq in sq_by_rho.items():
         for j, size in enumerate(SIZES):
             cells[(rho, int(size))] = SimpleNamespace(
-                system=system, noise=rho, library_size=int(size),
-                splits={"test": SimpleNamespace(moments=SimpleNamespace(
-                    analog_seed=np.sqrt(sq[:, j])))},
-                oracles={"test": SimpleNamespace(local_dim=local_dim)})
+                system=system,
+                noise=rho,
+                library_size=int(size),
+                splits={
+                    "test": SimpleNamespace(
+                        moments=SimpleNamespace(analog_seed=np.sqrt(sq[:, j]))
+                    )
+                },
+                oracles={"test": SimpleNamespace(local_dim=local_dim)},
+            )
     return cells
 
 
@@ -926,21 +1288,32 @@ def _config(resamples: int = 200) -> StudyConfig:
 
 
 def _h1a_ratio(
-    seed_sq: np.ndarray, inverse_dim: np.ndarray, sizes: np.ndarray, rows: np.ndarray
+    seed_sq: np.ndarray,
+    inverse_dim: np.ndarray,
+    sizes: np.ndarray,
+    rows: np.ndarray,
 ) -> float:
     """The H1a ratio on ``rows``: first entry of ``_median_fit_stats``."""
     return float(_median_fit_stats(seed_sq, inverse_dim, sizes, rows)[0])
 
 
-def _hand_ratio(seed_sq: np.ndarray, inverse_dim: np.ndarray, rows: np.ndarray) -> float:
+def _hand_ratio(
+    seed_sq: np.ndarray, inverse_dim: np.ndarray, rows: np.ndarray
+) -> float:
     """Median fit over mean reference on ``rows``, medians and mean formed by hand."""
 
     medians = []
     for j in range(seed_sq.shape[1]):
         v = np.sort(seed_sq[rows, j])
         m = len(v)
-        medians.append(v[m // 2] if m % 2 else 0.5 * (v[m // 2 - 1] + v[m // 2]))
-    return 0.5 * _fit_seed_law(SIZES, np.array(medians))[0] / (inverse_dim[rows].sum() / len(rows))
+        medians.append(
+            v[m // 2] if m % 2 else 0.5 * (v[m // 2 - 1] + v[m // 2])
+        )
+    return (
+        0.5
+        * _fit_seed_law(SIZES, np.array(medians))[0]
+        / (inverse_dim[rows].sum() / len(rows))
+    )
 
 
 def test_h1a_median_fit_recovers_inverse_dimension_with_heavy_tail() -> None:
@@ -967,13 +1340,19 @@ def test_h1a_median_fit_recovers_inverse_dimension_with_heavy_tail() -> None:
     cells = _fake_cells({0.01: sq}, _gamma_local_dim(rng, 300, D_TRUE))
     out = h1a_library_scaling(cells, _config())
     fitted = out["by_noise"]["0.01"]["fitted_inverse_dim"]
-    sq_cells = np.column_stack([cells[(0.01, int(n))].splits["test"].moments.analog_seed ** 2
-                                for n in SIZES])
+    sq_cells = np.column_stack(
+        [
+            cells[(0.01, int(n))].splits["test"].moments.analog_seed**2
+            for n in SIZES
+        ]
+    )
     assert fitted == 0.5 * _fit_seed_law(SIZES, np.median(sq_cells, axis=0))[0]
     assert abs(fitted * D_TRUE - 1.0) <= 0.05
 
 
-def test_h1a_ratio_is_the_hand_value_and_the_interval_is_the_joint_bootstrap() -> None:
+def test_h1a_ratio_is_the_hand_value_and_the_interval_is_the_joint_bootstrap() -> (
+    None
+):
     """``h1a_ratio`` is median fit over mean reference on the same rows; the CI is one joint draw.
 
     Reference: hand computation. (i) On 80 arbitrary rows with repeats of 60 states the ratio
@@ -994,29 +1373,48 @@ def test_h1a_ratio_is_the_hand_value_and_the_interval_is_the_joint_bootstrap() -
     rows = rng.integers(0, 60, size=80)
     assert len(np.unique(rows)) < 80
     assert _h1a_ratio(small, inv_small, SIZES, rows) == pytest.approx(
-        _hand_ratio(small, inv_small, rows), rel=1e-12, abs=0.0)
+        _hand_ratio(small, inv_small, rows), rel=1e-12, abs=0.0
+    )
 
     sq = _seed_sq(rng, 300, floor_index=1)
     local_dim = _gamma_local_dim(rng, 300, D_TRUE)
     config = _config()
-    out = h1a_library_scaling(_fake_cells({0.01: sq}, local_dim), config)["by_noise"]["0.01"]
+    out = h1a_library_scaling(_fake_cells({0.01: sq}, local_dim), config)[
+        "by_noise"
+    ]["0.01"]
     sq_cells = np.column_stack(
-        [np.sqrt(sq[:, j]) ** 2 for j in range(len(SIZES))])  # what the cells hold, squared again
+        [np.sqrt(sq[:, j]) ** 2 for j in range(len(SIZES))]
+    )  # what the cells hold, squared again
     inverse = inverse_dimension(local_dim)
     label = (config.seed, "lorenz63", "bootstrap", "H1a", "0.01")
-    joint = block_bootstrap_counted(lambda idx: _h1a_ratio(sq_cells, inverse, SIZES, idx), 300,
-                                    config.bootstrap_resamples, config.bootstrap_block,
-                                    make_rng(*label), 0.95)
+    joint = block_bootstrap_counted(
+        lambda idx: _h1a_ratio(sq_cells, inverse, SIZES, idx),
+        300,
+        config.bootstrap_resamples,
+        config.bootstrap_block,
+        make_rng(*label),
+        0.95,
+    )
     assert out["ratio_ci"] == [joint.lower, joint.upper]
-    assert out["n_failed_resamples"] == joint.n_failed and out["ratio"] == joint.estimate
+    assert (
+        out["n_failed_resamples"] == joint.n_failed
+        and out["ratio"] == joint.estimate
+    )
     marginal = block_bootstrap_counted(
-        lambda idx: 0.5 * _fit_seed_law(SIZES, np.median(sq_cells[idx], axis=0))[0], 300,
-        config.bootstrap_resamples, config.bootstrap_block, make_rng(*label), 0.95)
+        lambda idx: 0.5
+        * _fit_seed_law(SIZES, np.median(sq_cells[idx], axis=0))[0],
+        300,
+        config.bootstrap_resamples,
+        config.bootstrap_block,
+        make_rng(*label),
+        0.95,
+    )
     assert out["ci_inverse_dim"] == [marginal.lower, marginal.upper]
 
 
 def test_h1a_ratio_is_nan_when_a_median_is_not_positive_or_the_fit_raises(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A resample that cannot be fitted is NaN (a counted failure), never an exception (A3).
 
     Reference: the contract of the applied-mathematician (WU-0002.4-5 log, Job 1 item 5 (iv)).
@@ -1032,8 +1430,12 @@ def test_h1a_ratio_is_nan_when_a_median_is_not_positive_or_the_fit_raises(
     inv = np.full(40, 0.5)
     rows = np.arange(40)
 
-    def must_not_run(sizes: np.ndarray, medians: np.ndarray) -> tuple[float, float]:
-        raise AssertionError("the fit must not be tried on a non-positive median")
+    def must_not_run(
+        sizes: np.ndarray, medians: np.ndarray
+    ) -> tuple[float, float]:
+        raise AssertionError(
+            "the fit must not be tried on a non-positive median"
+        )
 
     monkeypatch.setattr(analysis, "_fit_seed_law", must_not_run)
     for bad in (0.0, -1.0, np.nan, np.inf):
@@ -1046,11 +1448,15 @@ def test_h1a_ratio_is_nan_when_a_median_is_not_positive_or_the_fit_raises(
 
     monkeypatch.setattr(analysis, "_fit_seed_law", raises)
     assert np.isnan(_h1a_ratio(sq, inv, SIZES, rows))
-    monkeypatch.setattr(analysis, "_fit_seed_law", lambda sizes, medians: (np.nan, np.nan))
+    monkeypatch.setattr(
+        analysis, "_fit_seed_law", lambda sizes, medians: (np.nan, np.nan)
+    )
     assert np.isnan(_h1a_ratio(sq, inv, SIZES, rows))
     monkeypatch.undo()
     assert np.isfinite(_h1a_ratio(sq, inv, SIZES, rows))
-    assert np.isnan(_h1a_ratio(sq, np.zeros(40), SIZES, rows))  # reference 0: no ratio
+    assert np.isnan(
+        _h1a_ratio(sq, np.zeros(40), SIZES, rows)
+    )  # reference 0: no ratio
 
 
 def test_h1a_verdicts_on_known_truth_at_both_noise_levels() -> None:
@@ -1075,25 +1481,49 @@ def test_h1a_verdicts_on_known_truth_at_both_noise_levels() -> None:
     rng = np.random.default_rng(11005)
     config = _config()
     same = {0.01: _seed_sq(rng, 300, 1), 0.02: _seed_sq(rng, 300, 1)}
-    good = h1a_library_scaling(_fake_cells(same, _gamma_local_dim(rng, 300, D_TRUE)), config)
-    assert [good["by_noise"][k]["verdict"] for k in ("0.01", "0.02")] == ["pass", "pass"]
-    assert good["verdict"] == "pass" and good["pass"] is True and good["reason"] is None
+    good = h1a_library_scaling(
+        _fake_cells(same, _gamma_local_dim(rng, 300, D_TRUE)), config
+    )
+    assert [good["by_noise"][k]["verdict"] for k in ("0.01", "0.02")] == [
+        "pass",
+        "pass",
+    ]
+    assert (
+        good["verdict"] == "pass"
+        and good["pass"] is True
+        and good["reason"] is None
+    )
     assert good["band"] == [0.75, 1.25] and good["level"] == 0.95
 
-    bad = h1a_library_scaling(_fake_cells(same, _gamma_local_dim(rng, 300, 1.2)), config)
-    assert [bad["by_noise"][k]["verdict"] for k in ("0.01", "0.02")] == ["fail", "fail"]
+    bad = h1a_library_scaling(
+        _fake_cells(same, _gamma_local_dim(rng, 300, 1.2)), config
+    )
+    assert [bad["by_noise"][k]["verdict"] for k in ("0.01", "0.02")] == [
+        "fail",
+        "fail",
+    ]
     assert bad["verdict"] == "fail" and bad["pass"] is False
 
     decreasing = {0.01: _seed_sq(rng, 300, 1), 0.02: _seed_sq(rng, 300, 2)}
-    out = h1a_library_scaling(_fake_cells(decreasing, _gamma_local_dim(rng, 300, D_TRUE)), config)
-    assert out["by_noise"]["0.02"]["floor_rms"] < out["by_noise"]["0.01"]["floor_rms"]
+    out = h1a_library_scaling(
+        _fake_cells(decreasing, _gamma_local_dim(rng, 300, D_TRUE)), config
+    )
+    assert (
+        out["by_noise"]["0.02"]["floor_rms"]
+        < out["by_noise"]["0.01"]["floor_rms"]
+    )
     assert out["verdict"] == "pass" and out["pass"] is True
-    assert not {"floor_increases", "threshold", "local_dimension_median",
-                "relative_error_vs_local_dim"} & set(out)
+    assert not {
+        "floor_increases",
+        "threshold",
+        "local_dimension_median",
+        "relative_error_vs_local_dim",
+    } & set(out)
 
 
 def test_h1a_minimum_states_and_uncomputable_fit_are_inconclusive_with_reasons(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Fewer than 50 states, or a fit that cannot be computed, give inconclusive (A3, T6).
 
     Reference: DEC-0008 A3 and the guard order of ``criterion_verdict``. (i) 49 states: both
@@ -1108,29 +1538,48 @@ def test_h1a_minimum_states_and_uncomputable_fit_are_inconclusive_with_reasons(
     rng = np.random.default_rng(11006)
     config = _config(100)
     for n_states, short in ((49, True), (50, False)):
-        cells = _fake_cells({0.01: _seed_sq(rng, n_states, 1), 0.02: _seed_sq(rng, n_states, 1)},
-                            _gamma_local_dim(rng, n_states, D_TRUE))
+        cells = _fake_cells(
+            {
+                0.01: _seed_sq(rng, n_states, 1),
+                0.02: _seed_sq(rng, n_states, 1),
+            },
+            _gamma_local_dim(rng, n_states, D_TRUE),
+        )
         out = analysis.h1a_library_scaling(cells, config)
         assert out["n_states"] == n_states and out["n_excluded_nonfinite"] == 0
         reasons = [out["by_noise"][k]["reason"] for k in ("0.01", "0.02")]
         if short:
-            assert reasons == ["n_states < 50"] * 2 and out["verdict"] == "inconclusive"
-            assert out["reason"] == "rho=0.01: n_states < 50; rho=0.02: n_states < 50"
+            assert (
+                reasons == ["n_states < 50"] * 2
+                and out["verdict"] == "inconclusive"
+            )
+            assert (
+                out["reason"]
+                == "rho=0.01: n_states < 50; rho=0.02: n_states < 50"
+            )
             assert out["pass"] is False
         else:
             assert "n_states < 50" not in reasons
 
-    cells = _fake_cells({0.01: _seed_sq(rng, 300, 1)}, _gamma_local_dim(rng, 300, D_TRUE))
-    monkeypatch.setattr(analysis, "_fit_seed_law", lambda sizes, medians: (np.nan, np.nan))
+    cells = _fake_cells(
+        {0.01: _seed_sq(rng, 300, 1)}, _gamma_local_dim(rng, 300, D_TRUE)
+    )
+    monkeypatch.setattr(
+        analysis, "_fit_seed_law", lambda sizes, medians: (np.nan, np.nan)
+    )
     out = analysis.h1a_library_scaling(cells, config)
     part = out["by_noise"]["0.01"]
-    assert part["verdict"] == "inconclusive" and part["reason"] == "not computable"
+    assert (
+        part["verdict"] == "inconclusive" and part["reason"] == "not computable"
+    )
     assert part["n_failed_resamples"] == config.bootstrap_resamples
     assert np.isnan(part["fitted_inverse_dim"]) and np.isnan(part["ratio"])
     assert out["verdict"] == "inconclusive" and out["pass"] is False
 
 
-def test_h1a_excludes_and_counts_states_with_nonfinite_inputs_once_for_both_rho() -> None:
+def test_h1a_excludes_and_counts_states_with_nonfinite_inputs_once_for_both_rho() -> (
+    None
+):
     """A state with a non-finite seed or reference is excluded from every rho and counted (A3).
 
     Reference: the applied-mathematician's conditions (WU-0002.4-5 log, Job 1 item 5 (i)).
@@ -1153,15 +1602,23 @@ def test_h1a_excludes_and_counts_states_with_nonfinite_inputs_once_for_both_rho(
     keep = np.delete(np.arange(300), [7, 11])
     inverse = inverse_dimension(local_dim)[keep]
     assert out["inverse_dim_reference"] == inverse.mean()
-    kept_sq = np.column_stack([np.sqrt(sq[0.01][keep, j]) ** 2 for j in range(len(SIZES))])
+    kept_sq = np.column_stack(
+        [np.sqrt(sq[0.01][keep, j]) ** 2 for j in range(len(SIZES))]
+    )
     joint = block_bootstrap_counted(
-        lambda idx: _h1a_ratio(kept_sq, inverse, SIZES, idx), 298, config.bootstrap_resamples,
-        config.bootstrap_block, make_rng(config.seed, "lorenz63", "bootstrap", "H1a", "0.01"),
-        0.95)
+        lambda idx: _h1a_ratio(kept_sq, inverse, SIZES, idx),
+        298,
+        config.bootstrap_resamples,
+        config.bootstrap_block,
+        make_rng(config.seed, "lorenz63", "bootstrap", "H1a", "0.01"),
+        0.95,
+    )
     assert out["by_noise"]["0.01"]["ratio_ci"] == [joint.lower, joint.upper]
 
 
-def test_h1a_rejects_cells_that_do_not_share_the_states_and_has_the_documented_keys() -> None:
+def test_h1a_rejects_cells_that_do_not_share_the_states_and_has_the_documented_keys() -> (
+    None
+):
     """Misaligned ``local_dim`` raises; the result has exactly the documented keys (T6, plan).
 
     Reference: the plan's result-key list (WU-0002.4-5). One cell with a different local
@@ -1175,23 +1632,50 @@ def test_h1a_rejects_cells_that_do_not_share_the_states_and_has_the_documented_k
     local_dim = _gamma_local_dim(rng, 80, D_TRUE)
     cells = _fake_cells({0.01: _seed_sq(rng, 80, 1)}, local_dim)
     out = h1a_library_scaling(cells, _config(50))
-    assert set(out) == {"inverse_dim_reference", "reference_estimator", "n_states",
-                        "n_excluded_nonfinite", "band", "level", "verdict", "reason", "pass",
-                        "by_noise"}
+    assert set(out) == {
+        "inverse_dim_reference",
+        "reference_estimator",
+        "n_states",
+        "n_excluded_nonfinite",
+        "band",
+        "level",
+        "verdict",
+        "reason",
+        "pass",
+        "by_noise",
+    }
     assert set(out["by_noise"]["0.01"]) == {
-        "fitted_inverse_dim", "ci_inverse_dim", "ratio", "ratio_ci", "n_failed_resamples",
-        "verdict", "reason", "floor_rms", "median_seed_by_n_lib",
-        "n_exponent_at_bound", "n_covariance_warnings"}  # the last two: WU-0002.11b counters
-    assert isinstance(out["reference_estimator"], str) and out["pass"] == (out["verdict"] == "pass")
-    assert list(out["by_noise"]["0.01"]["median_seed_by_n_lib"]) == [str(int(n)) for n in SIZES]
+        "fitted_inverse_dim",
+        "ci_inverse_dim",
+        "ratio",
+        "ratio_ci",
+        "n_failed_resamples",
+        "verdict",
+        "reason",
+        "floor_rms",
+        "median_seed_by_n_lib",
+        "n_exponent_at_bound",
+        "n_covariance_warnings",
+    }  # the last two: WU-0002.11b counters
+    assert isinstance(out["reference_estimator"], str) and out["pass"] == (
+        out["verdict"] == "pass"
+    )
+    assert list(out["by_noise"]["0.01"]["median_seed_by_n_lib"]) == [
+        str(int(n)) for n in SIZES
+    ]
     cells[(0.01, 3162)].oracles["test"].local_dim = local_dim[::-1].copy()
     with pytest.raises(ValueError, match="local_dim"):
         h1a_library_scaling(cells, _config(50))
 
 
 # ----------------------------------------------------------------------------------- H1b
-def _fake_h1b_cell(rng: np.random.Generator, n_states: int, slope_cp: float, slope_plp: float,
-                   log_noise: float = 0.0) -> SimpleNamespace:
+def _fake_h1b_cell(
+    rng: np.random.Generator,
+    n_states: int,
+    slope_cp: float,
+    slope_plp: float,
+    log_noise: float = 0.0,
+) -> SimpleNamespace:
     """A core cell whose H1b regressions have the stated slopes (power laws, optional noise).
 
     The CP regression is ``0.5 ln(sq_cp - noise^2/n_analogs)`` on ``ln(g seed_cp / sqrt(m))``
@@ -1208,18 +1692,26 @@ def _fake_h1b_cell(rng: np.random.Generator, n_states: int, slope_cp: float, slo
 
     def squared(slope: float, seed: np.ndarray) -> np.ndarray:
         x = np.log(gain * seed / np.sqrt(dim))
-        return np.exp(2.0 * (slope * x + 0.3 + rng.normal(0.0, log_noise, n_states)))
+        return np.exp(
+            2.0 * (slope * x + 0.3 + rng.normal(0.0, log_noise, n_states))
+        )
 
     gains = np.tile(gain[:, None], (1, horizon))
     moments = SimpleNamespace(
-        analog_seed=seed_cp, est_seed=seed_plp, at=lambda h: 0,
+        analog_seed=seed_cp,
+        est_seed=seed_plp,
+        at=lambda h: 0,
         sq_cp=(copied + squared(slope_cp, seed_cp))[:, None],
-        sq_plp=squared(slope_plp, seed_plp)[:, None])
+        sq_plp=squared(slope_plp, seed_plp)[:, None],
+    )
     return SimpleNamespace(
-        system=SYSTEM, noise=noise, setup=SimpleNamespace(n_analogs=n_analogs),
+        system=SYSTEM,
+        noise=noise,
+        setup=SimpleNamespace(n_analogs=n_analogs),
         ctx=SimpleNamespace(spec=SimpleNamespace(dim=dim)),
         splits={"test": SimpleNamespace(moments=moments)},
-        oracles={"test": SimpleNamespace(gains=gains)})
+        oracles={"test": SimpleNamespace(gains=gains)},
+    )
 
 
 def test_h1b_verdict_uses_the_plp_slope_only() -> None:
@@ -1237,27 +1729,56 @@ def test_h1b_verdict_uses_the_plp_slope_only() -> None:
     """
 
     config = _config(100)
-    ok = h1b_seed_amplifier(_fake_h1b_cell(np.random.default_rng(21001), 100, 1.6, 1.0), config)
+    ok = h1b_seed_amplifier(
+        _fake_h1b_cell(np.random.default_rng(21001), 100, 1.6, 1.0), config
+    )
     assert ok["CP"]["slope"] == pytest.approx(1.6, abs=1e-12, rel=0)
     assert ok["PLP"]["slope"] == pytest.approx(1.0, abs=1e-12, rel=0)
-    assert ok["verdict"] == "pass" and ok["pass"] is True and ok["reason"] is None
+    assert (
+        ok["verdict"] == "pass" and ok["pass"] is True and ok["reason"] is None
+    )
     # n_floored and CP.n_dropped_resamples are the WU-0002.11b counters (DEF-0001)
-    assert set(ok["CP"]) == {"slope", "ci", "n_excluded_nonfinite", "n_floored",
-                             "n_dropped_resamples"}
-    assert set(ok["PLP"]) == {"slope", "ci", "n_failed_resamples", "n_excluded_nonfinite",
-                              "n_floored"} and ok["PLP"]["n_failed_resamples"] == 0
-    assert set(ok) == {"CP", "PLP", "threshold", "n_states", "n_excluded_nonfinite", "verdict",
-                       "reason", "pass"}
+    assert set(ok["CP"]) == {
+        "slope",
+        "ci",
+        "n_excluded_nonfinite",
+        "n_floored",
+        "n_dropped_resamples",
+    }
+    assert (
+        set(ok["PLP"])
+        == {
+            "slope",
+            "ci",
+            "n_failed_resamples",
+            "n_excluded_nonfinite",
+            "n_floored",
+        }
+        and ok["PLP"]["n_failed_resamples"] == 0
+    )
+    assert set(ok) == {
+        "CP",
+        "PLP",
+        "threshold",
+        "n_states",
+        "n_excluded_nonfinite",
+        "verdict",
+        "reason",
+        "pass",
+    }
     assert ok["n_excluded_nonfinite"] == 0
     assert ok["threshold"] == [0.8, 1.2] and ok["n_states"] == 100
 
-    swapped = h1b_seed_amplifier(_fake_h1b_cell(np.random.default_rng(21002), 100, 1.0, 1.6),
-                                 config)
+    swapped = h1b_seed_amplifier(
+        _fake_h1b_cell(np.random.default_rng(21002), 100, 1.0, 1.6), config
+    )
     assert swapped["PLP"]["slope"] == pytest.approx(1.6, abs=1e-12, rel=0)
     assert swapped["verdict"] == "fail" and swapped["pass"] is False
 
 
-def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases() -> None:
+def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases() -> (
+    None
+):
     """Regression guard: slopes and intervals of both forecasters are those of ``block_bootstrap``.
 
     This compares with the old function at ``make_rng(config.seed, system, "bootstrap", "H1b")``
@@ -1273,67 +1794,103 @@ def test_regression_h1b_intervals_equal_the_old_block_bootstrap_and_edge_cases()
     """
 
     config = _config(100)
-    cell = _fake_h1b_cell(np.random.default_rng(21003), 100, 1.1, 0.9, log_noise=0.1)
+    cell = _fake_h1b_cell(
+        np.random.default_rng(21003), 100, 1.1, 0.9, log_noise=0.1
+    )
     out = h1b_seed_amplifier(cell, config)
     m, gain = cell.splits["test"].moments, cell.oracles["test"].gains[:, 29]
     copied = cell.noise**2 / cell.setup.n_analogs
-    for name, seed, sq, floor in (("CP", m.analog_seed, m.sq_cp[:, 0], copied),
-                                  ("PLP", m.est_seed, m.sq_plp[:, 0], 0.0)):
+    for name, seed, sq, floor in (
+        ("CP", m.analog_seed, m.sq_cp[:, 0], copied),
+        ("PLP", m.est_seed, m.sq_plp[:, 0], 0.0),
+    ):
         x = np.log(gain * seed / np.sqrt(cell.ctx.spec.dim))
         y = 0.5 * np.log(np.maximum(sq - floor, 1e-12))
-        old = block_bootstrap(lambda idx: ols_slope(x[idx], y[idx]), 100,
-                              config.bootstrap_resamples, config.bootstrap_block,
-                              make_rng(config.seed, SYSTEM, "bootstrap", "H1b"))
+        old = block_bootstrap(
+            lambda idx: ols_slope(x[idx], y[idx]),
+            100,
+            config.bootstrap_resamples,
+            config.bootstrap_block,
+            make_rng(config.seed, SYSTEM, "bootstrap", "H1b"),
+        )
         assert (out[name]["slope"], *out[name]["ci"]) == old
     assert out["PLP"]["n_failed_resamples"] == 0
 
     # A non-finite gain removes that state from both regressions and counts it (R2, plan (g)).
-    broken = _fake_h1b_cell(np.random.default_rng(21004), 100, 1.0, 1.0, log_noise=0.1)
-    clean = _fake_h1b_cell(np.random.default_rng(21004), 100, 1.0, 1.0, log_noise=0.1)
+    broken = _fake_h1b_cell(
+        np.random.default_rng(21004), 100, 1.0, 1.0, log_noise=0.1
+    )
+    clean = _fake_h1b_cell(
+        np.random.default_rng(21004), 100, 1.0, 1.0, log_noise=0.1
+    )
     broken.oracles["test"].gains[3, :] = np.nan
     nan_out = h1b_seed_amplifier(broken, config)
     assert nan_out["n_excluded_nonfinite"] == 1 and nan_out["n_states"] == 99
     assert nan_out["CP"]["n_excluded_nonfinite"] == 1
-    mp, gain_p = clean.splits["test"].moments, clean.oracles["test"].gains[:, 29]
+    mp, gain_p = (
+        clean.splits["test"].moments,
+        clean.oracles["test"].gains[:, 29],
+    )
     keep = np.delete(np.arange(100), 3)
     xp = np.log(gain_p * mp.est_seed / np.sqrt(3))[keep]
     yp = 0.5 * np.log(mp.sq_plp[:, 0])[keep]
-    kept = block_bootstrap(lambda idx: ols_slope(xp[idx], yp[idx]), 99,
-                           config.bootstrap_resamples, config.bootstrap_block,
-                           make_rng(config.seed, SYSTEM, "bootstrap", "H1b"))
+    kept = block_bootstrap(
+        lambda idx: ols_slope(xp[idx], yp[idx]),
+        99,
+        config.bootstrap_resamples,
+        config.bootstrap_block,
+        make_rng(config.seed, SYSTEM, "bootstrap", "H1b"),
+    )
     assert (nan_out["PLP"]["slope"], *nan_out["PLP"]["ci"]) == kept
-    assert nan_out["PLP"]["n_failed_resamples"] == 0 and nan_out["reason"] != "not computable"
+    assert (
+        nan_out["PLP"]["n_failed_resamples"] == 0
+        and nan_out["reason"] != "not computable"
+    )
 
     # Fifty remaining states are enough, 49 are not (MIN_STATES applies after exclusion).
     for n_bad, reason in ((50, None), (51, "n_states < 50")):
         few = _fake_h1b_cell(np.random.default_rng(21006), 100, 1.0, 1.0)
         few.oracles["test"].gains[:n_bad, :] = np.nan
         out = h1b_seed_amplifier(few, config)
-        assert out["n_states"] == 100 - n_bad and out["n_excluded_nonfinite"] == n_bad
+        assert (
+            out["n_states"] == 100 - n_bad
+            and out["n_excluded_nonfinite"] == n_bad
+        )
         assert (out["reason"] == "n_states < 50") == (reason is not None)
 
     # Constant regressor (x = 0 exactly): the slope is 0/0, not computable; every resample
     # fails and is counted.
     flat = _fake_h1b_cell(np.random.default_rng(21007), 100, 1.0, 1.0)
-    flat.splits["test"].moments.est_seed = np.full(100, np.sqrt(3.0))  # x = ln(1) = 0 exactly
+    flat.splits["test"].moments.est_seed = np.full(
+        100, np.sqrt(3.0)
+    )  # x = ln(1) = 0 exactly
     flat.oracles["test"].gains[:, :] = 1.0
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         flat_out = h1b_seed_amplifier(flat, config)
-    assert flat_out["verdict"] == "inconclusive" and flat_out["reason"] == "not computable"
+    assert (
+        flat_out["verdict"] == "inconclusive"
+        and flat_out["reason"] == "not computable"
+    )
     assert flat_out["PLP"]["n_failed_resamples"] == config.bootstrap_resamples
     assert flat_out["pass"] is False
 
-    short = h1b_seed_amplifier(_fake_h1b_cell(np.random.default_rng(21005), 40, 1.0, 1.0), config)
-    assert short["verdict"] == "inconclusive" and short["reason"] == "n_states < 50"
+    short = h1b_seed_amplifier(
+        _fake_h1b_cell(np.random.default_rng(21005), 40, 1.0, 1.0), config
+    )
+    assert (
+        short["verdict"] == "inconclusive"
+        and short["reason"] == "n_states < 50"
+    )
 
 
 # ----------------------------------------------------------------------------------- H1d
 TESTED_ROWS = ("analog_seed", "estimation_seed", "growth")
 
 
-def _pair(rng: np.random.Generator, n: int, spearman_target: float
-          ) -> tuple[np.ndarray, np.ndarray]:
+def _pair(
+    rng: np.random.Generator, n: int, spearman_target: float
+) -> tuple[np.ndarray, np.ndarray]:
     """Bivariate normal pair with Spearman correlation about ``spearman_target``.
 
     For a bivariate normal with Pearson ``r``, ``rho_s = (6 / pi) arcsin(r / 2)``, so
@@ -1344,9 +1901,14 @@ def _pair(rng: np.random.Generator, n: int, spearman_target: float
     return z[:, 0], r * z[:, 0] + np.sqrt(1.0 - r**2) * z[:, 1]
 
 
-def _pairs(rng: np.random.Generator, n: int, targets: tuple[float, float, float, float]) -> dict:
+def _pairs(
+    rng: np.random.Generator, n: int, targets: tuple[float, float, float, float]
+) -> dict:
     """The four H1d pairs (three tested rows and ``nhat``) with the given Spearman targets."""
-    return {name: _pair(rng, n, t) for name, t in zip((*TESTED_ROWS, "nhat"), targets)}
+    return {
+        name: _pair(rng, n, t)
+        for name, t in zip((*TESTED_ROWS, "nhat"), targets)
+    }
 
 
 def test_h1d_spearman_equals_scipy_and_the_closed_form_on_500_points() -> None:
@@ -1363,7 +1925,6 @@ def test_h1d_spearman_equals_scipy_and_the_closed_form_on_500_points() -> None:
     times 500; 1e-12 leaves about three orders.
     """
 
-
     pairs = _pairs(np.random.default_rng(21011), 500, (0.7861,) * 4)
     out = h1d_correlations(pairs, "lorenz63", _config(50))
     for name, (a, b) in pairs.items():
@@ -1374,7 +1935,9 @@ def test_h1d_spearman_equals_scipy_and_the_closed_form_on_500_points() -> None:
         assert got == pytest.approx(closed_form, abs=1e-12, rel=0)
 
 
-def test_h1d_interval_is_the_seeded_block_bootstrap_at_the_study_settings() -> None:
+def test_h1d_interval_is_the_seeded_block_bootstrap_at_the_study_settings() -> (
+    None
+):
     """The interval contains the point and equals ``block_bootstrap_counted`` with the label (T10).
 
     Reference: ``StudyConfig()`` has 2000 resamples and blocks of 5 (v3 section 7), and the
@@ -1394,15 +1957,25 @@ def test_h1d_interval_is_the_seeded_block_bootstrap_at_the_study_settings() -> N
     assert out["level"] == 0.95 and out["threshold"] == 0.7
     for name, (a, b) in pairs.items():
         ref = block_bootstrap_counted(
-            lambda idx: spearman(a[idx], b[idx]), 100, 2000, 5,
-            make_rng(config.seed, "rossler", "bootstrap", "H1d", name), 0.95)
+            lambda idx: spearman(a[idx], b[idx]),
+            100,
+            2000,
+            5,
+            make_rng(config.seed, "rossler", "bootstrap", "H1d", name),
+            0.95,
+        )
         row = out["rows"][name]
-        assert row["interval"] == [ref.lower, ref.upper] and row["spearman"] == ref.estimate
+        assert (
+            row["interval"] == [ref.lower, ref.upper]
+            and row["spearman"] == ref.estimate
+        )
         assert row["n_failed_resamples"] == ref.n_failed == 0
         assert row["interval"][0] <= row["spearman"] <= row["interval"][1]
 
 
-def test_h1d_nhat_has_no_verdict_and_does_not_move_the_overall_verdict() -> None:
+def test_h1d_nhat_has_no_verdict_and_does_not_move_the_overall_verdict() -> (
+    None
+):
     """``nhat`` is reported (Spearman and interval) without a verdict; the three rows decide (T11).
 
     Reference: v3 sections 2 and 8 and M2 H1e: N-hat is reported, not tested. Synthetic pairs
@@ -1419,17 +1992,27 @@ def test_h1d_nhat_has_no_verdict_and_does_not_move_the_overall_verdict() -> None
     rng = np.random.default_rng(21013)
     pairs = _pairs(rng, 500, (0.95, 0.95, 0.95, 0.9))
     flipped = dict(pairs, nhat=(pairs["nhat"][0], -pairs["nhat"][1]))
-    out, out_flipped = (h1d_correlations(p, "chua", config) for p in (pairs, flipped))
+    out, out_flipped = (
+        h1d_correlations(p, "chua", config) for p in (pairs, flipped)
+    )
     assert out["verdict"] == out_flipped["verdict"] == "pass"
     assert out["pass"] is out_flipped["pass"] is True and out["reason"] is None
-    assert [out["rows"][name]["verdict"] for name in TESTED_ROWS] == ["pass"] * 3
-    assert {name: out["rows"][name] for name in TESTED_ROWS} == \
-        {name: out_flipped["rows"][name] for name in TESTED_ROWS}
+    assert [out["rows"][name]["verdict"] for name in TESTED_ROWS] == [
+        "pass"
+    ] * 3
+    assert {name: out["rows"][name] for name in TESTED_ROWS} == {
+        name: out_flipped["rows"][name] for name in TESTED_ROWS
+    }
     nhat, nhat_flipped = out["rows"]["nhat"], out_flipped["rows"]["nhat"]
-    assert {"spearman", "interval"} <= set(nhat) and not {"pass", "verdict"} & set(nhat)
+    assert {"spearman", "interval"} <= set(nhat) and not {
+        "pass",
+        "verdict",
+    } & set(nhat)
     assert nhat["spearman"] > 0.8 and nhat_flipped["spearman"] < -0.8
 
-    low = h1d_correlations(_pairs(rng, 500, (0.95, 0.95, 0.2, 0.95)), "chua", config)
+    low = h1d_correlations(
+        _pairs(rng, 500, (0.95, 0.95, 0.2, 0.95)), "chua", config
+    )
     assert low["rows"]["growth"]["verdict"] == "fail"
     assert low["rows"]["analog_seed"]["verdict"] == "pass"
     assert low["verdict"] == "fail" and low["pass"] is False
@@ -1449,7 +2032,6 @@ def test_h1d_exclusions_minimum_states_and_uncomputable_rows() -> None:
     every resample is counted failed. (The scipy constant-input warning is expected.)
     """
 
-
     config = _config(100)
     rng = np.random.default_rng(21014)
     pairs = _pairs(rng, 120, (0.9, 0.9, 0.9, 0.9))
@@ -1463,13 +2045,20 @@ def test_h1d_exclusions_minimum_states_and_uncomputable_rows() -> None:
     pairs["growth"][1][9] = np.inf
     out = h1d_correlations(pairs, "lorenz63", config)
     assert out["rows"]["growth"]["n_states"] == 119 and out["n_states"] == 119
-    assert out["n_excluded_nonfinite"] == 1 and out["rows"]["growth"]["n_excluded_nonfinite"] == 1
+    assert (
+        out["n_excluded_nonfinite"] == 1
+        and out["rows"]["growth"]["n_excluded_nonfinite"] == 1
+    )
 
     short = h1d_correlations(_pairs(rng, 49, (0.95,) * 4), "lorenz63", config)
-    assert [short["rows"][n]["reason"] for n in TESTED_ROWS] == ["n_states < 50"] * 3
+    assert [short["rows"][n]["reason"] for n in TESTED_ROWS] == [
+        "n_states < 50"
+    ] * 3
     assert short["verdict"] == "inconclusive" and short["pass"] is False
-    assert short["reason"] == ("analog_seed: n_states < 50; estimation_seed: n_states < 50; "
-                               "growth: n_states < 50")
+    assert short["reason"] == (
+        "analog_seed: n_states < 50; estimation_seed: n_states < 50; "
+        "growth: n_states < 50"
+    )
 
     flat = _pairs(rng, 120, (0.9,) * 4)
     flat["estimation_seed"] = (np.ones(120), flat["estimation_seed"][1])
@@ -1477,12 +2066,19 @@ def test_h1d_exclusions_minimum_states_and_uncomputable_rows() -> None:
         warnings.simplefilter("ignore")
         out = h1d_correlations(flat, "lorenz63", config)
     row = out["rows"]["estimation_seed"]
-    assert row["verdict"] == "inconclusive" and row["reason"] == "not computable"
+    assert (
+        row["verdict"] == "inconclusive" and row["reason"] == "not computable"
+    )
     assert row["n_failed_resamples"] == config.bootstrap_resamples
-    assert out["verdict"] == "inconclusive" and out["reason"] == "estimation_seed: not computable"
+    assert (
+        out["verdict"] == "inconclusive"
+        and out["reason"] == "estimation_seed: not computable"
+    )
 
 
-def test_h1d_proxies_pairs_each_proxy_with_its_oracle_on_the_first_draw() -> None:
+def test_h1d_proxies_pairs_each_proxy_with_its_oracle_on_the_first_draw() -> (
+    None
+):
     """``h1d_proxies`` maps the cell onto the four pairs and keeps the Cramer-Rao comparison.
 
     Reference: the definitions of v3 H1d (and the pre-existing code): (eps-hat, eps_s),
@@ -1494,7 +2090,6 @@ def test_h1d_proxies_pairs_each_proxy_with_its_oracle_on_the_first_draw() -> Non
     pair visible. The result carries ``estimation_seed_vs_cramer_rao`` with no interval.
     """
 
-
     rng = np.random.default_rng(21015)
     n, noise = 80, 0.02
     eps_hat, analog = _pair(rng, n, 0.9)
@@ -1504,32 +2099,71 @@ def test_h1d_proxies_pairs_each_proxy_with_its_oracle_on_the_first_draw() -> Non
     _, nu_scaled = _pair(rng, n, 0.1)
     nu = np.exp(nu_scaled) / noise
     other = rng.standard_normal((n, 1))  # draw 1: must not be used
-    ev = SimpleNamespace(growth_proxy=np.column_stack([growth_hat, other]),
-                         noise_sens=np.column_stack([nhat, other]))
-    rules = SimpleNamespace(proxies=SimpleNamespace(
-        seeds=lambda e, rho: (np.column_stack([eps_hat, other]),
-                              np.column_stack([delta_hat, other]))))
+    ev = SimpleNamespace(
+        growth_proxy=np.column_stack([growth_hat, other]),
+        noise_sens=np.column_stack([nhat, other]),
+    )
+    rules = SimpleNamespace(
+        proxies=SimpleNamespace(
+            seeds=lambda e, rho: (
+                np.column_stack([eps_hat, other]),
+                np.column_stack([delta_hat, other]),
+            )
+        )
+    )
     cell = SimpleNamespace(
-        system="lorenz63", noise=noise,
-        splits={"test": SimpleNamespace(evals=ev, moments=SimpleNamespace(
-            analog_seed=analog, est_seed=est, noise_sens=noise_sens))},
-        oracles={"test": SimpleNamespace(growth=growth, nu=nu)})
+        system="lorenz63",
+        noise=noise,
+        splits={
+            "test": SimpleNamespace(
+                evals=ev,
+                moments=SimpleNamespace(
+                    analog_seed=analog, est_seed=est, noise_sens=noise_sens
+                ),
+            )
+        },
+        oracles={"test": SimpleNamespace(growth=growth, nu=nu)},
+    )
     out = h1d_proxies(cell, rules, _config(50))
-    expected = {"analog_seed": (eps_hat, analog), "estimation_seed": (delta_hat, est),
-                "growth": (growth_hat, growth), "nhat": (nhat, noise_sens)}
+    expected = {
+        "analog_seed": (eps_hat, analog),
+        "estimation_seed": (delta_hat, est),
+        "growth": (growth_hat, growth),
+        "nhat": (nhat, noise_sens),
+    }
     for name, (a, b) in expected.items():
-        assert out["rows"][name]["spearman"] == pytest.approx(spearmanr(a, b).statistic,
-                                                              abs=1e-12, rel=0)
+        assert out["rows"][name]["spearman"] == pytest.approx(
+            spearmanr(a, b).statistic, abs=1e-12, rel=0
+        )
     assert out["estimation_seed_vs_cramer_rao"] == pytest.approx(
-        spearmanr(est, noise * nu).statistic, abs=1e-12, rel=0)
-    assert set(out) == {"rows", "estimation_seed_vs_cramer_rao", "threshold", "level",
-                        "n_states", "n_excluded_nonfinite", "verdict", "reason", "pass"}
-    assert set(out["rows"]["growth"]) == {"spearman", "interval", "n_failed_resamples",
-                                          "n_states", "n_excluded_nonfinite", "verdict", "reason"}
+        spearmanr(est, noise * nu).statistic, abs=1e-12, rel=0
+    )
+    assert set(out) == {
+        "rows",
+        "estimation_seed_vs_cramer_rao",
+        "threshold",
+        "level",
+        "n_states",
+        "n_excluded_nonfinite",
+        "verdict",
+        "reason",
+        "pass",
+    }
+    assert set(out["rows"]["growth"]) == {
+        "spearman",
+        "interval",
+        "n_failed_resamples",
+        "n_states",
+        "n_excluded_nonfinite",
+        "verdict",
+        "reason",
+    }
 
 
 # ---------------------------------------------------------------- WU-0002.7: H2b and H2e
-def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> None:
+def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> (
+    None
+):
     """H2b(ii) is the mean over states of ``w*(10^4) - w*(10^3)`` at rho = 1%, level 1 - 0.05/3.
 
     Reference: the six-state table ``TABLE`` (values in [0, 1], multiples of 1/8). Hand differences
@@ -1542,22 +2176,39 @@ def test_h2b_library_change_is_the_paired_mean_with_the_primary_interval() -> No
     Tolerance: mean ``abs=1e-12`` (the stub weights are exact, the mean is one division).
     """
 
-    noise_cells = {0.01: _stub_cell(TABLE[:, 2]), 0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0))}
+    noise_cells = {
+        0.01: _stub_cell(TABLE[:, 2]),
+        0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0)),
+    }
     out = h2b_knob_response(noise_cells, _library_cells(TABLE), CONFIG)
     change = out["library_change"]
     assert change["mean_change"] == pytest.approx(0.1875, abs=1e-12)
-    assert change["level"] == LEVEL and change["n_states"] == 6 and change["rho"] == 0.01
+    assert (
+        change["level"] == LEVEL
+        and change["n_states"] == 6
+        and change["rho"] == 0.01
+    )
     diff = TABLE[:, 2] - TABLE[:, 0]
-    reference = block_bootstrap(lambda idx: float(np.mean(diff[idx])), 6, 200, 5,
-                                make_rng(CONFIG.seed, SYSTEM, "h2b-library-change", "0.01"), LEVEL)
+    reference = block_bootstrap(
+        lambda idx: float(np.mean(diff[idx])),
+        6,
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "h2b-library-change", "0.01"),
+        LEVEL,
+    )
     assert change["ci"] == [reference[1], reference[2]]
     assert change["pass"] is False and change["reason"] == "n_states < 50"
     assert change["verdict"] == "inconclusive"
-    assert change["n_failed_resamples"] == 0 and change["n_zero_difference"] == 1
+    assert (
+        change["n_failed_resamples"] == 0 and change["n_zero_difference"] == 1
+    )
     assert "fail" not in change and "fail" not in out
     # both parts rest on 6 states: the combined verdict is inconclusive and names both parts
     assert out["verdict"] == "inconclusive" and out["pass"] is False
-    assert out["reason"] == "noise: n_states < 50; library_change: n_states < 50"
+    assert (
+        out["reason"] == "noise: n_states < 50; library_change: n_states < 50"
+    )
 
 
 def test_regression_h2b_noise_part_uses_its_own_generator() -> None:
@@ -1574,16 +2225,29 @@ def test_regression_h2b_noise_part_uses_its_own_generator() -> None:
 
     low = np.array([0.0, 0.125, 0.25, 0.5, 0.5, 0.75])
     high = np.array([0.125, 0.25, 0.5, 0.625, 0.5, 0.875])
-    out = h2b_knob_response({0.01: _stub_cell(low), 0.02: _stub_cell(high)},
-                            _library_cells(TABLE), CONFIG)["noise"]
-    per_state = np.array([1.0, 1.0, 1.0, 1.0, 0.0, 1.0])  # Spearman with two levels: sign of the change
-    reference = block_bootstrap(lambda idx: float(np.mean(per_state[idx])), 6, 200, 5,
-                                make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"), LEVEL)
+    out = h2b_knob_response(
+        {0.01: _stub_cell(low), 0.02: _stub_cell(high)},
+        _library_cells(TABLE),
+        CONFIG,
+    )["noise"]
+    per_state = np.array(
+        [1.0, 1.0, 1.0, 1.0, 0.0, 1.0]
+    )  # Spearman with two levels: sign of the change
+    reference = block_bootstrap(
+        lambda idx: float(np.mean(per_state[idx])),
+        6,
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"),
+        LEVEL,
+    )
     assert out["mean_state_spearman"] == pytest.approx(5.0 / 6.0, abs=1e-12)
     assert out["ci"] == [reference[1], reference[2]]
 
 
-def test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing() -> None:
+def test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing() -> (
+    None
+):
     """With 60 states the strict lower bound > 0 decides; zero change and missing cells do not pass.
 
     Reference: hand-built outcomes. (a) The six-state table tiled ten times (60 states): every
@@ -1597,17 +2261,23 @@ def test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing() 
     NaN. Exact comparisons of booleans, None and strings.
     """
 
-    noise_cells = {0.01: _stub_cell(np.tile(TABLE[:, 2], 10)),
-                   0.02: _stub_cell(np.tile(np.minimum(TABLE[:, 2] + 0.125, 1.0), 10))}
+    noise_cells = {
+        0.01: _stub_cell(np.tile(TABLE[:, 2], 10)),
+        0.02: _stub_cell(np.tile(np.minimum(TABLE[:, 2] + 0.125, 1.0), 10)),
+    }
     tiled = np.tile(TABLE, (10, 1))
-    out = h2b_knob_response(noise_cells, _library_cells(tiled), CONFIG)["library_change"]
+    out = h2b_knob_response(noise_cells, _library_cells(tiled), CONFIG)[
+        "library_change"
+    ]
     assert out["pass"] is True and out["reason"] is None and out["ci"][0] > 0.0
     assert out["verdict"] == "pass"
     assert out["mean_change"] == pytest.approx(0.1875, abs=1e-12)
 
     flat = tiled.copy()
     flat[:, 2] = flat[:, 0]
-    out = h2b_knob_response(noise_cells, _library_cells(flat), CONFIG)["library_change"]
+    out = h2b_knob_response(noise_cells, _library_cells(flat), CONFIG)[
+        "library_change"
+    ]
     assert out["mean_change"] == 0.0 and out["ci"] == [0.0, 0.0]
     assert out["pass"] is False and out["reason"] is None
 
@@ -1615,7 +2285,11 @@ def test_h2b_library_change_passes_on_a_clear_rise_and_not_on_zero_or_missing() 
     del cells[(0.01, 1_000)]
     result = h2b_knob_response(noise_cells, cells, CONFIG)
     out = result["library_change"]
-    assert out["mean_change"] is None and out["ci"] is None and out["pass"] is False
+    assert (
+        out["mean_change"] is None
+        and out["ci"] is None
+        and out["pass"] is False
+    )
     assert "rho=0.01 n_lib=1000" in out["reason"]
     assert result["pass"] is False and not _has_nan(result)
     json.dumps(result, allow_nan=False)
@@ -1632,37 +2306,65 @@ def test_h2b_curves_and_the_reported_change_at_two_percent() -> None:
     Spearman keys of v1 and the saturation rule are gone.
     """
 
-    noise_cells = {0.01: _stub_cell(TABLE[:, 2]), 0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0))}
-    out = h2b_knob_response(noise_cells, _library_cells(TABLE, (0.01, 0.02)), CONFIG)
+    noise_cells = {
+        0.01: _stub_cell(TABLE[:, 2]),
+        0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0)),
+    }
+    out = h2b_knob_response(
+        noise_cells, _library_cells(TABLE, (0.01, 0.02)), CONFIG
+    )
     assert set(out["library_curves"]) == {"0.01", "0.02"}
     for rho in ("0.01", "0.02"):
         curve = out["library_curves"][rho]
         assert list(curve) == [str(n) for n in LIB_SIZES]
         for j, n in enumerate(LIB_SIZES):
             entry = curve[str(n)]
-            assert entry["mean"] == pytest.approx(np.mean(TABLE[:, j]), abs=1e-12)
-            assert entry["median"] == pytest.approx(np.median(TABLE[:, j]), abs=1e-12)
+            assert entry["mean"] == pytest.approx(
+                np.mean(TABLE[:, j]), abs=1e-12
+            )
+            assert entry["median"] == pytest.approx(
+                np.median(TABLE[:, j]), abs=1e-12
+            )
             assert len(entry["mean_ci"]) == len(entry["median_ci"]) == 2
-            assert entry["mean_ci"][0] <= entry["mean_ci"][1] and entry["level"] == 0.95
+            assert (
+                entry["mean_ci"][0] <= entry["mean_ci"][1]
+                and entry["level"] == 0.95
+            )
     reported = out["library_change_reported"]
     assert set(reported) == {"0.02"} and reported["0.02"]["role"] == "reported"
     assert reported["0.02"]["mean_change"] == pytest.approx(0.1875, abs=1e-12)
     diff = TABLE[:, 2] - TABLE[:, 0]
-    reference = block_bootstrap(lambda idx: float(np.mean(diff[idx])), 6, 200, 5,
-                                make_rng(CONFIG.seed, SYSTEM, "h2b-library-change", "0.02"), 0.95)
-    assert reported["0.02"]["ci"] == [reference[1], reference[2]] and reported["0.02"]["level"] == 0.95
+    reference = block_bootstrap(
+        lambda idx: float(np.mean(diff[idx])),
+        6,
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "h2b-library-change", "0.02"),
+        0.95,
+    )
+    assert (
+        reported["0.02"]["ci"] == [reference[1], reference[2]]
+        and reported["0.02"]["level"] == 0.95
+    )
     assert "pass" not in reported["0.02"]
-    assert "library" not in out and "median_at_largest_n_lib" not in json.dumps(out)
+    assert "library" not in out and "median_at_largest_n_lib" not in json.dumps(
+        out
+    )
 
 
-def _h2e_cells(low: np.ndarray, high: np.ndarray, rhos=(0.01, 0.02), cp_low=None) -> dict:
+def _h2e_cells(
+    low: np.ndarray, high: np.ndarray, rhos=(0.01, 0.02), cp_low=None
+) -> dict:
     """Library cells for H2e: correlation ``low`` at 10^3, ``high`` at 10^5 (and 0.5 at 10^4)."""
     n = len(low)
     none = np.zeros(n, dtype=bool)
     cells = {}
     for rho in rhos:
-        for size, corr, cp in ((1_000, low, cp_low if cp_low is not None else none),
-                               (10_000, np.full(n, 0.5), none), (100_000, high, none)):
+        for size, corr, cp in (
+            (1_000, low, cp_low if cp_low is not None else none),
+            (10_000, np.full(n, 0.5), none),
+            (100_000, high, none),
+        ):
             cells[(rho, size)] = _stub_cell(np.full(n, 0.5), corr, cp, none)
     return cells
 
@@ -1689,21 +2391,35 @@ def test_h2e_median_change_with_a_cp_constant_state_and_the_counts() -> None:
     delta = 0.25 + 0.01 * (idx % 5)
     cp_low = np.zeros(n, dtype=bool)
     cp_low[7] = True
-    out = h2e_noise_matching(_h2e_cells(low, low + delta, cp_low=cp_low), CONFIG)
+    out = h2e_noise_matching(
+        _h2e_cells(low, low + delta, cp_low=cp_low), CONFIG
+    )
     for rho in ("0.01", "0.02"):
         entry = out["by_noise"][rho]
         assert entry["median_change"] == pytest.approx(0.27, abs=1e-12)
         assert entry["pass"] is True and entry["reason"] is None
         assert entry["level"] == 0.95 and entry["n_states"] == 50
         assert out["zero_variance_corr"][rho]["1000"] == {
-            "cp_constant": 1, "plp_constant": 0, "both_constant": 0, "n_nonfinite": 0,
-            "n_states": 50}
+            "cp_constant": 1,
+            "plp_constant": 0,
+            "both_constant": 0,
+            "n_nonfinite": 0,
+            "n_states": 50,
+        }
         assert out["zero_variance_corr"][rho]["100000"]["cp_constant"] == 0
-        assert out["corr_curve"][rho]["1000"] == pytest.approx(np.median(low), abs=1e-12)
+        assert out["corr_curve"][rho]["1000"] == pytest.approx(
+            np.median(low), abs=1e-12
+        )
         assert out["corr_curve"][rho]["10000"] == 0.5
     diff = (low + delta) - low
-    reference = block_bootstrap(lambda i: float(np.median(diff[i])), 50, 200, 5,
-                                make_rng(CONFIG.seed, SYSTEM, "h2e", "0.01"), 0.95)
+    reference = block_bootstrap(
+        lambda i: float(np.median(diff[i])),
+        50,
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "h2e", "0.01"),
+        0.95,
+    )
     assert out["by_noise"]["0.01"]["ci"] == [reference[1], reference[2]]
     assert out["pass"] is True and out["reason"] is None and not _has_nan(out)
 
@@ -1725,17 +2441,34 @@ def test_h2e_no_change_is_not_a_pass_and_missing_cells_are_named() -> None:
     assert out["by_noise"]["0.01"]["ci"] == [0.0, 0.0]
     assert out["by_noise"]["0.01"]["n_zero_difference"] == 50
 
-    smoke = {(0.01, 1_000): _stub_cell(np.full(50, 0.5), low, np.zeros(50, dtype=bool),
-                                       np.zeros(50, dtype=bool)),
-             (0.01, 10_000): _stub_cell(np.full(50, 0.5), low, np.zeros(50, dtype=bool),
-                                        np.zeros(50, dtype=bool))}
+    smoke = {
+        (0.01, 1_000): _stub_cell(
+            np.full(50, 0.5),
+            low,
+            np.zeros(50, dtype=bool),
+            np.zeros(50, dtype=bool),
+        ),
+        (0.01, 10_000): _stub_cell(
+            np.full(50, 0.5),
+            low,
+            np.zeros(50, dtype=bool),
+            np.zeros(50, dtype=bool),
+        ),
+    }
     out = h2e_noise_matching(smoke, SMOKE)
     for rho in ("0.01", "0.02"):
-        assert out["by_noise"][rho]["median_change"] is None and out["by_noise"][rho]["ci"] is None
+        assert (
+            out["by_noise"][rho]["median_change"] is None
+            and out["by_noise"][rho]["ci"] is None
+        )
         assert out["by_noise"][rho]["pass"] is False
     assert "rho=0.01 n_lib=100000" in out["by_noise"]["0.01"]["reason"]
     assert "rho=0.02 n_lib=1000" in out["by_noise"]["0.02"]["reason"]
-    assert out["pass"] is False and "rho=0.02" in out["reason"] and not _has_nan(out)
+    assert (
+        out["pass"] is False
+        and "rho=0.02" in out["reason"]
+        and not _has_nan(out)
+    )
     json.dumps(out, allow_nan=False)
 
     with pytest.raises(ValueError, match="err_corr"):
@@ -1743,13 +2476,16 @@ def test_h2e_no_change_is_not_a_pass_and_missing_cells_are_named() -> None:
 
 
 # ---------------------------------------------------------------- WU-0002.8: H3a
-def _regime_data(hazards: tuple[float, ...], n_each: int, seed: int
-                 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _regime_data(
+    hazards: tuple[float, ...], n_each: int, seed: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """First-draw regime labels, geometric durations (all events) and a linear horizon target."""
     rng = np.random.default_rng(seed)
     regime = np.repeat(np.arange(len(hazards)), n_each)
     durations = np.concatenate([rng.geometric(h, n_each) for h in hazards])
-    target = np.concatenate([np.arange(n_each) * (k + 1.0) for k in range(len(hazards))])
+    target = np.concatenate(
+        [np.arange(n_each) * (k + 1.0) for k in range(len(hazards))]
+    )
     return regime, durations, target
 
 
@@ -1773,23 +2509,36 @@ def test_h3a_holm_and_raw_p_match_independent_references() -> None:
 
     regime, durations, target = _regime_data((0.05, 0.45, 0.15), 60, 3)
     events = np.ones(len(durations), dtype=bool)
-    out = h3a_logrank(regime, durations, events, np.array([14.0, 2.0, 5.0]), target, 30, 3)
+    out = h3a_logrank(
+        regime, durations, events, np.array([14.0, 2.0, 5.0]), target, 30, 3
+    )
     assert out["pairs"] == [[1, 2], [2, 0]] and out["chosen_K"] == 3
-    raw = [sps.logrank(durations[regime == a], durations[regime == b]).pvalue
-           for a, b in ((1, 2), (2, 0))]
+    raw = [
+        sps.logrank(durations[regime == a], durations[regime == b]).pvalue
+        for a, b in ((1, 2), (2, 0))
+    ]
     assert all(p < 0.005 for p in raw)  # premise: both pairs clearly separated
     assert out["logrank_p_raw"] == pytest.approx(raw, rel=1e-10)
     small, large = sorted(out["logrank_p_raw"])
     first = min(1.0, 2 * small)
     hand = {small: first, large: max(first, large)}
-    assert out["logrank_p_holm"] == pytest.approx([hand[p] for p in out["logrank_p_raw"]],
-                                                  rel=0, abs=1e-15)
+    assert out["logrank_p_holm"] == pytest.approx(
+        [hand[p] for p in out["logrank_p_raw"]], rel=0, abs=1e-15
+    )
     assert out["logrank_p_holm"] == holm_adjust(out["logrank_p_raw"])
-    assert out["pass"] is True and out["reason"] is None and out["verdict"] == "pass"
+    assert (
+        out["pass"] is True
+        and out["reason"] is None
+        and out["verdict"] == "pass"
+    )
     assert out["n_per_regime"] == [60, 60, 60]
-    assert out["iqr_lt"] == pytest.approx([29.5 * (k + 1) / 30 for k in range(3)], abs=1e-12)
+    assert out["iqr_lt"] == pytest.approx(
+        [29.5 * (k + 1) / 30 for k in range(3)], abs=1e-12
+    )
     assert out["iqr_lt_mean"] == pytest.approx(29.5 * 2 / 30, abs=1e-12)
-    assert not any("regret" in key or "fail" in key or key == "iqr_pass" for key in out)
+    assert not any(
+        "regret" in key or "fail" in key or key == "iqr_pass" for key in out
+    )
 
 
 def test_h3a_inconclusive_paths_and_small_regimes() -> None:
@@ -1813,46 +2562,95 @@ def test_h3a_inconclusive_paths_and_small_regimes() -> None:
     ones = np.ones(len(durations), dtype=bool)
     p_same = sps.logrank(durations[regime == 0], durations[regime == 1]).pvalue
     assert p_same > 0.01  # premise
-    out = h3a_logrank(regime, durations, ones, np.array([7.0, 8.0]), target, 30, 2)
+    out = h3a_logrank(
+        regime, durations, ones, np.array([7.0, 8.0]), target, 30, 2
+    )
     assert out["pass"] is False and "largest Holm-adjusted p" in out["reason"]
     assert out["logrank_p_holm"] == pytest.approx([p_same], rel=1e-10)
 
     regime3 = np.where(regime == 1, 2, 0)
-    out = h3a_logrank(regime3, durations, ones, np.array([5.0, 6.0, 7.0]), target, 30, 3)
-    assert out["pairs"] == [[0, 1], [1, 2]] and out["logrank_p_raw"] == [None, None]
+    out = h3a_logrank(
+        regime3, durations, ones, np.array([5.0, 6.0, 7.0]), target, 30, 3
+    )
+    assert out["pairs"] == [[0, 1], [1, 2]] and out["logrank_p_raw"] == [
+        None,
+        None,
+    ]
     assert out["logrank_p_holm"] == [1.0, 1.0] and out["pass"] is False
     assert "empty regime" in out["reason"]
     assert out["n_per_regime"] == [60, 0, 60] and out["iqr_lt"][1] is None
 
-    out = h3a_logrank(regime, durations, np.zeros(len(durations), dtype=bool),
-                      np.array([7.0, 8.0]), target, 30, 2)
+    out = h3a_logrank(
+        regime,
+        durations,
+        np.zeros(len(durations), dtype=bool),
+        np.array([7.0, 8.0]),
+        target,
+        30,
+        2,
+    )
     assert out["logrank_p_raw"] == [None] and out["logrank_p_holm"] == [1.0]
     assert out["pass"] is False and "zero log-rank variance" in out["reason"]
 
-    small_regime, small_dur, small_target = _regime_data((0.5, 0.15, 0.04), 20, 8)
-    small = h3a_logrank(small_regime, small_dur, np.ones(60, dtype=bool),
-                        np.array([2.0, 5.0, 14.0]), small_target, 30, 3)
-    assert max(sps.logrank(small_dur[:20], small_dur[20:40]).pvalue,
-               sps.logrank(small_dur[20:40], small_dur[40:]).pvalue) < 0.005  # premise
+    small_regime, small_dur, small_target = _regime_data(
+        (0.5, 0.15, 0.04), 20, 8
+    )
+    small = h3a_logrank(
+        small_regime,
+        small_dur,
+        np.ones(60, dtype=bool),
+        np.array([2.0, 5.0, 14.0]),
+        small_target,
+        30,
+        3,
+    )
+    assert (
+        max(
+            sps.logrank(small_dur[:20], small_dur[20:40]).pvalue,
+            sps.logrank(small_dur[20:40], small_dur[40:]).pvalue,
+        )
+        < 0.005
+    )  # premise
     assert small["pass"] is True and small["verdict"] == "pass"
     assert small["n_per_regime"] == [20, 20, 20]
 
-    one = h3a_logrank(np.zeros(60, dtype=int), durations[:60], ones[:60], np.array([5.0]),
-                      target[:60], 30, 1)
+    one = h3a_logrank(
+        np.zeros(60, dtype=int),
+        durations[:60],
+        ones[:60],
+        np.array([5.0]),
+        target[:60],
+        30,
+        1,
+    )
     assert one["pass"] is False and "fewer than two regimes" in one["reason"]
     assert one["pairs"] == [] and one["logrank_p_holm"] == []
     for result in (out, small, one):
-        assert "fail" not in result and {"verdict", "reason", "pass"} <= set(result)
-        assert result["verdict"] in ("pass", "inconclusive")  # H3a has no fail side (A3)
+        assert "fail" not in result and {"verdict", "reason", "pass"} <= set(
+            result
+        )
+        assert result["verdict"] in (
+            "pass",
+            "inconclusive",
+        )  # H3a has no fail side (A3)
 
     # Review R3: the 50-state minimum of the full sample (DEC-0008 A3, DEC-0011 O1) applies even
     # when the p-values are tiny: 20 + 20 states, hazards 0.5 and 0.05, p < 0.01 (premise).
     forty_regime, forty_dur, forty_target = _regime_data((0.5, 0.05), 20, 8)
     assert sps.logrank(forty_dur[:20], forty_dur[20:]).pvalue < 0.01
-    forty = h3a_logrank(forty_regime, forty_dur, np.ones(40, dtype=bool), np.array([2.0, 14.0]),
-                        forty_target, 30, 2)
+    forty = h3a_logrank(
+        forty_regime,
+        forty_dur,
+        np.ones(40, dtype=bool),
+        np.array([2.0, 14.0]),
+        forty_target,
+        30,
+        2,
+    )
     assert forty["pass"] is False and forty["verdict"] == "inconclusive"
-    assert forty["reason"] == "n_states < 50" and forty["logrank_p_holm"][0] < 0.01
+    assert (
+        forty["reason"] == "n_states < 50" and forty["logrank_p_holm"][0] < 0.01
+    )
 
 
 def test_h3a_orders_tied_and_missing_horizons_by_regime_index() -> None:
@@ -1867,20 +2665,44 @@ def test_h3a_orders_tied_and_missing_horizons_by_regime_index() -> None:
     """
 
     regime = np.repeat(np.arange(7), 5)
-    out = h3a_logrank(regime, np.arange(1, 36), np.ones(35, dtype=bool),
-                      np.array([7.0, 7.0, 3.0, 7.0, np.nan, 7.0, np.nan]), np.ones(35), 30, 7)
+    out = h3a_logrank(
+        regime,
+        np.arange(1, 36),
+        np.ones(35, dtype=bool),
+        np.array([7.0, 7.0, 3.0, 7.0, np.nan, 7.0, np.nan]),
+        np.ones(35),
+        30,
+        7,
+    )
     assert out["pairs"] == [[2, 0], [0, 1], [1, 3], [3, 5], [5, 4], [4, 6]]
-    assert out["n_km_not_reached"] == 2  # the two NaN medians are counted, not hidden
+    assert (
+        out["n_km_not_reached"] == 2
+    )  # the two NaN medians are counted, not hidden
 
 
-PRE_EXISTING_H3A_KEYS = {"chosen_K", "pairs", "logrank_p_raw", "logrank_p_holm", "n_per_regime",
-                         "n_km_not_reached", "n_empty_regimes", "n_degenerate_pairs", "iqr_lt",
-                         "iqr_lt_mean", "threshold", "verdict", "reason", "pass"}
+PRE_EXISTING_H3A_KEYS = {
+    "chosen_K",
+    "pairs",
+    "logrank_p_raw",
+    "logrank_p_holm",
+    "n_per_regime",
+    "n_km_not_reached",
+    "n_empty_regimes",
+    "n_degenerate_pairs",
+    "iqr_lt",
+    "iqr_lt_mean",
+    "threshold",
+    "verdict",
+    "reason",
+    "pass",
+}
 """The 14 keys of the H3a result before WU-0004d, typed from ``h3a_logrank``'s docstring of
 develop ``dfd656f``; the unit adds two and changes none of these."""
 
 
-def test_h3a_one_event_among_a_hundred_states_is_visible_in_the_counts() -> None:
+def test_h3a_one_event_among_a_hundred_states_is_visible_in_the_counts() -> (
+    None
+):
     """DEF-0018 / ruling B6b: a regime of 100 states with ONE event is shown as 1 event, 99 censored.
 
     Reference: a hand-built case. Regime 0 has 100 states with durations 1..100, censored except the
@@ -1897,18 +2719,32 @@ def test_h3a_one_event_among_a_hundred_states_is_visible_in_the_counts() -> None
     regime = np.repeat([0, 1], 100)
     durations = np.concatenate([np.arange(1, 101), np.arange(1, 101)])
     events = np.concatenate([np.arange(1, 101) == 37, np.ones(100, dtype=bool)])
-    out = h3a_logrank(regime, durations, events, np.array([30.0, 10.0]), np.ones(200), 30, 2)
+    out = h3a_logrank(
+        regime, durations, events, np.array([30.0, 10.0]), np.ones(200), 30, 2
+    )
     assert out["n_per_regime"] == [100, 100]
     assert out["n_events_per_regime"] == [1, 100]
     assert out["n_censored_per_regime"] == [99, 0]
     assert out["pairs"] == [[1, 0]]  # medians 30, 10: regime 1 first
-    ref = sps.logrank(sps.CensoredData(uncensored=durations[regime == 1]),
-                      sps.CensoredData(uncensored=durations[regime == 0][events[regime == 0]],
-                                       right=durations[regime == 0][~events[regime == 0]])).pvalue
+    ref = sps.logrank(
+        sps.CensoredData(uncensored=durations[regime == 1]),
+        sps.CensoredData(
+            uncensored=durations[regime == 0][events[regime == 0]],
+            right=durations[regime == 0][~events[regime == 0]],
+        ),
+    ).pvalue
     assert out["logrank_p_raw"] == pytest.approx([ref], rel=1e-10)
-    assert out["logrank_p_raw"][0] < 1e-10  # premise: an extreme p from one event (DEF-0018)
-    assert set(out) == PRE_EXISTING_H3A_KEYS | {"n_events_per_regime", "n_censored_per_regime"}
-    assert type(out["n_events_per_regime"][0]) is int and type(out["n_censored_per_regime"][0]) is int
+    assert (
+        out["logrank_p_raw"][0] < 1e-10
+    )  # premise: an extreme p from one event (DEF-0018)
+    assert set(out) == PRE_EXISTING_H3A_KEYS | {
+        "n_events_per_regime",
+        "n_censored_per_regime",
+    }
+    assert (
+        type(out["n_events_per_regime"][0]) is int
+        and type(out["n_censored_per_regime"][0]) is int
+    )
 
 
 def test_h3a_event_counts_match_a_python_loop_and_add_up() -> None:
@@ -1926,21 +2762,46 @@ def test_h3a_event_counts_match_a_python_loop_and_add_up() -> None:
     labels = rng.choice([0, 1, 2, 4], size=400)  # regime 3 never occurs
     flags = rng.random(400) < 0.6
     durations = rng.integers(1, 80, 400)
-    cases = [(5, labels, flags), (5, labels, np.zeros(400, dtype=bool)),
-             (5, labels, np.ones(400, dtype=bool)), (1, np.zeros(400, dtype=int), flags)]
+    cases = [
+        (5, labels, flags),
+        (5, labels, np.zeros(400, dtype=bool)),
+        (5, labels, np.ones(400, dtype=bool)),
+        (1, np.zeros(400, dtype=int), flags),
+    ]
     for k_real, lab, flg in cases:
-        out = h3a_logrank(lab, durations, flg, np.linspace(5.0, 25.0, k_real), np.ones(400), 30,
-                          k_real)
-        ev = [sum(1 for lbl, e in zip(lab, flg) if lbl == k and e) for k in range(k_real)]
+        out = h3a_logrank(
+            lab,
+            durations,
+            flg,
+            np.linspace(5.0, 25.0, k_real),
+            np.ones(400),
+            30,
+            k_real,
+        )
+        ev = [
+            sum(1 for lbl, e in zip(lab, flg) if lbl == k and e)
+            for k in range(k_real)
+        ]
         n = [sum(1 for lbl in lab if lbl == k) for k in range(k_real)]
         assert out["n_events_per_regime"] == ev and out["n_per_regime"] == n
         assert out["n_censored_per_regime"] == [a - b for a, b in zip(n, ev)]
-        assert all(e + c == m for e, c, m in zip(out["n_events_per_regime"],
-                                                 out["n_censored_per_regime"],
-                                                 out["n_per_regime"]))
-    first = h3a_logrank(labels, durations, flags, np.linspace(5.0, 25.0, 5), np.ones(400), 30, 5)
-    assert first["n_per_regime"][3] == first["n_events_per_regime"][3] == \
-        first["n_censored_per_regime"][3] == 0
+        assert all(
+            e + c == m
+            for e, c, m in zip(
+                out["n_events_per_regime"],
+                out["n_censored_per_regime"],
+                out["n_per_regime"],
+            )
+        )
+    first = h3a_logrank(
+        labels, durations, flags, np.linspace(5.0, 25.0, 5), np.ones(400), 30, 5
+    )
+    assert (
+        first["n_per_regime"][3]
+        == first["n_events_per_regime"][3]
+        == first["n_censored_per_regime"][3]
+        == 0
+    )
 
 
 def test_regression_h3a_new_keys_change_no_pre_existing_number() -> None:
@@ -1955,12 +2816,28 @@ def test_regression_h3a_new_keys_change_no_pre_existing_number() -> None:
     """
 
     regime, durations, target = _regime_data((0.05, 0.45, 0.15), 60, 3)
-    out = h3a_logrank(regime, durations, np.ones(len(durations), dtype=bool),
-                      np.array([14.0, 2.0, 5.0]), target, 30, 3)
-    assert set(out) - {"n_events_per_regime", "n_censored_per_regime"} == PRE_EXISTING_H3A_KEYS
-    assert out["pairs"] == [[1, 2], [2, 0]] and out["pass"] is True and out["verdict"] == "pass"
+    out = h3a_logrank(
+        regime,
+        durations,
+        np.ones(len(durations), dtype=bool),
+        np.array([14.0, 2.0, 5.0]),
+        target,
+        30,
+        3,
+    )
+    assert (
+        set(out) - {"n_events_per_regime", "n_censored_per_regime"}
+        == PRE_EXISTING_H3A_KEYS
+    )
+    assert (
+        out["pairs"] == [[1, 2], [2, 0]]
+        and out["pass"] is True
+        and out["verdict"] == "pass"
+    )
     assert out["n_per_regime"] == [60, 60, 60]
-    assert out["n_events_per_regime"] == [60, 60, 60] and out["n_censored_per_regime"] == [0, 0, 0]
+    assert out["n_events_per_regime"] == [60, 60, 60] and out[
+        "n_censored_per_regime"
+    ] == [0, 0, 0]
 
 
 # ---------------------------------------------------------------- WU-0002.8: H3b
@@ -1976,7 +2853,9 @@ def _h3b_data(seed: int, n: int = 600):
     return x, np.repeat(x[:, None, :], 2, axis=1), curvature
 
 
-def test_h3b_known_ordering_lambda_irrelevant_for_the_weight_and_first_for_the_horizon() -> None:
+def test_h3b_known_ordering_lambda_irrelevant_for_the_weight_and_first_for_the_horizon() -> (
+    None
+):
     """H3b passes where ``Lambda_tilde`` is irrelevant to the weight and dominates the horizon.
 
     Reference: manufactured truth, 600 states x 2 draws, ``x ~ U[0, 1]^4`` drawn per state and
@@ -2001,11 +2880,26 @@ def test_h3b_known_ordering_lambda_irrelevant_for_the_weight_and_first_for_the_h
     weight = out["weight_lambda"]
     assert weight["importance"] == 0.0 and weight["ci"] == [0.0, 0.0]
     assert weight["pass"] is True and weight["n_failed_resamples"] == 0
-    assert out["stability"] == 1.0 and out["D"]["ci"][0] >= 0.9 and out["D"]["value"] >= 0.9
-    assert out["D"]["pass"] is True and out["pass"] is True and out["reason"] is None
-    assert out["degenerate_fits"] == {"weight_tree": 0, "horizon_tree": 0,
-                                      "full_data": {"weight_tree": False, "horizon_tree": False}}
-    assert out["nan_resamples"] == 0 and out["max_leaf_nodes"] == 8 and out["n_resamples"] == 200
+    assert (
+        out["stability"] == 1.0
+        and out["D"]["ci"][0] >= 0.9
+        and out["D"]["value"] >= 0.9
+    )
+    assert (
+        out["D"]["pass"] is True
+        and out["pass"] is True
+        and out["reason"] is None
+    )
+    assert out["degenerate_fits"] == {
+        "weight_tree": 0,
+        "horizon_tree": 0,
+        "full_data": {"weight_tree": False, "horizon_tree": False},
+    }
+    assert (
+        out["nan_resamples"] == 0
+        and out["max_leaf_nodes"] == 8
+        and out["n_resamples"] == 200
+    )
 
 
 def test_h3b_reversed_ordering_fails_both_parts() -> None:
@@ -2022,11 +2916,23 @@ def test_h3b_reversed_ordering_fails_both_parts() -> None:
     """
 
     x, profile, curvature = _h3b_data(31)
-    out = h3b_importances(profile, 0.5 * (x[:, 2] > 0.5), curvature,
-                          3.0 * x[:, 0] + 0.5 * x[:, 2], CONFIG, SYSTEM)
-    assert out["weight_lambda"]["importance"] == 1.0 and out["weight_lambda"]["ci"] == [1.0, 1.0]
+    out = h3b_importances(
+        profile,
+        0.5 * (x[:, 2] > 0.5),
+        curvature,
+        3.0 * x[:, 0] + 0.5 * x[:, 2],
+        CONFIG,
+        SYSTEM,
+    )
+    assert out["weight_lambda"]["importance"] == 1.0 and out["weight_lambda"][
+        "ci"
+    ] == [1.0, 1.0]
     assert out["weight_lambda"]["pass"] is False
-    assert out["D"]["ci"][1] <= -0.9 and out["stability"] == 0.0 and out["D"]["pass"] is False
+    assert (
+        out["D"]["ci"][1] <= -0.9
+        and out["stability"] == 0.0
+        and out["D"]["pass"] is False
+    )
     assert out["pass"] is False and out["reason"] is None
 
 
@@ -2048,22 +2954,32 @@ def test_h3b_construction_leaf_count_row_expansion_and_point_fit() -> None:
     assert _state_rows(np.array([2, 0]), 3).tolist() == [6, 7, 8, 0, 1, 2]
 
     x, profile, curvature = _h3b_data(32, n=200)
-    w_star = 0.5 * (x[:, 0] > 0.5) + 0.25 * (x[:, 1] > 0.3) + 0.0625 * (x[:, 3] > 0.9)
+    w_star = (
+        0.5 * (x[:, 0] > 0.5)
+        + 0.25 * (x[:, 1] > 0.3)
+        + 0.0625 * (x[:, 3] > 0.9)
+    )
     log_t = 3.0 * x[:, 2] + 0.5 * x[:, 0] + 0.1 * x[:, 1]
     out = h3b_importances(profile, w_star, curvature, log_t, CONFIG, SYSTEM)
     flat = profile.reshape(-1, 4)
-    ref_w = DecisionTreeRegressor(max_leaf_nodes=8, random_state=CONFIG.seed).fit(
-        flat, np.repeat(w_star, 2), sample_weight=np.repeat(curvature, 2))
-    ref_t = DecisionTreeRegressor(max_leaf_nodes=8, random_state=CONFIG.seed).fit(
-        flat, np.repeat(log_t, 2))
-    assert [out["weight_tree_importance"][n] for n in PROFILE_NAMES] == \
-        ref_w.feature_importances_.tolist()
-    assert [out["horizon_tree_importance"][n] for n in PROFILE_NAMES] == \
-        ref_t.feature_importances_.tolist()
+    ref_w = DecisionTreeRegressor(
+        max_leaf_nodes=8, random_state=CONFIG.seed
+    ).fit(flat, np.repeat(w_star, 2), sample_weight=np.repeat(curvature, 2))
+    ref_t = DecisionTreeRegressor(
+        max_leaf_nodes=8, random_state=CONFIG.seed
+    ).fit(flat, np.repeat(log_t, 2))
+    assert [
+        out["weight_tree_importance"][n] for n in PROFILE_NAMES
+    ] == ref_w.feature_importances_.tolist()
+    assert [
+        out["horizon_tree_importance"][n] for n in PROFILE_NAMES
+    ] == ref_t.feature_importances_.tolist()
     assert ref_t.get_n_leaves() == 8
 
 
-def test_h3b_degenerate_fits_are_counted_failed_resamples_and_not_zeros() -> None:
+def test_h3b_degenerate_fits_are_counted_failed_resamples_and_not_zeros() -> (
+    None
+):
     """A single-leaf tree has no importance: NaN in a resample (counted), inconclusive if full-data.
 
     Reference: (a) a constant ``w*``: the full-data weight tree has one leaf (checked with the
@@ -2082,31 +2998,52 @@ def test_h3b_degenerate_fits_are_counted_failed_resamples_and_not_zeros() -> Non
     x, profile, curvature = _h3b_data(33, n=60)
     log_t = 3.0 * x[:, 2] + 0.5 * x[:, 0]
     constant = np.full(60, 0.5)
-    assert DecisionTreeRegressor(max_leaf_nodes=8).fit(
-        profile.reshape(-1, 4), np.repeat(constant, 2)).get_n_leaves() == 1  # premise
+    assert (
+        DecisionTreeRegressor(max_leaf_nodes=8)
+        .fit(profile.reshape(-1, 4), np.repeat(constant, 2))
+        .get_n_leaves()
+        == 1
+    )  # premise
     out = h3b_importances(profile, constant, curvature, log_t, CONFIG, SYSTEM)
     weight = out["weight_lambda"]
     assert weight["importance"] is None and weight["pass"] is False
     assert "degenerate full-data fit" in weight["reason"]
-    assert out["degenerate_fits"]["weight_tree"] == 200 and out["nan_resamples"] == 200
-    assert out["degenerate_fits"]["full_data"] == {"weight_tree": True, "horizon_tree": False}
+    assert (
+        out["degenerate_fits"]["weight_tree"] == 200
+        and out["nan_resamples"] == 200
+    )
+    assert out["degenerate_fits"]["full_data"] == {
+        "weight_tree": True,
+        "horizon_tree": False,
+    }
     assert out["weight_tree_importance"]["lambda_tilde"] is None
     assert out["pass"] is False and not _has_nan(out)
 
     sparse = np.zeros(60)
     sparse[20:25] = 0.5
     out = h3b_importances(profile, sparse, curvature, log_t, CONFIG, SYSTEM)
-    expected = sum(not np.isin(idx, np.arange(20, 25)).any() for idx in block_resample_indices(
-        60, 200, 5, make_rng(CONFIG.seed, SYSTEM, "h3b-bootstrap")))
-    assert expected > 0  # premise: the replay finds resamples that miss all five states
+    expected = sum(
+        not np.isin(idx, np.arange(20, 25)).any()
+        for idx in block_resample_indices(
+            60, 200, 5, make_rng(CONFIG.seed, SYSTEM, "h3b-bootstrap")
+        )
+    )
+    assert (
+        expected > 0
+    )  # premise: the replay finds resamples that miss all five states
     assert out["degenerate_fits"]["weight_tree"] == expected
     assert out["weight_lambda"]["n_failed_resamples"] == expected
     assert out["degenerate_fits"]["full_data"]["weight_tree"] is False
 
-    out = h3b_importances(profile, 0.5 * (x[:, 0] > 0.5), curvature, constant, CONFIG, SYSTEM)
+    out = h3b_importances(
+        profile, 0.5 * (x[:, 0] > 0.5), curvature, constant, CONFIG, SYSTEM
+    )
     assert out["D"]["value"] is None and out["D"]["pass"] is False
     assert "degenerate full-data fit" in out["D"]["reason"]
-    assert out["stability"] == 0.0 and out["degenerate_fits"]["horizon_tree"] == 200
+    assert (
+        out["stability"] == 0.0
+        and out["degenerate_fits"]["horizon_tree"] == 200
+    )
 
 
 # ---------------------------------------------------------------- WU-0002.8: H3c, H2c, wiring
@@ -2132,7 +3069,11 @@ def test_h3c_ratio_of_means_paired_resampling_and_closed_bound() -> None:
     same = h3c_ratio(a4, a4, CONFIG, SYSTEM)
     assert same["ci"] == [1.0, 1.0] and same["A5_over_A4_mse"] == 1.0
     assert same["pass"] is True and same["reason"] is None
-    assert same["level"] == LEVEL and same["n_states"] == 60 and same["n_failed_resamples"] == 0
+    assert (
+        same["level"] == LEVEL
+        and same["n_states"] == 60
+        and same["n_failed_resamples"] == 0
+    )
     worse = h3c_ratio(1.2 * a4, a4, CONFIG, SYSTEM)
     assert worse["ci"] == pytest.approx([1.2, 1.2], abs=1e-12)
     assert worse["pass"] is False and worse["reason"] is None
@@ -2140,9 +3081,17 @@ def test_h3c_ratio_of_means_paired_resampling_and_closed_bound() -> None:
 
     a5 = a4 * (1.0 + 0.1 * rng.uniform(size=60))
     out = h3c_ratio(a5, a4, CONFIG, SYSTEM)
-    assert out["A5_over_A4_mse"] == pytest.approx(np.mean(a5) / np.mean(a4), abs=1e-12)
-    reference = block_bootstrap(lambda idx: float(a5[idx].mean() / a4[idx].mean()), 60, 200, 5,
-                                make_rng(CONFIG.seed, SYSTEM, "h3c-ratio"), LEVEL)
+    assert out["A5_over_A4_mse"] == pytest.approx(
+        np.mean(a5) / np.mean(a4), abs=1e-12
+    )
+    reference = block_bootstrap(
+        lambda idx: float(a5[idx].mean() / a4[idx].mean()),
+        60,
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "h3c-ratio"),
+        LEVEL,
+    )
     assert out["ci"] == [reference[1], reference[2]]
 
     short = h3c_ratio(a4[:30], a4[:30], CONFIG, SYSTEM)
@@ -2153,28 +3102,52 @@ def test_h3c_ratio_of_means_paired_resampling_and_closed_bound() -> None:
 
 def _scores(**state_mse: np.ndarray) -> dict[str, RuleScores]:
     """Rule scores that carry only ``state_mse_ref`` (the field H2c and H3c read)."""
-    return {name: RuleScores(mse=np.zeros(1), state_mse_ref=mse, regret=np.zeros(1),
-                             agreement=0.0, km_median=0.0, rmst=0.0)
-            for name, mse in state_mse.items()}
+    return {
+        name: RuleScores(
+            mse=np.zeros(1),
+            state_mse_ref=mse,
+            regret=np.zeros(1),
+            agreement=0.0,
+            km_median=0.0,
+            rmst=0.0,
+        )
+        for name, mse in state_mse.items()
+    }
 
 
-def _calibration(cp_sq: float, plp_sq: float, n: int = 6, draws: int = 2) -> SplitData:
+def _calibration(
+    cp_sq: float, plp_sq: float, n: int = 6, draws: int = 2
+) -> SplitData:
     """A calibration split whose errors at H_ref (second of horizons 8, 30) have fixed squares."""
     cp = np.zeros((n, draws, 2))
     plp = np.zeros((n, draws, 2))
-    cp[:, :, 1] = np.sqrt(cp_sq) * np.where(np.arange(draws) % 2 == 0, 1.0, -1.0)
+    cp[:, :, 1] = np.sqrt(cp_sq) * np.where(
+        np.arange(draws) % 2 == 0, 1.0, -1.0
+    )
     plp[:, :, 1] = np.sqrt(plp_sq)
-    cp[:, :, 0], plp[:, :, 0] = 100.0, 100.0  # the other horizon must not be read
+    cp[:, :, 0], plp[:, :, 0] = (
+        100.0,
+        100.0,
+    )  # the other horizon must not be read
     zeros = np.zeros((n, draws, 2))
     evals = EvaluationDraws(
-        horizons=np.array([8, 30]), cp_err=cp, plp_err=plp, verify_noise=zeros,
-        distance=np.zeros((n, draws)), est_nu=np.zeros((n, draws)),
-        growth_proxy=np.zeros((n, draws)), gain_proxy=zeros, inputs=np.zeros((n, draws, 1)),
-        noise_sens=np.zeros((n, draws)))
+        horizons=np.array([8, 30]),
+        cp_err=cp,
+        plp_err=plp,
+        verify_noise=zeros,
+        distance=np.zeros((n, draws)),
+        est_nu=np.zeros((n, draws)),
+        growth_proxy=np.zeros((n, draws)),
+        gain_proxy=zeros,
+        inputs=np.zeros((n, draws, 1)),
+        noise_sens=np.zeros((n, draws)),
+    )
     return SplitData(moments=None, evals=evals)
 
 
-def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o() -> None:
+def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o() -> (
+    None
+):
     """The better single forecaster comes from the calibration split; A4o - A2 is reported only.
 
     Reference: hand-built data. Calibration squared errors at H_ref are 0.25 for CP (A0) and 4.0
@@ -2192,34 +3165,63 @@ def test_h2c_chooses_the_better_single_forecaster_on_calibration_and_reports_a4o
     a2 = np.tile(np.array([1.0, 1.5, 2.0, 2.5, 3.0, 3.5]), 10)
     a4 = a2 - 0.5
     a4o = a2 - np.tile(np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]), 10)
-    scores = _scores(A2=a2, A4=a4, A4o=a4o, A0=np.full(60, 0.2), A1=np.full(60, 0.1))
+    scores = _scores(
+        A2=a2, A4=a4, A4o=a4o, A0=np.full(60, 0.2), A1=np.full(60, 0.1)
+    )
     out = h2c_state_dependence(scores, _calibration(0.25, 4.0), CONFIG, SYSTEM)
     assert out["best_single"] == "A0"
     assert out["calibration_mse"] == {"A0": 0.25, "A1": 4.0}
     assert "A4_minus_A0" in out and "A4_minus_A1" not in out
-    assert out["A4_minus_A0"]["mean"] == pytest.approx(np.mean(a4 - 0.2), abs=1e-12)
+    assert out["A4_minus_A0"]["mean"] == pytest.approx(
+        np.mean(a4 - 0.2), abs=1e-12
+    )
     reported = out["A4o_minus_A2"]
-    assert reported["mean"] == pytest.approx(-0.35, abs=1e-12)  # mean of -0.1 .. -0.6
+    assert reported["mean"] == pytest.approx(
+        -0.35, abs=1e-12
+    )  # mean of -0.1 .. -0.6
     # Review R4: counted bootstrap, same resamples as the other H2c parts (the generator
     # make_rng(seed, system, "bootstrap", "H2c")), bitwise equal to the pre-existing
     # block_bootstrap when nothing fails; failures would be counted.
-    reference = block_bootstrap(lambda idx: float(np.mean((a4o - a2)[idx])), 60, 200, 5,
-                                make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c"), 0.95)
-    assert reported["ci"] == [reference[1], reference[2]] and reported["mean"] == reference[0]
+    reference = block_bootstrap(
+        lambda idx: float(np.mean((a4o - a2)[idx])),
+        60,
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c"),
+        0.95,
+    )
+    assert (
+        reported["ci"] == [reference[1], reference[2]]
+        and reported["mean"] == reference[0]
+    )
     assert reported["n_failed_resamples"] == 0
-    assert reported["level"] == 0.95 and reported["role"] == "reported" and "pass" not in reported
+    assert (
+        reported["level"] == 0.95
+        and reported["role"] == "reported"
+        and "pass" not in reported
+    )
     assert reported["relative"] == pytest.approx(-0.35 / np.mean(a2), abs=1e-12)
-    assert out["A4_minus_A2"]["pass"] is True  # a4 - a2 = -0.5 in every resample
-    assert out["A4_minus_A0"]["pass"] is False and out["pass"] is False  # a4 - 0.2 > 0 everywhere
+    assert (
+        out["A4_minus_A2"]["pass"] is True
+    )  # a4 - a2 = -0.5 in every resample
+    assert (
+        out["A4_minus_A0"]["pass"] is False and out["pass"] is False
+    )  # a4 - 0.2 > 0 everywhere
     tie = h2c_state_dependence(scores, _calibration(1.0, 1.0), CONFIG, SYSTEM)
     assert tie["best_single"] == "A0"
-    flipped = h2c_state_dependence(scores, _calibration(4.0, 0.25), CONFIG, SYSTEM)
+    flipped = h2c_state_dependence(
+        scores, _calibration(4.0, 0.25), CONFIG, SYSTEM
+    )
     assert flipped["best_single"] == "A1" and "A4_minus_A1" in flipped
     with pytest.raises(ValueError):
-        h2c_state_dependence(scores, SplitData(moments=None, evals=None), CONFIG, SYSTEM)
+        h2c_state_dependence(
+            scores, SplitData(moments=None, evals=None), CONFIG, SYSTEM
+        )
 
 
-def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_h3_regimes_wiring_keys_and_arguments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """``h3_regimes`` returns exactly H3a, H3b, H3c and regime_curve, calling the three helpers.
 
     Reference: the key sets of the plan (D4), written out below; no ``p_eff`` key anywhere. The
@@ -2238,56 +3240,158 @@ def test_h3_regimes_wiring_keys_and_arguments(monkeypatch: pytest.MonkeyPatch) -
     n_test, n_con, n_hor, n_draws = 60, 80, 30, 2
 
     def moments_of(n: int) -> EnsembleMoments:
-        t = realizable_triples(rng, n // 3, n // 3, n - 2 * (n // 3), inside=(0.1, 0.9))
-        e_c, e_p, cross = (np.repeat(t[k][:, None], n_hor, axis=1) for k in ("E_C", "E_P", "C"))
+        t = realizable_triples(
+            rng, n // 3, n // 3, n - 2 * (n // 3), inside=(0.1, 0.9)
+        )
+        e_c, e_p, cross = (
+            np.repeat(t[k][:, None], n_hor, axis=1) for k in ("E_C", "E_P", "C")
+        )
         zeros = np.zeros_like(e_c)
-        return EnsembleMoments(horizons=np.arange(1, n_hor + 1), mean_cp=zeros, mean_plp=zeros,
-                               sq_cp=e_c, sq_plp=e_p, cross=cross, analog_seed=np.ones(n),
-                               est_seed=np.ones(n), noise_sens=np.zeros(n))
+        return EnsembleMoments(
+            horizons=np.arange(1, n_hor + 1),
+            mean_cp=zeros,
+            mean_plp=zeros,
+            sq_cp=e_c,
+            sq_plp=e_p,
+            cross=cross,
+            analog_seed=np.ones(n),
+            est_seed=np.ones(n),
+            noise_sens=np.zeros(n),
+        )
 
     test_m, con_m = moments_of(n_test), moments_of(n_con)
-    profiles = {"test": rng.normal(size=(n_test, n_draws, 4)),
-                "construction": rng.normal(size=(n_con, n_draws, 4))}
-    monkeypatch.setattr(analysis, "deployable_profile", lambda ev, proxies, noise, lt: profiles[ev])
+    profiles = {
+        "test": rng.normal(size=(n_test, n_draws, 4)),
+        "construction": rng.normal(size=(n_con, n_draws, 4)),
+    }
+    monkeypatch.setattr(
+        analysis,
+        "deployable_profile",
+        lambda ev, proxies, noise, lt: profiles[ev],
+    )
     tree = DecisionTreeRegressor(max_leaf_nodes=3, random_state=1).fit(
-        profiles["test"].reshape(-1, 4), rng.normal(size=(n_test * n_draws, 2)))
+        profiles["test"].reshape(-1, 4), rng.normal(size=(n_test * n_draws, 2))
+    )
     leaf_ids = np.unique(tree.apply(profiles["test"].reshape(-1, 4)))
-    rmap = RegimeMap(tree=tree, leaf_ids=leaf_ids, weights=np.full((len(leaf_ids), n_hor), 0.5),
-                     horizons_km=np.array([20.0, 10.0, 30.0]))
-    rules = FittedRules(proxies=None, global_weights=None, predictor=None,
-                        regimes={3: rmap}, chosen_regimes=3)
-    cell = Cell(system="lorenz63", noise=0.01, library_size=0, label="stub", setup=None,
-                splits={"test": SplitData(test_m, "test"), "construction": SplitData(con_m, "construction")},
-                oracles={}, horizons=np.arange(1, n_hor + 1))
+    rmap = RegimeMap(
+        tree=tree,
+        leaf_ids=leaf_ids,
+        weights=np.full((len(leaf_ids), n_hor), 0.5),
+        horizons_km=np.array([20.0, 10.0, 30.0]),
+    )
+    rules = FittedRules(
+        proxies=None,
+        global_weights=None,
+        predictor=None,
+        regimes={3: rmap},
+        chosen_regimes=3,
+    )
+    cell = Cell(
+        system="lorenz63",
+        noise=0.01,
+        library_size=0,
+        label="stub",
+        setup=None,
+        splits={
+            "test": SplitData(test_m, "test"),
+            "construction": SplitData(con_m, "construction"),
+        },
+        oracles={},
+        horizons=np.arange(1, n_hor + 1),
+    )
     durations = rng.integers(1, 30, (n_test, n_draws))
-    a5 = RuleScores(mse=np.zeros(1), state_mse_ref=rng.uniform(1, 2, n_test), regret=np.zeros(1),
-                    agreement=0.0, km_median=0.0, rmst=0.0, durations=durations,
-                    events=np.ones((n_test, n_draws), dtype=bool))
-    a4 = RuleScores(mse=np.zeros(1), state_mse_ref=rng.uniform(1, 2, n_test), regret=np.zeros(1),
-                    agreement=0.0, km_median=0.0, rmst=0.0)
+    a5 = RuleScores(
+        mse=np.zeros(1),
+        state_mse_ref=rng.uniform(1, 2, n_test),
+        regret=np.zeros(1),
+        agreement=0.0,
+        km_median=0.0,
+        rmst=0.0,
+        durations=durations,
+        events=np.ones((n_test, n_draws), dtype=bool),
+    )
+    a4 = RuleScores(
+        mse=np.zeros(1),
+        state_mse_ref=rng.uniform(1, 2, n_test),
+        regret=np.zeros(1),
+        agreement=0.0,
+        km_median=0.0,
+        rmst=0.0,
+    )
     out = analysis.h3_regimes(cell, rules, {"A5": a5, "A4": a4}, CONFIG)
 
-    assert set(out) == {"H3a", "H3b", "H3c", "regime_curve"} and "p_eff" not in json.dumps(out)
-    assert set(out["H3a"]) == {"chosen_K", "pairs", "logrank_p_raw", "logrank_p_holm",
-                               "n_per_regime", "n_km_not_reached", "n_empty_regimes",
-                               "n_degenerate_pairs", "iqr_lt", "iqr_lt_mean",
-                               "threshold", "verdict", "pass", "reason",
-                               "n_events_per_regime", "n_censored_per_regime"}  # WU-0004d, additive
-    assert set(out["H3b"]) == {"weight_lambda", "D", "stability", "weight_tree_importance",
-                               "horizon_tree_importance", "degenerate_fits", "nan_resamples",
-                               "n_states", "n_resamples", "max_leaf_nodes", "threshold", "verdict",
-                               "pass", "reason"}
-    assert set(out["H3c"]) == {"A5_over_A4_mse", "ci", "ci_mc_se", "level", "n_states",
-                               "n_failed_resamples", "threshold", "verdict", "pass", "reason"}
-    assert out["H3c"] == analysis.h3c_ratio(a5.state_mse_ref, a4.state_mse_ref, CONFIG, SYSTEM)
+    assert set(out) == {
+        "H3a",
+        "H3b",
+        "H3c",
+        "regime_curve",
+    } and "p_eff" not in json.dumps(out)
+    assert set(out["H3a"]) == {
+        "chosen_K",
+        "pairs",
+        "logrank_p_raw",
+        "logrank_p_holm",
+        "n_per_regime",
+        "n_km_not_reached",
+        "n_empty_regimes",
+        "n_degenerate_pairs",
+        "iqr_lt",
+        "iqr_lt_mean",
+        "threshold",
+        "verdict",
+        "pass",
+        "reason",
+        "n_events_per_regime",
+        "n_censored_per_regime",
+    }  # WU-0004d, additive
+    assert set(out["H3b"]) == {
+        "weight_lambda",
+        "D",
+        "stability",
+        "weight_tree_importance",
+        "horizon_tree_importance",
+        "degenerate_fits",
+        "nan_resamples",
+        "n_states",
+        "n_resamples",
+        "max_leaf_nodes",
+        "threshold",
+        "verdict",
+        "pass",
+        "reason",
+    }
+    assert set(out["H3c"]) == {
+        "A5_over_A4_mse",
+        "ci",
+        "ci_mc_se",
+        "level",
+        "n_states",
+        "n_failed_resamples",
+        "threshold",
+        "verdict",
+        "pass",
+        "reason",
+    }
+    assert out["H3c"] == analysis.h3c_ratio(
+        a5.state_mse_ref, a4.state_mse_ref, CONFIG, SYSTEM
+    )
     col = CONFIG.reference_horizon - 1
     assert out["H3b"] == analysis.h3b_importances(
-        profiles["construction"], oracle_weight(con_m)[:, col], curvature(con_m)[:, col],
-        np.log(state_horizon_target(con_m, 0.01, CONFIG.primary_threshold)), CONFIG, SYSTEM)
+        profiles["construction"],
+        oracle_weight(con_m)[:, col],
+        curvature(con_m)[:, col],
+        np.log(state_horizon_target(con_m, 0.01, CONFIG.primary_threshold)),
+        CONFIG,
+        SYSTEM,
+    )
     first = rmap.assign(profiles["test"])[:, 0]
-    assert out["H3a"]["n_per_regime"] == [int(np.sum(first == k)) for k in range(3)]
-    assert out["H3a"]["chosen_K"] == 3 and set(out["regime_curve"]) == {"regret_ratio_by_K",
-                                                                       "realized_K"}
+    assert out["H3a"]["n_per_regime"] == [
+        int(np.sum(first == k)) for k in range(3)
+    ]
+    assert out["H3a"]["chosen_K"] == 3 and set(out["regime_curve"]) == {
+        "regret_ratio_by_K",
+        "realized_K",
+    }
 
 
 def test_h2c_a4o_minus_a2_counts_failed_resamples() -> None:
@@ -2307,11 +3411,18 @@ def test_h2c_a4o_minus_a2_counts_failed_resamples() -> None:
     a2 = np.linspace(1.0, 2.0, n)
     a4o = a2 - 0.1
     a4o[7] = np.nan
-    scores = _scores(A2=a2, A4=a2 - 0.5, A4o=a4o, A0=np.full(n, 0.2), A1=np.full(n, 0.1))
-    out = h2c_state_dependence(scores, _calibration(0.25, 4.0, n=n), CONFIG, SYSTEM)["A4o_minus_A2"]
-    expected = sum(bool((idx == 7).any()) for idx in
-                   block_resample_indices(n, 200, 5,
-                                          make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c")))
+    scores = _scores(
+        A2=a2, A4=a2 - 0.5, A4o=a4o, A0=np.full(n, 0.2), A1=np.full(n, 0.1)
+    )
+    out = h2c_state_dependence(
+        scores, _calibration(0.25, 4.0, n=n), CONFIG, SYSTEM
+    )["A4o_minus_A2"]
+    expected = sum(
+        bool((idx == 7).any())
+        for idx in block_resample_indices(
+            n, 200, 5, make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c")
+        )
+    )
     assert expected >= 5  # premise: enough failures to reach the threshold
     assert out["n_failed_resamples"] == expected
     assert out["ci"] == [-np.inf, np.inf] and np.isnan(out["mean"])
@@ -2339,23 +3450,42 @@ def test_h2b_combined_verdict_uses_both_parts() -> None:
     base = np.full(n, 0.5)
     straddle = {0.01: _stub_cell(base), 0.02: _stub_cell(base + 0.125 * sign)}
     out = h2b_knob_response(straddle, _library_cells(tiled), CONFIG)
-    assert out["noise"]["verdict"] == "inconclusive" and out["noise"]["pass"] is False
-    assert out["noise"]["ci"][0] < 0.0 < out["noise"]["ci"][1]  # premise: it straddles 0
+    assert (
+        out["noise"]["verdict"] == "inconclusive"
+        and out["noise"]["pass"] is False
+    )
+    assert (
+        out["noise"]["ci"][0] < 0.0 < out["noise"]["ci"][1]
+    )  # premise: it straddles 0
     assert out["library_change"]["verdict"] == "pass"
     assert out["verdict"] == "inconclusive" and out["pass"] is False
-    assert out["reason"].startswith("noise: ") and "library_change" not in out["reason"]
+    assert (
+        out["reason"].startswith("noise: ")
+        and "library_change" not in out["reason"]
+    )
 
     falling = {0.01: _stub_cell(base), 0.02: _stub_cell(base - 0.125)}
     cells = _library_cells(tiled)
     del cells[(0.01, 1_000)]
     out = h2b_knob_response(falling, cells, CONFIG)
-    assert out["noise"]["verdict"] == "fail" and out["noise"]["ci"] == [-1.0, -1.0]
+    assert out["noise"]["verdict"] == "fail" and out["noise"]["ci"] == [
+        -1.0,
+        -1.0,
+    ]
     assert out["library_change"]["verdict"] == "inconclusive"
-    assert out["verdict"] == "fail" and out["pass"] is False and out["reason"] is None
+    assert (
+        out["verdict"] == "fail"
+        and out["pass"] is False
+        and out["reason"] is None
+    )
 
     rising = {0.01: _stub_cell(base), 0.02: _stub_cell(base + 0.125)}
     out = h2b_knob_response(rising, _library_cells(tiled), CONFIG)
-    assert out["verdict"] == "pass" and out["pass"] is True and out["reason"] is None
+    assert (
+        out["verdict"] == "pass"
+        and out["pass"] is True
+        and out["reason"] is None
+    )
 
 
 def test_h3c_closed_edge_at_exactly_1_05_passes() -> None:
@@ -2370,12 +3500,22 @@ def test_h3c_closed_edge_at_exactly_1_05_passes() -> None:
 
     edge = h3c_ratio(np.full(60, 21.0), np.full(60, 20.0), CONFIG, SYSTEM)
     assert edge["ci"] == [1.05, 1.05] and edge["A5_over_A4_mse"] == 1.05
-    assert edge["verdict"] == "pass" and edge["pass"] is True and edge["reason"] is None
+    assert (
+        edge["verdict"] == "pass"
+        and edge["pass"] is True
+        and edge["reason"] is None
+    )
     over = h3c_ratio(np.full(60, 21.000001), np.full(60, 20.0), CONFIG, SYSTEM)
-    assert over["verdict"] == "fail" and over["pass"] is False and over["reason"] is None
+    assert (
+        over["verdict"] == "fail"
+        and over["pass"] is False
+        and over["reason"] is None
+    )
 
 
-def test_h3b_weight_band_is_open_at_0_2(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_h3b_weight_band_is_open_at_0_2(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The weight-importance band is [0, 0.2): an interval with upper bound exactly 0.2 is no pass (R5).
 
     Reference: DEC-0008 A1 (H3b weight band strict at 0.2, v3 section 2). The interval of the
@@ -2392,15 +3532,24 @@ def test_h3b_weight_band_is_open_at_0_2(monkeypatch: pytest.MonkeyPatch) -> None
     w_star = 0.5 * (x[:, 0] > 0.5) + 0.25 * (x[:, 1] > 0.3)
     log_t = 3.0 * x[:, 2] + 0.5 * x[:, 0]
     real = analysis.percentile_interval
-    for upper, verdict in ((0.2, "inconclusive"), (np.nextafter(0.2, 0.0), "pass")):
+    for upper, verdict in (
+        (0.2, "inconclusive"),
+        (np.nextafter(0.2, 0.0), "pass"),
+    ):
         calls = []
 
         def fake(values, level, upper=upper, calls=calls):
             calls.append(1)
-            return (0.0, float(upper), 0) if len(calls) == 1 else real(values, level)
+            return (
+                (0.0, float(upper), 0)
+                if len(calls) == 1
+                else real(values, level)
+            )
 
         monkeypatch.setattr(analysis, "percentile_interval", fake)
-        out = analysis.h3b_importances(profile, w_star, curvature, log_t, CONFIG, SYSTEM)
+        out = analysis.h3b_importances(
+            profile, w_star, curvature, log_t, CONFIG, SYSTEM
+        )
         assert out["weight_lambda"]["verdict"] == verdict, upper
         assert out["weight_lambda"]["pass"] is (verdict == "pass")
         if verdict == "inconclusive":
@@ -2411,6 +3560,7 @@ def test_h3b_weight_band_is_open_at_0_2(monkeypatch: pytest.MonkeyPatch) -> None
 # Plan checks V3 to V7 of WU-0002.9 with the main-session amendments (B1, N3, N5). Every
 # reference is a hand table, a closed-form value, a polyfit slope, or the pre-existing
 # ``block_bootstrap`` (an independent code path); nothing is classified by the code under test.
+
 
 def test_h1c_ratio_block_closed_band_edges_and_state_minimum() -> None:
     """H1c band [0.8, 1.25] is closed; fewer than 50 states is inconclusive; fewer than 10 no number.
@@ -2429,34 +3579,65 @@ def test_h1c_ratio_block_closed_band_edges_and_state_minimum() -> None:
     def block(value: float, n: int = 60) -> dict:
         return h1c_ratio_block(np.full(n, value), CONFIG, SYSTEM)
 
-    for value, ci, verdict in ((1.25, [1.25, 1.25], "pass"), (0.8, [0.8, 0.8], "pass"),
-                               (1.5, [1.5, 1.5], "fail")):
+    for value, ci, verdict in (
+        (1.25, [1.25, 1.25], "pass"),
+        (0.8, [0.8, 0.8], "pass"),
+        (1.5, [1.5, 1.5], "fail"),
+    ):
         out = block(value)
-        assert out["median_ratio"] == value and out["ci"] == ci and out["n_states"] == 60
+        assert (
+            out["median_ratio"] == value
+            and out["ci"] == ci
+            and out["n_states"] == 60
+        )
         assert out["verdict"] == verdict and out["reason"] is None
         assert out["pass"] is (verdict == "pass")
-        assert out["n_failed_resamples"] == 0 and out["n_excluded_nonfinite"] == 0
+        assert (
+            out["n_failed_resamples"] == 0 and out["n_excluded_nonfinite"] == 0
+        )
     alternating = h1c_ratio_block(np.tile([0.7, 1.0], 30), CONFIG, SYSTEM)
     assert alternating["verdict"] == "inconclusive"
-    assert alternating["reason"] == "interval meets band edge" and alternating["pass"] is False
+    assert (
+        alternating["reason"] == "interval meets band edge"
+        and alternating["pass"] is False
+    )
     assert 0.7 <= alternating["ci"][0] < 0.8 < alternating["ci"][1] <= 1.0
     short = block(1.0, 49)
-    assert short["verdict"] == "inconclusive" and short["reason"] == "n_states < 50"
+    assert (
+        short["verdict"] == "inconclusive"
+        and short["reason"] == "n_states < 50"
+    )
     assert short["ci"] == [1.0, 1.0] and short["n_states"] == 49
     tiny = block(1.0, 9)
-    assert tiny["median_ratio"] is None and tiny["ci"] is None and tiny["n_states"] == 9
-    assert tiny["verdict"] == "inconclusive" and tiny["reason"] == "n_states < 50"
-    reported = h1c_ratio_block(np.full(60, 1.0), CONFIG, SYSTEM, with_verdict=False)
-    assert set(reported) == {"median_ratio", "ci", "n_states", "n_excluded_nonfinite",
-                             "n_failed_resamples"}
-    mixed = h1c_ratio_block(np.concatenate([np.full(60, 1.0), [np.nan, np.inf]]), CONFIG, SYSTEM)
+    assert (
+        tiny["median_ratio"] is None
+        and tiny["ci"] is None
+        and tiny["n_states"] == 9
+    )
+    assert (
+        tiny["verdict"] == "inconclusive" and tiny["reason"] == "n_states < 50"
+    )
+    reported = h1c_ratio_block(
+        np.full(60, 1.0), CONFIG, SYSTEM, with_verdict=False
+    )
+    assert set(reported) == {
+        "median_ratio",
+        "ci",
+        "n_states",
+        "n_excluded_nonfinite",
+        "n_failed_resamples",
+    }
+    mixed = h1c_ratio_block(
+        np.concatenate([np.full(60, 1.0), [np.nan, np.inf]]), CONFIG, SYSTEM
+    )
     assert mixed["n_states"] == 60 and mixed["n_excluded_nonfinite"] == 2
     assert mixed["verdict"] == "pass"
 
 
 @pytest.mark.parametrize("n_states", [51, 60])
 def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_generator(
-        n_states: int) -> None:
+    n_states: int,
+) -> None:
     """The counted intervals equal the earlier ``block_bootstrap`` bitwise (plan V7).
 
     This is a regression guard against the previous code path, which stays in
@@ -2470,9 +3651,17 @@ def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_genera
     rng = np.random.default_rng(11)
     ratios = rng.uniform(0.5, 1.5, n_states)
     block = h1c_ratio_block(np.concatenate([ratios, [np.nan]]), CONFIG, SYSTEM)
-    est, lo, hi = block_bootstrap(lambda idx: float(np.median(ratios[idx])), n_states, 200, 5,
-                                  make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H1c"), 0.95)
-    assert (block["median_ratio"], *block["ci"]) == (est, lo, hi) and block["n_failed_resamples"] == 0
+    est, lo, hi = block_bootstrap(
+        lambda idx: float(np.median(ratios[idx])),
+        n_states,
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H1c"),
+        0.95,
+    )
+    assert (block["median_ratio"], *block["ci"]) == (est, lo, hi) and block[
+        "n_failed_resamples"
+    ] == 0
 
     a2 = rng.uniform(1.0, 2.0, n_states)
     a4 = a2 * rng.uniform(0.7, 1.1, n_states)
@@ -2482,19 +3671,32 @@ def test_regression_h1c_h2c_h2d_numbers_equal_block_bootstrap_at_the_same_genera
     h2c = h2c_state_dependence(scores, _calibration(0.25, 4.0), CONFIG, SYSTEM)
     for name, other in (("A4_minus_A2", a2), ("A4_minus_A0", a0)):
         diff = a4 - other
-        est, lo, hi = block_bootstrap(lambda idx: float(np.mean(diff[idx])), n_states, 200, 5,
-                                      make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c"), 0.95)
+        est, lo, hi = block_bootstrap(
+            lambda idx: float(np.mean(diff[idx])),
+            n_states,
+            200,
+            5,
+            make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c"),
+            0.95,
+        )
         assert (h2c[name]["mean"], *h2c[name]["ci"]) == (est, lo, hi)
         assert h2c[name]["n_failed_resamples"] == 0
     h2d = h2d_empirical_comparison(scores, CONFIG, SYSTEM)
-    est, lo, hi = block_bootstrap(lambda idx: float(a4[idx].mean() / a3[idx].mean() - 1.0),
-                                  n_states, 200, 5,
-                                  make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2d"), 0.95)
+    est, lo, hi = block_bootstrap(
+        lambda idx: float(a4[idx].mean() / a3[idx].mean() - 1.0),
+        n_states,
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2d"),
+        0.95,
+    )
     assert (h2d["in_distribution_excess"], *h2d["ci"]) == (est, lo, hi)
     assert h2d["n_failed_resamples"] == 0
 
 
-def _horizon_stub(tables: dict[str, np.ndarray], growth: np.ndarray, h_max: int = 40) -> Cell:
+def _horizon_stub(
+    tables: dict[str, np.ndarray], growth: np.ndarray, h_max: int = 40
+) -> Cell:
     """A cell whose first-passage horizons at thresholds (0.1, 0.2, 0.3, 0.5) are the tables.
 
     ``tables["PLP"]`` and ``tables["CP"]`` are ``(n, 4)`` integer first horizons (0 = never). The
@@ -2510,21 +3712,36 @@ def _horizon_stub(tables: dict[str, np.ndarray], growth: np.ndarray, h_max: int 
         for i, row in enumerate(table):
             for k, first in enumerate(row):
                 if first > 0:
-                    out[i, first - 1:] = levels[k]
-        return out ** 2
+                    out[i, first - 1 :] = levels[k]
+        return out**2
 
     zeros = np.zeros((len(growth), h_max))
     moments = EnsembleMoments(
-        horizons=np.arange(1, h_max + 1), mean_cp=zeros, mean_plp=zeros, sq_cp=curves(tables["CP"]),
-        sq_plp=curves(tables["PLP"]), cross=zeros, analog_seed=np.ones(len(growth)),
-        est_seed=np.ones(len(growth)), noise_sens=np.zeros(len(growth)))
-    return Cell(system="lorenz63", noise=0.0, library_size=0, label="stub", setup=None,
-                splits={"test": SplitData(moments, None)},
-                oracles={"test": SimpleNamespace(growth=growth)},
-                horizons=np.arange(1, h_max + 1))
+        horizons=np.arange(1, h_max + 1),
+        mean_cp=zeros,
+        mean_plp=zeros,
+        sq_cp=curves(tables["CP"]),
+        sq_plp=curves(tables["PLP"]),
+        cross=zeros,
+        analog_seed=np.ones(len(growth)),
+        est_seed=np.ones(len(growth)),
+        noise_sens=np.zeros(len(growth)),
+    )
+    return Cell(
+        system="lorenz63",
+        noise=0.0,
+        library_size=0,
+        label="stub",
+        setup=None,
+        splits={"test": SplitData(moments, None)},
+        oracles={"test": SimpleNamespace(growth=growth)},
+        horizons=np.arange(1, h_max + 1),
+    )
 
 
-def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_without_verdict() -> None:
+def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_without_verdict() -> (
+    None
+):
     """H1c end to end on a stub cell: PLP verdict from the interval; CP reported; exclusions counted.
 
     Reference: hand-built first-passage tables and ``np.polyfit`` of T on ln(theta) (independent
@@ -2545,37 +3762,76 @@ def test_h1c_horizon_law_decides_on_the_plp_counts_exclusions_and_leaves_cp_with
 
     def build(n_good: int) -> tuple[Cell, float]:
         shifts = np.arange(n_good) % 5
-        constant, censored = np.array([12, 12, 12, 12]), np.array([10, 14, 0, 0])
-        plp = [plp_row + s for s in shifts] + [constant, censored, censored] + [plp_row] * 3
-        cp = [cp_row + s for s in shifts] + [constant, censored, censored] + [cp_row] * 3
+        constant, censored = np.array([12, 12, 12, 12]), np.array(
+            [10, 14, 0, 0]
+        )
+        plp = (
+            [plp_row + s for s in shifts]
+            + [constant, censored, censored]
+            + [plp_row] * 3
+        )
+        cp = (
+            [cp_row + s for s in shifts]
+            + [constant, censored, censored]
+            + [cp_row] * 3
+        )
         # the last three: growth 0, growth -0.1 (ineligible) and infinite growth (inf ratio)
-        growth = [1.0 / slope(plp_row)] * n_good + [1.0, 1.0, 1.0, 0.0, -0.1, np.inf]
-        cell = _horizon_stub({"PLP": np.array(plp), "CP": np.array(cp)}, np.array(growth))
+        growth = [1.0 / slope(plp_row)] * n_good + [
+            1.0,
+            1.0,
+            1.0,
+            0.0,
+            -0.1,
+            np.inf,
+        ]
+        cell = _horizon_stub(
+            {"PLP": np.array(plp), "CP": np.array(cp)}, np.array(growth)
+        )
         return cell, slope(cp_row) / slope(plp_row)
 
     cell, cp_ratio = build(60)
     out = h1c_horizon_law(cell, CONFIG)
-    assert out["thresholds"] == [0.1, 0.2, 0.3, 0.5] and out["threshold"] == [0.8, 1.25]
+    assert out["thresholds"] == [0.1, 0.2, 0.3, 0.5] and out["threshold"] == [
+        0.8,
+        1.25,
+    ]
     plp, cp = out["PLP"], out["CP"]
     assert plp["median_ratio"] == pytest.approx(1.0, abs=1e-12)
     assert plp["ci"] == pytest.approx([1.0, 1.0], abs=1e-12)
     assert plp["n_states"] == 60 and plp["n_excluded_nonfinite"] == 1
     assert plp["n_ineligible_states"] == 5 and plp["n_failed_resamples"] == 0
-    assert plp["verdict"] == "pass" and plp["reason"] is None and plp["pass"] is True
+    assert (
+        plp["verdict"] == "pass"
+        and plp["reason"] is None
+        and plp["pass"] is True
+    )
     assert (out["verdict"], out["reason"], out["pass"]) == ("pass", None, True)
-    assert out["n_failed_resamples"] == 0 and out["n_states"] == 60  # copied from the PLP (R2)
-    assert cp["median_ratio"] == pytest.approx(cp_ratio, abs=1e-12) and cp_ratio > 1.25
+    assert (
+        out["n_failed_resamples"] == 0 and out["n_states"] == 60
+    )  # copied from the PLP (R2)
+    assert (
+        cp["median_ratio"] == pytest.approx(cp_ratio, abs=1e-12)
+        and cp_ratio > 1.25
+    )
     assert cp["n_states"] == 60 and cp["n_excluded_nonfinite"] == 1
     assert cp["n_ineligible_states"] == 5
     assert not {"verdict", "reason", "pass"} & set(cp)
     small, _ = build(40)
     out = h1c_horizon_law(small, CONFIG)
-    assert out["PLP"]["n_states"] == 40 and out["PLP"]["median_ratio"] is not None
-    assert (out["verdict"], out["reason"], out["pass"]) == ("inconclusive", "n_states < 50", False)
+    assert (
+        out["PLP"]["n_states"] == 40 and out["PLP"]["median_ratio"] is not None
+    )
+    assert (out["verdict"], out["reason"], out["pass"]) == (
+        "inconclusive",
+        "n_states < 50",
+        False,
+    )
     assert out["n_states"] == 40 and out["n_failed_resamples"] == 0
 
 
-def test_h1c_horizon_law_capture_holds_the_per_state_ratios_and_reproduces_the_leaves() -> None:
+def test_h1c_horizon_law_capture_holds_the_per_state_ratios_and_reproduces_the_leaves() -> (
+    None
+):
     """``capture`` (the dump's hook) gets the per-state ratios; ``h1c_ratio_block`` on them is the leaf.
 
     Reference: the stub world of the test above, decided by hand. States 0..59 are good and
@@ -2591,35 +3847,64 @@ def test_h1c_horizon_law_capture_holds_the_per_state_ratios_and_reproduces_the_l
     mask and NaN placement and the ratio 1 to 1e-12. Exact except the 1e-12 above.
     """
 
-
     thetas = np.log([0.1, 0.2, 0.3, 0.5])
     slope = lambda row: np.polyfit(thetas, row, 1)[0]
     plp_row, cp_row = np.array([10, 14, 17, 21]), np.array([6, 12, 16, 24])
     shifts = np.arange(60) % 5
     constant, censored = np.array([12, 12, 12, 12]), np.array([10, 14, 0, 0])
-    plp = [plp_row + s for s in shifts] + [constant, censored, censored] + [plp_row] * 3
-    cp = [cp_row + s for s in shifts] + [constant, censored, censored] + [cp_row] * 3
+    plp = (
+        [plp_row + s for s in shifts]
+        + [constant, censored, censored]
+        + [plp_row] * 3
+    )
+    cp = (
+        [cp_row + s for s in shifts]
+        + [constant, censored, censored]
+        + [cp_row] * 3
+    )
     growth = [1.0 / slope(plp_row)] * 60 + [1.0, 1.0, 1.0, 0.0, -0.1, np.inf]
-    cell = _horizon_stub({"PLP": np.array(plp), "CP": np.array(cp)}, np.array(growth))
+    cell = _horizon_stub(
+        {"PLP": np.array(plp), "CP": np.array(cp)}, np.array(growth)
+    )
     plain = h1c_horizon_law(cell, CONFIG)
     capture: dict = {}
     out = h1c_horizon_law(cell, CONFIG, capture=capture)
     assert json.dumps(out, sort_keys=True) == json.dumps(plain, sort_keys=True)
     assert capture["thresholds"].tolist() == [0.1, 0.2, 0.3, 0.5]
-    assert set(capture) == {"thresholds", "PLP/ratio", "PLP/eligible", "CP/ratio", "CP/eligible"}
+    assert set(capture) == {
+        "thresholds",
+        "PLP/ratio",
+        "PLP/eligible",
+        "CP/ratio",
+        "CP/eligible",
+    }
     want = np.array([True] * 60 + [False] * 5 + [True])
     for name in ("PLP", "CP"):
         eligible, ratio = capture[f"{name}/eligible"], capture[f"{name}/ratio"]
-        assert eligible.dtype == bool and ratio.dtype == np.float64 and ratio.shape == (66,)
+        assert (
+            eligible.dtype == bool
+            and ratio.dtype == np.float64
+            and ratio.shape == (66,)
+        )
         assert np.array_equal(eligible, want)
-        assert np.isnan(ratio[~eligible]).all() and np.isinf(ratio[65])  # the eligible inf state
-        again = h1c_ratio_block(ratio[eligible], CONFIG, SYSTEM, with_verdict=name == "PLP")
-        leaf = {k: v for k, v in out[name].items() if k != "n_ineligible_states"}
-        assert json.dumps(again, sort_keys=True) == json.dumps(leaf, sort_keys=True)
+        assert np.isnan(ratio[~eligible]).all() and np.isinf(
+            ratio[65]
+        )  # the eligible inf state
+        again = h1c_ratio_block(
+            ratio[eligible], CONFIG, SYSTEM, with_verdict=name == "PLP"
+        )
+        leaf = {
+            k: v for k, v in out[name].items() if k != "n_ineligible_states"
+        }
+        assert json.dumps(again, sort_keys=True) == json.dumps(
+            leaf, sort_keys=True
+        )
     assert np.allclose(capture["PLP/ratio"][:60], 1.0, rtol=0.0, atol=1e-12)
 
 
-def test_h1a_library_scaling_capture_holds_the_seed_errors_and_reproduces_the_statistics() -> None:
+def test_h1a_library_scaling_capture_holds_the_seed_errors_and_reproduces_the_statistics() -> (
+    None
+):
     """``capture`` gets the squared seed errors, the sizes, the levels and the inverse dimension.
 
     Reference: the synthetic world of the H1a tests (two noise levels, 300 states, the five
@@ -2639,53 +3924,87 @@ def test_h1a_library_scaling_capture_holds_the_seed_errors_and_reproduces_the_st
     arrays with the production generator label, bitwise. Exact.
     """
 
-
     rng = np.random.default_rng(11031)
     local = _gamma_local_dim(rng, 300, D_TRUE)
     local[7] = np.nan  # one excluded state
-    sq = {0.01: _seed_sq(rng, 300, floor_index=1), 0.02: _seed_sq(rng, 300, floor_index=2)}
+    sq = {
+        0.01: _seed_sq(rng, 300, floor_index=1),
+        0.02: _seed_sq(rng, 300, floor_index=2),
+    }
     cells = _fake_cells(sq, local)
     config = _config()
     plain = h1a_library_scaling(cells, config)
     capture: dict = {}
     out = h1a_library_scaling(cells, config, capture=capture)
     assert json.dumps(out, sort_keys=True) == json.dumps(plain, sort_keys=True)
-    assert set(capture) == {"noise_levels", "n_lib", "local_dim", "inverse_dim",
-                            "rho=0.01/seed_sq", "rho=0.02/seed_sq"}
-    assert capture["noise_levels"].tolist() == [0.01, 0.02] and np.array_equal(capture["n_lib"], SIZES)
+    assert set(capture) == {
+        "noise_levels",
+        "n_lib",
+        "local_dim",
+        "inverse_dim",
+        "rho=0.01/seed_sq",
+        "rho=0.02/seed_sq",
+    }
+    assert capture["noise_levels"].tolist() == [0.01, 0.02] and np.array_equal(
+        capture["n_lib"], SIZES
+    )
     assert np.array_equal(capture["local_dim"], local, equal_nan=True)
-    assert np.array_equal(capture["inverse_dim"], 18.0 / (19.0 * local), equal_nan=True)
+    assert np.array_equal(
+        capture["inverse_dim"], 18.0 / (19.0 * local), equal_nan=True
+    )
     for rho in (0.01, 0.02):
-        want = np.column_stack([cells[(rho, int(n))].splits["test"].moments.analog_seed ** 2
-                                for n in SIZES])
+        want = np.column_stack(
+            [
+                cells[(rho, int(n))].splits["test"].moments.analog_seed**2
+                for n in SIZES
+            ]
+        )
         assert np.array_equal(capture[f"rho={rho:g}/seed_sq"], want)
     keep = np.isfinite(capture["inverse_dim"])
     for rho in (0.01, 0.02):
         keep &= np.isfinite(capture[f"rho={rho:g}/seed_sq"]).all(axis=1)
     assert keep.sum() == 299 and out["n_states"] == 299
-    assert float(capture["inverse_dim"][keep].mean()) == out["inverse_dim_reference"]
+    assert (
+        float(capture["inverse_dim"][keep].mean())
+        == out["inverse_dim_reference"]
+    )
     for rho in (0.01, 0.02):
         leaf = out["by_noise"][f"{rho:g}"]
         kept = capture[f"rho={rho:g}/seed_sq"][keep]
         medians = np.median(kept, axis=0)
-        assert {str(int(n)): float(np.sqrt(v)) for n, v in zip(SIZES, medians)} == \
-            leaf["median_seed_by_n_lib"]
+        assert {
+            str(int(n)): float(np.sqrt(v)) for n, v in zip(SIZES, medians)
+        } == leaf["median_seed_by_n_lib"]
         point, _ = bootstrap_values(
-            lambda idx: _median_fit_stats(kept, capture["inverse_dim"][keep], SIZES, idx),
-            int(keep.sum()), config.bootstrap_resamples, config.bootstrap_block,
-            make_rng(config.seed, "lorenz63", "bootstrap", "H1a", f"{rho:g}"))
-        assert float(point[0]) == leaf["ratio"] and float(point[1]) == leaf["fitted_inverse_dim"]
+            lambda idx: _median_fit_stats(
+                kept, capture["inverse_dim"][keep], SIZES, idx
+            ),
+            int(keep.sum()),
+            config.bootstrap_resamples,
+            config.bootstrap_block,
+            make_rng(config.seed, "lorenz63", "bootstrap", "H1a", f"{rho:g}"),
+        )
+        assert (
+            float(point[0]) == leaf["ratio"]
+            and float(point[1]) == leaf["fitted_inverse_dim"]
+        )
 
 
-def _h2c_stub_scores(d_a2: np.ndarray, d_best: np.ndarray) -> dict[str, RuleScores]:
+def _h2c_stub_scores(
+    d_a2: np.ndarray, d_best: np.ndarray
+) -> dict[str, RuleScores]:
     """Scores for 60 states with A4 - A2 = d_a2 and A4 - A0 = d_best exactly (small integers)."""
     n = len(d_a2)
     base = 5.0 + (np.arange(n) % 7)
     a4 = base + d_a2
-    return _scores(A2=base, A4=a4, A4o=base.copy(), A0=a4 - d_best, A1=np.full(n, 99.0))
+    return _scores(
+        A2=base, A4=a4, A4o=base.copy(), A0=a4 - d_best, A1=np.full(n, 99.0)
+    )
 
 
-def test_h2c_multi_part_verdicts_all_nine_combinations_and_the_open_edge() -> None:
+def test_h2c_multi_part_verdicts_all_nine_combinations_and_the_open_edge() -> (
+    None
+):
     """H2c: each part is pass (diff -1), fail (+1) or inconclusive (straddling); 9 combinations.
 
     Reference (plan V3, V5): the hand table of v3 section 7 for two parts, classified by counting
@@ -2701,41 +4020,79 @@ def test_h2c_multi_part_verdicts_all_nine_combinations_and_the_open_edge() -> No
     """
 
     n = 60
-    parts = {"pass": np.full(n, -1.0), "fail": np.full(n, 1.0),
-             "inconclusive": np.where(np.arange(n) % 2 == 0, -1.0, 1.0)}
+    parts = {
+        "pass": np.full(n, -1.0),
+        "fail": np.full(n, 1.0),
+        "inconclusive": np.where(np.arange(n) % 2 == 0, -1.0, 1.0),
+    }
     calibration = _calibration(0.25, 4.0, n=n)
     combos = list(itertools.product(parts, repeat=2))
     assert len(combos) == 9
     for first, second in combos:
-        out = h2c_state_dependence(_h2c_stub_scores(parts[first], parts[second]), calibration,
-                                   CONFIG, SYSTEM)
+        out = h2c_state_dependence(
+            _h2c_stub_scores(parts[first], parts[second]),
+            calibration,
+            CONFIG,
+            SYSTEM,
+        )
         assert out["best_single"] == "A0"
-        assert out["A4_minus_A2"]["verdict"] == first and out["A4_minus_A0"]["verdict"] == second
-        want = ("fail" if "fail" in (first, second) else
-                "pass" if (first, second) == ("pass", "pass") else "inconclusive")
+        assert (
+            out["A4_minus_A2"]["verdict"] == first
+            and out["A4_minus_A0"]["verdict"] == second
+        )
+        want = (
+            "fail"
+            if "fail" in (first, second)
+            else (
+                "pass"
+                if (first, second) == ("pass", "pass")
+                else "inconclusive"
+            )
+        )
         assert out["verdict"] == want, (first, second)
         assert out["pass"] is (want == "pass")
-        names = [name for name, v in (("A4_minus_A2", first), ("A4_minus_A0", second))
-                 if v == "inconclusive"]
-        assert out["reason"] == ("; ".join(f"{name}: interval meets band edge" for name in names)
-                                 if want == "inconclusive" else None), (first, second)
+        names = [
+            name
+            for name, v in (("A4_minus_A2", first), ("A4_minus_A0", second))
+            if v == "inconclusive"
+        ]
+        assert out["reason"] == (
+            "; ".join(f"{name}: interval meets band edge" for name in names)
+            if want == "inconclusive"
+            else None
+        ), (first, second)
         for name in ("A4_minus_A2", "A4_minus_A0"):
             assert out[name]["pass"] is (out[name]["verdict"] == "pass")
             assert out[name]["n_failed_resamples"] == 0
         assert out["n_failed_resamples"] == 0
     zero = np.zeros(n)
-    edge = h2c_state_dependence(_h2c_stub_scores(zero, zero), calibration, CONFIG, SYSTEM)
-    assert edge["A4_minus_A2"]["ci"] == [0.0, 0.0] and edge["A4_minus_A0"]["ci"] == [0.0, 0.0]
-    assert edge["A4_minus_A2"]["verdict"] == "fail" and edge["A4_minus_A0"]["verdict"] == "fail"
+    edge = h2c_state_dependence(
+        _h2c_stub_scores(zero, zero), calibration, CONFIG, SYSTEM
+    )
+    assert edge["A4_minus_A2"]["ci"] == [0.0, 0.0] and edge["A4_minus_A0"][
+        "ci"
+    ] == [0.0, 0.0]
+    assert (
+        edge["A4_minus_A2"]["verdict"] == "fail"
+        and edge["A4_minus_A0"]["verdict"] == "fail"
+    )
     assert edge["verdict"] == "fail" and edge["pass"] is False
-    short = h2c_state_dependence(_h2c_stub_scores(parts["pass"][:49], parts["pass"][:49]),
-                                 calibration, CONFIG, SYSTEM)
+    short = h2c_state_dependence(
+        _h2c_stub_scores(parts["pass"][:49], parts["pass"][:49]),
+        calibration,
+        CONFIG,
+        SYSTEM,
+    )
     assert short["verdict"] == "inconclusive"
-    assert short["reason"] == "A4_minus_A2: n_states < 50; A4_minus_A0: n_states < 50"
+    assert (
+        short["reason"]
+        == "A4_minus_A2: n_states < 50; A4_minus_A0: n_states < 50"
+    )
 
 
 def test_h2d_closed_edge_at_one_tenth_through_the_real_percentile_interval(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """H2d band (-inf, 0.10] is closed at 0.10, tested on the real interval code (plan V6, B1).
 
     Reference: hand cases and the mathematician's exact construction. (a) A4 = A3 gives the
@@ -2757,30 +4114,64 @@ def test_h2d_closed_edge_at_one_tenth_through_the_real_percentile_interval(
 
     rng = np.random.default_rng(5)
     a3 = rng.uniform(1.0, 2.0, 60)
-    make = lambda e: RuleScores(mse=np.zeros(1), state_mse_ref=e, regret=np.zeros(1),
-                                agreement=0.0, km_median=0.0, rmst=0.0)
-    same = analysis.h2d_empirical_comparison({"A3": make(a3), "A4": make(a3)}, CONFIG, SYSTEM)
-    assert same["ci"] == [0.0, 0.0] and same["verdict"] == "pass" and same["pass"] is True
-    double = analysis.h2d_empirical_comparison({"A3": make(a3), "A4": make(2.0 * a3)}, CONFIG, SYSTEM)
-    assert double["ci"] == [1.0, 1.0] and double["verdict"] == "fail" and double["pass"] is False
+    make = lambda e: RuleScores(
+        mse=np.zeros(1),
+        state_mse_ref=e,
+        regret=np.zeros(1),
+        agreement=0.0,
+        km_median=0.0,
+        rmst=0.0,
+    )
+    same = analysis.h2d_empirical_comparison(
+        {"A3": make(a3), "A4": make(a3)}, CONFIG, SYSTEM
+    )
+    assert (
+        same["ci"] == [0.0, 0.0]
+        and same["verdict"] == "pass"
+        and same["pass"] is True
+    )
+    double = analysis.h2d_empirical_comparison(
+        {"A3": make(a3), "A4": make(2.0 * a3)}, CONFIG, SYSTEM
+    )
+    assert (
+        double["ci"] == [1.0, 1.0]
+        and double["verdict"] == "fail"
+        and double["pass"] is False
+    )
 
     low = 0.09999999999999987
     scores = {"A3": make(a3), "A4": make(1.05 * a3)}
     calls = []
     real = analysis.criterion_verdict
-    monkeypatch.setattr(analysis, "criterion_verdict",
-                        lambda *args, **kwargs: calls.append((args, kwargs)) or real(*args, **kwargs))
-    for k, verdict, upper in ((25, "pass", 0.1), (27, "inconclusive", 0.10000000000000002)):
-        values = np.array([low] * 1950 + [low + k * 2.0 ** -52] * 50)
-        monkeypatch.setattr(statistics_module, "bootstrap_values",
-                            lambda *args, _v=values: (0.05, _v))
+    monkeypatch.setattr(
+        analysis,
+        "criterion_verdict",
+        lambda *args, **kwargs: calls.append((args, kwargs))
+        or real(*args, **kwargs),
+    )
+    for k, verdict, upper in (
+        (25, "pass", 0.1),
+        (27, "inconclusive", 0.10000000000000002),
+    ):
+        values = np.array([low] * 1950 + [low + k * 2.0**-52] * 50)
+        monkeypatch.setattr(
+            statistics_module,
+            "bootstrap_values",
+            lambda *args, _v=values: (0.05, _v),
+        )
         out = analysis.h2d_empirical_comparison(scores, CONFIG, SYSTEM)
         assert out["ci"][1] == upper and out["verdict"] == verdict
-        assert out["reason"] == (None if verdict == "pass" else "interval meets band edge")
-        assert out["pass"] is (verdict == "pass") and out["n_failed_resamples"] == 0
+        assert out["reason"] == (
+            None if verdict == "pass" else "interval meets band edge"
+        )
+        assert (
+            out["pass"] is (verdict == "pass")
+            and out["n_failed_resamples"] == 0
+        )
     assert out["ci"][0] == low
-    assert [(args[3], args[4], kwargs) for args, kwargs in calls[-2:]] == \
-        [((-np.inf, 0.1), (True, True), {"n_states": 60})] * 2
+    assert [(args[3], args[4], kwargs) for args, kwargs in calls[-2:]] == [
+        ((-np.inf, 0.1), (True, True), {"n_states": 60})
+    ] * 2
 
 
 def test_gain_bound_has_no_bar_and_reports_each_screen() -> None:
@@ -2801,33 +4192,65 @@ def test_gain_bound_has_no_bar_and_reports_each_screen() -> None:
     h_max = 20
     horizons = np.arange(1, h_max + 1)
     # (T0, T1, growth, CP censored, negative cross)
-    spec = [(4, 9, 0.05, False, False), (3, 13, 0.05, False, False), (5, 8, 0.05, False, False),
-            (4, 9, 0.05, True, False), (4, 9, 0.05, False, True), (4, 9, 0.0, False, False),
-            (4, 9, -1.0, True, False)]
+    spec = [
+        (4, 9, 0.05, False, False),
+        (3, 13, 0.05, False, False),
+        (5, 8, 0.05, False, False),
+        (4, 9, 0.05, True, False),
+        (4, 9, 0.05, False, True),
+        (4, 9, 0.0, False, False),
+        (4, 9, -1.0, True, False),
+    ]
     sq_cp, sq_plp, cross = (np.zeros((len(spec), h_max)) for _ in range(3))
     for i, (first, second, _, censored, negative) in enumerate(spec):
         energy = np.full(h_max, 0.01)
-        energy[first - 1:] = 0.05
-        energy[second - 1:] = 0.09
+        energy[first - 1 :] = 0.05
+        energy[second - 1 :] = 0.09
         sq_plp[i] = energy
         sq_cp[i] = 0.01 if censored else energy
-        cross[i] = -0.005 if negative else 0.0  # |C| <= sqrt(E_C E_P): a possible moment
+        cross[i] = (
+            -0.005 if negative else 0.0
+        )  # |C| <= sqrt(E_C E_P): a possible moment
     zeros = np.zeros_like(sq_cp)
     moments = EnsembleMoments(
-        horizons=horizons, mean_cp=zeros, mean_plp=zeros, sq_cp=sq_cp, sq_plp=sq_plp,
-        cross=cross, analog_seed=np.ones(len(spec)), est_seed=np.ones(len(spec)),
-        noise_sens=np.zeros(len(spec)))
-    cell = Cell(system="lorenz63", noise=0.0, library_size=0, label="stub", setup=None,
-                splits={"test": SplitData(moments, None)},
-                oracles={"test": SimpleNamespace(growth=np.array([s[2] for s in spec]))},
-                horizons=horizons)
+        horizons=horizons,
+        mean_cp=zeros,
+        mean_plp=zeros,
+        sq_cp=sq_cp,
+        sq_plp=sq_plp,
+        cross=cross,
+        analog_seed=np.ones(len(spec)),
+        est_seed=np.ones(len(spec)),
+        noise_sens=np.zeros(len(spec)),
+    )
+    cell = Cell(
+        system="lorenz63",
+        noise=0.0,
+        library_size=0,
+        label="stub",
+        setup=None,
+        splits={"test": SplitData(moments, None)},
+        oracles={
+            "test": SimpleNamespace(growth=np.array([s[2] for s in spec]))
+        },
+        horizons=horizons,
+    )
     out = gain_horizon_bound(cell, CONFIG)
-    assert set(out) == {"fraction_within_bound", "n_states", "n_total_states", "n_screened_out",
-                        "median_gain_lyapunov", "max_gain_lyapunov"}
+    assert set(out) == {
+        "fraction_within_bound",
+        "n_states",
+        "n_total_states",
+        "n_screened_out",
+        "median_gain_lyapunov",
+        "max_gain_lyapunov",
+    }
     assert "pass" not in out and "threshold" not in out
     assert out["n_states"] == 3 and out["n_total_states"] == 7
-    assert out["n_screened_out"] == {"growth_nonpositive": 2, "censored_single_forecaster": 2,
-                                     "negative_covariance": 1}
+    assert out["n_screened_out"] == {
+        "growth_nonpositive": 2,
+        "censored_single_forecaster": 2,
+        "negative_covariance": 1,
+    }
     assert out["fraction_within_bound"] == pytest.approx(2.0 / 3.0, abs=1e-12)
     assert out["median_gain_lyapunov"] == pytest.approx(5.0 / 30.0, abs=1e-12)
     assert out["max_gain_lyapunov"] == pytest.approx(10.0 / 30.0, abs=1e-12)
@@ -2853,18 +4276,33 @@ def test_boot_returns_the_old_interval_and_the_dropped_count() -> None:
 
     def nan_on(calls: set[int]):
         counter = itertools.count()
-        return lambda idx: float("nan") if next(counter) in calls else float(np.mean(x_values[idx]))
+        return lambda idx: (
+            float("nan")
+            if next(counter) in calls
+            else float(np.mean(x_values[idx]))
+        )
 
-    got = _boot(CONFIG, nan_on({4, 11, 25}), 60, make_rng(CONFIG.seed, SYSTEM, "bootstrap", "B1"),
-                LEVEL)
+    got = _boot(
+        CONFIG,
+        nan_on({4, 11, 25}),
+        60,
+        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "B1"),
+        LEVEL,
+    )
     assert got[3] == 3
-    assert got[:3] == block_bootstrap(nan_on({4, 11, 25}), 60, CONFIG.bootstrap_resamples,
-                                      CONFIG.bootstrap_block,
-                                      make_rng(CONFIG.seed, SYSTEM, "bootstrap", "B1"), LEVEL)
+    assert got[:3] == block_bootstrap(
+        nan_on({4, 11, 25}),
+        60,
+        CONFIG.bootstrap_resamples,
+        CONFIG.bootstrap_block,
+        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "B1"),
+        LEVEL,
+    )
 
 
-def test_v7_reports_the_dropped_resamples_of_each_bootstrap(monkeypatch: pytest.MonkeyPatch
-                                                            ) -> None:
+def test_v7_reports_the_dropped_resamples_of_each_bootstrap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Wiring check: ``V7.n_dropped_resamples`` maps the counts of the slope and each level.
 
     This is a wiring test, not numerical evidence: ``block_bootstrap_dropped`` is replaced by a
@@ -2877,21 +4315,35 @@ def test_v7_reports_the_dropped_resamples_of_each_bootstrap(monkeypatch: pytest.
 
     levels = np.array([0.01, 0.02])
     nu = np.linspace(1.0, 2.0, 60)
-    deltas = np.outer(nu, levels) * np.exp(np.random.default_rng(32).normal(0, 0.05, (60, 2)))
+    deltas = np.outer(nu, levels) * np.exp(
+        np.random.default_rng(32).normal(0, 0.05, (60, 2))
+    )
     real = analysis.v7_efficiency(levels, deltas, nu, CONFIG, SYSTEM)
-    assert real["n_dropped_resamples"] == {"slope": 0, "efficiency": {"0.01": 0, "0.02": 0}}
+    assert real["n_dropped_resamples"] == {
+        "slope": 0,
+        "efficiency": {"0.01": 0, "0.02": 0},
+    }
 
     counts = iter([5, 6, 7])
-    monkeypatch.setattr(analysis, "block_bootstrap_dropped",
-                        lambda *a, **k: (1.0, 0.9, 1.1, next(counts)))
+    monkeypatch.setattr(
+        analysis,
+        "block_bootstrap_dropped",
+        lambda *a, **k: (1.0, 0.9, 1.1, next(counts)),
+    )
     stub = analysis.v7_efficiency(levels, deltas, nu, CONFIG, SYSTEM)
-    assert stub["n_dropped_resamples"] == {"slope": 5, "efficiency": {"0.01": 6, "0.02": 7}}
+    assert stub["n_dropped_resamples"] == {
+        "slope": 5,
+        "efficiency": {"0.01": 6, "0.02": 7},
+    }
 
     bad = deltas.copy()
     bad[3, 0] = np.nan
     flagged = analysis.v7_efficiency(levels, bad, nu, CONFIG, SYSTEM)
     assert flagged["n_nonfinite"] == 1 and flagged["pass"] is False
-    assert flagged["n_dropped_resamples"] == {"slope": 0, "efficiency": {"0.01": 0, "0.02": 0}}
+    assert flagged["n_dropped_resamples"] == {
+        "slope": 0,
+        "efficiency": {"0.01": 0, "0.02": 0},
+    }
 
 
 def _stats_with_fit(monkeypatch: pytest.MonkeyPatch, fit) -> np.ndarray:
@@ -2899,12 +4351,15 @@ def _stats_with_fit(monkeypatch: pytest.MonkeyPatch, fit) -> np.ndarray:
     from lpcstudy import analysis
 
     monkeypatch.setattr(analysis, "_fit_seed_law", fit)
-    table = np.tile(SIZES ** -0.5, (8, 1)) + 1e-4
-    return analysis._median_fit_stats(table, np.full(8, 0.5), SIZES, np.arange(8))
+    table = np.tile(SIZES**-0.5, (8, 1)) + 1e-4
+    return analysis._median_fit_stats(
+        table, np.full(8, 0.5), SIZES, np.arange(8)
+    )
 
 
 def test_h1a_fit_at_a_bound_and_covariance_warnings_are_counted(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """B2: ``_median_fit_stats`` flags a 2/d at a bound of ``curve_fit`` and counts OptimizeWarnings.
 
     Reference: hand-built fits. ``_fit_seed_law`` is replaced by stubs that return a chosen 2/d
@@ -2921,26 +4376,44 @@ def test_h1a_fit_at_a_bound_and_covariance_warnings_are_counted(
     def make_fit(two_over_d: float, n_optimize: int, n_other: int = 0):
         def fit(sizes, medians):
             for _ in range(n_optimize):
-                warnings.warn("Covariance of the parameters could not be estimated",
-                              OptimizeWarning)
+                warnings.warn(
+                    "Covariance of the parameters could not be estimated",
+                    OptimizeWarning,
+                )
             for _ in range(n_other):
                 warnings.warn("something else", UserWarning)
             return two_over_d, 1e-6
+
         return fit
 
-    for value, flagged in ((0.01, 1.0), (0.010000099, 1.0), (10.0, 1.0), (9.9999995, 1.0),
-                           (0.01001, 0.0), (9.99, 0.0), (0.5, 0.0)):
+    for value, flagged in (
+        (0.01, 1.0),
+        (0.010000099, 1.0),
+        (10.0, 1.0),
+        (9.9999995, 1.0),
+        (0.01001, 0.0),
+        (9.99, 0.0),
+        (0.5, 0.0),
+    ):
         out = _stats_with_fit(monkeypatch, make_fit(value, 0))
         assert out[3] == flagged and out[4] == 0.0, value
-        assert out[1] == value / 2.0 and out[2] == 1e-6  # fitted 1/d and floor of the fit
+        assert (
+            out[1] == value / 2.0 and out[2] == 1e-6
+        )  # fitted 1/d and floor of the fit
 
     with warnings.catch_warnings():
-        warnings.simplefilter("error")  # an OptimizeWarning must not reach the caller
+        warnings.simplefilter(
+            "error"
+        )  # an OptimizeWarning must not reach the caller
         assert _stats_with_fit(monkeypatch, make_fit(0.5, 3))[4] == 3.0
     with pytest.warns(UserWarning, match="something else") as seen:
         out = _stats_with_fit(monkeypatch, make_fit(0.5, 2, n_other=1))
-    assert out[4] == 2.0 and len(seen) == 1  # the other warning is passed on, once
-    assert math.isnan(_stats_with_fit(monkeypatch, lambda s, m: (np.nan, np.nan))[0])
+    assert (
+        out[4] == 2.0 and len(seen) == 1
+    )  # the other warning is passed on, once
+    assert math.isnan(
+        _stats_with_fit(monkeypatch, lambda s, m: (np.nan, np.nan))[0]
+    )
     nan_fit = _stats_with_fit(monkeypatch, lambda s, m: (np.nan, np.nan))
     assert nan_fit[3] == 0.0 and nan_fit[4] == 0.0
 
@@ -2952,7 +4425,9 @@ def test_h1a_fit_at_a_bound_and_covariance_warnings_are_counted(
     assert math.isnan(raised[0]) and raised[3] == 0.0 and raised[4] == 1.0
 
 
-def test_h1a_real_fit_at_the_lower_bound_is_flagged_and_matches_the_warning_record() -> None:
+def test_h1a_real_fit_at_the_lower_bound_is_flagged_and_matches_the_warning_record() -> (
+    None
+):
     """B2 on the real ``curve_fit``: data whose least-squares 2/d is below 0.01 is flagged.
 
     Reference: the medians ``n^(-0.001) + 1e-8`` (a true exponent 2/d = 0.001, below the lower
@@ -2964,25 +4439,33 @@ def test_h1a_real_fit_at_the_lower_bound_is_flagged_and_matches_the_warning_reco
     A well-determined data set (exponent 0.5 over 5 sizes) is not at a bound.
     """
 
-
     sizes = np.array([1e3, 1e4, 1e5])
-    medians = sizes ** -0.001 + 1e-8
+    medians = sizes**-0.001 + 1e-8
     with warnings.catch_warnings(record=True) as record:
         warnings.simplefilter("always")
         two_over_d, _ = _fit_seed_law(sizes, medians)
-    expected_warnings = sum(issubclass(w.category, OptimizeWarning) for w in record)
-    assert two_over_d == pytest.approx(0.01, abs=1e-6)  # premise: the fit sits at the bound
+    expected_warnings = sum(
+        issubclass(w.category, OptimizeWarning) for w in record
+    )
+    assert two_over_d == pytest.approx(
+        0.01, abs=1e-6
+    )  # premise: the fit sits at the bound
     table = np.tile(medians, (6, 1))
     out = _median_fit_stats(table, np.full(6, 0.5), sizes, np.arange(6))
-    assert out[3] == 1.0 and out[4] == float(expected_warnings) and expected_warnings >= 1
+    assert (
+        out[3] == 1.0
+        and out[4] == float(expected_warnings)
+        and expected_warnings >= 1
+    )
 
-    good = np.tile(SIZES ** -0.5 + 1e-4, (6, 1))
+    good = np.tile(SIZES**-0.5 + 1e-4, (6, 1))
     mild = _median_fit_stats(good, np.full(6, 0.5), SIZES, np.arange(6))
     assert mild[3] == 0.0
 
 
 def test_h1a_library_scaling_reports_the_bound_and_warning_counts_per_noise(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Wiring and regression guard (LPC.PC.21), not value evidence: ``by_noise[rho]`` carries point
     and resample counts, and the old keys are still those of the earlier bootstrap.
 
@@ -3008,19 +4491,33 @@ def test_h1a_library_scaling_reports_the_bound_and_warning_counts_per_noise(
     config = _config(200)
 
     def pinned(sizes, medians):
-        warnings.warn("Covariance of the parameters could not be estimated", OptimizeWarning)
+        warnings.warn(
+            "Covariance of the parameters could not be estimated",
+            OptimizeWarning,
+        )
         return 0.01, 1e-6
 
     monkeypatch.setattr(analysis, "_fit_seed_law", pinned)
     out = analysis.h1a_library_scaling(cells, config)["by_noise"]["0.01"]
     assert out["n_exponent_at_bound"] == {"point": 1, "resamples": 200}
     assert out["n_covariance_warnings"] == {"point": 1, "resamples": 200}
-    sq_cells = np.column_stack([np.sqrt(sq[:, j]) ** 2 for j in range(len(SIZES))])
+    sq_cells = np.column_stack(
+        [np.sqrt(sq[:, j]) ** 2 for j in range(len(SIZES))]
+    )
     joint = block_bootstrap_counted(
-        lambda idx: _h1a_ratio(sq_cells, inverse_dimension(local_dim), SIZES, idx), 80,
-        200, config.bootstrap_block, make_rng(config.seed, "lorenz63", "bootstrap", "H1a", "0.01"),
-        0.95)
-    assert out["ratio_ci"] == [joint.lower, joint.upper] and out["ratio"] == joint.estimate
+        lambda idx: _h1a_ratio(
+            sq_cells, inverse_dimension(local_dim), SIZES, idx
+        ),
+        80,
+        200,
+        config.bootstrap_block,
+        make_rng(config.seed, "lorenz63", "bootstrap", "H1a", "0.01"),
+        0.95,
+    )
+    assert (
+        out["ratio_ci"] == [joint.lower, joint.upper]
+        and out["ratio"] == joint.estimate
+    )
     assert out["n_failed_resamples"] == joint.n_failed
 
     monkeypatch.undo()
@@ -3031,7 +4528,9 @@ def test_h1a_library_scaling_reports_the_bound_and_warning_counts_per_noise(
     assert real["n_exponent_at_bound"]["resamples"] <= 200
 
 
-def test_h1b_counts_floored_states_among_the_regression_states_and_dropped_cp_resamples() -> None:
+def test_h1b_counts_floored_states_among_the_regression_states_and_dropped_cp_resamples() -> (
+    None
+):
     """B3: ``n_floored`` counts regression states with ``E e^2 - floor < 1e-12``; CP drops are counted.
 
     Reference: hand-built squared errors. PLP (floor 0): states 0, 1, 2 have E e^2 = 0.0,
@@ -3047,7 +4546,9 @@ def test_h1b_counts_floored_states_among_the_regression_states_and_dropped_cp_re
     """
 
     config = _config(100)
-    cell = _fake_h1b_cell(np.random.default_rng(31002), 100, 1.0, 1.0, log_noise=0.1)
+    cell = _fake_h1b_cell(
+        np.random.default_rng(31002), 100, 1.0, 1.0, log_noise=0.1
+    )
     m = cell.splits["test"].moments
     copied = cell.noise**2 / cell.setup.n_analogs
     m.sq_plp[:3, 0] = [0.0, 5e-13, 1e-12]
@@ -3056,30 +4557,45 @@ def test_h1b_counts_floored_states_among_the_regression_states_and_dropped_cp_re
     m.sq_plp[9, 0] = 0.0
     out = h1b_seed_amplifier(cell, config)
     assert out["PLP"]["n_floored"] == 2 and out["CP"]["n_floored"] == 2
-    assert out["CP"]["n_dropped_resamples"] == 0 and "n_dropped_resamples" not in out["PLP"]
+    assert (
+        out["CP"]["n_dropped_resamples"] == 0
+        and "n_dropped_resamples" not in out["PLP"]
+    )
     gain = cell.oracles["test"].gains[:, 29]
-    for name, seed, sq, floor in (("CP", m.analog_seed, m.sq_cp[:, 0], copied),
-                                  ("PLP", m.est_seed, m.sq_plp[:, 0], 0.0)):
+    for name, seed, sq, floor in (
+        ("CP", m.analog_seed, m.sq_cp[:, 0], copied),
+        ("PLP", m.est_seed, m.sq_plp[:, 0], 0.0),
+    ):
         x_all = np.log(gain * seed / np.sqrt(cell.ctx.spec.dim))
         y_all = 0.5 * np.log(np.maximum(sq - floor, 1e-12))
         keep = np.isfinite(x_all) & np.isfinite(y_all)
         x, y = x_all[keep], y_all[keep]
-        old = block_bootstrap(lambda idx: ols_slope(x[idx], y[idx]), len(x),
-                              config.bootstrap_resamples, config.bootstrap_block,
-                              make_rng(config.seed, SYSTEM, "bootstrap", "H1b"))
+        old = block_bootstrap(
+            lambda idx: ols_slope(x[idx], y[idx]),
+            len(x),
+            config.bootstrap_resamples,
+            config.bootstrap_block,
+            make_rng(config.seed, SYSTEM, "bootstrap", "H1b"),
+        )
         assert (out[name]["slope"], *out[name]["ci"]) == old and len(x) == 99
 
     flat = _fake_h1b_cell(np.random.default_rng(31003), 100, 1.0, 1.0)
-    flat.splits["test"].moments.analog_seed = np.full(100, np.sqrt(3.0))  # CP x = ln(1) = 0
+    flat.splits["test"].moments.analog_seed = np.full(
+        100, np.sqrt(3.0)
+    )  # CP x = ln(1) = 0
     flat.oracles["test"].gains[:, :] = 1.0
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         flat_out = h1b_seed_amplifier(flat, config)
     assert flat_out["CP"]["n_dropped_resamples"] == config.bootstrap_resamples
-    assert math.isnan(flat_out["CP"]["slope"]) and all(math.isnan(v) for v in flat_out["CP"]["ci"])
+    assert math.isnan(flat_out["CP"]["slope"]) and all(
+        math.isnan(v) for v in flat_out["CP"]["ci"]
+    )
 
 
-def test_per_state_spearman_counted_reports_the_constant_states_and_h2b_carries_them() -> None:
+def test_per_state_spearman_counted_reports_the_constant_states_and_h2b_carries_them() -> (
+    None
+):
     """B3: states whose weight is the same at every noise level get 0 and are counted.
 
     Reference: the count is formed by hand as the number of rows with a single distinct value
@@ -3093,20 +4609,40 @@ def test_per_state_spearman_counted_reports_the_constant_states_and_h2b_carries_
     """
 
     levels = np.array([0.01, 0.02, 0.04])
-    table = np.array([[0.0, 0.0, 0.0], [0.5, 0.5, 0.5], [0.0, 0.25, 0.5], [0.25, 0.125, 0.0],
-                      [0.75, 0.75, 0.75], [0.0, 0.0, 0.5]])
+    table = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [0.5, 0.5, 0.5],
+            [0.0, 0.25, 0.5],
+            [0.25, 0.125, 0.0],
+            [0.75, 0.75, 0.75],
+            [0.0, 0.0, 0.5],
+        ]
+    )
     rho, n_constant = _per_state_spearman_counted(levels, table)
     hand_constant = sum(len(np.unique(row)) == 1 for row in table)
     assert n_constant == hand_constant == 3 and type(n_constant) is int
-    reference = [0.0 if len(np.unique(row)) == 1 else sps.spearmanr(levels, row).statistic
-                 for row in table]
+    reference = [
+        (
+            0.0
+            if len(np.unique(row)) == 1
+            else sps.spearmanr(levels, row).statistic
+        )
+        for row in table
+    ]
     assert rho == pytest.approx(reference, abs=1e-12, rel=0)
 
-    noise_cells = {float(r): _stub_cell(table[:, j]) for j, r in enumerate(levels)}
+    noise_cells = {
+        float(r): _stub_cell(table[:, j]) for j, r in enumerate(levels)
+    }
     out = h2b_knob_response(noise_cells, _library_cells(TABLE), CONFIG)["noise"]
     assert out["n_constant_states"] == 3 and out["n_dropped_resamples"] == 0
-    assert out["n_failed_resamples"] == 0  # WU-0002.9b: the A3 count, the alias above equals it
-    assert out["mean_state_spearman"] == pytest.approx(np.mean(reference), abs=1e-12, rel=0)
+    assert (
+        out["n_failed_resamples"] == 0
+    )  # WU-0002.9b: the A3 count, the alias above equals it
+    assert out["mean_state_spearman"] == pytest.approx(
+        np.mean(reference), abs=1e-12, rel=0
+    )
 
 
 def test_h3a_counts_empty_regimes_and_degenerate_pairs() -> None:
@@ -3127,35 +4663,71 @@ def test_h3a_counts_empty_regimes_and_degenerate_pairs() -> None:
     regime = np.repeat([0, 2, 3], 30)
     durations = np.concatenate([rng.geometric(0.1, 30), np.full(60, 40)])
     events = np.concatenate([np.ones(30, dtype=bool), np.zeros(60, dtype=bool)])
-    out = h3a_logrank(regime, durations, events, np.array([5.0, np.nan, 10.0, 20.0]),
-                      np.ones(90), 30, 4)
+    out = h3a_logrank(
+        regime,
+        durations,
+        events,
+        np.array([5.0, np.nan, 10.0, 20.0]),
+        np.ones(90),
+        30,
+        4,
+    )
     assert out["pairs"] == [[0, 2], [2, 3], [3, 1]]
     assert out["n_empty_regimes"] == 4 - len(np.unique(regime)) == 1
     assert out["n_degenerate_pairs"] == 1 and out["n_km_not_reached"] == 1
-    assert out["logrank_p_raw"][0] is not None and out["logrank_p_raw"][1:] == [None, None]
-    assert "zero log-rank variance" in out["reason"] and "empty regime" in out["reason"]
+    assert out["logrank_p_raw"][0] is not None and out["logrank_p_raw"][1:] == [
+        None,
+        None,
+    ]
+    assert (
+        "zero log-rank variance" in out["reason"]
+        and "empty regime" in out["reason"]
+    )
 
     regime3, durations3, target3 = _regime_data((0.05, 0.45, 0.15), 60, 3)
-    clean = h3a_logrank(regime3, durations3, np.ones(len(durations3), dtype=bool),
-                        np.array([14.0, 2.0, 5.0]), target3, 30, 3)
+    clean = h3a_logrank(
+        regime3,
+        durations3,
+        np.ones(len(durations3), dtype=bool),
+        np.array([14.0, 2.0, 5.0]),
+        target3,
+        30,
+        3,
+    )
     assert clean["n_empty_regimes"] == 0 and clean["n_degenerate_pairs"] == 0
 
 
-def _old_boot(config: StudyConfig, stat, n_items: int, rng: np.random.Generator,
-              level: float = 0.95):
+def _old_boot(
+    config: StudyConfig,
+    stat,
+    n_items: int,
+    rng: np.random.Generator,
+    level: float = 0.95,
+):
     """Body of ``analysis._boot`` before WU-0002.9b (the independent reference), taking the
-    generator that WU-0002.14 gave it in place of the integer ``config.seed + salt``."""
-    return block_bootstrap_dropped(stat, n_items, config.bootstrap_resamples,
-                                   config.bootstrap_block, rng, level)
+    generator that WU-0002.14 gave it in place of the integer ``config.seed + salt``.
+    """
+    return block_bootstrap_dropped(
+        stat,
+        n_items,
+        config.bootstrap_resamples,
+        config.bootstrap_block,
+        rng,
+        level,
+    )
 
 
-def _inject_first_call(monkeypatch: pytest.MonkeyPatch, failing: set[int], value: float) -> None:
+def _inject_first_call(
+    monkeypatch: pytest.MonkeyPatch, failing: set[int], value: float
+) -> None:
     """Make the statistic of the FIRST ``analysis.bootstrap_values`` call return ``value``
     on the calls numbered ``failing`` (0-based; calls 0..B-1 are the resamples, call B is the
     point estimate). Later calls (part ii) are untouched. WU-0008.2a: H2b(i) calls
     ``bootstrap_values`` (the body of ``block_bootstrap_counted``) to keep the resample values,
-    so the injection point moved from the wrapper to its body; the semantics are unchanged."""
+    so the injection point moved from the wrapper to its body; the semantics are unchanged.
+    """
     from lpcstudy import analysis
+
     real = analysis.bootstrap_values
     seen = {"calls": 0}
 
@@ -3169,12 +4741,15 @@ def _inject_first_call(monkeypatch: pytest.MonkeyPatch, failing: set[int], value
             k = count["n"]
             count["n"] += 1
             return value if k in failing else statistic(idx)
+
         return real(faulty, *args, **kwargs)
 
     monkeypatch.setattr(analysis, "bootstrap_values", wrapper)
 
 
-def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails() -> None:
+def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails() -> (
+    None
+):
     """WU-0002.9b (1): with all-finite resamples the new H2b(i) interval equals the old one bitwise.
 
     Reference: a copy of the old ``_boot`` body (``block_bootstrap_dropped`` at
@@ -3188,20 +4763,38 @@ def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails(
 
     levels = np.array([0.01, 0.02, 0.04])
     weights = np.random.default_rng(90201).uniform(0.0, 1.0, (60, 3))
-    weights[:, 1] += 0.15 * np.random.default_rng(90202).uniform(size=60)  # a clear but noisy rise
+    weights[:, 1] += 0.15 * np.random.default_rng(90202).uniform(
+        size=60
+    )  # a clear but noisy rise
     corr, _ = _per_state_spearman_counted(levels, weights)
     stat = lambda idx: float(np.mean(corr[idx]))
     est, lo, hi, n_dropped = _old_boot(
-        CONFIG, stat, len(corr), make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"),
-        PRIMARY_LEVEL)
-    assert n_dropped == 0 and lo < est < hi  # premise: a non-degenerate interval
+        CONFIG,
+        stat,
+        len(corr),
+        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"),
+        PRIMARY_LEVEL,
+    )
+    assert (
+        n_dropped == 0 and lo < est < hi
+    )  # premise: a non-degenerate interval
 
-    values = np.array([stat(idx) for idx in block_resample_indices(
-        len(corr), CONFIG.bootstrap_resamples, CONFIG.bootstrap_block,
-        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"))])
+    values = np.array(
+        [
+            stat(idx)
+            for idx in block_resample_indices(
+                len(corr),
+                CONFIG.bootstrap_resamples,
+                CONFIG.bootstrap_block,
+                make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"),
+            )
+        ]
+    )
     alpha = (1.0 - PRIMARY_LEVEL) / 2.0
-    assert (lo, hi) == (float(np.nanquantile(values, alpha)),
-                        float(np.nanquantile(values, 1.0 - alpha)))  # reference is self-consistent
+    assert (lo, hi) == (
+        float(np.nanquantile(values, alpha)),
+        float(np.nanquantile(values, 1.0 - alpha)),
+    )  # reference is self-consistent
 
     cells = {float(r): _stub_cell(weights[:, j]) for j, r in enumerate(levels)}
     out = h2b_knob_response(cells, _library_cells(TABLE), CONFIG)["noise"]
@@ -3212,7 +4805,8 @@ def test_h2b_noise_interval_is_bitwise_the_old_boot_interval_when_nothing_fails(
 
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
 def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_inconclusive(
-        monkeypatch: pytest.MonkeyPatch, bad: float) -> None:
+    monkeypatch: pytest.MonkeyPatch, bad: float
+) -> None:
     """WU-0002.9b (2): a non-finite resample is counted, widens the interval, and at the tail
     threshold turns the verdict inconclusive (DEC-0008 A3, DEC-0012).
 
@@ -3238,14 +4832,24 @@ def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_incon
     levels = np.array([0.01, 0.02, 0.04])
     weights = np.random.default_rng(90203).uniform(0.0, 1.0, (60, 3))
     corr, _ = _per_state_spearman_counted(levels, weights)
-    values = np.array([float(np.mean(corr[idx])) for idx in block_resample_indices(
-        len(corr), n_res, CONFIG.bootstrap_block,
-        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"))])
+    values = np.array(
+        [
+            float(np.mean(corr[idx]))
+            for idx in block_resample_indices(
+                len(corr),
+                n_res,
+                CONFIG.bootstrap_block,
+                make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"),
+            )
+        ]
+    )
     failing = {7}
     mask = np.zeros(n_res, dtype=bool)
     mask[list(failing)] = True
     expected_lo = float(np.quantile(np.where(mask, -np.inf, values), alpha))
-    expected_hi = float(np.quantile(np.where(mask, np.inf, values), 1.0 - alpha))
+    expected_hi = float(
+        np.quantile(np.where(mask, np.inf, values), 1.0 - alpha)
+    )
     assert np.isfinite(expected_lo) and np.isfinite(expected_hi)
     _inject_first_call(monkeypatch, failing, bad)
     cells = {float(r): _stub_cell(weights[:, j]) for j, r in enumerate(levels)}
@@ -3253,27 +4857,46 @@ def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_incon
     assert out["n_failed_resamples"] == len(failing) == threshold - 1
     assert out["n_dropped_resamples"] == out["n_failed_resamples"]
     assert out["ci"] == [expected_lo, expected_hi]
-    assert out["mean_state_spearman"] == float(np.mean(corr))  # the point call was not injected
+    assert out["mean_state_spearman"] == float(
+        np.mean(corr)
+    )  # the point call was not injected
     monkeypatch.undo()
 
     # Part B: all states rise, so every healthy resample mean is exactly 1.
     n = 60
     base = np.full(n, 0.5)
     rising = {0.01: _stub_cell(base), 0.02: _stub_cell(base + 0.125)}
-    for count, verdict in ((threshold - 1, "pass"), (threshold, "inconclusive")):
+    for count, verdict in (
+        (threshold - 1, "pass"),
+        (threshold, "inconclusive"),
+    ):
         _inject_first_call(monkeypatch, set(range(count)), bad)
-        result = h2b_knob_response(rising, _library_cells(np.tile(TABLE, (10, 1))), CONFIG)
+        result = h2b_knob_response(
+            rising, _library_cells(np.tile(TABLE, (10, 1))), CONFIG
+        )
         monkeypatch.undo()
         noise = result["noise"]
-        assert noise["n_failed_resamples"] == count and noise["n_dropped_resamples"] == count
+        assert (
+            noise["n_failed_resamples"] == count
+            and noise["n_dropped_resamples"] == count
+        )
         assert noise["verdict"] == verdict
         if count < threshold:
-            assert noise["ci"] == [1.0, 1.0] and noise["reason"] is None and noise["pass"]
+            assert (
+                noise["ci"] == [1.0, 1.0]
+                and noise["reason"] is None
+                and noise["pass"]
+            )
             assert result["verdict"] == "pass"
         else:
             assert noise["ci"] == [-np.inf, np.inf]
-            assert noise["reason"] == "failed resamples >= threshold" and not noise["pass"]
-            assert result["verdict"] == "inconclusive" and result["pass"] is False
+            assert (
+                noise["reason"] == "failed resamples >= threshold"
+                and not noise["pass"]
+            )
+            assert (
+                result["verdict"] == "inconclusive" and result["pass"] is False
+            )
             assert result["reason"].startswith("noise: ")
 
 
@@ -3281,7 +4904,8 @@ def test_h2b_noise_failed_resample_goes_to_the_a3_tail_and_threshold_gives_incon
 
 
 def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A2: ``ci_mc_se`` equals ``endpoint_mc_error`` of the same resample values, exactly.
 
     Reference: the values are recomputed in the test with ``statistics.bootstrap_values`` at the
@@ -3302,24 +4926,47 @@ def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
     a4 = rng.uniform(1.0, 2.0, 60)
     a5 = a4 * (1.0 + 0.1 * rng.uniform(size=60))
     out = an.h3c_ratio(a5, a4, CONFIG, SYSTEM)
-    _, values = bootstrap_values(lambda idx: float(a5[idx].mean() / a4[idx].mean()), 60, 200, 5,
-                                 make_rng(CONFIG.seed, SYSTEM, "h3c-ratio"))
+    _, values = bootstrap_values(
+        lambda idx: float(a5[idx].mean() / a4[idx].mean()),
+        60,
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "h3c-ratio"),
+    )
     assert out["ci_mc_se"] == list(endpoint_mc_error(values, LEVEL))
     assert all(isinstance(v, float) for v in out["ci_mc_se"])
 
     # H2b(i) and (ii)
-    noise_cells = {0.01: _stub_cell(TABLE[:, 2]),
-                   0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0))}
-    res = an.h2b_knob_response(noise_cells, _library_cells(TABLE, (0.01, 0.02)), CONFIG)
+    noise_cells = {
+        0.01: _stub_cell(TABLE[:, 2]),
+        0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0)),
+    }
+    res = an.h2b_knob_response(
+        noise_cells, _library_cells(TABLE, (0.01, 0.02)), CONFIG
+    )
     diff = TABLE[:, 2] - TABLE[:, 0]
-    _, values = bootstrap_values(lambda idx: float(np.mean(diff[idx])), 6, 200, 5,
-                                 make_rng(CONFIG.seed, SYSTEM, "h2b-library-change", "0.01"))
-    assert res["library_change"]["ci_mc_se"] == list(endpoint_mc_error(values, LEVEL))
+    _, values = bootstrap_values(
+        lambda idx: float(np.mean(diff[idx])),
+        6,
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "h2b-library-change", "0.01"),
+    )
+    assert res["library_change"]["ci_mc_se"] == list(
+        endpoint_mc_error(values, LEVEL)
+    )
     rho_levels = np.array([0.01, 0.02])
-    w_rho = np.column_stack([an._split_weights(noise_cells[r], CONFIG) for r in rho_levels])
+    w_rho = np.column_stack(
+        [an._split_weights(noise_cells[r], CONFIG) for r in rho_levels]
+    )
     corr, _ = an._per_state_spearman_counted(rho_levels, w_rho)
-    _, values = bootstrap_values(lambda idx: float(np.mean(corr[idx])), len(corr), 200, 5,
-                                 make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"))
+    _, values = bootstrap_values(
+        lambda idx: float(np.mean(corr[idx])),
+        len(corr),
+        200,
+        5,
+        make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2b-noise"),
+    )
     assert res["noise"]["ci_mc_se"] == list(endpoint_mc_error(values, LEVEL))
     assert "ci_mc_se" not in res["library_change_reported"]["0.02"]
     n_h2e = 50
@@ -3339,15 +4986,34 @@ def test_ci_mc_se_is_persisted_at_the_five_primary_sites_and_only_there(
     gen = np.random.default_rng(12)
     weights = np.sort(gen.uniform(0.0, 1.0, (200, 3)), axis=1)
     small = gen.uniform(size=(200, 3)) < 0.8
-    first = an.h2a_initial_segments(weights, small, ["1", "2", "4"], n_resamples=200, block=5,
-                                    seed=3, level=LEVEL)
-    assert len(seen) == 1  # the main statistic only (the complete-case interval is a sensitivity)
-    assert first["ci_mc_se"] == list(real(*seen[0])) and None not in first["ci_mc_se"]
+    first = an.h2a_initial_segments(
+        weights,
+        small,
+        ["1", "2", "4"],
+        n_resamples=200,
+        block=5,
+        seed=3,
+        level=LEVEL,
+    )
+    assert (
+        len(seen) == 1
+    )  # the main statistic only (the complete-case interval is a sensitivity)
+    assert (
+        first["ci_mc_se"] == list(real(*seen[0]))
+        and None not in first["ci_mc_se"]
+    )
     assert list(percentile_interval(*seen[0])[:2]) == first["range_ci"]
     seen.clear()
     data = _synthetic("S0", 300, np.random.default_rng(3))
-    part = an.h2a_part_ii(data["w"], data["lam"], data["x"], n_resamples=200, block=5, seed=2,
-                          level=LEVEL)
+    part = an.h2a_part_ii(
+        data["w"],
+        data["lam"],
+        data["x"],
+        n_resamples=200,
+        block=5,
+        seed=2,
+        level=LEVEL,
+    )
     assert len(seen) == len(part["part_ii"]) >= 2
     for (array, level), item in zip(seen, part["part_ii"].values()):
         assert item["ci_mc_se"] == list(real(array, level))
@@ -3376,25 +5042,40 @@ def test_stored_levels_are_found_on_real_producer_output() -> None:
     idx = np.arange(n)
     low = idx / 100.0
     a4 = np.random.default_rng(21).uniform(1.0, 2.0, 60)
-    noise_cells = {0.01: _stub_cell(TABLE[:, 2]),
-                   0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0))}
+    noise_cells = {
+        0.01: _stub_cell(TABLE[:, 2]),
+        0.02: _stub_cell(np.minimum(TABLE[:, 2] + 0.125, 1.0)),
+    }
     produced = {
-        "H1a": an.h1a_library_scaling(_fake_cells(same, _gamma_local_dim(rng, 300, D_TRUE)),
-                                      config),
-        "H1d": an.h1d_correlations(_pairs(np.random.default_rng(21011), 500, (0.7861,) * 4),
-                                   "lorenz63", _config(50)),
+        "H1a": an.h1a_library_scaling(
+            _fake_cells(same, _gamma_local_dim(rng, 300, D_TRUE)), config
+        ),
+        "H1d": an.h1d_correlations(
+            _pairs(np.random.default_rng(21011), 500, (0.7861,) * 4),
+            "lorenz63",
+            _config(50),
+        ),
         "H2b": an.h2b_knob_response(noise_cells, _library_cells(TABLE), CONFIG),
         "H2e": an.h2e_noise_matching(_h2e_cells(low, low + 0.3), CONFIG),
-        "H3b": an.h3b_importances(profile, 0.5 * (x[:, 0] > 0.5), curvature,
-                                  3.0 * x[:, 2] + 0.5 * x[:, 0], CONFIG, SYSTEM),
-        "H3c": an.h3c_ratio(a4 * 1.01, a4, CONFIG, SYSTEM)}
+        "H3b": an.h3b_importances(
+            profile,
+            0.5 * (x[:, 0] > 0.5),
+            curvature,
+            3.0 * x[:, 2] + 0.5 * x[:, 0],
+            CONFIG,
+            SYSTEM,
+        ),
+        "H3c": an.h3c_ratio(a4 * 1.01, a4, CONFIG, SYSTEM),
+    }
     expected = {"H1a": 1, "H1d": 1, "H2b": 1, "H2e": 2, "H3b": 2, "H3c": 1}
     assert set(budget.STORED_LEVEL_PATHS) == set(expected) == set(produced)
     for row in HYPOTHESIS_TABLE:
         if row.key in expected:
             levels = budget.stored_levels(row, produced[row.key])
             assert len(levels) == expected[row.key], row.key
-            assert all(abs(v - budget.role_level(row)) < 1e-12 for v in levels), row.key
+            assert all(
+                abs(v - budget.role_level(row)) < 1e-12 for v in levels
+            ), row.key
 
 
 # ------------------------------------------------------- WU-0002.14: the pairings are kept (P9)
@@ -3415,18 +5096,29 @@ def test_h2c_parts_resample_with_identical_index_arrays() -> None:
     scores = _scores(A2=a2, A4=a4, A4o=a4, A0=a2, A1=a2 + 1.0)
     out = h2c_state_dependence(scores, _calibration(0.25, 4.0), CONFIG, SYSTEM)
     assert out["best_single"] == "A0"
-    first, second, third = out["A4_minus_A2"], out["A4_minus_A0"], out["A4o_minus_A2"]
-    assert first["ci"] == second["ci"] == third["ci"] and first["mean"] == second["mean"]
+    first, second, third = (
+        out["A4_minus_A2"],
+        out["A4_minus_A0"],
+        out["A4o_minus_A2"],
+    )
+    assert (
+        first["ci"] == second["ci"] == third["ci"]
+        and first["mean"] == second["mean"]
+    )
     assert first["n_failed_resamples"] == second["n_failed_resamples"] == 0
     diff = a4 - a2
     stat = lambda idx: float(np.mean(diff[idx]))
     used = make_rng(CONFIG.seed, SYSTEM, "bootstrap", "H2c")
     block_bootstrap(stat, 60, 200, 5, used, 0.95)  # the generator has advanced
     advanced = block_bootstrap(stat, 60, 200, 5, used, 0.95)
-    assert [advanced[1], advanced[2]] != first["ci"]  # premise: sharing would be visible
+    assert [advanced[1], advanced[2]] != first[
+        "ci"
+    ]  # premise: sharing would be visible
 
 
-def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(monkeypatch) -> None:
+def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(
+    monkeypatch,
+) -> None:
     """P9: the oracle and the deployable profile of Q-N bootstrap from identical generator states.
 
     Reference: ``qn_profile_block`` is replaced by a recorder (its numerical content is tested
@@ -3445,20 +5137,38 @@ def test_qn_profiles_share_one_resample_set_from_a_fresh_generator_each(monkeypa
         return {}
 
     monkeypatch.setattr(an, "qn_profile_block", record)
-    monkeypatch.setattr(an, "_oracle_profile", lambda cell, split, config: np.zeros((n, 4)))
-    monkeypatch.setattr(an, "deployable_profile", lambda ev, proxies, noise, lt: np.zeros((n, 1, 4)))
-    monkeypatch.setattr(an, "oracle_weight", lambda m: np.full((n, CONFIG.reference_horizon), 0.5))
-    monkeypatch.setattr(an, "state_horizon_target", lambda m, noise, thr: np.ones(n))
+    monkeypatch.setattr(
+        an, "_oracle_profile", lambda cell, split, config: np.zeros((n, 4))
+    )
+    monkeypatch.setattr(
+        an,
+        "deployable_profile",
+        lambda ev, proxies, noise, lt: np.zeros((n, 1, 4)),
+    )
+    monkeypatch.setattr(
+        an,
+        "oracle_weight",
+        lambda m: np.full((n, CONFIG.reference_horizon), 0.5),
+    )
+    monkeypatch.setattr(
+        an, "state_horizon_target", lambda m, noise, thr: np.ones(n)
+    )
     split = SimpleNamespace(moments=None, evals=None)
-    cell = SimpleNamespace(system=SYSTEM, noise=0.01,
-                           splits={s: split for s in ("construction", "calibration", "test")})
+    cell = SimpleNamespace(
+        system=SYSTEM,
+        noise=0.01,
+        splits={s: split for s in ("construction", "calibration", "test")},
+    )
     an.qn_noise_redundancy(cell, SimpleNamespace(proxies=None), CONFIG)
-    fresh = make_rng(CONFIG.seed, SYSTEM, "bootstrap", "Q-N").bit_generator.state
+    fresh = make_rng(
+        CONFIG.seed, SYSTEM, "bootstrap", "Q-N"
+    ).bit_generator.state
     assert states == [fresh, fresh]
 
 
 def test_qn_noise_redundancy_records_the_dump_keys_without_a_key_that_is_also_a_prefix(
-        monkeypatch) -> None:
+    monkeypatch,
+) -> None:
     """With a dump, ``qn_noise_redundancy`` records ``x_test``, ``w_star`` and ``log_t`` per kind (R6, R10).
 
     Reference: the schema of ``lpcstudy/dump.py`` (written by hand in the test): per kind
@@ -3476,30 +5186,66 @@ def test_qn_noise_redundancy_records_the_dump_keys_without_a_key_that_is_also_a_
     targets = ("logit_w_interior", "w_zero_indicator", "log_horizon")
 
     def stub(*args, capture=None, **kwargs):
-        capture.update({f"{t}/{k}": np.zeros(n) for t in targets
-                        for k in ("pred3", "pred4", "y", "domain")})
+        capture.update(
+            {
+                f"{t}/{k}": np.zeros(n)
+                for t in targets
+                for k in ("pred3", "pred4", "y", "domain")
+            }
+        )
         return {}
 
     monkeypatch.setattr(an, "qn_profile_block", stub)
-    monkeypatch.setattr(an, "_oracle_profile", lambda cell, split, config: np.zeros((n, 4)))
-    monkeypatch.setattr(an, "deployable_profile", lambda ev, proxies, noise, lt: np.zeros((n, 1, 4)))
-    monkeypatch.setattr(an, "oracle_weight", lambda m: np.full((n, CONFIG.reference_horizon), 0.5))
-    monkeypatch.setattr(an, "state_horizon_target", lambda m, noise, thr: np.ones(n))
+    monkeypatch.setattr(
+        an, "_oracle_profile", lambda cell, split, config: np.zeros((n, 4))
+    )
+    monkeypatch.setattr(
+        an,
+        "deployable_profile",
+        lambda ev, proxies, noise, lt: np.zeros((n, 1, 4)),
+    )
+    monkeypatch.setattr(
+        an,
+        "oracle_weight",
+        lambda m: np.full((n, CONFIG.reference_horizon), 0.5),
+    )
+    monkeypatch.setattr(
+        an, "state_horizon_target", lambda m, noise, thr: np.ones(n)
+    )
     split = SimpleNamespace(moments=None, evals=None)
-    cell = SimpleNamespace(system=SYSTEM, noise=0.01,
-                           splits={s: split for s in ("construction", "calibration", "test")})
+    cell = SimpleNamespace(
+        system=SYSTEM,
+        noise=0.01,
+        splits={s: split for s in ("construction", "calibration", "test")},
+    )
     dump = StateDump()
-    an.qn_noise_redundancy(cell, SimpleNamespace(proxies=None), CONFIG, dump=dump)
+    an.qn_noise_redundancy(
+        cell, SimpleNamespace(proxies=None), CONFIG, dump=dump
+    )
     keys = set(dump._qn[SYSTEM])
-    expected = {f"{kind}/{name}" for kind in ("oracle", "deployable")
-                for name in ("x_test", "w_star", "log_t",
-                             *(f"{t}/{k}" for t in targets
-                               for k in ("pred3", "pred4", "y", "domain")))}
+    expected = {
+        f"{kind}/{name}"
+        for kind in ("oracle", "deployable")
+        for name in (
+            "x_test",
+            "w_star",
+            "log_t",
+            *(
+                f"{t}/{k}"
+                for t in targets
+                for k in ("pred3", "pred4", "y", "domain")
+            ),
+        )
+    }
     assert keys == expected
-    assert not any(other.startswith(key + "/") for key in keys for other in keys)
+    assert not any(
+        other.startswith(key + "/") for key in keys for other in keys
+    )
 
 
-def test_qn_profile_block_capture_holds_the_predictions_and_changes_nothing() -> None:
+def test_qn_profile_block_capture_holds_the_predictions_and_changes_nothing() -> (
+    None
+):
     """``capture`` (the state dump's hook) gets both models' predictions, the targets and the domains.
 
     Reference: independent fits in the test with the literal parameters of T2 (as in the test
@@ -3512,11 +5258,15 @@ def test_qn_profile_block_capture_holds_the_predictions_and_changes_nothing() ->
     the ``delta_r2`` leaf bitwise (it is the same call on the same arrays; b3 of the plan).
     """
 
-
-
     d = _qn_synthetic(500, 200, 31)
-    args = (d["x_train"], d["x_test"], d["w_train"], d["w_test"], d["log_t_train"],
-            d["log_t_test"])
+    args = (
+        d["x_train"],
+        d["x_test"],
+        d["w_train"],
+        d["w_test"],
+        d["log_t_train"],
+        d["log_t_test"],
+    )
     kwargs = dict(seed=5, n_resamples=100, block=5, boot_seed=11)
     plain = qn_profile_block(*args, **kwargs)
     capture: dict = {}
@@ -3531,19 +5281,47 @@ def test_qn_profile_block_capture_holds_the_predictions_and_changes_nothing() ->
     inner = lambda w, rows: np.where(rows, w, 0.5)
     logit = lambda w, rows: np.log(inner(w, rows) / (1 - inner(w, rows)))
     everyone = np.ones(500, bool)
-    cases = {"logit_w_interior": (int_tr, logit(d["w_train"], int_tr), int_te,
-                                  logit(d["w_test"], int_te)),
-             "w_zero_indicator": (everyone, (d["w_train"] == 0).astype(float), np.ones(200, bool),
-                                  (d["w_test"] == 0).astype(float)),
-             "log_horizon": (everyone, d["log_t_train"], np.ones(200, bool), d["log_t_test"])}
-    assert set(capture) == {f"{t}/{k}" for t in cases for k in ("pred3", "pred4", "y", "domain")}
+    cases = {
+        "logit_w_interior": (
+            int_tr,
+            logit(d["w_train"], int_tr),
+            int_te,
+            logit(d["w_test"], int_te),
+        ),
+        "w_zero_indicator": (
+            everyone,
+            (d["w_train"] == 0).astype(float),
+            np.ones(200, bool),
+            (d["w_test"] == 0).astype(float),
+        ),
+        "log_horizon": (
+            everyone,
+            d["log_t_train"],
+            np.ones(200, bool),
+            d["log_t_test"],
+        ),
+    }
+    assert set(capture) == {
+        f"{t}/{k}" for t in cases for k in ("pred3", "pred4", "y", "domain")
+    }
     assert int_te.sum() < 200  # the placeholder is exercised
     for name, (rows_tr, y_tr, rows_te, y_te) in cases.items():
-        assert np.array_equal(capture[f"{name}/pred3"], fit_predict([0, 1, 2], rows_tr, y_tr))
-        assert np.array_equal(capture[f"{name}/pred4"], fit_predict([0, 1, 2, 3], rows_tr, y_tr))
+        assert np.array_equal(
+            capture[f"{name}/pred3"], fit_predict([0, 1, 2], rows_tr, y_tr)
+        )
+        assert np.array_equal(
+            capture[f"{name}/pred4"], fit_predict([0, 1, 2, 3], rows_tr, y_tr)
+        )
         assert np.array_equal(capture[f"{name}/y"], y_te)
         assert np.array_equal(capture[f"{name}/domain"], rows_te)
         rows = np.flatnonzero(rows_te)
-        assert delta_r2(capture[f"{name}/y"], capture[f"{name}/pred3"], capture[f"{name}/pred4"],
-                        rows) == out[name]["delta_r2"]
+        assert (
+            delta_r2(
+                capture[f"{name}/y"],
+                capture[f"{name}/pred3"],
+                capture[f"{name}/pred4"],
+                rows,
+            )
+            == out[name]["delta_r2"]
+        )
     assert (capture["logit_w_interior/y"][~int_te] == 0.0).all()
