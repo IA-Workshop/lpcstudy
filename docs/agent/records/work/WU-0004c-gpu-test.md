@@ -29,3 +29,17 @@
 ## Log
 
 <dated entries: what was done, commands, results, commits>
+
+- **2026-10-18, claude-sonnet-5-5 (developer), written before the run.**
+  - Branch `wu/0004c-gpu-test` from develop `7b6f6e6`; worktree `/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/0004c-gpu-test`. Commit f32fcbb: this unit file (plan) and `tests/gpu/test_reproducibility.py`.
+  - Offline checks of the test's helpers (CPU, no pytest, no GPU job): `compare_bitwise` on the R0 smoke `results.json` against a deep copy: 13,791 leaves, 9,432 floats, 0 different; with one `lambda_max` perturbed by 1 + 1e-15 and an extra `provenance` key: 1 different (max abs 9.99e-16, located), the provenance key ignored; `tools/compare_runs.py` `compare_trees` on that file against itself: tier T0, exit 0. The no-GPU probe, with `CUDA_VISIBLE_DEVICES=-1`, exits 3 with the message that the skip prints.
+  - Findings while reading: `tools/compare_runs.py` exists and is importable by path (it loads `compare_pilot` itself). The draft decision file cited by the task, `2026-10-18-owner-decision-drafts.md`, is on develop. `tests/gpu/` did not exist. The worktree has no `.venv`; the wrapper falls back to `python3`, which has no jax, so the run sets `LPC_PYTHON` to the main checkout's `.venv/bin/python` (jax 0.11.2, CUDA, RTX 4090).
+  - **4.9 checklist, before the invocation.**
+    1. Change set: `git status --porcelain` is two untracked paths, `docs/agent/records/work/WU-0004c-gpu-test.md` and `tests/gpu/test_reproducibility.py` (committed in f32fcbb); `git diff --name-only main...HEAD` lists 443 files because the branch is cut from develop, which is ahead of main: nothing of them is changed by this unit. The unit's own change set is the two files.
+    2. Radius: the new file alone, `gpu` tier (hand derivation of 4.2: a new test file in `tests/gpu/`, no `lpcstudy/` or `tools/` file changed, nothing else imports it; `unit` and `integration` unaffected, `test_rng_hygiene` scans `lpcstudy/` only). Much smaller than the whole suite; no gate.
+    3. Already run: no; this exact file on this exact code has never been run (the helper checks above exercised the helpers on CPU data, not the test).
+    4. Device: `gpu` tier under the lock; the wrapper sets `JAX_PLATFORMS=cuda,cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`; the test's child processes get `JAX_PLATFORMS=cuda` (no CPU fallback) and the same preallocation setting.
+    5. Threads and time: `LPC_THREADS=4` (environment value, unchanged), `OMP/MKL/OPENBLAS` 4; the tier timeout is 1800 s; the test's own bounds are 120 s (probe) and 780 s per run; expected 10 to 15 minutes.
+    6. Contention: the lock was free at the check. A unit-tier test run of another lane was active at 06:34 (CPU only, 300 s timeout); the instruction was to start only with no `lpcstudy --preset` or test process active, so the run waits for it to finish (one check, no loop). No `pilot`, `full` or preset run was active.
+    7. Output: `-q --tb=short -rfE` (set by the wrapper); only the summary line, the printed measurement line and any failure go in this Log.
+    8. Command: `LPC_PYTHON=/home/brianm/projects/physics/chaos/lpcstudy/.venv/bin/python tools/run_tests.sh gpu tests/gpu/test_reproducibility.py`, from the worktree, in the background (`--background`; the wrapper writes the log and exit file under `runs/tests/`), polled with `tail -n 5`.
