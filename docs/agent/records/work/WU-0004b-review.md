@@ -108,3 +108,49 @@ confirm that the A3 ledger entry exists (R6).
 **approve with fixes.** 6 findings: R1 and R2 must be fixed (printed claims that are false in part or in context), and
 R3 to R5 should be fixed in the same round. R6 is an owner dependency. After the fixes, run the radius once
 (`test_budget.py` at least; the same 9 files is simplest), and include the main session's C16 DEV-0 smoke neutrality check.
+
+## Round 2 (re-review of fix round 1)
+
+Reviewer: `reviewer`, claude-opus-5-5, 2026-10-18, fresh context. Scope: R1 to R6 only, `git diff 9d7dd53..182ef6f`
+(`lpcstudy/budget.py`, `tests/unit/test_budget.py`, the unit file, `queue.md`). Source checked:
+`docs/study/lm_doubling_dev0_report_v3.md` on this branch (§2 class definitions, §3 table, §5 line 134, §7 line 149).
+
+**Tests.** I ran none, per the dispatch. The developer ran the same 9-file unit radius once: `447 passed` (446 + 1 as in
+round 1, so the same tests). The change to the code is text only, so the radius is unchanged.
+
+**Offline render (no test, no preset).** I extracted `lpcstudy/` at 7b6f6e6 and 182ef6f with `git archive` into the
+scratchpad and imported `budget.budget_lines` over `runs/baseline/smoke/results.json` with `config.SMOKE` (CPU, niced).
+Old: 127 lines; new: 137. With the five note blocks removed, exactly one line differs: the H2a(i) oracle row (OF-4 wording
+of round 1). Its only number, F1 = 0.0368, is the same in both. Every other line, and so every number, is byte-identical.
+
+| Finding | Status | Check |
+| --- | --- | --- |
+| R1 | **resolved** | The note now reads "... below 10% of the sampling half-width (class N) for 5 of the 18 parts ... and does not show it below 10% for the other 13 (X, not negligible, 6; U, not certified, 7)". This matches report §2 (X "not negligible", U "not certified"), §3 (flag yes for 5, no for 13; N 5 / X 6 / U 7) and §7 ("not shown negligible (class X or U) for 13 of 18"). It no longer claims the U parts are above 10%. |
+| R2 | **resolved** | The note says "from the pilot preset to the full preset ... (<a> → <b> test/sweep states in the two presets)", which is true on any preset. The test takes sizes and factors from `config.PILOT` and `config.FULL` (n_test 500/1000, n_test_sweep 300/1000; `config.py` 132-133, 196-200). It asserts the exact projection sentence, and it keeps the literal `["1.41", "1.41", "1.83", "1.83", "1.41"]` pin, the WU-0005.6 reference, so a preset change would fail the test. |
+| R3 | **resolved** | "a 30/60-iteration twin of the full-size run would remove it", as in report §5 ("a full-run 30/60 twin would remove the projection"). "only" dropped. |
+| R4 | **resolved** | "5 of the 18 parts of the five QoIs and three systems (this QoI: class N in k of m parts)". I recounted from the §3 table: H2a(i) X, X, U → 0 of 3; H2a(ii) chua U, U, lorenz63 U, N, rossler N, N → 3 of 6; H2b(i) X, X, U → 0 of 3; H2b(ii) chua N, lorenz63 X, rossler N → 2 of 3; H3c U, X, U → 0 of 3. Sum 5, total 18. The rendered notes carry these counts under the right tables, in the order H2a(i), H2a(ii), H2b(i), H2b(ii), H3c. |
+| R5 | **resolved** | The test asserts the exact count sentence with its direction (flag yes = class N for 5; "does not show it below 10%" for 13) and that "not below it" is absent. The docstring states the flag direction and that the 13 must not be described as found above 10%. |
+| R6 | **resolved (safe option)** | The `oracle_range_bound` docstring cites the draft addendum A3, `docs/agent/notes/2026-10-18-owner-decision-drafts.md` §3.2 (present, heading at line 94), and says it is not yet in the ledger (`decisions.md` has DEC-0024 A1 and A2 only). The owner's A3 ledger entry stays a freeze-checklist dependency. |
+
+**No assertion loosened (PRIME.2).** Only `test_lm_development_note_under_every_table` changed, which is the developer's own
+new test from round 1. Each old check has a stricter successor:
+- `index(ITERATIVE) < index(note)` is implied by the kept `== index + 2`;
+- `startswith("Development evidence")` and "not a sealed result" became the exact opening clause;
+- the "5 of 18" and class-count substrings became the exact sentence;
+- the `×factor` substring became the exact projection sentence;
+- "stays not estimated" became `endswith` the full sentence.
+
+The absence check for the other factor and the H3c "not estimated" cell assertions are kept. No other test, tolerance or
+criterion was touched. The diff adds no clip, fallback, exception handling, randomness or dtype change.
+
+**Governance.** 182ef6f names the unit and carries `Co-Authored-By` and `Agent: claude-sonnet-5-5`. Its parent is 9d7dd53,
+so the history is linear. `queue.md` gains one appended line. The unit file changes only its Status field and appends a
+section. Observation, not a finding: the unit-file Log says "commit given below once made", but no hash follows. This
+review records it as 182ef6f.
+
+**New findings (round 2):** none.
+
+**Owner checkpoint (unchanged).** Needs owner review before freeze. The owner should read the final note text, rendered
+above, and enter the A3 ledger entry (R6). C16, the DEV-0 smoke neutrality check, is still the main session's.
+
+**Verdict (round 2): approve.** All 6 round-1 findings are resolved, with 0 new findings.
