@@ -497,6 +497,25 @@ Here s = max(|lo|, |hi|) of `ci_inverse_dim`, and 4e-5·s is the Q1 a-priori bou
 
 **Affected checks:** none for this amendment (documentation only). J1's test and J2 are .8c work, with radius `tests/unit/test_tools_rehearsal_diagnostics.py`.
 
+### Plan amendment 11 (2026-10-18, planner claude-opus-5-5)
+
+**Basis:**
+- the owner's ruling of 2026-10-18 on Q6 and F4, "keep both as built; Q6 recorded as a dated plan amendment" (amendments note §33, develop `b554041`);
+- plan amendment 3 C2 and C6 (Q6);
+- the WU-0003.9 Log, fix round 1, "Record of the d1 change": the main-session instruction (task message of 2026-10-14, which also said not to copy large results into tests);
+- review R10 (`WU-0003.9-review.md`) and its round-2 confirmation (`WU-0003.9-review-round2.md`).
+
+Earlier amendments stay in force except where an item below says otherwise. No threshold, tolerance or criterion changes. This amendment records a decision on a test fixture made during WU-0003.9 (2026-10-14), after the fact but before it decided any rehearsal outcome.
+
+| # | Decision | Relation | Strictness |
+| --- | --- | --- | --- |
+| K1 | **B2 d1 is met on synthetic result trees plus the real-schema extract** (`tests/unit/fixtures/real_schema_extract.json`, about 10 KB, from the WU-0002.14 S3 smoke `results.json`: the lorenz63 `handling` subtree with its LM kinds, the top-level `handling` block, the `clip_sensitivity` block), **not on the 164 KB S3-pair fixtures.** The tier truth table (each of the six TD triggers alone gives TD, both `start_state` parts; W or U alone gives T2; a weight digest alone gives T3; all equal on another device gives T1; same host, device and threads gives T0; a missing selecting leaf on either side gives exit 2; precedence TD > T2 > T3 > T1) is exact on the synthetic trees. Scope, LM kinds, verdict strings and sum-over-systems run on the extract. Authorized by the main session on 2026-10-14; ruled by the owner on 2026-10-18 (Q6 closed). | Replaces "fixtures built from the WU-0002.14 S3 smoke pair (164 KB each, copied to `tests/unit/fixtures/`)" in B2 d1; confirms C2. | At least as discriminating for tier selection (note `2026-10-14-math-wu0003-9-q1.md` §Q5, reading 12). The S3 pair predates .7a and lacks the selecting leaves, so every unedited pair from it is "tier undetermined" by B1 item 1. |
+| K2 | **Record of d3 as built (information).** C2 says "d3 runs on the unedited S3 pair". As built, the unedited pair gives exit 2 (no .7a selecting leaves). The d3 declarations (1e-5 for class (a), largest rel 2.94e-7; 1e-4 for (b) to (g)) were shown once on scratch copies of the real pair with injected digests (Log, WU-0003.9 evidence run). The committed test is a synthetic pair shaped like the kernel pair, citing `m2_floors.log`. d4 runs on the committed P0/P1 extract (`td_p0p1_parts.json`), as C2 says. | Corrects C2's description of d3. | No test changes. Whether the owner's "as built" covers d3 as well as d1 is the owner's to confirm. |
+
+**Affected checks:** none (documentation only). **Owner checkpoint:** `tools/compare_runs.py` still needs owner review before freeze (tolerance and verdict-comparison code; CSQ2 use in WU-0016).
+
+**Entry note (2026-10-18, claude-sonnet-5-5, main session; WU-0004.9).** Entered from `docs/agent/notes/2026-10-18-owner-decision-drafts.md` section 4 (see `docs/agent/notes/2026-10-18-ledger-batch-draft.md` section 2, D6). It follows plan amendment 10, as the draft says. The owner's answer on K2 (whether the ruling "keep both as built" covers d3 as well as d1) is **not yet given**; item K2 stands as drafted, an information record, until the owner answers by a dated line below.
+
 ## Log
 
 ### WU-0003.7a (developer claude-sonnet-5-5, 2026-10-14; branch `wu/0003-rehearsal`, from `dcc4ff2`)
@@ -1475,3 +1494,5 @@ Implements two owner rulings of 2026-10-18 (note 33 of `docs/agent/notes/2026-10
 ## Review
 
 ## Audit
+
+- 2026-10-18 (claude-sonnet-5-5, main session; WU-0004.9, freeze audit M5): see the unit Log; no separate audit text was written (freeze audit 2026-10-18, M5). Evidence that exists: the Log (rehearsal runs R1 to R6 and the compare records); the independent reviews `WU-0003.9-review.md` (with `-round2` and `-round3`), `WU-0003.9b-review.md` and `WU-0003.9c-review.md`; the decisions DEC-0028 to DEC-0031; and the pre-freeze audit `docs/agent/records/audits/2026-10-18-freeze.md`.
