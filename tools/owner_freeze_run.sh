@@ -7,7 +7,7 @@
 #   tests       the freeze gate: unit, integration, slow, gpu (LPC_GATE=freeze); appends summary lines to a GATE record
 #   merge       merge develop into main with a merge commit (needs a clean main checkout)
 #   lock        write requirements.lock from the installed packages and commit it
-#   ledger      append the freeze `classification` entry (asks for your name; you enter the other entries yourself)
+#   ledger      append a `ruling` entry (DEC-0028 to DEC-0033) and the freeze `classification` entry (asks for your name; you enter the other entries yourself)
 #   tag         commit pending ledger changes, hash the v3 export, create the annotated tag freeze-1
 #   prerun      the WU-0015.1 checks on the tagged tree; prints the launch conditions
 #
@@ -106,14 +106,24 @@ EOF
 }
 
 ledger() {
-  say "Freeze classification entry (entry to CSQ2, LPC.PC.5). Enter the other drafted entries yourself:"
+  say "Two entries: a ruling entry for DEC-0028 to DEC-0033, then the freeze classification (entry to CSQ2, LPC.PC.5)."
+  say "Enter the other drafted entries yourself, as you choose:"
   say "  docs/agent/notes/2026-10-18-ledger-batch-draft.md"
   read -r -p "Your name for the actor field: " actor
   [ -n "$actor" ] || { say "actor required"; exit 2; }
+  local v3="docs/study/proposal_and_methods_v3.md" v3sum head branch
+  [ -f "$v3" ] || { say "no such file: $v3"; exit 2; }
+  v3sum="$(sha256sum "$v3" | cut -d' ' -f1)"
+  head="$(git rev-parse HEAD)"
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+  "$PY" tools/ledger.py append --type ruling --actor "$actor" --role "human owner" \
+    --authority "PRIME.1; DEC-0028 to DEC-0033" \
+    --summary "Owner rulings of 2026-10-11 to 2026-10-18 as recorded in decisions.md DEC-0028 to DEC-0033: reproducibility tolerance, confirmatory sample size, rehearsal and comparison-tool rulings, CPU as the official device, freeze-blocker rulings B5 to B11, freeze-audit rulings M1 to M4" \
+    --data "{\"decisions\": [\"DEC-0028\", \"DEC-0029\", \"DEC-0030\", \"DEC-0031\", \"DEC-0032\", \"DEC-0033\"], \"source\": \"docs/agent/notes/2026-10-11-amendments-for-owner.md; docs/agent/records/audits/2026-10-18-freeze.md\", \"audit_rulings_quote\": \"M1 amend / M2 extrapolate / M3 report only / M4 apply this\"}"
   "$PY" tools/ledger.py append --type classification --actor "$actor" --role "human owner" \
-    --authority "LPC.PC.5, LPC.PC.8; owner decision of 2026-10-18" \
-    --summary "Freeze: entry to CSQ2 at commit $(git rev-parse HEAD)" \
-    --data "{\"commit\": \"$(git rev-parse HEAD)\", \"branch\": \"$(git rev-parse --abbrev-ref HEAD)\"}"
+    --authority "LPC.PC.5, LPC.PC.8; owner decision of 2026-10-18; freeze-audit rulings M2, M3, M4" \
+    --summary "Freeze: entry to CSQ2 at commit $head. Governing design text: $v3 at SHA-256 $v3sum (the Claude Doc is a working copy). Bitwise agreement of the CPU run at the full preset and LPC_THREADS=8 is extrapolated from smoke and GPU pilot size. The gain-bound screen (ROADMAP WU-0002.15) is a post-freeze change to a reported-only quantity." \
+    --data "{\"commit\": \"$head\", \"branch\": \"$branch\", \"v3_governing_file\": \"$v3\", \"v3_sha256\": \"$v3sum\", \"claude_doc_status\": \"working copy, not the governing text\", \"bitwise_declaration\": \"measured at smoke size (CPU, 4 and 8 threads) and GPU pilot size; extrapolated to the full preset at LPC_THREADS=8; a regeneration that is not bitwise is judged by the per-quantity tolerances (v3 section 9 item 4)\", \"post_freeze_reported_only\": \"ROADMAP WU-0002.15 gain-bound screen (DEC-0033, M3)\"}"
   "$PY" tools/ledger.py verify
   say "Now YOU run the seed-sealing step of WU-0004.6 (draw CONF-1, store seed and salt outside the repository, commitment entry). Then run: tools/owner_freeze_run.sh tag"
 }
