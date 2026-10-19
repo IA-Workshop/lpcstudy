@@ -63,8 +63,8 @@
     {"name": "H3c", "row": "H3c", "experiment": "E5", "estimate": "H3c/A5_over_A4_mse", "interval": "H3c/ci", "verdict": "H3c/verdict", "level": "H3c/level", "band": [null, 1.05], "band_text": "upper bound ≤ 1.05 (closed)", "v3": "§2 H3c"}
   ],
   "secondary_parts": [
-    {"name": "H1a rho 1%", "row": "H1a", "experiment": "E2", "estimate": "H1a/by_noise/0.01/ratio", "interval": "H1a/by_noise/0.01/ratio_ci", "verdict": "H1a/by_noise/0.01/verdict", "level": "H1a/level", "band": [0.75, 1.25], "band_text": "interval inside [0.75, 1.25] (closed)", "v3": "§2 H1a"},
-    {"name": "H1a rho 2%", "row": "H1a", "experiment": "E2", "estimate": "H1a/by_noise/0.02/ratio", "interval": "H1a/by_noise/0.02/ratio_ci", "verdict": "H1a/by_noise/0.02/verdict", "level": "H1a/level", "band": [0.75, 1.25], "band_text": "interval inside [0.75, 1.25] (closed)", "v3": "§2 H1a"},
+    {"name": "H1a rho-1%", "row": "H1a", "experiment": "E2", "estimate": "H1a/by_noise/0.01/ratio", "interval": "H1a/by_noise/0.01/ratio_ci", "verdict": "H1a/by_noise/0.01/verdict", "level": "H1a/level", "band": [0.75, 1.25], "band_text": "interval inside [0.75, 1.25] (closed)", "v3": "§2 H1a"},
+    {"name": "H1a rho-2%", "row": "H1a", "experiment": "E2", "estimate": "H1a/by_noise/0.02/ratio", "interval": "H1a/by_noise/0.02/ratio_ci", "verdict": "H1a/by_noise/0.02/verdict", "level": "H1a/level", "band": [0.75, 1.25], "band_text": "interval inside [0.75, 1.25] (closed)", "v3": "§2 H1a"},
     {"name": "H1b PLP", "row": "H1b", "experiment": "E3", "estimate": "H1b/PLP/slope", "interval": "H1b/PLP/ci", "verdict": "H1b/verdict", "level": null, "band": [0.8, 1.2], "band_text": "interval inside [0.8, 1.2] (closed)", "v3": "§2 H1b"},
     {"name": "H1c PLP", "row": "H1c", "experiment": "E3", "estimate": "H1c/PLP/median_ratio", "interval": "H1c/PLP/ci", "verdict": "H1c/PLP/verdict", "level": null, "band": [0.8, 1.25], "band_text": "interval inside [0.8, 1.25] (closed)", "v3": "§2 H1c"},
     {"name": "H1d analog seed", "row": "H1d", "experiment": "E3", "estimate": "H1d/rows/analog_seed/spearman", "interval": "H1d/rows/analog_seed/interval", "verdict": "H1d/rows/analog_seed/verdict", "level": "H1d/level", "band": [0.7, null], "band_text": "lower bound ≥ 0.7 (closed)", "v3": "§2 H1d"},
@@ -73,20 +73,20 @@
     {"name": "H2c A4 - A2", "row": "H2c", "experiment": "E4", "estimate": "H2c/A4_minus_A2/mean", "interval": "H2c/A4_minus_A2/ci", "verdict": "H2c/A4_minus_A2/verdict", "level": null, "band": [null, 0.0], "band_text": "upper bound < 0 (strict)", "v3": "§2 H2c"},
     {"name": "H2c A4 - A1", "row": "H2c", "experiment": "E4", "estimate": "H2c/A4_minus_A1/mean", "interval": "H2c/A4_minus_A1/ci", "verdict": "H2c/A4_minus_A1/verdict", "level": null, "band": [null, 0.0], "band_text": "upper bound < 0 (strict)", "v3": "§2 H2c"},
     {"name": "H2d", "row": "H2d", "experiment": "E4", "estimate": "H2d/in_distribution_excess", "interval": "H2d/ci", "verdict": "H2d/verdict", "level": null, "band": [null, 0.1], "band_text": "upper bound ≤ 0.10 (closed)", "v3": "§2 H2d"},
-    {"name": "H2e rho 1%", "row": "H2e", "experiment": "E2", "estimate": "H2e/by_noise/0.01/median_change", "interval": "H2e/by_noise/0.01/ci", "verdict": "H2e/by_noise/0.01/verdict", "level": "H2e/by_noise/0.01/level", "band": [0.0, null], "band_text": "lower bound > 0 (strict)", "v3": "§2 H2e"},
-    {"name": "H2e rho 2%", "row": "H2e", "experiment": "E2", "estimate": "H2e/by_noise/0.02/median_change", "interval": "H2e/by_noise/0.02/ci", "verdict": "H2e/by_noise/0.02/verdict", "level": "H2e/by_noise/0.02/level", "band": [0.0, null], "band_text": "lower bound > 0 (strict)", "v3": "§2 H2e"},
+    {"name": "H2e rho-1%", "row": "H2e", "experiment": "E2", "estimate": "H2e/by_noise/0.01/median_change", "interval": "H2e/by_noise/0.01/ci", "verdict": "H2e/by_noise/0.01/verdict", "level": "H2e/by_noise/0.01/level", "band": [0.0, null], "band_text": "lower bound > 0 (strict)", "v3": "§2 H2e"},
+    {"name": "H2e rho-2%", "row": "H2e", "experiment": "E2", "estimate": "H2e/by_noise/0.02/median_change", "interval": "H2e/by_noise/0.02/ci", "verdict": "H2e/by_noise/0.02/verdict", "level": "H2e/by_noise/0.02/level", "band": [0.0, null], "band_text": "lower bound > 0 (strict)", "v3": "§2 H2e"},
     {"name": "H3b weight tree", "row": "H3b", "experiment": "E5", "estimate": "H3b/weight_lambda/importance", "interval": "H3b/weight_lambda/ci", "verdict": "H3b/weight_lambda/verdict", "level": "H3b/weight_lambda/level", "band": [0.0, 0.2], "band_text": "interval inside [0, 0.2) (strict)", "v3": "§2 H3b"},
     {"name": "H3b horizon tree D", "row": "H3b", "experiment": "E5", "estimate": "H3b/D/value", "interval": "H3b/D/ci", "verdict": "H3b/D/verdict", "level": "H3b/D/level", "band": [0.0, null], "band_text": "lower bound > 0 (strict)", "v3": "§2 H3b"}
   ],
   "qn_parts": [
     {"name": "Q-N oracle logit w*", "row": "Q-N", "experiment": "E3", "estimate": "Q-N/oracle/logit_w_interior/delta_r2", "interval": "Q-N/oracle/logit_w_interior/ci", "verdict": "Q-N/oracle/logit_w_interior/reading", "level": null, "band": [0.0, 0.05], "band_text": "reading table of v3 §7", "v3": "§7 (reading of Q-N)"},
-    {"name": "Q-N oracle w*=0", "row": "Q-N", "experiment": "E3", "estimate": "Q-N/oracle/w_zero_indicator/delta_r2", "interval": "Q-N/oracle/w_zero_indicator/ci", "verdict": "Q-N/oracle/w_zero_indicator/reading", "level": null, "band": [0.0, 0.05], "band_text": "reading table of v3 §7", "v3": "§7 (reading of Q-N)"}
+    {"name": "Q-N oracle zero indicator", "row": "Q-N", "experiment": "E3", "estimate": "Q-N/oracle/w_zero_indicator/delta_r2", "interval": "Q-N/oracle/w_zero_indicator/ci", "verdict": "Q-N/oracle/w_zero_indicator/reading", "level": null, "band": [0.0, 0.05], "band_text": "reading table of v3 §7", "v3": "§7 (reading of Q-N)"}
   ],
   "gate_rows": [
     {"check": "V1", "stats": [["delay_jacobian_rel_err", "validation/delay_jacobian_rel_err", ".3g"], ["gain_rel_err", "validation/gain_rel_err", ".3g"]], "pass": "validation/gate/V1", "bar": "v1_bar"},
     {"check": "V2", "stats": [["crlb_ratio_min", "validation/crlb_ratio_min", ".3f"], ["crlb_ratio_max", "validation/crlb_ratio_max", ".3f"]], "pass": "validation/gate/V2", "bar": "v2_bar"},
     {"check": "V3", "stats": [["cp_median_vpt_lyapunov", "validation/cp_median_vpt_lyapunov", ".3g"]], "pass": null, "bar": "v3_bar"},
-    {"check": "V4", "stats": [["median_half_width at M = 200", "validation/convergence/200/median_half_width", ".3g"]], "pass": "validation/gate/V4", "bar": "v4_bar"},
+    {"check": "V4", "stats": [["median_half_width at the design M", "validation/convergence/200/median_half_width", ".3g"]], "pass": "validation/gate/V4", "bar": "v4_bar"},
     {"check": "V5", "stats": [["km_max_abs_dev", "validation/km_max_abs_dev", ".3g"]], "pass": "validation/gate/V5", "bar": "v5_bar"},
     {"check": "V6", "stats": [["integrator_max_dev_sigma", "validation/integrator_max_dev_sigma", ".3g"]], "pass": "validation/gate/V6", "bar": "v6_bar"},
     {"check": "V7", "stats": [["median_slope", "V7/median_slope", ".4f"]], "pass": "validation/gate/V7", "bar": "v7_bar"}

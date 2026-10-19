@@ -63,7 +63,7 @@ Hybrid horizon gain against the P1 bound ({{const:gain_label}}):
 
 ## 7. Handling counters (nothing is silent) [DIAGNOSTIC]
 
-Every clip, floor, replacement and fallback counted by the run (PRIME.4). Zeros are printed as 0.
+Every clip, floor, replacement and fallback counted by the run (PRIME.4). Zero counters are printed, never omitted.
 
 {{table:handling}}
 
@@ -121,3 +121,5 @@ Copied verbatim from the `RESULTS.md` of the official run, one per row (procedur
 ## C. Trace
 
 Every number quoted above is listed with its source and leaf path in `{{meta:trace_name}}`. Run `python3 tools/findings_build.py check` on this directory to verify the document against the sources.
+
+{{table:missing}}
