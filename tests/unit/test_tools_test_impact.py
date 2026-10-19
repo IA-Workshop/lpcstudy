@@ -637,6 +637,31 @@ def test_tools_seeds_and_unknown_files(repo: Path) -> None:
     ]
 
 
+def test_tool_data_files_select_their_tools_test(repo: Path) -> None:
+    """A data file under ``tools/findings/`` selects the findings tool's test.
+
+    Reference: the plan of WU-0020 (review finding R11): a band or wording
+    edit alone must run ``test_tools_findings_build.py``, with no warning,
+    even though no ``tools/findings_build.py`` changed. Exact equality.
+    """
+    write(
+        repo,
+        "tests/unit/test_tools_findings_build.py",
+        "def test_a():\n    pass\n",
+    )
+    write(repo, "tools/findings/design_constants.json", "{}\n")
+    write(repo, "tools/findings/preliminary.template.md", "x\n")
+    sel = pick(
+        repo,
+        [
+            "tools/findings/design_constants.json",
+            "tools/findings/preliminary.template.md",
+        ],
+    )
+    assert sel.tiers["unit"] == ["tests/unit/test_tools_findings_build.py"]
+    assert sel.warnings == []
+
+
 def test_test_helper_selects_tests_that_name_it(repo: Path) -> None:
     """A non-test file under a tier selects the tests that name it.
 
