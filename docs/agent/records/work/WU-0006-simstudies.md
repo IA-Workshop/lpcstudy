@@ -644,3 +644,5 @@ No seed, provenance code or dependency changed.
 **Re-review verdict: approve with fixes.** R1, R2, R4, R5, R6 and R7 are closed. R3 is closed except for the one-line residual R3a, which the developer can fix before merge without another review round. No new finding beyond R3a. **Findings this round: 1 (R3a, low).**
 
 ## Audit
+
+- 2026-10-18 (claude-sonnet-5-5, main session; WU-0004.9, freeze audit M5): see the unit Log; no separate audit text was written (freeze audit 2026-10-18, M5). Evidence that exists: the independent review of WU-0006.1 to .3 under `## Review` (verdict approve with fixes), the Option C unit `WU-0006.5-option-c.md`, DEF-0020 to DEF-0022, DEC-0018 and DEC-0026 item 2, and the pre-freeze audit `docs/agent/records/audits/2026-10-18-freeze.md` (M1: the ROADMAP row WU-0006.2 is amended per DEC-0033).
