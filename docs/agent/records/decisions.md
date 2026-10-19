@@ -629,3 +629,19 @@ The owner added that time is short ("We are out of time"); the remaining audit f
 **Evidence.** `docs/agent/records/audits/2026-10-18-freeze.md` (M1 to M4, lines 31 to 48); DEC-0018 (Options C and K); DEC-0026 item 2 (Option C ratified); DEC-0028 (reproducibility tolerance, with its amendment of 2026-10-18); v3 section 8 (limitations) and section 9; `docs/agent/notes/2026-10-11-amendments-for-owner.md` sections 46 and 47 (the owner code review and the rulings on it); section 48 (these rulings and the records entered).
 
 **Affects:** ROADMAP row WU-0006.2 (owner or main-session edit), v3 section 8 (main-session edit), the freeze entry (WU-0004.7), DEF-0005 and DEF-0020 status lines, WU-0002.15. **Status:** owner instruction relayed by the main session; the ledger `ruling` entry is the owner's to append.
+
+## DEC-0033 addendum A1: the bracketed owner confirmations of DEC-0030, DEC-0031 and DEC-0032 (2026-10-18, owner answers through the question tool, recorded by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+Entries DEC-0030, DEC-0031 and DEC-0032 were entered with owner brackets unfilled (this file is append-only, so they are answered here, not edited). On 2026-10-18 the owner answered the two open questions and approved recording the rest from the answers already on record ("Yes, record them", question tool). Each bracket, in the order of the entries:
+
+- **DEC-0030 item 6, DEF-0028 readings (a) and (b):** in force as built in `tools/lm_doubling.py classify` (a half-width <= 0, a NaN value and an infinite point estimate with finite bounds are not structural switches; an infinite lower or upper bound at any arm is). The owner's ruling of 2026-10-17 was "Amend tool to the plan"; the readings of amendments note section 30 are approved by this addendum.
+- **DEC-0030 item 9, OF-7:** `ratio` and `ratio_ci` stay `cp 1e-12` (strict, as built; the owner's rulings OF-1 and "keep the tool's strict readings" of 2026-10-18). `floor_rms` is class (g) as built (`tools/compare_runs.py` RETAGS); `fitted_inverse_dim` and `ci_inverse_dim[0..1]` are class (a), 1e-4 s.
+- **DEC-0030 item 12, Q7, Q8, Q9 and `follows_k`:** the strict readings are kept as built, including the K-block listing `follows_k` (owner, 2026-10-18: "keep the tool's strict readings").
+- **DEC-0030 item 17, K2 of plan amendment 11 (d3 on scratch copies of the S3 pair):** covered by "keep as built" (owner, 2026-10-18: F4 and Q6 kept as built).
+- **DEC-0031 item 5, LPC.PC.6 (owner, 2026-10-18):** yes. R1 (GPU pilot), R3 (CPU pilot) and R6 (CPU full) satisfy "the validation gate V1-V7 passes on all three systems in the rehearsal"; R5's Chua V6 failure on the GPU context is recorded under DEF-0026 (per-seed risk about 4.4%), not a rehearsal failure.
+- **DEC-0031 item 6, O3 (owner, 2026-10-18):** `XLA_FLAGS` stays unset for the GPU cross-run (R1 = R2 bitwise without `--xla_gpu_deterministic_ops`).
+- **DEC-0032 item 5, B8, VmHWM recording:** not now (the owner called it optional on 2026-10-18; not built; the refusal of a run on a dirty tree or an unknown commit is built and reviewed).
+- **DEC-0032 item 6, B9:** all B9 items are ratified en bloc, with plan amendment 1 O2, O3 and O4 recorded as overtaken and N2, N3 and OF-I1 ruled as the entry states (owner, 2026-10-18, fifth round).
+- **DEC-0032 item 8, B11:** the governance reread (LPC.PC.25, WU-0004.8) is performed by the human owner; the owner's name is entered in the ledger note of that entry.
+
+**Status:** owner answers; recorded pending the owner's ledger entry (the `ruling` entry of `tools/owner_freeze_run.sh ledger` covers DEC-0028 to DEC-0033 and this addendum).

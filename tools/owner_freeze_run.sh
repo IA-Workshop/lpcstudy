@@ -118,7 +118,7 @@ ledger() {
   branch="$(git rev-parse --abbrev-ref HEAD)"
   "$PY" tools/ledger.py append --type ruling --actor "$actor" --role "human owner" \
     --authority "PRIME.1; DEC-0028 to DEC-0033" \
-    --summary "Owner rulings of 2026-10-11 to 2026-10-18 as recorded in decisions.md DEC-0028 to DEC-0033: reproducibility tolerance, confirmatory sample size, rehearsal and comparison-tool rulings, CPU as the official device, freeze-blocker rulings B5 to B11, freeze-audit rulings M1 to M4" \
+    --summary "Owner rulings of 2026-10-11 to 2026-10-18 as recorded in decisions.md DEC-0028 to DEC-0033: reproducibility tolerance, confirmatory sample size, rehearsal and comparison-tool rulings, CPU as the official device, freeze-blocker rulings B5 to B11, freeze-audit rulings M1 to M4, with the addendum A1 to DEC-0033 that answers their open brackets" \
     --data "{\"decisions\": [\"DEC-0028\", \"DEC-0029\", \"DEC-0030\", \"DEC-0031\", \"DEC-0032\", \"DEC-0033\"], \"source\": \"docs/agent/notes/2026-10-11-amendments-for-owner.md; docs/agent/records/audits/2026-10-18-freeze.md\", \"audit_rulings_quote\": \"M1 amend / M2 extrapolate / M3 report only / M4 apply this\"}"
   "$PY" tools/ledger.py append --type classification --actor "$actor" --role "human owner" \
     --authority "LPC.PC.5, LPC.PC.8; owner decision of 2026-10-18; freeze-audit rulings M2, M3, M4" \
