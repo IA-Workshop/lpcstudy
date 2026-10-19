@@ -278,3 +278,114 @@ All runs used scratch copies, `nice -n 19`, `LPC_THREADS=1 OMP_NUM_THREADS=1 JAX
 - A10 beyond the two decimals that `compare_runs` prints.
 
 Reviewer scripts are in the session scratchpad: `perturb.py`, `perturb2.py`, `perturb3.py`, `variants2.py` and `variants3.py`.
+
+## Re-review of fix round 2 (2026-10-19)
+
+- **Reviewer:** `reviewer`, claude-opus-5-5. I read `wu/prelim-build` at tip bf20192 read-only. Scope: R16 to R19, and anything the new code could have broken in R1 to R15.
+- **Verdict:** **approve with notes.**
+  - R16, R17, R18 and R19 are fixed, within the residual limits the tool states.
+  - R1 to R15 still hold.
+  - Every attack from my earlier tables now fails `check` or is refused at render. The one exception is the residual the tool states and documents: a `compare_runs` text that is altered but carries the right paths and leaves (B2, B4 below).
+  - The notes N1 to N4 below are cheap improvements, not conditions for merging.
+- **Owner checkpoint:** yes, for the release guard. The items are listed at the end.
+
+### Evidence
+
+All runs used scratch copies, `nice -n 19`, `LPC_THREADS=1 OMP_NUM_THREADS=1 JAX_PLATFORMS=cpu`, with no preset and no GPU.
+
+- **Tests and style.** One run of the findings test file: **`42 passed in 7.93s`**. Black 26.10.1 reports both files unchanged.
+- **Committed dry run.** `check` on the committed DEV-2 document passes, using overrides to my byte-identical copies and running from a working directory where the text's relative REF and NEW paths resolve: `check passed: 983 traced values, 0 problems`. A fresh render gives 983 traced values and three PNGs byte-identical to the committed ones (A12). The TD numbers are unchanged and equal my independent recomputation: 18 of 18 parts, sum of z² 15.77, max 2.26, 0 failing, 52 differing.
+- **New provenance rows.** "compare_runs text | … (by realpath and realpath)", "Cross-check commit … (same as official: no)" with its count, and "Release reference | none (development dry run)".
+- **Earlier table, re-run.** P1 to P13, Q6a to Q9c, X1 and X2 all exit 1. The only exit-0 entry is the unedited control row of P12.
+
+R16, confirmatory guard (variants4, all on synthetic relabels of DEV-2 copies; no sealed data):
+
+| Case | Result |
+| --- | --- |
+| C0, a clean confirmatory pair (CPU official at freeze-1 with 8 threads, GPU cross-check, `ledger-seq-1`, hashes given) | renders (exit 0); control |
+| C1 to C7: official dirty, incomplete, GPU, `LPC_THREADS` "1", integer 8, " 8", commit not freeze-1 | all refused (exit 2), each with a clear message |
+| C8 to C10: cross-check dirty, incomplete, CPU | all refused |
+| C11: cross-check commit differs | renders, and prints "(same as official: no)" with the count 1 |
+| C12: same path; C13: a copy with the same SHA-256 at another path | both refused (C13 by the leaf binding, which runs before the SHA comparison) |
+| DEV-2 development pair | still renders |
+
+R17, `compare_runs` binding:
+
+| Case | Result |
+| --- | --- |
+| B1: swapped REF and NEW | refused, with "made in the other order" |
+| B3: one listed leaf value altered | refused |
+| B5: the stored R5-vs-R6 record with its paths rewritten to bind | refused by the leaf check, since the listed values are reversed |
+| B6: no REF or NEW lines | refused |
+| B2: REF and NEW under another prefix with the same last two components, and every z set to 9.99 | **renders and passes** |
+| B4: the "TD: … differ" line and its leaf listing deleted from an otherwise correct text | **renders and passes**, and prints "none listed" although 52 leaves differ |
+
+Both B2 and B4 are edits of the text itself, so they fall inside the stated residual ("an altered z in a text with the right paths is not detected"). B4 widens that residual: deleting the listing switches the leaf check off, because that check has nothing to test. The docstring should name this case too (note N1).
+
+R18, free slots (body of §11 and dated §9 lines):
+
+- **Refused, all with the document line number:**
+  - every round-2 attack: § decimals, r947, QA.73, DEF-0947 and D14, "# 42.", superscripts, ¾, Ⅶ, 十, fullwidth digits, "**CONFIRMATORY: PROMOTED**", "proves", identifiers such as V7, a `[TAG]`, `###` headings, "## " headings;
+  - in §9: a date that does not exist (0938-09-47), a date before the run ended, an undated line, digits in dated text, an edit of a rendered line.
+- **Still accepted, all without digits:**
+  - inflections of refused or banned words: "proved", "confirmed", "significantly", "gates", "provisionally", "promotion";
+  - a setext heading ("Verdicts" underlined with `===`);
+  - "[CROSS CHECK]" with a space;
+  - a blockquote status sentence worded without refused words;
+  - a claim that contradicts the stored verdict ("H3c passes on every system and H2a is supported");
+  - "H1a H2a H3a";
+  - number words;
+  - a far-future dated line (2099-12-31);
+  - the date itself as a small number channel (a real date such as 2026-11-23).
+
+  The module docstring states these limits: "Number words and claims phrased in other words cannot be detected."
+
+R19: the free-slot messages name the document line. I checked by hand that line 379 and line 351 hold the planted text. The Release reference row reads "ledger-seq-1 (format checked only; not verified against the ledger by this tool)".
+
+### Findings R16 to R19
+
+- **R16: fixed.** All the A9 conditions requested are enforced in confirmatory mode, and the files must differ by both path and SHA-256. The cross-check commit is printed with "same as official". One open point: the document says "a ledger-only later commit is allowed", but the tool does not check that the difference is ledger-only (N2).
+- **R17: fixed, with the stated residual.** Judging that residual:
+  - The tool recomputes no z, as instructed. A wrong-run text is caught when its paths differ in the last two components, or when it lists a differing leaf whose values disagree with the files. The listing includes the first 20 verdict-type leaves, and a different realization almost surely differs in at least one of them.
+  - A text whose last two path components match but comes from another tree is caught only through that listing. For the sealed pair the components will be roughly `run-1/full` and `run-1-gpu/full`, which a run under another prefix could share. If the listing is empty or deleted (B4), nothing ties the text to the files.
+  - I judge the residual acceptable for an information-only section that changes no verdict, on two conditions:
+    - in confirmatory mode, require binding by realpath (N3);
+    - make it a step of the WU-0020.8 review to rerun `compare_runs` on the released directories and diff the result with the committed text. Its SHA-256 is already in `sources.json`.
+  - The docstring states the z residual plainly. It should add the empty-listing case (N1).
+- **R18: fixed for numbers, status tags and headings, with stated residuals for wording.**
+  - **The hypothesis-name allowance.** Removing the 12 names `H1a` to `H3c` would only push the student towards "H-two-a", with no gain. The allowance carries no number: "H2a1" is refused, and the names are fixed strings. A claim such as "H3c passes" can be phrased without the name just as easily. I would keep it. (The allowance actually covers 12 names, not 14: Q-N and the gain bound have no digit and need none.)
+  - **The real gap is the banned list.** The free-slot rule uses whole-word matching, so inflections pass ("proved", "confirmed", "significantly", "gates", "provisionally"). The PRE-REGISTERED rule matches substrings and catches those. N4 gives the fix.
+- **R19: fixed.**
+
+### Notes (not merge conditions)
+
+- **N1.** Add to the docstring and to the "compare_runs text" row that an empty or deleted leaf listing leaves only the path binding. Better still: in confirmatory mode, refuse a TD text that has no "TD: … differ" line while its tier is TD and any listed verdict leaf of the two files differs. That would be a string comparison of stored verdict words, which A3 allows.
+- **N2.** `git diff --name-only <official>..<cross-check>` is read-only git, which the tool already calls for freeze-1. In confirmatory mode, refuse when the cross-check commit differs and the changed paths fall outside `docs/agent/records/`. Without that, the words "a ledger-only later commit is allowed" describe a rule nobody checks.
+- **N3.**
+  - `check` depends on the working directory. Relative REF and NEW paths resolve against the current directory, so the binding sentence changes from "realpath" to "trailing two path components". An unaltered document then fails `check` with "meta values differ" ("trace file differs"; reproduced from the scratchpad root).
+  - This fails safe, but it is confusing.
+  - Fix: in confirmatory mode, require `compare_runs` to be run with absolute paths and bind only by realpath. Otherwise, record the render's working directory in `sources.json` and resolve against it.
+- **N4.**
+  - In the free slots, match the banned and refused words as prefixes (`\bprov(e|es|ed|en|ing)\b`, `\bconfirm\w*`, `\bsignifican\w*`, `\bgate\w*`, `\bprovisional\w*`, `\bpromot\w*`), as the PRE-REGISTERED rule already does by substring.
+  - Refuse setext underlines (`^=+$`, `^-+$` after text) and any `[…]` in capitals.
+  - Refuse a dated line later than the day `check` runs.
+
+### Residual risks the owner must know (stated in the module docstring)
+
+1. The tool reads neither the manifest nor the ledger. Hashes typed from the wrong file, and a release reference that does not exist, both pass. The owner compares the three hashes with the WU-0015.3 manifest row, and `ledger-seq-<n>` with the ledger.
+2. A `compare_runs` text with altered z values, or with its leaf listing deleted, passes if its paths bind. Remedy: rerun `compare_runs` on the released directories and diff (N1, N3).
+3. The cross-check commit may differ from freeze-1. Only "same as official: no" is shown, so the owner checks that the difference is ledger-only (N2).
+4. In §11 and the dated §9 lines, claims in words are not detected: a verdict contradicted in prose, inflected banned words (N4) or number words. The WU-0020.8 reviewer reads every claim.
+
+### Owner-checkpoint items for the release guard
+
+These need owner review before sealed use:
+
+- the `classify` kinds;
+- the confirmatory conditions (official: complete, clean, CPU, `LPC_THREADS` "8", commit equal to freeze-1; cross-check: complete, clean, GPU, a different file);
+- the `ledger-seq-<n>` format;
+- that manifest hashes are typed, not read;
+- the cross-check commit rule (N2);
+- the REF and NEW binding rule (N3).
+
+Reviewer scripts are in the session scratchpad: `variants4.py`, `freeslot.py` and the earlier `perturb*.py`.
