@@ -35,6 +35,10 @@ The study asks whether four measurable local conditions of a chaotic system (rec
 | Cross-check seed id | DEV-2 |
 | Cross-check backend | gpu |
 | Cross-check SHA-256 | f0649d75eb9d341b210c75a05460ef7ef5f507f6fa157437d94c12ecf13e52b2 |
+| compare_runs text | REF is the official run and NEW the cross-check (by realpath and realpath) |
+| Cross-check commit | 6f1a8c854f35552546a3dd68f56b2b5de416f3de (same as official: no) |
+
+Cross-check commits that differ from the official commit: 1 (a ledger-only later commit is allowed; both commits are shown above).
 
 ## 3. Validation gate (experiment E0) [PRE-REGISTERED]
 

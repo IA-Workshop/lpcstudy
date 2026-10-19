@@ -19,10 +19,15 @@ Two commands:
 * ``check`` re-reads the sources, verifies their hashes, and renders the
   document again from scratch. The new text must equal the document byte for
   byte, except in two free slots: the body of section 11 (the student's
-  words) and dated lines appended to section 9 (``- YYYY-MM-DD: text``).
-  Rendering is deterministic, so any other edit, including an edited sentence
-  or a swapped figure, fails. Inside the free slots no digit may appear
-  (write numbers as words); number words themselves cannot be detected.
+  words) and dated lines appended to section 9 (``- YYYY-MM-DD: text``, a
+  real date not before the run ended). Rendering is deterministic, so any
+  other edit, including an edited sentence or a swapped figure, fails.
+  Inside the free slots there is no numeric character of any kind (write
+  numbers as words; only the 14 hypothesis names such as H2a are allowed),
+  no heading, no ``[TAG]``, and none of the words in ``banned_phrases`` and
+  ``free_slot_refused`` of ``design_constants.json`` (promoted,
+  pre-registered, provisional, verified, gate and others). Number words and
+  claims phrased in other words cannot be detected.
 
 The tool only reads and formats. It computes no statistic and no verdict: a
 verdict word in the document is the string stored in the results file, and no
@@ -38,7 +43,17 @@ confirmatory, ``seed_id`` starting ``CONF-``). Any other mix is refused. A
 confirmatory build needs ``--release-ref`` of the form ``ledger-seq-<n>``, the
 SHA-256 manifest hashes of the three files, and a commit equal to
 ``git rev-parse freeze-1^{commit}``. A ``--development`` file must be a
-development run. What the tool cannot verify: it does not read the ledger, so
+development run. The cross-check must be another file than the official one.
+For confirmatory builds only (a development run is built whatever it
+recorded), the official run must be complete, clean, a CPU run with
+``LPC_THREADS`` 8, and the cross-check complete, clean and a GPU run; the
+cross-check's commit may differ from the official commit and is printed with
+"same as official: yes/no". The ``compare_runs`` text must name the official
+run as REF and the cross-check as NEW (by realpath, or by the last two path
+components when it was made under another prefix) and every differing leaf it
+lists must exist in both files with the printed values; the z values
+themselves are not recomputed, so an altered z in a text with the right paths
+is not detected. What the tool cannot verify: it does not read the ledger, so
 it cannot tell that the release reference exists; and it does not read the
 manifest, so it only checks that the hashes typed on the command line equal
 the files' hashes (an operator who types hashes taken from the wrong file
@@ -62,6 +77,8 @@ import re
 import subprocess
 import sys
 import tempfile
+import unicodedata
+from datetime import date
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -115,7 +132,9 @@ IDENTIFIER = re.compile(
     r"|\brho-(?:0\.5|1|2|5)%"
     r"|\bclosed_form_floor_a4o?\b"
 )
-DATED_LINE = re.compile(r"^- \d{4}-\d{2}-\d{2}: ")
+DATED_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2}): ")
+HYPOTHESIS_ID = re.compile(r"\bH[1-3][a-e]\b")
+STATUS_TAG = re.compile(r"\[[A-Z][A-Z-]+(?::[^\]]*)?\]")
 HEADING = re.compile(r"^(#{2,3}) ")
 TAG = re.compile(r"\[([A-Z][A-Z-]+)(?::[^\]]*)?\]\s*$")
 RELEASE_REF = re.compile(r"^ledger-seq-\d+$")
@@ -151,6 +170,9 @@ TD_TOTALS = re.compile(
 TD_DIFFERS = re.compile(r"^TD: (\d+) verdict-type leaves differ")
 TD_RESULT = re.compile(r"^RESULT: (.*)$")
 TD_TIER = re.compile(r"^tier: (\S+)")
+TD_REF = re.compile(r"^REF: (.+)$")
+TD_NEW = re.compile(r"^NEW: (.+)$")
+TD_LEAF = re.compile(r"^      (\S+): (.+) -> (.+)$")
 
 
 class ToolError(Exception):
@@ -303,9 +325,19 @@ def parse_td(path: Path) -> dict:
     is written as text, never as a number: "none listed" for a TD report and
     "not available" for any other text.
     """
-    out: dict = {"parts": {}, "total": {}}
+    out: dict = {"parts": {}, "total": {}, "leaves": []}
     tier = None
+    listing = False
     for line in path.read_text().splitlines():
+        leaf = TD_LEAF.match(line) if listing else None
+        if leaf:
+            out["leaves"].append(leaf.groups())
+            continue
+        listing = bool(TD_DIFFERS.match(line))
+        for key, regex in (("ref", TD_REF), ("new", TD_NEW)):
+            found = regex.match(line)
+            if found:
+                out["total"][key] = found.group(1).strip()
         row = TD_ROW.match(line)
         if row:
             names = ("d", "z_sym", "z_away", "hw", "status")
@@ -337,6 +369,8 @@ def parse_td(path: Path) -> dict:
                 out["total"].update(zip(names, hit.groups()))
     if "failing" not in out["total"]:
         raise ToolError(f"{path} has no TD totals line (not a TD report)")
+    if "ref" not in out["total"] or "new" not in out["total"]:
+        raise ToolError(f"{path} has no REF and NEW lines: refused")
     out["total"].setdefault(
         "differing", NONE_LISTED if tier == "TD" else NOT_AVAILABLE
     )
@@ -460,10 +494,23 @@ class Builder:
                 "",
             ),
             ("Cross-check SHA-256", "meta", "crosscheck_sha", ""),
+            ("compare_runs text", "meta", "td_binding", ""),
         ]
-        return ["| Item | Value |", "|---|---|"] + [
+        out = ["| Item | Value |", "|---|---|"] + [
             f"| {name} | {self.ref(src, path, spec)} |"
             for name, src, path, spec in rows
+        ]
+        out.append(
+            f"| Cross-check commit | "
+            f"{self.ref('crosscheck', 'provenance/commit')} (same as "
+            f"official: {self.ref('meta', 'cross_commit_same')}) |"
+        )
+        differs = self.ref("meta", "cross_commit_differs")
+        return out + [
+            "",
+            "Cross-check commits that differ from the official commit: "
+            f"{differs} (a ledger-only later commit is allowed; both commits "
+            "are shown above).",
         ]
 
     def table_gate(self) -> list[str]:
@@ -1182,7 +1229,74 @@ def read_sources(paths: dict[str, Path], constants: dict) -> dict:
         )
     if sources["official_md"]["banner"] is None:
         raise ToolError("RESULTS.md has no label line")
+    if paths["official"].resolve() == paths["crosscheck"].resolve():
+        raise ToolError("the cross-check file is the official file: refused")
+    sources["td_binding"] = bind_td(sources, paths)
     return sources
+
+
+def same_run(text_path: str, results: Path) -> str | None:
+    """Say how a path printed by ``compare_runs`` matches a results file.
+
+    Returns "realpath" if both name the same directory, "trailing two path
+    components" if only their last two components agree (the text may have
+    been made with another prefix, for example ``run-1/full``), else None.
+    """
+    printed = Path(text_path)
+    printed = printed.parent if printed.name == "results.json" else printed
+    ours = results.parent
+    if printed.resolve() == ours.resolve():
+        return "realpath"
+    if printed.parts[-2:] == ours.parts[-2:]:
+        return "trailing two path components"
+    return None
+
+
+def bind_td(sources: dict, paths: dict[str, Path]) -> str:
+    """Tie the ``compare_runs`` text to the two results files (R17).
+
+    The text's REF line must be the official run and its NEW line the
+    cross-check, by realpath or, failing that, by the last two path
+    components (the tool cannot know the prefix the text was made under).
+    Every differing verdict-type leaf that the text lists must exist in both
+    results files with the printed values. No z value or verdict is
+    recomputed, so a text with the right paths and leaves but altered z
+    values is not detected; the owner compares the text with a rerun of
+    ``compare_runs``. Returns the sentence for the document.
+    """
+    total = sources["td"]["total"]
+    ref = same_run(total["ref"], paths["official"])
+    new = same_run(total["new"], paths["crosscheck"])
+    if ref is None or new is None:
+        swapped = same_run(total["ref"], paths["crosscheck"]) is not None
+        raise ToolError(
+            "the compare_runs text was made in the other order (REF is the "
+            "cross-check): rerun it with the official run first"
+            if swapped
+            else "the REF and NEW lines of the compare_runs text do not name "
+            f"the official and cross-check runs ({total['ref']!r}, "
+            f"{total['new']!r}): refused"
+        )
+    for path, was, now in sources["td"]["leaves"]:
+        keys = "/".join(
+            re.sub(r"^\[(\d+)\]$", r"\1", k) for k in path.split("/")
+        )
+        for name, text in (("official", was), ("crosscheck", now)):
+            try:
+                value = repr(walk(sources[name], keys))
+            except Missing:
+                raise ToolError(
+                    f"compare_runs lists {path}, which is not in the {name} "
+                    "results: refused"
+                ) from None
+            if value != text:
+                raise ToolError(
+                    f"compare_runs lists {path} as {text} for the {name} "
+                    f"run, the results store {value}: refused"
+                )
+    return (
+        f"REF is the official run and NEW the cross-check (by {ref} and {new})"
+    )
 
 
 def manifest_text(name: str, sha: str, given: str | None, needed: bool) -> str:
@@ -1198,6 +1312,37 @@ def manifest_text(name: str, sha: str, given: str | None, needed: bool) -> str:
     if given.lower() != sha:
         raise ToolError(f"{name} SHA-256 {sha} differs from the manifest hash")
     return "given"
+
+
+def require_frozen_run(prov: dict, what: str, backend: str) -> None:
+    """Refuse a confirmatory run that is not the frozen kind (A9, R16).
+
+    Both runs must be complete and clean. The official run must be a CPU run
+    with ``LPC_THREADS`` 8 (v3 section 9 items 2 and 3); the cross-check must
+    be a GPU run. Applied to confirmatory builds only: development runs, such
+    as the DEV-2 pair, are built whatever they recorded. The cross-check's
+    commit may differ from the official one; it is printed, not refused.
+    """
+    wanted = {"complete": True, "dirty": False}
+    if what == "official":
+        wanted["LPC_THREADS"] = "8"
+    for key, required in wanted.items():
+        found = (
+            (prov.get("env") or {}).get(key)
+            if key == "LPC_THREADS"
+            else prov.get(key)
+        )
+        if found != required:
+            raise ToolError(
+                f"{what} run: {key} is {found!r}, required {required!r}: "
+                "refused"
+            )
+    found = (prov.get("device") or {}).get("backend")
+    if found != backend:
+        raise ToolError(
+            f"{what} run: device backend is {found!r}, required {backend!r}: "
+            "refused"
+        )
 
 
 def make_meta(
@@ -1227,6 +1372,11 @@ def make_meta(
     if sources["official_md"]["banner"] != banner_rule(official):
         raise ToolError("RESULTS.md label line differs from provenance.label")
     confirmatory = mode == "confirmatory"
+    if confirmatory:
+        require_frozen_run(official, "official", "cpu")
+        require_frozen_run(cross, "cross-check", "gpu")
+    if shas["official"] == shas["crosscheck"]:
+        raise ToolError("official and cross-check results are the same file")
     if confirmatory and not (release_ref and RELEASE_REF.match(release_ref)):
         raise ToolError(
             "a confirmatory build needs --release-ref ledger-seq-<n> "
@@ -1259,7 +1409,17 @@ def make_meta(
             else "none given (development)"
         ),
         "release_ref": (
-            release_ref if confirmatory else "none (development dry run)"
+            f"{release_ref} (format checked only; not verified against the "
+            "ledger by this tool)"
+            if confirmatory
+            else "none (development dry run)"
+        ),
+        "td_binding": sources["td_binding"],
+        "cross_commit_same": (
+            "yes" if official.get("commit") == cross.get("commit") else "no"
+        ),
+        "cross_commit_differs": (
+            "0" if official.get("commit") == cross.get("commit") else "1"
         ),
         "trace_name": f"{stem}.trace.csv",
         "mode_notice": (
@@ -1388,26 +1548,27 @@ def split_sections(text: str) -> list[tuple[str, list[str]]]:
 
 def merge_free_slots(
     expected: str, actual: str
-) -> tuple[str, list[str], list[str]]:
+) -> tuple[str, list[tuple[int, str, bool]], list[str]]:
     """Put a fresh render's text into the two free slots of the document.
 
-    The body of section 11 may differ, and section 9 may carry extra dated
-    lines after the rendered ones. Returns ``(text, free, problems)``: the
-    document with those slots replaced by the fresh text (so that line
-    positions match the trace again), the lines taken out of the slots (to be
-    scanned for digits), and a problem for each extra section 9 line that is
-    not dated.
+    The body of section 11 may differ, and section 9 may carry extra lines
+    after the rendered ones. Returns ``(text, free, problems)``: the document
+    with those slots replaced by the fresh text (so that line positions match
+    the trace again); the lines taken out of the slots as ``(document line,
+    text, dated)`` (``dated`` is True for section 9), to be checked by
+    ``check_free_slots``; and a problem if the headings differ.
     """
     want, have = split_sections(expected), split_sections(actual)
     if [h for h, _ in want] != [h for h, _ in have]:
         return actual, [], ["the section headings differ from a fresh render"]
     lines: list[str] = []
-    free: list[str] = []
-    problems: list[str] = []
+    free: list[tuple[int, str, bool]] = []
+    start = 0  # index of the first line of the section in the document
     for (heading, fresh), (_, found) in zip(want, have):
         body = found
+        first = start + (1 if heading else 0)
         if heading.startswith("## 11."):
-            free += found
+            free += [(first + k + 1, x, False) for k, x in enumerate(found)]
             body = fresh
         elif heading.startswith("## 9."):
             fresh_trim, found_trim = list(fresh), list(found)
@@ -1416,16 +1577,89 @@ def merge_free_slots(
             while found_trim and not found_trim[-1]:
                 found_trim.pop()
             if found_trim[: len(fresh_trim)] == fresh_trim:
-                extra = found_trim[len(fresh_trim) :]
-                free += extra
-                body = fresh
-                problems += [
-                    f"section 9: extra line is not a dated line: {x!r}"
-                    for x in extra
-                    if x and not DATED_LINE.match(x)
+                k0 = len(fresh_trim)
+                free += [
+                    (first + k0 + k + 1, x, True)
+                    for k, x in enumerate(found_trim[k0:])
                 ]
+                body = fresh
         lines += ([heading] if heading else []) + body
-    return "\n".join(lines), free, problems
+        start += (1 if heading else 0) + len(found)
+    return "\n".join(lines), free, []
+
+
+def check_free_slots(
+    free: list[tuple[int, str, bool]], constants: dict, floor: date | None
+) -> list[str]:
+    """Check the text of the two free slots (R18, R19).
+
+    Free text may say what the student thinks, and nothing that looks like
+    a number, a status or a section. In section 11 and in the dated lines of
+    section 9 (``- YYYY-MM-DD: text``, a real calendar date not before the
+    official run ended) it must have: no numeric character of any kind (the
+    Unicode categories Nd, Nl and No, and any character with a numeric
+    value), except the 14 hypothesis names such as H2a; no heading line; no
+    ``[TAG]``; none of the words banned in PRE-REGISTERED sections or listed
+    as ``free_slot_refused`` in ``design_constants.json`` (case-insensitive,
+    whole words: promoted, pre-registered, provisional, verified, gate and
+    others). Problems name the document line.
+    """
+    ids = {
+        i["key"]
+        for i in constants["identifiers"]
+        if re.match(r"H\d[a-e]$", i["key"])
+    }
+    words = constants["banned_phrases"] + constants["free_slot_refused"]
+    problems = []
+    for number, text, dated in free:
+        if not text.strip():
+            continue
+        where = f"line {number}"
+        if dated:
+            found = DATED_LINE.match(text)
+            try:
+                when = date.fromisoformat(found.group(1)) if found else None
+            except ValueError:
+                when = None
+            if found is None or when is None:
+                problems.append(
+                    f"{where}: extra section 9 line is not '- <real date>: "
+                    f"text': {text!r}"
+                )
+                continue
+            if floor is not None and when < floor:
+                problems.append(f"{where}: date {when} is before the run ended")
+            text = text[found.end() :]
+        if text.lstrip().startswith("#"):
+            problems.append(f"{where}: heading inside a free slot")
+        clean = HYPOTHESIS_ID.sub(
+            lambda m: " " if m.group(0) in ids else m.group(0), text
+        )
+        for ch in clean:
+            if unicodedata.category(ch) in ("Nd", "Nl", "No") or (
+                unicodedata.numeric(ch, None) is not None
+            ):
+                problems.append(
+                    f"{where}: numeric character {ch!r} in a free slot "
+                    "(write numbers as words)"
+                )
+                break
+        if STATUS_TAG.search(text):
+            problems.append(f"{where}: a [TAG] inside a free slot")
+        for word in words:
+            if re.search(rf"\b{re.escape(word)}\b", text, re.I):
+                problems.append(
+                    f"{where}: refused word {word!r} in a free slot"
+                )
+    return problems
+
+
+def run_end_date(official: dict) -> date | None:
+    """Return the date the official run ended (None if not stored)."""
+    try:
+        return date.fromisoformat(official["provenance"]["end_utc"][:10])
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def diff_sections(expected: str, actual: str) -> list[str]:
@@ -1508,7 +1742,7 @@ def untraced_numbers(lines: list[str], rows: list[dict]) -> list[str]:
             masked[k] = masked[k][:col] + " " * n + masked[k][col + n :]
     bad = []
     for k, line in enumerate(masked):
-        clean = IDENTIFIER.sub(" ", DATED_LINE.sub("- : ", line, count=1))
+        clean = IDENTIFIER.sub(" ", line)
         hit = re.search(r"\d", clean)
         if hit:
             bad.append(
@@ -1624,6 +1858,9 @@ def run_check(directory: Path, stem: str, override: dict) -> int:
         fresh, builder = build_document(sources, constants, Path(tmp), stem)
         merged, free, extra = merge_free_slots(fresh, actual)
         problems += extra + diff_sections(fresh, merged)
+        problems += check_free_slots(
+            free, constants, run_end_date(sources["official"])
+        )
         lines = merged.split("\n")
         if builder.meta != record["meta"]:
             problems.append("meta values differ from a fresh render")
@@ -1650,7 +1887,7 @@ def run_check(directory: Path, stem: str, override: dict) -> int:
             if not old.is_file() or old.read_bytes() != new.read_bytes():
                 problems.append(f"figure {name} differs from a fresh render")
     problems += check_rows(rows, lines, sources)
-    problems += untraced_numbers(lines, rows) + untraced_numbers(free, [])
+    problems += untraced_numbers(lines, rows)
     problems += check_text(lines, sources, rows)
     for p in problems[:50]:
         print(f"CHECK FAIL: {p}")

@@ -11,6 +11,8 @@
     "official_md": null
   },
   "meta": {
+    "cross_commit_differs": "1",
+    "cross_commit_same": "no",
     "crosscheck_sha": "f0649d75eb9d341b210c75a05460ef7ef5f507f6fa157437d94c12ecf13e52b2",
     "design_levels_1": "12",
     "design_levels_3": "15",
@@ -65,6 +67,7 @@
     "official_md_sha": "9ee9b8493c4df67acd18c2ae348cc8c230de36529decf469bdfbacb8c0f65b55",
     "official_sha": "5e2eaf6824c06f19c30f1d0fc9e06b663e7fa74281ec1fb3feaa98154a6dd752",
     "release_ref": "none (development dry run)",
+    "td_binding": "REF is the official run and NEW the cross-check (by realpath and realpath)",
     "trace_name": "2026-10-19-prelim-findings-dryrun-dev2.trace.csv"
   },
   "release_ref": null,

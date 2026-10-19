@@ -77,7 +77,11 @@ def set_path(tree: dict, path: str, value: object) -> None:
     tree[keys[-1]] = value
 
 
-def make_results(kind: str = "development", gate: dict | None = None) -> dict:
+def make_results(
+    kind: str = "development",
+    gate: dict | None = None,
+    backend: str = "cpu",
+) -> dict:
     """Build a small results file whose every quoted leaf is planted."""
     confirmatory = kind == "confirmatory"
     out = {
@@ -97,7 +101,7 @@ def make_results(kind: str = "development", gate: dict | None = None) -> dict:
             "wall_seconds": 12345.6,
             "start_utc": "2026-01-02T03:04:05+00:00",
             "end_utc": "2026-01-02T06:07:08+00:00",
-            "device": {"backend": "cpu"},
+            "device": {"backend": backend},
             "env": {"LPC_THREADS": "8"},
         },
         "systems": {},
@@ -183,11 +187,19 @@ def make_markdown(results: dict) -> str:
 def make_td(
     differing: str | None = "2", tier: str | None = "TD", result: str = "PASS"
 ) -> str:
-    """Build a compare_runs text with hand-typed z values."""
+    """Build a compare_runs text with hand-typed z values.
+
+    ``REFDIR`` and ``NEWDIR`` stand for the two run directories; ``render_args``
+    replaces them. The one listed leaf has the same stored value in both runs.
+    """
     lines = [f"tier: {tier} (x)"] if tier else ["mode: --td-only"]
+    lines += ["REF: REFDIR", "NEW: NEWDIR"]
     if differing is not None:
         lines.append(
             f"TD: {differing} verdict-type leaves differ (reported, no failure):"
+        )
+        lines.append(
+            "      systems/lorenz63/H2a/part_i_verdict: 'pass' -> 'pass'"
         )
     lines.append("  system    part   d z_sym z_away  hw1/hw0  status")
     for n, s in enumerate(SYSTEMS):
@@ -216,8 +228,12 @@ def write_run(directory: Path, results: dict) -> Path:
 def render_args(tmp: Path, **extra) -> Namespace:
     """Arguments of ``render`` over synthetic runs written under ``tmp``."""
     write_run(tmp / "official", extra.pop("official", None) or make_results())
-    write_run(tmp / "cross", extra.pop("cross", None) or make_results())
-    (tmp / "td.txt").write_text(extra.pop("td", None) or make_td())
+    write_run(
+        tmp / "cross", extra.pop("cross", None) or make_results(backend="gpu")
+    )
+    text = extra.pop("td", None) or make_td()
+    text = text.replace("REFDIR", str(tmp / "official"))
+    (tmp / "td.txt").write_text(text.replace("NEWDIR", str(tmp / "cross")))
     base = {
         "official": str(tmp / "official"),
         "crosscheck": str(tmp / "cross"),
@@ -282,7 +298,9 @@ def bad(tmp_path_factory):
     official["verdicts"]["H2a"].update(verdict="not supported")
     official["verdicts"]["H2b"].update(verdict="inconclusive")
     return fast_build(
-        tmp, official=official, cross=make_results(gate={"chua": False})
+        tmp,
+        official=official,
+        cross=make_results(gate={"chua": False}, backend="gpu"),
     )
 
 
@@ -827,7 +845,7 @@ def conf_args(tmp: Path) -> Namespace:
     return render_args(
         tmp,
         official=make_results("confirmatory"),
-        cross=make_results("confirmatory"),
+        cross=make_results("confirmatory", backend="gpu"),
     )
 
 
@@ -907,7 +925,9 @@ def test_guard_refuses_inconsistent_kind_and_development_file(tmp_path) -> None:
     args.development = str(tmp_path / "c" / "conf")
     with pytest.raises(fb.ToolError, match="must be a development run"):
         fb.render(args)
-    mixed = render_args(tmp_path / "d", cross=make_results("confirmatory"))
+    mixed = render_args(
+        tmp_path / "d", cross=make_results("confirmatory", backend="gpu")
+    )
     with pytest.raises(fb.ToolError, match="different kinds"):
         fb.render(mixed)
 
@@ -1244,3 +1264,203 @@ def test_render_is_deterministic(built, tmp_path) -> None:
     ]
     for name in names:
         assert fb.sha256_of(out / name) == fb.sha256_of(second / name), name
+
+
+# --- fix round 2: provenance (R16), the compare_runs text (R17), free slots ---
+def conf_render(tmp: Path, monkeypatch, edit_official=None, edit_cross=None):
+    """Render a confirmatory pair with all guards satisfied, after edits."""
+    monkeypatch.setattr(fb, "git_freeze_commit", lambda root: "c" * 40)
+    official = make_results("confirmatory")
+    cross = make_results("confirmatory", backend="gpu")
+    if edit_official:
+        edit_official(official["provenance"])
+    if edit_cross:
+        edit_cross(cross["provenance"])
+    args = render_args(tmp, official=official, cross=cross)
+    args.release_ref = "ledger-seq-3"
+    args.manifest_official = fb.sha256_of(tmp / "official" / "results.json")
+    args.manifest_official_md = fb.sha256_of(tmp / "official" / "RESULTS.md")
+    args.manifest_crosscheck = fb.sha256_of(tmp / "cross" / "results.json")
+    with stub_figures():
+        return args, fb.render(args)
+
+
+def test_confirmatory_provenance_is_enforced(tmp_path, monkeypatch) -> None:
+    """The official run must be a clean, complete, 8-thread CPU run (A9, R16).
+
+    Each edit below makes a confirmatory render refuse with a message naming
+    the field; the cross-check must be clean, complete and a GPU run, and not
+    the official file. The unedited pair renders. The same edits do not stop a
+    development build (DEV-2 recorded other values).
+    """
+    refused = {
+        "dirty": (lambda p: p.update(dirty=True), None, "dirty"),
+        "incomplete": (lambda p: p.update(complete=False), None, "complete"),
+        "gpu official": (lambda p: p["device"].update(backend="gpu"), None, "backend"),
+        "one thread": (lambda p: p["env"].update(LPC_THREADS="1"), None, "LPC_THREADS"),
+        "no threads": (lambda p: p["env"].pop("LPC_THREADS"), None, "LPC_THREADS"),
+        "cross dirty": (None, lambda p: p.update(dirty=True), "dirty"),
+        "cross incomplete": (None, lambda p: p.update(complete=False), "complete"),
+        "cross cpu": (None, lambda p: p["device"].update(backend="cpu"), "backend"),
+    }  # fmt: skip
+    for name, (edit_o, edit_c, word) in refused.items():
+        with pytest.raises(fb.ToolError, match=word):
+            conf_render(
+                tmp_path / name.replace(" ", "_"), monkeypatch, edit_o, edit_c
+            )
+    args, code = conf_render(tmp_path / "ok", monkeypatch)
+    assert code == 0
+    text = doc_of(Path(args.out))
+    assert "not verified against the ledger" in text
+    assert "(format checked only" in text
+    dev = make_results()
+    dev["provenance"].update(dirty=True, complete=False)
+    dev["provenance"]["env"]["LPC_THREADS"] = "1"
+    fast_build(tmp_path / "dev", official=dev)
+
+
+def test_same_file_cross_check_is_refused(tmp_path) -> None:
+    """The official file passed as its own cross-check is refused (R16)."""
+    args = render_args(tmp_path)
+    args.crosscheck = args.official
+    with pytest.raises(fb.ToolError, match="same file|is the official"):
+        fb.render(args)
+    twin = write_run(tmp_path / "twin", make_results())
+    args = render_args(tmp_path / "x", cross=make_results())
+    shutil.copy(
+        twin / "results.json", tmp_path / "x" / "cross" / "results.json"
+    )
+    shutil.copy(
+        twin / "results.json", tmp_path / "x" / "official" / "results.json"
+    )
+    with pytest.raises(fb.ToolError, match="same file"):
+        fb.render(args)
+
+
+def test_cross_check_commit_may_differ_but_is_shown(tmp_path) -> None:
+    """A later commit of the cross-check is printed and counted, not refused."""
+    other = make_results(backend="gpu")
+    other["provenance"]["commit"] = "d" * 40
+    text = doc_of(fast_build(tmp_path / "a", cross=other))
+    assert f"| Cross-check commit | {'d' * 40} (same as official: no) |" in text
+    assert (
+        "Cross-check commits that differ from the official commit: 1 " in text
+    )
+    same = doc_of(fast_build(tmp_path / "b"))
+    assert (
+        f"| Cross-check commit | {'c' * 40} (same as official: yes) |" in same
+    )
+    assert (
+        "Cross-check commits that differ from the official commit: 0 " in same
+    )
+
+
+def test_compare_runs_text_is_bound_to_the_two_files(tmp_path) -> None:
+    """REF and NEW must be the official and cross-check runs; leaves must match.
+
+    Refused: the other order (with a message saying so), paths of other runs,
+    a listed leaf that does not exist in a results file, a listed leaf whose
+    printed value differs from the stored one. Accepted: the same directories
+    under another prefix (last two path components). The z values are not
+    recomputed, so none of this detects an altered z; the docstring says so.
+    """
+    base = tmp_path / "base"
+    render_args(base)
+    paths = {
+        "official": base / "official" / "results.json",
+        "official_md": base / "official" / "RESULTS.md",
+        "crosscheck": base / "cross" / "results.json",
+        "td": base / "td.txt",
+    }
+
+    def load(text: str):
+        paths["td"].write_text(
+            text.replace("REFDIR", str(base / "official")).replace(
+                "NEWDIR", str(base / "cross")
+            )
+        )
+        return fb.read_sources(paths, CONSTANTS)
+
+    assert "REF is the official run" in load(make_td())["td_binding"]
+    swapped = make_td().replace("REFDIR", "TMPX").replace("NEWDIR", "REFDIR")
+    with pytest.raises(fb.ToolError, match="other order"):
+        load(swapped.replace("TMPX", "NEWDIR"))
+    with pytest.raises(fb.ToolError, match="do not name"):
+        load(make_td().replace("REFDIR", "/elsewhere/run/full"))
+    with pytest.raises(fb.ToolError, match="which is not in the official"):
+        load(make_td().replace("H2a/part_i_verdict", "H2a/no_such_leaf"))
+    with pytest.raises(fb.ToolError, match="the results store"):
+        load(make_td().replace("'pass' -> 'pass'", "'pass' -> 'fail'"))
+    prefix = f"/other/prefix/{base.name}/"
+    moved = make_td().replace("REFDIR", prefix + "official")
+    moved = moved.replace("NEWDIR", prefix + "cross")
+    assert "trailing two path components" in load(moved)["td_binding"]
+    with pytest.raises(fb.ToolError, match="no REF and NEW"):
+        load(make_td().replace("REF: REFDIR\n", ""))
+
+
+ATTACKS = [
+    "§ 0.938 of the states",
+    "r947 and QA.73 and PRIME.14 and LPC.PC.95",
+    "DEF-0947 and WU-0938.1 and D14 and item 7",
+    "# 42. percent",
+    "CONF-9 and rho-5%",
+    "⁹⁵ percent of them",
+    "¾ of the parts",
+    "٣ cases and １２ cases and Ⅻ",
+    "**CONFIRMATORY: PROMOTED** All three are supported.",
+    "### Verdicts [PRE-REGISTERED]",
+    "so the study proves the theory",
+    "PROVISIONAL is lifted and H2b is supported",
+    "this was verified by hand",
+    "the gate passed after all",
+    "a [STUDENT] note",
+    "Results are UNPROMOTED no more",
+]
+DATED_ATTACKS = [
+    "- 0938-09-47: agreed",
+    "- 2026-02-30: agreed",
+    "- 2025-01-01: agreed",
+    "- 2026-10-19: GPU cross-check agreed; PROVISIONAL is lifted and H2b is supported.",
+    "- 2026-10-19: see item 3",
+    "- 2026-10-19: agreed to five digits and 3 more",
+    "- 2026-10-19 agreed",
+]
+
+
+def test_free_slot_attacks_are_refused(fast, tmp_path) -> None:
+    """Every free-slot attack of the second review fails ``check`` (R18, R19).
+
+    The strings are typed here: identifier shapes carrying digits, numerals of
+    other Unicode categories (superscript, vulgar fraction, Arabic-Indic,
+    fullwidth, Roman), status claims, headings and tags, and bad dates. Each
+    goes in section 11 or as a section 9 line and must fail; a digit problem
+    names the document line. Plain student words with hypothesis names pass.
+    """
+    student = "The student writes this section"
+    for k, text in enumerate(ATTACKS):
+        assert (
+            check_copy(
+                fast,
+                tmp_path,
+                f"a{k}",
+                lambda t: t.replace(student, text + "\n" + student),
+            )
+            == 1
+        ), text
+    for k, text in enumerate(DATED_ATTACKS):
+        edit = lambda t: t.replace(
+            "## 10. Limitations", text + "\n\n## 10. Limitations"
+        )  # noqa: E731
+        assert check_copy(fast, tmp_path, f"d{k}", edit) == 1, text
+    fine = "H2a and H3c are inconclusive, so the picture is mixed."
+    edit = lambda t: t.replace(student, fine + "\n" + student)  # noqa: E731
+    assert check_copy(fast, tmp_path, "fine", edit) == 0
+    # The message names the document line, not the line inside the slot.
+    doc = doc_of(fast).split("\n")
+    at = next(i for i, x in enumerate(doc) if x.startswith(student)) + 1
+    free = [(at, "I saw ⁹⁵ percent", False)]
+    problems = fb.check_free_slots(free, CONSTANTS, None)
+    assert problems and problems[0].startswith(f"line {at}:")
+    free = [(7, "- 2026-10-19: 3 cases", True)]
+    assert fb.check_free_slots(free, CONSTANTS, None)[0].startswith("line 7:")

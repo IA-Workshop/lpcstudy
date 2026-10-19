@@ -681,5 +681,17 @@
     "rossler",
     "chua"
   ],
-  "systems_v3": "§4 (the three systems of the study); v3 §7 (a system with no result is inconclusive)"
+  "systems_v3": "§4 (the three systems of the study); v3 §7 (a system with no result is inconclusive)",
+  "free_slot_refused": [
+    "promoted",
+    "unpromoted",
+    "pre-registered",
+    "verified",
+    "unverified",
+    "provisional",
+    "confirmatory",
+    "development",
+    "preliminary",
+    "gate"
+  ]
 }
