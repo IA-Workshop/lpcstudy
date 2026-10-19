@@ -1,9 +1,10 @@
 {
+  "cwd": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-polish",
   "files": {
-    "crosscheck": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-build/runs/dev/prelim-dryrun/crosscheck/results.json",
-    "official": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-build/runs/dev/prelim-dryrun/official/results.json",
-    "official_md": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-build/runs/dev/prelim-dryrun/official/RESULTS.md",
-    "td": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-build/docs/agent/notes/2026-10-19-prelim-dryrun-compare-R6-vs-R5.txt"
+    "crosscheck": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-polish/runs/dev/prelim-dryrun/crosscheck/results.json",
+    "official": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-polish/runs/dev/prelim-dryrun/official/results.json",
+    "official_md": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-polish/runs/dev/prelim-dryrun/official/RESULTS.md",
+    "td": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-polish/docs/agent/notes/2026-10-19-prelim-dryrun-compare-R6-vs-R5.txt"
   },
   "manifest": {
     "crosscheck": null,
@@ -11,6 +12,7 @@
     "official_md": null
   },
   "meta": {
+    "cross_commit_check": "not checked (development run)",
     "cross_commit_differs": "1",
     "cross_commit_same": "no",
     "crosscheck_sha": "f0649d75eb9d341b210c75a05460ef7ef5f507f6fa157437d94c12ecf13e52b2",

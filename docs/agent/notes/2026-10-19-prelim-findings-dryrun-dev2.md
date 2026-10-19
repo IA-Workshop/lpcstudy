@@ -38,7 +38,7 @@ The study asks whether four measurable local conditions of a chaotic system (rec
 | compare_runs text | REF is the official run and NEW the cross-check (by realpath and realpath) |
 | Cross-check commit | 6f1a8c854f35552546a3dd68f56b2b5de416f3de (same as official: no) |
 
-Cross-check commits that differ from the official commit: 1 (a ledger-only later commit is allowed; both commits are shown above).
+Cross-check commits that differ from the official commit: 1 (a later commit is allowed only if `git diff --name-only` shows paths under docs/agent/records/ or the ledger alone; check: not checked (development run); both commits are shown above).
 
 ## 3. Validation gate (experiment E0) [PRE-REGISTERED]
 
