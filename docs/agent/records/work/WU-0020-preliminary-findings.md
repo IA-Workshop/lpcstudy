@@ -104,6 +104,8 @@ Detail, the section list, the pipeline and the owner decisions D1 to D10 are in 
 
 ## Log
 
+- 2026-10-19: WU-0020.5 drafted on branch wu/prelim-poster by claude-sonnet-5-5: `docs/agent/notes/2026-10-19-prelim-poster-outline.md` (number-free poster outline, 10-slide variant, highlights H2c/H2e/H3a/Q-N fixed per D10, figure/table and honesty checklists). Documents only: no code, no tests, no runs, no sealed data read. Wording review by owner and student pending.
+
 ## Review
 
 - **Reviewer:**
