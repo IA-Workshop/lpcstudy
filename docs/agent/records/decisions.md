@@ -645,3 +645,15 @@ Entries DEC-0030, DEC-0031 and DEC-0032 were entered with owner brackets unfille
 - **DEC-0032 item 8, B11:** the governance reread (LPC.PC.25, WU-0004.8) is performed by the human owner; the owner's name is entered in the ledger note of that entry.
 
 **Status:** owner answers; recorded pending the owner's ledger entry (the `ruling` entry of `tools/owner_freeze_run.sh ledger` covers DEC-0028 to DEC-0033 and this addendum).
+
+## DEC-0034: Owner lifts the compute caps for production runs (2026-10-19, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `authorization` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim: "all caps are hereby lifted for all production runs. caps were to limit churn and resource wastage during development".
+
+**Reading, for the owner to correct.** The caps are the limits of LPC.AUTH.3 (`authorizations.md`, row "Limits"): each run under 12 hours wall-clock, and at most 60 GPU-hours per calendar week. They no longer bind a production run: the sealed official CPU run, its GPU cross-check (WU-0015.2b), and any further run the owner designates as production. The earlier lift of the LPC.AUTH.2 page cap (DEC-0009) stands. The caps were set to limit churn and wasted resources during development, so they stay in force for development runs started through `tools/run_preset.sh` (its `timeout 12h` and the weekly check of `tools/gpu_hours.py`) until the owner says otherwise.
+
+**What this does not change.** One GPU job at a time under the lock (it serializes the card and keeps runs comparable; it is not a cost cap). The seed rules (LPC.PC.7), the per-action authorization of every use of the sealed seed (LPC.AUTH.6), the dirty-tree and commitment refusals, and the recording of wall-clock time and GPU hours per run (the tally is a report, no longer a limit, for production runs). The acceptance line of ROADMAP WU-0015.2 ("wall-clock under 12 h") stays a measured and reported figure; a run past it is reported, not refused.
+
+**Effect now.** Nothing in the plan is blocked by a cap: the official CPU run takes about 4.7 h, the GPU cross-check about 0.8 h, and the tally for the week is 0 GPU-hours of 60. The change matters for longer runs (a scaled-up ensemble), where the `timeout 12h` in the launch commands may be raised or left off.
+
+**Affects:** LPC.AUTH.3, WU-0015.2, WU-0015.2b, any scaled-up ensemble. **Status:** owner instruction; recorded pending the owner's ledger entry. Suggested entry (the owner's act): `python3 tools/ledger.py append --type authorization --actor "<you>" --role "human owner" --authority "LPC.AUTH.3; DEC-0034" --summary "Compute caps of LPC.AUTH.3 (12 h per run, 60 GPU-hours per week) lifted for production runs" --data '{"ruled_on": "2026-10-19", "quote": "all caps are hereby lifted for all production runs. caps were to limit churn and resource wastage during development", "source": "decisions.md DEC-0034"}'`.
