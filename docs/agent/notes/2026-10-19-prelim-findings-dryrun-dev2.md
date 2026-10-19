@@ -5,7 +5,7 @@ PRELIMINARY: internal to the owner and the student until promotion (QA.11, LPC.P
 
 # Preliminary findings for seed DEV-2
 
-This document is built by `tools/findings_build.py` from the files named in §2. Every number in it is either read from one of those files (and listed in the trace file) or is a design constant of the v3 proposal that cites its section. The build computes no statistic and no verdict. Agents write the tables and this frame; the student writes §11.
+This document is built by `tools/findings_build.py` from the files named in §2. Every number in it is either read from one of those files (and listed in the trace file) or is a design constant of the v3 proposal that cites its section. The build computes no statistic and no verdict. Agents write the tables and this frame; the student writes §11. `check` re-renders the whole document and accepts a difference only in §11 and in dated lines appended to §9.
 
 ## 1. The question
 
@@ -29,12 +29,12 @@ The study asks whether four measurable local conditions of a chaotic system (rec
 | Start (UTC) | 2026-10-17T16:43:13+00:00 |
 | End (UTC) | 2026-10-17T21:27:02+00:00 |
 | SHA-256 of results.json | 5e2eaf6824c06f19c30f1d0fc9e06b663e7fa74281ec1fb3feaa98154a6dd752 |
-| Manifest check | no manifest row given (development) |
+| SHA-256 of RESULTS.md | 9ee9b8493c4df67acd18c2ae348cc8c230de36529decf469bdfbacb8c0f65b55 |
+| Manifest hashes | none given (development) |
 | Release reference | none (development dry run) |
 | Cross-check seed id | DEV-2 |
 | Cross-check backend | gpu |
 | Cross-check SHA-256 | f0649d75eb9d341b210c75a05460ef7ef5f507f6fa157437d94c12ecf13e52b2 |
-| Cross-check manifest | no manifest row given (development) |
 
 ## 3. Validation gate (experiment E0) [PRE-REGISTERED]
 
@@ -50,7 +50,11 @@ Checks V1 to V7 of v3 §6, per system. A system whose gate failed is marked PROV
 | lorenz63 | V4 | median_half_width at the design M | 0.029 | median half-width ≤ 0.05 | yes |
 | lorenz63 | V5 | km_max_abs_dev | 0.00583 | deviation < 0.01 | yes |
 | lorenz63 | V6 | integrator_max_dev_sigma | 2.18e-05 | change < 10⁻³ σ_x | yes |
-| lorenz63 | V7 | median_slope | 1.0008 | slope in [0.9, 1.1] | yes |
+| lorenz63 | V7 | median_slope | 1.0008 | median slope and median δ/(ρν) at every ρ in [0.9, 1.1] | yes |
+| lorenz63 | V7 | efficiency_median rho-0.5% | 1.0040 |  |  |
+| lorenz63 | V7 | efficiency_median rho-1% | 1.0055 |  |  |
+| lorenz63 | V7 | efficiency_median rho-2% | 1.0072 |  |  |
+| lorenz63 | V7 | efficiency_median rho-5% | 1.0112 |  |  |
 | lorenz63 | gate | gate_pass | | | yes |
 | rossler | V1 | delay_jacobian_rel_err | 1.21e-09 | relative error < 10⁻⁴ | yes |
 | rossler | V1 | gain_rel_err | 1.55e-09 |  |  |
@@ -60,7 +64,11 @@ Checks V1 to V7 of v3 §6, per system. A system whose gate failed is marked PROV
 | rossler | V4 | median_half_width at the design M | 0.035 | median half-width ≤ 0.05 | yes |
 | rossler | V5 | km_max_abs_dev | 0.00583 | deviation < 0.01 | yes |
 | rossler | V6 | integrator_max_dev_sigma | 3.06e-05 | change < 10⁻³ σ_x | yes |
-| rossler | V7 | median_slope | 1.0000 | slope in [0.9, 1.1] | yes |
+| rossler | V7 | median_slope | 1.0000 | median slope and median δ/(ρν) at every ρ in [0.9, 1.1] | yes |
+| rossler | V7 | efficiency_median rho-0.5% | 0.9967 |  |  |
+| rossler | V7 | efficiency_median rho-1% | 0.9961 |  |  |
+| rossler | V7 | efficiency_median rho-2% | 0.9977 |  |  |
+| rossler | V7 | efficiency_median rho-5% | 0.9985 |  |  |
 | rossler | gate | gate_pass | | | yes |
 | chua | V1 | delay_jacobian_rel_err | 2.44e-09 | relative error < 10⁻⁴ | yes |
 | chua | V1 | gain_rel_err | 1.59e-09 |  |  |
@@ -70,7 +78,11 @@ Checks V1 to V7 of v3 §6, per system. A system whose gate failed is marked PROV
 | chua | V4 | median_half_width at the design M | 0.023 | median half-width ≤ 0.05 | yes |
 | chua | V5 | km_max_abs_dev | 0.00583 | deviation < 0.01 | yes |
 | chua | V6 | integrator_max_dev_sigma | 0.000334 | change < 10⁻³ σ_x | yes |
-| chua | V7 | median_slope | 1.0001 | slope in [0.9, 1.1] | yes |
+| chua | V7 | median_slope | 1.0001 | median slope and median δ/(ρν) at every ρ in [0.9, 1.1] | yes |
+| chua | V7 | efficiency_median rho-0.5% | 1.0002 |  |  |
+| chua | V7 | efficiency_median rho-1% | 1.0003 |  |  |
+| chua | V7 | efficiency_median rho-2% | 1.0007 |  |  |
+| chua | V7 | efficiency_median rho-5% | 1.0034 |  |  |
 | chua | gate | gate_pass | | | yes |
 
 > Every system passed the validation gate, so no result carries the PROVISIONAL mark.
@@ -107,90 +119,103 @@ Q-N is read from the §7 table and is never pass or fail. The hybrid's horizon g
 
 ## 5. The three primary hypotheses (E1, E2, E4, E5) [PRE-REGISTERED]
 
-Each row is one primary part on one system: the stored estimate, its interval at the level stored in the result (or the primary level of v3 §7 where the result stores none), the pass band of v3 §2 and the stored verdict. The two notes on every row are limitations stated before the run (v3 §8).
+Each row is one primary part on one system: the stored estimate, its interval at the level stored in the result (or the primary level of v3 §7 where the result stores none), the pass band of v3 §2 and the stored verdict. The two notes on every row are limitations stated before the run (v3 §8). Endpoints are rounded to four-digit precision for printing; every verdict uses the unrounded endpoints (v3 §7), so a printed edge can equal a band edge that the stored endpoint does not reach.
 
 | System | Part | Estimate | Interval | Level | Band | Verdict | Notes |
 |---|---|---|---|---|---|---|---|
-| lorenz63 | H2a(i) | 0.1011 | [0.0793, 0.1326] | 0.9833 | interval below 0.1 (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| lorenz63 | H2a(ii) zero | -0.03464 | [-0.09541, 0.03384] | 0.9833 | interval inside (−0.1, 0.1) (strict) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| lorenz63 | H2a(ii) interior | 0.1895 | [0.0903, 0.2886] | 0.9833 | interval inside (−0.1, 0.1) (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| lorenz63 | H2b(i) | 0.1907 | [0.1411, 0.242] | 0.9833 | lower bound > 0 (strict) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| lorenz63 | H2a(i) | 0.1011 | [0.0793, 0.1326] | 0.9833 (design value, not stored) | interval below 0.1 (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| lorenz63 | H2a(ii) zero | -0.03464 | [-0.09541, 0.03384] | 0.9833 (design value, not stored) | interval inside (−0.1, 0.1) (strict) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| lorenz63 | H2a(ii) interior | 0.1895 | [0.0903, 0.2886] | 0.9833 (design value, not stored) | interval inside (−0.1, 0.1) (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| lorenz63 | H2b(i) | 0.1907 | [0.1411, 0.242] | 0.9833 (design value, not stored) | lower bound > 0 (strict) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
 | lorenz63 | H2b(ii) | 0.08514 | [0.06243, 0.1102] | 0.9833 | lower bound > 0 (strict) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
 | lorenz63 | H3c | 0.7455 | [0.5661, 0.9016] | 0.9833 | upper bound ≤ 1.05 (closed) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| rossler | H2a(i) | 0.2917 | [0.2455, 0.3154] | 0.9833 | interval below 0.1 (strict) | fail | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| rossler | H2a(ii) zero | -0.05337 | [-0.1304, 0.0293] | 0.9833 | interval inside (−0.1, 0.1) (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| rossler | H2a(ii) interior | 0.02144 | [-0.06819, 0.1089] | 0.9833 | interval inside (−0.1, 0.1) (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| rossler | H2b(i) | 0.1405 | [0.08557, 0.192] | 0.9833 | lower bound > 0 (strict) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| rossler | H2a(i) | 0.2917 | [0.2455, 0.3154] | 0.9833 (design value, not stored) | interval below 0.1 (strict) | fail | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| rossler | H2a(ii) zero | -0.05337 | [-0.1304, 0.0293] | 0.9833 (design value, not stored) | interval inside (−0.1, 0.1) (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| rossler | H2a(ii) interior | 0.02144 | [-0.06819, 0.1089] | 0.9833 (design value, not stored) | interval inside (−0.1, 0.1) (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| rossler | H2b(i) | 0.1405 | [0.08557, 0.192] | 0.9833 (design value, not stored) | lower bound > 0 (strict) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
 | rossler | H2b(ii) | 0.04943 | [0.02753, 0.07171] | 0.9833 | lower bound > 0 (strict) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
 | rossler | H3c | 0.9677 | [0.9282, 1.014] | 0.9833 | upper bound ≤ 1.05 (closed) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| chua | H2a(i) | 0.1561 | [0.1253, 0.1849] | 0.9833 | interval below 0.1 (strict) | fail | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| chua | H2a(ii) zero | -0.07083 | [-0.1494, 0.007693] | 0.9833 | interval inside (−0.1, 0.1) (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| chua | H2a(ii) interior | 0.2236 | [0.08551, 0.3466] | 0.9833 | interval inside (−0.1, 0.1) (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
-| chua | H2b(i) | 0.2672 | [0.2122, 0.3186] | 0.9833 | lower bound > 0 (strict) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| chua | H2a(i) | 0.1561 | [0.1253, 0.1849] | 0.9833 (design value, not stored) | interval below 0.1 (strict) | fail | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| chua | H2a(ii) zero | -0.07083 | [-0.1494, 0.007693] | 0.9833 (design value, not stored) | interval inside (−0.1, 0.1) (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| chua | H2a(ii) interior | 0.2236 | [0.08551, 0.3466] | 0.9833 (design value, not stored) | interval inside (−0.1, 0.1) (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
+| chua | H2b(i) | 0.2672 | [0.2122, 0.3186] | 0.9833 (design value, not stored) | lower bound > 0 (strict) | pass | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
 | chua | H2b(ii) | 0.008392 | [-0.01395, 0.03061] | 0.9833 | lower bound > 0 (strict) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
 | chua | H3c | 0.9849 | [0.9364, 1.058] | 0.9833 | upper bound ≤ 1.05 (closed) | inconclusive | LM iteration error: not estimated; block-sensitive label: not computable for the sealed run |
 
-![F1: F1_primary](2026-10-19-prelim-findings-dryrun-dev2.figures/F1_primary.png)
+Level cells that show a design value: 12.
 
-*Figure F1 (experiments E1, E2, E4 and E5; v3 identifiers H2a, H2b and H3c). One panel per primary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples) at level 98.33%. The shaded region is the pass band of v3 §2. Marker shape and text give the stored verdict: filled circle pass, cross fail, open diamond inconclusive. A system that failed the validation gate is marked PROVISIONAL.*
+![F1](2026-10-19-prelim-findings-dryrun-dev2.figures/F1_primary.png)
+
+*Figure F1 (experiments E1, E2, E4 and E5; v3 identifiers H2a, H2b and H3c). One panel per primary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples) at level 98.33% (each panel states its level). The shaded region is the pass band of v3 §2. Marker shape and text give the stored verdict: filled circle pass, cross fail, open diamond inconclusive. A system that failed the validation gate is marked PROVISIONAL.*
+
+Cells written "not recorded" so far: 0. Null leaves written "not computed" so far: 0. The full list is in Appendix C.
 
 ## 6. Secondary hypotheses, Q-N, H3a counts and the gain bound (E2 to E5) [PRE-REGISTERED]
+
+Endpoints are rounded to four-digit precision for printing; every verdict uses the unrounded endpoints (v3 §7). The H2c row A4o minus A2 is reported with its interval and carries no verdict (v3 §2).
 
 | System | Part | Estimate | Interval | Level | Band | Verdict |
 |---|---|---|---|---|---|---|
 | lorenz63 | H1a rho-1% | 1.204 | [1.064, 1.349] | 0.9500 | interval inside [0.75, 1.25] (closed) | inconclusive |
 | lorenz63 | H1a rho-2% | 1.254 | [1.08, 1.419] | 0.9500 | interval inside [0.75, 1.25] (closed) | inconclusive |
-| lorenz63 | H1b PLP | 0.874 | [0.8401, 0.9152] | 0.95 | interval inside [0.8, 1.2] (closed) | pass |
-| lorenz63 | H1c PLP | 0.5652 | [0.5015, 0.6152] | 0.95 | interval inside [0.8, 1.25] (closed) | fail |
+| lorenz63 | H1b PLP | 0.874 | [0.8401, 0.9152] | 0.95 (design value, not stored) | interval inside [0.8, 1.2] (closed) | pass |
+| lorenz63 | H1c PLP | 0.5652 | [0.5015, 0.6152] | 0.95 (design value, not stored) | interval inside [0.8, 1.25] (closed) | fail |
 | lorenz63 | H1d analog seed | 0.7759 | [0.7451, 0.8028] | 0.9500 | lower bound ≥ 0.7 (closed) | pass |
 | lorenz63 | H1d estimation seed | 0.9127 | [0.8839, 0.9392] | 0.9500 | lower bound ≥ 0.7 (closed) | pass |
 | lorenz63 | H1d growth | 0.9857 | [0.9792, 0.991] | 0.9500 | lower bound ≥ 0.7 (closed) | pass |
-| lorenz63 | H2c A4 - A2 | 0.01523 | [0.005794, 0.02677] | 0.95 | upper bound < 0 (strict) | fail |
-| lorenz63 | H2c A4 - A1 | -0.01038 | [-0.01983, -0.003257] | 0.95 | upper bound < 0 (strict) | pass |
-| lorenz63 | H2d | 0.1684 | [-0.009443, 0.5028] | 0.95 | upper bound ≤ 0.10 (closed) | inconclusive |
+| lorenz63 | H2c A4 - A2 | 0.01523 | [0.005794, 0.02677] | 0.95 (design value, not stored) | upper bound < 0 (strict) | fail |
+| lorenz63 | H2c A4 - A1 | -0.01038 | [-0.01983, -0.003257] | 0.95 (design value, not stored) | upper bound < 0 (strict) | pass |
+| lorenz63 | H2c A4o - A2 (reported) | -0.0255 | [-0.03815, -0.01414] | 0.9500 | reported with its interval, no verdict (v3 §2 H2c) | reported |
+| lorenz63 | H2d | 0.1684 | [-0.009443, 0.5028] | 0.95 (design value, not stored) | upper bound ≤ 0.10 (closed) | inconclusive |
 | lorenz63 | H2e rho-1% | 0.3554 | [0.335, 0.3764] | 0.9500 | lower bound > 0 (strict) | pass |
 | lorenz63 | H2e rho-2% | 0.3124 | [0.2845, 0.341] | 0.9500 | lower bound > 0 (strict) | pass |
 | lorenz63 | H3b weight tree | 0.1072 | [0, 0.8625] | 0.9500 | interval inside [0, 0.2) (strict) | inconclusive |
 | lorenz63 | H3b horizon tree D | -0.2192 | [-0.4297, 0.2398] | 0.9500 | lower bound > 0 (strict) | inconclusive |
 | rossler | H1a rho-1% | 0.9209 | [0.8622, 0.9942] | 0.9500 | interval inside [0.75, 1.25] (closed) | pass |
 | rossler | H1a rho-2% | 0.786 | [0.6999, 0.8695] | 0.9500 | interval inside [0.75, 1.25] (closed) | inconclusive |
-| rossler | H1b PLP | 0.6705 | [0.6303, 0.7089] | 0.95 | interval inside [0.8, 1.2] (closed) | fail |
-| rossler | H1c PLP | 0.986 | [0.9397, 1.029] | 0.95 | interval inside [0.8, 1.25] (closed) | pass |
+| rossler | H1b PLP | 0.6705 | [0.6303, 0.7089] | 0.95 (design value, not stored) | interval inside [0.8, 1.2] (closed) | fail |
+| rossler | H1c PLP | 0.986 | [0.9397, 1.029] | 0.95 (design value, not stored) | interval inside [0.8, 1.25] (closed) | pass |
 | rossler | H1d analog seed | 0.7697 | [0.7375, 0.7965] | 0.9500 | lower bound ≥ 0.7 (closed) | pass |
 | rossler | H1d estimation seed | 0.9588 | [0.9505, 0.9652] | 0.9500 | lower bound ≥ 0.7 (closed) | pass |
 | rossler | H1d growth | 0.9925 | [0.99, 0.9945] | 0.9500 | lower bound ≥ 0.7 (closed) | pass |
-| rossler | H2c A4 - A2 | 3.259e-05 | [3.301e-06, 5.999e-05] | 0.95 | upper bound < 0 (strict) | fail |
-| rossler | H2c A4 - A1 | 1.877e-05 | [-1.654e-05, 5.114e-05] | 0.95 | upper bound < 0 (strict) | inconclusive |
-| rossler | H2d | 0.001396 | [-0.05371, 0.04521] | 0.95 | upper bound ≤ 0.10 (closed) | pass |
+| rossler | H2c A4 - A2 | 3.259e-05 | [3.301e-06, 5.999e-05] | 0.95 (design value, not stored) | upper bound < 0 (strict) | fail |
+| rossler | H2c A4 - A1 | 1.877e-05 | [-1.654e-05, 5.114e-05] | 0.95 (design value, not stored) | upper bound < 0 (strict) | inconclusive |
+| rossler | H2c A4o - A2 (reported) | -5.895e-05 | [-9.242e-05, -2.812e-05] | 0.9500 | reported with its interval, no verdict (v3 §2 H2c) | reported |
+| rossler | H2d | 0.001396 | [-0.05371, 0.04521] | 0.95 (design value, not stored) | upper bound ≤ 0.10 (closed) | pass |
 | rossler | H2e rho-1% | 0.3537 | [0.3338, 0.3775] | 0.9500 | lower bound > 0 (strict) | pass |
 | rossler | H2e rho-2% | 0.2515 | [0.2263, 0.2817] | 0.9500 | lower bound > 0 (strict) | pass |
 | rossler | H3b weight tree | 0.07115 | [0, 0.1846] | 0.9500 | interval inside [0, 0.2) (strict) | pass |
 | rossler | H3b horizon tree D | 0.3903 | [0.1772, 0.5221] | 0.9500 | lower bound > 0 (strict) | pass |
 | chua | H1a rho-1% | 0.7458 | [0.6611, 0.8214] | 0.9500 | interval inside [0.75, 1.25] (closed) | inconclusive |
 | chua | H1a rho-2% | 0.5827 | [0.4981, 0.6783] | 0.9500 | interval inside [0.75, 1.25] (closed) | fail |
-| chua | H1b PLP | 1.054 | [1.027, 1.08] | 0.95 | interval inside [0.8, 1.2] (closed) | pass |
-| chua | H1c PLP | 0.7643 | [0.7183, 0.8205] | 0.95 | interval inside [0.8, 1.25] (closed) | inconclusive |
+| chua | H1b PLP | 1.054 | [1.027, 1.08] | 0.95 (design value, not stored) | interval inside [0.8, 1.2] (closed) | pass |
+| chua | H1c PLP | 0.7643 | [0.7183, 0.8205] | 0.95 (design value, not stored) | interval inside [0.8, 1.25] (closed) | inconclusive |
 | chua | H1d analog seed | 0.7339 | [0.6998, 0.7643] | 0.9500 | lower bound ≥ 0.7 (closed) | inconclusive |
 | chua | H1d estimation seed | 0.9454 | [0.918, 0.9677] | 0.9500 | lower bound ≥ 0.7 (closed) | pass |
 | chua | H1d growth | 0.9756 | [0.9658, 0.9834] | 0.9500 | lower bound ≥ 0.7 (closed) | pass |
-| chua | H2c A4 - A2 | 0.0003368 | [-0.00102, 0.002111] | 0.95 | upper bound < 0 (strict) | inconclusive |
-| chua | H2c A4 - A1 | -0.00108 | [-0.002596, 0.0001691] | 0.95 | upper bound < 0 (strict) | inconclusive |
-| chua | H2d | -0.01179 | [-0.06308, 0.05348] | 0.95 | upper bound ≤ 0.10 (closed) | pass |
+| chua | H2c A4 - A2 | 0.0003368 | [-0.00102, 0.002111] | 0.95 (design value, not stored) | upper bound < 0 (strict) | inconclusive |
+| chua | H2c A4 - A1 | -0.00108 | [-0.002596, 0.0001691] | 0.95 (design value, not stored) | upper bound < 0 (strict) | inconclusive |
+| chua | H2c A4o - A2 (reported) | -0.005324 | [-0.01291, -8.391e-05] | 0.9500 | reported with its interval, no verdict (v3 §2 H2c) | reported |
+| chua | H2d | -0.01179 | [-0.06308, 0.05348] | 0.95 (design value, not stored) | upper bound ≤ 0.10 (closed) | pass |
 | chua | H2e rho-1% | 0.3095 | [0.283, 0.3312] | 0.9500 | lower bound > 0 (strict) | pass |
 | chua | H2e rho-2% | 0.2192 | [0.1923, 0.241] | 0.9500 | lower bound > 0 (strict) | pass |
 | chua | H3b weight tree | 0.4676 | [0, 0.5301] | 0.9500 | interval inside [0, 0.2) (strict) | inconclusive |
 | chua | H3b horizon tree D | 0.8076 | [0.6553, 0.8935] | 0.9500 | lower bound > 0 (strict) | pass |
 
+Level cells that show a design value: 15.
+
 Q-N, oracle values, read by the table of v3 §7 (a reading, never pass or fail):
 
 | System | Part | Estimate | Interval | Level | Band | Verdict |
 |---|---|---|---|---|---|---|
-| lorenz63 | Q-N oracle logit w* | -0.009238 | [-0.03016, 0.01182] | 0.95 | reading table of v3 §7 | reduces |
-| lorenz63 | Q-N oracle zero indicator | 0.2342 | [0.1815, 0.2905] | 0.95 | reading table of v3 §7 | substantial |
-| rossler | Q-N oracle logit w* | 0.01192 | [-0.02354, 0.04698] | 0.95 | reading table of v3 §7 | reduces |
-| rossler | Q-N oracle zero indicator | 0.1298 | [0.07593, 0.18] | 0.95 | reading table of v3 §7 | substantial |
-| chua | Q-N oracle logit w* | -0.004859 | [-0.03977, 0.02341] | 0.95 | reading table of v3 §7 | reduces |
-| chua | Q-N oracle zero indicator | 0.09748 | [0.05075, 0.1437] | 0.95 | reading table of v3 §7 | substantial |
+| lorenz63 | Q-N oracle logit w* | -0.009238 | [-0.03016, 0.01182] | 0.95 (design value, not stored) | read by the table of v3 §7 (edges 0 and 0.05) | reduces |
+| lorenz63 | Q-N oracle zero indicator | 0.2342 | [0.1815, 0.2905] | 0.95 (design value, not stored) | read by the table of v3 §7 (edges 0 and 0.05) | substantial |
+| rossler | Q-N oracle logit w* | 0.01192 | [-0.02354, 0.04698] | 0.95 (design value, not stored) | read by the table of v3 §7 (edges 0 and 0.05) | reduces |
+| rossler | Q-N oracle zero indicator | 0.1298 | [0.07593, 0.18] | 0.95 (design value, not stored) | read by the table of v3 §7 (edges 0 and 0.05) | substantial |
+| chua | Q-N oracle logit w* | -0.004859 | [-0.03977, 0.02341] | 0.95 (design value, not stored) | read by the table of v3 §7 (edges 0 and 0.05) | reduces |
+| chua | Q-N oracle zero indicator | 0.09748 | [0.05075, 0.1437] | 0.95 (design value, not stored) | read by the table of v3 §7 (edges 0 and 0.05) | substantial |
+
+Level cells that show a design value: 6.
 
 H3a: events and censored states per regime, with the stored Holm-adjusted log-rank p-values (DEF-0018). H3a cannot fail, since no equivalence margin is set (v3 §2).
 
@@ -227,6 +252,8 @@ H3a: events and censored states per regime, with the stored Holm-adjusted log-ra
 | chua | 2, 1 | 2.19e-18 | 6.58e-18 |
 | chua | 1, 0 | 9.3e-08 | 1.86e-07 |
 
+Cells written "not recorded" so far: 30. Null leaves written "not computed" so far: 0. The full list is in Appendix C.
+
 Hybrid horizon gain against the P1 bound (reported, v1 statistic, v3 screen pending):
 
 | System | fraction_within_bound | n_states | n_total_states | median_gain_lyapunov | max_gain_lyapunov |
@@ -235,9 +262,11 @@ Hybrid horizon gain against the P1 bound (reported, v1 statistic, v3 screen pend
 | rossler | 0.880 | 676 | 1000 | 0 | 3.2 |
 | chua | 0.932 | 644 | 1000 | 0 | 2.07 |
 
-![F2: F2_secondary](2026-10-19-prelim-findings-dryrun-dev2.figures/F2_secondary.png)
+![F2](2026-10-19-prelim-findings-dryrun-dev2.figures/F2_secondary.png)
 
-*Figure F2 (experiments E2 to E5; v3 identifiers H1a to H1d, H2c to H2e, H3b and Q-N). One panel per secondary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples; H3b resamples construction states) at level 95%. The shaded region is the pass band of v3 §2, or for Q-N the reading bands of v3 §7. Marker shape and text give the stored verdict or reading: filled circle pass, cross fail, open diamond inconclusive, square a Q-N reading. A system that failed the validation gate is marked PROVISIONAL.*
+*Figure F2 (experiments E2 to E5; v3 identifiers H1a to H1d, H2c to H2e, H3b and Q-N). One panel per secondary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples; H3b resamples construction states) at the level stated in each panel (95% unless the result stores another). The shaded region is the pass band of v3 §2. For Q-N no band is shaded: dashed lines mark the reading edges of v3 §7. Each panel states its level, and the three H2c panels are drawn one per system because the scales differ. Marker shape and text give the stored verdict or reading: filled circle pass, cross fail, open diamond inconclusive, square a Q-N reading. A system that failed the validation gate is marked PROVISIONAL.*
+
+Cells written "not recorded" so far: 30. Null leaves written "not computed" so far: 0. The full list is in Appendix C.
 
 ## 7. Handling counters (nothing is silent) [DIAGNOSTIC]
 
@@ -279,7 +308,7 @@ Failed robustness variants: 0.
 
 The GPU run of the same seed is a cross-check, never the result (v3 §9 item 3, DEC-0031). The z value uses the interval arm facing away from the other estimate, and a part disagrees if it exceeds the bound 3.4. The numbers below are copied from the compare_runs text.
 
-| System | Part | d | z_sym (information) | z_away (governs) | hw1/hw0 | Status |
+| System | Part | d | z_sym (information) | z_away (governs) | hw ratio | Status |
 |---|---|---|---|---|---|---|
 | lorenz63 | H2a(i) | 0.0179 | 1.11 | 1.06 | 1.045 | ok |
 | lorenz63 | H2a(ii) zero | 0.0269 | 0.64 | 0.65 | 1.196 | ok |
@@ -308,9 +337,9 @@ GPU validation gate passed: lorenz63 yes, rossler yes, chua no.
 
 At least one primary part exceeds the bound, a verdict-type leaf differs or a GPU gate failed. This is reported here only and changes no verdict (DEC-0031).
 
-![F3: F3_crosscheck](2026-10-19-prelim-findings-dryrun-dev2.figures/F3_crosscheck.png)
+![F3](2026-10-19-prelim-findings-dryrun-dev2.figures/F3_crosscheck.png)
 
-*Figure F3 (cross-check, information only; v3 §9 item 3, DEC-0031; experiments E1, E2, E4 and E5). For each of the 18 primary parts, the away-arm z value comparing the official CPU run with the GPU run of the same seed, from the compare_runs text (interval procedure: the 98.33% moving-block bootstrap intervals of the two runs). The dashed line is the bound 3.4. This figure changes no verdict.*
+*Figure F3 (cross-check, information only; v3 §9 item 3, DEC-0031; experiments E1, E2, E4 and E5). For each of the 18 primary parts, the away-arm z value comparing the official CPU run with the GPU run of the same seed, from the compare_runs text (interval procedure: the 98.33% moving-block bootstrap intervals of the two runs). The dashed line is the bound 3.4. Each row names a failed GPU validation gate and a PROVISIONAL official system. This figure changes no verdict.*
 
 ## 9. Reproducibility
 
@@ -326,7 +355,7 @@ All items of v3 §8 apply, plus the registered deficiencies and rulings listed h
 - N̂ measures retrieval sensitivity at the observed (noisy) query, not at the true one, so it is reported, not tested.
 - The seed × amplifier test (H1b) assumes isotropic seeds and is applied to PLP only.
 - Same attractors, fresh seeds: this is not a new set of systems.
-- Interval coverage (DEF-0020): the block-5 percentile intervals undercover, at a level of 0.923 to 0.947. The pre-registered intervals and block length are kept.
+- Interval coverage (DEF-0020): The block-5 percentile intervals undercover at these sample sizes: about 0.938 to 0.947 at 95% with independent states and 0.923 to 0.931 at lag-1 autocorrelation 0.3, which adds about 1 to 2 percentage points of false-verdict probability under dependence (v3 §8; DEF-0020). The pre-registered intervals and block length are kept.
 - Slow dependence beyond five states cannot be resolved at these sample sizes.
 - Small regimes in H3a (DEF-0018): no minimum is set per regime, so counts are reported beside every p-value.
 - Iterative error of PLP (DEF-0027): the Levenberg–Marquardt flag was raised on 5 of 18 primary parts on a development seed. It is development evidence, projected and not corrected.
@@ -368,36 +397,36 @@ Copied verbatim from the `RESULTS.md` of the official run, one per row (procedur
 
 ## C. Trace
 
-Every number quoted above is listed with its source and leaf path in `2026-10-19-prelim-findings-dryrun-dev2.trace.csv`. Run `python3 tools/findings_build.py check` on this directory to verify the document against the sources.
+Every number quoted above is listed with its source and leaf path in `2026-10-19-prelim-findings-dryrun-dev2.trace.csv`. Run the `check` command of `tools/findings_build.py` on this directory to verify the document against the sources.
 
-Leaves not found in the sources, written "not recorded": 30.
-- `official:systems/chua/H3a/n_censored_per_regime/0`
-- `official:systems/chua/H3a/n_censored_per_regime/1`
-- `official:systems/chua/H3a/n_censored_per_regime/2`
-- `official:systems/chua/H3a/n_censored_per_regime/3`
-- `official:systems/chua/H3a/n_events_per_regime/0`
-- `official:systems/chua/H3a/n_events_per_regime/1`
-- `official:systems/chua/H3a/n_events_per_regime/2`
-- `official:systems/chua/H3a/n_events_per_regime/3`
-- `official:systems/lorenz63/H3a/n_censored_per_regime/0`
-- `official:systems/lorenz63/H3a/n_censored_per_regime/1`
-- `official:systems/lorenz63/H3a/n_censored_per_regime/2`
-- `official:systems/lorenz63/H3a/n_censored_per_regime/3`
-- `official:systems/lorenz63/H3a/n_censored_per_regime/4`
-- `official:systems/lorenz63/H3a/n_censored_per_regime/5`
-- `official:systems/lorenz63/H3a/n_censored_per_regime/6`
-- `official:systems/lorenz63/H3a/n_censored_per_regime/7`
-- `official:systems/lorenz63/H3a/n_events_per_regime/0`
-- `official:systems/lorenz63/H3a/n_events_per_regime/1`
-- `official:systems/lorenz63/H3a/n_events_per_regime/2`
-- `official:systems/lorenz63/H3a/n_events_per_regime/3`
-- `official:systems/lorenz63/H3a/n_events_per_regime/4`
-- `official:systems/lorenz63/H3a/n_events_per_regime/5`
-- `official:systems/lorenz63/H3a/n_events_per_regime/6`
-- `official:systems/lorenz63/H3a/n_events_per_regime/7`
-- `official:systems/rossler/H3a/n_censored_per_regime/0`
-- `official:systems/rossler/H3a/n_censored_per_regime/1`
-- `official:systems/rossler/H3a/n_censored_per_regime/2`
-- `official:systems/rossler/H3a/n_events_per_regime/0`
-- `official:systems/rossler/H3a/n_events_per_regime/1`
-- `official:systems/rossler/H3a/n_events_per_regime/2`
+Leaves not found in the sources, written "not recorded": 30. Null leaves written "not computed": 0.
+- official:systems/chua/H3a/n_censored_per_regime/0
+- official:systems/chua/H3a/n_censored_per_regime/1
+- official:systems/chua/H3a/n_censored_per_regime/2
+- official:systems/chua/H3a/n_censored_per_regime/3
+- official:systems/chua/H3a/n_events_per_regime/0
+- official:systems/chua/H3a/n_events_per_regime/1
+- official:systems/chua/H3a/n_events_per_regime/2
+- official:systems/chua/H3a/n_events_per_regime/3
+- official:systems/lorenz63/H3a/n_censored_per_regime/0
+- official:systems/lorenz63/H3a/n_censored_per_regime/1
+- official:systems/lorenz63/H3a/n_censored_per_regime/2
+- official:systems/lorenz63/H3a/n_censored_per_regime/3
+- official:systems/lorenz63/H3a/n_censored_per_regime/4
+- official:systems/lorenz63/H3a/n_censored_per_regime/5
+- official:systems/lorenz63/H3a/n_censored_per_regime/6
+- official:systems/lorenz63/H3a/n_censored_per_regime/7
+- official:systems/lorenz63/H3a/n_events_per_regime/0
+- official:systems/lorenz63/H3a/n_events_per_regime/1
+- official:systems/lorenz63/H3a/n_events_per_regime/2
+- official:systems/lorenz63/H3a/n_events_per_regime/3
+- official:systems/lorenz63/H3a/n_events_per_regime/4
+- official:systems/lorenz63/H3a/n_events_per_regime/5
+- official:systems/lorenz63/H3a/n_events_per_regime/6
+- official:systems/lorenz63/H3a/n_events_per_regime/7
+- official:systems/rossler/H3a/n_censored_per_regime/0
+- official:systems/rossler/H3a/n_censored_per_regime/1
+- official:systems/rossler/H3a/n_censored_per_regime/2
+- official:systems/rossler/H3a/n_events_per_regime/0
+- official:systems/rossler/H3a/n_events_per_regime/1
+- official:systems/rossler/H3a/n_events_per_regime/2

@@ -5,21 +5,24 @@ The study asks whether four local predictability conditions decide how to
 blend an analog forecaster (CP) with a physics-based forecaster (PLP). When
 the sealed confirmatory run finishes, the owner and the student need one
 short, honest document that says what came out. This tool writes that
-document from the stored results and then proves that every number in it
-came from a stored file.
+document from the stored results and then proves that it says nothing else.
 
 Two commands:
 
 * ``render`` reads the official ``results.json`` (with the ``RESULTS.md`` next
   to it), the cross-check ``results.json`` and the ``compare_runs`` text. It
   fills the template ``tools/findings/preliminary.template.md`` and writes
-  the document, a trace file (one row per quoted number, with its source and
-  leaf path), a ``sources.json`` (paths and SHA-256 hashes) and three
-  figures (F1 primary forest plot, F2 secondary forest plot, F3 cross-check).
-* ``check`` re-reads the sources and fails if any quoted number differs
-  from its leaf, if a number appears that the trace does not explain, if a
-  section quotes a source its tag forbids, or if the banner, the language
-  rules or the completeness rules fail.
+  the document, a trace file (one row per quoted value, with its source and
+  leaf path), a ``sources.json`` (paths, SHA-256 hashes, manifest hashes and
+  the release reference) and three figures (F1 primary forest plot, F2
+  secondary forest plot, F3 cross-check).
+* ``check`` re-reads the sources, verifies their hashes, and renders the
+  document again from scratch. The new text must equal the document byte for
+  byte, except in two free slots: the body of section 11 (the student's
+  words) and dated lines appended to section 9 (``- YYYY-MM-DD: text``).
+  Rendering is deterministic, so any other edit, including an edited sentence
+  or a swapped figure, fails. Inside the free slots no digit may appear
+  (write numbers as words); number words themselves cannot be detected.
 
 The tool only reads and formats. It computes no statistic and no verdict: a
 verdict word in the document is the string stored in the results file, and no
@@ -27,6 +30,20 @@ interval is compared with a band. Figures draw the stored estimates and
 interval endpoints as they are. Constants of the v3 design (bands, levels,
 bars) come from ``tools/findings/design_constants.json``, each with its v3
 section. Nothing in ``lpcstudy/`` is imported or changed.
+
+Release guard (an owner checkpoint). A results file is either a development
+run (``seed_kind`` development, ``seed_id`` starting ``DEV-``, no
+CONFIRMATORY in the label) or a confirmatory one (``seed_kind``
+confirmatory, ``seed_id`` starting ``CONF-``). Any other mix is refused. A
+confirmatory build needs ``--release-ref`` of the form ``ledger-seq-<n>``, the
+SHA-256 manifest hashes of the three files, and a commit equal to
+``git rev-parse freeze-1^{commit}``. A ``--development`` file must be a
+development run. What the tool cannot verify: it does not read the ledger, so
+it cannot tell that the release reference exists; and it does not read the
+manifest, so it only checks that the hashes typed on the command line equal
+the files' hashes (an operator who types hashes taken from the wrong file
+passes). The owner or the main session must compare both with the committed
+manifest row and the ledger entry.
 
 Placeholders in the template look like ``{{official:systems/chua/H3c/ci|ci:.3g}}``:
 a source name, a leaf path and an optional format. Standard library plus
@@ -44,6 +61,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -61,14 +79,47 @@ PRELIMINARY_LINE = (
 )
 MISSING = "<missing>"
 NOT_RECORDED = "not recorded"
+NOT_COMPUTED = "not computed"
+NONE_LISTED = (
+    "none listed (compare_runs prints this line only when the count is "
+    "nonzero)"
+)
+NOT_AVAILABLE = "not available (the compare_runs text is not a TD report)"
 PLACEHOLDER = re.compile(r"\{\{(\w+)(?::([^}|]*))?(?:\|([^}]*))?\}\}")
 MARK = re.compile("\x00(\\d+)\x01(.*?)\x02", re.S)
-NUMERAL = re.compile(r"(?<![\w.\-])-?\d+(?:\.\d+)?(?:e[-+]?\d+)?")
-STRUCTURE = re.compile(
-    r"§\s*\d+(?:\.\d+)?|^#{1,6} \d+\.|\bitem \d+|`[^`\s]*`|\]\([^)\s]*\)"
+# A digit may stay in untraced text only inside an identifier of the study
+# (a hypothesis, a check, a decision, a work unit, a section mark). Every
+# other digit is a number the trace does not explain.
+IDENTIFIER = re.compile(
+    r"§\s*M?\d+(?:\.\d+)?(?![\d%])"
+    r"|^#{1,6} \d+\."
+    r"|\bitem \d+\b(?![.\d%])"
+    r"|\b(?:DEC|DEF)-\d{4}\b"
+    r"|\bWU-\d{4}(?:\.\d)?\b"
+    r"|\b(?:CONF|DEV)-\d\b"
+    r"|\b(?:PRIME|QA|NVVUQ)\.\d+\b"
+    r"|\bLPC\.PC\.\d+\b"
+    r"|\bH\d[a-e]\b"
+    r"|\bV[1-7]\b"
+    r"|\bE[0-6]\b"
+    r"|\bP[1-3]\b"
+    r"|\bA[0-5]o?\b"
+    r"|\bD\d{1,2}\b"
+    r"|\bM[23]\b"
+    r"|\bF[1-4]\b"
+    r"|\bv[1-3]\b"
+    r"|\br\d+\b"
+    r"|\b(?:Lorenz-63|lorenz63)\b"
+    r"|\bSHA-256\b"
+    r"|\bfreeze-1\b"
+    r"|\brho-(?:0\.5|1|2|5)%"
+    r"|\bclosed_form_floor_a4o?\b"
 )
+DATED_LINE = re.compile(r"^- \d{4}-\d{2}-\d{2}: ")
 HEADING = re.compile(r"^(#{2,3}) ")
 TAG = re.compile(r"\[([A-Z][A-Z-]+)(?::[^\]]*)?\]\s*$")
+RELEASE_REF = re.compile(r"^ledger-seq-\d+$")
+SHA_HEX = re.compile(r"^[0-9a-f]{64}$")
 SOURCES = (
     "official",
     "official_md",
@@ -81,10 +132,10 @@ SOURCES = (
 # Which sources each section tag may quote (A6). Untagged sections may quote
 # the official run, the cross-check file and the constants (provenance).
 ALLOWED = {
-    "PRE-REGISTERED": {"official", "official_md", "const"},
-    "DIAGNOSTIC": {"official", "const"},
-    "CROSS-CHECK": {"crosscheck", "td", "const"},
-    "DEVELOPMENT": {"dev", "const"},
+    "PRE-REGISTERED": {"official", "official_md", "const", "meta"},
+    "DIAGNOSTIC": {"official", "const", "meta"},
+    "CROSS-CHECK": {"crosscheck", "td", "const", "meta"},
+    "DEVELOPMENT": {"dev", "const", "meta"},
     "STUDENT": set(),
     "": {"official", "official_md", "crosscheck", "const", "meta"},
 }
@@ -99,6 +150,7 @@ TD_TOTALS = re.compile(
 )
 TD_DIFFERS = re.compile(r"^TD: (\d+) verdict-type leaves differ")
 TD_RESULT = re.compile(r"^RESULT: (.*)$")
+TD_TIER = re.compile(r"^tier: (\S+)")
 
 
 class ToolError(Exception):
@@ -173,7 +225,7 @@ def fmt(value: object, spec: str) -> str:
     is written "not computed".
     """
     if value is None:
-        return "not computed"
+        return NOT_COMPUTED
     if spec == "yn":
         if not isinstance(value, bool):
             raise ToolError(f"format yn needs a boolean, got {value!r}")
@@ -205,19 +257,12 @@ def read_json(path: Path) -> dict:
         raise ToolError(f"cannot read {path}: {exc}") from None
 
 
-def run_files(target: Path) -> tuple[Path, Path | None]:
-    """Return ``results.json`` and the ``RESULTS.md`` beside it (or None)."""
-    results = target / "results.json" if target.is_dir() else target
-    markdown = results.parent / "RESULTS.md"
-    return results, markdown if markdown.exists() else None
-
-
 def split_cells(line: str) -> list[str]:
     """Split a Markdown table row on pipes that are not escaped."""
     return [c.strip() for c in re.split(r"(?<!\\)\|", line.strip())[1:-1]]
 
 
-def parse_results_md(path: Path | None) -> dict:
+def parse_results_md(path: Path) -> dict:
     """Read the banner, interval labels and clip cells of ``RESULTS.md``.
 
     These three are copied verbatim into the document, so the tool never
@@ -226,8 +271,6 @@ def parse_results_md(path: Path | None) -> dict:
     last cell of the verdict-table row.
     """
     out: dict = {"banner": None, "label": {}, "clip": {}}
-    if path is None:
-        return out
     lines = path.read_text().splitlines()
     out["banner"] = next((x for x in lines[1:6] if x.startswith("**")), None)
     in_labels = in_verdicts = False
@@ -255,9 +298,13 @@ def parse_td(path: Path) -> dict:
     """Read the TD table of a ``compare_runs`` text as printed strings.
 
     Every number stays the string that ``compare_runs`` printed, so the
-    document copies it exactly (A10).
+    document copies it exactly (A10). ``compare_runs`` prints the count of
+    differing verdict-type leaves only when it is nonzero, so an absent line
+    is written as text, never as a number: "none listed" for a TD report and
+    "not available" for any other text.
     """
-    out: dict = {"parts": {}, "total": {"differing": "0"}}
+    out: dict = {"parts": {}, "total": {}}
+    tier = None
     for line in path.read_text().splitlines():
         row = TD_ROW.match(line)
         if row:
@@ -266,6 +313,8 @@ def parse_td(path: Path) -> dict:
             out["parts"].setdefault(system, {})[part] = dict(
                 zip(names, row.groups()[2:])
             )
+        found = TD_TIER.match(line)
+        tier = found.group(1) if found else tier
         for regex, names in (
             (
                 TD_TOTALS,
@@ -286,6 +335,11 @@ def parse_td(path: Path) -> dict:
             hit = regex.search(line)
             if hit:
                 out["total"].update(zip(names, hit.groups()))
+    if "failing" not in out["total"]:
+        raise ToolError(f"{path} has no TD totals line (not a TD report)")
+    out["total"].setdefault(
+        "differing", NONE_LISTED if tier == "TD" else NOT_AVAILABLE
+    )
     return out
 
 
@@ -306,32 +360,33 @@ class Builder:
     A quoted value is written as a marker (``\\x00id\\x01text\\x02``) while the
     text is assembled. ``finalize`` removes the markers and records each
     value's position, so the trace says exactly where every number sits.
+    The systems are the three of v3 (a constant); a system that is absent
+    from the results reads "not recorded" everywhere and counts as failing
+    the gate, so no table shrinks silently.
     """
 
     def __init__(
         self, sources: dict, constants: dict, directory: Path, stem: str
     ):
         self.sources = sources
+        self.meta = sources["meta"]
         self.constants = constants
         self.directory = directory
         self.stem = stem
         self.rows: list[Row] = []
         self.missing: list[str] = []
-        official = sources["official"]
-        self.systems = [
-            s
-            for s in walk(official, "config/core_systems")
-            if s in official["systems"]
-        ]
+        self.nulls: list[str] = []
+        self.counter = 0
+        self.systems = list(constants["systems"])
         self.provisional = {
-            s: self.gate_state(s) is not True for s in self.systems
+            s: self.gate_state("official", s) is not True for s in self.systems
         }
 
-    def gate_state(self, system: str) -> object:
+    def gate_state(self, source: str, system: str) -> object:
         """Return the stored ``gate_pass`` of a system (None if absent)."""
         try:
             return walk(
-                self.sources["official"],
+                self.sources[source],
                 f"systems/{system}/validation/gate/gate_pass",
             )
         except Missing:
@@ -342,11 +397,18 @@ class Builder:
         try:
             value = walk(self.sources[source], path)
             raw, text = repr(value), fmt(value, spec)
+            if value is None:
+                self.nulls.append(f"{source}:{path}")
         except Missing:
             raw, text = MISSING, NOT_RECORDED
             self.missing.append(f"{source}:{path}")
         self.rows.append(Row(source, path, spec, raw, text))
         return f"\x00{len(self.rows) - 1}\x01{text}\x02"
+
+    def meta_ref(self, key: str, value: object) -> str:
+        """Store a value computed by the builder and quote it."""
+        self.meta[key] = value
+        return self.ref("meta", key)
 
     def const(self, path: str) -> str:
         """Quote a design constant (a bare name means ``constants/<name>``)."""
@@ -387,7 +449,8 @@ class Builder:
             ("Start (UTC)", "official", "provenance/start_utc", ""),
             ("End (UTC)", "official", "provenance/end_utc", ""),
             ("SHA-256 of results.json", "meta", "official_sha", ""),
-            ("Manifest check", "meta", "official_manifest", ""),
+            ("SHA-256 of RESULTS.md", "meta", "official_md_sha", ""),
+            ("Manifest hashes", "meta", "manifest_check", ""),
             ("Release reference", "meta", "release_ref", ""),
             ("Cross-check seed id", "crosscheck", "provenance/seed_id", ""),
             (
@@ -397,7 +460,6 @@ class Builder:
                 "",
             ),
             ("Cross-check SHA-256", "meta", "crosscheck_sha", ""),
-            ("Cross-check manifest", "meta", "crosscheck_manifest", ""),
         ]
         return ["| Item | Value |", "|---|---|"] + [
             f"| {name} | {self.ref(src, path, spec)} |"
@@ -454,18 +516,32 @@ class Builder:
     def parts_rows(
         self, parts_key: str, default_level: str, notes: bool
     ) -> list[str]:
-        """Rows of a parts table: estimate, interval, level, band, verdict."""
+        """Rows of a parts table: estimate, interval, level, band, verdict.
+
+        The level is the stored leaf where the results have one. Otherwise it
+        is the design level of v3 section 7, written with the words "design
+        value, not stored", and those cells are counted under the table.
+        """
         head = ["System", "Part", "Estimate", "Interval", "Level", "Band"]
         head += ["Verdict"] + (["Notes"] if notes else [])
         out = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+        designed = 0
         for s in self.systems:
             for i, part in enumerate(self.constants[parts_key]):
                 level = part["level"]
                 if level and self.has_leaf(s, level):
                     level_cell = self.official(s, level, ".4f")
                 else:
-                    level_cell = self.const(default_level)
-                spec = "" if part["verdict"].endswith("/reading") else "verdict"
+                    designed += 1
+                    level_cell = (
+                        f"{self.const(default_level)} "
+                        f"({self.const('level_design_note')})"
+                    )
+                spec = (
+                    ""
+                    if part["verdict"].endswith(("reading", "role"))
+                    else "verdict"
+                )
                 cells = [
                     f"{s}{self.mark(s)}",
                     part["name"],
@@ -480,7 +556,9 @@ class Builder:
                         f"{self.const('lm_note')}; {self.const('block_note')}"
                     )
                 out.append("| " + " | ".join(cells) + " |")
-        return out
+        self.counter += 1
+        count = self.meta_ref(f"design_levels_{self.counter}", str(designed))
+        return out + ["", f"Level cells that show a design value: {count}."]
 
     def has_leaf(self, system: str, leaf: str) -> bool:
         """Return True if a leaf of the official run exists."""
@@ -545,6 +623,19 @@ class Builder:
             self.missing.append(f"official:{path}")
             return 0
 
+    def table_counts(self) -> list[str]:
+        """Say how many cells so far are "not recorded" or "not computed"."""
+        self.counter += 1
+        missing = self.meta_ref(
+            f"missing_{self.counter}", str(len(self.missing))
+        )
+        nulls = self.meta_ref(f"nulls_{self.counter}", str(len(self.nulls)))
+        return [
+            f'Cells written "{NOT_RECORDED}" so far: {missing}. '
+            f'Null leaves written "{NOT_COMPUTED}" so far: {nulls}. '
+            "The full list is in Appendix C."
+        ]
+
     def table_gain(self) -> list[str]:
         """The reported hybrid horizon gain against the P1 bound."""
         leaves = (
@@ -589,7 +680,7 @@ class Builder:
         """The TD table of the cross-check and its totals."""
         out = [
             "| System | Part | d | z_sym (information) | z_away (governs) | "
-            "hw1/hw0 | Status |",
+            "hw ratio | Status |",
             "|---|---|---|---|---|---|---|",
         ]
         for s in self.systems:
@@ -648,35 +739,23 @@ class Builder:
         return "\n".join(lines)
 
     def wording_gpu(self) -> str:
-        """Agree or disagree sentence for the cross-check (no new verdict)."""
+        """Agree or disagree sentence for the cross-check (no new verdict).
+
+        Agreement needs every TD token in its good state: no failing part,
+        no differing verdict leaf (a count of zero or the "none listed" text),
+        a PASS result and a passed GPU gate for each of the three systems.
+        Anything else, including an unavailable count, is the disagreement
+        sentence.
+        """
         total = self.sources["td"]["total"]
-        gates = [
-            walk(
-                self.sources["crosscheck"],
-                f"systems/{s}/validation/gate/gate_pass",
-            )
-            for s in self.systems
-            if self.has_cross_gate(s)
-        ]
+        gates = [self.gate_state("crosscheck", s) for s in self.systems]
         bad = (
-            total.get("failing", "x") != "0"
-            or total.get("differing", "x") != "0"
+            total["failing"] != "0"
+            or total["differing"] not in ("0", NONE_LISTED)
             or not total.get("result", "").startswith("PASS")
             or any(g is not True for g in gates)
-            or len(gates) != len(self.systems)
         )
         return self.constants["wording"]["gpu_disagree" if bad else "gpu_agree"]
-
-    def has_cross_gate(self, system: str) -> bool:
-        """Return True if the cross-check file stores this system's gate."""
-        try:
-            walk(
-                self.sources["crosscheck"],
-                f"systems/{system}/validation/gate/gate_pass",
-            )
-            return True
-        except Missing:
-            return False
 
     def gate_box(self) -> str:
         """The boxed gate sentence: failure branch or all-clear branch."""
@@ -715,38 +794,46 @@ class Builder:
         figures = self.directory / f"{self.stem}.figures"
         figures.mkdir(parents=True, exist_ok=True)
         label = walk(self.sources["official"], "provenance/label")
-        file = {"F1": "F1_primary", "F2": "F2_secondary", "F3": "F3_crosscheck"}
-        path = figures / f"{file[name]}.png"
+        files = {
+            "F1": "F1_primary",
+            "F2": "F2_secondary",
+            "F3": "F3_crosscheck",
+        }
+        marks = dict(self.provisional)
         if name == "F3":
-            fig = draw_crosscheck(self.sources["td"], self.constants, label)
+            gates = {s: self.gate_state("crosscheck", s) for s in self.systems}
+            fig = draw_crosscheck(
+                self.sources["td"], self.constants, label, marks, gates
+            )
         else:
             key = "primary_parts" if name == "F1" else "secondary_parts"
+            parts = self.constants[key]
+            parts = parts + (self.constants["qn_parts"] if name == "F2" else [])
             panels = panel_data(
-                self.sources["official"],
-                self.constants[key]
-                + (self.constants["qn_parts"] if name == "F2" else []),
-                self.systems,
+                self.sources["official"], parts, self.systems, self.constants
             )
-            marks = {s: self.provisional[s] for s in self.systems}
-            cols = 3 if name == "F1" else 4
-            fig = draw_panels(panels, cols, label, marks)
-        save_figure(fig, path)
-        alt = f"{name}: {file[name]}"
-        return (
-            f"![{alt}]({self.stem}.figures/{path.name})\n\n"
-            f"*{self.const('caption_' + name)}*"
+            fig = draw_panels(panels, 3 if name == "F1" else 5, label, marks)
+        save_figure(fig, figures / f"{files[name]}.png")
+        link = self.meta_ref(
+            f"figure_{name}", f"{self.stem}.figures/{files[name]}.png"
         )
+        return f"![{name}]({link})\n\n*{self.const('caption_' + name)}*"
 
     def missing_note(self) -> str:
         """Count and list the leaves that were not found (PRIME.4)."""
         unique = sorted(set(self.missing))
-        count = self.sources["meta"]["missing_count"] = str(len(unique))
+        self.meta["missing_paths"] = unique
+        count = self.meta_ref("missing_total", str(len(unique)))
+        nulls = self.meta_ref("nulls_total", str(len(set(self.nulls))))
         text = [
             f'Leaves not found in the sources, written "{NOT_RECORDED}": '
-            f"{self.ref('meta', 'missing_count')}."
+            f'{count}. Null leaves written "{NOT_COMPUTED}": {nulls}.'
         ]
-        text += [f"- `{path}`" for path in unique]
-        return "\n".join(text) if count else text[0]
+        text += [
+            f"- {self.ref('meta', f'missing_paths/{k}')}"
+            for k in range(len(unique))
+        ]
+        return "\n".join(text)
 
     def expand(self, template: str) -> str:
         """Replace every placeholder of the template, in order."""
@@ -757,9 +844,9 @@ class Builder:
 
         def replace(match: re.Match) -> str:
             kind, arg, spec = match.group(1), match.group(2), match.group(3)
+            if kind == "const":
+                return self.const(arg)
             if kind in SOURCES:
-                if kind == "const":
-                    return self.const(arg)
                 return self.ref(kind, arg, spec or "")
             if kind == "table":
                 if arg == "missing":
@@ -772,7 +859,7 @@ class Builder:
             if kind == "banner":
                 return self.ref("official_md", "banner")
             if kind == "mode_notice":
-                return self.sources["meta"]["mode_notice"]
+                return self.meta["mode_notice"]
             if kind in simple:
                 return simple[kind]()
             raise ToolError(f"unknown placeholder {match.group(0)!r}")
@@ -807,7 +894,7 @@ class Builder:
 def section_tags(text: str) -> list[str]:
     """Return the source tag of each line (from the nearest ``##`` heading)."""
     tags, current = [], ""
-    for line in text.splitlines():
+    for line in text.split("\n"):
         head = HEADING.match(line)
         if head:
             tag = TAG.search(line)
@@ -821,75 +908,116 @@ def section_tags(text: str) -> list[str]:
 
 # --- figures ----------------------------------------------------------
 OKABE = {"pass": "#009E73", "fail": "#D55E00", "inconclusive": "#0072B2"}
-OKABE_READING = "#CC79A7"
+OKABE_OTHER = "#CC79A7"
 BAND_COLOR = "#56B4E9"
 MARKERS = {"pass": "o", "fail": "X", "inconclusive": "D"}
 
 
-def panel_data(official: dict, parts: list[dict], systems: list[str]) -> list:
+def panel_data(
+    official: dict, parts: list[dict], systems: list[str], constants: dict
+) -> list[dict]:
     """Collect the stored estimate, interval and verdict of each panel.
 
-    Returns one dict per part with ``name``, ``band`` and ``points`` (one
-    entry per system: ``(est, lo, hi, label)`` or None if not recorded).
-    The numbers are the leaves as stored: nothing is recomputed.
+    Returns one dict per panel with ``name``, ``experiment``, ``band``,
+    ``lines`` (reference lines, drawn instead of a band), ``level`` (text),
+    ``systems`` and ``points`` (one entry per system: ``(est, lo, hi, label)``,
+    or the text "not recorded" or "not computed"). A part marked ``own_axis``
+    gets one panel per system, because the systems' scales differ too much to
+    share an axis. The numbers are the leaves as stored: nothing is
+    recomputed.
     """
     panels = []
     for part in parts:
-        points = []
-        for s in systems:
-            base = f"systems/{s}/"
-            try:
-                est = float(walk(official, base + part["estimate"]))
-                lo, hi = (
-                    float(v) for v in walk(official, base + part["interval"])
-                )
-                label = str(walk(official, base + part["verdict"]))
-                points.append((est, lo, hi, label))
-            except (Missing, TypeError, ValueError):
-                points.append(None)
-        panels.append(
-            {
-                "name": part["name"],
-                "experiment": part["experiment"],
-                "band": part["band"],
-                "points": points,
-            }
+        default = (
+            "primary_level"
+            if part in constants["primary_parts"]
+            else "standard_level"
         )
+        groups = [[s] for s in systems] if part.get("own_axis") else [systems]
+        for group in groups:
+            points, levels = [], []
+            for s in group:
+                base = f"systems/{s}/"
+                try:
+                    est = float(walk(official, base + part["estimate"]))
+                    lo, hi = (
+                        float(v)
+                        for v in walk(official, base + part["interval"])
+                    )
+                    label = str(walk(official, base + part["verdict"]))
+                    points.append((est, lo, hi, label))
+                except Missing:
+                    points.append(NOT_RECORDED)
+                except TypeError:
+                    points.append(NOT_COMPUTED)
+                try:
+                    levels.append(
+                        float(walk(official, base + str(part["level"])))
+                    )
+                except (Missing, TypeError, ValueError):
+                    pass
+            level = (
+                f"{levels[0]:.4f}"
+                if levels
+                else constants["constants"][default]["text"] + " (design value)"
+            )
+            name = part["name"] + (f" {group[0]}" if len(group) == 1 else "")
+            panels.append(
+                {
+                    "name": name,
+                    "experiment": part["experiment"],
+                    "band": part["band"],
+                    "lines": part.get("lines", []),
+                    "level": level,
+                    "systems": group,
+                    "points": points,
+                }
+            )
     return panels
 
 
+def status_title(label: str) -> str:
+    """Return the figure title: the provenance label and the status line."""
+    return f"{label}\n{PRELIMINARY_LINE}"
+
+
 def draw_panels(
-    panels: list, columns: int, label: str, provisional: dict
+    panels: list[dict], columns: int, label: str, provisional: dict
 ) -> plt.Figure:
     """Draw one small panel per part: markers, interval bars and band.
 
     Marker shape and text carry the verdict, so color is never the only cue.
     A system that failed the validation gate is named PROVISIONAL on its
-    row of every panel.
+    row of every panel. A part with reference lines (Q-N) gets dashed lines
+    at the reading edges and no shaded band, since a reading is not a pass.
     """
     rows = -(-len(panels) // columns)
     fig, axes = plt.subplots(
-        rows, columns, figsize=(4.2 * columns, 2.1 * rows + 0.9), squeeze=False
+        rows, columns, figsize=(4.2 * columns, 2.3 * rows + 1.0), squeeze=False
     )
-    names = list(provisional)
     for ax in axes.flat[len(panels) :]:
         ax.axis("off")
     for ax, panel in zip(axes.flat, panels):
-        ends = [v for p in panel["points"] if p for v in p[1:3]]
-        ends += [b for b in panel["band"] if b is not None]
+        names = panel["systems"]
+        ends = [
+            v for p in panel["points"] if isinstance(p, tuple) for v in p[1:3]
+        ]
+        ends += [b for b in panel["band"] if b is not None] + panel["lines"]
         low, high = (min(ends), max(ends)) if ends else (0.0, 1.0)
         pad = 0.08 * (high - low or 1.0)
         low, high = low - pad, high + pad
-        band = [low if b is None else b for b in panel["band"][:1]] + [
-            high if b is None else b for b in panel["band"][1:]
-        ]
-        ax.axvspan(band[0], band[1], color=BAND_COLOR, alpha=0.2, lw=0)
-        for y, (name, point) in enumerate(zip(names, panel["points"])):
-            if point is None:
-                ax.text(low, y, " not recorded", va="center", fontsize=7)
+        if any(b is not None for b in panel["band"]):
+            lo_edge = low if panel["band"][0] is None else panel["band"][0]
+            hi_edge = high if panel["band"][1] is None else panel["band"][1]
+            ax.axvspan(lo_edge, hi_edge, color=BAND_COLOR, alpha=0.2, lw=0)
+        for edge in panel["lines"]:
+            ax.axvline(edge, color="#555555", ls="--", lw=0.8)
+        for y, point in enumerate(panel["points"]):
+            if not isinstance(point, tuple):
+                ax.text(low, y, f" {point}", va="center", fontsize=7)
                 continue
             est, lo, hi, word = point
-            color = OKABE.get(word, OKABE_READING)
+            color = OKABE.get(word, OKABE_OTHER)
             ax.plot([lo, hi], [y, y], color=color, lw=1.5)
             ax.plot(
                 [est],
@@ -916,40 +1044,62 @@ def draw_panels(
             fontsize=7,
         )
         ax.tick_params(axis="x", labelsize=7)
-        ax.set_title(f"{panel['name']} ({panel['experiment']})", fontsize=8)
-    fig.suptitle(label, fontsize=9)
+        ax.set_title(
+            f"{panel['name']} ({panel['experiment']})\nlevel {panel['level']}",
+            fontsize=7,
+        )
+    fig.suptitle(status_title(label), fontsize=8)
     fig.tight_layout()
     return fig
 
 
-def crosscheck_points(td: dict, constants: dict) -> list[tuple[str, float]]:
-    """Return ``(system part, z_away)`` for every parsed TD row."""
+def crosscheck_points(
+    td: dict, constants: dict
+) -> list[tuple[str, str, float]]:
+    """Return ``(system, part, z_away)`` for every parsed TD row."""
     points = []
-    for system in td["parts"]:
+    for system in constants["systems"]:
         for part in constants["primary_parts"]:
-            row = td["parts"][system].get(part["name"])
+            row = td["parts"].get(system, {}).get(part["name"])
             if row:
-                points.append(
-                    (f"{system} {part['name']}", float(row["z_away"]))
-                )
+                points.append((system, part["name"], float(row["z_away"])))
     return points
 
 
-def draw_crosscheck(td: dict, constants: dict, label: str) -> plt.Figure:
-    """Draw the cross-check z values, in gray, with the bound line."""
+def draw_crosscheck(
+    td: dict, constants: dict, label: str, provisional: dict, gpu_gate: dict
+) -> plt.Figure:
+    """Draw the cross-check z values, in gray, with the bound line.
+
+    Each row names its system's PROVISIONAL status, and a system whose GPU
+    validation gate failed (or is not recorded) is named in the row and in
+    the footer.
+    """
     points = crosscheck_points(td, constants)
-    fig, ax = plt.subplots(figsize=(6.0, 0.3 * len(points) + 1.4))
+    fig, ax = plt.subplots(figsize=(7.0, 0.3 * len(points) + 2.0))
     ys = list(range(len(points)))
-    ax.plot([z for _, z in points], ys, "o", color="#555555")
+    ax.plot([z for _, _, z in points], ys, "o", color="#555555")
     bound = float(constants["constants"]["td_bound"]["text"])
     ax.axvline(bound, color="#555555", ls="--")
+    names = []
+    for system, part, _ in points:
+        extra = " PROVISIONAL" if provisional[system] else ""
+        extra += (
+            " [GPU gate not passed]" if gpu_gate[system] is not True else ""
+        )
+        names.append(f"{system} {part}{extra}")
     ax.set_yticks(ys)
-    ax.set_yticklabels([n for n, _ in points], fontsize=7)
+    ax.set_yticklabels(names, fontsize=7)
     ax.invert_yaxis()
     ax.set_xlabel("z (away arm)")
     ax.set_title("Cross-check, information only", fontsize=9)
-    fig.suptitle(label, fontsize=8)
-    fig.tight_layout()
+    gate_text = ", ".join(
+        f"{s} {'passed' if gpu_gate[s] is True else 'NOT passed'}"
+        for s in constants["systems"]
+    )
+    fig.suptitle(status_title(label), fontsize=8)
+    fig.text(0.01, 0.01, f"GPU validation gate: {gate_text}", fontsize=7)
+    fig.tight_layout(rect=(0, 0.04, 1, 1))
     return fig
 
 
@@ -959,7 +1109,7 @@ def save_figure(fig: plt.Figure, path: Path) -> None:
     plt.close(fig)
 
 
-# --- render -----------------------------------------------------------
+# --- sources, guard and render -------------------------------------------
 def banner_rule(provenance: dict) -> str:
     """Return the label line as ``report.header_lines`` writes it (A1)."""
     label = provenance["label"]
@@ -982,69 +1132,136 @@ def git_freeze_commit(root: Path) -> str:
     return done.stdout.strip()
 
 
-def manifest_text(sha: str, given: str | None, needed: bool, what: str) -> str:
-    """Compare a file hash with the manifest row; refuse a mismatch."""
+def classify(provenance: dict, what: str) -> str:
+    """Return "development" or "confirmatory"; refuse any other mix.
+
+    A development run has ``seed_kind`` development, a ``seed_id`` that starts
+    with ``DEV-`` and a label without CONFIRMATORY. A confirmatory run has
+    ``seed_kind`` confirmatory and a ``seed_id`` that starts with ``CONF-``.
+    A file that is neither (for example seed id CONF-1 with kind development)
+    is refused, never treated as development.
+    """
+    kind = provenance.get("seed_kind")
+    seed = str(provenance.get("seed_id"))
+    label = str(provenance.get("label"))
+    if (
+        kind == "development"
+        and seed.startswith("DEV-")
+        and "CONFIRMATORY" not in label.upper()
+    ):
+        return "development"
+    if kind == "confirmatory" and seed.startswith("CONF-"):
+        return "confirmatory"
+    raise ToolError(
+        f"{what}: seed_kind {kind!r}, seed_id {seed!r} and label {label!r} "
+        "do not describe a development or a confirmatory run: refused"
+    )
+
+
+def read_sources(paths: dict[str, Path], constants: dict) -> dict:
+    """Load every source file; refuse a results file that lacks a system.
+
+    ``paths`` holds ``official``, ``official_md``, ``crosscheck``, ``td`` and
+    optionally ``dev``. The official results must list exactly the three
+    systems of v3 in ``config.core_systems``.
+    """
+    sources = {
+        "official": read_json(paths["official"]),
+        "crosscheck": read_json(paths["crosscheck"]),
+        "official_md": parse_results_md(paths["official_md"]),
+        "td": parse_td(paths["td"]),
+        "const": constants,
+    }
+    if "dev" in paths:
+        sources["dev"] = read_json(paths["dev"])
+    listed = sources["official"].get("config", {}).get("core_systems")
+    if listed != constants["systems"]:
+        raise ToolError(
+            f"config.core_systems is {listed!r}, not the three systems of v3 "
+            f"{constants['systems']!r}: refused"
+        )
+    if sources["official_md"]["banner"] is None:
+        raise ToolError("RESULTS.md has no label line")
+    return sources
+
+
+def manifest_text(name: str, sha: str, given: str | None, needed: bool) -> str:
+    """Compare a file hash with the hash given for the manifest row."""
     if given is None:
         if needed:
             raise ToolError(
-                f"a confirmatory run needs the {what} manifest hash"
+                f"a confirmatory run needs the manifest hash of {name}"
             )
-        return "no manifest row given (development)"
+        return "none given"
+    if not SHA_HEX.match(given.lower()):
+        raise ToolError(f"manifest hash of {name} is not 64 hex digits")
     if given.lower() != sha:
-        raise ToolError(f"{what} SHA-256 {sha} differs from the manifest row")
-    return "equals the manifest row"
+        raise ToolError(f"{name} SHA-256 {sha} differs from the manifest hash")
+    return "given"
 
 
-def load_sources(args: argparse.Namespace, root: Path) -> tuple[dict, dict]:
-    """Load every source named on the command line and build ``meta``."""
-    constants = read_json(CONSTANTS_PATH)
-    official_json, official_md = run_files(Path(args.official))
-    cross_json, _ = run_files(Path(args.crosscheck))
-    official, cross = read_json(official_json), read_json(cross_json)
-    prov = official.get("provenance") or {}
-    kind = prov.get("seed_kind")
-    if kind is None:
-        raise ToolError("the official results carry no provenance.seed_kind")
-    confirmatory = kind == "confirmatory"
-    if confirmatory and not args.release_ref:
-        raise ToolError(
-            "a confirmatory results.json needs --release-ref (the release "
-            "record of WU-0015.4): refused"
-        )
-    if prov.get("seed_id") != (cross.get("provenance") or {}).get("seed_id"):
+def make_meta(
+    sources: dict,
+    shas: dict,
+    manifest: dict,
+    release_ref: str | None,
+    stem: str,
+    root: Path,
+) -> dict:
+    """Apply the release guard and return the builder's ``meta`` values.
+
+    The checks are listed in the module docstring, with what they cannot
+    verify. Raises ``ToolError`` when a check fails.
+    """
+    official = sources["official"].get("provenance") or {}
+    cross = sources["crosscheck"].get("provenance") or {}
+    mode = classify(official, "official results")
+    if classify(cross, "cross-check results") != mode:
+        raise ToolError("official and cross-check runs are of different kinds")
+    if official.get("seed_id") != cross.get("seed_id"):
         raise ToolError("official and cross-check runs have different seeds")
-    markdown = parse_results_md(official_md)
-    if markdown["banner"] != banner_rule(prov):
-        raise ToolError("RESULTS.md banner differs from provenance.label")
-    shas = {
-        "official": sha256_of(official_json),
-        "crosscheck": sha256_of(cross_json),
-    }
+    if "dev" in sources:
+        dev = sources["dev"].get("provenance") or {}
+        if classify(dev, "--development file") != "development":
+            raise ToolError("--development must be a development run: refused")
+    if sources["official_md"]["banner"] != banner_rule(official):
+        raise ToolError("RESULTS.md label line differs from provenance.label")
+    confirmatory = mode == "confirmatory"
+    if confirmatory and not (release_ref and RELEASE_REF.match(release_ref)):
+        raise ToolError(
+            "a confirmatory build needs --release-ref ledger-seq-<n> "
+            "(the release record of WU-0015.4): refused"
+        )
+    checks = [
+        manifest_text(n, shas[n], manifest.get(n), confirmatory)
+        for n in ("official", "official_md", "crosscheck")
+    ]
     if confirmatory:
         frozen = git_freeze_commit(root)
-        if prov.get("commit") != frozen:
+        if official.get("commit") != frozen:
             raise ToolError(
-                f"official commit {prov.get('commit')} is not freeze-1 {frozen}"
+                f"official commit {official.get('commit')} is not "
+                f"freeze-1 {frozen}"
             )
         freeze = "equals freeze-1"
     else:
         freeze = "not applicable (development run)"
-    meta = {
+    return {
+        "mode": mode,
         "freeze_check": freeze,
         "official_sha": shas["official"],
+        "official_md_sha": shas["official_md"],
         "crosscheck_sha": shas["crosscheck"],
-        "official_manifest": manifest_text(
-            shas["official"], args.manifest_official, confirmatory, "official"
+        "manifest_check": (
+            "hashes of the three files given at build and equal to them "
+            "(the tool cannot read the manifest)"
+            if all(c == "given" for c in checks)
+            else "none given (development)"
         ),
-        "crosscheck_manifest": manifest_text(
-            shas["crosscheck"],
-            args.manifest_crosscheck,
-            confirmatory,
-            "cross-check",
+        "release_ref": (
+            release_ref if confirmatory else "none (development dry run)"
         ),
-        "release_ref": args.release_ref or "none (development dry run)",
-        "trace_name": f"{args.stem}.trace.csv",
-        "missing_count": "0",
+        "trace_name": f"{stem}.trace.csv",
         "mode_notice": (
             "**DEVELOPMENT DRY RUN (WU-0020.3).** Every number below comes "
             "from a development seed. It rehearses the build and is not a "
@@ -1054,43 +1271,22 @@ def load_sources(args: argparse.Namespace, root: Path) -> tuple[dict, dict]:
             "seed. Verdicts are read from the file and not recomputed."
         ),
     }
-    sources = {
-        "official": official,
-        "official_md": markdown,
-        "crosscheck": cross,
-        "td": parse_td(Path(args.td)),
-        "const": constants,
-        "meta": meta,
-    }
-    files = {
-        "official": str(official_json.resolve()),
-        "crosscheck": str(cross_json.resolve()),
-        "td": str(Path(args.td).resolve()),
-    }
-    if args.development:
-        dev_json, _ = run_files(Path(args.development))
-        sources["dev"] = read_json(dev_json)
-        files["dev"] = str(dev_json.resolve())
-    return sources, files
+
+
+def build_document(
+    sources: dict, constants: dict, directory: Path, stem: str
+) -> tuple[str, Builder]:
+    """Fill the template; write the figures under ``directory``."""
+    builder = Builder(sources, constants, directory, stem)
+    text = builder.finalize(builder.expand(TEMPLATE_PATH.read_text()))
+    return text, builder
 
 
 def write_trace(rows: list[Row], path: Path) -> None:
     """Write the trace file: one row per quoted value."""
     with path.open("w", newline="") as handle:
         writer = csv.writer(handle, lineterminator="\n")
-        writer.writerow(
-            [
-                "id",
-                "tag",
-                "source",
-                "path",
-                "spec",
-                "raw",
-                "rendered",
-                "line",
-                "col",
-            ]
-        )
+        writer.writerow(TRACE_COLUMNS)
         for k, r in enumerate(rows):
             writer.writerow(
                 [
@@ -1107,55 +1303,148 @@ def write_trace(rows: list[Row], path: Path) -> None:
             )
 
 
+TRACE_COLUMNS = [
+    "id",
+    "tag",
+    "source",
+    "path",
+    "spec",
+    "raw",
+    "rendered",
+    "line",
+    "col",
+]
+
+
+def paths_of(args: argparse.Namespace) -> dict[str, Path]:
+    """Return the source files named on the command line."""
+    official = Path(args.official)
+    official = official / "results.json" if official.is_dir() else official
+    cross = Path(args.crosscheck)
+    cross = cross / "results.json" if cross.is_dir() else cross
+    paths = {
+        "official": official,
+        "official_md": official.parent / "RESULTS.md",
+        "crosscheck": cross,
+        "td": Path(args.td),
+    }
+    if args.development:
+        dev = Path(args.development)
+        paths["dev"] = dev / "results.json" if dev.is_dir() else dev
+    for name, path in paths.items():
+        if not path.is_file():
+            raise ToolError(f"{name} file not found: {path}")
+    return paths
+
+
 def render(args: argparse.Namespace) -> int:
     """Write the document, trace, sources file and figures; then check."""
-    root = HERE.parent
-    sources, files = load_sources(args, root)
+    constants = read_json(CONSTANTS_PATH)
+    paths = paths_of(args)
+    sources = read_sources(paths, constants)
+    shas = {n: sha256_of(p) for n, p in paths.items()}
+    manifest = {
+        "official": args.manifest_official,
+        "official_md": args.manifest_official_md,
+        "crosscheck": args.manifest_crosscheck,
+    }
+    sources["meta"] = make_meta(
+        sources, shas, manifest, args.release_ref, args.stem, HERE.parent
+    )
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    constants = sources["const"]
-    builder = Builder(sources, constants, out, args.stem)
-    text = builder.finalize(builder.expand(TEMPLATE_PATH.read_text()))
+    text, builder = build_document(sources, constants, out, args.stem)
     (out / f"{args.stem}.md").write_text(text)
     write_trace(builder.rows, out / f"{args.stem}.trace.csv")
     record = {
-        "files": files,
-        "sha256": {k: sha256_of(Path(v)) for k, v in files.items()},
-        "meta": sources["meta"],
-        "mode": (
-            "confirmatory"
-            if sources["official"]["provenance"]["seed_kind"] == "confirmatory"
-            else "development"
-        ),
+        "files": {n: str(p.resolve()) for n, p in paths.items()},
+        "sha256": shas,
+        "manifest": manifest,
+        "release_ref": args.release_ref,
+        "meta": builder.meta,
     }
     (out / f"{args.stem}.sources.json").write_text(
         json.dumps(record, indent=2, sort_keys=True) + "\n"
     )
-    missing = sorted(set(builder.missing))
     print(
         f"rendered {args.stem}: {len(builder.rows)} traced values, "
-        f"{len(missing)} leaves not recorded"
+        f"{len(set(builder.missing))} leaves not recorded, "
+        f"{len(set(builder.nulls))} null leaves"
     )
     return run_check(out, args.stem, {})
 
 
 # --- check ------------------------------------------------------------
-def rebuild_sources(record: dict, constants: dict, override: dict) -> dict:
-    """Reload the sources named in ``sources.json`` (paths may be overridden)."""
-    sources: dict = {"const": constants, "meta": record["meta"]}
-    paths = {
-        name: Path(override.get(name) or path)
-        for name, path in record["files"].items()
-    }
-    for name, path in paths.items():
-        if sha256_of(path) != record["sha256"][name]:
-            raise ToolError(f"{name} changed since the build: {path}")
-        sources[name] = parse_td(path) if name == "td" else read_json(path)
-    markdown = paths["official"].parent / "RESULTS.md"
-    sources["official_md"] = parse_results_md(
-        markdown if markdown.exists() else None
-    )
-    return sources
+def split_sections(text: str) -> list[tuple[str, list[str]]]:
+    """Split a document at its ``## `` headings (the first part has none)."""
+    sections: list[tuple[str, list[str]]] = [("", [])]
+    for line in text.split("\n"):
+        if line.startswith("## "):
+            sections.append((line, []))
+        else:
+            sections[-1][1].append(line)
+    return sections
+
+
+def merge_free_slots(
+    expected: str, actual: str
+) -> tuple[str, list[str], list[str]]:
+    """Put a fresh render's text into the two free slots of the document.
+
+    The body of section 11 may differ, and section 9 may carry extra dated
+    lines after the rendered ones. Returns ``(text, free, problems)``: the
+    document with those slots replaced by the fresh text (so that line
+    positions match the trace again), the lines taken out of the slots (to be
+    scanned for digits), and a problem for each extra section 9 line that is
+    not dated.
+    """
+    want, have = split_sections(expected), split_sections(actual)
+    if [h for h, _ in want] != [h for h, _ in have]:
+        return actual, [], ["the section headings differ from a fresh render"]
+    lines: list[str] = []
+    free: list[str] = []
+    problems: list[str] = []
+    for (heading, fresh), (_, found) in zip(want, have):
+        body = found
+        if heading.startswith("## 11."):
+            free += found
+            body = fresh
+        elif heading.startswith("## 9."):
+            fresh_trim, found_trim = list(fresh), list(found)
+            while fresh_trim and not fresh_trim[-1]:
+                fresh_trim.pop()
+            while found_trim and not found_trim[-1]:
+                found_trim.pop()
+            if found_trim[: len(fresh_trim)] == fresh_trim:
+                extra = found_trim[len(fresh_trim) :]
+                free += extra
+                body = fresh
+                problems += [
+                    f"section 9: extra line is not a dated line: {x!r}"
+                    for x in extra
+                    if x and not DATED_LINE.match(x)
+                ]
+        lines += ([heading] if heading else []) + body
+    return "\n".join(lines), free, problems
+
+
+def diff_sections(expected: str, actual: str) -> list[str]:
+    """Name the first section in which two documents differ."""
+    problems = []
+    want, have = split_sections(expected), split_sections(actual)
+    if [h for h, _ in want] != [h for h, _ in have]:
+        return ["the section headings differ from a fresh render"]
+    for (heading, a), (_, b) in zip(want, have):
+        if a != b:
+            first = next(
+                (k for k, (x, y) in enumerate(zip(a, b)) if x != y),
+                min(len(a), len(b)),
+            )
+            problems.append(
+                f"{heading or 'the preamble'!r} differs from a fresh render "
+                f"at its line {first + 1}"
+            )
+    return problems
 
 
 def check_rows(rows: list[dict], lines: list[str], sources: dict) -> list[str]:
@@ -1163,48 +1452,68 @@ def check_rows(rows: list[dict], lines: list[str], sources: dict) -> list[str]:
     problems = []
     constants = sources["const"]
     for r in rows:
-        where = f"row {r['id']} ({r['source']}:{r['path']})"
-        if r["source"] not in ALLOWED.get(r["tag"], set()):
-            problems.append(
-                f"{where}: source not allowed in a {r['tag'] or 'plain'} section"
-            )
         try:
-            value = walk(sources[r["source"]], r["path"])
-            raw, text = repr(value), fmt(value, r["spec"])
-        except Missing:
-            raw, text = MISSING, NOT_RECORDED
-        except ToolError as exc:
-            problems.append(f"{where}: {exc}")
-            continue
-        if raw != r["raw"] or text != r["rendered"]:
-            problems.append(
-                f"{where}: leaf gives {text!r}, trace says {r['rendered']!r}"
+            where = f"row {r['id']} ({r['source']}:{r['path']})"
+            if r["source"] not in sources:
+                problems.append(f"{where}: unknown source")
+                continue
+            if r["source"] not in ALLOWED.get(r["tag"], set()):
+                problems.append(
+                    f"{where}: source not allowed in a "
+                    f"{r['tag'] or 'plain'} section"
+                )
+            try:
+                value = walk(sources[r["source"]], r["path"])
+                raw, text = repr(value), fmt(value, r["spec"])
+            except Missing:
+                raw, text = MISSING, NOT_RECORDED
+            if raw != r["raw"] or text != r["rendered"]:
+                problems.append(
+                    f"{where}: leaf gives {text!r}, trace says {r['rendered']!r}"
+                )
+            line, col = int(r["line"]), int(r["col"])
+            found = (
+                lines[line - 1][col : col + len(r["rendered"])]
+                if 1 <= line <= len(lines)
+                else ""
             )
-        line, col = int(r["line"]), int(r["col"])
-        found = (
-            lines[line - 1][col : col + len(r["rendered"])]
-            if line <= len(lines)
-            else ""
-        )
-        if found != r["rendered"]:
-            problems.append(f"{where}: document has {found!r} at line {line}")
-        if r["source"] == "const" and not const_citation(constants, r["path"]):
-            problems.append(f"{where}: constant without a v3 citation")
+            if found != r["rendered"]:
+                problems.append(
+                    f"{where}: document has {found!r} at line {line}"
+                )
+            if r["source"] == "const" and not const_citation(
+                constants, r["path"]
+            ):
+                problems.append(f"{where}: constant without a v3 citation")
+        except (KeyError, ValueError, TypeError, ToolError, Missing) as exc:
+            problems.append(f"row {r.get('id')}: malformed ({exc!r})")
     return problems
 
 
 def untraced_numbers(lines: list[str], rows: list[dict]) -> list[str]:
-    """Return lines that hold a numeral the trace does not explain."""
+    """Return lines that hold a digit the trace and the identifiers do not.
+
+    Traced spans are blanked, then the identifier shapes of the study
+    (``IDENTIFIER``), then any remaining digit is a number nobody traced.
+    Dated lines appended to section 9 lose their date first. Number words
+    ("forty-two") cannot be detected.
+    """
     masked = list(lines)
     for r in rows:
-        k, col, n = int(r["line"]) - 1, int(r["col"]), len(r["rendered"])
-        masked[k] = masked[k][:col] + " " * n + masked[k][col + n :]
+        try:
+            k, col, n = int(r["line"]) - 1, int(r["col"]), len(r["rendered"])
+        except (KeyError, ValueError, TypeError):
+            continue  # a malformed row is reported by ``check_rows``
+        if 0 <= k < len(masked):
+            masked[k] = masked[k][:col] + " " * n + masked[k][col + n :]
     bad = []
     for k, line in enumerate(masked):
-        clean = STRUCTURE.sub(" ", line)
-        hits = NUMERAL.findall(clean)
-        if hits:
-            bad.append(f"line {k + 1}: untraced number {hits[0]!r}")
+        clean = IDENTIFIER.sub(" ", DATED_LINE.sub("- : ", line, count=1))
+        hit = re.search(r"\d", clean)
+        if hit:
+            bad.append(
+                f"line {k + 1}: untraced number near {clean[hit.start() : hit.start() + 12]!r}"
+            )
     return bad
 
 
@@ -1234,36 +1543,46 @@ def check_text(lines: list[str], sources: dict, rows: list[dict]) -> list[str]:
         if word.lower() not in limits.lower():
             problems.append(f"limitations lack {word!r}")
     paths = {(r["source"], r["path"]) for r in rows}
+    systems = constants["systems"]
     for item in constants["identifiers"]:
+        for s in systems:
+            if (
+                "official",
+                f"verdicts/{item['key']}/by_system/{s}",
+            ) not in paths:
+                problems.append(
+                    f"{item['key']} of {s} missing from the verdict table"
+                )
         if ("official", f"verdicts/{item['key']}/verdict") not in paths:
-            problems.append(
-                f"identifier {item['key']} missing from the verdict table"
-            )
-    systems = [
-        s
-        for s in walk(official, "config/core_systems")
-        if s in official["systems"]
-    ]
+            problems.append(f"identifier {item['key']} missing")
     for s in systems:
+        block = (official.get("systems") or {}).get(s) or {}
         for part in constants["primary_parts"]:
-            leaf = f"systems/{s}/{part['estimate']}"
-            if ("official", leaf) not in paths:
+            if ("official", f"systems/{s}/{part['estimate']}") not in paths:
                 problems.append(f"primary part {s} {part['name']} missing")
         for gate in constants["gate_rows"]:
             for _, leaf, _ in gate["stats"]:
                 if ("official", f"systems/{s}/{leaf}") not in paths:
                     problems.append(f"{gate['check']} of {s} missing")
-        if ("official", f"systems/{s}/validation/gate/gate_pass") not in paths:
-            problems.append(f"gate of {s} missing")
-        gate = official["systems"][s].get("validation", {}).get("gate", {})
-        if gate.get("gate_pass") is not True:
+        gate_pass = block.get("validation", {}).get("gate", {}).get("gate_pass")
+        if gate_pass is not True:
             rows_s = [x for x in lines if x.startswith(f"| {s}")]
             if not rows_s or any("PROVISIONAL" not in x for x in rows_s):
                 problems.append(
                     f"{s} failed the gate but a row lacks PROVISIONAL"
                 )
-    totals = walk(official, "handling/totals")
-    for name in totals:
+            for r in rows:
+                if r["source"] == "official" and r["path"].endswith(
+                    f"/by_system/{s}"
+                ):
+                    line, col = int(r["line"]), int(r["col"]) + len(
+                        r["rendered"]
+                    )
+                    if not lines[line - 1][col:].startswith(" PROVISIONAL"):
+                        problems.append(
+                            f"verdict cell {r['path']} lacks PROVISIONAL"
+                        )
+    for name in walk(official, "handling/totals"):
         if ("official", f"handling/totals/{name}") not in paths:
             problems.append(f"handling counter {name} missing")
     if ("official", "handling/failed_variants") not in paths:
@@ -1272,24 +1591,72 @@ def check_text(lines: list[str], sources: dict, rows: list[dict]) -> list[str]:
 
 
 def run_check(directory: Path, stem: str, override: dict) -> int:
-    """Check the document in ``directory``; print problems; return 0 or 1."""
+    """Check the document in ``directory``; print problems; return 0 or 1.
+
+    Order: hash every source, apply the release guard again, render a fresh
+    copy (with figures) in a temporary directory, and compare it with the
+    document, the trace and the three PNG files; then run the independent
+    checks on the document text.
+    """
     record = read_json(directory / f"{stem}.sources.json")
     constants = read_json(CONSTANTS_PATH)
-    sources = rebuild_sources(record, constants, override)
-    lines = (directory / f"{stem}.md").read_text().split("\n")
+    paths = {
+        name: Path(override.get(name) or path)
+        for name, path in record["files"].items()
+    }
+    for name, path in paths.items():
+        if not path.is_file() or sha256_of(path) != record["sha256"][name]:
+            raise ToolError(f"{name} changed since the build: {path}")
+    sources = read_sources(paths, constants)
+    sources["meta"] = make_meta(
+        sources,
+        record["sha256"],
+        record["manifest"],
+        record["release_ref"],
+        stem,
+        HERE.parent,
+    )
+    actual = (directory / f"{stem}.md").read_text()
     with (directory / f"{stem}.trace.csv").open(newline="") as handle:
         rows = list(csv.DictReader(handle))
-    problems = check_rows(rows, lines, sources)
-    problems += untraced_numbers(lines, rows)
+    problems = []
+    with tempfile.TemporaryDirectory() as tmp:
+        fresh, builder = build_document(sources, constants, Path(tmp), stem)
+        merged, free, extra = merge_free_slots(fresh, actual)
+        problems += extra + diff_sections(fresh, merged)
+        lines = merged.split("\n")
+        if builder.meta != record["meta"]:
+            problems.append("meta values differ from a fresh render")
+        expected_rows = [
+            [
+                str(k),
+                r.tag,
+                r.source,
+                r.path,
+                r.spec,
+                r.raw,
+                r.rendered,
+                str(r.line),
+                str(r.col),
+            ]
+            for k, r in enumerate(builder.rows)
+        ]
+        got_rows = [[r.get(c, "") for c in TRACE_COLUMNS] for r in rows]
+        if expected_rows != got_rows:
+            problems.append("the trace file differs from a fresh render")
+        for name in ("F1_primary", "F2_secondary", "F3_crosscheck"):
+            old = directory / f"{stem}.figures" / f"{name}.png"
+            new = Path(tmp) / f"{stem}.figures" / f"{name}.png"
+            if not old.is_file() or old.read_bytes() != new.read_bytes():
+                problems.append(f"figure {name} differs from a fresh render")
+    problems += check_rows(rows, lines, sources)
+    problems += untraced_numbers(lines, rows) + untraced_numbers(free, [])
     problems += check_text(lines, sources, rows)
-    for name in ("F1_primary", "F2_secondary", "F3_crosscheck"):
-        if not (directory / f"{stem}.figures" / f"{name}.png").exists():
-            problems.append(f"figure {name} missing")
     for p in problems[:50]:
         print(f"CHECK FAIL: {p}")
     print(
-        f"check {'FAILED' if problems else 'passed'}: {len(rows)} traced values, "
-        f"{len(problems)} problems"
+        f"check {'FAILED' if problems else 'passed'}: {len(rows)} traced "
+        f"values, {len(problems)} problems"
     )
     return 1 if problems else 0
 
@@ -1300,36 +1667,31 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     ren = sub.add_parser("render", help="write the document, trace and figures")
     ren.add_argument(
-        "--official", required=True, help="official run dir or results.json"
+        "--official", required=True, help="run dir or results.json"
     )
     ren.add_argument(
-        "--crosscheck",
-        required=True,
-        help="cross-check run dir or results.json",
+        "--crosscheck", required=True, help="run dir or results.json"
     )
     ren.add_argument("--td", required=True, help="compare_runs text file")
     ren.add_argument("--development", help="development run dir (appendix A)")
     ren.add_argument("--out", required=True)
     ren.add_argument("--stem", default="preliminary_findings")
+    ren.add_argument("--release-ref", help="ledger-seq-<n>; confirmatory only")
     ren.add_argument(
-        "--release-ref",
-        help="release record (WU-0015.4); required for a confirmatory run",
+        "--manifest-official", help="manifest SHA-256, results.json"
     )
     ren.add_argument(
-        "--manifest-official",
-        help="manifest SHA-256 of the official results.json",
+        "--manifest-official-md", help="manifest SHA-256, RESULTS.md"
     )
     ren.add_argument(
-        "--manifest-crosscheck",
-        help="manifest SHA-256 of the cross-check results.json",
+        "--manifest-crosscheck", help="manifest SHA-256, cross-check"
     )
     chk = sub.add_parser("check", help="verify a rendered document")
     chk.add_argument("directory")
     chk.add_argument("--stem", default="preliminary_findings")
-    for name in ("official", "crosscheck", "td", "development"):
+    for name in ("official", "official_md", "crosscheck", "td", "dev"):
         chk.add_argument(
-            f"--{name}",
-            help=f"use this {name} file instead of the recorded path",
+            f"--{name}", help=f"use this {name} file (hash is checked)"
         )
     args = parser.parse_args(argv)
     try:
@@ -1337,12 +1699,8 @@ def main(argv: list[str] | None = None) -> int:
             return render(args)
         override = {
             n: getattr(args, n)
-            for n in ("official", "crosscheck", "td", "development")
+            for n in ("official", "official_md", "crosscheck", "td", "dev")
             if getattr(args, n)
-        }
-        override = {
-            n: str(run_files(Path(v))[0]) if n != "td" else v
-            for n, v in override.items()
         }
         return run_check(Path(args.directory), args.stem, override)
     except ToolError as exc:

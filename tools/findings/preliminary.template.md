@@ -5,7 +5,7 @@ PRELIMINARY: internal to the owner and the student until promotion (QA.11, LPC.P
 
 # Preliminary findings for seed {{official:provenance/seed_id}}
 
-This document is built by `tools/findings_build.py` from the files named in §2. Every number in it is either read from one of those files (and listed in the trace file) or is a design constant of the v3 proposal that cites its section. The build computes no statistic and no verdict. Agents write the tables and this frame; the student writes §11.
+This document is built by `tools/findings_build.py` from the files named in §2. Every number in it is either read from one of those files (and listed in the trace file) or is a design constant of the v3 proposal that cites its section. The build computes no statistic and no verdict. Agents write the tables and this frame; the student writes §11. `check` re-renders the whole document and accepts a difference only in §11 and in dated lines appended to §9.
 
 ## 1. The question
 
@@ -37,13 +37,17 @@ Q-N is read from the §7 table and is never pass or fail. The hybrid's horizon g
 
 ## 5. The three primary hypotheses (E1, E2, E4, E5) [PRE-REGISTERED]
 
-Each row is one primary part on one system: the stored estimate, its interval at the level stored in the result (or the primary level of v3 §7 where the result stores none), the pass band of v3 §2 and the stored verdict. The two notes on every row are limitations stated before the run (v3 §8).
+Each row is one primary part on one system: the stored estimate, its interval at the level stored in the result (or the primary level of v3 §7 where the result stores none), the pass band of v3 §2 and the stored verdict. The two notes on every row are limitations stated before the run (v3 §8). Endpoints are rounded to four-digit precision for printing; every verdict uses the unrounded endpoints (v3 §7), so a printed edge can equal a band edge that the stored endpoint does not reach.
 
 {{table:primary}}
 
 {{fig:F1}}
 
+{{table:counts}}
+
 ## 6. Secondary hypotheses, Q-N, H3a counts and the gain bound (E2 to E5) [PRE-REGISTERED]
+
+Endpoints are rounded to four-digit precision for printing; every verdict uses the unrounded endpoints (v3 §7). The H2c row A4o minus A2 is reported with its interval and carries no verdict (v3 §2).
 
 {{table:secondary}}
 
@@ -55,11 +59,15 @@ H3a: events and censored states per regime, with the stored Holm-adjusted log-ra
 
 {{table:h3a}}
 
+{{table:counts}}
+
 Hybrid horizon gain against the P1 bound ({{const:gain_label}}):
 
 {{table:gain}}
 
 {{fig:F2}}
+
+{{table:counts}}
 
 ## 7. Handling counters (nothing is silent) [DIAGNOSTIC]
 
@@ -91,7 +99,7 @@ All items of v3 §8 apply, plus the registered deficiencies and rulings listed h
 - N̂ measures retrieval sensitivity at the observed (noisy) query, not at the true one, so it is reported, not tested.
 - The seed × amplifier test (H1b) assumes isotropic seeds and is applied to PLP only.
 - Same attractors, fresh seeds: this is not a new set of systems.
-- Interval coverage (DEF-0020): the block-5 percentile intervals undercover, at a level of {{const:coverage_range}}. The pre-registered intervals and block length are kept.
+- Interval coverage (DEF-0020): {{const:coverage_limit}}
 - Slow dependence beyond five states cannot be resolved at these sample sizes.
 - Small regimes in H3a (DEF-0018): no minimum is set per regime, so counts are reported beside every p-value.
 - Iterative error of PLP (DEF-0027): the Levenberg–Marquardt flag was raised on {{const:lm_flag_count}} primary parts on a development seed. It is development evidence, projected and not corrected.
@@ -120,6 +128,6 @@ Copied verbatim from the `RESULTS.md` of the official run, one per row (procedur
 
 ## C. Trace
 
-Every number quoted above is listed with its source and leaf path in `{{meta:trace_name}}`. Run `python3 tools/findings_build.py check` on this directory to verify the document against the sources.
+Every number quoted above is listed with its source and leaf path in `{{meta:trace_name}}`. Run the `check` command of `tools/findings_build.py` on this directory to verify the document against the sources.
 
 {{table:missing}}

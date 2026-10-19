@@ -56,6 +56,11 @@ NO_TEST_FILES = frozenset(
     {"README.md", "ROADMAP.md", "DEVELOPMENT_WORKFLOW.md", "seeds/README.md"}
 )
 NO_TEST_DIRS = ("docs/", ".claude/")
+# Data files read by a tool (its template and constants): the tool's test file
+# covers them, so an edit to one of them selects that test and nothing else.
+TOOL_DATA_TESTS = {
+    "tools/findings/": "tests/unit/test_tools_findings_build.py",
+}
 WHOLE_SUITE = frozenset({"", ".", "./", "tests", "tests/"})
 PYTEST_FLAGS = ("-q", "--tb=short", "-rfE")
 SEEDS_TESTS = (
@@ -506,6 +511,9 @@ def _map_file(
         if not (root / test).is_file():
             warnings.append(f"{path} has no test ({test})")
         return "tool: its test file", _exists(root, test)
+    for prefix, test in TOOL_DATA_TESTS.items():
+        if path.startswith(prefix):
+            return "tool data file: its tool's test file", _exists(root, test)
     tier = _tier_of(path)
     if (
         tier is not None
