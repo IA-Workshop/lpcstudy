@@ -693,5 +693,24 @@
     "development",
     "preliminary",
     "gate"
+  ],
+  "free_slot_stems": [
+    "prove",
+    "provin",
+    "confirm",
+    "signific",
+    "demonstrat",
+    "breakthrough",
+    "gate",
+    "gating",
+    "provision",
+    "promot",
+    "unpromot",
+    "verif",
+    "unverif",
+    "pre-regist",
+    "preregist",
+    "developm",
+    "preliminar"
   ]
 }

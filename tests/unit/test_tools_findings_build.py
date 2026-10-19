@@ -41,10 +41,13 @@ import copy
 import csv
 import importlib.util
 import json
+import os
 import re
 import shutil
+import subprocess
 import sys
 from argparse import Namespace
+from datetime import date
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -1395,6 +1398,7 @@ def test_compare_runs_text_is_bound_to_the_two_files(tmp_path) -> None:
     moved = make_td().replace("REFDIR", prefix + "official")
     moved = moved.replace("NEWDIR", prefix + "cross")
     assert "trailing two path components" in load(moved)["td_binding"]
+    assert "(development mode only)" in load(moved)["td_binding"]
     with pytest.raises(fb.ToolError, match="no REF and NEW"):
         load(make_td().replace("REF: REFDIR\n", ""))
 
@@ -1416,6 +1420,18 @@ ATTACKS = [
     "the gate passed after all",
     "a [STUDENT] note",
     "Results are UNPROMOTED no more",
+    # N4: inflected forms of refused words (stems), no digit anywhere.
+    "the study proved it",
+    "all of it was confirmed",
+    "a significantly better blend",
+    "two gates were passed",
+    "the result is provisionally fine",
+    "after the promotion we know",
+    # N4: setext headings, and a bracketed capitalized token of any text.
+    "Verdicts\n========",
+    "Verdicts\n--------",
+    "[CROSS CHECK] here",
+    "[Note about the table] here",
 ]
 DATED_ATTACKS = [
     "- 0938-09-47: agreed",
@@ -1425,6 +1441,7 @@ DATED_ATTACKS = [
     "- 2026-10-19: see item 3",
     "- 2026-10-19: agreed to five digits and 3 more",
     "- 2026-10-19 agreed",
+    "- 2099-12-31: agreed",  # N4: after the day check runs
 ]
 
 
@@ -1464,3 +1481,333 @@ def test_free_slot_attacks_are_refused(fast, tmp_path) -> None:
     assert problems and problems[0].startswith(f"line {at}:")
     free = [(7, "- 2026-10-19: 3 cases", True)]
     assert fb.check_free_slots(free, CONSTANTS, None)[0].startswith("line 7:")
+
+
+# (text, a word that its problem message must contain): each attack must fail
+# for the intended reason, not by accident of another rule.
+FREE_SLOT_REASONS = [
+    ("the study proved it", "stem 'prove'"),
+    ("all of it was confirmed", "stem 'confirm'"),
+    ("a significantly better blend", "stem 'signific'"),
+    ("two gates were passed", "stem 'gate'"),
+    ("the result is provisionally fine", "stem 'provision'"),
+    ("after the promotion we know", "stem 'promot'"),
+    ("the unpromoted copy", "stem 'unpromot'"),
+    ("it was proving the point", "stem 'provin'"),
+    ("a [CROSS CHECK] here", "bracketed capitalized"),
+    ("a [Note about the table] here", "bracketed capitalized"),
+    ("a [ Open] here", "bracketed capitalized"),
+]
+FREE_SLOT_FINE = [
+    "H2a and H3c are inconclusive, so the picture is mixed.",
+    "These notes provide some context for the table.",
+    "A [lowercase bracket] and a (parenthesis) are allowed.",
+    "- a list item\n- another list item",
+    "A line\n\nAnother line after a blank line",
+    "Three words - separated by a dash - on one line",
+]
+
+
+def test_free_slot_stems_and_brackets_name_their_reason() -> None:
+    """Prefix stems and bracket tokens fail for the intended reason (N4).
+
+    Reference: typed here by hand. Each text holds no digit, no heading and
+    no whole-word refusal, so the only rule that can refuse it is the one
+    named in the second column. The controls must pass every rule, which
+    shows that the stems are not so broad that plain words are refused.
+    """
+    for text, reason in FREE_SLOT_REASONS:
+        problems = fb.check_free_slots([(5, text, False)], CONSTANTS, None)
+        assert any(reason in p for p in problems), (text, problems)
+    for text in FREE_SLOT_FINE:
+        lines = [(5 + k, t, False) for k, t in enumerate(text.split("\n"))]
+        assert fb.check_free_slots(lines, CONSTANTS, None) == [], text
+
+
+def test_setext_heading_names_its_line() -> None:
+    """A line followed by a line of only = or - is a heading and is refused (N4).
+
+    Reference: CommonMark's definition of a setext heading, typed by hand.
+    The message names the document line of the text, and the underline of a
+    paragraph that is a list item or a blank line is not a heading.
+    """
+    for under in ("=", "=====", "---", "-", "  ===  "):
+        free = [(8, "Verdicts", False), (9, under, False)]
+        problems = fb.check_free_slots(free, CONSTANTS, None)
+        assert problems and problems[0].startswith("line 8: setext"), under
+    blank = [(8, "Verdicts", False), (9, "", False), (10, "---", False)]
+    assert fb.check_free_slots(blank, CONSTANTS, None) == []
+
+
+def test_dated_line_after_today_is_refused() -> None:
+    """A dated line later than the day ``check`` runs is refused (N4).
+
+    The day is passed in, so the test does not depend on the clock; the same
+    line is accepted on its own day and refused the day before.
+    """
+    free = [(7, "- 2026-10-20: agreed", True)]
+    on_day = fb.check_free_slots(
+        free, CONSTANTS, None, today=date(2026, 10, 20)
+    )
+    assert on_day == []
+    before = fb.check_free_slots(
+        free, CONSTANTS, None, today=date(2026, 10, 19)
+    )
+    assert len(before) == 1 and "after today" in before[0]
+    assert before[0].startswith("line 7:")
+    # The default day is the real one: a date long in the future is refused.
+    far = [(7, "- 2099-12-31: agreed", True)]
+    assert any(
+        "after today" in p for p in fb.check_free_slots(far, CONSTANTS, None)
+    )
+    # The old rule still holds: before the end of the official run.
+    early = [(7, "- 2026-01-01: agreed", True)]
+    problems = fb.check_free_slots(early, CONSTANTS, date(2026, 1, 2))
+    assert any("before the run ended" in p for p in problems)
+
+
+def test_docstring_states_the_limits() -> None:
+    """The module docstring quotes the stems and states the residual limits.
+
+    N1: the empty-listing residual and the rerun-and-diff step; N2: the git
+    check and that nothing more is verified; N3: the absolute-path rule; N4:
+    the stems and the limits of the free-slot rules.
+    """
+    doc = " ".join(fb.__doc__.split())
+    for stem in CONSTANTS["free_slot_stems"]:
+        assert stem in doc, stem
+    for phrase in (
+        "empty or deleted",
+        "rerun ``compare_runs`` on the released directories and diff",
+        "WU-0020.8",
+        "git diff --name-only",
+        "does not verify the commit difference",
+        "absolute paths",
+        "realpath only",
+        "Number words",
+        "reads every claim",
+        "date.today()",
+    ):
+        assert phrase in doc, phrase
+
+
+# --- the cross-check commit (N2) ---------------------------------------------
+def conf_with_commits(tmp: Path, monkeypatch, changed):
+    """Render a confirmatory pair whose cross-check commit differs.
+
+    ``changed`` is the stubbed answer of ``git_changed_paths`` (a list), or an
+    exception to raise; the stub records its calls.
+    """
+    calls = []
+
+    def stub(root, old, new):
+        calls.append((old, new))
+        if isinstance(changed, Exception):
+            raise changed
+        return list(changed)
+
+    monkeypatch.setattr(fb, "git_changed_paths", stub)
+    out = conf_render(
+        tmp, monkeypatch, None, lambda p: p.update(commit="d" * 40)
+    )
+    return out, calls
+
+
+def test_later_cross_check_commit_must_change_only_records(
+    tmp_path, monkeypatch
+) -> None:
+    """A differing cross-check commit is allowed only for records and the ledger (N2).
+
+    The git call is stubbed (the answer is typed here). Accepted: a diff of
+    records files and the ledger only (and an empty diff). Refused: a diff that
+    touches ``lpcstudy/`` or any path that only looks like a record path
+    (a sibling directory, a suffix of the ledger name), and a failing git.
+    """
+    (args, code), calls = conf_with_commits(
+        tmp_path / "ok",
+        monkeypatch,
+        [
+            "docs/agent/records/work/WU-0020.md",
+            "docs/agent/governance/ledger.jsonl",
+        ],
+    )
+    assert code == 0 and calls == [("c" * 40, "d" * 40)] * 2  # render, check
+    text = doc_of(Path(args.out))
+    assert "(same as official: no)" in text
+    assert (
+        "lists 2 path(s), all under docs/agent/records/ or the ledger" in text
+    )
+    (args, code), _ = conf_with_commits(tmp_path / "empty", monkeypatch, [])
+    assert code == 0
+    refused = [
+        ["lpcstudy/data.py"],
+        ["docs/agent/records/x.md", "lpcstudy/statistics.py"],
+        ["docs/agent/records-extra/x.md"],
+        ["docs/agent/governance/ledger.jsonl.bak"],
+        ["docs/agent/governance/other.md"],
+        ["tools/findings_build.py"],
+        ["../docs/agent/records/x.md"],
+    ]
+    for k, paths in enumerate(refused):
+        with pytest.raises(fb.ToolError, match="outside"):
+            conf_with_commits(tmp_path / f"r{k}", monkeypatch, paths)
+    with pytest.raises(fb.ToolError, match="cannot list"):
+        conf_with_commits(
+            tmp_path / "fail", monkeypatch, fb.ToolError("cannot list: no git")
+        )
+
+    # The same commit needs no git call at all.
+    def never(root, old, new):
+        raise AssertionError("git must not be called for one commit")
+
+    monkeypatch.setattr(fb, "git_changed_paths", never)
+    args, code = conf_render(tmp_path / "same", monkeypatch)
+    assert code == 0
+    assert "not needed (the same commit)" in doc_of(Path(args.out))
+
+
+def test_changed_paths_helper_refuses_when_git_cannot_answer(
+    tmp_path, monkeypatch
+) -> None:
+    """The git helper turns every failure into ``ToolError`` (N2).
+
+    Reference: real git on this repository. An empty diff of a commit with
+    itself lists nothing; an unknown commit, a failing subprocess, a missing
+    git program and a commit string that is not 40 hex digits (which could
+    be read as an option) are all refused.
+    """
+    head = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert fb.git_changed_paths(ROOT, head, head) == []
+    assert fb.check_later_commit(ROOT, head, head).startswith("git diff")
+    with pytest.raises(fb.ToolError, match="cannot list"):
+        fb.git_changed_paths(ROOT, "0" * 40, head)
+    with pytest.raises(fb.ToolError, match="cannot list"):
+        fb.git_changed_paths(tmp_path, head, head)  # not a repository
+    for bad in ("--output=x", "main", "d" * 39, "D" * 40, None):
+        with pytest.raises(fb.ToolError, match="40 hex"):
+            fb.check_later_commit(ROOT, bad, head)
+        with pytest.raises(fb.ToolError, match="40 hex"):
+            fb.check_later_commit(ROOT, head, bad)
+
+    def missing(*a, **k):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(fb.subprocess, "run", missing)
+    with pytest.raises(fb.ToolError, match="cannot run git"):
+        fb.git_changed_paths(ROOT, head, head)
+
+
+# --- the working directory (N3) ----------------------------------------------
+def test_check_does_not_depend_on_the_working_directory(
+    tmp_path, monkeypatch
+) -> None:
+    """An unaltered document passes ``check`` from any directory (N3).
+
+    The committed dry-run text prints its REF and NEW lines relative to the
+    directory it was made in. Here the fixture does the same: it is built
+    from inside ``tmp_path`` with relative REF and NEW paths, then checked from
+    a different directory. The recorded ``cwd`` is what the relative paths are
+    read against, so the answer is the same. Without the record the paths
+    would be read against the new directory and fail to bind.
+    """
+    text = make_td().replace("REFDIR", "official").replace("NEWDIR", "cross")
+    args = render_args(tmp_path, td=text)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(tmp_path)
+    with stub_figures():
+        assert fb.render(args) == 0
+    out = Path(args.out)
+    record = json.loads((out / "doc.sources.json").read_text())
+    assert record["cwd"] == str(tmp_path.resolve())
+    assert all(Path(p).is_absolute() for p in record["files"].values())
+    assert "(by realpath and realpath)" in doc_of(out)
+    monkeypatch.chdir(elsewhere)
+    with stub_figures():
+        assert fb.run_check(out, "doc", {}) == 0
+        assert fb.main(["check", str(out), "--stem", "doc"]) == 0
+        # A record that names another directory cannot bind the relative path.
+        record["cwd"] = str(elsewhere)
+        (out / "doc.sources.json").write_text(json.dumps(record))
+        with pytest.raises(fb.ToolError, match="do not name"):
+            fb.run_check(out, "doc", {})
+        del record["cwd"]
+        (out / "doc.sources.json").write_text(json.dumps(record))
+        with pytest.raises(fb.ToolError, match="no cwd"):
+            fb.run_check(out, "doc", {})
+
+
+def test_confirmatory_build_needs_absolute_paths(tmp_path, monkeypatch) -> None:
+    """A confirmatory build refuses relative paths and binds by realpath only (N3).
+
+    Refused: a relative ``--official``, ``--crosscheck`` or ``--td``; REF and
+    NEW lines that are relative; REF and NEW under another prefix with the
+    same last two path components (the development fallback). Accepted: REF
+    through a symbolic link to the official directory (realpath binds), and
+    then ``check`` passes from another directory.
+    """
+    monkeypatch.setattr(fb, "git_freeze_commit", lambda root: "c" * 40)
+    official = make_results("confirmatory")
+    cross = make_results("confirmatory", backend="gpu")
+
+    def args_for(name: str, td: str | None = None) -> Namespace:
+        base = tmp_path / name
+        args = render_args(base, official=official, cross=cross, td=td)
+        args.release_ref = "ledger-seq-3"
+        args.manifest_official = fb.sha256_of(
+            base / "official" / "results.json"
+        )
+        args.manifest_official_md = fb.sha256_of(
+            base / "official" / "RESULTS.md"
+        )
+        args.manifest_crosscheck = fb.sha256_of(base / "cross" / "results.json")
+        return args
+
+    for k, field in enumerate(("official", "crosscheck", "td")):
+        args = args_for(f"rel{k}")
+        monkeypatch.chdir(tmp_path / f"rel{k}")
+        setattr(args, field, os.path.relpath(getattr(args, field)))
+        assert not Path(getattr(args, field)).is_absolute()
+        with pytest.raises(fb.ToolError, match=f"absolute path for {field}"):
+            fb.render(args)
+    relative = (
+        make_td().replace("REFDIR", "official").replace("NEWDIR", "cross")
+    )
+    args = args_for("reltext", relative)
+    monkeypatch.chdir(tmp_path / "reltext")
+    with pytest.raises(fb.ToolError, match="absolute REF and NEW"):
+        fb.render(args)
+    args = args_for("prefix")
+    # Same last two components as the real directories: development binds it.
+    real = tmp_path / "prefix"
+    moved = make_td().replace("REFDIR", f"/other/{real.name}/official")
+    moved = moved.replace("NEWDIR", f"/other/{real.name}/cross")
+    (real / "td.txt").write_text(moved)
+    with pytest.raises(fb.ToolError, match="do not name"):
+        fb.render(args)
+    # Through a symbolic link: the realpath is the official directory.
+    args = args_for("link")
+    base = tmp_path / "link"
+    (base / "alias").symlink_to(base / "official", target_is_directory=True)
+    linked = make_td().replace("REFDIR", str(base / "alias"))
+    (base / "td.txt").write_text(linked.replace("NEWDIR", str(base / "cross")))
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    with stub_figures():
+        assert fb.render(args) == 0
+        out = Path(args.out)
+        record = json.loads((out / "doc.sources.json").read_text())
+        assert all(Path(p).is_absolute() for p in record["files"].values())
+        monkeypatch.chdir(tmp_path)
+        assert fb.run_check(out, "doc", {}) == 0
+        monkeypatch.chdir(base)
+        assert fb.main(["check", str(out), "--stem", "doc"]) == 0
+        # A relative override is refused in a confirmatory check.
+        with pytest.raises(fb.ToolError, match="absolute path for td"):
+            fb.run_check(out, "doc", {"td": "td.txt"})

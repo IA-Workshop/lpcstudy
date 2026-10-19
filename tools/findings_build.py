@@ -23,11 +23,22 @@ Two commands:
   real date not before the run ended). Rendering is deterministic, so any
   other edit, including an edited sentence or a swapped figure, fails.
   Inside the free slots there is no numeric character of any kind (write
-  numbers as words; only the 14 hypothesis names such as H2a are allowed),
-  no heading, no ``[TAG]``, and none of the words in ``banned_phrases`` and
-  ``free_slot_refused`` of ``design_constants.json`` (promoted,
-  pre-registered, provisional, verified, gate and others). Number words and
-  claims phrased in other words cannot be detected.
+  numbers as words; only the 14 hypothesis names such as H2a are allowed).
+  There is no heading (a ``#`` line, or a line underlined by a line of only
+  ``=`` or ``-``), no bracketed capitalized token ``[...]`` with any inner
+  text, and no dated line later than the day ``check`` runs (``date.today()``)
+  or earlier than the end of the official run. There is none of the words in
+  ``banned_phrases`` and ``free_slot_refused`` (whole words,
+  case-insensitive: promoted, pre-registered, provisional, verified, gate and
+  others) and no word that begins with one of the stems in
+  ``free_slot_stems`` of ``design_constants.json``: prove, provin, confirm,
+  signific, demonstrat, breakthrough, gate, gating, provision, promot,
+  unpromot, verif, unverif, pre-regist, preregist, developm, preliminar (so
+  proved, confirmed, significantly, gates, provisionally and promotion are
+  refused, and so is the odd innocent word such as provenance: reword it).
+  Number words ("forty-two") and claims phrased in other words cannot be
+  detected, and a real date is a small number channel; the WU-0020.8 reviewer
+  reads every claim in the free slots.
 
 The tool only reads and formats. It computes no statistic and no verdict: a
 verdict word in the document is the string stored in the results file, and no
@@ -49,16 +60,38 @@ recorded), the official run must be complete, clean, a CPU run with
 ``LPC_THREADS`` 8, and the cross-check complete, clean and a GPU run; the
 cross-check's commit may differ from the official commit and is printed with
 "same as official: yes/no". The ``compare_runs`` text must name the official
-run as REF and the cross-check as NEW (by realpath, or by the last two path
-components when it was made under another prefix) and every differing leaf it
-lists must exist in both files with the printed values; the z values
-themselves are not recomputed, so an altered z in a text with the right paths
-is not detected. What the tool cannot verify: it does not read the ledger, so
-it cannot tell that the release reference exists; and it does not read the
-manifest, so it only checks that the hashes typed on the command line equal
-the files' hashes (an operator who types hashes taken from the wrong file
-passes). The owner or the main session must compare both with the committed
-manifest row and the ledger entry.
+run as REF and the cross-check as NEW and every differing leaf it lists must
+exist in both files with the printed values; the z values themselves are not
+recomputed, so an altered z in a text with the right paths is not detected.
+A ``compare_runs`` text whose leaf list is empty or deleted is bound to the
+two results files only by its REF and NEW paths: the owner must rerun
+``compare_runs`` on the released directories and diff the result with the
+committed text (a step of WU-0020.8).
+
+Working directory (N3). In a confirmatory build ``--official``,
+``--crosscheck`` and ``--td`` must be absolute paths (relative ones are
+refused), they are resolved with realpath, the REF and NEW lines must be
+absolute and are bound by realpath only, and ``sources.json`` stores the
+resolved absolute paths, so ``check`` gives the same answer from any
+directory. In a development build a REF or NEW path may be relative (it is
+read against the working directory of the build, stored in ``sources.json``
+as ``cwd``) and may also be bound by its last two path components; the
+document then says "(development mode only)".
+
+Cross-check commit (N2). It may differ from the official commit. In a
+confirmatory build the tool then runs the read-only command ``git diff
+--name-only <official>..<cross-check>`` and refuses unless every changed path
+is under ``docs/agent/records/`` or is ``docs/agent/governance/ledger.jsonl``
+(and refuses when git cannot answer). Beyond that check the tool does not
+verify the commit difference: it does not look at what the changed records
+say, and it needs both commits in the repository that holds the tool.
+
+What the tool cannot verify: it does not read the ledger, so it cannot tell
+that the release reference exists; and it does not read the manifest, so it
+only checks that the hashes typed on the command line equal the files' hashes
+(an operator who types hashes taken from the wrong file passes). The owner or
+the main session must compare both with the committed manifest row and the
+ledger entry.
 
 Placeholders in the template look like ``{{official:systems/chua/H3c/ci|ci:.3g}}``:
 a source name, a leaf path and an optional format. Standard library plus
@@ -134,7 +167,11 @@ IDENTIFIER = re.compile(
 )
 DATED_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2}): ")
 HYPOTHESIS_ID = re.compile(r"\bH[1-3][a-e]\b")
-STATUS_TAG = re.compile(r"\[[A-Z][A-Z-]+(?::[^\]]*)?\]")
+BRACKET_CAPITAL = re.compile(r"\[\s*[A-Z][^\]]*\]")
+SETEXT_UNDERLINE = re.compile(r"^ {0,3}(?:=+|-+)\s*$")
+FULL_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+RECORDS_PREFIX = "docs/agent/records/"
+LEDGER_PATH = "docs/agent/governance/ledger.jsonl"
 HEADING = re.compile(r"^(#{2,3}) ")
 TAG = re.compile(r"\[([A-Z][A-Z-]+)(?::[^\]]*)?\]\s*$")
 RELEASE_REF = re.compile(r"^ledger-seq-\d+$")
@@ -509,8 +546,10 @@ class Builder:
         return out + [
             "",
             "Cross-check commits that differ from the official commit: "
-            f"{differs} (a ledger-only later commit is allowed; both commits "
-            "are shown above).",
+            f"{differs} (a later commit is allowed only if "
+            "`git diff --name-only` shows paths under docs/agent/records/ or "
+            f"the ledger alone; check: {self.ref('meta', 'cross_commit_check')}"
+            "; both commits are shown above).",
         ]
 
     def table_gate(self) -> list[str]:
@@ -1179,6 +1218,68 @@ def git_freeze_commit(root: Path) -> str:
     return done.stdout.strip()
 
 
+def git_changed_paths(root: Path, old: str, new: str) -> list[str]:
+    """Return the paths changed from ``old`` to ``new`` (read-only git).
+
+    Runs ``git diff --name-only -z old..new`` and raises ``ToolError`` when
+    git cannot answer (a missing commit, no repository, no git).
+    """
+    try:
+        done = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "diff",
+                "--name-only",
+                "-z",
+                f"{old}..{new}",
+            ],
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        raise ToolError(f"cannot run git: {exc}") from None
+    if done.returncode:
+        raise ToolError(
+            f"git cannot list the paths changed between {old} and {new}: "
+            + done.stderr.strip()
+        )
+    return [x for x in done.stdout.split("\0") if x]
+
+
+def check_later_commit(root: Path, official: object, cross: object) -> str:
+    """Refuse a cross-check commit that changes more than records (N2).
+
+    Both commits must be 40 hex digits. Every path that
+    ``git diff --name-only <official>..<cross-check>`` lists must lie under
+    ``docs/agent/records/`` or be ``docs/agent/governance/ledger.jsonl``.
+    Returns the sentence for the document; raises ``ToolError`` otherwise.
+    """
+    for commit in (official, cross):
+        if not FULL_COMMIT.match(str(commit)):
+            raise ToolError(
+                f"commit {commit!r} is not 40 hex digits: the difference "
+                "between the official and cross-check commits cannot be checked"
+            )
+    changed = git_changed_paths(root, str(official), str(cross))
+    outside = [
+        p
+        for p in changed
+        if not (p.startswith(RECORDS_PREFIX) or p == LEDGER_PATH)
+    ]
+    if outside:
+        raise ToolError(
+            "the cross-check commit differs from the official commit and "
+            f"changes {len(outside)} path(s) outside {RECORDS_PREFIX} and the "
+            f"ledger, first {outside[0]!r}: refused"
+        )
+    return (
+        f"git diff --name-only lists {len(changed)} path(s), all under "
+        f"{RECORDS_PREFIX} or the ledger"
+    )
+
+
 def classify(provenance: dict, what: str) -> str:
     """Return "development" or "confirmatory"; refuse any other mix.
 
@@ -1205,12 +1306,18 @@ def classify(provenance: dict, what: str) -> str:
     )
 
 
-def read_sources(paths: dict[str, Path], constants: dict) -> dict:
+def read_sources(
+    paths: dict[str, Path], constants: dict, base: Path | None = None
+) -> dict:
     """Load every source file; refuse a results file that lacks a system.
 
     ``paths`` holds ``official``, ``official_md``, ``crosscheck``, ``td`` and
     optionally ``dev``. The official results must list exactly the three
-    systems of v3 in ``config.core_systems``.
+    systems of v3 in ``config.core_systems``. ``base`` is the directory that
+    a relative REF or NEW path of the ``compare_runs`` text is read against
+    in a development build (default: the working directory); a confirmatory
+    build needs absolute ``official``, ``crosscheck`` and ``td`` paths and
+    absolute REF and NEW paths, and binds by realpath only (N3).
     """
     sources = {
         "official": read_json(paths["official"]),
@@ -1231,33 +1338,66 @@ def read_sources(paths: dict[str, Path], constants: dict) -> dict:
         raise ToolError("RESULTS.md has no label line")
     if paths["official"].resolve() == paths["crosscheck"].resolve():
         raise ToolError("the cross-check file is the official file: refused")
-    sources["td_binding"] = bind_td(sources, paths)
+    strict = (
+        classify(
+            sources["official"].get("provenance") or {}, "official results"
+        )
+        == "confirmatory"
+    )
+    if strict:
+        for name in ("official", "crosscheck", "td"):
+            if not paths[name].is_absolute():
+                raise ToolError(
+                    f"a confirmatory build needs an absolute path for "
+                    f"{name}, got {str(paths[name])!r}: refused"
+                )
+        paths = {name: path.resolve() for name, path in paths.items()}
+    sources["td_binding"] = bind_td(
+        sources, paths, Path.cwd() if base is None else base, strict
+    )
     return sources
 
 
-def same_run(text_path: str, results: Path) -> str | None:
+def same_run(
+    text_path: str, results: Path, base: Path, strict: bool = False
+) -> str | None:
     """Say how a path printed by ``compare_runs`` matches a results file.
 
-    Returns "realpath" if both name the same directory, "trailing two path
-    components" if only their last two components agree (the text may have
-    been made with another prefix, for example ``run-1/full``), else None.
+    Returns "realpath" if both name the same directory. In a development
+    build (``strict`` False) a relative printed path is read against
+    ``base`` and, if only the last two path components agree (the text may
+    have been made with another prefix), the answer is "trailing two path
+    components (development mode only)". In a confirmatory build (``strict``)
+    a relative printed path is refused and only realpath binds. Otherwise
+    None.
     """
     printed = Path(text_path)
+    if not printed.is_absolute():
+        if strict:
+            raise ToolError(
+                f"the compare_runs text prints the relative path "
+                f"{text_path!r}: a confirmatory build needs absolute REF and "
+                "NEW paths (rerun compare_runs with absolute paths)"
+            )
+        printed = base / printed
     printed = printed.parent if printed.name == "results.json" else printed
     ours = results.parent
     if printed.resolve() == ours.resolve():
         return "realpath"
-    if printed.parts[-2:] == ours.parts[-2:]:
-        return "trailing two path components"
+    if not strict and printed.parts[-2:] == ours.parts[-2:]:
+        return "trailing two path components (development mode only)"
     return None
 
 
-def bind_td(sources: dict, paths: dict[str, Path]) -> str:
-    """Tie the ``compare_runs`` text to the two results files (R17).
+def bind_td(
+    sources: dict, paths: dict[str, Path], base: Path, strict: bool = False
+) -> str:
+    """Tie the ``compare_runs`` text to the two results files (R17, N3).
 
     The text's REF line must be the official run and its NEW line the
-    cross-check, by realpath or, failing that, by the last two path
-    components (the tool cannot know the prefix the text was made under).
+    cross-check, by realpath or, in a development build only, failing that,
+    by the last two path components (the tool cannot know the prefix the
+    text was made under). A relative path is read against ``base``.
     Every differing verdict-type leaf that the text lists must exist in both
     results files with the printed values. No z value or verdict is
     recomputed, so a text with the right paths and leaves but altered z
@@ -1265,10 +1405,13 @@ def bind_td(sources: dict, paths: dict[str, Path]) -> str:
     ``compare_runs``. Returns the sentence for the document.
     """
     total = sources["td"]["total"]
-    ref = same_run(total["ref"], paths["official"])
-    new = same_run(total["new"], paths["crosscheck"])
+    ref = same_run(total["ref"], paths["official"], base, strict)
+    new = same_run(total["new"], paths["crosscheck"], base, strict)
     if ref is None or new is None:
-        swapped = same_run(total["ref"], paths["crosscheck"]) is not None
+        swapped = (
+            same_run(total["ref"], paths["crosscheck"], base, strict)
+            is not None
+        )
         raise ToolError(
             "the compare_runs text was made in the other order (REF is the "
             "cross-check): rerun it with the official run first"
@@ -1396,6 +1539,14 @@ def make_meta(
         freeze = "equals freeze-1"
     else:
         freeze = "not applicable (development run)"
+    if official.get("commit") == cross.get("commit"):
+        later = "not needed (the same commit)"
+    elif confirmatory:
+        later = check_later_commit(
+            root, official.get("commit"), cross.get("commit")
+        )
+    else:
+        later = "not checked (development run)"
     return {
         "mode": mode,
         "freeze_check": freeze,
@@ -1418,6 +1569,7 @@ def make_meta(
         "cross_commit_same": (
             "yes" if official.get("commit") == cross.get("commit") else "no"
         ),
+        "cross_commit_check": later,
         "cross_commit_differs": (
             "0" if official.get("commit") == cross.get("commit") else "1"
         ),
@@ -1521,6 +1673,7 @@ def render(args: argparse.Namespace) -> int:
         "sha256": shas,
         "manifest": manifest,
         "release_ref": args.release_ref,
+        "cwd": str(Path.cwd()),
         "meta": builder.meta,
     }
     (out / f"{args.stem}.sources.json").write_text(
@@ -1589,7 +1742,10 @@ def merge_free_slots(
 
 
 def check_free_slots(
-    free: list[tuple[int, str, bool]], constants: dict, floor: date | None
+    free: list[tuple[int, str, bool]],
+    constants: dict,
+    floor: date | None,
+    today: date | None = None,
 ) -> list[str]:
     """Check the text of the two free slots (R18, R19).
 
@@ -1598,11 +1754,16 @@ def check_free_slots(
     section 9 (``- YYYY-MM-DD: text``, a real calendar date not before the
     official run ended) it must have: no numeric character of any kind (the
     Unicode categories Nd, Nl and No, and any character with a numeric
-    value), except the 14 hypothesis names such as H2a; no heading line; no
-    ``[TAG]``; none of the words banned in PRE-REGISTERED sections or listed
-    as ``free_slot_refused`` in ``design_constants.json`` (case-insensitive,
+    value), except the 14 hypothesis names such as H2a; no heading line (a
+    ``#`` line, or a line followed by a line of only ``=`` or ``-``); no
+    bracketed capitalized token ``[...]`` with any inner text; none of the
+    words banned in PRE-REGISTERED sections or listed as
+    ``free_slot_refused`` in ``design_constants.json`` (case-insensitive,
     whole words: promoted, pre-registered, provisional, verified, gate and
-    others). Problems name the document line.
+    others), and no word that begins with a stem of ``free_slot_stems``
+    (proved, confirmed, significantly, gates, provisionally, promotion and
+    others). A dated line is also refused if its date is after ``today``
+    (default ``date.today()``). Problems name the document line.
     """
     ids = {
         i["key"]
@@ -1610,6 +1771,8 @@ def check_free_slots(
         if re.match(r"H\d[a-e]$", i["key"])
     }
     words = constants["banned_phrases"] + constants["free_slot_refused"]
+    today = date.today() if today is None else today
+    by_number = {number: text for number, text, _ in free}
     problems = []
     for number, text, dated in free:
         if not text.strip():
@@ -1629,9 +1792,24 @@ def check_free_slots(
                 continue
             if floor is not None and when < floor:
                 problems.append(f"{where}: date {when} is before the run ended")
+            if when > today:
+                problems.append(
+                    f"{where}: date {when} is after today ({today})"
+                )
             text = text[found.end() :]
         if text.lstrip().startswith("#"):
             problems.append(f"{where}: heading inside a free slot")
+        under = by_number.get(number + 1)
+        if (
+            not dated
+            and under is not None
+            and not SETEXT_UNDERLINE.match(text)
+            and SETEXT_UNDERLINE.match(under)
+        ):
+            problems.append(
+                f"{where}: setext heading (underlined by line {number + 1}) "
+                "inside a free slot"
+            )
         clean = HYPOTHESIS_ID.sub(
             lambda m: " " if m.group(0) in ids else m.group(0), text
         )
@@ -1644,12 +1822,20 @@ def check_free_slots(
                     "(write numbers as words)"
                 )
                 break
-        if STATUS_TAG.search(text):
-            problems.append(f"{where}: a [TAG] inside a free slot")
+        if BRACKET_CAPITAL.search(text):
+            problems.append(
+                f"{where}: a bracketed capitalized token [..] inside a free slot"
+            )
         for word in words:
             if re.search(rf"\b{re.escape(word)}\b", text, re.I):
                 problems.append(
                     f"{where}: refused word {word!r} in a free slot"
+                )
+        for stem in constants["free_slot_stems"]:
+            if re.search(rf"\b{re.escape(stem)}", text, re.I):
+                problems.append(
+                    f"{where}: word beginning with refused stem {stem!r} in a "
+                    "free slot"
                 )
     return problems
 
@@ -1841,7 +2027,9 @@ def run_check(directory: Path, stem: str, override: dict) -> int:
     for name, path in paths.items():
         if not path.is_file() or sha256_of(path) != record["sha256"][name]:
             raise ToolError(f"{name} changed since the build: {path}")
-    sources = read_sources(paths, constants)
+    if not isinstance(record.get("cwd"), str):
+        raise ToolError("sources.json has no cwd: rebuild the document")
+    sources = read_sources(paths, constants, Path(record["cwd"]))
     sources["meta"] = make_meta(
         sources,
         record["sha256"],
