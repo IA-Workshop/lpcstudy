@@ -176,3 +176,105 @@ Edits that `check` misses, or inputs that `render` accepts (exit 0):
 - **P4 and P5:** not built in .1 to .3, so not reviewed.
 
 Reviewer scripts, all throwaway and outside the repository, are in the session scratchpad: `z_recompute.py`, `vcount.py`, `sample.py`, `perturb.py`, `perturb2.py`, `perturb3.py` and `variants.py`.
+
+## Re-review of fix round 1 (2026-10-19)
+
+- **Reviewer:** `reviewer`, claude-opus-5-5, fresh context. I read `wu/prelim-build` at tip a1af5f8 read-only; this review branch still sits on the old tip.
+- **Verdict:** **one more fix round needed.** R3 to R15 are fixed. R1 and R2 are only partly fixed, because the two free slots still leak (R18). Two new gaps need closing before the tool touches sealed outputs: the cross-check text is not bound to the two results files (R17), and the A9 provenance conditions are shown but not enforced (R16). R19 holds three small notes.
+- **Owner checkpoint:** yes, unchanged. These need owner review before sealed use:
+  - the release guard (R5, R16);
+  - the cross-check binding (R17);
+  - the two limits the tool states and cannot close: it reads neither the ledger nor the manifest.
+
+### Evidence
+
+All runs used scratch copies, `nice -n 19`, `LPC_THREADS=1 OMP_NUM_THREADS=1 JAX_PLATFORMS=cpu`. I started no preset and used no GPU.
+
+- **Tests.** I ran the radius once from the `wu/prelim-build` worktree: `LPC_PYTHON=…/.venv/bin/python tools/run_tests.sh unit tests/unit/test_tools_findings_build.py tests/unit/test_tools_test_impact.py` gave **`88 passed in 9.38s`**. Black 26.10.1 leaves all four files unchanged.
+- **Committed dry run.** `check` on the committed document, with overrides pointing to my byte-identical scratch copies, gives `check passed: 979 traced values, 0 problems` (exit 0). A fresh render from the copies gives 979 traced values and 30 leaves not recorded. Its three PNGs are byte-identical to the committed ones (A12).
+- **DEV-2 equality (A10).** The document still prints 18 of 18 parts computed, sum of z² (away) 15.77, largest z 2.26, 0 failing and 52 differing verdict-type leaves. All of these equal my independent recomputation from the first round, and the TD file has the same SHA-256 (df8fcaad…).
+- **New rows read stored leaves.** I checked by hand against the JSON:
+  - V7 `efficiency_median_by_noise` at 0.005, 0.01, 0.02 and 0.05 equals the leaves (for example lorenz63 1.0040, 1.0055, 1.0072, 1.0112).
+  - H2c A4o − A2 equals `H2c/A4o_minus_A2/{mean, ci, level, role}`: lorenz63 −0.0255 [−0.03815, −0.01414], level 0.9500, role "reported"; rossler and chua likewise.
+  - Both are plain `ref` and `fmt` calls. No comparison and no arithmetic is involved, so A3 still holds.
+- **Old perturbation table.** I re-ran the first-round tables (P1 to P13, Q6a to Q9c, X1, X2, G1 to G5, H1 to H4, M, D) against the new tool: **every one now fails `check` (exit 1) or is refused at render (exit 2)**, except the expected cases:
+  - M (chua absent from `systems`) now renders chua as "not recorded" and PROVISIONAL everywhere, counts 118 such cells and passes. That is the intended fail-closed behaviour.
+  - M2 (chua also removed from `core_systems`) is refused.
+  - D (TD text without the "differing" line) now prints "none listed (…)", never "0".
+  - H1d (confirmatory, well-formed but unverifiable reference, typed hashes, commit equal to freeze-1) still renders. That is the inherent limit the docstring states (see weak point 2).
+
+### Status of R1 to R15
+
+| Finding | Status | Evidence |
+| --- | --- | --- |
+| R1 frame not verified | **partly** | `check` re-renders and compares byte for byte (`tools/findings_build.py:1593-1661`). P7, P8, P9, Q9 to Q9c, G4 and P11 now fail. The two free slots can still carry status claims; see R18. |
+| R2 numeral loopholes | **partly** | Outside traced spans the frame is byte-compared, so the scan now matters only in the free slots. All old loopholes Q6a to Q6j are caught, and `test_numeral_scan_catches_every_loophole` uses typed patterns. The `IDENTIFIER` list and non-ASCII digits still let numbers into the free slots; see R18. |
+| R3 missing system | fixed | The three systems are a constant. `core_systems` must equal them (M2 refused), an absent system is "not recorded" and PROVISIONAL and is counted (M), and `check` requires 14 × 3 verdict rows and 6 × 3 primary rows. |
+| R4 PROVISIONAL and figures | fixed | G2 is caught: "verdict cell … lacks PROVISIONAL". G5 and P12 are caught: figures are re-drawn and compared byte for byte. |
+| R5 release guard | partly, by design | Fixed: (a) `classify` refuses a mixed kind (H2, H4); (b) `--development` must be development (H3); manifest hashes are stored in `sources.json` and re-verified; the freeze check is re-run by `check`. Inherent: (c) the hashes are typed, not read from the manifest; (d) the reference is checked for format only. New gaps: R16, R17. |
+| R6 RESULTS.md hash | fixed | It is hashed, stored, re-verified, and has a manifest hash for CONF-1. |
+| R7 TD default "0" | fixed | The absent count is "none listed" or "not available", never a number. A text with no totals line is refused. `test_absent_differing_count_is_never_a_number` covers it. |
+| R8 design level | fixed | Cells read "0.9833 (design value, not stored)", with a count under each table (12, 15, 6). |
+| R9 V7 and A4o − A2 | fixed | The rows are read from stored leaves, verified above. |
+| R10 figures | fixed | I viewed the PNGs. Q-N has dashed edges at 0 and 0.05 and no band. Every panel title states its level ("(design value)" where not stored). F3 names "[GPU gate not passed]" per row, has a footer, and marks PROVISIONAL. H2c has one axis per system. Every suptitle carries the PRELIMINARY line. |
+| R11 test-impact | fixed | `select()` on the template and constants alone now gives `['tests/unit/test_tools_findings_build.py']`. The `TOOL_DATA_TESTS` entry has its test. The Log correction is recorded. |
+| R12 tests | fixed | There is an independent `REAL_LEAVES` table. Bands and bars are pinned to quoted v3 phrases (`test_bands_and_bars_equal_the_proposal`), the loophole list is typed, and tests cover the guard, the free slots and figure swaps. The tests are exact and none is vacuous. |
+| R13 dead code and crash | fixed | `test_every_constant_is_used`. A malformed trace row now gives a message (X1 "unknown source", X2 "leaf gives …"). |
+| R14 counts | fixed | Counts of "not recorded" and "not computed" appear in the body after §5, the H3a table and F2. Nulls are counted. Figure text uses the table's words. |
+| R15 wording | fixed | The rounding sentence is above both parts tables. The coverage limitation is v3 §8 word for word (`test_coverage_limit_quotes_v3_section_8`). |
+
+### New findings
+
+- **R16 (should fix, owner checkpoint).** A9's provenance conditions are shown but not enforced, and the cross-check run's commit is never checked.
+  - **Where:** `tools/findings_build.py:1239-1248`.
+  - **Scenario (case N4):** a confirmatory official file with `dirty` true, `complete` false, backend gpu and `LPC_THREADS` 1, and a cross-check at commit `000…0`, renders with exit 0. The document then says "Source: the official CPU run of the sealed confirmatory seed" above "Backend | gpu", "Dirty | yes", "Complete | no".
+  - **Fix (needs no ledger):** for confirmatory mode, refuse unless:
+    - the official file has `complete` true, `dirty` false, `device.backend` cpu and `env.LPC_THREADS` "8" (v3 §9 item 2 and 3; A9);
+    - the cross-check file has `complete` true, `dirty` false and a commit equal to the official commit (the same freeze, DEC-0031);
+    - the two results files have different SHA-256 values. Case N3 shows the official file passed as its own cross-check is accepted today.
+
+  The mode notice should also stop asserting "CPU"; let the backend row speak for it.
+- **R17 (should fix, before sealed use).** The `compare_runs` text is not bound to the two results files.
+  - **Where:** `tools/findings_build.py:297-343`, `:1161-1185`.
+  - **Scenario:** any text with a TD totals line is accepted and its z values are copied verbatim:
+    - N1: the swapped-order text renders and passes;
+    - N2: a text in which I set every z to 9.99 renders and passes, printing `| lorenz63 | H2a(i) | 0.0179 | 9.99 | 9.99 | …` beside these files.
+
+    For CONF-1, a stale or wrong TD file (for example the DEV-2 one) would put another run pair's cross-check numbers into §8 and F3 under the CONF-1 banner. `check` passes, because the TD file is hashed only against itself.
+  - **Fix (no recomputation needed):**
+    - require the `REF:` and `NEW:` lines of the text to resolve to the `--official` and `--crosscheck` directories (run `compare_runs` with absolute paths, as step b of the plan note implies);
+    - and/or verify that every listed `TD: … differ` leaf (`path: 'ref' -> 'new'`) equals the stored strings in the two files;
+    - refuse on mismatch.
+- **R18 (should fix; the remainder of R1 and R2).** The free slots (the body of §11 and the dated §9 lines) are fenced off from the frame, but they still leak.
+  - **Where:** `tools/findings_build.py:93-117`, `:1389-1428`, `:1493-1517`.
+  - **What the free text cannot do:** change any rendered verdict, number or status line. Those are byte-compared. Adding a `## ` heading is caught (S5), editing a rendered §9 line is caught (S4), and an undated extra line is caught (S3).
+  - **What it can do:**
+    - **(a) Numbers through identifier shapes.** All of these pass: "§ 0.938", "r947", "QA.73", "PRIME.14", "LPC.PC.95", "DEF-0947", "WU-0938.1", "D14", "item 7", "# 42. percent", and the shapes "CONF-9", "rho-5%" (cases F1 to F5, F10, F11). `IDENTIFIER` is the trust boundary, and in free text almost every shape takes free digits. Fix: in the free slots, use a separate, strict mask that allows only `H\d[a-e]`, `V[1-7]`, `E[0-6]`, `v3` and `§\d+` with no decimal.
+    - **(b) Non-ASCII numerals.** "⁹⁵ percent" and "¾ of the parts" pass (F6). Python's `\d` matches only category Nd, as the fullwidth control F7 shows. Fix: reject any character with `unicodedata.numeric(ch, None) is not None` in the free slots.
+    - **(c) Status and verdict claims in words.** These pass:
+      - F8: "**CONFIRMATORY: PROMOTED** All three primary hypotheses are supported and the study proves the theory." (the banned phrases are not applied there);
+      - S6: "### Verdicts [PRE-REGISTERED]" inside §11;
+      - S1: "- 2026-10-20: GPU cross-check agreed after all; PROVISIONAL is lifted and H2b is supported."
+
+      Fix: in both slots, refuse the banned phrases, the status tokens (CONFIRMATORY, DEVELOPMENT, PROMOTED, UNPROMOTED, PROVISIONAL, PRELIMINARY, GATE, any `[TAG]`) and headings. The student's interpretation can still use verdict words.
+    - **(d) The date channel.** "- 0938-09-47: …" passes (S2). Fix: validate the date with `date.fromisoformat` and require it not to be earlier than the build.
+  - **Tests:** add a test per case, with the patterns typed independently.
+- **R19 (notes).**
+  - (a) A digit found in a free slot is reported as "line 4", which is its index in the slot, not its line in the document (F7). Report the document line.
+  - (b) The "Release reference" row should say "(format checked only; not verified against the ledger by this tool)". The "Manifest hashes" row already says its limit plainly.
+  - (c) N3 (identical official and cross-check files) is covered by the R16 fix.
+
+### The developer's three weak points
+
+1. **`IDENTIFIER` as the trust boundary.** It is safe for the frame, which is byte-compared, so a smuggled identifier there fails as a diff. It is not safe for the free slots: R18 (a) shows eleven shapes that carry arbitrary digits, and R18 (b) shows non-Nd numerals. A narrower mask for the free slots is the fix.
+2. **Release guard limits.**
+   - The module docstring (`tools/findings_build.py:34-46`) says plainly what the tool cannot verify: it reads neither the ledger nor the manifest, typed hashes from the wrong file pass, and the owner or main session must compare both. I judge that plain enough for the owner. The document's "Manifest hashes" row repeats the limit; the "Release reference" row does not (R19 b).
+   - Without reading the ledger, the guard can still be tightened as in R16 (complete, dirty, backend, threads, cross-check commit, distinct files) and R17 (binding the TD text to the files). Reading the committed manifest row read-only would remove the typed-hash weakness. That is a design choice for the owner.
+3. **`merge_free_slots`.** Text in a free slot cannot change a verdict, a number or a status line that the tool renders. It can add competing numbers and status claims beside them; see R18. The merge logic itself is sound: equal headings are required, §9 must keep the rendered lines as a prefix, and the fresh text is put back before the positional checks.
+
+### Could not check
+
+- Anything on real sealed outputs, or on the real manifest and ledger.
+- A10 beyond the two decimals that `compare_runs` prints.
+
+Reviewer scripts are in the session scratchpad: `perturb.py`, `perturb2.py`, `perturb3.py`, `variants2.py` and `variants3.py`.
