@@ -104,6 +104,9 @@ Detail, the section list, the pipeline and the owner decisions D1 to D10 are in 
 
 ## Log
 
+- 2026-10-19 (developer claude-sonnet-5-5, branch `wu/prelim-build` from develop 2e2ceb3): started WU-0020.1 to .3. Owner rulings of 2026-10-19 applied: D4 (DEV-seed numbers only in the labeled development appendix, never beside the sealed result; a DEV ensemble may be appended later), D5 (the document says in its header that it is internal to the owner and the student until promotion, QA.11). Planner defaults used because the owner has not ruled them (marked DEFAULT): D1 document at `docs/study/preliminary_findings_conf1.md` with `.trace.csv`, written by the main session; D2 release of CPU and GPU outputs together after the owner's check of header, gate line and completeness; D3 build in parallel with the regeneration, a dated line after WU-0016.4; D6 block-sensitive label reported as "not computable for the sealed run" (a limitation); D7 a gate failure marks the system PROVISIONAL and shows its verdicts; D8 agents write tables, figures and number-free templates, the student writes §11; D10 secondary highlights H2c, H2e, H3a, Q-N.
+- 2026-10-19 WU-0020.1 done: `tools/findings/preliminary.template.md` (number-free; sections 0 to 11 and appendices A to C of the note §4; placeholders `{{source:leaf|format}}`, tables and figures by `{{table:...}}` and `{{fig:...}}`) and `tools/findings/design_constants.json` (each constant cites its v3 section; wording templates for supported, not supported, inconclusive, gate failure, GPU agreement and disagreement; the banned-phrase list; the limitation keyword list; the part lists with their v3 bands). The wording is a draft for the owner and the student to review.
+
 ## Review
 
 - **Reviewer:**
