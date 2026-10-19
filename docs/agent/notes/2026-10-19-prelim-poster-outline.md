@@ -17,10 +17,10 @@ Author claude-sonnet-5-5, 2026-10-19, for the student (Deem), from the WU-0020 p
 | F1 | Primary forest plot: 18 parts (H2a(i), H2a(ii) zero, H2a(ii) interior, H2b(i), H2b(ii), H3c, each on Lorenz-63, Rössler, Chua), estimate with its interval at the level stored in the leaf, shaded pass band, verdict by marker shape and text | `tools/findings_build.py` (to be built, WU-0020.2) from the official CPU `results.json` | missing until .2 |
 | F2 | Secondary forest plot: H1a to H1d, H2c, H2d, H2e, H3b with intervals; Q-N shown against its reading table, not as pass/fail | same tool | missing until .2 |
 | F3 | CPU versus GPU cross-check: z per primary part with the tolerance line, titled "cross-check, information only", in grey | same tool, from `compare_runs` text and the GPU file | missing until .2 |
-| F4 | The four existing report figures from `lpcstudy.report.make_figures`: `separation_weight_vs_horizon.png` (E4, H2a context: median and IQR of w\* against horizon), `kaplan_meier_by_rule.png` (E4/E5, H2c and H3a context: realized-horizon curves per rule), `regret_vs_regimes.png` (E5, H3c context: regret against number of regimes K, 5% line), `knob_response_library.png` (E2, H2b(ii) context: w\* against library size per noise level) | `lpcstudy.report.make_figures`; captions from `budget.FIGURE_CAPTIONS` | exist; they say "no confidence interval is shown", so they are context, never verdicts |
-| S1 | Schematic of CP, PLP, the four conditions and w\* | hand-drawn by the student; no data | to draw |
+| R1 to R4 | The four existing report figures from `lpcstudy.report.make_figures`, which the plan has no F label for: R1 `separation_weight_vs_horizon.png` (E4, H2a context: median and IQR of w\* against horizon), R2 `kaplan_meier_by_rule.png` (E4/E5, H2c and H3a context: realized-horizon curves per rule), R3 `regret_vs_regimes.png` (E5, H3c context: regret against number of regimes K, 5% line), R4 `knob_response_library.png` (E2, H2b(ii) context: w\* against library size per noise level) | `lpcstudy.report.make_figures`; captions from `budget.FIGURE_CAPTIONS` | exist; they say "no confidence interval is shown", so they are context, never verdicts |
+| F4 | Schematic of CP, PLP, the four conditions and w\* | hand-drawn by the student; no data | to draw |
 
-Note: the plan note lists "F4" both as the schematic and (in this task) as the existing report figures. This file uses **F4 = the four existing report figures** and **S1 = the schematic**, so each slot has one meaning. Flag to the owner if the plan should be changed to match.
+Labels follow the plan note (figure table): F1 to F3 are the three missing data figures, F4 is the hand-drawn schematic, and the four figures that already exist are called R1 to R4 here, by file name.
 
 Figure rules: intervals always drawn, level written in the panel; one message per figure; Okabe-Ito palette plus marker shape and text for the verdict; each caption names the experiment (E1 to E6), the v3 identifier and the interval procedure; `PROVISIONAL` in the title of any system that failed the gate.
 
@@ -30,15 +30,15 @@ Layout: three folds, left to right, reading order top to bottom within a fold. P
 
 ### Left fold
 
-**Panel 1. The question.** Slot: S1 (small) or a photo or sketch of a chaotic trajectory.
+**Panel 1. The question.** Slot: F4 (small) or a photo or sketch of a chaotic trajectory.
 Must answer: What is predictability, and why does a chaotic system limit it? What exactly do we ask? (Can four measurable local conditions decide, state by state, how much to trust an analog forecaster against a physics-based one, and for how long?) Why does anyone care? What is new (v3 §1: no prior state-dependent blend under partial observation)?
 Terms: chaos, Lyapunov time, forecast horizon.
 
-**Panel 2. Two ways to forecast.** Slot: S1.
+**Panel 2. Two ways to forecast.** Slot: F4.
 Must answer: What does CP do (copies the future of the nearest past pattern in a library)? What does PLP do (estimates the hidden state, then integrates the known equations)? Why can each one fail (CP: few or noisy neighbors; PLP: state error grows)? Both see only one noisy measurement of a three-dimensional system: say why that matters.
 Terms: analog forecast, delay vector, library size, state estimate, noise level, observable.
 
-**Panel 3. Four conditions and a blend weight.** Slot: S1 (conditions around the weight).
+**Panel 3. Four conditions and a blend weight.** Slot: F4 (conditions around the weight).
 Must answer: What are the four local conditions (recurrence, observability, instability, noise sensitivity), each in one everyday sentence? What is the blend weight w\* (weight on CP, between 0 and 1) and what is "optimal" (least mean squared error)? What was proved (P1: closed-form optimal weight; blending can extend the horizon by at most half an error-doubling time; P2: retrieval of the nearest analog is stable while noise is below half the neighbor margin)? Say which part is theorem and which is tested.
 Terms: mean squared error, blend, theorem, w\*, noise sensitivity.
 
@@ -56,7 +56,7 @@ Terms: pre-registration, hypothesis, seed (random number seed), confidence inter
 Must answer: For each of the three primaries and three systems, where is the interval relative to the band? Which verdict does the pre-registered rule give: [verdict: from results.json]? Is any system marked PROVISIONAL (gate failure)? Say it in the file's words, not new words. One message only.
 Terms: forest plot, interval, PROVISIONAL, gate.
 
-**Panel 7. Highlights (secondary).** Slot: **[F2]** and one of **[F4]** (see section 3 for the fixed list).
+**Panel 7. Highlights (secondary).** Slot: **[F2]** and one of **[R2]** (H2c, H3a context), if needed (see section 3 for the fixed list).
 Must answer: What do the four pre-fixed highlights say, each read with its interval and its verdict or table reading? Remind the judge that these are secondary and not the main test.
 Terms: secondary hypothesis, Kaplan-Meier curve, log-rank test, noise matching.
 
@@ -93,17 +93,17 @@ Rules: no substitution after release; if a highlight is inconclusive or not supp
 
 | # | Slide | Content slot | Figure |
 | --- | --- | --- | --- |
-| 1 | The question | panel 1 questions; title, names, banner | S1 (small) |
-| 2 | The two forecasters | CP and PLP, panel 2 questions | S1 |
-| 3 | The four conditions and w\* | panel 3 questions; what is proved | S1 |
+| 1 | The question | panel 1 questions; title, names, banner | F4 (small) |
+| 2 | The two forecasters | CP and PLP, panel 2 questions | F4 |
+| 3 | The four conditions and w\* | panel 3 questions; what is proved | F4 |
 | 4 | The three systems | panel 4 questions | attractor pictures |
 | 5 | Pre-registration, sealed seed, verdict rule | panel 5 questions; "supported" only if all three systems pass | timeline strip (optional) |
 | 6 | Primary verdicts | panel 6; [verdict: from results.json]; PROVISIONAL if any | **[F1]** |
-| 7 | Secondary highlights (H2c, H2e, H3a, Q-N) | panel 7 | **[F2]**, plus one of [F4] if needed |
+| 7 | Secondary highlights (H2c, H2e, H3a, Q-N) | panel 7 | **[F2]**, plus one of [R2] if needed |
 | 8 | What it means, and does not mean | panel 8 (student) | none |
 | 9 | Limits and the CPU/GPU cross-check | panel 9 and 10; "information only" | **[F3]** |
 | 10 | What next, thanks, AI-use statement | panel 11 | none |
-| Appendix (hidden unless asked) | Context figures; development context (labeled, D4) | existing four report figures | **[F4]** |
+| Appendix (hidden unless asked) | Context figures; development context (labeled, D4) | existing four report figures | **[R1 to R4]** |
 
 Presenting rules: one message per slide; read the interval before the verdict; do not say "significant"; speak the header on any results slide until promotion.
 
@@ -116,11 +116,11 @@ Sources are leaves of the official CPU `results.json` (CONF-1) unless stated. Le
 | F1 | 18 primary parts: estimate, interval at the stored level (1 − 0.05/3), band, verdict | `systems/<s>/<H2a,H2b,H3c>/...` parts as listed in `compare_runs.TD_PARTS` (point and interval leaves); `verdict` leaf of each part | `findings_build.py` (TBD) | panel 6, slide 6 |
 | F2 | Secondary parts with 95% intervals; Q-N reading | `systems/<s>/<H1a..H1d, H2c, H2d, H2e, H3b>` leaves; `systems/<s>/Q-N` | `findings_build.py` (TBD) | panel 7, slide 7 |
 | F3 | z_away per primary part, tolerance line, "information only" | GPU `results.json` and `compare_runs` TD text (`docs/study/conf1_cpu_vs_gpu_td.txt`) | `tools/compare_runs.py`, `findings_build.py` (TBD) | panel 10, slide 9 |
-| F4a | w\* median and IQR against horizon | `systems/<s>/weight_profile` | `lpcstudy.report.make_figures` | appendix, panel 7 option |
-| F4b | Kaplan-Meier curves per rule | `systems/<s>/km_curves` | `make_figures` | panel 7 (H2c, H3a context) |
-| F4c | Regret ratio against K | `systems/<s>/regime_curve/regret_ratio_by_K` | `make_figures` | appendix (H3c context) |
-| F4d | w\* against library size per noise level | `systems/<s>/` knob-response leaves (see `make_figures`) | `make_figures` | appendix (H2b(ii) context) |
-| S1 | Schematic | none | student, by hand | panels 2, 3 |
+| R1 | w\* median and IQR against horizon | `systems/<s>/weight_profile` | `lpcstudy.report.make_figures` | appendix, panel 7 option |
+| R2 | Kaplan-Meier curves per rule | `systems/<s>/km_curves` | `make_figures` | panel 7 (H2c, H3a context) |
+| R3 | Regret ratio against K | `systems/<s>/regime_curve/regret_ratio_by_K` | `make_figures` | appendix (H3c context) |
+| R4 | w\* against library size per noise level | `systems/<s>/` knob-response leaves (see `make_figures`) | `make_figures` | appendix (H2b(ii) context) |
+| F4 | Schematic | none | student, by hand | panels 2, 3 |
 | T1 | Overall verdict table, 14 rows (H1a to H3c, Q-N, gain bound) | `verdicts.<id>.by_system`, `verdicts.<id>.verdict`; interval labels from `RESULTS.md` | `findings_build.py` (TBD); `report.write_markdown` | preliminary document section 4; poster verdict box |
 | T2 | 18-part table (estimate, interval, level, band, verdict) | part leaves as in F1 | `findings_build.py` (TBD) | document section 5 |
 | T3 | Validation gate V1, V2, V4 to V7 per system with statistic | `gate` leaves, `gate_pass` per system | `findings_build.py` (TBD) | document section 3; PROVISIONAL flag on F1 |
@@ -162,7 +162,7 @@ chaos; Lyapunov time (1 Lyapunov time = 30 steps); forecast horizon; analog fore
 ## 8. Open questions for the student and owner
 
 1. The fair's date, its rules on unverified results, its AI-use disclosure and poster size limits (researcher); decides whether the poster waits for promotion (D5).
-2. Naming: the plan note calls the schematic "F4"; this file uses F4 for the existing report figures and S1 for the schematic. Confirm.
+2. (resolved) Labels follow the plan note: F4 is the schematic, R1 to R4 are the four existing report figures.
 3. Is Panel 4 allowed attractor pictures drawn from development data? (They carry no results, but owner to confirm.)
 4. The panel count (11) fits a tri-fold with three or four per fold; merge panels 10 and 11 if space is short.
 5. Do you want the optional noise-knob panel for H2b(i) (medians, labeled "no interval")?

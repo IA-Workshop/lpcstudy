@@ -105,6 +105,7 @@ Detail, the section list, the pipeline and the owner decisions D1 to D10 are in 
 ## Log
 
 - 2026-10-19: WU-0020.5 drafted on branch wu/prelim-poster by claude-sonnet-5-5: `docs/agent/notes/2026-10-19-prelim-poster-outline.md` (number-free poster outline, 10-slide variant, highlights H2c/H2e/H3a/Q-N fixed per D10, figure/table and honesty checklists). Documents only: no code, no tests, no runs, no sealed data read. Wording review by owner and student pending.
+- 2026-10-19: WU-0020.5 relabel on the main session's instruction: F4 is the hand-drawn schematic (as in the plan note), and the four existing report figures are R1 to R4 by file name; S1 removed from the outline, poster panels, slides and checklists.
 
 ## Review
 
