@@ -1403,6 +1403,47 @@ def test_compare_runs_text_is_bound_to_the_two_files(tmp_path) -> None:
         load(make_td().replace("REF: REFDIR\n", ""))
 
 
+BOLD_PROMOTED = "".join(chr(0x1D400 + ord(c) - 65) for c in "PROMOTED")
+# (text, what its problem message must name). None holds a digit, so only the
+# rule named can refuse it. Typed from the verification's probe, with the
+# invisible characters written as escapes.
+HIDING = [
+    ("The study is _PROMOTED_ now.", "promot"),
+    ("__CONFIRMATORY__ All three are supported.", "confirm"),
+    ("_PROVISIONAL_ is lifted and H2b is supported", "provision"),
+    ("it is un_promoted", "promot"),
+    ("the pre_registered verdicts hold", "regist"),
+    ("The study is PRO*MOTED*.", "promot"),
+    ("The study is PRO**MOTED**.", "promot"),
+    ("The study is PRO<!-- -->MOTED.", "HTML tag"),
+    ("The study is PRO<b></b>MOTED.", "HTML tag"),
+    ("The study is PRO&shy;MOTED.", "HTML entity"),
+    ("The study is PRO&ZeroWidthSpace;MOTED.", "HTML entity"),
+    ("The study is PRO\u200bMOTED.", "format character"),
+    ("The study is PRO\u00adMOTED.", "format character"),
+    ("The study is PRO\u2060MOTED.", "format character"),
+    ("The study is PR\u041eMOTED.", "Latin script"),
+    (
+        "The study is \uff30\uff32\uff2f\uff2d\uff2f\uff34\uff25\uff24.",
+        "promot",
+    ),
+    (f"The study is {BOLD_PROMOTED}.", "promot"),
+    ("> Verdicts: all supported\n> ========", "setext"),
+    ("> ## Verdicts: all supported", "heading"),
+    ("- ## Verdicts: all supported", "heading"),
+    ("- Verdicts: all supported\n    ---", "setext"),
+    ("Verdicts\n    ====", "setext"),
+    ("\uff3bSEALED\uff3d the verdicts stand", "bracketed"),
+    ("[`SEALED`] the verdicts stand", "bracketed"),
+    ("[*S*EALED] the verdicts stand", "bracketed"),
+    ("[\u200bSEALED] the verdicts stand", "format character"),
+    ("&lbrack;SEALED&rbrack; the verdicts stand", "HTML entity"),
+    ("[\uff33EALED] the verdicts stand", "bracketed"),
+    ("about &half; of the parts", "HTML entity"),
+    ("a heading\n-", "setext"),
+    ("a task [X] is done", "bracketed"),
+    ("see [Lorenz attractor](https://example.org/lorenz)", "bracketed"),
+]
 ATTACKS = [
     "§ 0.938 of the states",
     "r947 and QA.73 and PRIME.14 and LPC.PC.95",
@@ -1432,6 +1473,8 @@ ATTACKS = [
     "Verdicts\n--------",
     "[CROSS CHECK] here",
     "[Note about the table] here",
+    # V2 to V5 of the verification: Markdown and Unicode disguises.
+    *[text for text, _ in HIDING],
 ]
 DATED_ATTACKS = [
     "- 0938-09-47: agreed",
@@ -1442,6 +1485,8 @@ DATED_ATTACKS = [
     "- 2026-10-19: agreed to five digits and 3 more",
     "- 2026-10-19 agreed",
     "- 2099-12-31: agreed",  # N4: after the day check runs
+    "- 2026-10-19: the study is _PROMOTED_",  # V2 in a dated line
+    "- 2026-10-19: all PRO\u200bMOTED",  # V4 in a dated line
 ]
 
 
@@ -1505,6 +1550,10 @@ FREE_SLOT_FINE = [
     "- a list item\n- another list item",
     "A line\n\nAnother line after a blank line",
     "Three words - separated by a dash - on one line",
+    "I improved my plots and Approved is not a stem.",
+    "R\u00f6ssler and Chua behave alike, and the \u0141ukasiewicz note is fine.",
+    "- [x] read the table\n- [a lowercase bracket] stays",
+    "the developer wrote it and it was done",
 ]
 
 
@@ -1516,8 +1565,9 @@ def test_free_slot_stems_and_brackets_name_their_reason() -> None:
     named in the second column. The controls must pass every rule, which
     shows that the stems are not so broad that plain words are refused.
     """
-    for text, reason in FREE_SLOT_REASONS:
-        problems = fb.check_free_slots([(5, text, False)], CONSTANTS, None)
+    for text, reason in FREE_SLOT_REASONS + HIDING:
+        lines = [(5 + k, t, False) for k, t in enumerate(text.split("\n"))]
+        problems = fb.check_free_slots(lines, CONSTANTS, None)
         assert any(reason in p for p in problems), (text, problems)
     for text in FREE_SLOT_FINE:
         lines = [(5 + k, t, False) for k, t in enumerate(text.split("\n"))]
@@ -1649,7 +1699,8 @@ def test_later_cross_check_commit_must_change_only_records(
         ["../docs/agent/records/x.md"],
     ]
     for k, paths in enumerate(refused):
-        with pytest.raises(fb.ToolError, match="outside"):
+        reason = "'..' component" if ".." in paths[0] else "outside"
+        with pytest.raises(fb.ToolError, match=reason):
             conf_with_commits(tmp_path / f"r{k}", monkeypatch, paths)
     with pytest.raises(fb.ToolError, match="cannot list"):
         conf_with_commits(
@@ -1747,9 +1798,10 @@ def test_confirmatory_build_needs_absolute_paths(tmp_path, monkeypatch) -> None:
 
     Refused: a relative ``--official``, ``--crosscheck`` or ``--td``; REF and
     NEW lines that are relative; REF and NEW under another prefix with the
-    same last two path components (the development fallback). Accepted: REF
-    through a symbolic link to the official directory (realpath binds), and
-    then ``check`` passes from another directory.
+    same last two path components (the development fallback); a REF that is
+    a symbolic link or has a ``..`` component (it must be its own realpath).
+    Accepted: the real paths, and then ``check`` passes from other
+    directories.
     """
     monkeypatch.setattr(fb, "git_freeze_commit", lambda root: "c" * 40)
     official = make_results("confirmatory")
@@ -1794,8 +1846,15 @@ def test_confirmatory_build_needs_absolute_paths(tmp_path, monkeypatch) -> None:
     args = args_for("link")
     base = tmp_path / "link"
     (base / "alias").symlink_to(base / "official", target_is_directory=True)
-    linked = make_td().replace("REFDIR", str(base / "alias"))
-    (base / "td.txt").write_text(linked.replace("NEWDIR", str(base / "cross")))
+    for odd in (str(base / "alias"), f"{base}/official/../official"):
+        text = make_td().replace("REFDIR", odd)
+        (base / "td.txt").write_text(
+            text.replace("NEWDIR", str(base / "cross"))
+        )
+        with pytest.raises(fb.ToolError, match="own realpath"):
+            fb.render(args)  # a printed link or '..' path does not bind
+    text = make_td().replace("REFDIR", str(base / "official"))
+    (base / "td.txt").write_text(text.replace("NEWDIR", str(base / "cross")))
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
     monkeypatch.chdir(elsewhere)
@@ -1811,3 +1870,151 @@ def test_confirmatory_build_needs_absolute_paths(tmp_path, monkeypatch) -> None:
         # A relative override is refused in a confirmatory check.
         with pytest.raises(fb.ToolError, match="absolute path for td"):
             fb.run_check(out, "doc", {"td": "td.txt"})
+
+
+# --- V1, V6, V7: the changed-path check against real git ------------------------
+def git_repo(tmp: Path):
+    """Make a throwaway repository; return a function that runs git in it."""
+    tmp.mkdir(parents=True)
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@example.org",
+                "-c",
+                "commit.gpgsign=false",
+                *args,
+            ],
+            cwd=tmp,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+    git("init", "-q")
+    return git
+
+
+def commit_files(git, root: Path, files: dict[str, str], message: str) -> str:
+    """Write files (a ``None`` content removes one), commit, return the hash."""
+    for name, text in files.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    git("add", "-A")
+    git("commit", "-q", "-m", message)
+    return git("rev-parse", "HEAD")
+
+
+def test_renames_out_of_code_are_refused_with_real_git(tmp_path) -> None:
+    """A move into the records lists the old path too and is refused (V1).
+
+    Reference: real git in a throwaway repository, with git's default rename
+    detection on. ``git mv`` of a file out of ``lpcstudy/``, ``seeds/`` or
+    ``tools/`` into ``docs/agent/records/`` is refused, with and without an
+    edit of the content (a rename with a small edit is still detected as a
+    rename), while a records edit, a ledger edit and a move inside the
+    records pass.
+    """
+    root = tmp_path / "repo"
+    git = git_repo(root)
+    body = "".join(f"line {k} of a source file\n" for k in range(40))
+    base = commit_files(
+        git,
+        root,
+        {
+            "lpcstudy/core.py": body,
+            "lpcstudy/core2.py": body + "extra\n",
+            "seeds/dev.txt": body + "seed\n",
+            "tools/t.py": body + "tool\n",
+            "docs/agent/records/a.md": "a\n" + body,
+            "docs/agent/governance/ledger.jsonl": "{}\n",
+        },
+        "base",
+    )
+    moves = {
+        "lpcstudy": "lpcstudy/core.py",
+        "seeds": "seeds/dev.txt",
+        "tools": "tools/t.py",
+    }
+    for edit in (False, True):
+        for key, source in moves.items():
+            git("checkout", "-q", "-B", f"b-{key}-{edit}", base)
+            git("mv", source, f"docs/agent/records/{key}-moved.py")
+            if edit:
+                moved = root / f"docs/agent/records/{key}-moved.py"
+                moved.write_text(moved.read_text() + "# edited\n")
+            git("add", "-A")
+            git("commit", "-q", "-m", "move")
+            head = git("rev-parse", "HEAD")
+            # git's own rename detection sees one rename ...
+            assert git("diff", "--name-status", f"{base}..{head}").startswith(
+                "R"
+            )
+            # ... and the tool still lists both paths and refuses.
+            assert source in fb.git_changed_paths(root, base, head)
+            with pytest.raises(fb.ToolError, match="outside"):
+                fb.check_later_commit(root, base, head)
+    ok = {
+        "records edit": {"docs/agent/records/a.md": "changed\n"},
+        "ledger edit": {"docs/agent/governance/ledger.jsonl": "{}\n{}\n"},
+        "new record": {"docs/agent/records/new.md": "new\n"},
+    }
+    for name, files in ok.items():
+        git("checkout", "-q", "-B", name.replace(" ", "-"), base)
+        head = commit_files(git, root, files, name)
+        assert fb.check_later_commit(root, base, head).startswith("git diff")
+    git("checkout", "-q", "-B", "inner", base)
+    git("mv", "docs/agent/records/a.md", "docs/agent/records/b.md")
+    git("commit", "-q", "-m", "inner move")
+    inner = git("rev-parse", "HEAD")
+    assert sorted(fb.git_changed_paths(root, base, inner)) == [
+        "docs/agent/records/a.md",
+        "docs/agent/records/b.md",
+    ]
+    assert fb.check_later_commit(root, base, inner).startswith("git diff")
+
+
+def test_path_that_is_not_utf8_is_a_reported_refusal(tmp_path) -> None:
+    """A changed path of invalid UTF-8 gives ``ToolError``, not a traceback (V6).
+
+    Reference: real git; the file name holds the byte 0xff, written through a
+    bytes path.
+    """
+    root = tmp_path / "repo"
+    git = git_repo(root)
+    base = commit_files(git, root, {"docs/agent/records/a.md": "a\n"}, "base")
+    folder = os.fsencode(root / "docs/agent/records")
+    with open(folder + b"/bad\xff.md", "w") as handle:
+        handle.write("x\n")
+    git("add", "-A")
+    git("commit", "-q", "-m", "bad name")
+    head = git("rev-parse", "HEAD")
+    with pytest.raises(fb.ToolError, match="not valid UTF-8"):
+        fb.git_changed_paths(root, base, head)
+    with pytest.raises(fb.ToolError, match="not valid UTF-8"):
+        fb.check_later_commit(root, base, head)
+
+
+def test_dotdot_paths_and_trailing_newline_commits_are_refused(
+    monkeypatch,
+) -> None:
+    """A ``..`` component is refused and a commit needs a full match (V7).
+
+    The helper is stubbed to print a path that real git never prints, so the
+    guard is tested on its own.
+    """
+    monkeypatch.setattr(
+        fb,
+        "git_changed_paths",
+        lambda root, old, new: ["docs/agent/records/../../lpcstudy/x.py"],
+    )
+    with pytest.raises(fb.ToolError, match=r"'\.\.' component"):
+        fb.check_later_commit(ROOT, "a" * 40, "b" * 40)
+    with pytest.raises(fb.ToolError, match="40 hex"):
+        fb.check_later_commit(ROOT, "a" * 40 + "\n", "b" * 40)
+    assert not fb.FULL_COMMIT.fullmatch("a" * 40 + "\n")
