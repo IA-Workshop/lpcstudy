@@ -1,0 +1,17 @@
+(A) toy, conditional estimand: c = 4.063e-05, rho^2/k = 1.000e-04, c/(rho^2/k) = 0.406  -> floor violated: True
+(B) Lorenz-63, ||Gamma_H J^+||^2 = Var(e_P)/rho^2 to first order, 40 attractor states
+    H(steps)  median   min     max    fraction < 1
+       1       0.701   0.029    1.876   0.70
+       2       0.872   0.079    3.693   0.53
+       5       0.981   0.026   19.652   0.50
+      10       0.927   0.031  715.734   0.53
+      30       4.047   0.039 6231.805   0.30
+(C) Lorenz-63 library N=10000, D=7, tau=5, rho=0.01, 30 library-noise realizations x 300 queries x 4 draws
+    H   E[xi]/rho (+-se)      E[xi (e_C - xi)]/rho^2 (+-se)   E[xi^2]/rho^2
+     1  -0.0040 (0.0052)      -0.0873 (0.0246)            0.9907
+     2  +0.0006 (0.0052)      +0.0811 (0.0297)            0.9909
+     3  -0.0017 (0.0053)      +0.0568 (0.0327)            0.9929
+     5  -0.0004 (0.0053)      -0.0913 (0.0399)            0.9939
+    10  -0.0152 (0.0053)      +0.1858 (0.0932)            0.9957
+    30  +0.0149 (0.0053)      -0.1962 (0.2037)            1.0128
+elapsed 254.0 s

@@ -1,0 +1,2 @@
+P1(d) with C >= 0 at every horizon: 1976 cases, violations of gain <= ln2/(2Lambda) + 1 step: 0; worst (gain - bound) = -3.07 steps (negative means never reached)
+With C = -0.9 sqrt(E_C E_P): bound violated in 500 of 500 cases (example gain 44 steps against bound 11.4): P1(e) as expected
