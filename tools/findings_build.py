@@ -22,12 +22,22 @@ Two commands:
   words) and dated lines appended to section 9 (``- YYYY-MM-DD: text``, a
   real date not before the run ended). Rendering is deterministic, so any
   other edit, including an edited sentence or a swapped figure, fails.
-  Inside the free slots there is no numeric character of any kind (write
-  numbers as words; only the 14 hypothesis names such as H2a are allowed).
-  There is no heading (a ``#`` line, or a line underlined by a line of only
-  ``=`` or ``-``), no bracketed capitalized token ``[...]`` with any inner
-  text, and no dated line later than the day ``check`` runs (``date.today()``)
-  or earlier than the end of the official run. There is none of the words in
+  The rules for the free slots (threat model: accidental misstatement by a
+  student, not a hostile author; the owner reads every claim in them, and
+  so does the WU-0020.8 reviewer). Every line is normalized once before the checks:
+  NFKC, and ``*``, ``_`` and the backtick are cut before words, stems and
+  brackets are matched, so ``__CONFIRMATORY__``, ``PRO*MOTED*`` and
+  ``un_promoted`` are found; leading ``>`` and list marks are cut before the
+  heading tests. A line is refused if it has an invisible format character
+  (Unicode category Cf), an HTML entity ``&...;``, an HTML tag or comment, or
+  a letter outside the Latin script (Rössler passes; a Cyrillic look-alike
+  does not). There is no numeric character of any kind (write numbers as
+  words; only the 14 hypothesis names such as H2a are allowed). There is no
+  heading (a ``#`` line, or a line underlined by a line of only ``=`` or
+  ``-``, also inside a quote or a list item), no bracketed capitalized token
+  ``[...]`` with any inner text (fullwidth brackets included), and no dated
+  line later than the day ``check`` runs (``date.today()``) or earlier than
+  the end of the official run. There is none of the words in
   ``banned_phrases`` and ``free_slot_refused`` (whole words,
   case-insensitive: promoted, pre-registered, provisional, verified, gate and
   others) and no word that begins with one of the stems in
@@ -35,10 +45,16 @@ Two commands:
   signific, demonstrat, breakthrough, gate, gating, provision, promot,
   unpromot, verif, unverif, pre-regist, preregist, developm, preliminar (so
   proved, confirmed, significantly, gates, provisionally and promotion are
-  refused, and so is the odd innocent word such as provenance: reword it).
-  Number words ("forty-two") and claims phrased in other words cannot be
-  detected, and a real date is a small number channel; the WU-0020.8 reviewer
-  reads every claim in the free slots.
+  refused). Number words ("forty-two"), words split by a hyphen or a space
+  ("pro-moted"), mid-word forms ("unconfirmed", "disproved") and claims
+  phrased in other words cannot be detected, and a real date is a small
+  number channel. False positives a student will hit, each refused with a
+  message that names the rule: "provenance", "province", "proverb", "proven",
+  "gateway", "gated", "development", "verify", "verification", "confirm",
+  "demonstrates", "preliminary", "promote", "significant"; a Markdown link
+  with a capitalized label such as ``[Lorenz attractor](...)``; a checked task
+  box ``[X]``; a line followed by a line of a single ``-``; a letter that is
+  not Latin (Greek mu). Reword, or ask the owner.
 
 The tool only reads and formats. It computes no statistic and no verdict: a
 verdict word in the document is the string stored in the results file, and no
@@ -82,7 +98,9 @@ Cross-check commit (N2). It may differ from the official commit. In a
 confirmatory build the tool then runs the read-only command ``git diff
 --name-only <official>..<cross-check>`` and refuses unless every changed path
 is under ``docs/agent/records/`` or is ``docs/agent/governance/ledger.jsonl``
-(and refuses when git cannot answer). Beyond that check the tool does not
+(and refuses when git cannot answer). The command uses ``--no-renames``, so a
+move out of ``lpcstudy/`` into the records lists both paths and is refused;
+a path that is not valid UTF-8 or has a ``..`` component is refused. Beyond that check the tool does not
 verify the commit difference: it does not look at what the changed records
 say, and it needs both commits in the repository that holds the tool.
 
@@ -106,6 +124,7 @@ import argparse
 import csv
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -113,7 +132,7 @@ import tempfile
 import unicodedata
 from datetime import date
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import matplotlib
 
@@ -168,8 +187,12 @@ IDENTIFIER = re.compile(
 DATED_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2}): ")
 HYPOTHESIS_ID = re.compile(r"\bH[1-3][a-e]\b")
 BRACKET_CAPITAL = re.compile(r"\[\s*[A-Z][^\]]*\]")
-SETEXT_UNDERLINE = re.compile(r"^ {0,3}(?:=+|-+)\s*$")
-FULL_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+SETEXT_UNDERLINE = re.compile(r"(?:=+|-+)\s*")
+LEADING_MARKS = re.compile(r"(?:\s*>|\s*[-*+]\s)*\s*")
+MARKDOWN_NOISE = re.compile(r"[*_`]")
+HTML_ENTITY = re.compile(r"&[#A-Za-z0-9]+;")
+HTML_TAG = re.compile(r"<[!/?A-Za-z]")
+FULL_COMMIT = re.compile(r"[0-9a-f]{40}")
 RECORDS_PREFIX = "docs/agent/records/"
 LEDGER_PATH = "docs/agent/governance/ledger.jsonl"
 HEADING = re.compile(r"^(#{2,3}) ")
@@ -1221,8 +1244,12 @@ def git_freeze_commit(root: Path) -> str:
 def git_changed_paths(root: Path, old: str, new: str) -> list[str]:
     """Return the paths changed from ``old`` to ``new`` (read-only git).
 
-    Runs ``git diff --name-only -z old..new`` and raises ``ToolError`` when
-    git cannot answer (a missing commit, no repository, no git).
+    Runs ``git diff --no-renames --no-ext-diff --no-textconv --name-only -z
+    old..new``. ``--no-renames`` matters: with renames detected (git's
+    default) ``--name-only`` lists only the destination of a moved file, so a
+    move out of ``lpcstudy/`` into the records would look like a records
+    change. Raises ``ToolError`` when git cannot answer (a missing commit, no
+    repository, no git) or prints a path that is not valid UTF-8.
     """
     try:
         done = subprocess.run(
@@ -1231,38 +1258,55 @@ def git_changed_paths(root: Path, old: str, new: str) -> list[str]:
                 "-C",
                 str(root),
                 "diff",
+                "--no-renames",
+                "--no-ext-diff",
+                "--no-textconv",
                 "--name-only",
                 "-z",
                 f"{old}..{new}",
             ],
             capture_output=True,
-            text=True,
         )
     except OSError as exc:
         raise ToolError(f"cannot run git: {exc}") from None
     if done.returncode:
         raise ToolError(
             f"git cannot list the paths changed between {old} and {new}: "
-            + done.stderr.strip()
+            + done.stderr.decode("utf-8", "replace").strip()
         )
-    return [x for x in done.stdout.split("\0") if x]
+    paths = []
+    for raw in done.stdout.split(b"\0"):
+        try:
+            paths.append(raw.decode("utf-8"))
+        except UnicodeDecodeError:
+            raise ToolError(
+                f"git lists a path that is not valid UTF-8 ({raw!r}): refused"
+            ) from None
+    return [x for x in paths if x]
 
 
 def check_later_commit(root: Path, official: object, cross: object) -> str:
     """Refuse a cross-check commit that changes more than records (N2).
 
     Both commits must be 40 hex digits. Every path that
-    ``git diff --name-only <official>..<cross-check>`` lists must lie under
-    ``docs/agent/records/`` or be ``docs/agent/governance/ledger.jsonl``.
-    Returns the sentence for the document; raises ``ToolError`` otherwise.
+    ``git diff --no-renames --name-only <official>..<cross-check>`` lists
+    (the old and the new path of a move) must lie under
+    ``docs/agent/records/`` or be ``docs/agent/governance/ledger.jsonl``, and
+    none may contain a ``..`` component. Returns the sentence for the
+    document; raises ``ToolError`` otherwise.
     """
     for commit in (official, cross):
-        if not FULL_COMMIT.match(str(commit)):
+        if not FULL_COMMIT.fullmatch(str(commit)):
             raise ToolError(
                 f"commit {commit!r} is not 40 hex digits: the difference "
                 "between the official and cross-check commits cannot be checked"
             )
     changed = git_changed_paths(root, str(official), str(cross))
+    for path in changed:
+        if ".." in PurePosixPath(path).parts:
+            raise ToolError(
+                f"git lists the path {path!r} with a '..' component: refused"
+            )
     outside = [
         p
         for p in changed
@@ -1380,6 +1424,12 @@ def same_run(
                 "NEW paths (rerun compare_runs with absolute paths)"
             )
         printed = base / printed
+    elif strict and Path(os.path.realpath(printed)) != printed:
+        raise ToolError(
+            f"the compare_runs text prints {text_path!r}, which is not its "
+            "own realpath (a link or a '..' component): a confirmatory build "
+            "needs REF and NEW paths that are real paths"
+        )
     printed = printed.parent if printed.name == "results.json" else printed
     ours = results.parent
     if printed.resolve() == ours.resolve():
@@ -1741,29 +1791,72 @@ def merge_free_slots(
     return "\n".join(lines), free, []
 
 
+def hidden_text(text: str) -> list[str]:
+    """Name what in a free-slot line can hide or disguise a word (V2 to V5).
+
+    A line is refused if it holds an invisible format character (Unicode
+    category Cf), an HTML entity ``&...;``, an HTML tag or comment ``<...``,
+    or after NFKC a letter outside the Latin script (so a Cyrillic look-alike
+    is refused and "Rössler" is not).
+    """
+    norm = unicodedata.normalize("NFKC", text)
+    out = []
+    if any(unicodedata.category(ch) == "Cf" for ch in text):
+        out.append("an invisible format character")
+    if HTML_ENTITY.search(norm):
+        out.append("an HTML entity (&...;)")
+    if HTML_TAG.search(norm):
+        out.append("an HTML tag or comment")
+    if any(
+        ch.isalpha() and "LATIN" not in unicodedata.name(ch, "") for ch in norm
+    ):
+        out.append("a letter outside the Latin script")
+    return out
+
+
+def line_core(text: str) -> str:
+    """Return a line with NFKC applied and leading ``>`` and list marks cut.
+
+    Used by the heading tests, so a heading inside a quote or a list item is
+    found as a heading.
+    """
+    norm = unicodedata.normalize("NFKC", text)
+    return norm[LEADING_MARKS.match(norm).end() :]
+
+
 def check_free_slots(
     free: list[tuple[int, str, bool]],
     constants: dict,
     floor: date | None,
     today: date | None = None,
 ) -> list[str]:
-    """Check the text of the two free slots (R18, R19).
+    """Check the text of the two free slots (R18, R19, V2 to V5).
 
     Free text may say what the student thinks, and nothing that looks like
-    a number, a status or a section. In section 11 and in the dated lines of
-    section 9 (``- YYYY-MM-DD: text``, a real calendar date not before the
-    official run ended) it must have: no numeric character of any kind (the
-    Unicode categories Nd, Nl and No, and any character with a numeric
-    value), except the 14 hypothesis names such as H2a; no heading line (a
-    ``#`` line, or a line followed by a line of only ``=`` or ``-``); no
-    bracketed capitalized token ``[...]`` with any inner text; none of the
-    words banned in PRE-REGISTERED sections or listed as
-    ``free_slot_refused`` in ``design_constants.json`` (case-insensitive,
-    whole words: promoted, pre-registered, provisional, verified, gate and
-    others), and no word that begins with a stem of ``free_slot_stems``
-    (proved, confirmed, significantly, gates, provisionally, promotion and
-    others). A dated line is also refused if its date is after ``today``
-    (default ``date.today()``). Problems name the document line.
+    a number, a status or a section. The threat model is accidental
+    misstatement, not a hostile author: the owner and the WU-0020.8 reviewer
+    read every claim in the free slots. In section 11 and in the dated lines
+    of section 9 (``- YYYY-MM-DD: text``, a real calendar date not before the
+    official run ended and not after ``today``, default ``date.today()``):
+
+    * Every line is first checked by ``hidden_text``: no invisible format
+      character, no HTML entity or tag, no letter outside the Latin script.
+    * Then it is normalized: NFKC (fullwidth and mathematical letters become
+      plain ones) and ``*``, ``_`` and the backtick are cut before words,
+      stems and brackets are matched, so ``__CONFIRMATORY__``, ``PRO*MOTED*``
+      and ``un_promoted`` are found.
+    * No numeric character of any kind (the Unicode categories Nd, Nl and No,
+      and any character with a numeric value), except the 14 hypothesis
+      names such as H2a.
+    * No heading line, after cutting leading ``>`` and list marks: a ``#``
+      line, or a line followed by a line of only ``=`` or ``-``.
+    * No bracketed capitalized token ``[...]`` with any inner text.
+    * None of the words banned in PRE-REGISTERED sections or listed as
+      ``free_slot_refused`` (case-insensitive, whole words), and no word that
+      begins with a stem of ``free_slot_stems`` (proved, confirmed,
+      significantly, gates, provisionally, promotion and others).
+
+    Problems name the document line.
     """
     ids = {
         i["key"]
@@ -1778,6 +1871,8 @@ def check_free_slots(
         if not text.strip():
             continue
         where = f"line {number}"
+        for reason in hidden_text(text):
+            problems.append(f"{where}: {reason} in a free slot")
         if dated:
             found = DATED_LINE.match(text)
             try:
@@ -1797,21 +1892,24 @@ def check_free_slots(
                     f"{where}: date {when} is after today ({today})"
                 )
             text = text[found.end() :]
-        if text.lstrip().startswith("#"):
+        core = line_core(text)
+        if core.startswith("#"):
             problems.append(f"{where}: heading inside a free slot")
         under = by_number.get(number + 1)
         if (
             not dated
             and under is not None
-            and not SETEXT_UNDERLINE.match(text)
-            and SETEXT_UNDERLINE.match(under)
+            and core.strip()
+            and not SETEXT_UNDERLINE.fullmatch(core)
+            and SETEXT_UNDERLINE.fullmatch(line_core(under))
         ):
             problems.append(
                 f"{where}: setext heading (underlined by line {number + 1}) "
                 "inside a free slot"
             )
+        bare = MARKDOWN_NOISE.sub("", text)
         clean = HYPOTHESIS_ID.sub(
-            lambda m: " " if m.group(0) in ids else m.group(0), text
+            lambda m: " " if m.group(0) in ids else m.group(0), bare
         )
         for ch in clean:
             if unicodedata.category(ch) in ("Nd", "Nl", "No") or (
@@ -1822,17 +1920,18 @@ def check_free_slots(
                     "(write numbers as words)"
                 )
                 break
-        if BRACKET_CAPITAL.search(text):
+        plain = MARKDOWN_NOISE.sub("", unicodedata.normalize("NFKC", text))
+        if BRACKET_CAPITAL.search(plain):
             problems.append(
                 f"{where}: a bracketed capitalized token [..] inside a free slot"
             )
         for word in words:
-            if re.search(rf"\b{re.escape(word)}\b", text, re.I):
+            if re.search(rf"\b{re.escape(word)}\b", plain, re.I):
                 problems.append(
                     f"{where}: refused word {word!r} in a free slot"
                 )
         for stem in constants["free_slot_stems"]:
-            if re.search(rf"\b{re.escape(stem)}", text, re.I):
+            if re.search(rf"\b{re.escape(stem)}", plain, re.I):
                 problems.append(
                     f"{where}: word beginning with refused stem {stem!r} in a "
                     "free slot"
