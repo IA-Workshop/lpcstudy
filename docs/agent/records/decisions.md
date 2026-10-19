@@ -446,3 +446,202 @@ Amends the row-9 text of addendum A1 (A1 is left as written, append-only). The s
 **Decision.** The main session asked the owner for a ruling on O4 of WU-0002.14 (the D3 criterion of the DEC-0019/0020 regression when every value moves because the start states are redrawn by design), with the applied-mathematician's recommendation (Mathematics check M5, WU-0002.14 unit file): "take both arms facing away from the other estimate, since the two runs are exchangeable; the current mixed rule is not symmetric under swapping them", with the proposed triage order (an excess beyond 2 z_B is a defect candidate, an excess below it is reported with the undercoverage of DEC-0018 in mind). The owner answered, in the session on 2026-10-13, in these words: "O4 take the recommendation". Recorded as: (1) `compare_pilot --redrawn-states` applies D3 with **both SE arms facing away** (`REDRAWN_D3_ARMS = "away"`; SE_new as implemented, which closes the DEC-0020 item; SE_old changes from the side of Delta to the side facing away); the options `--d3-arms half-width|delta-side` stay available only to reproduce other readings; (2) the **triage order** of M5(a) is adopted (excess beyond 2 z_B: defect candidate, referred; otherwise reported, not tuned); (3) a V4 failure at P1 (indicatively 5 to 15% for correct code) is **referred to the owner, never retuned**. The 'working default pending the owner' wording of the tool's report text is replaced by this record in a later commit of WU-0002.14 (text only).
 
 **Affects:** WU-0002.14 (P1 may be judged), WU-0003.4. Marked "needs owner review before freeze". **Status:** owner instruction; recorded pending the owner's ledger entry.
+
+## DEC-0028: WU-0003.6: the reproducibility tolerance declaration (same context bitwise; equal contexts by the A6 tiers; across devices by the TD statistic, away-arm form)  (2026-10-18, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Source of the wording.** ruling given through the question tool, recorded in the amendments note §29 and §33; text drafted by claude-opus-5-5 (planner). Entered by the main session on 2026-10-18 in the freeze records (WU-0004.9) with the substitutions listed in `docs/agent/notes/2026-10-18-ledger-batch-draft.md` section 2.
+
+**Decision.** The project declares its outputs reproducible as follows (LPC.PC.18 "within the tolerance recorded in WU-0003"; REPRO.3; NVVUQ.12). The tier of a pair is selected mechanically from the context digests by `tools/compare_runs.py` (A6, B1 item 1), and the pair is judged by that tool.
+1. **Same context, same device type, same host, code, seed and environment (tier T0): bitwise.** Every leaf identical (IEEE bytes), except timing (`seconds`) and the top-level `provenance` block.
+2. **Equal context digests, different device, host, BLAS kernel or network weights (tiers T1 to T3): the A6/B1 tolerances as implemented in `compare_runs`.** The network-independent chain leaves (`cp`, `oracle`, `dynamics`, `fixture`) within 1e-12 relative; V1 (`delay_jacobian_rel_err`, `gain_rel_err`) within 1e-12 absolute; V2 within 1e-10 relative; LM summaries by the T1/T2 rules; QoIs and interval endpoints within 1e-4·max(|lo|, |hi|) (class a; this includes `fitted_inverse_dim` and `ci_inverse_dim[0..1]`, re-tagged under OF-7; `floor_rms` is class (g), and `ratio` and `ratio_ci` stay in the cp chain at 1e-12, see DEC-0030 item 9); other classes by the 10x rule, capped at 1e-4; every verdict identical. By OF-2 the V1 1e-12 rule applies only to these equal-context pairs.
+3. **Different contexts (tier TD; GPU against CPU in practice): the TD statistic.** No per-leaf tolerance. For each of the 18 primary parts (6 per system; H2a(ii) counts two), z = |d| / sqrt(se0^2 + se1^2) with each se taken from the interval arm that faces away from the other estimate (if run 1 lies above run 0: run 0's lower arm and run 1's upper arm; the pairing of DEC-0027; OF-5), se = arm / z_level, z_level = Phi^-1(1 - 0.05/6) = 2.394 (the primary level 1 - 0.05/3). A part fails if |z_away| > 3.4 (Phi^-1(1 - 0.01/30) = 3.403; family level at most 1.2% over 18 parts). The symmetric form (se = hw / z_level) is printed as information and does not fail a part. Verdict-type leaves that differ are reported, not failed.
+4. **What a TD pass does not mean.** It does not reproduce verdicts or the gate outcome. R5 against R6 passes the statistic while 52 verdict-type leaves differ and Chua's `gate_pass` differs (V6 on the GPU context 2.405e-3, a fail; on the CPU context 3.3e-4). The choice of confirmatory device is DEC-0031.
+
+**Evidence (DEVELOPMENT; not hypothesis tests).**
+- R1 against R2 (DEV-1 pilot, GPU RTX 4090, code c9bb981, repeated on the same host): tier T0, **20533 of 20533 leaves equal** (provenance and 23 timing leaves excluded). `WU-0003-R1R2.md` and `WU-0003-R1R2-compare-r1-r2.txt` on `run/r1-c9bb981`.
+- R0 (smoke): DEV-0 CPU against the step-4 reference smoke: T0, 4794 leaves, 0 different (CPU bitwise). DEV-1 GPU against DEV-1 CPU: TD on all three systems; 18 of 18 parts, 0 failing, max |z| 2.53 symmetric / 2.61 away. All six V1 leaves differ across devices by 3.5e-10 to 1.5e-8 absolute (different trajectories: the reason for OF-2).
+- R1 against R3 (DEV-1 pilot, GPU against CPU): TD; 18 of 18 parts, 0 failing; **max |z| 2.73 symmetric, 2.72 away** (Lorenz-63 H2a(ii) zero); 30 verdict-type leaves differ. `WU-0003-R3R6-compare-R1-R3.txt`.
+- R5 against R6 (DEV-2 full, GPU against CPU): TD; 18 of 18 parts, 0 failing; **max |z| 2.32 symmetric, 2.26 away** (Rossler H2b(i)); sum z^2 16.5 / 15.8; 52 verdict-type leaves differ. `WU-0003-R3R6-compare-R5-R6.txt`.
+- No rehearsal pair fell in T1 to T3 (no R4 record exists on the branches read). The T1 to T3 numbers rest on the WU-0003.9 kernel-pair evidence (WU-0002.14 S3 smoke pair, scratch copies with injected digests: declared 1e-5 for class (a), largest rel 2.94e-7; 1e-4 for (b) to (g)) and on the mathematician's notes `2026-10-14-math-wu0003.md` §M1, §M2 and `2026-10-14-math-wu0003-9-q1.md`.
+
+**Alternatives weighed and why rejected.**
+- *ROADMAP WU-0003.4's rule, "10x the GPU-to-GPU maximum relative difference, rounded up to a power of 10".* Degenerate: the GPU repeat is bitwise (10 x 0). It survives as item 1 (bitwise) and says nothing about cross-device pairs.
+- *The V1 1e-12 rule across devices, as item 11 was written, or a wider replacement of about 1e-9 (OF-2 (b)).* Rejected (OF-2, §26): across devices the contexts differ, so V1 is computed on different trajectories and the comparison is not like for like.
+- *A part fails on max(|z_sym|, |z_away|) > 3.4 (plan amendment 2, B1 item 5; the tool as built).* Replaced by the away-arm form (OF-5). See "Dissent".
+- *Pin trajectory generation to the CPU (O4 (a)).* Not decided here (O4).
+
+**Affects.**
+- `tools/compare_runs.py`: the TD failing rule is |z_away| > 3.4 (WU-0003.9c, merged 91c93f5, independent review `WU-0003.9c-review.md`); needs owner review before freeze.
+- ROADMAP WU-0003.4 (line 176) and its definition of done (line 187) do not match what was done: no "one core cell" (O8 widened it to the pilot), no differences table for w*, eps_s, delta, nu, Lambda-bar, N in the row's form, and `tests/gpu/test_reproducibility.py` does not exist. The compare_runs reports stand in. The row text is the owner's edit (or the owner requires the gpu test).
+- ROADMAP WU-0003.6 (lines 178, 189): this entry is one of its two decision entries.
+- WU-0016.3 (cross-host comparisons, CSQ2), WU-0004.1 (freeze checklist), LPC.PC.18.
+- Not decided here: O3 (`--xla_gpu_deterministic_ops`). O4 is DEC-0031.
+
+**Dissent and resolution (REPRO.8).** The applied-mathematician recommended the away arms and called them "not a loosening" on the sum (P0/P1: sum z^2 11.99 against 12.65; note §M1.4). Plan amendment 2 (B1 item 5) recorded that the away form alone gives a lower z on 7 of the 18 P0/P1 parts (Chua H3c 1.02 against 1.34), so, per part, away-only is looser than the as-built max-of-both rule. The owner ruled for the away form (§33, OF-5). Every rehearsal pair passes under both forms, so no rehearsal outcome changes.
+
+**Status:** owner ruling 2026-10-18 (question tool); the ledger `ruling` entry is the owner's. Needs owner review before freeze (tolerance and verdict-comparison code).
+
+**Record files.** `docs/agent/records/work/WU-0003-R1R2.md`; `WU-0003-R1R2-compare-r1-r2.txt`; `WU-0003-R3R6-compare-R1-R3.txt`; `WU-0003-R3R6-compare-R5-R6.txt`; `WU-0003-9c-compare-R1R3.txt`; `WU-0003-9c-compare-R5R6.txt`; `docs/agent/notes/2026-10-14-math-wu0003.md` section M1, M2; `docs/agent/notes/2026-10-14-math-wu0003-9-q1.md`.
+
+**Amendment of 2026-10-18, owner ruling M2 of the freeze audit** (`docs/agent/records/audits/2026-10-18-freeze.md`, M2; recorded in DEC-0033). The bitwise (T0) declaration of item 1 for the official configuration (CPU, full preset, LPC_THREADS=8) is measured at smoke size (CPU, at 4 and at 8 threads) and at GPU pilot size, and is extrapolated to the full preset at LPC_THREADS=8. No CPU full-size repeat is run. If the regeneration (WU-0016.2) is not bitwise, v3 section 9 routes it to the per-quantity tolerances (tiers T1 to T3 of item 2), so no verdict is at risk.
+
+## DEC-0029: WU-0003.6: the confirmatory sample size stays the full preset  (2026-10-18, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Source of the wording.** ruling given through the question tool, recorded in the amendments note §33; text drafted by claude-opus-5-5 (planner). Entered by the main session on 2026-10-18 in the freeze records (WU-0004.9) with the substitutions listed in `docs/agent/notes/2026-10-18-ledger-batch-draft.md` section 2.
+
+**Decision.** The confirmatory run uses the full preset as in v3 §4 and `lpcstudy/config.py` `FULL`: construction 2000, calibration 1000, test 1000 and sweep cells 1000 states; M = 200 oracle draws and 4 evaluation draws per state; V4 at M = 50, 200, 800 on 100 states; B = 2000 bootstrap resamples. No size changes.
+
+**These are development runs, not hypothesis-test results.** Every number below comes from DEV-1 and DEV-2. None is a verdict of the study, and none was used to choose a criterion.
+
+**Rehearsal evidence.**
+- **H3a.** At full size a pass is reachable only on Chua (R5: Holm p 0.00397; R6: same pattern). On Lorenz-63 and Rossler the full preset cannot deliver an H3a pass at these realizations. The R1 pilot projection reached it on no system (K_pilot 6, 4, 5).
+- **H2e.** R6 half-widths 0.0207 (Lorenz-63), 0.0218 (Rossler, rho 0.01), 0.0241 and 0.0244 (Chua): all narrower than v3 §7's projected 0.04 (a precision gain).
+- **v3 §7 precision statements.** On R6, reading (i) fires on 10 of 18 parts and reading (ii) on 10 of 18. R5 against the R1 projection: 4 reading-(ii) triggers over 69 parts (about 0.47 predicted). R6 pre-registered predictions: 11 of 12 within (outside: Lorenz-63 Q-N oracle logit, 0.0210, 0.525 of v3's 0.04, where "undetermined" was predicted). The pilot size does not support the same statements; the full preset is not oversized.
+- **V4 at full size** (bar 0.05): R5 0.0263, 0.0424, 0.0299; R6 0.0290, 0.0350, 0.0230. All pass.
+- **Finite-M bias.** D5 "not determined" on all three systems (R5), so budget row 1 stays "not below 10%" (PF-5). Raising M is not a lever: no admissible M (at most 399, H-M1/H-M2) brings F1 below 0.1 hw_full; that would need M of about 5,700 to 29,000 (note `2026-10-14-math-wu0003.md` §M5.1).
+- **Compute against LPC.PC.22** (budget: the full preset completes within 12 h on the owner's GPU workstation). R5, GPU: 2739 s (0.76 h). R6, CPU at `LPC_THREADS=8`: 17031 s (4.73 h), peak RSS 4.75 GB; above the A1 planning bound of 4 h, below 12 h; not a clean C6 figure (other lanes may have shared the CPU). Both are within budget, so no optimization is warranted (RSRC.4).
+- **Device (input to O4, not decided here).** For the same seed, the device changes the context and therefore the realization: DEV-2 Chua V6 fails on the GPU context (2.405e-3) and passes on the CPU context (3.3e-4). GPU repeats are bitwise on this host (R1/R2); a CPU sealed run would take about 4.7 h (R6, not clean) and regenerates bitwise on CPU. The official sealed run is on the CPU (DEC-0031).
+
+**Alternatives weighed and why rejected.**
+- *Pilot size.* Rejected: the projections from R1 reach fewer decisions (H3a on no system), and reading (ii) shows the pilot does not support v3 §7's statements.
+- *Larger n.* Not chosen; no recommendation was made. Its effect on H3a for Lorenz-63 and Rossler is not measured, and it lengthens the CPU run.
+- *Larger M.* Rejected on the M5.1 evidence above (no admissible M reaches the 10% rule).
+
+**Affects:** WU-0003.6 (ROADMAP lines 178, 189), WU-0004.1 (freeze checklist), the pre-registration text. v3 §4 is unchanged. Whether v3 §7's precision paragraph is updated with the rehearsal figures is a separate owner edit, not decided here. The device is DEC-0031.
+
+**Dissent and resolution (REPRO.8).** None recorded.
+
+**Status:** owner ruling 2026-10-18 (question tool); the ledger `ruling` entry is the owner's.
+
+**Record files.** `WU-0003-R1R2-R5-rehearsal-report-r5.txt`; `WU-0003-R1R2-R5-rehearsal-report-r1-observed-r5.txt`; `WU-0003-R3R6-report-R6.txt`; `WU-0003-R3R6.md` (all under `docs/agent/records/work/`); `docs/agent/notes/2026-10-14-math-wu0003.md` section M5.1.
+
+## DEC-0030: Owner rulings of 2026-10-17 and 2026-10-18 on the WU-0003 rehearsal, the LM-doubling study and the comparison and diagnostics tools  (2026-10-18, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Source of the wording.** answers given through the question tool and recorded by the main session in docs/agent/notes/2026-10-11-amendments-for-owner.md §§26, 29, 30, 31, 33; text drafted by claude-opus-5-5. Entered by the main session on 2026-10-18 in the freeze records (WU-0004.9) with the substitutions listed in `docs/agent/notes/2026-10-18-ledger-batch-draft.md` section 2.
+
+**Decision.** The note sections are the record of the wording; this entry restates them.
+1. OF-2 (§26, 2026-10-17): "Equal contexts only". The V1 1e-12 rule of plan item 11 applies only to pairs whose context digests are equal (tiers T0 to T2); GPU-against-CPU pairs (TD) are judged by the TD statistic.
+2. R5 and R6 (§26): authorized (full preset on DEV-2; GPU with the states dump; CPU at LPC_THREADS=8). Run on 2026-10-17.
+3. DEF-0026 (§26): the offline V6/V4 check on DEV-1 to DEV-4 only. Not chosen: a pre-registered response to a sealed-run gate failure, evaluating the outcome-free gate checks first, a risk-register-only entry. A sealed-run gate failure stays a hard stop referred to the owner (DEC-0027).
+4. OQ-R9 (§26): the diagnostics defaults (tool seed 20261018, 1000 permutations, 2000 resamples) are pre-registered; the first default-options report per run is the record; any other option is labelled non-default and is not the record.
+5. O5, DEF-0027 (§29): report and flag only. The design value stays 15 LM iterations; the iteration-sensitivity flag is reported per part; no new reference run.
+6. DEF-0028 (§29): amend tools/lm_doubling.py to the plan (structural switch, class U, before the X bullets). Done: merged f14c8fa after independent review (WU-0005.6-rule-r-order-review.md). Readings of §30: [owner: "confirmed" | "ruled otherwise: ..."]: (a) a half-width <= 0, a NaN value and an infinite point estimate with finite bounds are not structural switches; (b) an infinite lower or upper bound at any arm is.
+7. OF-R2, OF-G6 (§29): keep the range. The pre-registered kappa_E range [0.7071, 1] governs; no dump change, no half-split estimator, no rerun.
+8. Block length (§29, §31): keep block length 5 for all three systems (no v3 or Methods v2 amendment). OF-3: the pooled permutation reading governs the D2 verdict; the A5 rule and beta-hat-5 are printed as information. A report-only "block-sensitive" label marks a primary part whose verdict would change if the half-width were widened by sqrt(max(1, V*(10)/V*(5))); it changes no criterion. Implemented in WU-0003.8d (merged 1e3d726). Judgement calls of WU-0003.8d: [owner: (b) label rows, including "not computable" rows, never set exit 2 — "confirmed" | "count them for the exit code"]; [owner: (d) the label is per primary part, not per combined hypothesis verdict — "confirmed" | ...].
+9. OF-7 (§33, 2026-10-18): re-tag the H1a fit leaves out of the cp chain under the A6 QoI rule; the 1e-12 rule stays elsewhere. As merged (WU-0003.9c, 91c93f5): fitted_inverse_dim and ci_inverse_dim[0..1] class (a), 1e-4 s; floor_rms class (g); ratio and ratio_ci stay cp 1e-12 with the OF-7 pointer. [owner: "ratio and ratio_ci are covered by OF-7 (class a)" | "they stay cp 1e-12"; note: the text ruled on said they "already" were at 1e-4 s, which stopped being true at da22cdd on 2026-10-17; under the literal reading every T2 pair fails on 18 H1a leaves with correct code.] [owner: floor_rms "class (g) as built" | "class (a) as the ruling text says".]
+10. OF-1 (§33): keep strict. No licence for H2c, H2d or H3c under T1 to T3 for a fitted-coefficient change beyond 1e-6.
+11. R5 of the WU-0003.9 review, O3 (§33): the declared-tolerance rule O3 is information only on T1 to T3 pairs.
+12. Q7, Q8, Q9 and the handling-count scope (§33): keep the tool's strict readings; the handling-count licence is kept as written. [owner: follows_k (the K-block listing, labelled a looser reading in WU-0003.9 R17) — "confirmed" | ...]
+13. OF-4 (§33): the F1 wording is corrected by DEC-0024 addendum A3.
+14. OF-5 (§33): the away-arm TD form is the failing rule (|z_away| > 3.4 over 18 parts); the symmetric form is printed as information. Merged in WU-0003.9c (91c93f5). The plan text of A6 and B1 item 5 is left as written; the plan amendment for it is the planner's.
+15. OF-F3 (§33): keep N = 24 diagnostic series as written (H1c not counted).
+16. OF-G3 (§33): the margin band 0.0850 to 0.0933 governs the H2a(ii) comparison against v3; the hw band [0.0603, 0.135] stays printed, not governing.
+17. F4 and Q6 (§33): keep both as built; Q6 is recorded as WU-0003 plan amendment 11. [owner: K2, d3 shown on scratch copies of the S3 pair — "covered by keep as built" | ...]
+18. WU-0003.6 (§33): DEC-0028 (reproducibility tolerance) and DEC-0029 (sample size).
+
+**Alternatives weighed.** As listed in the cited note sections and the mathematician's notes (2026-10-14-math-wu0003.md, 2026-10-14-math-wu0003-9-q1.md, 2026-10-14-math-wu0003-3a-kappa.md, 2026-10-17-math-block-length.md).
+
+**Affects:** tools/compare_runs.py, tools/lm_doubling.py, tools/rehearsal_diagnostics.py, tools/rehearsal_report.py, lpcstudy/budget.py (OF-4), WU-0003, WU-0004.1, WU-0016.
+
+**Dissent and resolution (REPRO.8):** OF-5, see DEC-0028. Otherwise none recorded.
+
+**Status:** owner rulings (question tool); ledger rulings L12 to L17. Items 6, 8, 9, 12 and 17 carry confirmations the owner fills in above. Needs owner review before freeze (tolerance, comparison and statistics tool code).
+
+**Note on the bracketed owner confirmations (items 6, 8, 9, 12, 17).** They are entered unfilled, as drafted. The owner fills them with a dated line appended below; until then the item is the drafted reading, not an owner-confirmed one.
+
+## DEC-0031: The confirmatory run is on the CPU; a GPU run of the same sealed seed is a cross-check that informs only  (2026-10-18, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Source of the wording.** answer given through the question tool after the clarification of §35, recorded in docs/agent/notes/2026-10-11-amendments-for-owner.md §36; text drafted by claude-opus-5-5. Entered by the main session on 2026-10-18 in the freeze records (WU-0004.9) with the substitutions listed in `docs/agent/notes/2026-10-18-ledger-batch-draft.md` section 2.
+
+**Decision.** Pre-declared before the freeze (WU-0003 plan amendment 1, A12 O4):
+1. The official sealed run (CONF-1, full preset) runs on the CPU at LPC_THREADS=8. Device and thread count are part of the freeze configuration (LPC.PC.8; DEF-0023: the thread count changes results in the last bits).
+2. A GPU run of the same sealed seed is a cross-check. It is compared with the official run by tools/compare_runs.py with the TD statistic, away-arm form, failing bound 3.4 (DEC-0028 item 3). The CPU verdicts stand. A differing verdict-type leaf, a TD failure or a GPU gate failure is reported as information and changes no verdict.
+3. The GPU cross-run is a second use of the sealed seed: it needs its own per-action authorization (LPC.AUTH.6), and its outputs are released only with the official run's release decision.
+4. The regeneration by another actor (WU-0016) runs on the CPU: bitwise (T0) on the same platform and LPC_THREADS, otherwise judged by the A6 tiers (DEC-0028 item 2).
+5. [owner: whether R1 (GPU pilot), R3 (CPU pilot) and R6 (CPU full) satisfy LPC.PC.6 "validation gate V1-V7 passes on all three systems in the rehearsal", with R5's Chua V6 failure (GPU context) recorded under DEF-0026 — "yes" | "the rehearsal must pass at full size on the CPU (R6 did)" | ...]
+6. [owner: O3 for the GPU cross-run: "XLA_FLAGS not set (R1 = R2 bitwise without it)" | "set --xla_gpu_deterministic_ops=true".]
+
+**Evidence (DEVELOPMENT; not hypothesis tests).** R5 against R6 (DEV-2, full): tier TD, 18 of 18 parts, 0 failing, max |z_away| 2.26; 52 verdict-type leaves differ; Chua V6 fails on the GPU context (2.405e-3 against 1e-3) and passes on the CPU context (3.3e-4). R1 = R2 bitwise on the GPU (20533 leaves). CPU wall time of R6 17031 s (4.73 h; possibly shared CPU), within LPC.PC.22's 12 h. Records: WU-0003-R1R2.md, WU-0003-R3R6.md, WU-0003-R3R6-compare-R5-R6.txt, WU-0003-R3R6-gates-clips-R6.txt.
+
+**Alternatives weighed.** Both runs on the GPU (fast; a regeneration on another GPU is only TD; the only full-size GPU rehearsal failed V6). Accepting TD for the regeneration (weakest). Pinning trajectory generation to the CPU (a numbers-changing code step after the rehearsal).
+
+**What this does not change.** The per-seed gate risk (DEF-0026: about 4.6% for Chua V6, 11 to 25% for V4 or V6 at full size) is the same on either device. A gate failure of the official CPU run is a hard stop referred to the owner, never retuned (DEC-0027; no pre-seal response rule, §26).
+
+**Affects:** the freeze configuration (WU-0004.7), WU-0015, WU-0016, DEC-0028 item 4, the gpu test of B10 (which tests the cross-check device only). Supersedes plan amendment 1 O4's recommendation "(b) same device type".
+
+**Dissent and resolution (REPRO.8):** none recorded. **Status:** owner ruling 2026-10-18; ledger ruling L20.
+
+**Note on the bracketed owner questions (items 5 and 6).** Entered unfilled, as drafted; the owner answers by a dated line appended below.
+
+## DEC-0032: Owner rulings of 2026-10-18 on the freeze blockers B5 to B11 (B4 is DEC-0031)  (2026-10-18, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Source of the wording.** answers given through the question tool, recorded in docs/agent/notes/2026-10-11-amendments-for-owner.md §35 and §36 against docs/agent/notes/2026-10-18-freeze-blockers.md; text drafted by claude-opus-5-5. Entered by the main session on 2026-10-18 in the freeze records (WU-0004.9) with the substitutions listed in `docs/agent/notes/2026-10-18-ledger-batch-draft.md` section 2.
+
+**Decision.**
+1. B5 (where the freeze lives): develop is merged into main after the owner's code review (WU-0004.5) and a green full suite at the freeze gate; the freeze commit and tag live on main. No main request is made now.
+2. B6a (DEF-0020): keep the pre-registered percentile intervals and block length 5; no widening and no other interval procedure. The measured undercoverage (DEF-0020, DEC-0018) and the report-only block-sensitive label are stated as limitations.
+3. B6b (DEF-0018): keep H3a as is (no per-regime or event-count minimum; DEC-0011 O1 stands); report the event counts per regime; state the exposure (one event in a tiny regime can give an extreme log-rank p and a Holm-adjusted pass) as a limitation. To be implemented: h3a_logrank reports per-regime state counts, not event counts.
+4. B7 (LM row; WU-0005.6 O4 and O6): the DEV-0 flags are quoted as development evidence with the sqrt(n_full/n_pilot) projection; the sealed report keeps "not estimated" plus a pointer; no sealed 30-iteration twin run. A text and small budget change (WU-0004b), with review and owner review.
+5. B8 (DEC-0008 C): implement the refusal of a sealed run on a dirty tree or an unknown commit (code, tests, independent review, then the owner's review). VmHWM recording: [owner: "yes" | "not now"].
+6. B9: ratify en bloc the working defaults and stricter readings of freeze blockers B9 [owner: "all B9 items" | "only: N2/N3 under Option C, PF-1 to PF-5, OF-H1, OF-I2, C6-R6, the R3 families of WU-0003.9b, the planner defaults of WU-0002.11c (Q1, Q2) and WU-0002.14 (O1 to O8), WU-0005.6 O1 to O3, WU-0003 plan amendment 1 O1 to O8"], except that plan amendment 1 O2 (R4, not run), O3 (GPU deterministic-ops flag, never set) and O4 (same device type; replaced by DEC-0031) are recorded as overtaken, not ratified. Ruled separately: N2 and N3 keep the code's reading (N1, N2 and N3 computed and reported, none asserted; the consistency ranges asserted); OF-I1 keeps the min anchor (H1d at 98.3% prints 0.9794). The DEV registry statuses are updated (DEV-1, DEV-2 used; DEV-3, DEV-4 used for V6 contexts only).
+7. B10: write tests/gpu/test_reproducibility.py (smoke twice on the GPU against the tolerance of DEC-0028), under the GPU lock; the owner edits the ROADMAP WU-0003.4 row and definition of done to what was done.
+8. B11: the sealed run keeps the states dump off; the freeze is recorded as a ledger classification entry (entry to CSQ2) plus the commitment entry written by the seed-sealing step. [owner: WU-0004.8, the governance reread (LPC.PC.25), is performed by <name>.]
+
+**Alternatives weighed.** As in the freeze-blocker note, B5 to B11.
+
+**Affects:** WU-0004.1 to .8, WU-0015, WU-0016, lpcstudy/analysis.py and report.py (B6b), lpcstudy/budget.py (B7), lpcstudy/__main__.py and provenance.py (B8), tests/gpu/ (B10), seeds/development_seeds.json (B9), ROADMAP.md (B10).
+
+**Dissent and resolution (REPRO.8):** none recorded. **Status:** owner rulings 2026-10-18; ledger note L21 and ruling L22.
+
+**Note on the bracketed owner choices (items 5, 6 and 8).** Entered unfilled, as drafted; the owner answers by a dated line appended below. The ledger references (L12 to L22) are the entries of `docs/agent/notes/2026-10-18-ledger-batch-draft.md` section 3.
+
+## DEC-0024 addendum A3: OF-4: F1 is an indicative value, not a worst case for the median  (2026-10-18, human owner; ruling given through the question tool, recorded in the amendments note §33; text drafted by claude-opus-5-5 (planner) from the applied-mathematician's note `docs/agent/notes/2026-10-14-math-wu0003.md` §M5)
+
+Amends point 2 of DEC-0024 and the F1 wording of WU-0008 M3 (design 28dfbd1). The earlier text is left as written.
+
+**Correction.** F1 = (3/sqrt(pi))·h/z_0.975 is the expected range of a state whose true range is zero, with draw noise independent across the 3 horizons. It is **indicative (the bias of a zero-range state); it is not a bound on the bias of the median range.** When more than half of the eligible states have exact separation, the median of the noisy ranges lies near an upper quantile of the noise-only range, above its mean. A synthetic case (60% separated, independent noise across horizons, M = 200; `m5_d5sim.log`, seed 20261016) reaches **1.38·F1**; with noise correlation 0.5 it is 1.01·F1, with 0.9 it is 0.48·F1. The direction stands: upward, toward a fail.
+
+**Point 2, replacement text.** "The Chua pilot H2a(i) fail is not certified against the finite-M bias. The indicative F1 for the H2a(i) median range is 0.86 of the V4 median half-width, i.e. 43 to 86% of the interval half-width on the DEV-0 pilot; a bias of that size already moves the Chua pilot's range below the 0.1 bound (0.1135 − 0.027 = 0.087), and F1 does not bound the bias, which can be larger (1.38·F1 in a synthetic case). A pass is not certified either. This is a development-run observation (DEV-0, not a hypothesis test). The number of oracle draws is not a remedy: F1/hw_full is 0.54 to 1.20 at M = 200 (0.38 to 0.85 at M = 399, the largest admissible M by H-M1/H-M2), and bringing F1 below 10% of the half-width would need M of about 5,700 to 29,000. Only a small measured bias (the D5 estimator of WU-0003) can show the row below 10%."
+
+**WU-0008 M3, replacement wording** (appended to the WU-0008 Log as a dated correction):
+- line 310: "Indicative value (the bias of a zero-range state; not a bound on the median), assuming draw noise independent across the k = 3 horizons and SD s_med at each: F1 = (3/√π)·h/z₀.₉₇₅ = 0.86362·h. Use 2/√π if k = 2."
+- line 313: "The Rössler fail survives a bias of size F1 (0.211 − 0.034 = 0.177 > 0.1); F1 is not a bound, so this is an indication, not a certificate."
+- line 314: "The Chua pilot fail is not certified against the finite-M bias: a bias of size F1 already gives 0.1135 − 0.027 = 0.087, and the true bias can exceed F1."
+- line 315, the cell: "not estimated: finite-M bias upward (toward fail); indicative F1 = … (bias of a zero-range state, independent draw noise across horizons; not a bound on the median; V4 at H_ref only)".
+- line 216, row 1, H2a(i): "bias upward; indicative F1 (not a bound)".
+- line 868 (a review record; left as written): its "upper indication" is superseded by this addendum.
+
+**Code consequence.** `lpcstudy/budget.py` prints the old wording into RESULTS.md. The docstring of `oracle_range_bound` (lines 565, 570) and the cell string at line 702 change to the wording above: a report-text change, no number changes. Radius from `/test-impact` (at least `tests/unit/test_budget.py`); needs owner review before freeze. Until it lands, every RESULTS.md, including a sealed run's, prints "indicative worst case ≤ F1".
+
+**Affects:** WU-0008 (M3, row 1), DEC-0024 point 2 (still open per DEC-0026), `lpcstudy/budget.py`. **Status:** owner ruling 2026-10-18; the ledger entry is the owner's.
+
+## DEC-0033: Owner rulings of 2026-10-18 on the freeze audit majors M1 to M4  (2026-10-18, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner ruled on the four majors of the pre-freeze audit (`docs/agent/records/audits/2026-10-18-freeze.md`, verdict "ready after the listed fixes"). Verbatim, 2026-10-18: "M1 amend / M2 extrapolate / M3 report only / M4 apply this / We are out of time." In plain words:
+1. **M1 (ROADMAP row WU-0006.2): amend.** The row is amended to say that the coverage-bound rows are recorded characterization rows under DEC-0018 Option C (in force since DEC-0026 item 2; `ASSERT_ROADMAP_BOUNDS = False`), and that the consistency ranges and exact checks are the asserted criterion. The main session makes the ROADMAP edit; this entry records the decision. The intervals are not changed (DEC-0032 item 2). The ledger `amendment` entry for the ROADMAP edit is the owner's.
+2. **M2 (T0 bitwise declaration at full size): extrapolate, do not repeat.** The bitwise declaration for the official configuration (CPU, full preset, LPC_THREADS=8) is measured at smoke size (CPU, at 4 and at 8 threads) and at GPU pilot size, and is extrapolated to the full preset. No CPU full-size repeat is run. The extrapolation is stated in DEC-0028 (amendment paragraph), in the freeze entry, and in the limitations of v3 section 8 (the main session edits v3). If the regeneration (WU-0016.2) is not bitwise, v3 section 9 routes it to the per-quantity tolerances, so no verdict is at risk.
+3. **M3 (the gain-bound row WU-0002.15): report only, option (b) of the audit.** The row stays in the ROADMAP. It is recorded as a post-freeze change to a reported-only quantity (LPC.PC.8, second paragraph), so its results are promotable as reported. No code change is made now (`GAIN_BOUND_PENDING` stays as it is). The DEF-0005 closing line is appended (`defects.md`).
+4. **M4 (the governing text): apply the audit's fix.** The freeze entry names `docs/study/proposal_and_methods_v3.md`, at its recorded SHA-256 (`2a856a4595bead58fa7de168f602ae4f250098839347aa352245b941459d0a06`, ledger entry 8), as the governing text, and states that the Claude Doc is a working copy. No re-export is made.
+The owner added that time is short ("We are out of time"); the remaining audit fixes are applied as recorded and nothing further is re-litigated.
+
+**Alternatives weighed.** As listed in the audit, M1 to M4: for M1, restoring the assertion (Option K) and accepting red rows; for M2, one CPU full-preset repeat on DEV-2 (about 4.7 h) before the seal; for M3, ruling the row out with a one-string code edit (option (a)); for M4, applying the 23 edits to the Claude Doc and re-exporting.
+
+**Evidence.** `docs/agent/records/audits/2026-10-18-freeze.md` (M1 to M4, lines 31 to 48); DEC-0018 (Options C and K); DEC-0026 item 2 (Option C ratified); DEC-0028 (reproducibility tolerance, with its amendment of 2026-10-18); v3 section 8 (limitations) and section 9; `docs/agent/notes/2026-10-11-amendments-for-owner.md` sections 46 and 47 (the owner code review and the rulings on it); section 48 (these rulings and the records entered).
+
+**Affects:** ROADMAP row WU-0006.2 (owner or main-session edit), v3 section 8 (main-session edit), the freeze entry (WU-0004.7), DEF-0005 and DEF-0020 status lines, WU-0002.15. **Status:** owner instruction relayed by the main session; the ledger `ruling` entry is the owner's to append.
+
+## DEC-0033 addendum A1: the bracketed owner confirmations of DEC-0030, DEC-0031 and DEC-0032 (2026-10-18, owner answers through the question tool, recorded by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+Entries DEC-0030, DEC-0031 and DEC-0032 were entered with owner brackets unfilled (this file is append-only, so they are answered here, not edited). On 2026-10-18 the owner answered the two open questions and approved recording the rest from the answers already on record ("Yes, record them", question tool). Each bracket, in the order of the entries:
+
+- **DEC-0030 item 6, DEF-0028 readings (a) and (b):** in force as built in `tools/lm_doubling.py classify` (a half-width <= 0, a NaN value and an infinite point estimate with finite bounds are not structural switches; an infinite lower or upper bound at any arm is). The owner's ruling of 2026-10-17 was "Amend tool to the plan"; the readings of amendments note section 30 are approved by this addendum.
+- **DEC-0030 item 9, OF-7:** `ratio` and `ratio_ci` stay `cp 1e-12` (strict, as built; the owner's rulings OF-1 and "keep the tool's strict readings" of 2026-10-18). `floor_rms` is class (g) as built (`tools/compare_runs.py` RETAGS); `fitted_inverse_dim` and `ci_inverse_dim[0..1]` are class (a), 1e-4 s.
+- **DEC-0030 item 12, Q7, Q8, Q9 and `follows_k`:** the strict readings are kept as built, including the K-block listing `follows_k` (owner, 2026-10-18: "keep the tool's strict readings").
+- **DEC-0030 item 17, K2 of plan amendment 11 (d3 on scratch copies of the S3 pair):** covered by "keep as built" (owner, 2026-10-18: F4 and Q6 kept as built).
+- **DEC-0031 item 5, LPC.PC.6 (owner, 2026-10-18):** yes. R1 (GPU pilot), R3 (CPU pilot) and R6 (CPU full) satisfy "the validation gate V1-V7 passes on all three systems in the rehearsal"; R5's Chua V6 failure on the GPU context is recorded under DEF-0026 (per-seed risk about 4.4%), not a rehearsal failure.
+- **DEC-0031 item 6, O3 (owner, 2026-10-18):** `XLA_FLAGS` stays unset for the GPU cross-run (R1 = R2 bitwise without `--xla_gpu_deterministic_ops`).
+- **DEC-0032 item 5, B8, VmHWM recording:** not now (the owner called it optional on 2026-10-18; not built; the refusal of a run on a dirty tree or an unknown commit is built and reviewed).
+- **DEC-0032 item 6, B9:** all B9 items are ratified en bloc, with plan amendment 1 O2, O3 and O4 recorded as overtaken and N2, N3 and OF-I1 ruled as the entry states (owner, 2026-10-18, fifth round).
+- **DEC-0032 item 8, B11:** the governance reread (LPC.PC.25, WU-0004.8) is performed by the human owner; the owner's name is entered in the ledger note of that entry.
+
+**Status:** owner answers; recorded pending the owner's ledger entry (the `ruling` entry of `tools/owner_freeze_run.sh ledger` covers DEC-0028 to DEC-0033 and this addendum).

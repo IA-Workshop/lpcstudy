@@ -286,3 +286,9 @@ Append-only (PRIME.5). To change an entry's status, add a dated status line unde
 - **Description.** `alive(pid)` read `/proc/<pid>/stat` after the process might have exited; the read raised `ProcessLookupError` (ESRCH), which the helper did not treat as "not alive". Seen once, in the gate of develop `1b263d7` (`GATE-2026-10-18c-develop.md`); it passed in the gates of `1e3d726` and `ff26883`. Unrelated to WU-0004f. Not retried.
 - **Resolution:** WU-0004g (`7d2a803`, merged): the helper treats `ProcessLookupError` like `FileNotFoundError`; no assertion changed; a small liveness test added. The race itself cannot be forced deterministically; the next gates are the evidence.
 - 2026-10-18: opened and resolved (claude-sonnet-5-5, main session; fix by the developer of WU-0004g).
+
+Status lines of 2026-10-18 (freeze records, WU-0004.9; they belong to the defects named in each line, appended here because records are append-only):
+
+- DEF-0005, status line (2026-10-18, claude-sonnet-5-5, main session; WU-0004.9): **closed in the freeze:** criteria equal v3 section 2 (audit 2026-10-18, 14 of 14 rows; test pinned); the gain-bound row WU-0002.15 is ruled a post-freeze change to a reported-only quantity (DEC-0033, M3), no code change.
+- DEF-0001, status line (2026-10-18, claude-sonnet-5-5, main session; WU-0004.9): code side confirmed by the pre-freeze audit 2026-10-18 (294 hits of the V4 pattern classified, none silent); open only for the owner's code review (checklist item 3).
+- DEF-0020, status line (2026-10-18, claude-sonnet-5-5, main session; WU-0004.9): the ROADMAP row WU-0006.2 is amended (DEC-0033, M1) to say the coverage-bound rows are recorded characterization rows under DEC-0018 Option C and the consistency ranges are the asserted criterion.
