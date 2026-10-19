@@ -1,0 +1,14 @@
+sympy 1.14.0, mpmath 1.3.0 (ephemeral tool, not a project dependency)
+P1(a)  V(w) - [c (w-u)^2 + V(u)] = 0
+P1(c)  V(u) - (E_C E_P - C^2)/c = 0
+P1(c)  2V(u) - E_C - [E_C(E_P - E_C) + 2C(E_C - C)]/c = 0
+P1(b)  c*u - (E_P - C) = 0 ;  c*(1-u) - (E_C - C) = 0
+P1(e)  V(u) at E_C=E_P=1, C=-1: 0
+P1(d)  H' - H = -log(2)/(2*Lambda)
+P1(d)  (E/2 + rho^2) - (E + rho^2)/2 = rho**2/2 >= 0
+L6     u under proportional covariances + copied noise = q*(delta2 - kappa)/(delta2*q + eps2*q - 2*kappa*q + r2k)
+L6     limit q -> oo: (delta2 - kappa)/(delta2 + eps2 - 2*kappa) ; equals delta2/(eps2+delta2) only if kappa = 0
+L6     at finite q with kappa = 0, u - delta2/(eps2+delta2) = delta2*(-delta2*q - eps2*q + q*(delta2 + eps2) - r2k)/((delta2 + eps2)*(delta2*q + eps2*q + r2k)) (nonzero whenever r2k > 0: an H-dependence through q_H)
+P3(a)  vertex - sum c u / sum c = 0
+P3(b)  E[c(f-u)^2|F] - {E[c|F](f-ubar)^2 + E[c(u-ubar)^2|F]} = 0
+P2(a)  (r2 - eta) - (r1 + eta) = Delta - 2*eta > 0 iff eta < Delta/2
