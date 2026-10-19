@@ -64,7 +64,9 @@ NOT_RECORDED = "not recorded"
 PLACEHOLDER = re.compile(r"\{\{(\w+)(?::([^}|]*))?(?:\|([^}]*))?\}\}")
 MARK = re.compile("\x00(\\d+)\x01(.*?)\x02", re.S)
 NUMERAL = re.compile(r"(?<![\w.\-])-?\d+(?:\.\d+)?(?:e[-+]?\d+)?")
-STRUCTURE = re.compile(r"§\s*\d+(?:\.\d+)?|^#{1,6} \d+\.|\bitem \d+|`[^`\s]*`")
+STRUCTURE = re.compile(
+    r"§\s*\d+(?:\.\d+)?|^#{1,6} \d+\.|\bitem \d+|`[^`\s]*`|\]\([^)\s]*\)"
+)
 HEADING = re.compile(r"^(#{2,3}) ")
 TAG = re.compile(r"\[([A-Z][A-Z-]+)(?::[^\]]*)?\]\s*$")
 SOURCES = (

@@ -1,0 +1,24 @@
+{
+  "files": {
+    "crosscheck": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-build/runs/dev/prelim-dryrun/crosscheck/results.json",
+    "official": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-build/runs/dev/prelim-dryrun/official/results.json",
+    "td": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/prelim-build/docs/agent/notes/2026-10-19-prelim-dryrun-compare-R6-vs-R5.txt"
+  },
+  "meta": {
+    "crosscheck_manifest": "no manifest row given (development)",
+    "crosscheck_sha": "f0649d75eb9d341b210c75a05460ef7ef5f507f6fa157437d94c12ecf13e52b2",
+    "freeze_check": "not applicable (development run)",
+    "missing_count": "30",
+    "mode_notice": "**DEVELOPMENT DRY RUN (WU-0020.3).** Every number below comes from a development seed. It rehearses the build and is not a result of the study.",
+    "official_manifest": "no manifest row given (development)",
+    "official_sha": "5e2eaf6824c06f19c30f1d0fc9e06b663e7fa74281ec1fb3feaa98154a6dd752",
+    "release_ref": "none (development dry run)",
+    "trace_name": "2026-10-19-prelim-findings-dryrun-dev2.trace.csv"
+  },
+  "mode": "development",
+  "sha256": {
+    "crosscheck": "f0649d75eb9d341b210c75a05460ef7ef5f507f6fa157437d94c12ecf13e52b2",
+    "official": "5e2eaf6824c06f19c30f1d0fc9e06b663e7fa74281ec1fb3feaa98154a6dd752",
+    "td": "df8fcaad7aea90aeeae89bdf9b3daac20bcfccb3b92e58e38b0849a8f52e2f6c"
+  }
+}

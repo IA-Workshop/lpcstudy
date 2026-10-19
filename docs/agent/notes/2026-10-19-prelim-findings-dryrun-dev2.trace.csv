@@ -1,0 +1,877 @@
+id,tag,source,path,spec,raw,rendered,line,col
+0,,official_md,banner,,'**DEVELOPMENT (DEV-2): not a hypothesis test** · **UNPROMOTED**',**DEVELOPMENT (DEV-2): not a hypothesis test** · **UNPROMOTED**,1,0
+1,,official,provenance/seed_id,,'DEV-2',DEV-2,6,32
+2,,official,provenance/seed_id,,'DEV-2',DEV-2,18,12
+3,,official,provenance/seed_kind,,'development',development,19,14
+4,,official,provenance/label,,'DEVELOPMENT (DEV-2): not a hypothesis test',DEVELOPMENT (DEV-2): not a hypothesis test,20,10
+5,,official,provenance/preset,,'full',full,21,11
+6,,official,provenance/commit,,'059dc84f7a958b82bedcea7a5f3ed7ff5a6e1091',059dc84f7a958b82bedcea7a5f3ed7ff5a6e1091,22,11
+7,,meta,freeze_check,,'not applicable (development run)',not applicable (development run),23,17
+8,,official,provenance/device/backend,,'cpu',cpu,24,12
+9,,official,provenance/env/LPC_THREADS,,'8',8,25,16
+10,,official,provenance/dirty,yn,False,no,26,10
+11,,official,provenance/complete,yn,True,yes,27,13
+12,,official,provenance/wall_seconds,.0f,17028.268190359,17028,28,17
+13,,official,provenance/start_utc,,'2026-10-17T16:43:13+00:00',2026-10-17T16:43:13+00:00,29,16
+14,,official,provenance/end_utc,,'2026-10-17T21:27:02+00:00',2026-10-17T21:27:02+00:00,30,14
+15,,meta,official_sha,,'5e2eaf6824c06f19c30f1d0fc9e06b663e7fa74281ec1fb3feaa98154a6dd752',5e2eaf6824c06f19c30f1d0fc9e06b663e7fa74281ec1fb3feaa98154a6dd752,31,28
+16,,meta,official_manifest,,'no manifest row given (development)',no manifest row given (development),32,19
+17,,meta,release_ref,,'none (development dry run)',none (development dry run),33,22
+18,,crosscheck,provenance/seed_id,,'DEV-2',DEV-2,34,24
+19,,crosscheck,provenance/device/backend,,'gpu',gpu,35,24
+20,,meta,crosscheck_sha,,'f0649d75eb9d341b210c75a05460ef7ef5f507f6fa157437d94c12ecf13e52b2',f0649d75eb9d341b210c75a05460ef7ef5f507f6fa157437d94c12ecf13e52b2,36,24
+21,,meta,crosscheck_manifest,,'no manifest row given (development)',no manifest row given (development),37,25
+22,PRE-REGISTERED,official,systems/lorenz63/validation/gate/V1,yn,True,yes,45,78
+23,PRE-REGISTERED,official,systems/lorenz63/validation/delay_jacobian_rel_err,.3g,2.6099066733557758e-09,2.61e-09,45,43
+24,PRE-REGISTERED,const,constants/v1_bar/text,,'relative error < 10⁻⁴',relative error < 10⁻⁴,45,54
+25,PRE-REGISTERED,official,systems/lorenz63/validation/gain_rel_err,.3g,1.6134775651249602e-09,1.61e-09,46,33
+26,PRE-REGISTERED,official,systems/lorenz63/validation/gate/V2,yn,True,yes,47,65
+27,PRE-REGISTERED,official,systems/lorenz63/validation/crlb_ratio_min,.3f,0.8695137618639157,0.870,47,35
+28,PRE-REGISTERED,const,constants/v2_bar/text,,"'ratio in [0.8, 1.2]'","ratio in [0.8, 1.2]",47,43
+29,PRE-REGISTERED,official,systems/lorenz63/validation/crlb_ratio_max,.3f,1.0650246729888824,1.065,48,35
+30,PRE-REGISTERED,official,systems/lorenz63/validation/cp_median_vpt_lyapunov,.3g,2.1,2.1,49,43
+31,PRE-REGISTERED,const,constants/v3_bar/text,,"'reported, no bar'","reported, no bar",49,49
+32,PRE-REGISTERED,official,systems/lorenz63/validation/gate/V4,yn,True,yes,50,89
+33,PRE-REGISTERED,official,systems/lorenz63/validation/convergence/200/median_half_width,.3g,0.02898950303508798,0.029,50,54
+34,PRE-REGISTERED,const,constants/v4_bar/text,,'median half-width ≤ 0.05',median half-width ≤ 0.05,50,62
+35,PRE-REGISTERED,official,systems/lorenz63/validation/gate/V5,yn,True,yes,51,64
+36,PRE-REGISTERED,official,systems/lorenz63/validation/km_max_abs_dev,.3g,0.005830472656782881,0.00583,51,35
+37,PRE-REGISTERED,const,constants/v5_bar/text,,'deviation < 0.01',deviation < 0.01,51,45
+38,PRE-REGISTERED,official,systems/lorenz63/validation/gate/V6,yn,True,yes,52,76
+39,PRE-REGISTERED,official,systems/lorenz63/validation/integrator_max_dev_sigma,.3g,2.1802591911046492e-05,2.18e-05,52,45
+40,PRE-REGISTERED,const,constants/v6_bar/text,,'change < 10⁻³ σ_x',change < 10⁻³ σ_x,52,56
+41,PRE-REGISTERED,official,systems/lorenz63/validation/gate/V7,yn,True,yes,53,64
+42,PRE-REGISTERED,official,systems/lorenz63/V7/median_slope,.4f,1.000795339409776,1.0008,53,33
+43,PRE-REGISTERED,const,constants/v7_bar/text,,"'slope in [0.9, 1.1]'","slope in [0.9, 1.1]",53,42
+44,PRE-REGISTERED,official,systems/lorenz63/validation/gate/gate_pass,yn,True,yes,54,36
+45,PRE-REGISTERED,official,systems/rossler/validation/gate/V1,yn,True,yes,55,77
+46,PRE-REGISTERED,official,systems/rossler/validation/delay_jacobian_rel_err,.3g,1.2100510812070393e-09,1.21e-09,55,42
+47,PRE-REGISTERED,const,constants/v1_bar/text,,'relative error < 10⁻⁴',relative error < 10⁻⁴,55,53
+48,PRE-REGISTERED,official,systems/rossler/validation/gain_rel_err,.3g,1.5499728836934952e-09,1.55e-09,56,32
+49,PRE-REGISTERED,official,systems/rossler/validation/gate/V2,yn,True,yes,57,64
+50,PRE-REGISTERED,official,systems/rossler/validation/crlb_ratio_min,.3f,0.8560848920611505,0.856,57,34
+51,PRE-REGISTERED,const,constants/v2_bar/text,,"'ratio in [0.8, 1.2]'","ratio in [0.8, 1.2]",57,42
+52,PRE-REGISTERED,official,systems/rossler/validation/crlb_ratio_max,.3f,1.0669358911029552,1.067,58,34
+53,PRE-REGISTERED,official,systems/rossler/validation/cp_median_vpt_lyapunov,.3g,3.466666666666667,3.47,59,42
+54,PRE-REGISTERED,const,constants/v3_bar/text,,"'reported, no bar'","reported, no bar",59,49
+55,PRE-REGISTERED,official,systems/rossler/validation/gate/V4,yn,True,yes,60,88
+56,PRE-REGISTERED,official,systems/rossler/validation/convergence/200/median_half_width,.3g,0.03503557649803507,0.035,60,53
+57,PRE-REGISTERED,const,constants/v4_bar/text,,'median half-width ≤ 0.05',median half-width ≤ 0.05,60,61
+58,PRE-REGISTERED,official,systems/rossler/validation/gate/V5,yn,True,yes,61,63
+59,PRE-REGISTERED,official,systems/rossler/validation/km_max_abs_dev,.3g,0.005830472656782881,0.00583,61,34
+60,PRE-REGISTERED,const,constants/v5_bar/text,,'deviation < 0.01',deviation < 0.01,61,44
+61,PRE-REGISTERED,official,systems/rossler/validation/gate/V6,yn,True,yes,62,75
+62,PRE-REGISTERED,official,systems/rossler/validation/integrator_max_dev_sigma,.3g,3.0603832151101185e-05,3.06e-05,62,44
+63,PRE-REGISTERED,const,constants/v6_bar/text,,'change < 10⁻³ σ_x',change < 10⁻³ σ_x,62,55
+64,PRE-REGISTERED,official,systems/rossler/validation/gate/V7,yn,True,yes,63,63
+65,PRE-REGISTERED,official,systems/rossler/V7/median_slope,.4f,0.9999832939508351,1.0000,63,32
+66,PRE-REGISTERED,const,constants/v7_bar/text,,"'slope in [0.9, 1.1]'","slope in [0.9, 1.1]",63,41
+67,PRE-REGISTERED,official,systems/rossler/validation/gate/gate_pass,yn,True,yes,64,35
+68,PRE-REGISTERED,official,systems/chua/validation/gate/V1,yn,True,yes,65,74
+69,PRE-REGISTERED,official,systems/chua/validation/delay_jacobian_rel_err,.3g,2.435456990748745e-09,2.44e-09,65,39
+70,PRE-REGISTERED,const,constants/v1_bar/text,,'relative error < 10⁻⁴',relative error < 10⁻⁴,65,50
+71,PRE-REGISTERED,official,systems/chua/validation/gain_rel_err,.3g,1.590034759757069e-09,1.59e-09,66,29
+72,PRE-REGISTERED,official,systems/chua/validation/gate/V2,yn,True,yes,67,61
+73,PRE-REGISTERED,official,systems/chua/validation/crlb_ratio_min,.3f,0.8583708958985615,0.858,67,31
+74,PRE-REGISTERED,const,constants/v2_bar/text,,"'ratio in [0.8, 1.2]'","ratio in [0.8, 1.2]",67,39
+75,PRE-REGISTERED,official,systems/chua/validation/crlb_ratio_max,.3f,1.0011932798548302,1.001,68,31
+76,PRE-REGISTERED,official,systems/chua/validation/cp_median_vpt_lyapunov,.3g,2.8666666666666667,2.87,69,39
+77,PRE-REGISTERED,const,constants/v3_bar/text,,"'reported, no bar'","reported, no bar",69,46
+78,PRE-REGISTERED,official,systems/chua/validation/gate/V4,yn,True,yes,70,85
+79,PRE-REGISTERED,official,systems/chua/validation/convergence/200/median_half_width,.3g,0.022968734637229777,0.023,70,50
+80,PRE-REGISTERED,const,constants/v4_bar/text,,'median half-width ≤ 0.05',median half-width ≤ 0.05,70,58
+81,PRE-REGISTERED,official,systems/chua/validation/gate/V5,yn,True,yes,71,60
+82,PRE-REGISTERED,official,systems/chua/validation/km_max_abs_dev,.3g,0.005830472656782881,0.00583,71,31
+83,PRE-REGISTERED,const,constants/v5_bar/text,,'deviation < 0.01',deviation < 0.01,71,41
+84,PRE-REGISTERED,official,systems/chua/validation/gate/V6,yn,True,yes,72,72
+85,PRE-REGISTERED,official,systems/chua/validation/integrator_max_dev_sigma,.3g,0.00033398382382766916,0.000334,72,41
+86,PRE-REGISTERED,const,constants/v6_bar/text,,'change < 10⁻³ σ_x',change < 10⁻³ σ_x,72,52
+87,PRE-REGISTERED,official,systems/chua/validation/gate/V7,yn,True,yes,73,60
+88,PRE-REGISTERED,official,systems/chua/V7/median_slope,.4f,1.000085393211938,1.0001,73,29
+89,PRE-REGISTERED,const,constants/v7_bar/text,,"'slope in [0.9, 1.1]'","slope in [0.9, 1.1]",73,38
+90,PRE-REGISTERED,official,systems/chua/validation/gate/gate_pass,yn,True,yes,74,32
+91,PRE-REGISTERED,const,constants/standard_level_pct/text,,'95%',95%,80,395
+92,PRE-REGISTERED,const,constants/unc_not_supported/text,,'about 7.3%',about 7.3%,80,422
+93,PRE-REGISTERED,const,constants/unc_h2c/text,,'about 14%',about 14%,80,453
+94,PRE-REGISTERED,official,verdicts/H1a/by_system/lorenz63,verdict,'inconclusive',inconclusive,86,20
+95,PRE-REGISTERED,official,verdicts/H1a/by_system/rossler,verdict,'inconclusive',inconclusive,86,35
+96,PRE-REGISTERED,official,verdicts/H1a/by_system/chua,verdict,'fail',fail,86,50
+97,PRE-REGISTERED,official,verdicts/H1a/verdict,verdict,'not supported',not supported,86,57
+98,PRE-REGISTERED,official_md,clip/H1a,,'lorenz63: n/a; rossler: n/a; chua: n/a',lorenz63: n/a; rossler: n/a; chua: n/a,86,73
+99,PRE-REGISTERED,official,verdicts/H1b/by_system/lorenz63,verdict,'pass',pass,87,20
+100,PRE-REGISTERED,official,verdicts/H1b/by_system/rossler,verdict,'fail',fail,87,27
+101,PRE-REGISTERED,official,verdicts/H1b/by_system/chua,verdict,'pass',pass,87,34
+102,PRE-REGISTERED,official,verdicts/H1b/verdict,verdict,'not supported',not supported,87,41
+103,PRE-REGISTERED,official_md,clip/H1b,,'lorenz63: —; rossler: —; chua: —',lorenz63: —; rossler: —; chua: —,87,57
+104,PRE-REGISTERED,official,verdicts/H1c/by_system/lorenz63,verdict,'fail',fail,88,20
+105,PRE-REGISTERED,official,verdicts/H1c/by_system/rossler,verdict,'pass',pass,88,27
+106,PRE-REGISTERED,official,verdicts/H1c/by_system/chua,verdict,'inconclusive',inconclusive,88,34
+107,PRE-REGISTERED,official,verdicts/H1c/verdict,verdict,'not supported',not supported,88,49
+108,PRE-REGISTERED,official_md,clip/H1c,,'lorenz63: invariant; rossler: invariant; chua: invariant',lorenz63: invariant; rossler: invariant; chua: invariant,88,65
+109,PRE-REGISTERED,official,verdicts/H1d/by_system/lorenz63,verdict,'pass',pass,89,20
+110,PRE-REGISTERED,official,verdicts/H1d/by_system/rossler,verdict,'pass',pass,89,27
+111,PRE-REGISTERED,official,verdicts/H1d/by_system/chua,verdict,'inconclusive',inconclusive,89,34
+112,PRE-REGISTERED,official,verdicts/H1d/verdict,verdict,'inconclusive',inconclusive,89,49
+113,PRE-REGISTERED,official_md,clip/H1d,,'lorenz63: n/a; rossler: n/a; chua: n/a',lorenz63: n/a; rossler: n/a; chua: n/a,89,64
+114,PRE-REGISTERED,official,verdicts/Q-N/by_system/lorenz63,verdict,'reduces',reduces,90,19
+115,PRE-REGISTERED,official,verdicts/Q-N/by_system/rossler,verdict,'reduces',reduces,90,29
+116,PRE-REGISTERED,official,verdicts/Q-N/by_system/chua,verdict,'reduces',reduces,90,39
+117,PRE-REGISTERED,official,verdicts/Q-N/verdict,verdict,"'estimate (read, no pass/fail)'","estimate (read, no pass/fail)",90,49
+118,PRE-REGISTERED,official_md,clip/Q-N,,'lorenz63: —; rossler: —; chua: —',lorenz63: —; rossler: —; chua: —,90,81
+119,PRE-REGISTERED,official,verdicts/H2a/by_system/lorenz63,verdict,'inconclusive',inconclusive,91,18
+120,PRE-REGISTERED,official,verdicts/H2a/by_system/rossler,verdict,'fail',fail,91,33
+121,PRE-REGISTERED,official,verdicts/H2a/by_system/chua,verdict,'fail',fail,91,40
+122,PRE-REGISTERED,official,verdicts/H2a/verdict,verdict,'not supported',not supported,91,47
+123,PRE-REGISTERED,official_md,clip/H2a,,'lorenz63: (i) invariant; (ii) —; rossler: (i) invariant; (ii) —; chua: (i) invariant; (ii) —',lorenz63: (i) invariant; (ii) —; rossler: (i) invariant; (ii) —; chua: (i) invariant; (ii) —,91,63
+124,PRE-REGISTERED,official,verdicts/H2b/by_system/lorenz63,verdict,'pass',pass,92,18
+125,PRE-REGISTERED,official,verdicts/H2b/by_system/rossler,verdict,'pass',pass,92,25
+126,PRE-REGISTERED,official,verdicts/H2b/by_system/chua,verdict,'inconclusive',inconclusive,92,32
+127,PRE-REGISTERED,official,verdicts/H2b/verdict,verdict,'inconclusive',inconclusive,92,47
+128,PRE-REGISTERED,official_md,clip/H2b,,'lorenz63: —; rossler: —; chua: —',lorenz63: —; rossler: —; chua: —,92,62
+129,PRE-REGISTERED,official,verdicts/H2c/by_system/lorenz63,verdict,'fail',fail,93,20
+130,PRE-REGISTERED,official,verdicts/H2c/by_system/rossler,verdict,'fail',fail,93,27
+131,PRE-REGISTERED,official,verdicts/H2c/by_system/chua,verdict,'inconclusive',inconclusive,93,34
+132,PRE-REGISTERED,official,verdicts/H2c/verdict,verdict,'not supported',not supported,93,49
+133,PRE-REGISTERED,official_md,clip/H2c,,'lorenz63: —; rossler: —; chua: —',lorenz63: —; rossler: —; chua: —,93,65
+134,PRE-REGISTERED,official,verdicts/H2d/by_system/lorenz63,verdict,'inconclusive',inconclusive,94,20
+135,PRE-REGISTERED,official,verdicts/H2d/by_system/rossler,verdict,'pass',pass,94,35
+136,PRE-REGISTERED,official,verdicts/H2d/by_system/chua,verdict,'pass',pass,94,42
+137,PRE-REGISTERED,official,verdicts/H2d/verdict,verdict,'inconclusive',inconclusive,94,49
+138,PRE-REGISTERED,official_md,clip/H2d,,'lorenz63: —; rossler: —; chua: —',lorenz63: —; rossler: —; chua: —,94,64
+139,PRE-REGISTERED,official,verdicts/H2e/by_system/lorenz63,verdict,'pass',pass,95,20
+140,PRE-REGISTERED,official,verdicts/H2e/by_system/rossler,verdict,'pass',pass,95,27
+141,PRE-REGISTERED,official,verdicts/H2e/by_system/chua,verdict,'pass',pass,95,34
+142,PRE-REGISTERED,official,verdicts/H2e/verdict,verdict,'supported',"supported (preliminary, unpromoted)",95,41
+143,PRE-REGISTERED,official_md,clip/H2e,,'lorenz63: —; rossler: —; chua: —',lorenz63: —; rossler: —; chua: —,95,79
+144,PRE-REGISTERED,official,verdicts/gain_bound/by_system/lorenz63,verdict,'reported',reported,96,26
+145,PRE-REGISTERED,official,verdicts/gain_bound/by_system/rossler,verdict,'reported',reported,96,37
+146,PRE-REGISTERED,official,verdicts/gain_bound/by_system/chua,verdict,'reported',reported,96,48
+147,PRE-REGISTERED,official,verdicts/gain_bound/verdict,verdict,'reported (no pass/fail)',reported (no pass/fail),96,59
+148,PRE-REGISTERED,official_md,clip/gain_bound,,'lorenz63: n/a; rossler: n/a; chua: n/a',lorenz63: n/a; rossler: n/a; chua: n/a,96,85
+149,PRE-REGISTERED,official,verdicts/H3a/by_system/lorenz63,verdict,'inconclusive',inconclusive,97,20
+150,PRE-REGISTERED,official,verdicts/H3a/by_system/rossler,verdict,'inconclusive',inconclusive,97,35
+151,PRE-REGISTERED,official,verdicts/H3a/by_system/chua,verdict,'pass',pass,97,50
+152,PRE-REGISTERED,official,verdicts/H3a/verdict,verdict,'inconclusive',inconclusive,97,57
+153,PRE-REGISTERED,official_md,clip/H3a,,'lorenz63: invariant; rossler: invariant; chua: invariant',lorenz63: invariant; rossler: invariant; chua: invariant,97,72
+154,PRE-REGISTERED,official,verdicts/H3b/by_system/lorenz63,verdict,'inconclusive',inconclusive,98,20
+155,PRE-REGISTERED,official,verdicts/H3b/by_system/rossler,verdict,'pass',pass,98,35
+156,PRE-REGISTERED,official,verdicts/H3b/by_system/chua,verdict,'inconclusive',inconclusive,98,42
+157,PRE-REGISTERED,official,verdicts/H3b/verdict,verdict,'inconclusive',inconclusive,98,57
+158,PRE-REGISTERED,official_md,clip/H3b,,'lorenz63: —; rossler: —; chua: —',lorenz63: —; rossler: —; chua: —,98,72
+159,PRE-REGISTERED,official,verdicts/H3c/by_system/lorenz63,verdict,'pass',pass,99,18
+160,PRE-REGISTERED,official,verdicts/H3c/by_system/rossler,verdict,'pass',pass,99,25
+161,PRE-REGISTERED,official,verdicts/H3c/by_system/chua,verdict,'inconclusive',inconclusive,99,32
+162,PRE-REGISTERED,official,verdicts/H3c/verdict,verdict,'inconclusive',inconclusive,99,47
+163,PRE-REGISTERED,official_md,clip/H3c,,'lorenz63: —; rossler: —; chua: —',lorenz63: —; rossler: —; chua: —,99,62
+164,PRE-REGISTERED,const,constants/gain_label/text,,"'reported, v1 statistic, v3 screen pending'","reported, v1 statistic, v3 screen pending",101,86
+165,PRE-REGISTERED,official,verdicts/H2a/verdict,verdict,'not supported',not supported,103,11
+166,PRE-REGISTERED,official,verdicts/H2b/verdict,verdict,'inconclusive',inconclusive,104,11
+167,PRE-REGISTERED,official,verdicts/H3c/verdict,verdict,'inconclusive',inconclusive,105,11
+168,PRE-REGISTERED,official,verdicts/H2c/verdict,verdict,'not supported',not supported,106,11
+169,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,114,50
+170,PRE-REGISTERED,official,systems/lorenz63/H2a/median_range,.4g,0.10114056632236605,0.1011,114,22
+171,PRE-REGISTERED,official,systems/lorenz63/H2a/range_ci,ci:.4g,"[0.07929824440472696, 0.1325963387477116]","[0.0793, 0.1326]",114,31
+172,PRE-REGISTERED,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),114,59
+173,PRE-REGISTERED,official,systems/lorenz63/H2a/part_i_verdict,verdict,'inconclusive',inconclusive,114,89
+174,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,114,104
+175,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,114,139
+176,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,115,61
+177,PRE-REGISTERED,official,systems/lorenz63/H2a/part_ii/zero/partial_corr,.4g,-0.034642301496619676,-0.03464,115,28
+178,PRE-REGISTERED,official,systems/lorenz63/H2a/part_ii/zero/ci,ci:.4g,"[-0.09540890734586832, 0.03383875116043075]","[-0.09541, 0.03384]",115,39
+179,PRE-REGISTERED,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",115,70
+180,PRE-REGISTERED,official,systems/lorenz63/H2a/part_ii/zero/verdict,verdict,'pass',pass,115,109
+181,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,115,116
+182,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,115,151
+183,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,116,60
+184,PRE-REGISTERED,official,systems/lorenz63/H2a/part_ii/interior/partial_corr,.4g,0.18951678884304612,0.1895,116,32
+185,PRE-REGISTERED,official,systems/lorenz63/H2a/part_ii/interior/ci,ci:.4g,"[0.09030100800241289, 0.2886179729132684]","[0.0903, 0.2886]",116,41
+186,PRE-REGISTERED,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",116,69
+187,PRE-REGISTERED,official,systems/lorenz63/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,116,108
+188,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,116,123
+189,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,116,158
+190,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,117,49
+191,PRE-REGISTERED,official,systems/lorenz63/H2b/noise/mean_state_spearman,.4g,0.19071777383911226,0.1907,117,22
+192,PRE-REGISTERED,official,systems/lorenz63/H2b/noise/ci,ci:.4g,"[0.1410594018655342, 0.24200166583305943]","[0.1411, 0.242]",117,31
+193,PRE-REGISTERED,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),117,58
+194,PRE-REGISTERED,official,systems/lorenz63/H2b/noise/verdict,verdict,'pass',pass,117,85
+195,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,117,92
+196,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,117,127
+197,PRE-REGISTERED,official,systems/lorenz63/H2b/library_change/level,.4f,0.9833333333333333,0.9833,118,53
+198,PRE-REGISTERED,official,systems/lorenz63/H2b/library_change/mean_change,.4g,0.08514106344781538,0.08514,118,23
+199,PRE-REGISTERED,official,systems/lorenz63/H2b/library_change/ci,ci:.4g,"[0.062425371683448805, 0.11019591171771531]","[0.06243, 0.1102]",118,33
+200,PRE-REGISTERED,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),118,62
+201,PRE-REGISTERED,official,systems/lorenz63/H2b/library_change/verdict,verdict,'pass',pass,118,89
+202,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,118,96
+203,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,118,131
+204,PRE-REGISTERED,official,systems/lorenz63/H3c/level,.4f,0.9833333333333333,0.9833,119,47
+205,PRE-REGISTERED,official,systems/lorenz63/H3c/A5_over_A4_mse,.4g,0.7455007783217763,0.7455,119,19
+206,PRE-REGISTERED,official,systems/lorenz63/H3c/ci,ci:.4g,"[0.5661287465517306, 0.9016078148667539]","[0.5661, 0.9016]",119,28
+207,PRE-REGISTERED,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),119,56
+208,PRE-REGISTERED,official,systems/lorenz63/H3c/verdict,verdict,'pass',pass,119,86
+209,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,119,93
+210,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,119,128
+211,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,120,49
+212,PRE-REGISTERED,official,systems/rossler/H2a/median_range,.4g,0.2917426930638243,0.2917,120,21
+213,PRE-REGISTERED,official,systems/rossler/H2a/range_ci,ci:.4g,"[0.24549471707274378, 0.31536344542666184]","[0.2455, 0.3154]",120,30
+214,PRE-REGISTERED,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),120,58
+215,PRE-REGISTERED,official,systems/rossler/H2a/part_i_verdict,verdict,'fail',fail,120,88
+216,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,120,95
+217,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,120,130
+218,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,121,58
+219,PRE-REGISTERED,official,systems/rossler/H2a/part_ii/zero/partial_corr,.4g,-0.05337179125102676,-0.05337,121,27
+220,PRE-REGISTERED,official,systems/rossler/H2a/part_ii/zero/ci,ci:.4g,"[-0.1303568148471563, 0.02929690774526643]","[-0.1304, 0.0293]",121,38
+221,PRE-REGISTERED,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",121,67
+222,PRE-REGISTERED,official,systems/rossler/H2a/part_ii/zero/verdict,verdict,'inconclusive',inconclusive,121,106
+223,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,121,121
+224,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,121,156
+225,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,122,62
+226,PRE-REGISTERED,official,systems/rossler/H2a/part_ii/interior/partial_corr,.4g,0.02143687274115571,0.02144,122,31
+227,PRE-REGISTERED,official,systems/rossler/H2a/part_ii/interior/ci,ci:.4g,"[-0.0681923919537626, 0.10889834384594056]","[-0.06819, 0.1089]",122,41
+228,PRE-REGISTERED,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",122,71
+229,PRE-REGISTERED,official,systems/rossler/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,122,110
+230,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,122,125
+231,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,122,160
+232,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,123,49
+233,PRE-REGISTERED,official,systems/rossler/H2b/noise/mean_state_spearman,.4g,0.14053829368303403,0.1405,123,21
+234,PRE-REGISTERED,official,systems/rossler/H2b/noise/ci,ci:.4g,"[0.08557169223602126, 0.19198176341617304]","[0.08557, 0.192]",123,30
+235,PRE-REGISTERED,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),123,58
+236,PRE-REGISTERED,official,systems/rossler/H2b/noise/verdict,verdict,'pass',pass,123,85
+237,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,123,92
+238,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,123,127
+239,PRE-REGISTERED,official,systems/rossler/H2b/library_change/level,.4f,0.9833333333333333,0.9833,124,53
+240,PRE-REGISTERED,official,systems/rossler/H2b/library_change/mean_change,.4g,0.04942691694453235,0.04943,124,22
+241,PRE-REGISTERED,official,systems/rossler/H2b/library_change/ci,ci:.4g,"[0.02752513331802233, 0.07171451393657627]","[0.02753, 0.07171]",124,32
+242,PRE-REGISTERED,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),124,62
+243,PRE-REGISTERED,official,systems/rossler/H2b/library_change/verdict,verdict,'pass',pass,124,89
+244,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,124,96
+245,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,124,131
+246,PRE-REGISTERED,official,systems/rossler/H3c/level,.4f,0.9833333333333333,0.9833,125,45
+247,PRE-REGISTERED,official,systems/rossler/H3c/A5_over_A4_mse,.4g,0.9676754845686039,0.9677,125,18
+248,PRE-REGISTERED,official,systems/rossler/H3c/ci,ci:.4g,"[0.9281866884211233, 1.0144147706676858]","[0.9282, 1.014]",125,27
+249,PRE-REGISTERED,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),125,54
+250,PRE-REGISTERED,official,systems/rossler/H3c/verdict,verdict,'pass',pass,125,84
+251,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,125,91
+252,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,125,126
+253,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,126,46
+254,PRE-REGISTERED,official,systems/chua/H2a/median_range,.4g,0.15609359310922108,0.1561,126,18
+255,PRE-REGISTERED,official,systems/chua/H2a/range_ci,ci:.4g,"[0.1252851092697112, 0.18489940795761017]","[0.1253, 0.1849]",126,27
+256,PRE-REGISTERED,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),126,55
+257,PRE-REGISTERED,official,systems/chua/H2a/part_i_verdict,verdict,'fail',fail,126,85
+258,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,126,92
+259,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,126,127
+260,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,127,57
+261,PRE-REGISTERED,official,systems/chua/H2a/part_ii/zero/partial_corr,.4g,-0.07082708952107492,-0.07083,127,24
+262,PRE-REGISTERED,official,systems/chua/H2a/part_ii/zero/ci,ci:.4g,"[-0.14937151253909706, 0.007693275048279916]","[-0.1494, 0.007693]",127,35
+263,PRE-REGISTERED,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",127,66
+264,PRE-REGISTERED,official,systems/chua/H2a/part_ii/zero/verdict,verdict,'inconclusive',inconclusive,127,105
+265,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,127,120
+266,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,127,155
+267,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,128,57
+268,PRE-REGISTERED,official,systems/chua/H2a/part_ii/interior/partial_corr,.4g,0.2236185624400827,0.2236,128,28
+269,PRE-REGISTERED,official,systems/chua/H2a/part_ii/interior/ci,ci:.4g,"[0.08550559746320918, 0.34664841265583196]","[0.08551, 0.3466]",128,37
+270,PRE-REGISTERED,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",128,66
+271,PRE-REGISTERED,official,systems/chua/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,128,105
+272,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,128,120
+273,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,128,155
+274,PRE-REGISTERED,const,constants/primary_level/text,,'0.9833',0.9833,129,46
+275,PRE-REGISTERED,official,systems/chua/H2b/noise/mean_state_spearman,.4g,0.2672034545760398,0.2672,129,18
+276,PRE-REGISTERED,official,systems/chua/H2b/noise/ci,ci:.4g,"[0.21218427716622312, 0.3186070283791518]","[0.2122, 0.3186]",129,27
+277,PRE-REGISTERED,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),129,55
+278,PRE-REGISTERED,official,systems/chua/H2b/noise/verdict,verdict,'pass',pass,129,82
+279,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,129,89
+280,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,129,124
+281,PRE-REGISTERED,official,systems/chua/H2b/library_change/level,.4f,0.9833333333333333,0.9833,130,52
+282,PRE-REGISTERED,official,systems/chua/H2b/library_change/mean_change,.4g,0.008392133657319643,0.008392,130,19
+283,PRE-REGISTERED,official,systems/chua/H2b/library_change/ci,ci:.4g,"[-0.013946702957132457, 0.030614696259172583]","[-0.01395, 0.03061]",130,30
+284,PRE-REGISTERED,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),130,61
+285,PRE-REGISTERED,official,systems/chua/H2b/library_change/verdict,verdict,'inconclusive',inconclusive,130,88
+286,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,130,103
+287,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,130,138
+288,PRE-REGISTERED,official,systems/chua/H3c/level,.4f,0.9833333333333333,0.9833,131,42
+289,PRE-REGISTERED,official,systems/chua/H3c/A5_over_A4_mse,.4g,0.9849455122818027,0.9849,131,15
+290,PRE-REGISTERED,official,systems/chua/H3c/ci,ci:.4g,"[0.9364124180266606, 1.057712015969989]","[0.9364, 1.058]",131,24
+291,PRE-REGISTERED,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),131,51
+292,PRE-REGISTERED,official,systems/chua/H3c/verdict,verdict,'inconclusive',inconclusive,131,81
+293,PRE-REGISTERED,const,constants/lm_note/text,,'LM iteration error: not estimated',LM iteration error: not estimated,131,96
+294,PRE-REGISTERED,const,constants/block_note/text,,'block-sensitive label: not computable for the sealed run',block-sensitive label: not computable for the sealed run,131,131
+295,PRE-REGISTERED,const,constants/caption_F1/text,,"'Figure F1 (experiments E1, E2, E4 and E5; v3 identifiers H2a, H2b and H3c). One panel per primary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples) at level 98.33%. The shaded region is the pass band of v3 §2. Marker shape and text give the stored verdict: filled circle pass, cross fail, open diamond inconclusive. A system that failed the validation gate is marked PROVISIONAL.'","Figure F1 (experiments E1, E2, E4 and E5; v3 identifiers H2a, H2b and H3c). One panel per primary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples) at level 98.33%. The shaded region is the pass band of v3 §2. Marker shape and text give the stored verdict: filled circle pass, cross fail, open diamond inconclusive. A system that failed the validation gate is marked PROVISIONAL.",135,1
+296,PRE-REGISTERED,official,systems/lorenz63/H1a/level,.4f,0.95,0.9500,141,51
+297,PRE-REGISTERED,official,systems/lorenz63/H1a/by_noise/0.01/ratio,.4g,1.2036265808032147,1.204,141,26
+298,PRE-REGISTERED,official,systems/lorenz63/H1a/by_noise/0.01/ratio_ci,ci:.4g,"[1.0637005817802618, 1.3487246630205199]","[1.064, 1.349]",141,34
+299,PRE-REGISTERED,const,secondary_parts/0/band_text,,"'interval inside [0.75, 1.25] (closed)'","interval inside [0.75, 1.25] (closed)",141,60
+300,PRE-REGISTERED,official,systems/lorenz63/H1a/by_noise/0.01/verdict,verdict,'inconclusive',inconclusive,141,100
+301,PRE-REGISTERED,official,systems/lorenz63/H1a/level,.4f,0.95,0.9500,142,50
+302,PRE-REGISTERED,official,systems/lorenz63/H1a/by_noise/0.02/ratio,.4g,1.254234322881585,1.254,142,26
+303,PRE-REGISTERED,official,systems/lorenz63/H1a/by_noise/0.02/ratio_ci,ci:.4g,"[1.0796046886511879, 1.4193761958052475]","[1.08, 1.419]",142,34
+304,PRE-REGISTERED,const,secondary_parts/1/band_text,,"'interval inside [0.75, 1.25] (closed)'","interval inside [0.75, 1.25] (closed)",142,59
+305,PRE-REGISTERED,official,systems/lorenz63/H1a/by_noise/0.02/verdict,verdict,'inconclusive',inconclusive,142,99
+306,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,143,50
+307,PRE-REGISTERED,official,systems/lorenz63/H1b/PLP/slope,.4g,0.8740321494281682,0.874,143,23
+308,PRE-REGISTERED,official,systems/lorenz63/H1b/PLP/ci,ci:.4g,"[0.8401373373088888, 0.9152126261236201]","[0.8401, 0.9152]",143,31
+309,PRE-REGISTERED,const,secondary_parts/2/band_text,,"'interval inside [0.8, 1.2] (closed)'","interval inside [0.8, 1.2] (closed)",143,57
+310,PRE-REGISTERED,official,systems/lorenz63/H1b/verdict,verdict,'pass',pass,143,95
+311,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,144,51
+312,PRE-REGISTERED,official,systems/lorenz63/H1c/PLP/median_ratio,.4g,0.5652220644530133,0.5652,144,23
+313,PRE-REGISTERED,official,systems/lorenz63/H1c/PLP/ci,ci:.4g,"[0.5014819583139488, 0.615178527967881]","[0.5015, 0.6152]",144,32
+314,PRE-REGISTERED,const,secondary_parts/3/band_text,,"'interval inside [0.8, 1.25] (closed)'","interval inside [0.8, 1.25] (closed)",144,58
+315,PRE-REGISTERED,official,systems/lorenz63/H1c/PLP/verdict,verdict,'fail',fail,144,97
+316,PRE-REGISTERED,official,systems/lorenz63/H1d/level,.4f,0.95,0.9500,145,59
+317,PRE-REGISTERED,official,systems/lorenz63/H1d/rows/analog_seed/spearman,.4g,0.775859767859768,0.7759,145,31
+318,PRE-REGISTERED,official,systems/lorenz63/H1d/rows/analog_seed/interval,ci:.4g,"[0.7451296645671405, 0.802753085028197]","[0.7451, 0.8028]",145,40
+319,PRE-REGISTERED,const,secondary_parts/4/band_text,,'lower bound ≥ 0.7 (closed)',lower bound ≥ 0.7 (closed),145,68
+320,PRE-REGISTERED,official,systems/lorenz63/H1d/rows/analog_seed/verdict,verdict,'pass',pass,145,97
+321,PRE-REGISTERED,official,systems/lorenz63/H1d/level,.4f,0.95,0.9500,146,63
+322,PRE-REGISTERED,official,systems/lorenz63/H1d/rows/estimation_seed/spearman,.4g,0.9127343174407363,0.9127,146,35
+323,PRE-REGISTERED,official,systems/lorenz63/H1d/rows/estimation_seed/interval,ci:.4g,"[0.8838853072557157, 0.9392161884619269]","[0.8839, 0.9392]",146,44
+324,PRE-REGISTERED,const,secondary_parts/5/band_text,,'lower bound ≥ 0.7 (closed)',lower bound ≥ 0.7 (closed),146,72
+325,PRE-REGISTERED,official,systems/lorenz63/H1d/rows/estimation_seed/verdict,verdict,'pass',pass,146,101
+326,PRE-REGISTERED,official,systems/lorenz63/H1d/level,.4f,0.95,0.9500,147,53
+327,PRE-REGISTERED,official,systems/lorenz63/H1d/rows/growth/spearman,.4g,0.9857070617070617,0.9857,147,26
+328,PRE-REGISTERED,official,systems/lorenz63/H1d/rows/growth/interval,ci:.4g,"[0.9792186608498764, 0.990950617371691]","[0.9792, 0.991]",147,35
+329,PRE-REGISTERED,const,secondary_parts/6/band_text,,'lower bound ≥ 0.7 (closed)',lower bound ≥ 0.7 (closed),147,62
+330,PRE-REGISTERED,official,systems/lorenz63/H1d/rows/growth/verdict,verdict,'pass',pass,147,91
+331,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,148,59
+332,PRE-REGISTERED,official,systems/lorenz63/H2c/A4_minus_A2/mean,.4g,0.01523420671304877,0.01523,148,27
+333,PRE-REGISTERED,official,systems/lorenz63/H2c/A4_minus_A2/ci,ci:.4g,"[0.005793859995109785, 0.02677294287006786]","[0.005794, 0.02677]",148,37
+334,PRE-REGISTERED,const,secondary_parts/7/band_text,,'upper bound < 0 (strict)',upper bound < 0 (strict),148,66
+335,PRE-REGISTERED,official,systems/lorenz63/H2c/A4_minus_A2/verdict,verdict,'fail',fail,148,93
+336,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,149,62
+337,PRE-REGISTERED,official,systems/lorenz63/H2c/A4_minus_A1/mean,.4g,-0.010377003141244408,-0.01038,149,27
+338,PRE-REGISTERED,official,systems/lorenz63/H2c/A4_minus_A1/ci,ci:.4g,"[-0.01982951706168645, -0.00325722465880253]","[-0.01983, -0.003257]",149,38
+339,PRE-REGISTERED,const,secondary_parts/8/band_text,,'upper bound < 0 (strict)',upper bound < 0 (strict),149,69
+340,PRE-REGISTERED,official,systems/lorenz63/H2c/A4_minus_A1/verdict,verdict,'pass',pass,149,96
+341,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,150,50
+342,PRE-REGISTERED,official,systems/lorenz63/H2d/in_distribution_excess,.4g,0.1684403943182886,0.1684,150,19
+343,PRE-REGISTERED,official,systems/lorenz63/H2d/ci,ci:.4g,"[-0.009443171833386301, 0.5027878570591173]","[-0.009443, 0.5028]",150,28
+344,PRE-REGISTERED,const,secondary_parts/9/band_text,,'upper bound ≤ 0.10 (closed)',upper bound ≤ 0.10 (closed),150,57
+345,PRE-REGISTERED,official,systems/lorenz63/H2d/verdict,verdict,'inconclusive',inconclusive,150,87
+346,PRE-REGISTERED,official,systems/lorenz63/H2e/by_noise/0.01/level,.4f,0.95,0.9500,151,53
+347,PRE-REGISTERED,official,systems/lorenz63/H2e/by_noise/0.01/median_change,.4g,0.355435350773323,0.3554,151,26
+348,PRE-REGISTERED,official,systems/lorenz63/H2e/by_noise/0.01/ci,ci:.4g,"[0.33499209303392236, 0.376350186378218]","[0.335, 0.3764]",151,35
+349,PRE-REGISTERED,const,secondary_parts/10/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),151,62
+350,PRE-REGISTERED,official,systems/lorenz63/H2e/by_noise/0.01/verdict,verdict,'pass',pass,151,89
+351,PRE-REGISTERED,official,systems/lorenz63/H2e/by_noise/0.02/level,.4f,0.95,0.9500,152,53
+352,PRE-REGISTERED,official,systems/lorenz63/H2e/by_noise/0.02/median_change,.4g,0.3123912799877995,0.3124,152,26
+353,PRE-REGISTERED,official,systems/lorenz63/H2e/by_noise/0.02/ci,ci:.4g,"[0.284518478959707, 0.34104354095773304]","[0.2845, 0.341]",152,35
+354,PRE-REGISTERED,const,secondary_parts/11/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),152,62
+355,PRE-REGISTERED,official,systems/lorenz63/H2e/by_noise/0.02/verdict,verdict,'pass',pass,152,89
+356,PRE-REGISTERED,official,systems/lorenz63/H3b/weight_lambda/level,.4f,0.95,0.9500,153,54
+357,PRE-REGISTERED,official,systems/lorenz63/H3b/weight_lambda/importance,.4g,0.1071606550547285,0.1072,153,31
+358,PRE-REGISTERED,official,systems/lorenz63/H3b/weight_lambda/ci,ci:.4g,"[0.0, 0.8625399878789833]","[0, 0.8625]",153,40
+359,PRE-REGISTERED,const,secondary_parts/12/band_text,,"'interval inside [0, 0.2) (strict)'","interval inside [0, 0.2) (strict)",153,63
+360,PRE-REGISTERED,official,systems/lorenz63/H3b/weight_lambda/verdict,verdict,'inconclusive',inconclusive,153,99
+361,PRE-REGISTERED,official,systems/lorenz63/H3b/D/level,.4f,0.95,0.9500,154,64
+362,PRE-REGISTERED,official,systems/lorenz63/H3b/D/value,.4g,-0.21917899088562398,-0.2192,154,34
+363,PRE-REGISTERED,official,systems/lorenz63/H3b/D/ci,ci:.4g,"[-0.4296632399528409, 0.23980992582949978]","[-0.4297, 0.2398]",154,44
+364,PRE-REGISTERED,const,secondary_parts/13/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),154,73
+365,PRE-REGISTERED,official,systems/lorenz63/H3b/D/verdict,verdict,'inconclusive',inconclusive,154,100
+366,PRE-REGISTERED,official,systems/rossler/H1a/level,.4f,0.95,0.9500,155,53
+367,PRE-REGISTERED,official,systems/rossler/H1a/by_noise/0.01/ratio,.4g,0.9208681083480208,0.9209,155,25
+368,PRE-REGISTERED,official,systems/rossler/H1a/by_noise/0.01/ratio_ci,ci:.4g,"[0.8622017191553646, 0.9941970795939242]","[0.8622, 0.9942]",155,34
+369,PRE-REGISTERED,const,secondary_parts/0/band_text,,"'interval inside [0.75, 1.25] (closed)'","interval inside [0.75, 1.25] (closed)",155,62
+370,PRE-REGISTERED,official,systems/rossler/H1a/by_noise/0.01/verdict,verdict,'pass',pass,155,102
+371,PRE-REGISTERED,official,systems/rossler/H1a/level,.4f,0.95,0.9500,156,52
+372,PRE-REGISTERED,official,systems/rossler/H1a/by_noise/0.02/ratio,.4g,0.7859602106481672,0.786,156,25
+373,PRE-REGISTERED,official,systems/rossler/H1a/by_noise/0.02/ratio_ci,ci:.4g,"[0.6999183015168591, 0.869490027298254]","[0.6999, 0.8695]",156,33
+374,PRE-REGISTERED,const,secondary_parts/1/band_text,,"'interval inside [0.75, 1.25] (closed)'","interval inside [0.75, 1.25] (closed)",156,61
+375,PRE-REGISTERED,official,systems/rossler/H1a/by_noise/0.02/verdict,verdict,'inconclusive',inconclusive,156,101
+376,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,157,50
+377,PRE-REGISTERED,official,systems/rossler/H1b/PLP/slope,.4g,0.670457294207982,0.6705,157,22
+378,PRE-REGISTERED,official,systems/rossler/H1b/PLP/ci,ci:.4g,"[0.6302736629762572, 0.7089270576806204]","[0.6303, 0.7089]",157,31
+379,PRE-REGISTERED,const,secondary_parts/2/band_text,,"'interval inside [0.8, 1.2] (closed)'","interval inside [0.8, 1.2] (closed)",157,57
+380,PRE-REGISTERED,official,systems/rossler/H1b/verdict,verdict,'fail',fail,157,95
+381,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,158,48
+382,PRE-REGISTERED,official,systems/rossler/H1c/PLP/median_ratio,.4g,0.9860277517771381,0.986,158,22
+383,PRE-REGISTERED,official,systems/rossler/H1c/PLP/ci,ci:.4g,"[0.9397475898726209, 1.0286018033447162]","[0.9397, 1.029]",158,30
+384,PRE-REGISTERED,const,secondary_parts/3/band_text,,"'interval inside [0.8, 1.25] (closed)'","interval inside [0.8, 1.25] (closed)",158,55
+385,PRE-REGISTERED,official,systems/rossler/H1c/PLP/verdict,verdict,'pass',pass,158,94
+386,PRE-REGISTERED,official,systems/rossler/H1d/level,.4f,0.95,0.9500,159,58
+387,PRE-REGISTERED,official,systems/rossler/H1d/rows/analog_seed/spearman,.4g,0.7696803856803858,0.7697,159,30
+388,PRE-REGISTERED,official,systems/rossler/H1d/rows/analog_seed/interval,ci:.4g,"[0.7375222935214654, 0.7965218453127009]","[0.7375, 0.7965]",159,39
+389,PRE-REGISTERED,const,secondary_parts/4/band_text,,'lower bound ≥ 0.7 (closed)',lower bound ≥ 0.7 (closed),159,67
+390,PRE-REGISTERED,official,systems/rossler/H1d/rows/analog_seed/verdict,verdict,'pass',pass,159,96
+391,PRE-REGISTERED,official,systems/rossler/H1d/level,.4f,0.95,0.9500,160,62
+392,PRE-REGISTERED,official,systems/rossler/H1d/rows/estimation_seed/spearman,.4g,0.9587926155959507,0.9588,160,34
+393,PRE-REGISTERED,official,systems/rossler/H1d/rows/estimation_seed/interval,ci:.4g,"[0.9505122238588846, 0.9651858055674947]","[0.9505, 0.9652]",160,43
+394,PRE-REGISTERED,const,secondary_parts/5/band_text,,'lower bound ≥ 0.7 (closed)',lower bound ≥ 0.7 (closed),160,71
+395,PRE-REGISTERED,official,systems/rossler/H1d/rows/estimation_seed/verdict,verdict,'pass',pass,160,100
+396,PRE-REGISTERED,official,systems/rossler/H1d/level,.4f,0.95,0.9500,161,51
+397,PRE-REGISTERED,official,systems/rossler/H1d/rows/growth/spearman,.4g,0.9925028365028364,0.9925,161,25
+398,PRE-REGISTERED,official,systems/rossler/H1d/rows/growth/interval,ci:.4g,"[0.9900496215446479, 0.9945059976146855]","[0.99, 0.9945]",161,34
+399,PRE-REGISTERED,const,secondary_parts/6/band_text,,'lower bound ≥ 0.7 (closed)',lower bound ≥ 0.7 (closed),161,60
+400,PRE-REGISTERED,official,systems/rossler/H1d/rows/growth/verdict,verdict,'pass',pass,161,89
+401,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,162,63
+402,PRE-REGISTERED,official,systems/rossler/H2c/A4_minus_A2/mean,.4g,3.2593563221069485e-05,3.259e-05,162,26
+403,PRE-REGISTERED,official,systems/rossler/H2c/A4_minus_A2/ci,ci:.4g,"[3.3006786949268455e-06, 5.998981785525027e-05]","[3.301e-06, 5.999e-05]",162,38
+404,PRE-REGISTERED,const,secondary_parts/7/band_text,,'upper bound < 0 (strict)',upper bound < 0 (strict),162,70
+405,PRE-REGISTERED,official,systems/rossler/H2c/A4_minus_A2/verdict,verdict,'fail',fail,162,97
+406,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,163,64
+407,PRE-REGISTERED,official,systems/rossler/H2c/A4_minus_A1/mean,.4g,1.8771838188343603e-05,1.877e-05,163,26
+408,PRE-REGISTERED,official,systems/rossler/H2c/A4_minus_A1/ci,ci:.4g,"[-1.6537439565061444e-05, 5.1135404941533834e-05]","[-1.654e-05, 5.114e-05]",163,38
+409,PRE-REGISTERED,const,secondary_parts/8/band_text,,'upper bound < 0 (strict)',upper bound < 0 (strict),163,71
+410,PRE-REGISTERED,official,systems/rossler/H2c/A4_minus_A1/verdict,verdict,'inconclusive',inconclusive,163,98
+411,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,164,51
+412,PRE-REGISTERED,official,systems/rossler/H2d/in_distribution_excess,.4g,0.0013961363212171563,0.001396,164,18
+413,PRE-REGISTERED,official,systems/rossler/H2d/ci,ci:.4g,"[-0.05370797491040001, 0.04521015674377689]","[-0.05371, 0.04521]",164,29
+414,PRE-REGISTERED,const,secondary_parts/9/band_text,,'upper bound ≤ 0.10 (closed)',upper bound ≤ 0.10 (closed),164,58
+415,PRE-REGISTERED,official,systems/rossler/H2d/verdict,verdict,'pass',pass,164,88
+416,PRE-REGISTERED,official,systems/rossler/H2e/by_noise/0.01/level,.4f,0.95,0.9500,165,53
+417,PRE-REGISTERED,official,systems/rossler/H2e/by_noise/0.01/median_change,.4g,0.35370393886879115,0.3537,165,25
+418,PRE-REGISTERED,official,systems/rossler/H2e/by_noise/0.01/ci,ci:.4g,"[0.3337948161344254, 0.377465353170157]","[0.3338, 0.3775]",165,34
+419,PRE-REGISTERED,const,secondary_parts/10/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),165,62
+420,PRE-REGISTERED,official,systems/rossler/H2e/by_noise/0.01/verdict,verdict,'pass',pass,165,89
+421,PRE-REGISTERED,official,systems/rossler/H2e/by_noise/0.02/level,.4f,0.95,0.9500,166,53
+422,PRE-REGISTERED,official,systems/rossler/H2e/by_noise/0.02/median_change,.4g,0.25146057521294995,0.2515,166,25
+423,PRE-REGISTERED,official,systems/rossler/H2e/by_noise/0.02/ci,ci:.4g,"[0.22629029227074965, 0.28168418841187487]","[0.2263, 0.2817]",166,34
+424,PRE-REGISTERED,const,secondary_parts/11/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),166,62
+425,PRE-REGISTERED,official,systems/rossler/H2e/by_noise/0.02/verdict,verdict,'pass',pass,166,89
+426,PRE-REGISTERED,official,systems/rossler/H3b/weight_lambda/level,.4f,0.95,0.9500,167,54
+427,PRE-REGISTERED,official,systems/rossler/H3b/weight_lambda/importance,.4g,0.07115177151185069,0.07115,167,30
+428,PRE-REGISTERED,official,systems/rossler/H3b/weight_lambda/ci,ci:.4g,"[0.0, 0.1846288983485454]","[0, 0.1846]",167,40
+429,PRE-REGISTERED,const,secondary_parts/12/band_text,,"'interval inside [0, 0.2) (strict)'","interval inside [0, 0.2) (strict)",167,63
+430,PRE-REGISTERED,official,systems/rossler/H3b/weight_lambda/verdict,verdict,'pass',pass,167,99
+431,PRE-REGISTERED,official,systems/rossler/H3b/D/level,.4f,0.95,0.9500,168,61
+432,PRE-REGISTERED,official,systems/rossler/H3b/D/value,.4g,0.3903231309843667,0.3903,168,33
+433,PRE-REGISTERED,official,systems/rossler/H3b/D/ci,ci:.4g,"[0.17719062885627115, 0.5220938217535963]","[0.1772, 0.5221]",168,42
+434,PRE-REGISTERED,const,secondary_parts/13/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),168,70
+435,PRE-REGISTERED,official,systems/rossler/H3b/D/verdict,verdict,'pass',pass,168,97
+436,PRE-REGISTERED,official,systems/chua/H1a/level,.4f,0.95,0.9500,169,50
+437,PRE-REGISTERED,official,systems/chua/H1a/by_noise/0.01/ratio,.4g,0.7458275532497821,0.7458,169,22
+438,PRE-REGISTERED,official,systems/chua/H1a/by_noise/0.01/ratio_ci,ci:.4g,"[0.6611154393254958, 0.8213529817092146]","[0.6611, 0.8214]",169,31
+439,PRE-REGISTERED,const,secondary_parts/0/band_text,,"'interval inside [0.75, 1.25] (closed)'","interval inside [0.75, 1.25] (closed)",169,59
+440,PRE-REGISTERED,official,systems/chua/H1a/by_noise/0.01/verdict,verdict,'inconclusive',inconclusive,169,99
+441,PRE-REGISTERED,official,systems/chua/H1a/level,.4f,0.95,0.9500,170,50
+442,PRE-REGISTERED,official,systems/chua/H1a/by_noise/0.02/ratio,.4g,0.5827311581542922,0.5827,170,22
+443,PRE-REGISTERED,official,systems/chua/H1a/by_noise/0.02/ratio_ci,ci:.4g,"[0.49811442650707066, 0.6783282318743091]","[0.4981, 0.6783]",170,31
+444,PRE-REGISTERED,const,secondary_parts/1/band_text,,"'interval inside [0.75, 1.25] (closed)'","interval inside [0.75, 1.25] (closed)",170,59
+445,PRE-REGISTERED,official,systems/chua/H1a/by_noise/0.02/verdict,verdict,'fail',fail,170,99
+446,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,171,43
+447,PRE-REGISTERED,official,systems/chua/H1b/PLP/slope,.4g,1.0542466763672487,1.054,171,19
+448,PRE-REGISTERED,official,systems/chua/H1b/PLP/ci,ci:.4g,"[1.0265065110020113, 1.0795839936818068]","[1.027, 1.08]",171,27
+449,PRE-REGISTERED,const,secondary_parts/2/band_text,,"'interval inside [0.8, 1.2] (closed)'","interval inside [0.8, 1.2] (closed)",171,50
+450,PRE-REGISTERED,official,systems/chua/H1b/verdict,verdict,'pass',pass,171,88
+451,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,172,47
+452,PRE-REGISTERED,official,systems/chua/H1c/PLP/median_ratio,.4g,0.7643016842327925,0.7643,172,19
+453,PRE-REGISTERED,official,systems/chua/H1c/PLP/ci,ci:.4g,"[0.7183065837256006, 0.8205404084429571]","[0.7183, 0.8205]",172,28
+454,PRE-REGISTERED,const,secondary_parts/3/band_text,,"'interval inside [0.8, 1.25] (closed)'","interval inside [0.8, 1.25] (closed)",172,54
+455,PRE-REGISTERED,official,systems/chua/H1c/PLP/verdict,verdict,'inconclusive',inconclusive,172,93
+456,PRE-REGISTERED,official,systems/chua/H1d/level,.4f,0.95,0.9500,173,55
+457,PRE-REGISTERED,official,systems/chua/H1d/rows/analog_seed/spearman,.4g,0.7338833658833659,0.7339,173,27
+458,PRE-REGISTERED,official,systems/chua/H1d/rows/analog_seed/interval,ci:.4g,"[0.6997703146637556, 0.7643174409056553]","[0.6998, 0.7643]",173,36
+459,PRE-REGISTERED,const,secondary_parts/4/band_text,,'lower bound ≥ 0.7 (closed)',lower bound ≥ 0.7 (closed),173,64
+460,PRE-REGISTERED,official,systems/chua/H1d/rows/analog_seed/verdict,verdict,'inconclusive',inconclusive,173,93
+461,PRE-REGISTERED,official,systems/chua/H1d/level,.4f,0.95,0.9500,174,58
+462,PRE-REGISTERED,official,systems/chua/H1d/rows/estimation_seed/spearman,.4g,0.9454147576454982,0.9454,174,31
+463,PRE-REGISTERED,official,systems/chua/H1d/rows/estimation_seed/interval,ci:.4g,"[0.9179559907514467, 0.967694825544482]","[0.918, 0.9677]",174,40
+464,PRE-REGISTERED,const,secondary_parts/5/band_text,,'lower bound ≥ 0.7 (closed)',lower bound ≥ 0.7 (closed),174,67
+465,PRE-REGISTERED,official,systems/chua/H1d/rows/estimation_seed/verdict,verdict,'pass',pass,174,96
+466,PRE-REGISTERED,official,systems/chua/H1d/level,.4f,0.95,0.9500,175,50
+467,PRE-REGISTERED,official,systems/chua/H1d/rows/growth/spearman,.4g,0.9755678323886192,0.9756,175,22
+468,PRE-REGISTERED,official,systems/chua/H1d/rows/growth/interval,ci:.4g,"[0.9658235268088726, 0.9833506404461835]","[0.9658, 0.9834]",175,31
+469,PRE-REGISTERED,const,secondary_parts/6/band_text,,'lower bound ≥ 0.7 (closed)',lower bound ≥ 0.7 (closed),175,59
+470,PRE-REGISTERED,official,systems/chua/H1d/rows/growth/verdict,verdict,'pass',pass,175,88
+471,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,176,58
+472,PRE-REGISTERED,official,systems/chua/H2c/A4_minus_A2/mean,.4g,0.00033675267085514894,0.0003368,176,23
+473,PRE-REGISTERED,official,systems/chua/H2c/A4_minus_A2/ci,ci:.4g,"[-0.0010195301677808689, 0.002111094600642744]","[-0.00102, 0.002111]",176,35
+474,PRE-REGISTERED,const,secondary_parts/7/band_text,,'upper bound < 0 (strict)',upper bound < 0 (strict),176,65
+475,PRE-REGISTERED,official,systems/chua/H2c/A4_minus_A2/verdict,verdict,'inconclusive',inconclusive,176,92
+476,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,177,59
+477,PRE-REGISTERED,official,systems/chua/H2c/A4_minus_A1/mean,.4g,-0.0010796363160582548,-0.00108,177,23
+478,PRE-REGISTERED,official,systems/chua/H2c/A4_minus_A1/ci,ci:.4g,"[-0.002596457492461678, 0.00016907914612268856]","[-0.002596, 0.0001691]",177,34
+479,PRE-REGISTERED,const,secondary_parts/8/band_text,,'upper bound < 0 (strict)',upper bound < 0 (strict),177,66
+480,PRE-REGISTERED,official,systems/chua/H2c/A4_minus_A1/verdict,verdict,'inconclusive',inconclusive,177,93
+481,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,178,48
+482,PRE-REGISTERED,official,systems/chua/H2d/in_distribution_excess,.4g,-0.011793334212303885,-0.01179,178,15
+483,PRE-REGISTERED,official,systems/chua/H2d/ci,ci:.4g,"[-0.06307813167548984, 0.05348298023364288]","[-0.06308, 0.05348]",178,26
+484,PRE-REGISTERED,const,secondary_parts/9/band_text,,'upper bound ≤ 0.10 (closed)',upper bound ≤ 0.10 (closed),178,55
+485,PRE-REGISTERED,official,systems/chua/H2d/verdict,verdict,'pass',pass,178,85
+486,PRE-REGISTERED,official,systems/chua/H2e/by_noise/0.01/level,.4f,0.95,0.9500,179,49
+487,PRE-REGISTERED,official,systems/chua/H2e/by_noise/0.01/median_change,.4g,0.30948746348448664,0.3095,179,22
+488,PRE-REGISTERED,official,systems/chua/H2e/by_noise/0.01/ci,ci:.4g,"[0.2830139621260972, 0.33118219510634955]","[0.283, 0.3312]",179,31
+489,PRE-REGISTERED,const,secondary_parts/10/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),179,58
+490,PRE-REGISTERED,official,systems/chua/H2e/by_noise/0.01/verdict,verdict,'pass',pass,179,85
+491,PRE-REGISTERED,official,systems/chua/H2e/by_noise/0.02/level,.4f,0.95,0.9500,180,49
+492,PRE-REGISTERED,official,systems/chua/H2e/by_noise/0.02/median_change,.4g,0.21916301227375098,0.2192,180,22
+493,PRE-REGISTERED,official,systems/chua/H2e/by_noise/0.02/ci,ci:.4g,"[0.19226856561584155, 0.24097596758978385]","[0.1923, 0.241]",180,31
+494,PRE-REGISTERED,const,secondary_parts/11/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),180,58
+495,PRE-REGISTERED,official,systems/chua/H2e/by_noise/0.02/verdict,verdict,'pass',pass,180,85
+496,PRE-REGISTERED,official,systems/chua/H3b/weight_lambda/level,.4f,0.95,0.9500,181,50
+497,PRE-REGISTERED,official,systems/chua/H3b/weight_lambda/importance,.4g,0.46761397861654636,0.4676,181,27
+498,PRE-REGISTERED,official,systems/chua/H3b/weight_lambda/ci,ci:.4g,"[0.0, 0.5300517956420421]","[0, 0.5301]",181,36
+499,PRE-REGISTERED,const,secondary_parts/12/band_text,,"'interval inside [0, 0.2) (strict)'","interval inside [0, 0.2) (strict)",181,59
+500,PRE-REGISTERED,official,systems/chua/H3b/weight_lambda/verdict,verdict,'inconclusive',inconclusive,181,95
+501,PRE-REGISTERED,official,systems/chua/H3b/D/level,.4f,0.95,0.9500,182,58
+502,PRE-REGISTERED,official,systems/chua/H3b/D/value,.4g,0.8076384906504239,0.8076,182,30
+503,PRE-REGISTERED,official,systems/chua/H3b/D/ci,ci:.4g,"[0.6552644104334902, 0.8935453891272613]","[0.6553, 0.8935]",182,39
+504,PRE-REGISTERED,const,secondary_parts/13/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),182,67
+505,PRE-REGISTERED,official,systems/chua/H3b/D/verdict,verdict,'pass',pass,182,94
+506,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,188,69
+507,PRE-REGISTERED,official,systems/lorenz63/Q-N/oracle/logit_w_interior/delta_r2,.4g,-0.00923841252825719,-0.009238,188,35
+508,PRE-REGISTERED,official,systems/lorenz63/Q-N/oracle/logit_w_interior/ci,ci:.4g,"[-0.03016264928306247, 0.011817324112713516]","[-0.03016, 0.01182]",188,47
+509,PRE-REGISTERED,const,qn_parts/0/band_text,,'reading table of v3 §7',reading table of v3 §7,188,76
+510,PRE-REGISTERED,official,systems/lorenz63/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,188,101
+511,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,189,69
+512,PRE-REGISTERED,official,systems/lorenz63/Q-N/oracle/w_zero_indicator/delta_r2,.4g,0.23419171309739728,0.2342,189,41
+513,PRE-REGISTERED,official,systems/lorenz63/Q-N/oracle/w_zero_indicator/ci,ci:.4g,"[0.1814616566914044, 0.2904971751426462]","[0.1815, 0.2905]",189,50
+514,PRE-REGISTERED,const,qn_parts/1/band_text,,'reading table of v3 §7',reading table of v3 §7,189,76
+515,PRE-REGISTERED,official,systems/lorenz63/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,189,101
+516,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,190,66
+517,PRE-REGISTERED,official,systems/rossler/Q-N/oracle/logit_w_interior/delta_r2,.4g,0.01192459613414032,0.01192,190,34
+518,PRE-REGISTERED,official,systems/rossler/Q-N/oracle/logit_w_interior/ci,ci:.4g,"[-0.023539771619284628, 0.04697861743517001]","[-0.02354, 0.04698]",190,44
+519,PRE-REGISTERED,const,qn_parts/0/band_text,,'reading table of v3 §7',reading table of v3 §7,190,73
+520,PRE-REGISTERED,official,systems/rossler/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,190,98
+521,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,191,67
+522,PRE-REGISTERED,official,systems/rossler/Q-N/oracle/w_zero_indicator/delta_r2,.4g,0.12983856703416907,0.1298,191,40
+523,PRE-REGISTERED,official,systems/rossler/Q-N/oracle/w_zero_indicator/ci,ci:.4g,"[0.07593404529665104, 0.1800437701932885]","[0.07593, 0.18]",191,49
+524,PRE-REGISTERED,const,qn_parts/1/band_text,,'reading table of v3 §7',reading table of v3 §7,191,74
+525,PRE-REGISTERED,official,systems/rossler/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,191,99
+526,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,192,65
+527,PRE-REGISTERED,official,systems/chua/Q-N/oracle/logit_w_interior/delta_r2,.4g,-0.004858633501647391,-0.004859,192,31
+528,PRE-REGISTERED,official,systems/chua/Q-N/oracle/logit_w_interior/ci,ci:.4g,"[-0.039772697946445404, 0.023406479651862995]","[-0.03977, 0.02341]",192,43
+529,PRE-REGISTERED,const,qn_parts/0/band_text,,'reading table of v3 §7',reading table of v3 §7,192,72
+530,PRE-REGISTERED,official,systems/chua/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,192,97
+531,PRE-REGISTERED,const,constants/standard_level/text,,'0.95',0.95,193,67
+532,PRE-REGISTERED,official,systems/chua/Q-N/oracle/w_zero_indicator/delta_r2,.4g,0.09747766940143177,0.09748,193,37
+533,PRE-REGISTERED,official,systems/chua/Q-N/oracle/w_zero_indicator/ci,ci:.4g,"[0.050754865113929445, 0.14368970262340444]","[0.05075, 0.1437]",193,47
+534,PRE-REGISTERED,const,qn_parts/1/band_text,,'reading table of v3 §7',reading table of v3 §7,193,74
+535,PRE-REGISTERED,official,systems/chua/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,193,99
+536,PRE-REGISTERED,official,systems/lorenz63/H3a/n_per_regime/0,d,25,25,199,18
+537,PRE-REGISTERED,official,systems/lorenz63/H3a/n_events_per_regime/0,d,<missing>,not recorded,199,23
+538,PRE-REGISTERED,official,systems/lorenz63/H3a/n_censored_per_regime/0,d,<missing>,not recorded,199,38
+539,PRE-REGISTERED,official,systems/lorenz63/H3a/n_per_regime/1,d,21,21,200,18
+540,PRE-REGISTERED,official,systems/lorenz63/H3a/n_events_per_regime/1,d,<missing>,not recorded,200,23
+541,PRE-REGISTERED,official,systems/lorenz63/H3a/n_censored_per_regime/1,d,<missing>,not recorded,200,38
+542,PRE-REGISTERED,official,systems/lorenz63/H3a/n_per_regime/2,d,196,196,201,18
+543,PRE-REGISTERED,official,systems/lorenz63/H3a/n_events_per_regime/2,d,<missing>,not recorded,201,24
+544,PRE-REGISTERED,official,systems/lorenz63/H3a/n_censored_per_regime/2,d,<missing>,not recorded,201,39
+545,PRE-REGISTERED,official,systems/lorenz63/H3a/n_per_regime/3,d,234,234,202,18
+546,PRE-REGISTERED,official,systems/lorenz63/H3a/n_events_per_regime/3,d,<missing>,not recorded,202,24
+547,PRE-REGISTERED,official,systems/lorenz63/H3a/n_censored_per_regime/3,d,<missing>,not recorded,202,39
+548,PRE-REGISTERED,official,systems/lorenz63/H3a/n_per_regime/4,d,147,147,203,18
+549,PRE-REGISTERED,official,systems/lorenz63/H3a/n_events_per_regime/4,d,<missing>,not recorded,203,24
+550,PRE-REGISTERED,official,systems/lorenz63/H3a/n_censored_per_regime/4,d,<missing>,not recorded,203,39
+551,PRE-REGISTERED,official,systems/lorenz63/H3a/n_per_regime/5,d,64,64,204,18
+552,PRE-REGISTERED,official,systems/lorenz63/H3a/n_events_per_regime/5,d,<missing>,not recorded,204,23
+553,PRE-REGISTERED,official,systems/lorenz63/H3a/n_censored_per_regime/5,d,<missing>,not recorded,204,38
+554,PRE-REGISTERED,official,systems/lorenz63/H3a/n_per_regime/6,d,127,127,205,18
+555,PRE-REGISTERED,official,systems/lorenz63/H3a/n_events_per_regime/6,d,<missing>,not recorded,205,24
+556,PRE-REGISTERED,official,systems/lorenz63/H3a/n_censored_per_regime/6,d,<missing>,not recorded,205,39
+557,PRE-REGISTERED,official,systems/lorenz63/H3a/n_per_regime/7,d,186,186,206,18
+558,PRE-REGISTERED,official,systems/lorenz63/H3a/n_events_per_regime/7,d,<missing>,not recorded,206,24
+559,PRE-REGISTERED,official,systems/lorenz63/H3a/n_censored_per_regime/7,d,<missing>,not recorded,206,39
+560,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/0/0,d,1,1,217,13
+561,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/0/1,d,0,0,217,16
+562,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_raw/0,.3g,0.37323918794350674,0.373,217,20
+563,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_holm/0,.3g,0.6842910622201313,0.684,217,28
+564,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/1/0,d,0,0,218,13
+565,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/1/1,d,7,7,218,16
+566,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_raw/1,.3g,2.6967558667389883e-32,2.7e-32,218,20
+567,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_holm/1,.3g,1.8877291067172918e-31,1.89e-31,218,30
+568,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/2/0,d,7,7,219,13
+569,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/2/1,d,3,3,219,16
+570,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_raw/2,.3g,0.07384290969626103,0.0738,219,20
+571,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_holm/2,.3g,0.3692145484813052,0.369,219,29
+572,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/3/0,d,3,3,220,13
+573,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/3/1,d,6,6,220,16
+574,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_raw/3,.3g,0.11360128861457705,0.114,220,20
+575,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_holm/3,.3g,0.4544051544583082,0.454,220,28
+576,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/4/0,d,6,6,221,13
+577,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/4/1,d,2,2,221,16
+578,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_raw/4,.3g,0.3421455311100656,0.342,221,20
+579,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_holm/4,.3g,0.6842910622201313,0.684,221,28
+580,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/5/0,d,2,2,222,13
+581,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/5/1,d,4,4,222,16
+582,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_raw/5,.3g,0.00024691785034745503,0.000247,222,20
+583,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_holm/5,.3g,0.0014815071020847302,0.00148,222,31
+584,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/6/0,d,4,4,223,13
+585,PRE-REGISTERED,official,systems/lorenz63/H3a/pairs/6/1,d,5,5,223,16
+586,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_raw/6,.3g,0.19015805597403335,0.19,223,20
+587,PRE-REGISTERED,official,systems/lorenz63/H3a/logrank_p_holm/6,.3g,0.5704741679221,0.57,223,27
+588,PRE-REGISTERED,official,systems/rossler/H3a/n_per_regime/0,d,170,170,207,17
+589,PRE-REGISTERED,official,systems/rossler/H3a/n_events_per_regime/0,d,<missing>,not recorded,207,23
+590,PRE-REGISTERED,official,systems/rossler/H3a/n_censored_per_regime/0,d,<missing>,not recorded,207,38
+591,PRE-REGISTERED,official,systems/rossler/H3a/n_per_regime/1,d,462,462,208,17
+592,PRE-REGISTERED,official,systems/rossler/H3a/n_events_per_regime/1,d,<missing>,not recorded,208,23
+593,PRE-REGISTERED,official,systems/rossler/H3a/n_censored_per_regime/1,d,<missing>,not recorded,208,38
+594,PRE-REGISTERED,official,systems/rossler/H3a/n_per_regime/2,d,368,368,209,17
+595,PRE-REGISTERED,official,systems/rossler/H3a/n_events_per_regime/2,d,<missing>,not recorded,209,23
+596,PRE-REGISTERED,official,systems/rossler/H3a/n_censored_per_regime/2,d,<missing>,not recorded,209,38
+597,PRE-REGISTERED,official,systems/rossler/H3a/pairs/0/0,d,1,1,224,12
+598,PRE-REGISTERED,official,systems/rossler/H3a/pairs/0/1,d,2,2,224,15
+599,PRE-REGISTERED,official,systems/rossler/H3a/logrank_p_raw/0,.3g,0.20447678905224503,0.204,224,19
+600,PRE-REGISTERED,official,systems/rossler/H3a/logrank_p_holm/0,.3g,0.20447678905224503,0.204,224,27
+601,PRE-REGISTERED,official,systems/rossler/H3a/pairs/1/0,d,2,2,225,12
+602,PRE-REGISTERED,official,systems/rossler/H3a/pairs/1/1,d,0,0,225,15
+603,PRE-REGISTERED,official,systems/rossler/H3a/logrank_p_raw/1,.3g,2.3755855433684338e-17,2.38e-17,225,19
+604,PRE-REGISTERED,official,systems/rossler/H3a/logrank_p_holm/1,.3g,4.7511710867368676e-17,4.75e-17,225,30
+605,PRE-REGISTERED,official,systems/chua/H3a/n_per_regime/0,d,405,405,210,14
+606,PRE-REGISTERED,official,systems/chua/H3a/n_events_per_regime/0,d,<missing>,not recorded,210,20
+607,PRE-REGISTERED,official,systems/chua/H3a/n_censored_per_regime/0,d,<missing>,not recorded,210,35
+608,PRE-REGISTERED,official,systems/chua/H3a/n_per_regime/1,d,387,387,211,14
+609,PRE-REGISTERED,official,systems/chua/H3a/n_events_per_regime/1,d,<missing>,not recorded,211,20
+610,PRE-REGISTERED,official,systems/chua/H3a/n_censored_per_regime/1,d,<missing>,not recorded,211,35
+611,PRE-REGISTERED,official,systems/chua/H3a/n_per_regime/2,d,170,170,212,14
+612,PRE-REGISTERED,official,systems/chua/H3a/n_events_per_regime/2,d,<missing>,not recorded,212,20
+613,PRE-REGISTERED,official,systems/chua/H3a/n_censored_per_regime/2,d,<missing>,not recorded,212,35
+614,PRE-REGISTERED,official,systems/chua/H3a/n_per_regime/3,d,38,38,213,14
+615,PRE-REGISTERED,official,systems/chua/H3a/n_events_per_regime/3,d,<missing>,not recorded,213,19
+616,PRE-REGISTERED,official,systems/chua/H3a/n_censored_per_regime/3,d,<missing>,not recorded,213,34
+617,PRE-REGISTERED,official,systems/chua/H3a/pairs/0/0,d,3,3,226,9
+618,PRE-REGISTERED,official,systems/chua/H3a/pairs/0/1,d,2,2,226,12
+619,PRE-REGISTERED,official,systems/chua/H3a/logrank_p_raw/0,.3g,6.7142054753652e-05,6.71e-05,226,16
+620,PRE-REGISTERED,official,systems/chua/H3a/logrank_p_holm/0,.3g,6.7142054753652e-05,6.71e-05,226,27
+621,PRE-REGISTERED,official,systems/chua/H3a/pairs/1/0,d,2,2,227,9
+622,PRE-REGISTERED,official,systems/chua/H3a/pairs/1/1,d,1,1,227,12
+623,PRE-REGISTERED,official,systems/chua/H3a/logrank_p_raw/1,.3g,2.1917116081570793e-18,2.19e-18,227,16
+624,PRE-REGISTERED,official,systems/chua/H3a/logrank_p_holm/1,.3g,6.5751348244712375e-18,6.58e-18,227,27
+625,PRE-REGISTERED,official,systems/chua/H3a/pairs/2/0,d,1,1,228,9
+626,PRE-REGISTERED,official,systems/chua/H3a/pairs/2/1,d,0,0,228,12
+627,PRE-REGISTERED,official,systems/chua/H3a/logrank_p_raw/2,.3g,9.302212294043956e-08,9.3e-08,228,16
+628,PRE-REGISTERED,official,systems/chua/H3a/logrank_p_holm/2,.3g,1.8604424588087912e-07,1.86e-07,228,26
+629,PRE-REGISTERED,const,constants/gain_label/text,,"'reported, v1 statistic, v3 screen pending'","reported, v1 statistic, v3 screen pending",230,42
+630,PRE-REGISTERED,official,systems/lorenz63/gain_bound/fraction_within_bound,.3f,0.9495412844036697,0.950,234,13
+631,PRE-REGISTERED,official,systems/lorenz63/gain_bound/n_states,d,654,654,234,21
+632,PRE-REGISTERED,official,systems/lorenz63/gain_bound/n_total_states,d,1000,1000,234,27
+633,PRE-REGISTERED,official,systems/lorenz63/gain_bound/median_gain_lyapunov,.3g,0.0,0,234,34
+634,PRE-REGISTERED,official,systems/lorenz63/gain_bound/max_gain_lyapunov,.3g,2.3,2.3,234,38
+635,PRE-REGISTERED,official,systems/rossler/gain_bound/fraction_within_bound,.3f,0.8801775147928994,0.880,235,12
+636,PRE-REGISTERED,official,systems/rossler/gain_bound/n_states,d,676,676,235,20
+637,PRE-REGISTERED,official,systems/rossler/gain_bound/n_total_states,d,1000,1000,235,26
+638,PRE-REGISTERED,official,systems/rossler/gain_bound/median_gain_lyapunov,.3g,0.0,0,235,33
+639,PRE-REGISTERED,official,systems/rossler/gain_bound/max_gain_lyapunov,.3g,3.2,3.2,235,37
+640,PRE-REGISTERED,official,systems/chua/gain_bound/fraction_within_bound,.3f,0.9316770186335404,0.932,236,9
+641,PRE-REGISTERED,official,systems/chua/gain_bound/n_states,d,644,644,236,17
+642,PRE-REGISTERED,official,systems/chua/gain_bound/n_total_states,d,1000,1000,236,23
+643,PRE-REGISTERED,official,systems/chua/gain_bound/median_gain_lyapunov,.3g,0.0,0,236,30
+644,PRE-REGISTERED,official,systems/chua/gain_bound/max_gain_lyapunov,.3g,2.066666666666667,2.07,236,34
+645,PRE-REGISTERED,const,constants/caption_F2/text,,"'Figure F2 (experiments E2 to E5; v3 identifiers H1a to H1d, H2c to H2e, H3b and Q-N). One panel per secondary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples; H3b resamples construction states) at level 95%. The shaded region is the pass band of v3 §2, or for Q-N the reading bands of v3 §7. Marker shape and text give the stored verdict or reading: filled circle pass, cross fail, open diamond inconclusive, square a Q-N reading. A system that failed the validation gate is marked PROVISIONAL.'","Figure F2 (experiments E2 to E5; v3 identifiers H1a to H1d, H2c to H2e, H3b and Q-N). One panel per secondary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples; H3b resamples construction states) at level 95%. The shaded region is the pass band of v3 §2, or for Q-N the reading bands of v3 §7. Marker shape and text give the stored verdict or reading: filled circle pass, cross fail, open diamond inconclusive, square a Q-N reading. A system that failed the validation gate is marked PROVISIONAL.",240,1
+646,DIAGNOSTIC,official,handling/by_system/lorenz63/invariant_mean_replacements,d,0,0,248,38
+647,DIAGNOSTIC,official,handling/by_system/rossler/invariant_mean_replacements,d,425,425,248,42
+648,DIAGNOSTIC,official,handling/by_system/chua/invariant_mean_replacements,d,0,0,248,48
+649,DIAGNOSTIC,official,handling/totals/invariant_mean_replacements,d,425,425,248,32
+650,DIAGNOSTIC,official,handling/by_system/lorenz63/nu_replacements,d,0,0,249,26
+651,DIAGNOSTIC,official,handling/by_system/rossler/nu_replacements,d,425,425,249,30
+652,DIAGNOSTIC,official,handling/by_system/chua/nu_replacements,d,0,0,249,36
+653,DIAGNOSTIC,official,handling/totals/nu_replacements,d,425,425,249,20
+654,DIAGNOSTIC,official,handling/by_system/lorenz63/error_clips,d,0,0,250,20
+655,DIAGNOSTIC,official,handling/by_system/rossler/error_clips,d,0,0,250,24
+656,DIAGNOSTIC,official,handling/by_system/chua/error_clips,d,0,0,250,28
+657,DIAGNOSTIC,official,handling/totals/error_clips,d,0,0,250,16
+658,DIAGNOSTIC,official,handling/by_system/lorenz63/error_clips_cp,d,0,0,251,23
+659,DIAGNOSTIC,official,handling/by_system/rossler/error_clips_cp,d,0,0,251,27
+660,DIAGNOSTIC,official,handling/by_system/chua/error_clips_cp,d,0,0,251,31
+661,DIAGNOSTIC,official,handling/totals/error_clips_cp,d,0,0,251,19
+662,DIAGNOSTIC,official,handling/by_system/lorenz63/error_clips_plp,d,0,0,252,24
+663,DIAGNOSTIC,official,handling/by_system/rossler/error_clips_plp,d,0,0,252,28
+664,DIAGNOSTIC,official,handling/by_system/chua/error_clips_plp,d,0,0,252,32
+665,DIAGNOSTIC,official,handling/totals/error_clips_plp,d,0,0,252,20
+666,DIAGNOSTIC,official,handling/by_system/lorenz63/error_clips_nonfinite,d,0,0,253,30
+667,DIAGNOSTIC,official,handling/by_system/rossler/error_clips_nonfinite,d,0,0,253,34
+668,DIAGNOSTIC,official,handling/by_system/chua/error_clips_nonfinite,d,0,0,253,38
+669,DIAGNOSTIC,official,handling/totals/error_clips_nonfinite,d,0,0,253,26
+670,DIAGNOSTIC,official,handling/by_system/lorenz63/error_clips_plp_href,d,0,0,254,29
+671,DIAGNOSTIC,official,handling/by_system/rossler/error_clips_plp_href,d,0,0,254,33
+672,DIAGNOSTIC,official,handling/by_system/chua/error_clips_plp_href,d,0,0,254,37
+673,DIAGNOSTIC,official,handling/totals/error_clips_plp_href,d,0,0,254,25
+674,DIAGNOSTIC,official,handling/by_system/lorenz63/error_clips_nonfinite_href,d,0,0,255,35
+675,DIAGNOSTIC,official,handling/by_system/rossler/error_clips_nonfinite_href,d,0,0,255,39
+676,DIAGNOSTIC,official,handling/by_system/chua/error_clips_nonfinite_href,d,0,0,255,43
+677,DIAGNOSTIC,official,handling/totals/error_clips_nonfinite_href,d,0,0,255,31
+678,DIAGNOSTIC,official,handling/by_system/lorenz63/gain_replacements,d,0,0,256,26
+679,DIAGNOSTIC,official,handling/by_system/rossler/gain_replacements,d,0,0,256,30
+680,DIAGNOSTIC,official,handling/by_system/chua/gain_replacements,d,0,0,256,34
+681,DIAGNOSTIC,official,handling/totals/gain_replacements,d,0,0,256,22
+682,DIAGNOSTIC,official,handling/by_system/lorenz63/gain_floor,d,0,0,257,19
+683,DIAGNOSTIC,official,handling/by_system/rossler/gain_floor,d,0,0,257,23
+684,DIAGNOSTIC,official,handling/by_system/chua/gain_floor,d,0,0,257,27
+685,DIAGNOSTIC,official,handling/totals/gain_floor,d,0,0,257,15
+686,DIAGNOSTIC,official,handling/by_system/lorenz63/zero_variance_corr,d,254220,254220,258,32
+687,DIAGNOSTIC,official,handling/by_system/rossler/zero_variance_corr,d,104910,104910,258,41
+688,DIAGNOSTIC,official,handling/by_system/chua/zero_variance_corr,d,146435,146435,258,50
+689,DIAGNOSTIC,official,handling/totals/zero_variance_corr,d,505565,505565,258,23
+690,DIAGNOSTIC,official,handling/by_system/lorenz63/zero_variance_corr_cp,d,254220,254220,259,35
+691,DIAGNOSTIC,official,handling/by_system/rossler/zero_variance_corr_cp,d,104910,104910,259,44
+692,DIAGNOSTIC,official,handling/by_system/chua/zero_variance_corr_cp,d,146435,146435,259,53
+693,DIAGNOSTIC,official,handling/totals/zero_variance_corr_cp,d,505565,505565,259,26
+694,DIAGNOSTIC,official,handling/by_system/lorenz63/zero_variance_corr_plp,d,0,0,260,31
+695,DIAGNOSTIC,official,handling/by_system/rossler/zero_variance_corr_plp,d,0,0,260,35
+696,DIAGNOSTIC,official,handling/by_system/chua/zero_variance_corr_plp,d,0,0,260,39
+697,DIAGNOSTIC,official,handling/totals/zero_variance_corr_plp,d,0,0,260,27
+698,DIAGNOSTIC,official,handling/by_system/lorenz63/curvature_floor,d,0,0,261,24
+699,DIAGNOSTIC,official,handling/by_system/rossler/curvature_floor,d,0,0,261,28
+700,DIAGNOSTIC,official,handling/by_system/chua/curvature_floor,d,0,0,261,32
+701,DIAGNOSTIC,official,handling/totals/curvature_floor,d,0,0,261,20
+702,DIAGNOSTIC,official,handling/by_system/lorenz63/decisive_floor,d,0,0,262,23
+703,DIAGNOSTIC,official,handling/by_system/rossler/decisive_floor,d,0,0,262,27
+704,DIAGNOSTIC,official,handling/by_system/chua/decisive_floor,d,0,0,262,31
+705,DIAGNOSTIC,official,handling/totals/decisive_floor,d,0,0,262,19
+706,DIAGNOSTIC,official,handling/by_system/lorenz63/lm_nonfinite_cost,d,24,24,263,28
+707,DIAGNOSTIC,official,handling/by_system/rossler/lm_nonfinite_cost,d,692,692,263,33
+708,DIAGNOSTIC,official,handling/by_system/chua/lm_nonfinite_cost,d,0,0,263,39
+709,DIAGNOSTIC,official,handling/totals/lm_nonfinite_cost,d,716,716,263,22
+710,DIAGNOSTIC,official,handling/by_system/lorenz63/lm_nonfinite_jacobian,d,0,0,264,32
+711,DIAGNOSTIC,official,handling/by_system/rossler/lm_nonfinite_jacobian,d,425,425,264,36
+712,DIAGNOSTIC,official,handling/by_system/chua/lm_nonfinite_jacobian,d,0,0,264,42
+713,DIAGNOSTIC,official,handling/totals/lm_nonfinite_jacobian,d,425,425,264,26
+714,DIAGNOSTIC,official,handling/by_system/lorenz63/local_dim_zero_distance,d,0,0,265,32
+715,DIAGNOSTIC,official,handling/by_system/rossler/local_dim_zero_distance,d,0,0,265,36
+716,DIAGNOSTIC,official,handling/by_system/chua/local_dim_zero_distance,d,0,0,265,40
+717,DIAGNOSTIC,official,handling/totals/local_dim_zero_distance,d,0,0,265,28
+718,DIAGNOSTIC,official,handling/by_system/lorenz63/oracle_gain_floor,d,0,0,266,26
+719,DIAGNOSTIC,official,handling/by_system/rossler/oracle_gain_floor,d,0,0,266,30
+720,DIAGNOSTIC,official,handling/by_system/chua/oracle_gain_floor,d,0,0,266,34
+721,DIAGNOSTIC,official,handling/totals/oracle_gain_floor,d,0,0,266,22
+722,DIAGNOSTIC,official,handling/by_system/lorenz63/oracle_nonfinite,d,0,0,267,25
+723,DIAGNOSTIC,official,handling/by_system/rossler/oracle_nonfinite,d,0,0,267,29
+724,DIAGNOSTIC,official,handling/by_system/chua/oracle_nonfinite,d,0,0,267,33
+725,DIAGNOSTIC,official,handling/totals/oracle_nonfinite,d,0,0,267,21
+726,DIAGNOSTIC,official,handling/by_system/lorenz63/nu_cap_clips,d,154,154,268,23
+727,DIAGNOSTIC,official,handling/by_system/rossler/nu_cap_clips,d,160,160,268,29
+728,DIAGNOSTIC,official,handling/by_system/chua/nu_cap_clips,d,146,146,268,35
+729,DIAGNOSTIC,official,handling/totals/nu_cap_clips,d,460,460,268,17
+730,DIAGNOSTIC,official,handling/by_system/lorenz63/closed_form_floor_a4,d,0,0,269,29
+731,DIAGNOSTIC,official,handling/by_system/rossler/closed_form_floor_a4,d,0,0,269,33
+732,DIAGNOSTIC,official,handling/by_system/chua/closed_form_floor_a4,d,0,0,269,37
+733,DIAGNOSTIC,official,handling/totals/closed_form_floor_a4,d,0,0,269,25
+734,DIAGNOSTIC,official,handling/by_system/lorenz63/closed_form_floor_a4o,d,0,0,270,30
+735,DIAGNOSTIC,official,handling/by_system/rossler/closed_form_floor_a4o,d,0,0,270,34
+736,DIAGNOSTIC,official,handling/by_system/chua/closed_form_floor_a4o,d,0,0,270,38
+737,DIAGNOSTIC,official,handling/totals/closed_form_floor_a4o,d,0,0,270,26
+738,DIAGNOSTIC,official,handling/by_system/lorenz63/empty_regime_fallback,d,0,0,271,30
+739,DIAGNOSTIC,official,handling/by_system/rossler/empty_regime_fallback,d,0,0,271,34
+740,DIAGNOSTIC,official,handling/by_system/chua/empty_regime_fallback,d,0,0,271,38
+741,DIAGNOSTIC,official,handling/totals/empty_regime_fallback,d,0,0,271,26
+742,DIAGNOSTIC,official,handling/by_system/lorenz63/empty_regime_fallback_chosen,d,0,0,272,37
+743,DIAGNOSTIC,official,handling/by_system/rossler/empty_regime_fallback_chosen,d,0,0,272,41
+744,DIAGNOSTIC,official,handling/by_system/chua/empty_regime_fallback_chosen,d,0,0,272,45
+745,DIAGNOSTIC,official,handling/totals/empty_regime_fallback_chosen,d,0,0,272,33
+746,DIAGNOSTIC,official,handling/by_system/lorenz63/pooled_curvature_floor,d,0,0,273,31
+747,DIAGNOSTIC,official,handling/by_system/rossler/pooled_curvature_floor,d,0,0,273,35
+748,DIAGNOSTIC,official,handling/by_system/chua/pooled_curvature_floor,d,0,0,273,39
+749,DIAGNOSTIC,official,handling/totals/pooled_curvature_floor,d,0,0,273,27
+750,DIAGNOSTIC,official,handling/by_system/lorenz63/regime_target_constant,d,0,0,274,31
+751,DIAGNOSTIC,official,handling/by_system/rossler/regime_target_constant,d,0,0,274,35
+752,DIAGNOSTIC,official,handling/by_system/chua/regime_target_constant,d,0,0,274,39
+753,DIAGNOSTIC,official,handling/totals/regime_target_constant,d,0,0,274,27
+754,DIAGNOSTIC,official,handling/failed_variants,d,0,0,276,28
+755,CROSS-CHECK,const,constants/td_bound/text,,'3.4',3.4,280,206
+756,CROSS-CHECK,td,parts/lorenz63/H2a(i)/d,,'0.0179',0.0179,284,22
+757,CROSS-CHECK,td,parts/lorenz63/H2a(i)/z_sym,,'1.11',1.11,284,31
+758,CROSS-CHECK,td,parts/lorenz63/H2a(i)/z_away,,'1.06',1.06,284,38
+759,CROSS-CHECK,td,parts/lorenz63/H2a(i)/hw,,'1.045',1.045,284,45
+760,CROSS-CHECK,td,parts/lorenz63/H2a(i)/status,,'ok',ok,284,53
+761,CROSS-CHECK,td,parts/lorenz63/H2a(ii) zero/d,,'0.0269',0.0269,285,28
+762,CROSS-CHECK,td,parts/lorenz63/H2a(ii) zero/z_sym,,'0.64',0.64,285,37
+763,CROSS-CHECK,td,parts/lorenz63/H2a(ii) zero/z_away,,'0.65',0.65,285,44
+764,CROSS-CHECK,td,parts/lorenz63/H2a(ii) zero/hw,,'1.196',1.196,285,51
+765,CROSS-CHECK,td,parts/lorenz63/H2a(ii) zero/status,,'ok',ok,285,59
+766,CROSS-CHECK,td,parts/lorenz63/H2a(ii) interior/d,,'0.0299',0.0299,286,32
+767,CROSS-CHECK,td,parts/lorenz63/H2a(ii) interior/z_sym,,'0.53',0.53,286,41
+768,CROSS-CHECK,td,parts/lorenz63/H2a(ii) interior/z_away,,'0.54',0.54,286,48
+769,CROSS-CHECK,td,parts/lorenz63/H2a(ii) interior/hw,,'0.912',0.912,286,55
+770,CROSS-CHECK,td,parts/lorenz63/H2a(ii) interior/status,,'ok',ok,286,63
+771,CROSS-CHECK,td,parts/lorenz63/H2b(i)/d,,'0.0399',0.0399,287,22
+772,CROSS-CHECK,td,parts/lorenz63/H2b(i)/z_sym,,'1.34',1.34,287,31
+773,CROSS-CHECK,td,parts/lorenz63/H2b(i)/z_away,,'1.35',1.35,287,38
+774,CROSS-CHECK,td,parts/lorenz63/H2b(i)/hw,,'0.996',0.996,287,45
+775,CROSS-CHECK,td,parts/lorenz63/H2b(i)/status,,'ok',ok,287,53
+776,CROSS-CHECK,td,parts/lorenz63/H2b(ii)/d,,'-0.0090',-0.0090,288,23
+777,CROSS-CHECK,td,parts/lorenz63/H2b(ii)/z_sym,,'0.61',0.61,288,33
+778,CROSS-CHECK,td,parts/lorenz63/H2b(ii)/z_away,,'0.60',0.60,288,40
+779,CROSS-CHECK,td,parts/lorenz63/H2b(ii)/hw,,'1.076',1.076,288,47
+780,CROSS-CHECK,td,parts/lorenz63/H2b(ii)/status,,'ok',ok,288,55
+781,CROSS-CHECK,td,parts/lorenz63/H3c/d,,'-0.0312',-0.0312,289,19
+782,CROSS-CHECK,td,parts/lorenz63/H3c/z_sym,,'0.28',0.28,289,29
+783,CROSS-CHECK,td,parts/lorenz63/H3c/z_away,,'0.29',0.29,289,36
+784,CROSS-CHECK,td,parts/lorenz63/H3c/hw,,'1.223',1.223,289,43
+785,CROSS-CHECK,td,parts/lorenz63/H3c/status,,'ok',ok,289,51
+786,CROSS-CHECK,td,parts/rossler/H2a(i)/d,,'-0.0047',-0.0047,290,21
+787,CROSS-CHECK,td,parts/rossler/H2a(i)/z_sym,,'0.22',0.22,290,31
+788,CROSS-CHECK,td,parts/rossler/H2a(i)/z_away,,'0.26',0.26,290,38
+789,CROSS-CHECK,td,parts/rossler/H2a(i)/hw,,'1.103',1.103,290,45
+790,CROSS-CHECK,td,parts/rossler/H2a(i)/status,,'ok',ok,290,53
+791,CROSS-CHECK,td,parts/rossler/H2a(ii) zero/d,,'-0.0103',-0.0103,291,27
+792,CROSS-CHECK,td,parts/rossler/H2a(ii) zero/z_sym,,'0.21',0.21,291,37
+793,CROSS-CHECK,td,parts/rossler/H2a(ii) zero/z_away,,'0.21',0.21,291,44
+794,CROSS-CHECK,td,parts/rossler/H2a(ii) zero/hw,,'1.033',1.033,291,51
+795,CROSS-CHECK,td,parts/rossler/H2a(ii) zero/status,,'ok',ok,291,59
+796,CROSS-CHECK,td,parts/rossler/H2a(ii) interior/d,,'-0.0004',-0.0004,292,31
+797,CROSS-CHECK,td,parts/rossler/H2a(ii) interior/z_sym,,'0.01',0.01,292,41
+798,CROSS-CHECK,td,parts/rossler/H2a(ii) interior/z_away,,'0.01',0.01,292,48
+799,CROSS-CHECK,td,parts/rossler/H2a(ii) interior/hw,,'1.262',1.262,292,55
+800,CROSS-CHECK,td,parts/rossler/H2a(ii) interior/status,,'ok',ok,292,63
+801,CROSS-CHECK,td,parts/rossler/H2b(i)/d,,'0.0710',0.0710,293,21
+802,CROSS-CHECK,td,parts/rossler/H2b(i)/z_sym,,'2.32',2.32,293,30
+803,CROSS-CHECK,td,parts/rossler/H2b(i)/z_away,,'2.26',2.26,293,37
+804,CROSS-CHECK,td,parts/rossler/H2b(i)/hw,,'0.948',0.948,293,44
+805,CROSS-CHECK,td,parts/rossler/H2b(i)/status,,'ok',ok,293,52
+806,CROSS-CHECK,td,parts/rossler/H2b(ii)/d,,'0.0073',0.0073,294,22
+807,CROSS-CHECK,td,parts/rossler/H2b(ii)/z_sym,,'0.57',0.57,294,31
+808,CROSS-CHECK,td,parts/rossler/H2b(ii)/z_away,,'0.56',0.56,294,38
+809,CROSS-CHECK,td,parts/rossler/H2b(ii)/hw,,'0.956',0.956,294,45
+810,CROSS-CHECK,td,parts/rossler/H2b(ii)/status,,'ok',ok,294,53
+811,CROSS-CHECK,td,parts/rossler/H3c/d,,'-0.0162',-0.0162,295,18
+812,CROSS-CHECK,td,parts/rossler/H3c/z_sym,,'0.62',0.62,295,28
+813,CROSS-CHECK,td,parts/rossler/H3c/z_away,,'0.62',0.62,295,35
+814,CROSS-CHECK,td,parts/rossler/H3c/hw,,'1.043',1.043,295,42
+815,CROSS-CHECK,td,parts/rossler/H3c/status,,'ok',ok,295,50
+816,CROSS-CHECK,td,parts/chua/H2a(i)/d,,'0.0266',0.0266,296,18
+817,CROSS-CHECK,td,parts/chua/H2a(i)/z_sym,,'1.19',1.19,296,27
+818,CROSS-CHECK,td,parts/chua/H2a(i)/z_away,,'1.07',1.07,296,34
+819,CROSS-CHECK,td,parts/chua/H2a(i)/hw,,'1.488',1.488,296,41
+820,CROSS-CHECK,td,parts/chua/H2a(i)/status,,'ok',ok,296,49
+821,CROSS-CHECK,td,parts/chua/H2a(ii) zero/d,,'0.0217',0.0217,297,24
+822,CROSS-CHECK,td,parts/chua/H2a(ii) zero/z_sym,,'0.46',0.46,297,33
+823,CROSS-CHECK,td,parts/chua/H2a(ii) zero/z_away,,'0.46',0.46,297,40
+824,CROSS-CHECK,td,parts/chua/H2a(ii) zero/hw,,'1.038',1.038,297,47
+825,CROSS-CHECK,td,parts/chua/H2a(ii) zero/status,,'ok',ok,297,55
+826,CROSS-CHECK,td,parts/chua/H2a(ii) interior/d,,'0.0277',0.0277,298,28
+827,CROSS-CHECK,td,parts/chua/H2a(ii) interior/z_sym,,'0.41',0.41,298,37
+828,CROSS-CHECK,td,parts/chua/H2a(ii) interior/z_away,,'0.40',0.40,298,44
+829,CROSS-CHECK,td,parts/chua/H2a(ii) interior/hw,,'0.725',0.725,298,51
+830,CROSS-CHECK,td,parts/chua/H2a(ii) interior/status,,'ok',ok,298,59
+831,CROSS-CHECK,td,parts/chua/H2b(i)/d,,'-0.0350',-0.0350,299,18
+832,CROSS-CHECK,td,parts/chua/H2b(i)/z_sym,,'1.12',1.12,299,28
+833,CROSS-CHECK,td,parts/chua/H2b(i)/z_away,,'1.13',1.13,299,35
+834,CROSS-CHECK,td,parts/chua/H2b(i)/hw,,'0.988',0.988,299,42
+835,CROSS-CHECK,td,parts/chua/H2b(i)/status,,'ok',ok,299,50
+836,CROSS-CHECK,td,parts/chua/H2b(ii)/d,,'0.0233',0.0233,300,19
+837,CROSS-CHECK,td,parts/chua/H2b(ii)/z_sym,,'1.69',1.69,300,28
+838,CROSS-CHECK,td,parts/chua/H2b(ii)/z_away,,'1.67',1.67,300,35
+839,CROSS-CHECK,td,parts/chua/H2b(ii)/hw,,'1.101',1.101,300,42
+840,CROSS-CHECK,td,parts/chua/H2b(ii)/status,,'ok',ok,300,50
+841,CROSS-CHECK,td,parts/chua/H3c/d,,'-0.0174',-0.0174,301,15
+842,CROSS-CHECK,td,parts/chua/H3c/z_sym,,'0.44',0.44,301,25
+843,CROSS-CHECK,td,parts/chua/H3c/z_away,,'0.42',0.42,301,32
+844,CROSS-CHECK,td,parts/chua/H3c/hw,,'1.178',1.178,301,39
+845,CROSS-CHECK,td,parts/chua/H3c/status,,'ok',ok,301,47
+846,CROSS-CHECK,crosscheck,systems/lorenz63/validation/gate/gate_pass,yn,True,yes,307,37
+847,CROSS-CHECK,crosscheck,systems/rossler/validation/gate/gate_pass,yn,True,yes,307,50
+848,CROSS-CHECK,crosscheck,systems/chua/validation/gate/gate_pass,yn,False,no,307,60
+849,CROSS-CHECK,td,total/computed,,'18',18,303,15
+850,CROSS-CHECK,td,total/expected,,'18',18,303,21
+851,CROSS-CHECK,td,total/sum_away,,'15.77',15.77,303,49
+852,CROSS-CHECK,td,total/max_away,,'2.26',2.26,303,73
+853,CROSS-CHECK,td,total/failing,,'0',0,303,93
+854,CROSS-CHECK,const,constants/td_bound/text,,'3.4',3.4,303,102
+855,CROSS-CHECK,td,total/differing,,'52',52,305,54
+856,CROSS-CHECK,td,total/result,,'PASS (exit 0)',PASS (exit 0),305,79
+857,CROSS-CHECK,const,constants/caption_F3/text,,"'Figure F3 (cross-check, information only; v3 §9 item 3, DEC-0031; experiments E1, E2, E4 and E5). For each of the 18 primary parts, the away-arm z value comparing the official CPU run with the GPU run of the same seed, from the compare_runs text (interval procedure: the 98.33% moving-block bootstrap intervals of the two runs). The dashed line is the bound 3.4. This figure changes no verdict.'","Figure F3 (cross-check, information only; v3 §9 item 3, DEC-0031; experiments E1, E2, E4 and E5). For each of the 18 primary parts, the away-arm z value comparing the official CPU run with the GPU run of the same seed, from the compare_runs text (interval procedure: the 98.33% moving-block bootstrap intervals of the two runs). The dashed line is the bound 3.4. This figure changes no verdict.",313,1
+858,,const,constants/coverage_range/text,,'0.923 to 0.947',0.923 to 0.947,329,91
+859,,const,constants/lm_flag_count/text,,'5 of 18',5 of 18,332,80
+860,,official_md,label/H1a,,"'H1a (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass'","H1a (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass",354,2
+861,,official_md,label/H1b,,"'H1b (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass'","H1b (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass",355,2
+862,,official_md,label/H1c,,"'H1c (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass'","H1c (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass",356,2
+863,,official_md,label/H1d,,"'H1d (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass'","H1d (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass",357,2
+864,,official_md,label/Q-N,,"'Q-N (estimate) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (an estimate, read by the table of v3 section 7, not decided)'","Q-N (estimate) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (an estimate, read by the table of v3 section 7, not decided)",358,2
+865,,official_md,label/H2a,,"'H2a (primary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states (all of them, not only the eligible ones) in time order, B = 2000, with the eligibility of part (i) and the domain of part (ii) re-evaluated inside each resample (DEC-0008 A4); level: 1 − 0.05/3 (98.33%); dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: Bonferroni over the three primaries (H2a, H2b, H3c), intersection–union across systems, every part of the criterion must pass; iterative error: the fixed 15-iteration Levenberg–Marquardt error of the PLP estimator is not estimated and is unverified (DEC-0024)'","H2a (primary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states (all of them, not only the eligible ones) in time order, B = 2000, with the eligibility of part (i) and the domain of part (ii) re-evaluated inside each resample (DEC-0008 A4); level: 1 − 0.05/3 (98.33%); dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: Bonferroni over the three primaries (H2a, H2b, H3c), intersection–union across systems, every part of the criterion must pass; iterative error: the fixed 15-iteration Levenberg–Marquardt error of the PLP estimator is not estimated and is unverified (DEC-0024)",359,2
+866,,official_md,label/H2b,,"'H2b (primary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 1 − 0.05/3 (98.33%); dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: Bonferroni over the three primaries (H2a, H2b, H3c), intersection–union across systems, every part of the criterion must pass; iterative error: the fixed 15-iteration Levenberg–Marquardt error of the PLP estimator is not estimated and is unverified (DEC-0024)'","H2b (primary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 1 − 0.05/3 (98.33%); dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: Bonferroni over the three primaries (H2a, H2b, H3c), intersection–union across systems, every part of the criterion must pass; iterative error: the fixed 15-iteration Levenberg–Marquardt error of the PLP estimator is not estimated and is unverified (DEC-0024)",360,2
+867,,official_md,label/H2c,,"'H2c (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass'","H2c (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass",361,2
+868,,official_md,label/H2d,,"'H2d (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass'","H2d (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass",362,2
+869,,official_md,label/H2e,,"'H2e (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass'","H2e (secondary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass",363,2
+870,,official_md,label/gain_bound,,"'(reported) — procedure: none, a fraction of states within the P1 bound is reported with no interval; level: not applicable; dependence: not applicable; multiplicity: none (reported with no pass/fail bar)'","(reported) — procedure: none, a fraction of states within the P1 bound is reported with no interval; level: not applicable; dependence: not applicable; multiplicity: none (reported with no pass/fail bar)",364,2
+871,,official_md,label/H3a,,"'H3a (secondary) — procedure: Holm-adjusted log-rank tests between consecutive regimes, p-values with no interval; level: each adjusted p must be below 0.01; dependence: the log-rank test treats states as independent, serial dependence between neighbouring states is not modelled; multiplicity: Holm over the consecutive comparisons within a system, intersection–union across systems'","H3a (secondary) — procedure: Holm-adjusted log-rank tests between consecutive regimes, p-values with no interval; level: each adjusted p must be below 0.01; dependence: the log-rank test treats states as independent, serial dependence between neighbouring states is not modelled; multiplicity: Holm over the consecutive comparisons within a system, intersection–union across systems",365,2
+872,,official_md,label/H3b,,"'H3b (secondary) — procedure: moving-block bootstrap percentile interval over construction states, blocks of 5 consecutive states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive construction states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass; coverage not measured: the interval conditions on the fitted proxies and is not guaranteed to cover, because the split variable can switch between resamples (the bootstrap of a non-smooth functional; the WU-0006 coverage study has no H3b case)'","H3b (secondary) — procedure: moving-block bootstrap percentile interval over construction states, blocks of 5 consecutive states in time order, B = 2000; level: 95%; dependence: resampled in blocks of 5 consecutive construction states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: none (secondary, unadjusted), intersection–union across systems, every part of the criterion must pass; coverage not measured: the interval conditions on the fitted proxies and is not guaranteed to cover, because the split variable can switch between resamples (the bootstrap of a non-smooth functional; the WU-0006 coverage study has no H3b case)",366,2
+873,,official_md,label/H3c,,"'H3c (primary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 1 − 0.05/3 (98.33%); dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: Bonferroni over the three primaries (H2a, H2b, H3c), intersection–union across systems, every part of the criterion must pass; iterative error: the fixed 15-iteration Levenberg–Marquardt error of the PLP estimator is not estimated and is unverified (DEC-0024)'","H3c (primary) — procedure: moving-block bootstrap percentile interval, blocks of 5 consecutive test states in time order, B = 2000; level: 1 − 0.05/3 (98.33%); dependence: resampled in blocks of 5 consecutive test states in time order (Künsch 1989), so dependence is kept within a block and none is assumed beyond it; multiplicity: Bonferroni over the three primaries (H2a, H2b, H3c), intersection–union across systems, every part of the criterion must pass; iterative error: the fixed 15-iteration Levenberg–Marquardt error of the PLP estimator is not estimated and is unverified (DEC-0024)",367,2
+874,,meta,trace_name,,'2026-10-19-prelim-findings-dryrun-dev2.trace.csv',2026-10-19-prelim-findings-dryrun-dev2.trace.csv,371,70
+875,,meta,missing_count,,'30',30,373,57
