@@ -169,3 +169,29 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
 - 2026-10-18, claude-sonnet-5-5 (developer): WU-0004e **implemented on branch `wu/0004e-citation-seeds`** (from develop e10f65e; not merged): C8 the docstring of `test_regression_ami_delay_lorenz_band` cites Deshmukh et al., arXiv:2003.06509 (Sec. IV.B, Fig. 5) per the researcher's note, docstring only (AST equal); C9 `seeds/development_seeds.json` DEV-1 to DEV-4 `status` unused -> used plus a `note` key (ids, values, schema and DEV-0 untouched; the loader reads only `id` and `value`, no test or hash pins the status). Radius: unit 8 files `406 passed`, integration `test_cli_seeds.py` `8 passed`. **C9 needs owner review before freeze** (seed registry). Note: `seeds/README.md` says "never edit or remove" an entry; only status text was changed, under the owner's ratification of 2026-10-18 (amendments section 36, B9). Pending: independent review.
 - 2026-10-18, claude-sonnet-5-5 (developer): WU-0004e **fix round 1** (review R1 to R4) on `wu/0004e-citation-seeds`: registry notes corrected (V6 context checks only for DEV-3/DEV-4; DEV-1/DEV-2 cite the offline-check note; no V4 claim), docstring attribution of 'shallow' to the researcher's reading, Log records that the first registry edit was a script that bypassed the `ask` rule (owner approval of the exact diff pending; not to be merged until then; this round's seed edits by the Edit tool) and the README conflict (owner item). Unit radius `406 passed`, integration `8 passed`.
 - 2026-10-19, claude-opus-5-5 (planner): WU-0020 **plan written** on branch `wu/prelim-findings-plan` (from develop 044dae2; not merged): preliminary findings document and data presentation for CONF-1 (internal to owner and student until promotion, QA.11). Unit file `WU-0020-preliminary-findings.md`; detail and owner decisions D1 to D10 in `docs/agent/notes/2026-10-19-preliminary-findings-plan.md`. Sub-tasks .1 to .6 (template, `tools/findings_build.py` with test, DEV-2 dry run, review, poster outline, merge) need no sealed output; .7 to .9 wait for the release (WU-0015.4). Depends on WU-0015.4 for .7; feeds WU-0017. No `lpcstudy/` change. Owner checkpoint: release, D1 to D10, reading (WU-0017.3). Status: planned.
+
+## Added 2026-10-20: extension program, phase H (DEC-0037; claude-opus-5-5, planner)
+
+Exploratory development work: DEV seeds only, labeled, never beside the sealed result, never merged to `main`; the freeze and the sealed track (WU-0016 to WU-0018) are untouched and keep priority. Plans in the unit files; schedule, drop order, risks and owner decisions O1 to O9 in `docs/agent/notes/2026-10-20-extension-schedule.md`; ROADMAP.md §8 (takes effect with the owner's ledger entries listed there).
+
+| Unit | Title | Depends on | Owner checkpoint | Status |
+| --- | --- | --- | --- | --- |
+| WU-0021 | Two additional attractors: S1 hyperchaotic Rössler, S2 Lorenz-63 at r = 166.1 (S3 Rössler observed through z optional); bitwise regression of the frozen pipeline | DEC-0037 ledger entries (merge and runs only) | scope ruling O1; O3, O8 | planned (.1, .2 running); **due 2026-10-22** |
+| WU-0022 | Dysts cross-check of Lorenz-63, Rössler, Chua; attribution of the Chua exponent difference | — | DEC-0010 wording proposal | planned |
+| WU-0023 | CP / PLP / A4 comparison on further Dysts systems (first set, pilots) | WU-0021.7 | O9 (cap) | planned; target 2026-10-26 |
+| WU-0024 | Descriptive comparison with the Dysts forecasting benchmark (no ranking) | WU-0026.2 for values | none | planned; target 2026-10-24 |
+| WU-0025 | Extension and ensemble in the 10/28 materials: `findings_build.py` appendix A, research statement, poster outline | WU-0026.2, WU-0021.9, WU-0023.5, WU-0024.3 (each if ready by 10-26 18:00) | O5, O7; poster wording | planned |
+| WU-0026 | Development ensemble records (full, GPU, DEV-1, DEV-3, DEV-4 at develop 3dec086) | runs end | none | in progress (runs launched 05:31) |
+
+Sub-task dependency index:
+
+| Unit | Sub-tasks and their dependencies |
+| --- | --- |
+| WU-0021 | .1 ← —; .2 ← .1; .3 ← —; .4 ← .2, .3; .5 ← .4; .6 ← .5; .7 ← .5; .8 ← .6, .7; .9 ← .8; .4b (S3, optional) ← .5 passed and .6 passed by 10-21 noon |
+| WU-0022 | .1 ← —; .2 ← .1 |
+| WU-0023 | .1 ← WU-0021.1; .2 ← .1, O9; .3 ← WU-0021.7, .2; .4 ← .3; .5 ← .4 |
+| WU-0024 | .1 ← —; .2 ← .1; .3 ← .2, WU-0026.2; .4 ← .3 |
+| WU-0025 | .1 ← —; .2 ← .1; .3 ← WU-0021.2, WU-0022.1; .4 ← .1; .5 ← .2, WU-0026.2 (and WU-0021.9, WU-0023.5, WU-0024.3 if ready); .6 ← .5 |
+| WU-0026 | .1 ← runs end; .2 ← .1 |
+
+- 2026-10-20, claude-opus-5-5 (planner): phase H **planned** on branch `wu/ext-plan` (from develop 22483b4; not merged). Unit files `WU-0021-extension-attractors.md` to `WU-0026-dev-ensemble.md`. Critical path WU-0021.2 → .4 → .5 → .6 → .7 → .8 → .9 (10-22), then WU-0023 (10-26), then WU-0025.5 → .6 (10-27). Acceptance criteria fixed in advance, including R1 (smoke DEV-0 of the three frozen systems, CPU, `LPC_THREADS=1`, bitwise equal to a reference made from code equal to `freeze-1`, outside `provenance/` and `seconds`). Can start now without the ledger entries: WU-0021.3, WU-0021.4 on a branch, WU-0022.1, WU-0024.1, WU-0025.1, WU-0026. Needs the owner's ledger entries before a merge or an extension pilot: scope ruling (LPC.PC.1 lists new systems as out of scope) and the ROADMAP §8 amendment.
