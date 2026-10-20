@@ -702,3 +702,7 @@ Entries DEC-0030, DEC-0031 and DEC-0032 were entered with owner brackets unfille
 4. **Retraction.** The main session's earlier ruling that accepted a "2 to 5% per seed abort hazard" for S1 rested on a wrong mechanism (an integrator instability at the production step, not an escape to infinity: review R1) and is withdrawn.
 
 **Affects:** WU-0021, WU-0023, the extension runs. **Status:** owner instruction; recorded pending the owner's ledger entry.
+
+### DEC-0038 addendum A1 (2026-10-20, main session; correction found by the independent re-review of WU-0021.7, finding N4)
+
+The entry above says option (a) "is approved". The owner's words quoted there are the main session's own list of three items (including "Verdict code. Still pending: option (a)" and "Owner review needed") repeated back, followed by "Proceed with all." The words do not state an approval of the code change as such. The correct reading, which replaces item 1 and item 2 of the reading above: the owner authorized the main session to proceed with implementation, review, merging to `develop` and the development runs of the extension program, with option (a) in place; the owner's own review of these four items is **still pending** and is not claimed as done: the verdict-reporting branch in `lpcstudy/report.py` (`report.verdicts` and the added `extension_text`), the additive field `lyapunov_steps` in `data.lyapunov_record`, and `tests/slow/test_start_states.py`. The change never goes to `main` without that review. The owner may correct this reading.
