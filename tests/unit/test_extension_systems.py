@@ -578,3 +578,41 @@ def test_lorenz_trapping_identity_and_the_s2_bound() -> None:
     assert abs(trapping_radius(sigma, 28.0, beta) - 39.25) < 5e-3
     assert 181.88 < SYSTEMS["lorenz63_r166"].orbit_bound == 185.0
     assert trapping_radius(sigma, 28.0, beta) < SYSTEMS["lorenz63"].orbit_bound
+
+
+# ------------------------------------------- Lyapunov reference rows (R11)
+
+
+def test_lyapunov_references_cover_every_registry_system() -> None:
+    """R11: every registry system has a row; S1 has the published one.
+
+    Reference: the specification note section 1.1 and section 7 R11,
+    typed here: S1 0.1121 (Ramasubramanian and Sriram 1999, Table 1, standard
+    method), tolerance 3%; S2 and S3 have no confirmed published value (empty
+    list). The table builder compares the cached S1 value 0.11251662 with
+    0.1121: the relative difference ``0.11251662 / 0.1121 - 1 = 0.003717`` is
+    computed here by hand and must print as ``+0.37%`` and PASS (3% > 0.37%).
+
+    Tolerance: none for the keys and constants; the printed text is exact.
+    """
+    from lpcstudy import report
+
+    assert set(report.LYAPUNOV_REFERENCES) == set(SYSTEMS)
+    rows = report.LYAPUNOV_REFERENCES["rossler_hyper"]
+    assert len(rows) == 1
+    assert rows[0][:2] == (0.1121, 0.03)
+    assert "Ramasubramanian" in rows[0][2]
+    assert report.LYAPUNOV_REFERENCES["lorenz63_r166"] == []
+    assert report.LYAPUNOV_REFERENCES["rossler_z"] == []
+    results = {
+        "systems": {
+            "rossler_hyper": {"context": {"lambda_max": LAMBDA["rossler_hyper"]}},
+            "lorenz63_r166": {"context": {"lambda_max": LAMBDA["lorenz63_r166"]}},
+        }
+    }
+    lines = report._lyapunov_lines(results, ["rossler_hyper", "lorenz63_r166"])
+    hyper = [ln for ln in lines if ln.startswith("| rossler_hyper")]
+    assert len(hyper) == 1 and "+0.37%" in hyper[0] and "PASS" in hyper[0]
+    other = [ln for ln in lines if ln.startswith("| lorenz63_r166")]
+    assert len(other) == 1
+    assert "no confirmed published value" in other[0]
