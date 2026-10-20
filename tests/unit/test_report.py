@@ -2409,3 +2409,69 @@ def test_extension_note_appears_only_for_per_system_runs() -> None:
     ext = {"verdicts": {"H2a": {"verdict": "per-system only"}}}
     assert extension_note_lines(ext) == ["", EXTENSION_NOTE]
     assert "no overall verdict" in EXTENSION_NOTE
+
+
+def test_extension_text_fixes_the_v3_only_wording_and_fails_on_drift() -> None:
+    """``extension_text`` rewrites the five v3-only phrases and drops Chua lines.
+
+    Reference: the phrases are copied from the generated report of the A7
+    smoke runs of WU-0021 (reviewed text, hand-typed here), and the expected
+    result is written by hand. The Chua paragraph and the Chua memo row go
+    only when Chua is not in the run. A pattern that is absent raises
+    ``ValueError`` (a silent no-op would hide a change of the report text).
+    Exact string checks.
+    """
+    from lpcstudy.report import EXTENSION_REPLACEMENTS, extension_text
+
+    lines = [
+        "the 0.999 quantile of χ²(dof) (18.47 for dof 4) is 0.001",
+        "Validation does not apply: the three systems are mathematical models (NVVUQ.13).",
+        "| Model form: exact model, three systems, scalar observable | e |",
+        "| Round-off | n | 0.0001 (DEVELOPMENT (DEV-0) against the v1 pilot, M5); excludes | 1 |",
+        "of the 18 parts of the five QoIs and three systems (this QoI: class N in 0 of 3 parts)",
+        "Chua at the study's own parameters (α=15.6) has no confirmed value",
+        "| chua, memo parameter set (α=9) | not computed |",
+        "| rossler_z | 0.07 | none | x |",
+    ]
+    out = extension_text(lines, ["rossler_z"])
+    assert out == [
+        "the 0.999 quantile of χ²(dof) (18.47 for dof 4, 16.27 for dof 3: the "
+        "dof of a system is D − m, listed in the table) is 0.001",
+        "Validation does not apply: the systems of this run are mathematical "
+        "models (NVVUQ.13).",
+        "| Model form: exact model, the systems of this run, scalar observable | e |",
+        "| Round-off | n | 0.0001 (DEVELOPMENT (DEV-0) against the v1 pilot, M5; "
+        "calibrated on the three v3 systems, not established for the extension "
+        "systems); excludes | 1 |",
+        "of the 18 parts of the five QoIs and the three v3 systems, not the "
+        "extension systems (this QoI, on the v3 systems: class N in 0 of 3 parts)",
+        "| rossler_z | 0.07 | none | x |",
+    ]
+    kept = extension_text(lines, ["rossler_z", "chua"])
+    assert len(kept) == len(lines)
+    assert len(EXTENSION_REPLACEMENTS) == 5
+    with pytest.raises(ValueError, match="pattern not found"):
+        extension_text(lines[1:], ["rossler_z"])
+
+
+def test_lyapunov_rows_of_extension_systems_do_not_cite_dec_0010() -> None:
+    """S2 and S3 have no published value and the row must not cite DEC-0010.
+
+    Reference: DEC-0010 is the Chua parameter retrieval decision (the study's
+    own Chua parameters); it does not cover the extension systems. Chua keeps
+    its row unchanged (known limitation, DEC-0010). Exact substring checks.
+    """
+    from lpcstudy import report
+
+    results = {
+        "systems": {
+            "lorenz63_r166": {"context": {"lambda_max": 0.6217}},
+            "chua": {"context": {"lambda_max": 0.33}},
+        }
+    }
+    lines = report._lyapunov_lines(results, ["lorenz63_r166", "chua"])
+    ext = [ln for ln in lines if ln.startswith("| lorenz63_r166")]
+    assert len(ext) == 1 and "extension system" in ext[0]
+    assert "NVVUQ.13, DEC-0010" not in ext[0]
+    chua = [ln for ln in lines if ln.startswith("| chua |")]
+    assert len(chua) == 1 and "known limitation, NVVUQ.13, DEC-0010" in chua[0]

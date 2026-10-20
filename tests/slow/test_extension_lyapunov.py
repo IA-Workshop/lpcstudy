@@ -5,12 +5,19 @@ The study's time unit is one Lyapunov time, ``1 / lambda_max``, with
 ``data.lyapunov_record``). For each extension system (S1 ``rossler_hyper``,
 S2 ``lorenz63_r166``, S3 ``rossler_z``) this test checks three things.
 
-1. **The cached value is the specified one.** ``lyapunov_record`` on a fresh
-   cache equals the value of the specification note section 0
-   (``docs/agent/notes/2026-10-20-math-extension-specs.md``) to a relative
-   1e-12 (the cross-host rule of the note, T1; on the host and XLA build of
-   the note it is bitwise, and the test prints whether it is), and its orbit
-   maximum is below the spec's bound.
+1. **Regression guard (not correctness evidence), host- and build-bound.**
+   ``lyapunov_record`` on a fresh cache equals the value of the specification
+   note section 0 (``docs/agent/notes/2026-10-20-math-extension-specs.md``) to
+   a relative 1e-12, and its orbit maximum is below the spec's bound. The
+   expected values were produced by the code's own ``lyapunov_guarded`` on
+   the development host (Intel i9-14900K, CPU, jax and jaxlib 0.11.2), so this
+   compares the code with its earlier output (LPC.PC.21). A chaotic Benettin
+   run of 1e6 to 4e6 steps decorrelates under any change of rounding, so on
+   another CPU or XLA build the value differs at the level of its standard
+   error (0.2% to 1%), not at 1e-12: the test is then skipped with the
+   reason stated, and only check 2 applies. The tolerance is 1e-12 relative
+   (the observed difference on this host is 0 for S2 and S3 and 6.7e-16 for
+   S1). The test name starts with ``test_regression_``.
 2. **The code agrees with an independent Benettin/QR implementation.** The
    reference below is written in this file and imports nothing from
    ``lpcstudy.systems``: its own fields, its own hand-derived Jacobians, its
@@ -30,7 +37,8 @@ S2 ``lorenz63_r166``, S3 ``rossler_z``) this test checks three things.
    long-memory systems underestimates the true uncertainty (S2: about 2% true
    against 1% block, specification note section 1.2), which makes the test
    stricter, not looser; the specification note's own run agrees with the
-   cached value within 1 SE.
+   cached value within 1 SE. This is the correctness check, valid on any
+   host; its tolerance is the 3 sigma above, not the 1e-12 of check 1.
 3. **A literature value is reported, and asserted only where confirmed.** S1:
    0.1121 (Ramasubramanian and Sriram, arXiv:chao-dyn/9909029, Table 1,
    standard method; the researcher read it directly; their second method gives
@@ -228,26 +236,72 @@ def reference_benettin(name: str, n_steps: int):
 # ------------------------------------------------------------------ test
 
 
-@pytest.mark.parametrize("name", sorted(EXPECTED))
-def test_extension_lyapunov_matches_the_specification_and_an_independent_run(
-    name: str, tmp_path, capsys
-) -> None:
-    """A6: cached lambda equals the note's value and an independent Benettin.
+def _build_matches_the_recorded_one() -> str | None:
+    """Return why this is not the recorded host and build, or ``None`` if it is."""
+    cpu = ""
+    try:
+        with open("/proc/cpuinfo") as handle:
+            for line in handle:
+                if line.startswith("model name"):
+                    cpu = line.split(":", 1)[1].strip()
+                    break
+    except OSError:
+        pass
+    if "i9-14900K" not in cpu:
+        return f"CPU {cpu!r} is not the recorded Intel i9-14900K"
+    if jax.default_backend() != "cpu":
+        return f"backend {jax.default_backend()!r} is not cpu"
+    if jax.__version__ != "0.11.2":
+        return f"jax {jax.__version__} is not the recorded 0.11.2"
+    return None
 
-    See the module docstring for the references, the tolerance
-    ``3 sqrt(SE_code^2 + SE_ref^2)`` and its justification.
+
+@pytest.fixture(scope="module", params=sorted(EXPECTED))
+def cached(request, tmp_path_factory) -> tuple[str, float, float]:
+    """Compute ``lyapunov_record`` once per system: (name, value, orbit max)."""
+    name = request.param
+    spec = SYSTEMS[name]
+    path = tmp_path_factory.mktemp(name) / "lyapunov.json"
+    value, orbit_max = lyapunov_record(spec, path)
+    assert json.loads(path.read_text())[name]["lambda_max"] == value
+    return name, value, orbit_max
+
+
+def test_regression_cached_lambda_equals_the_recorded_value(cached) -> None:
+    """Regression guard, host- and build-bound: cached lambda equals the note's.
+
+    This compares the code with its own earlier output (specification note
+    section 0, produced by ``lyapunov_guarded`` on the Intel i9-14900K, CPU,
+    jax 0.11.2), so it is not correctness evidence; the independent Benettin
+    test below is. Tolerance: relative 1e-12 (the observed differences are 0 for
+    S2 and S3 and 6.7e-16 for S1 on the recorded host). Skipped, with the
+    reason, on another CPU or XLA build, where the Benettin value differs at
+    the level of its standard error. The orbit maximum must be below the bound.
     """
+    name, value, orbit_max = cached
+    spec = SYSTEMS[name]
+    assert orbit_max < spec.orbit_bound
+    reason = _build_matches_the_recorded_one()
+    if reason is not None:
+        pytest.skip(f"host-bound regression guard not applicable: {reason}")
+    bitwise = struct.pack("<d", value) == struct.pack("<d", EXPECTED[name])
+    print(f"[A6 {name}] cached {value!r}, bitwise as recorded: {bitwise}")
+    assert abs(value / EXPECTED[name] - 1.0) <= 1e-12, (value, EXPECTED[name])
+
+
+def test_extension_lyapunov_matches_an_independent_benettin_run(
+    cached, capsys
+) -> None:
+    """A6 (correctness): cached lambda against an independent Benettin/QR run.
+
+    Valid on any host. See the module docstring for the reference, the
+    tolerance ``3 sqrt(SE_code^2 + SE_ref^2)`` (20 batch means each) and its
+    justification; the 1e-12 of the regression guard does not apply here.
+    """
+    name, cached_value, orbit_max = cached
     spec = SYSTEMS[name]
     n_steps = spec.lyapunov_steps
     interval = 20 * spec.max_dt
-
-    cached, orbit_max = lyapunov_record(spec, tmp_path / "lyapunov.json")
-    assert json.loads((tmp_path / "lyapunov.json").read_text())[name][
-        "lambda_max"
-    ] == cached
-    bitwise = struct.pack("<d", cached) == struct.pack("<d", EXPECTED[name])
-    assert abs(cached / EXPECTED[name] - 1.0) <= 1e-12, (cached, EXPECTED[name])
-    assert orbit_max < spec.orbit_bound
 
     lam_ref, se_ref, starts, ref_max = reference_benettin(name, n_steps)
     assert ref_max < spec.orbit_bound
@@ -264,24 +318,25 @@ def test_extension_lyapunov_matches_the_specification_and_an_independent_run(
     tolerance = 3.0 * math.sqrt(se_code**2 + se_ref**2)
     with capsys.disabled():
         print(
-            f"\n[A6 {name}] cached {cached!r} (bitwise as specified: "
-            f"{bitwise}); reference {lam_ref:.6f} +- {se_ref:.6f}; code "
+            f"\n[A6 {name}] reference {lam_ref:.6f} +- {se_ref:.6f}; code "
             f"batches {lam_batches:.6f} +- {se_code:.6f}; |cached - ref| = "
-            f"{abs(cached - lam_ref):.3e}, tolerance {tolerance:.3e}; "
+            f"{abs(cached_value - lam_ref):.3e}, tolerance {tolerance:.3e}; "
             f"relative SE of the cached value (code batches) "
-            f"{100 * se_code / cached:.2f}%; orbit max code {orbit_max:.4g}, "
-            f"reference {ref_max:.4g}, bound {spec.orbit_bound:g}"
+            f"{100 * se_code / cached_value:.2f}%; orbit max code "
+            f"{orbit_max:.4g}, reference {ref_max:.4g}, bound "
+            f"{spec.orbit_bound:g}"
         )
         if name == "rossler_hyper":
             print(
                 f"[A6 {name}] published 0.1121 (Ramasubramanian and Sriram): "
-                f"relative difference {100 * (cached / 0.1121 - 1):+.2f}%"
+                f"relative difference {100 * (cached_value / 0.1121 - 1):+.2f}%"
             )
         if name == "rossler_z":
+            reg = 0.07193978510879935
             print(
-                f"[A6 {name}] registry Rossler cached 0.07193978510879935: "
-                f"relative difference {100 * (cached / 0.07193978510879935 - 1):+.2f}%"
+                f"[A6 {name}] registry Rossler cached {reg}: relative "
+                f"difference {100 * (cached_value / reg - 1):+.2f}%"
             )
-    assert abs(cached - lam_ref) <= tolerance
+    assert abs(cached_value - lam_ref) <= tolerance
     if name == "rossler_hyper":
-        assert abs(cached / 0.1121 - 1.0) <= 0.03
+        assert abs(cached_value / 0.1121 - 1.0) <= 0.03

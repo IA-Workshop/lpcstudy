@@ -914,6 +914,15 @@ def _lyapunov_lines(results: dict, systems: list[str]) -> list[str]:
         code = "n/a" if found is None else _fmt(found, 6)
         # A system without an entry raises (PRIME.4).
         references = LYAPUNOV_REFERENCES[s]
+        if s in EXTENSION_SYSTEMS and not references:
+            # The DEC-0010 limitation concerns the Chua parameters only.
+            lines.append(
+                f"| {s} | {code} | none | no confirmed published value | "
+                "n/a | not validated: no confirmed published value at these "
+                "parameters (extension system, WU-0021; the DEC-0010 "
+                "limitation concerns the Chua parameters only) |"
+            )
+            continue
         if not references:
             lines.append(
                 f"| {s} | {code} | none | no confirmed published value | "
@@ -1604,6 +1613,62 @@ def _robustness_lines(results: dict) -> list[str]:
     return lines
 
 
+# Text of an extension run that is wrong or misleading for systems outside the
+# three v3 systems (WU-0021 review R5): (old, new) pairs, each of which must
+# occur in the generated report (a vanished pattern raises, never a silent
+# no-op). Applied only to extension runs, so the report of a v3 run is unchanged.
+EXTENSION_REPLACEMENTS: tuple[tuple[str, str], ...] = (
+    (
+        "(18.47 for dof 4)",
+        "(18.47 for dof 4, 16.27 for dof 3: the dof of a system is D − m, "
+        "listed in the table)",
+    ),
+    (
+        "the three systems are mathematical models",
+        "the systems of this run are mathematical models",
+    ),
+    (
+        "exact model, three systems, scalar observable",
+        "exact model, the systems of this run, scalar observable",
+    ),
+    (
+        "(DEVELOPMENT (DEV-0) against the v1 pilot, M5);",
+        "(DEVELOPMENT (DEV-0) against the v1 pilot, M5; calibrated on the "
+        "three v3 systems, not established for the extension systems);",
+    ),
+    (
+        "and three systems (this QoI:",
+        "and the three v3 systems, not the extension systems (this QoI, on "
+        "the v3 systems:",
+    ),
+)
+# Lines about Chua, dropped from an extension run that does not include Chua.
+CHUA_ONLY_PREFIXES = (
+    "Chua at the study's own parameters",
+    "| chua, memo parameter set",
+)
+
+
+def extension_text(lines: list[str], systems: list[str]) -> list[str]:
+    """Return the report lines of an extension run with the v3-only text fixed.
+
+    Applies ``EXTENSION_REPLACEMENTS`` and, when Chua is not in the run, drops
+    the Chua paragraph and the Chua memo row of the Lyapunov section. Raises
+    ``ValueError`` if a pattern does not occur (the report text changed).
+    """
+    out = list(lines)
+    for old, new in EXTENSION_REPLACEMENTS:
+        hits = sum(line.count(old) for line in out)
+        if hits == 0:
+            raise ValueError(
+                f"extension text pattern not found in the report: {old!r}"
+            )
+        out = [line.replace(old, new) for line in out]
+    if "chua" not in systems:
+        out = [ln for ln in out if not ln.startswith(CHUA_ONLY_PREFIXES)]
+    return out
+
+
 def extension_note_lines(results: dict) -> list[str]:
     """Return the note of an extension run (blank line and text), else ``[]``.
 
@@ -1715,6 +1780,8 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
         "",
         *handling_lines(results, systems),
     ]
+    if extension_note_lines(results):
+        lines = extension_text(lines, systems)
     path.write_text("\n".join(lines) + "\n")
 
 
