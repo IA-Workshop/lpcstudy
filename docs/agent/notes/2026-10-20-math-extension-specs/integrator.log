@@ -1,34 +1,36 @@
-[S1] rossler_hyper: Delta 0.296787, sigma_x 21.4233, 20 states, 30 steps
+[S4] hindmarsh_rose: Delta 0.152518, sigma_x 0.3036, 20 states, 30 steps
     max_dt substeps   V6 stat (h vs h/2)/sigma_x gate <1e-3
-    0.0200       15                    1.686e-05       pass
-    0.0100       30                    1.145e-06       pass
-    0.0050       60                    7.426e-08       pass
-    0.0025      119                    4.905e-09       pass
+    0.0200        8                    8.754e-02       FAIL
+    0.0100       16                    4.940e-03       FAIL
+    0.0050       31                    3.396e-04       pass
+    0.0025       62                    2.074e-05       pass
   observed order p from (h, h/2, h/4) on the max-abs deviation at 1 LT:
-    h 0.0200: |q_h - q_h/2| 1.686e-05, |q_h/2 - q_h/4| 1.145e-06, p 3.88, Richardson error at h/2: 8.33e-08 sigma_x
-    h 0.0100: |q_h - q_h/2| 1.145e-06, |q_h/2 - q_h/4| 7.426e-08, p 3.95, Richardson error at h/2: 5.15e-09 sigma_x
-    h 0.0050: |q_h - q_h/2| 7.426e-08, |q_h/2 - q_h/4| 4.905e-09, p 3.92, Richardson error at h/2: 3.47e-10 sigma_x
-    h 0.0025: |q_h - q_h/2| 4.905e-09, |q_h/2 - q_h/4| 3.094e-10, p 3.99, Richardson error at h/2: 2.08e-11 sigma_x
+    h 0.0200: |q_h - q_h/2| 8.754e-02, |q_h/2 - q_h/4| 4.940e-03, p 4.15, Richardson error at h/2: 2.95e-04 sigma_x
+    h 0.0100: |q_h - q_h/2| 4.940e-03, |q_h/2 - q_h/4| 3.396e-04, p 3.86, Richardson error at h/2: 2.51e-05 sigma_x
+    h 0.0050: |q_h - q_h/2| 3.396e-04, |q_h/2 - q_h/4| 2.074e-05, p 4.03, Richardson error at h/2: 1.35e-06 sigma_x
+    h 0.0025: |q_h - q_h/2| 2.074e-05, |q_h/2 - q_h/4| 1.327e-06, p 3.97, Richardson error at h/2: 9.07e-08 sigma_x
 
-[S2] lorenz63_r166: Delta 0.053725, sigma_x 20.3383, 20 states, 30 steps
+[S5] hyper_jha: Delta 0.093012, sigma_x 9.6587, 20 states, 30 steps
     max_dt substeps   V6 stat (h vs h/2)/sigma_x gate <1e-3
-    0.0080        7                    9.924e-03       FAIL
-    0.0040       14                    3.608e-04       pass
-    0.0020       27                    1.699e-05       pass
-    0.0010       54                    7.454e-07       pass
+    0.0200        5                    1.122e-02       FAIL
+    0.0100       10                    4.857e-03       FAIL
+    0.0050       19                    5.413e-04       pass
+    0.0025       38                    3.907e-05       pass
   observed order p from (h, h/2, h/4) on the max-abs deviation at 1 LT:
-    h 0.0080: |q_h - q_h/2| 9.924e-03, |q_h/2 - q_h/4| 3.608e-04, p 4.78, Richardson error at h/2: 1.36e-05 sigma_x
-    h 0.0040: |q_h - q_h/2| 3.608e-04, |q_h/2 - q_h/4| 1.699e-05, p 4.41, Richardson error at h/2: 8.40e-07 sigma_x
-    h 0.0020: |q_h - q_h/2| 1.699e-05, |q_h/2 - q_h/4| 7.454e-07, p 4.51, Richardson error at h/2: 3.42e-08 sigma_x
-    h 0.0010: |q_h - q_h/2| 7.454e-07, |q_h/2 - q_h/4| 3.660e-08, p 4.35, Richardson error at h/2: 1.89e-09 sigma_x
+    h 0.0200: |q_h - q_h/2| 1.122e-02, |q_h/2 - q_h/4| 4.857e-03, p 1.21, Richardson error at h/2: 3.70e-03 sigma_x
+    h 0.0100: |q_h - q_h/2| 4.857e-03, |q_h/2 - q_h/4| 5.413e-04, p 3.17, Richardson error at h/2: 6.79e-05 sigma_x
+    h 0.0050: |q_h - q_h/2| 5.413e-04, |q_h/2 - q_h/4| 3.907e-05, p 3.79, Richardson error at h/2: 3.04e-06 sigma_x
+    h 0.0025: |q_h - q_h/2| 3.907e-05, |q_h/2 - q_h/4| 2.750e-06, p 3.83, Richardson error at h/2: 2.08e-07 sigma_x
 
-[S3] rossler_z: Delta 0.461657, sigma_x 2.8116, 20 states, 30 steps
+[S6] lorenz96_4: Delta 0.027553, sigma_x 6.9354, 20 states, 30 steps
     max_dt substeps   V6 stat (h vs h/2)/sigma_x gate <1e-3
-    0.0800        6                    1.647e-03       FAIL
-    0.0400       12                    1.186e-04       pass
-    0.0200       24                    7.884e-06       pass
+    0.0200        2                    3.177e-04       pass
+    0.0100        3                    7.479e-05       pass
+    0.0050        6                    5.609e-06       pass
+    0.0025       12                    3.907e-07       pass
   observed order p from (h, h/2, h/4) on the max-abs deviation at 1 LT:
-    h 0.0800: |q_h - q_h/2| 1.647e-03, |q_h/2 - q_h/4| 1.186e-04, p 3.80, Richardson error at h/2: 9.20e-06 sigma_x
-    h 0.0400: |q_h - q_h/2| 1.186e-04, |q_h/2 - q_h/4| 7.884e-06, p 3.91, Richardson error at h/2: 5.61e-07 sigma_x
-    h 0.0200: |q_h - q_h/2| 7.884e-06, |q_h/2 - q_h/4| 5.554e-07, p 3.83, Richardson error at h/2: 4.21e-08 sigma_x
+    h 0.0200: |q_h - q_h/2| 3.177e-04, |q_h/2 - q_h/4| 7.479e-05, p 2.09, Richardson error at h/2: 2.30e-05 sigma_x
+    h 0.0100: |q_h - q_h/2| 7.479e-05, |q_h/2 - q_h/4| 5.609e-06, p 3.74, Richardson error at h/2: 4.55e-07 sigma_x
+    h 0.0050: |q_h - q_h/2| 5.609e-06, |q_h/2 - q_h/4| 3.907e-07, p 3.84, Richardson error at h/2: 2.92e-08 sigma_x
+    h 0.0025: |q_h - q_h/2| 3.907e-07, |q_h/2 - q_h/4| 3.068e-08, p 3.67, Richardson error at h/2: 2.62e-09 sigma_x
 

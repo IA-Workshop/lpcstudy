@@ -32,7 +32,10 @@ def block_se(sp, interval, n_steps, burn_in, n_blocks=50):
     return g.sum() / (n_steps * interval), blocks.std(ddof=1) / math.sqrt(n_blocks)
 
 
-for key, n in (("S1", 1_000_000), ("S2", 4_000_000), ("S3", 1_000_000)):
+import sys
+STEPS = {"S1": 2_000_000, "S2": 4_000_000, "S3": 1_000_000, "S4": 2_000_000, "S5": 2_000_000, "S6": 1_000_000}
+for key in (sys.argv[1:] or ["S1", "S2", "S3"]):
+    n = STEPS[key]
     sp = CANDIDATES[key]()
     interval = 20 * sp.max_dt
     t0 = time.time()
