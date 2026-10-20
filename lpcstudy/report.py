@@ -825,6 +825,21 @@ LYAPUNOV_REFERENCES: dict[str, list[tuple[float, float, str]]] = {
         ),
     ],
     "chua": [],
+    # Extension systems (WU-0021, DEC-0037, specification note 2026-10-20
+    # sections 1.1 and 7 R11). S1: the largest exponent of the standard method
+    # in Ramasubramanian and Sriram, arXiv:chao-dyn/9909029, Table 1 (read by
+    # the researcher); their other method gives 0.1128 and the code's value is
+    # 0.4% away, so the 3% of the Rossler secondary source is generous.
+    "rossler_hyper": [
+        (
+            0.1121,
+            0.03,
+            "Ramasubramanian and Sriram, arXiv:chao-dyn/9909029, Table 1, "
+            "standard method (primary)",
+        )
+    ],
+    "lorenz63_r166": [],
+    "rossler_z": [],
 }
 # A different Chua parameter set (alpha 9, beta 100/7, m0 -8/7, m1 -5/7):
 # 0.23 per circuit time of the memo, divided by 0.7 (tau = 0.7 t, derived),
