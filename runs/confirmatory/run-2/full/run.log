@@ -1,0 +1,228 @@
+2026-10-20 04:51:39,279 INFO provenance: seed id CONF-1, commit df8928fd06721d681469c9c3e40705e1b4b8053f, dirty False
+2026-10-20 04:51:41,822 INFO context ('lorenz63', 7) built in 2.5s: {'lambda_max': 0.9054940534657817, 'interval': 0.03681231611157454, 'delay': 5, 'ami_delay': 5, 'embed_dim': 7, 'acf_time': 9, 'spacing': 45, 'obs_scale': 7.924907899372742, 'trajectory_len': 282146, 'library_len': 100271, 'theiler': 30, 'lyapunov_orbit_max_abs': 19.267721702218743, 'trajectory_max_abs': {'statistics': 19.193823483829128, 'main': 19.26416249732227, 'estimator': 19.461278034414576}, 'start_index': {'main': 5027, 'estimator': 73405}, 'start_state': {'main': [4.9219865676152015, 1.6279881837329928, 27.564833385599457], 'estimator': [0.20220780110206427, 4.695111240891755, 26.72317507450298]}, 'main_digest': '80d5a95c94383169554369a717a754ce6422ce8cfbed3adafa10db52015fe81f', 'estimator_digest': '0f5855021e7223969abb45c6060e6b16cf9cfffc0537f8d86a6b2ad6420d48bf'}
+2026-10-20 04:53:04,583 INFO estimator ('lorenz63', 7, 5, 0.01) trained: {'val_loss_by_width': {64: 0.002678542278548383, 128: 0.0013651737608140824}, 'chosen_width': 128, 'seconds': 82.75957822799683, 'weights_digest': 'a9235b68acc248fcddabf8ed609d3b4eb46b86ad84230075075cf777d26c5338'}
+2026-10-20 05:00:27,937 INFO cell lorenz63 rho=0.010 n_lib=10000 core=True label=base done in 526.1s
+2026-10-20 05:01:31,804 INFO lorenz63 validation (V1-V6; the gate is set after V7): {'delay_jacobian_rel_err': 4.4861699780131365e-09, 'gain_rel_err': np.float64(1.9926276047302167e-09), 'crlb_ratio_median': 0.9553662188328989, 'crlb_ratio_min': 0.8383301964405617, 'crlb_ratio_max': 0.9946945451817525, 'km_max_abs_dev': 0.005830472656782881, 'integrator_max_dev_sigma': 4.360575062346504e-05, 'cp_median_vpt_lyapunov': 1.9666666666666666, 'convergence': {'50': {'median_half_width': 0.05865516791447327, 'mean_abs_dev_from_max': 0.031122073762843802}, '200': {'median_half_width': 0.03663840598846459, 'mean_abs_dev_from_max': 0.019763540951618332}, '800': {'median_half_width': 0.019307149606717408, 'mean_abs_dev_from_max': 0.0}, 'used_M': 200, 'pass': True}, 'estimators': {"('lorenz63', 7, 5, 0.01)": {'val_loss_by_width': {64: 0.002678542278548383, 128: 0.0013651737608140824}, 'chosen_width': 128, 'seconds': 82.75957822799683, 'weights_digest': 'a9235b68acc248fcddabf8ed609d3b4eb46b86ad84230075075cf777d26c5338'}}}
+2026-10-20 05:01:32,398 INFO lorenz63 P2(c) verification: 0 of 4000 states violate, 2965 switching states
+2026-10-20 05:03:08,666 INFO estimator ('lorenz63', 7, 5, 0.005) trained: {'val_loss_by_width': {64: 0.0015524666543906347, 128: 0.0005960094886866245}, 'chosen_width': 128, 'seconds': 69.50466418266296, 'weights_digest': '415e8e9eaf948d21a4743dbb72fbf19c2095373cf7b9d1e1f811a3c3b2665949'}
+2026-10-20 05:04:56,495 INFO cell lorenz63 rho=0.005 n_lib=10000 core=False label=base done in 177.3s
+2026-10-20 05:06:08,002 INFO estimator ('lorenz63', 7, 5, 0.02) trained: {'val_loss_by_width': {64: 0.005065940938416964, 128: 0.0038544367288223134}, 'chosen_width': 128, 'seconds': 71.50546193122864, 'weights_digest': '2ce5d6f658f67389a2154c74c4accbba19ba3bc94d2de7c0e99d1b9489c8c2d2'}
+2026-10-20 05:07:46,207 INFO cell lorenz63 rho=0.020 n_lib=10000 core=False label=base done in 169.7s
+2026-10-20 05:08:57,000 INFO estimator ('lorenz63', 7, 5, 0.05) trained: {'val_loss_by_width': {64: 0.017534884097182242, 128: 0.015155829109123482}, 'chosen_width': 128, 'seconds': 70.79151964187622, 'weights_digest': 'b2335c7e13c894027244bc9290ca71ccc34d233d1c4e796cd2a998dbd0123728'}
+2026-10-20 05:10:35,167 INFO cell lorenz63 rho=0.050 n_lib=10000 core=False label=base done in 169.0s
+2026-10-20 05:12:08,538 INFO cell lorenz63 rho=0.010 n_lib=1000 core=False label=base done in 93.4s
+2026-10-20 05:13:43,879 INFO cell lorenz63 rho=0.010 n_lib=3162 core=False label=base done in 95.3s
+2026-10-20 05:15:15,530 INFO cell lorenz63 rho=0.010 n_lib=31623 core=False label=base done in 91.7s
+2026-10-20 05:16:49,330 INFO cell lorenz63 rho=0.010 n_lib=100000 core=False label=base done in 93.8s
+2026-10-20 05:18:20,906 INFO cell lorenz63 rho=0.020 n_lib=1000 core=False label=base done in 91.6s
+2026-10-20 05:20:08,487 INFO cell lorenz63 rho=0.020 n_lib=3162 core=False label=base done in 107.6s
+2026-10-20 05:21:40,362 INFO cell lorenz63 rho=0.020 n_lib=31623 core=False label=base done in 91.9s
+2026-10-20 05:22:59,323 INFO cell lorenz63 rho=0.020 n_lib=100000 core=False label=base done in 79.0s
+2026-10-20 05:22:59,574 INFO lorenz63 validation gate: {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=10000|core: zero_variance_corr = 248400 of 960000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 248400 of 960000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=10000|core: lm_nonfinite_cost = 7 of 816000 estimates
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 137 of 16000 nu_cap_estimates
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.005|n_lib=10000|sweep: zero_variance_corr = 2800 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.005|n_lib=10000|sweep: zero_variance_corr_cp = 2800 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.02|n_lib=10000|sweep: zero_variance_corr = 290 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.02|n_lib=10000|sweep: zero_variance_corr_cp = 290 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.05|n_lib=10000|sweep: zero_variance_corr = 15 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.05|n_lib=10000|sweep: zero_variance_corr_cp = 15 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=1000|sweep: zero_variance_corr = 3500 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=1000|sweep: zero_variance_corr_cp = 3500 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=1000|sweep: lm_nonfinite_cost = 3 of 200000 estimates
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=3162|sweep: zero_variance_corr = 2360 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=3162|sweep: zero_variance_corr_cp = 2360 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=3162|sweep: lm_nonfinite_cost = 3 of 200000 estimates
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=31623|sweep: zero_variance_corr = 360 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=31623|sweep: zero_variance_corr_cp = 360 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=31623|sweep: lm_nonfinite_cost = 3 of 200000 estimates
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=100000|sweep: zero_variance_corr = 80 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=100000|sweep: zero_variance_corr_cp = 80 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.01|n_lib=100000|sweep: lm_nonfinite_cost = 3 of 200000 estimates
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.02|n_lib=1000|sweep: zero_variance_corr = 2195 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.02|n_lib=1000|sweep: zero_variance_corr_cp = 2195 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.02|n_lib=3162|sweep: zero_variance_corr = 920 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.02|n_lib=3162|sweep: zero_variance_corr_cp = 920 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.02|n_lib=31623|sweep: zero_variance_corr = 55 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.02|n_lib=31623|sweep: zero_variance_corr_cp = 55 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.02|n_lib=100000|sweep: zero_variance_corr = 10 of 5000 moment_entries
+2026-10-20 05:23:31,654 WARNING handling lorenz63 base|rho=0.02|n_lib=100000|sweep: zero_variance_corr_cp = 10 of 5000 moment_entries
+2026-10-20 05:23:31,654 INFO handling lorenz63: 30 nonzero counters in 19 blocks
+2026-10-20 05:23:31,654 INFO lorenz63 finished in 1912s
+2026-10-20 05:23:33,744 INFO context ('rossler', 7) built in 2.1s: {'lambda_max': 0.07193978510879935, 'interval': 0.4633504712715099, 'delay': 3, 'ami_delay': 3, 'embed_dim': 7, 'acf_time': 1500, 'spacing': 150, 'obs_scale': 5.149956526819005, 'trajectory_len': 701735, 'library_len': 100259, 'theiler': 30, 'lyapunov_orbit_max_abs': 11.432287285529059, 'trajectory_max_abs': {'statistics': 11.433133265324681, 'main': 11.433160913492749, 'estimator': 11.433201635219904}, 'start_index': {'main': 15189, 'estimator': 100014}, 'start_state': {'main': [3.7742351575526145, -9.196606318050213, 0.05302812212991438], 'estimator': [3.902217302078302, 0.5346276768804343, 0.09723867974698797]}, 'main_digest': 'b5bb30634c0e30b00bc541e302b72c7d482d8ae19299968c6d07c1bfcfe6c4ad', 'estimator_digest': 'fb0db6b4efd7c38289f412f0d955bc3ac27c32559830ff6eadcb70e64d6acbf5'}
+2026-10-20 05:24:33,366 INFO estimator ('rossler', 7, 3, 0.01) trained: {'val_loss_by_width': {64: 0.0017543256383720574, 128: 0.0016435905129389315}, 'chosen_width': 128, 'seconds': 59.621076345443726, 'weights_digest': 'f1aacc0e79311734ac35cc8d4424acf5c232e6f43c7d79ddae2682b7e9bb9322'}
+2026-10-20 05:32:54,804 INFO cell rossler rho=0.010 n_lib=10000 core=True label=base done in 561.1s
+2026-10-20 05:33:23,492 INFO rossler validation (V1-V6; the gate is set after V7): {'delay_jacobian_rel_err': 1.4442344862237065e-09, 'gain_rel_err': np.float64(9.675384240327863e-10), 'crlb_ratio_median': 0.9344934866889696, 'crlb_ratio_min': 0.8876796685115012, 'crlb_ratio_max': 1.0973932510493671, 'km_max_abs_dev': 0.005830472656782881, 'integrator_max_dev_sigma': 3.651242960411335e-05, 'cp_median_vpt_lyapunov': 3.433333333333333, 'convergence': {'50': {'median_half_width': 0.05075139208095812, 'mean_abs_dev_from_max': 0.024285420396479757}, '200': {'median_half_width': 0.028118671008192722, 'mean_abs_dev_from_max': 0.011190409259198642}, '800': {'median_half_width': 0.01540373410386685, 'mean_abs_dev_from_max': 0.0}, 'used_M': 200, 'pass': True}, 'estimators': {"('rossler', 7, 3, 0.01)": {'val_loss_by_width': {64: 0.0017543256383720574, 128: 0.0016435905129389315}, 'chosen_width': 128, 'seconds': 59.621076345443726, 'weights_digest': 'f1aacc0e79311734ac35cc8d4424acf5c232e6f43c7d79ddae2682b7e9bb9322'}}}
+2026-10-20 05:33:23,745 INFO rossler P2(c) verification: 0 of 4000 states violate, 3503 switching states
+2026-10-20 05:34:34,949 INFO estimator ('rossler', 7, 3, 0.005) trained: {'val_loss_by_width': {64: 0.0006788118521512806, 128: 0.0005731973674025123}, 'chosen_width': 128, 'seconds': 56.81293439865112, 'weights_digest': 'd94dd0a3621d7183c6e16ed8f5c121bbdad8722b7d16a36af87619cda52f7db1'}
+2026-10-20 05:37:05,554 INFO cell rossler rho=0.005 n_lib=10000 core=False label=base done in 207.4s
+2026-10-20 05:37:55,785 INFO estimator ('rossler', 7, 3, 0.02) trained: {'val_loss_by_width': {64: 0.004952032972576505, 128: 0.004122030375127611}, 'chosen_width': 128, 'seconds': 50.230690479278564, 'weights_digest': 'cfe65e240666510b2a05185ef0bae0c4cbb274bebcf81cf3bbd3d7b96ae9d4ff'}
+2026-10-20 05:38:55,746 INFO cell rossler rho=0.020 n_lib=10000 core=False label=base done in 110.2s
+2026-10-20 05:39:19,987 INFO estimator ('rossler', 7, 3, 0.05) trained: {'val_loss_by_width': {64: 0.018143686094335486, 128: 0.013831549227108266}, 'chosen_width': 128, 'seconds': 24.24116563796997, 'weights_digest': '2f38d061d790874b9bd143fe75ac805751163027fc3b5eff7084484d19d462df'}
+2026-10-20 05:40:02,607 INFO cell rossler rho=0.050 n_lib=10000 core=False label=base done in 66.9s
+2026-10-20 05:40:45,706 INFO cell rossler rho=0.010 n_lib=1000 core=False label=base done in 43.1s
+2026-10-20 05:41:28,173 INFO cell rossler rho=0.010 n_lib=3162 core=False label=base done in 42.5s
+2026-10-20 05:42:07,079 INFO cell rossler rho=0.010 n_lib=31623 core=False label=base done in 38.9s
+2026-10-20 05:43:11,675 INFO cell rossler rho=0.010 n_lib=100000 core=False label=base done in 64.6s
+2026-10-20 05:44:53,848 INFO cell rossler rho=0.020 n_lib=1000 core=False label=base done in 102.2s
+2026-10-20 05:46:14,752 INFO cell rossler rho=0.020 n_lib=3162 core=False label=base done in 80.9s
+2026-10-20 05:47:09,315 INFO cell rossler rho=0.020 n_lib=31623 core=False label=base done in 54.6s
+2026-10-20 05:47:51,742 INFO cell rossler rho=0.020 n_lib=100000 core=False label=base done in 42.4s
+2026-10-20 05:47:51,921 INFO rossler validation gate: {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.01|n_lib=10000|core: zero_variance_corr = 119280 of 960000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 119280 of 960000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 180 of 16000 nu_cap_estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.005|n_lib=10000|sweep: zero_variance_corr = 2030 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.005|n_lib=10000|sweep: zero_variance_corr_cp = 2030 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=10000|sweep: invariant_mean_replacements = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=10000|sweep: nu_replacements = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=10000|sweep: zero_variance_corr = 60 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=10000|sweep: zero_variance_corr_cp = 60 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=10000|sweep: lm_nonfinite_cost = 33 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=10000|sweep: lm_nonfinite_jacobian = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.05|n_lib=10000|sweep: invariant_mean_replacements = 116 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.05|n_lib=10000|sweep: nu_replacements = 116 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.05|n_lib=10000|sweep: lm_nonfinite_cost = 326 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.05|n_lib=10000|sweep: lm_nonfinite_jacobian = 116 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.01|n_lib=1000|sweep: zero_variance_corr = 3050 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.01|n_lib=1000|sweep: zero_variance_corr_cp = 3050 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.01|n_lib=3162|sweep: zero_variance_corr = 1775 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.01|n_lib=3162|sweep: zero_variance_corr_cp = 1775 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.01|n_lib=31623|sweep: zero_variance_corr = 120 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.01|n_lib=31623|sweep: zero_variance_corr_cp = 120 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=1000|sweep: invariant_mean_replacements = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=1000|sweep: nu_replacements = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=1000|sweep: zero_variance_corr = 1460 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=1000|sweep: zero_variance_corr_cp = 1460 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=1000|sweep: lm_nonfinite_cost = 33 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=1000|sweep: lm_nonfinite_jacobian = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=3162|sweep: invariant_mean_replacements = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=3162|sweep: nu_replacements = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=3162|sweep: zero_variance_corr = 460 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=3162|sweep: zero_variance_corr_cp = 460 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=3162|sweep: lm_nonfinite_cost = 33 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=3162|sweep: lm_nonfinite_jacobian = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=31623|sweep: invariant_mean_replacements = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=31623|sweep: nu_replacements = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=31623|sweep: zero_variance_corr = 5 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=31623|sweep: zero_variance_corr_cp = 5 of 5000 moment_entries
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=31623|sweep: lm_nonfinite_cost = 33 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=31623|sweep: lm_nonfinite_jacobian = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=100000|sweep: invariant_mean_replacements = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=100000|sweep: nu_replacements = 25 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=100000|sweep: lm_nonfinite_cost = 33 of 200000 estimates
+2026-10-20 05:48:21,798 WARNING handling rossler base|rho=0.02|n_lib=100000|sweep: lm_nonfinite_jacobian = 25 of 200000 estimates
+2026-10-20 05:48:21,798 INFO handling rossler: 43 nonzero counters in 19 blocks
+2026-10-20 05:48:21,798 INFO rossler finished in 1490s
+2026-10-20 05:48:23,554 INFO context ('chua', 7) built in 1.8s: {'lambda_max': 0.43113260161336364, 'interval': 0.07731573350889016, 'delay': 5, 'ami_delay': 5, 'embed_dim': 7, 'acf_time': 76, 'spacing': 150, 'obs_scale': 1.4189768372671627, 'trajectory_len': 701831, 'library_len': 100271, 'theiler': 30, 'lyapunov_orbit_max_abs': 2.2630536344327434, 'trajectory_max_abs': {'statistics': 2.26307137050988, 'main': 2.2630766422669657, 'estimator': 2.2630833091790015}, 'start_index': {'main': 141948, 'estimator': 185848}, 'start_state': {'main': [1.0135346121597326, -0.2852362337333646, -1.3984099883977932], 'estimator': [1.4056500159562122, -0.19612954821597609, -2.3353663903428035]}, 'main_digest': 'ccfb680da5b00c248a3083cfe03087e7a2412748d3e8206258051e3a39288697', 'estimator_digest': '7069745e86711a09bbfdcc2253e0f5d0194a9a4b494dd51d3e419f41398d4904'}
+2026-10-20 05:48:47,012 INFO estimator ('chua', 7, 5, 0.01) trained: {'val_loss_by_width': {64: 0.0017293397839942346, 128: 0.0014425143551604518}, 'chosen_width': 128, 'seconds': 23.457501888275146, 'weights_digest': '8b3f161be8a9d49895b62b97a4a6ddb8c4590b1f7cce4f7cbd9b5b09605164f7'}
+2026-10-20 05:58:44,923 INFO cell chua rho=0.010 n_lib=10000 core=True label=base done in 621.4s
+2026-10-20 05:59:38,382 INFO chua validation (V1-V6; the gate is set after V7): {'delay_jacobian_rel_err': 2.282395061176139e-09, 'gain_rel_err': np.float64(1.4422725811450024e-09), 'crlb_ratio_median': 0.9467584249898444, 'crlb_ratio_min': 0.9291192294938044, 'crlb_ratio_max': 1.0111679016392698, 'km_max_abs_dev': 0.005830472656782881, 'integrator_max_dev_sigma': 0.0005837407854961925, 'cp_median_vpt_lyapunov': 2.8, 'convergence': {'50': {'median_half_width': 0.08124585450119826, 'mean_abs_dev_from_max': 0.061141133121937016}, '200': {'median_half_width': 0.04672225912904342, 'mean_abs_dev_from_max': 0.02785940811890515}, '800': {'median_half_width': 0.023785635214632804, 'mean_abs_dev_from_max': 0.0}, 'used_M': 200, 'pass': True}, 'estimators': {"('chua', 7, 5, 0.01)": {'val_loss_by_width': {64: 0.0017293397839942346, 128: 0.0014425143551604518}, 'chosen_width': 128, 'seconds': 23.457501888275146, 'weights_digest': '8b3f161be8a9d49895b62b97a4a6ddb8c4590b1f7cce4f7cbd9b5b09605164f7'}}}
+2026-10-20 05:59:38,634 INFO chua P2(c) verification: 0 of 4000 states violate, 3437 switching states
+2026-10-20 06:00:20,118 INFO estimator ('chua', 7, 5, 0.005) trained: {'val_loss_by_width': {64: 0.0009253546690354, 128: 0.0005632565392775848}, 'chosen_width': 128, 'seconds': 30.17276954650879, 'weights_digest': 'a95c82f1e1349e4fb6e99cf511d86a98f245e2b83e59236120c0d17ad69584ac'}
+2026-10-20 06:02:05,064 INFO cell chua rho=0.005 n_lib=10000 core=False label=base done in 135.1s
+2026-10-20 06:02:28,759 INFO estimator ('chua', 7, 5, 0.02) trained: {'val_loss_by_width': {64: 0.004707208923933886, 128: 0.003959985480071804}, 'chosen_width': 128, 'seconds': 23.694244146347046, 'weights_digest': '29498f163b73af4e38e810a31c25228ba92a50987c4e83cb2052ad7053f424e7'}
+2026-10-20 06:04:21,610 INFO cell chua rho=0.020 n_lib=10000 core=False label=base done in 136.5s
+2026-10-20 06:04:55,075 INFO estimator ('chua', 7, 5, 0.05) trained: {'val_loss_by_width': {64: 0.018279915332943642, 128: 0.015377850742689617}, 'chosen_width': 128, 'seconds': 33.46403098106384, 'weights_digest': '7a49d5fc244503ef0efc382b3ec4ac25f617e4a5868c5d9c621888e2c98e89df'}
+2026-10-20 06:08:18,095 INFO cell chua rho=0.050 n_lib=10000 core=False label=base done in 236.5s
+2026-10-20 06:09:44,767 INFO cell chua rho=0.010 n_lib=1000 core=False label=base done in 86.7s
+2026-10-20 06:11:18,758 INFO cell chua rho=0.010 n_lib=3162 core=False label=base done in 94.0s
+2026-10-20 06:12:47,650 INFO cell chua rho=0.010 n_lib=31623 core=False label=base done in 88.9s
+2026-10-20 06:15:51,951 INFO cell chua rho=0.010 n_lib=100000 core=False label=base done in 184.3s
+2026-10-20 06:18:46,132 INFO cell chua rho=0.020 n_lib=1000 core=False label=base done in 174.2s
+2026-10-20 06:20:26,199 INFO cell chua rho=0.020 n_lib=3162 core=False label=base done in 100.1s
+2026-10-20 06:22:23,935 INFO cell chua rho=0.020 n_lib=31623 core=False label=base done in 117.7s
+2026-10-20 06:24:52,544 INFO cell chua rho=0.020 n_lib=100000 core=False label=base done in 148.6s
+2026-10-20 06:24:52,726 INFO chua validation gate: {'V1': True, 'V2': True, 'V4': True, 'V5': True, 'V6': True, 'V7': True, 'gate_pass': True}
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=10000|core: zero_variance_corr = 135120 of 960000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 135120 of 960000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 130 of 16000 nu_cap_estimates
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.005|n_lib=10000|sweep: zero_variance_corr = 1825 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.005|n_lib=10000|sweep: zero_variance_corr_cp = 1825 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.02|n_lib=10000|sweep: zero_variance_corr = 160 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.02|n_lib=10000|sweep: zero_variance_corr_cp = 160 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.05|n_lib=10000|sweep: error_clips = 1 of no denominator (total)
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.05|n_lib=10000|sweep: error_clips_plp = 1 of 1000000 error_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.05|n_lib=10000|sweep: zero_variance_corr = 15 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.05|n_lib=10000|sweep: zero_variance_corr_cp = 15 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=1000|sweep: zero_variance_corr = 2855 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=1000|sweep: zero_variance_corr_cp = 2855 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=3162|sweep: zero_variance_corr = 1495 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=3162|sweep: zero_variance_corr_cp = 1495 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=31623|sweep: zero_variance_corr = 275 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=31623|sweep: zero_variance_corr_cp = 275 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=100000|sweep: zero_variance_corr = 85 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.01|n_lib=100000|sweep: zero_variance_corr_cp = 85 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.02|n_lib=1000|sweep: zero_variance_corr = 1505 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.02|n_lib=1000|sweep: zero_variance_corr_cp = 1505 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.02|n_lib=3162|sweep: zero_variance_corr = 435 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.02|n_lib=3162|sweep: zero_variance_corr_cp = 435 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.02|n_lib=31623|sweep: zero_variance_corr = 90 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.02|n_lib=31623|sweep: zero_variance_corr_cp = 90 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.02|n_lib=100000|sweep: zero_variance_corr = 5 of 5000 moment_entries
+2026-10-20 06:25:23,969 WARNING handling chua base|rho=0.02|n_lib=100000|sweep: zero_variance_corr_cp = 5 of 5000 moment_entries
+2026-10-20 06:25:23,969 INFO handling chua: 27 nonzero counters in 19 blocks
+2026-10-20 06:25:23,969 INFO chua finished in 2222s
+2026-10-20 06:25:25,451 INFO context ('lorenz63', 5) built in 0.8s: {'lambda_max': 0.9054940534657817, 'interval': 0.03681231611157454, 'delay': 5, 'ami_delay': 5, 'embed_dim': 5, 'acf_time': 9, 'spacing': 45, 'obs_scale': 7.924907899372742, 'trajectory_len': 282066, 'library_len': 100261, 'theiler': 30, 'lyapunov_orbit_max_abs': 19.267721702218743, 'trajectory_max_abs': {'statistics': 19.193823483829128, 'main': 19.26416249732227, 'estimator': 19.461278034414576}, 'start_index': {'main': 5027, 'estimator': 73405}, 'start_state': {'main': [4.9219865676152015, 1.6279881837329928, 27.564833385599457], 'estimator': [0.20220780110206427, 4.695111240891755, 26.72317507450298]}, 'main_digest': '951eea71cc3904289d4adfad6a79394756b3e5451f7a1d25e8f858ff6a11ab2f', 'estimator_digest': 'd43ce30a9d0f608a87366c2200567e07df91c2f732dac83613179a01664115bb'}
+2026-10-20 06:25:49,481 INFO estimator ('lorenz63', 5, 5, 0.01) trained: {'val_loss_by_width': {64: 0.0030827022115746602, 128: 0.0025359209476295387}, 'chosen_width': 128, 'seconds': 24.0293447971344, 'weights_digest': 'c9cd17fd751c2d45c06942163e95d44878ffad631c7597b73c52e71067b83a40'}
+2026-10-20 06:27:33,427 INFO cell lorenz63 rho=0.010 n_lib=10000 core=True label=D=5 done in 128.8s
+2026-10-20 06:27:47,772 INFO context ('lorenz63', 10) built in 0.8s: {'lambda_max': 0.9054940534657817, 'interval': 0.03681231611157454, 'delay': 3, 'ami_delay': 5, 'embed_dim': 10, 'acf_time': 9, 'spacing': 45, 'obs_scale': 7.924907899372742, 'trajectory_len': 282122, 'library_len': 100268, 'theiler': 30, 'lyapunov_orbit_max_abs': 19.267721702218743, 'trajectory_max_abs': {'statistics': 19.193823483829128, 'main': 19.26416249732227, 'estimator': 19.461278034414576}, 'start_index': {'main': 5027, 'estimator': 73405}, 'start_state': {'main': [4.9219865676152015, 1.6279881837329928, 27.564833385599457], 'estimator': [0.20220780110206427, 4.695111240891755, 26.72317507450298]}, 'main_digest': '5bfdc682db135c83eddd2c30ebf548004af029d004d5b89ed5257b411e0a320e', 'estimator_digest': '81e5459f89d0d3337b7f45c664535c47c259449317a2dfce0dca21b3d836d676'}
+2026-10-20 06:28:14,643 INFO estimator ('lorenz63', 10, 3, 0.01) trained: {'val_loss_by_width': {64: 0.0013510369736344711, 128: 0.0012791931955018188}, 'chosen_width': 128, 'seconds': 26.870803356170654, 'weights_digest': '4bff431038142d07f212dbfa6ec770695840b603449846e3a2bb2acdb9b7c101'}
+2026-10-20 06:30:51,034 INFO cell lorenz63 rho=0.010 n_lib=10000 core=True label=D=10 done in 184.1s
+2026-10-20 06:33:38,900 INFO cell lorenz63 rho=0.010 n_lib=10000 core=True label=k=5 done in 147.5s
+2026-10-20 06:36:00,101 INFO cell lorenz63 rho=0.010 n_lib=10000 core=True label=misspec=0.05 done in 131.7s
+2026-10-20 06:40:07,584 INFO cell lorenz63 rho=0.010 n_lib=10000 core=True label=misspec=0.1 done in 234.8s
+2026-10-20 06:40:23,360 INFO context ('rossler', 5) built in 1.0s: {'lambda_max': 0.07193978510879935, 'interval': 0.4633504712715099, 'delay': 3, 'ami_delay': 3, 'embed_dim': 5, 'acf_time': 1500, 'spacing': 150, 'obs_scale': 5.149956526819005, 'trajectory_len': 701687, 'library_len': 100253, 'theiler': 30, 'lyapunov_orbit_max_abs': 11.432287285529059, 'trajectory_max_abs': {'statistics': 11.433133265324681, 'main': 11.433160913492749, 'estimator': 11.433201635219904}, 'start_index': {'main': 15189, 'estimator': 100014}, 'start_state': {'main': [3.7742351575526145, -9.196606318050213, 0.05302812212991438], 'estimator': [3.902217302078302, 0.5346276768804343, 0.09723867974698797]}, 'main_digest': 'a0bba786c81d62414093bf3928352d1a81b6c02eba85bdbb5ad25206add0b8b4', 'estimator_digest': 'a621e31d59c77ba073d61060d683bedf9cde062299d9f7eba9ebe4813f9df4a5'}
+2026-10-20 06:40:59,037 INFO estimator ('rossler', 5, 3, 0.01) trained: {'val_loss_by_width': {64: 0.0026091776636601844, 128: 0.001984122839963866}, 'chosen_width': 128, 'seconds': 35.67657542228699, 'weights_digest': 'db57ccce6ffd0c41db54effd3a990025ce9327db9b8d33e478d9d879a350a791'}
+2026-10-20 06:43:52,747 INFO cell rossler rho=0.010 n_lib=10000 core=True label=D=5 done in 210.4s
+2026-10-20 06:44:05,070 INFO context ('rossler', 10) built in 1.1s: {'lambda_max': 0.07193978510879935, 'interval': 0.4633504712715099, 'delay': 3, 'ami_delay': 3, 'embed_dim': 10, 'acf_time': 1500, 'spacing': 150, 'obs_scale': 5.149956526819005, 'trajectory_len': 701807, 'library_len': 100268, 'theiler': 30, 'lyapunov_orbit_max_abs': 11.432287285529059, 'trajectory_max_abs': {'statistics': 11.433133265324681, 'main': 11.433160913492749, 'estimator': 11.433201635219904}, 'start_index': {'main': 15189, 'estimator': 100014}, 'start_state': {'main': [3.7742351575526145, -9.196606318050213, 0.05302812212991438], 'estimator': [3.902217302078302, 0.5346276768804343, 0.09723867974698797]}, 'main_digest': 'db57f23de0cc91aa3021517f7296c33d0287c7f36eaf7bc4c7dc0f4131071cb0', 'estimator_digest': 'f2869b044180ad306d1ffe76d3831c88720d815b60844d8ceaa702b540e6e4e8'}
+2026-10-20 06:44:34,505 INFO estimator ('rossler', 10, 3, 0.01) trained: {'val_loss_by_width': {64: 0.002006692283541737, 128: 0.0016186333598538767}, 'chosen_width': 128, 'seconds': 29.434972763061523, 'weights_digest': 'f8090c4464c54e367c8357756d7c2e726c70b1d5fa9cc7840a3a990f2caa53be'}
+2026-10-20 06:50:05,371 INFO cell rossler rho=0.010 n_lib=10000 core=True label=D=10 done in 361.4s
+2026-10-20 06:54:04,579 INFO cell rossler rho=0.010 n_lib=10000 core=True label=k=5 done in 229.7s
+2026-10-20 06:58:41,821 INFO cell rossler rho=0.010 n_lib=10000 core=True label=misspec=0.05 done in 267.9s
+2026-10-20 07:02:52,004 INFO cell rossler rho=0.010 n_lib=10000 core=True label=misspec=0.1 done in 234.3s
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness D=5|rho=0.01|n_lib=10000|core: zero_variance_corr = 110880 of 960000 moment_entries
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness D=5|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 110880 of 960000 moment_entries
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness D=5|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 177 of 16000 nu_cap_estimates
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness D=10|rho=0.01|n_lib=10000|core: zero_variance_corr = 279360 of 960000 moment_entries
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness D=10|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 279360 of 960000 moment_entries
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness D=10|rho=0.01|n_lib=10000|core: lm_nonfinite_cost = 1 of 816000 estimates
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness D=10|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 180 of 16000 nu_cap_estimates
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness k=5|rho=0.01|n_lib=10000|core: zero_variance_corr = 49809 of 960000 moment_entries
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness k=5|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 49809 of 960000 moment_entries
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness k=5|rho=0.01|n_lib=10000|core: lm_nonfinite_cost = 7 of 816000 estimates
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness k=5|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 137 of 16000 nu_cap_estimates
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness misspec=0.05|rho=0.01|n_lib=10000|core: zero_variance_corr = 248400 of 960000 moment_entries
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness misspec=0.05|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 248400 of 960000 moment_entries
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness misspec=0.05|rho=0.01|n_lib=10000|core: lm_nonfinite_cost = 4 of 816000 estimates
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness misspec=0.05|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 135 of 16000 nu_cap_estimates
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness misspec=0.1|rho=0.01|n_lib=10000|core: zero_variance_corr = 248400 of 960000 moment_entries
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness misspec=0.1|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 248400 of 960000 moment_entries
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness misspec=0.1|rho=0.01|n_lib=10000|core: lm_nonfinite_cost = 1 of 816000 estimates
+2026-10-20 07:03:03,691 WARNING handling lorenz63 robustness misspec=0.1|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 136 of 16000 nu_cap_estimates
+2026-10-20 07:03:03,691 INFO handling lorenz63 robustness: 19 nonzero counters in 21 blocks
+2026-10-20 07:03:03,691 WARNING handling rossler robustness D=5|rho=0.01|n_lib=10000|core: invariant_mean_replacements = 8 of 816000 estimates
+2026-10-20 07:03:03,691 WARNING handling rossler robustness D=5|rho=0.01|n_lib=10000|core: nu_replacements = 8 of 816000 estimates
+2026-10-20 07:03:03,692 WARNING handling rossler robustness D=5|rho=0.01|n_lib=10000|core: zero_variance_corr = 59760 of 960000 moment_entries
+2026-10-20 07:03:03,692 WARNING handling rossler robustness D=5|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 59760 of 960000 moment_entries
+2026-10-20 07:03:03,692 WARNING handling rossler robustness D=5|rho=0.01|n_lib=10000|core: lm_nonfinite_cost = 12 of 816000 estimates
+2026-10-20 07:03:03,692 WARNING handling rossler robustness D=5|rho=0.01|n_lib=10000|core: lm_nonfinite_jacobian = 8 of 816000 estimates
+2026-10-20 07:03:03,692 WARNING handling rossler robustness D=5|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 125 of 16000 nu_cap_estimates
+2026-10-20 07:03:03,692 WARNING handling rossler robustness D=10|rho=0.01|n_lib=10000|core: zero_variance_corr = 215040 of 960000 moment_entries
+2026-10-20 07:03:03,692 WARNING handling rossler robustness D=10|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 215040 of 960000 moment_entries
+2026-10-20 07:03:03,692 WARNING handling rossler robustness D=10|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 220 of 16000 nu_cap_estimates
+2026-10-20 07:03:03,692 WARNING handling rossler robustness k=5|rho=0.01|n_lib=10000|core: zero_variance_corr = 13317 of 960000 moment_entries
+2026-10-20 07:03:03,692 WARNING handling rossler robustness k=5|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 13317 of 960000 moment_entries
+2026-10-20 07:03:03,692 WARNING handling rossler robustness k=5|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 180 of 16000 nu_cap_estimates
+2026-10-20 07:03:03,692 WARNING handling rossler robustness misspec=0.05|rho=0.01|n_lib=10000|core: zero_variance_corr = 119280 of 960000 moment_entries
+2026-10-20 07:03:03,692 WARNING handling rossler robustness misspec=0.05|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 119280 of 960000 moment_entries
+2026-10-20 07:03:03,692 WARNING handling rossler robustness misspec=0.05|rho=0.01|n_lib=10000|core: lm_nonfinite_cost = 4705 of 816000 estimates
+2026-10-20 07:03:03,692 WARNING handling rossler robustness misspec=0.05|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 167 of 16000 nu_cap_estimates
+2026-10-20 07:03:03,692 WARNING handling rossler robustness misspec=0.1|rho=0.01|n_lib=10000|core: zero_variance_corr = 119280 of 960000 moment_entries
+2026-10-20 07:03:03,692 WARNING handling rossler robustness misspec=0.1|rho=0.01|n_lib=10000|core: zero_variance_corr_cp = 119280 of 960000 moment_entries
+2026-10-20 07:03:03,692 WARNING handling rossler robustness misspec=0.1|rho=0.01|n_lib=10000|core: lm_nonfinite_cost = 20651 of 816000 estimates
+2026-10-20 07:03:03,692 WARNING handling rossler robustness misspec=0.1|rho=0.01|n_lib=10000|core/evaluation: nu_cap_clips = 167 of 16000 nu_cap_estimates
+2026-10-20 07:03:03,692 INFO handling rossler robustness: 21 nonzero counters in 21 blocks
+2026-10-20 07:03:04,598 INFO study finished in 7884s
