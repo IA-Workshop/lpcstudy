@@ -33,7 +33,7 @@ def block_se(sp, interval, n_steps, burn_in, n_blocks=50):
 
 
 import sys
-STEPS = {"S1": 1_000_000, "S2": 4_000_000, "S3": 1_000_000, "S4": 2_000_000, "S5": 2_000_000, "S6": 1_000_000}
+STEPS = {"S1": 2_000_000, "S2": 4_000_000, "S3": 1_000_000, "S4": 2_000_000, "S5": 2_000_000, "S6": 1_000_000}
 for key in (sys.argv[1:] or ["S1", "S2", "S3"]):
     n = STEPS[key]
     sp = CANDIDATES[key]()

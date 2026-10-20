@@ -1,2 +1,1 @@
-[S4] hindmarsh_rose: lyapunov_guarded(interval 0.05, n_steps 2000000, burn_in 5000) = 0.21688316515721046; max|x| 1.929; 100000 time units; independent 0.216883 +- 0.002001 (relative 0.92%); Delta = 0.153693; substeps 62  [12 s]
-[S5] hyper_jha: lyapunov_guarded(interval 0.05, n_steps 2000000, burn_in 5000) = 0.3603046265219353; max|x| 38.094; 100000 time units; independent 0.360305 +- 0.001544 (relative 0.43%); Delta = 0.092514; substeps 38  [13 s]
+[S1] rossler_hyper: lyapunov_guarded(interval 0.1, n_steps 2000000, burn_in 5000) = 0.11220508610149857; max|x| 166.345; 200000 time units; independent 0.112205 +- 0.000528 (relative 0.47%); Delta = 0.297075; substeps 60  [14 s]

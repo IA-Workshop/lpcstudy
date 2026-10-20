@@ -41,7 +41,7 @@ def rossler_zfirst_field(state, params):
     )
 
 
-def s1(max_dt=0.01, bound=300.0):
+def s1(max_dt=0.005, bound=460.0):
     return SystemSpec(
         name="rossler_hyper",
         field_fn=rossler_hyper_field,

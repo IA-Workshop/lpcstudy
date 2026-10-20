@@ -1,0 +1,13 @@
+S1 at max_dt 0.005: lambda(1e5) 0.11231, Delta 0.296787, substeps 60, h 0.004946; RK4 real-axis limit |h x| < 2.785 -> |x| < 563
+(a) 64 orbits x 700000 steps = 13.30e6 time units: non-finite 0; per-orbit max|x| sorted (top 12): [303.3, 302.13, 301.37, 300.68, 294.25, 293.63, 284.82, 181.42, 176.91, 176.27, 174.32, 173.87]; orbits with max > 200: 7, > 300: 4, > 304: 0; steps with |x| > 200: 324, > 300: 4; quantiles of per-orbit max 50/90% [164.0, 253.8]
+(b) at the recorded minimum-x states (orbits sorted by min x):
+   state (x,y,z,w) = [-303.3, -0.66, 0.01, 132.53]: eig(J) real parts [-303.3, 0.12, 0.12, 0.05], |imag| max 0.99; rho(R(hJ)) at h 0.009875: 1.365, at h 0.00495: 1.0006, at h 0.00395: 1.0005; h_new*x = -1.500
+   state (x,y,z,w) = [-302.13, 3.86, 0.01, 132.7]: eig(J) real parts [-302.13, 0.12, 0.12, 0.05], |imag| max 0.99; rho(R(hJ)) at h 0.009875: 1.342, at h 0.00495: 1.0006, at h 0.00395: 1.0005; h_new*x = -1.494
+   state (x,y,z,w) = [-301.37, -15.19, 0.01, 131.43]: eig(J) real parts [-301.37, 0.12, 0.12, 0.05], |imag| max 0.99; rho(R(hJ)) at h 0.009875: 1.328, at h 0.00495: 1.0006, at h 0.00395: 1.0005; h_new*x = -1.491
+   state (x,y,z,w) = [-300.68, 3.97, 0.01, 130.14]: eig(J) real parts [-300.68, 0.12, 0.12, 0.05], |imag| max 0.99; rho(R(hJ)) at h 0.009875: 1.315, at h 0.00495: 1.0006, at h 0.00395: 1.0005; h_new*x = -1.487
+   state (x,y,z,w) = [-294.25, 23.19, 0.01, 131.64]: eig(J) real parts [-294.25, 0.12, 0.12, 0.05], |imag| max 0.99; rho(R(hJ)) at h 0.009875: 1.197, at h 0.00495: 1.0006, at h 0.00395: 1.0005; h_new*x = -1.456
+   state (x,y,z,w) = [-293.63, 19.78, 0.01, 127.68]: eig(J) real parts [-293.63, 0.12, 0.12, 0.05], |imag| max 0.99; rho(R(hJ)) at h 0.009875: 1.186, at h 0.00495: 1.0006, at h 0.00395: 1.0005; h_new*x = -1.452
+   state (x,y,z,w) = [-284.82, 3.04, 0.01, 132.57]: eig(J) real parts [-284.82, 0.12, 0.12, 0.05], |imag| max 0.99; rho(R(hJ)) at h 0.009875: 1.042, at h 0.00495: 1.0006, at h 0.00395: 1.0005; h_new*x = -1.409
+   state (x,y,z,w) = [-181.42, -10.32, 0.02, 87.29]: eig(J) real parts [-181.42, 0.12, 0.12, 0.05], |imag| max 0.99; rho(R(hJ)) at h 0.009875: 1.001, at h 0.00495: 1.0006, at h 0.00395: 1.0005; h_new*x = -0.897
+(c) typical orbit, 200 000 steps sampled every 5:
+   max |Re eig| 169.4, max |eig| 169.4; max_i |R(h lambda_i)| at the new step 1.1044 (the unstable physical modes give values slightly above 1 by h*lambda_u); margin 2.785/(h max|Re eig|) = 3.3
