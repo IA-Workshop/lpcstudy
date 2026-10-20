@@ -1,0 +1,24 @@
+r 166.000: lambda -0.0000 +- 0.0002; windows(1.6 tu) with growth < 0.1: 0.503; 56494 z-maxima, lag-1 |dz| median 28.22; laminar fraction (<1) 0.000, (<3) 0.000
+    thr 1.0: 1 laminar phases, length cycles median 0 p90 0 max 0
+    thr 3.0: 1 laminar phases, length cycles median 0 p90 0 max 0
+r 166.075: lambda 0.4232 +- 0.0163; windows(1.6 tu) with growth < 0.1: 0.402; 56374 z-maxima, lag-1 |dz| median 28.36; laminar fraction (<1) 0.002, (<3) 0.007
+    thr 1.0: 122 laminar phases, length cycles median 1 p90 2 max 2
+    thr 3.0: 222 laminar phases, length cycles median 1 p90 3 max 9
+r 166.080: lambda 0.4447 +- 0.0149; windows(1.6 tu) with growth < 0.1: 0.401; 56376 z-maxima, lag-1 |dz| median 28.37; laminar fraction (<1) 0.002, (<3) 0.007
+    thr 1.0: 113 laminar phases, length cycles median 1 p90 1 max 3
+    thr 3.0: 214 laminar phases, length cycles median 1 p90 3 max 7
+r 166.100: lambda 0.6651 +- 0.0181; windows(1.6 tu) with growth < 0.1: 0.348; 56323 z-maxima, lag-1 |dz| median 28.35; laminar fraction (<1) 0.004, (<3) 0.010
+    thr 1.0: 185 laminar phases, length cycles median 1 p90 2 max 2
+    thr 3.0: 354 laminar phases, length cycles median 1 p90 3 max 7
+r 166.150: lambda 0.7868 +- 0.0193; windows(1.6 tu) with growth < 0.1: 0.322; 56295 z-maxima, lag-1 |dz| median 28.25; laminar fraction (<1) 0.004, (<3) 0.013
+    thr 1.0: 192 laminar phases, length cycles median 1 p90 2 max 2
+    thr 3.0: 425 laminar phases, length cycles median 1 p90 3 max 8
+r 166.200: lambda 0.9084 +- 0.0165; windows(1.6 tu) with growth < 0.1: 0.298; 56267 z-maxima, lag-1 |dz| median 28.19; laminar fraction (<1) 0.005, (<3) 0.016
+    thr 1.0: 257 laminar phases, length cycles median 1 p90 2 max 2
+    thr 3.0: 483 laminar phases, length cycles median 1 p90 4 max 10
+r 166.500: lambda 1.4134 +- 0.0149; windows(1.6 tu) with growth < 0.1: 0.199; 56155 z-maxima, lag-1 |dz| median 27.96; laminar fraction (<1) 0.007, (<3) 0.023
+    thr 1.0: 358 laminar phases, length cycles median 1 p90 2 max 3
+    thr 3.0: 759 laminar phases, length cycles median 1 p90 3 max 9
+r 167.000: lambda 1.6911 +- 0.0122; windows(1.6 tu) with growth < 0.1: 0.144; 56178 z-maxima, lag-1 |dz| median 27.32; laminar fraction (<1) 0.012, (<3) 0.038
+    thr 1.0: 608 laminar phases, length cycles median 1 p90 2 max 4
+    thr 3.0: 1158 laminar phases, length cycles median 1 p90 4 max 13

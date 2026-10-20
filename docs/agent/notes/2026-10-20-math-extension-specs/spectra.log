@@ -1,0 +1,30 @@
+[S1] rossler_hyper dim 4 params {'a': 0.25, 'b': 3.0, 'c': 0.5, 'd': 0.05} max_dt 0.01
+  long run: interval 0.2, 1000000 steps = 200000 time units
+  spectrum: +0.11252 (se 0.00056), +0.02072 (se 0.00034), -0.00001 (se 0.00006), -24.76475 (se 0.10499)
+  lambda_max 0.11252 +- 0.00056; LT 8.8876; d_KY 3.005; Delta = 1/(30 lambda) = 0.29625; substeps ceil(Delta/max_dt) = 30
+  max|s_i| per coordinate over the long orbit: [166.353 108.735 401.429  83.598]
+  code cache value lyapunov_guarded(interval 0.2, 100000, 5000) = 0.11225907424447891, max|x| 135.363 [1 s]; independent routine at the same settings 0.11226 se 0.00179 (relative se 1.596%)
+  steps for a 1% relative se at this interval: about 254,765
+  [5 s]
+
+[S2] lorenz63_r166 dim 3 params {'sigma': 10.0, 'rho': 166.1, 'beta': 2.6666666666666665} max_dt 0.002
+  long run: interval 0.04, 4000000 steps = 160000 time units
+  spectrum: +0.62170 (se 0.00661), -0.00000 (se 0.00008), -14.28836 (se 0.00660)
+  lambda_max 0.62170 +- 0.00661; LT 1.6085; d_KY 2.044; Delta = 1/(30 lambda) = 0.05362; substeps ceil(Delta/max_dt) = 27
+  max|s_i| per coordinate over the long orbit: [ 57.68  128.117 283.265]
+  code cache value lyapunov_guarded(interval 0.04, 100000, 5000) = 0.6204447073633099, max|x| 62.399 [1 s]; independent routine at the same settings 0.62044 se 0.03389 (relative se 5.462%)
+  steps for a 1% relative se at this interval: about 2,983,598
+  analytic trapping bound on |x| (Lorenz, sigma 10.0, r 166.1, beta 2.6667): 181.88; for r = 28: 39.25
+  per-1LT-window largest-exponent estimate: quantiles 5/25/50/75/95 = [-1.017 -0.216  0.392  1.198  3.191]; fraction of windows below 0.1: 0.358; mean 0.6217
+  histogram of per-window exponents (bins of 0.25 from -1 to 3): [5281, 5630, 7524, 8254, 9882, 15960, 7414, 5366, 5448, 4627, 3052, 2344, 2081, 2051, 1858, 1706]
+  [13 s]
+
+[S3] rossler_z dim 3 params {'a': 0.2, 'b': 0.2, 'c': 5.7} max_dt 0.04
+  long run: interval 0.8, 1000000 steps = 800000 time units
+  spectrum: +0.07133 (se 0.00017), +0.00000 (se 0.00001), -5.39175 (se 0.00013)
+  lambda_max 0.07133 +- 0.00017; LT 14.0188; d_KY 2.013; Delta = 1/(30 lambda) = 0.46729; substeps ceil(Delta/max_dt) = 12
+  max|s_i| per coordinate over the long orbit: [22.851 11.433 10.791]
+  code cache value lyapunov_guarded(interval 0.8, 100000, 5000) = 0.07220367383989693, max|x| 22.847 [1 s]; independent routine at the same settings 0.07220 se 0.00060 (relative se 0.832%)
+  steps for a 1% relative se at this interval: about 69,243
+  [4 s]
+
