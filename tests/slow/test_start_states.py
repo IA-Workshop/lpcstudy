@@ -202,7 +202,9 @@ def run(request, tmp_path_factory) -> dict:
     return out
 
 
-def test_sd1_no_start_is_refused_over_the_full_horizon(run: dict) -> None:
+def test_sd1_no_start_is_refused_over_the_full_horizon(
+    run: dict, request: pytest.FixtureRequest
+) -> None:
     """S-D1: 0 refusals for 400 starts over ``burn + 705 000`` steps; the
     control is refused.
 
@@ -211,6 +213,20 @@ def test_sd1_no_start_is_refused_over_the_full_horizon(run: dict) -> None:
     bound B of the system. The control (a start at 2B) must be flagged, which
     shows that the vectorized guard works. Tolerance: none (a count).
     """
+    if run["name"] == "rossler_hyper":
+        # Pre-stated criterion S-D1 not met by S1 (WU-0021): measured 10 of 400
+        # starts refused over burn + 705 000 steps, 7 of them non-finite
+        # (escape to infinity; S1 has no trapping region). The owner's ruling
+        # keeps S1 and reports a refusal as a result; the criterion is not
+        # loosened. Strict: an unexpected pass is a failure and is noticed.
+        # See the Referral and Log of docs/agent/records/work/WU-0021-*.md.
+        request.node.add_marker(
+            pytest.mark.xfail(
+                strict=True,
+                reason="S-D1 not met by S1: 10 of 400 starts refused, 7 "
+                "non-finite (WU-0021 Referral)",
+            )
+        )
     assert len(run["starts"]) == 2 * N_SEEDS
     assert run["control_refused"].tolist() == [
         False,

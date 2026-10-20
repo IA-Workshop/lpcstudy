@@ -2321,3 +2321,91 @@ def test_handling_section_labels_the_clip_sensitivity_sentinels_a7(
         f"{base}/n_floored_2L",
         "clip_sensitivity/n_caught_exceptions",
     }
+
+
+# --------------------------------------- extension systems (WU-0021, DEC-0037)
+
+
+def test_verdicts_of_an_extension_run_are_per_system_only() -> None:
+    """An extension system never yields "supported" or "not supported".
+
+    Reference: the specification note 2026-10-20 section 5 and the main
+    session's ruling on WU-0021 (verdict-reporting change): a run that contains
+    an extension system stores ``by_system`` and the word "per-system only" for
+    every decided row, with no ``missing_systems``, and never calls the v3
+    decision rule. Hand cases: each of pass, fail and inconclusive on one
+    extension system, and a mix of a v3 system and an extension system, all give
+    the same word whatever the flags are. The Q-N and gain-bound rows keep the
+    shape they have for v3 runs. A label outside the v3 and extension systems
+    still raises, with or without an extension system beside it. Exact checks.
+    """
+    from lpcstudy.report import EXTENSION_SYSTEMS, PER_SYSTEM_VERDICT
+    from lpcstudy.systems import SYSTEMS
+    from lpcstudy.statistics import V3_SYSTEMS
+
+    assert set(EXTENSION_SYSTEMS) == set(SYSTEMS) - set(V3_SYSTEMS)
+    assert PER_SYSTEM_VERDICT not in ("supported", "not supported")
+    config = dataclasses.replace(SMOKE, core_systems=("rossler_z",))
+
+    def results_with(flag: str, names: tuple) -> dict:
+        systems = {}
+        for name in names:
+            res = fake_system(config)
+            res["H2a"] = dict(res["H2a"], verdict=flag, reason=None)
+            systems[name] = res
+        return {"systems": systems}
+
+    for flag in ("pass", "fail", "inconclusive"):
+        out = verdicts(results_with(flag, ("rossler_z",)), config)
+        assert out["H2a"] == {
+            "by_system": {"rossler_z": flag},
+            "verdict": "per-system only",
+        }
+        decided = [
+            v["verdict"]
+            for k, v in out.items()
+            if k not in ("Q-N", "gain_bound")
+        ]
+        assert set(decided) == {"per-system only"}
+        assert not {"supported", "not supported"} & set(decided)
+        assert out["gain_bound"]["verdict"] == "reported (no pass/fail)"
+        assert out["Q-N"]["verdict"] == "estimate (read, no pass/fail)"
+    mixed = dataclasses.replace(
+        SMOKE, core_systems=("lorenz63", "rossler_hyper")
+    )
+    out = verdicts(results_with("fail", ("lorenz63", "rossler_hyper")), mixed)
+    assert out["H2a"] == {
+        "by_system": {"lorenz63": "fail", "rossler_hyper": "fail"},
+        "verdict": "per-system only",
+    }
+    odd = dataclasses.replace(SMOKE, core_systems=("lorenz96", "rossler_z"))
+    with pytest.raises(ValueError, match="lorenz96"):
+        verdicts(results_with("pass", ("lorenz96", "rossler_z")), odd)
+    # A run of v3 systems alone is unchanged: a lone pass is inconclusive and
+    # lists the missing systems; a fail is not supported (the pinned v3 rule).
+    lone = dataclasses.replace(SMOKE, core_systems=("lorenz63",))
+    assert verdicts(results_with("pass", ("lorenz63",)), lone)["H2a"] == {
+        "by_system": {"lorenz63": "pass"},
+        "verdict": "inconclusive",
+        "missing_systems": ["rossler", "chua"],
+    }
+    assert (
+        verdicts(results_with("fail", ("lorenz63",)), lone)["H2a"]["verdict"]
+        == "not supported"
+    )
+
+
+def test_extension_note_appears_only_for_per_system_runs() -> None:
+    """``extension_note_lines`` is empty for v3 results and non-empty otherwise.
+
+    Reference: the definition (hand-built verdict dicts). It keeps the report of
+    a run of the three v3 systems byte-for-byte as before. Exact checks.
+    """
+    from lpcstudy.report import EXTENSION_NOTE, extension_note_lines
+
+    v3 = {"verdicts": {"H2a": {"verdict": "supported"}, "Q-N": {"verdict": "x"}}}
+    assert extension_note_lines(v3) == []
+    assert extension_note_lines({}) == []
+    ext = {"verdicts": {"H2a": {"verdict": "per-system only"}}}
+    assert extension_note_lines(ext) == ["", EXTENSION_NOTE]
+    assert "no overall verdict" in EXTENSION_NOTE
