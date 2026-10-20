@@ -389,3 +389,136 @@ These need owner review before sealed use:
 - the REF and NEW binding rule (N3).
 
 Reviewer scripts are in the session scratchpad: `variants4.py`, `freeslot.py` and the earlier `perturb*.py`.
+
+## WU-0020.8 review of the sealed-run document (reviewer, 2026-10-20)
+
+- **Reviewer:** `reviewer`, claude-opus-5-5. Fresh context; I did not write the document, the tool or the template.
+- **Subject:** develop at 0e55df8, `docs/agent/notes/2026-10-20-prelim-findings-conf1.{md,trace.csv,sources.json,compare.txt,figures/}`.
+- **Sources read under the release:** `python3 tools/ledger.py verify` reported "ledger chain intact". Entry seq 20 is an `authorization` by the owner: audience Brian McDermott and Deem Albaty; paths `runs/confirmatory/run-1/full`, `run-1-gpu/full` and `run-1-compare.txt`; `promoted: false`. I read only those paths, plus the governing and record files. I did not read the sealed seed, the seal script, `run-2` or anything else under `runs/confirmatory/`.
+- **Tests:** none run. `python3 tools/test_impact.py --base f8bfe74` prints "no tests", because the change set holds no code. I did not run `findings_build.py check`; the main session reported "check passed: 961 traced values, 0 problems". Every check below is my own read-only Python (`.venv/bin/python -I`) or a read by hand.
+- **Verdict:** **changes required**. 11 findings: 3 blockers (R1, R2, R4), 3 should fix (R3, R5, R6), 5 notes (R7 to R11).
+
+### What I checked and found correct
+
+- **Provenance (§2).**
+  - The SHA-256 of `run-1/full/results.json` (ae4b0fe5…), `RESULTS.md` (2a4c1d06…) and `run-1-gpu/full/results.json` (b768cb03…) equal the files on disk, the owner's `.sha256` files and the WU-0015.3 row of `results-manifest.md`.
+  - `git rev-parse freeze-1^{commit}` is df8928f…, which equals the official commit.
+  - `git diff --name-only df8928f..78f7f2f` lists only `docs/agent/governance/ledger.jsonl` (commit "Ledger: authorization for the GPU cross-check of CONF-1"), so the "1 path, all under … the ledger" row is true.
+  - Start 08:38:31Z plus 15555 s gives 12:57:46Z, the stored end time, and agrees with the manifest's "04:38 (local), 15555s".
+  - `LPC_THREADS` 8, cpu, dirty no, complete yes: all equal their leaves.
+  - Release reference: ledger seq 20 exists and covers these paths.
+- **Every trace row (961).** An independent resolver (`chk_trace.py` in my scratchpad) resolved each `official` and `crosscheck` path in its JSON:
+  - 0 raw-value mismatches;
+  - 0 rendered strings off their raw value by more than half a unit in the last printed digit;
+  - 0 rows whose rendered string is not found at its recorded document line and column.
+- **Semantic mapping.** I printed every cell of the gate, primary, secondary, Q-N, H3a and gain tables beside its leaf path, and each cell reads the right statistic for its row label:
+  - H2a(i) reads `median_range`/`range_ci`;
+  - H2b(i) reads `noise/mean_state_spearman`;
+  - H2b(ii) reads `library_change`;
+  - H3c reads `A5_over_A4_mse`;
+  - H1c reads `PLP/median_ratio`;
+  - H2c reads `A4_minus_A1`. The stored `best_single` is "A1" on all three systems.
+  - H2a(ii) correctly has no third part: `n_w_one` is 22, 5 and 16 of 1000, all under 5%.
+- **Verdicts (step 3).**
+  - All 14 rows of §4 equal `verdicts.<id>` in `results.json`.
+  - Each overall word follows v3 §7 from its three per-system words. Each per-system word follows the "every part passes / any part fails" rule from its part words.
+  - Applying the v3 §2 bands, strict or closed as v3 §7 lists them, to the 60 stored primary and secondary endpoint pairs reproduces every stored part verdict (0 mismatches).
+  - Q-N readings follow the v3 §7 table from their stored endpoints. H3a is inconclusive on all three systems because Holm p ≥ 0.01 somewhere on each.
+  - No sentence uses "confirmed", "proves", "significant", "shows" or "no effect". "Inconclusive" is glossed as "does not say the effect is absent", and "supported" carries "(preliminary, unpromoted)".
+- **20 random trace rows re-read by hand.** I drew them with `random.Random(20261020).sample(range(961), 20)`, which gave ids 32, 63, 67, 83, 151, 208, 217, 321, 330, 470, 492, 507, 520, 666, 667, 763, 792, 814, 837 and 879.
+  - Each was re-read by a direct key access in `results.json`, in `design_constants.json` with its v3 citation, or in compare-text line 377 (id 879).
+  - All 20 equal the document cell. For example: id 32 is 0.8383301964405617, shown as 0.838; id 666 is `rossler/H3a/pairs[2]` = [1, 0], shown as "1, 0"; id 879 is 0.0271.
+  - The constants match v3: V1 bar §6; v3_bar "reported"; the H1a band [0.75, 1.25] closed (§2).
+- **Clip column and Appendix B.** Each of the 14 clip cells equals the last cell of its row in the `RESULTS.md` verdict table. Each of the 14 interval labels (lines 389 to 402) occurs verbatim in `RESULTS.md`.
+- **Cross-check numbers (§8).**
+  - The 18 rows equal compare-text lines 363 to 380 field by field.
+  - The totals line equals line 381; 53 and PASS equal lines 340 and 382.
+  - The GPU gate leaves are all true.
+  - `compare.txt` differs from the owner's released `run-1-compare.txt` only in the REF and NEW path prefixes (`diff` after stripping the prefix: empty).
+- **Handling (§7).** Every total and per-system cell equals `handling.totals` and `handling.by_system`, and `failed_variants` is 0. All nine `SENTINEL_COUNTERS` of `report.py`, and the sentinel result paths, are 0 everywhere in `handling` and `systems`.
+- **Figures.**
+  - **F1.** Every marker and bar matches its §5 row. The bands are drawn as written: below 0.1; (−0.1, 0.1); > 0; ≤ 1.05. Levels read "(design value)" exactly where the table says so. Shape and text encode the verdict.
+  - **F2.** Every panel matches §6, including chua H1a ρ-2% inconclusive, rossler H3b weight 0 [0, 0.13] pass, and the Q-N dashed edges at 0 and 0.05 with no band.
+  - **F3.** The 18 z_away values equal §8, the dashed line is at 3.4, and the gate footer reads "passed" for all three systems.
+- **Limitations (§10).** It covers all 14 items of v3 §8 plus DEF-0018, DEF-0020, DEF-0026, DEF-0027, DEC-0033 M2 and M3, one realization per system, and the D6 block-sensitive status. The coverage sentence is v3 §8's text. The content of the DEF-0027 line is wrong (R4).
+- **Labeling.**
+  - Line 1 is `**CONFIRMATORY: UNPROMOTED**`, equal to `provenance.label`; line 2 is the note §2.1 sentence.
+  - Section tags match the note's section table: §3 to §6 `[PRE-REGISTERED]`, §7 `[DIAGNOSTIC]`, §8 `[CROSS-CHECK: information only]`, §11 `[STUDENT]`, A `[DEVELOPMENT]`, the rest untagged.
+  - Appendix A holds no development numbers. §11 is still the prompt, and §9 has no dated line, so there is no free-slot text to read.
+- **Untraced numerals.** I masked the trace spans and identifier shapes and scanned the document for digits. Only section numbers, "SHA-256", ρ row labels (`rho-1%`), counter names (`closed_form_floor_a4`) and "v2 §M16" remain.
+
+### Findings
+
+- **R1 (blocker): the Q-N row of the overall table reports only one of the two pre-registered parts.**
+  - **Location:** document line 106 (§4), trace ids 131 to 133 (`verdicts/Q-N/by_system/{lorenz63,rossler,chua}`), together with line 117.
+  - **What is wrong:** the row reads "reduces | reduces | reduces". v3 §2 and §7 read Q-N "separately for its two parts". The stored indicator part reads **substantial** on all three systems: `systems/<s>/Q-N/oracle/w_zero_indicator/reading`, with ΔR² 0.2266 [0.1673, 0.2839], 0.2002 [0.1462, 0.2538] and 0.1438 [0.09589, 0.1902]; §6 lines 216, 218 and 220 show this.
+  - **Cause:** the stored word is faithful to the file, but the file's `verdicts.Q-N.by_system` is built from the logit part alone (`lpcstudy/report.py`, the `row.role == "estimate"` branch: `readings[s] = res[res["primary"]]["logit_w_interior"]["reading"]`). `RESULTS.md` shows both parts in its cell ("reduces: oracle: interior reduces (…), w*=0 substantial (…)"). The document drops the second.
+  - **Why it matters:** Q-N is a D10 poster highlight. A reader of the headline table would conclude that "N reduces to the other three", which the indicator part contradicts.
+  - **Fix:** in the §4 row, show both stored readings per system (logit / indicator), traced to the two `reading` leaves, or label the cell "logit part only" with the indicator readings beside it. Do not change frozen code. Refer the collapse in `report.py` to the owner as a reporting observation (verdict and report code: needs owner review).
+- **R2 (blocker): the cross-check section does not report the differing verdicts, and its framing implies agreement.**
+  - **Location:** §8, lines 317 to 344 (trace ids 938 and 939), and F3.
+  - **What is wrong:** v3 §9 item 3 ("a differing verdict … is reported") and DEC-0031 item 2 require the differing verdicts to be reported. DEC-0028 item 4 says a TD pass "does not reproduce verdicts or the gate outcome". The document gives only the count (53) next to "compare_runs result: PASS (exit 0)" and 18 "ok" rows, and none of the differences.
+  - **Evidence:** read from the two `results.json`, CPU → GPU:
+    - **Overall words:** H2c inconclusive → **not supported**; H2d inconclusive → **not supported**.
+    - **Primary per system:** lorenz63 H2a fail → inconclusive (H2a(ii) interior fail → inconclusive); lorenz63 H3c inconclusive → **pass**; rossler and chua H2a(ii) zero inconclusive → pass.
+    - **Q-N:** rossler reads reduces → **substantial**.
+    - **Other per-system words:** lorenz63 H1a pass → inconclusive; chua H1c inconclusive → fail; rossler H3b pass → inconclusive; lorenz63 H2c and H2d inconclusive → fail; chua H2c pass → inconclusive.
+    - **H3a regimes:** lorenz63 has 6 regimes on the CPU and 4 on the GPU (compare text lines 324 to 339, one-sided leaves).
+    - The compare text lists only the first 20 of the 53 leaves (lines 341 to 360).
+  - **Why it matters:** "PASS" and "ok" read as agreement. The owner and student would not see that two secondary overall verdicts and three primary per-system words flip across devices.
+  - **Fix:** add a `[CROSS-CHECK]` table of stored verdict words that differ, overall and per system (primary parts first), read from the two files as a string comparison (A3 allows this). Add DEC-0028 item 4's sentence.
+  - **Plan note:** the note §2 item 2 limits `[CROSS-CHECK]` to "the count of differing verdict-type leaves". That is narrower than v3 §9 item 3, so the plan needs a planner or owner amendment for the fix.
+- **R3 (should fix): the closing sentence of §8 is a fixed disjunction that is misleading for this data.**
+  - **Location:** line 344; `tools/findings_build.py` `wording_gpu` (lines 850 to 867); `design_constants.json` `wording.gpu_disagree`.
+  - **What is wrong:** "At least one primary part exceeds the bound, a verdict-type leaf differs or a GPU gate failed" is true here only through the second clause. No part exceeds 3.4 (largest 2.21) and every GPU gate passed. A reader takes it as a TD failure.
+  - **Second instance:** the F3 caption (line 348) says "Each row names a failed GPU validation gate and a PROVISIONAL official system", which reads as an assertion although neither occurs.
+  - **Fix:** emit one sentence per condition from the tokens: "no primary part exceeds the bound"; "53 verdict-type leaves differ"; "the GPU gate passed on all three systems". Make the F3 sentence conditional ("a row would name …").
+- **R4 (blocker): the DEF-0027 limitation reverses the meaning of "5 of 18".**
+  - **Location:** line 367, trace id 943 (`constants/lm_flag_count` = "5 of 18", cited to v3 §8); the per-row note "LM iteration error: not estimated" (lines 130 to 147).
+  - **What is wrong:** the document says "the Levenberg–Marquardt flag was raised on 5 of 18 primary parts", as if 5 parts were affected. In the source records the LM-row flag is "yes iff class N", meaning negligible (`docs/study/lm_doubling_dev0_report_v3.md`, lines 24 and 66). The official `RESULTS.md` says (line 429 and the four parallel lines) that the change is below 10% of the half-width "for 5 of the 18 parts … and does not show it below 10% for the other 13 (X, not negligible, 6; U, not certified, 7)". The DEF-0027 correction of 2026-10-18 gives N 5 / X 6 / U 7 (Lorenz-63 X 4, Chua X 2, Rössler X 0).
+  - **Root:** v3 §8's own sentence ("not negligible … for 5 of the 18 primary parts") disagrees with the corrected record. The document copies v3 and so contradicts the official run's own report.
+  - **Plan gap:** the plan (note §2 item 3) also requires a pointer to `lm_doubling_dev0_report_v3.md` on the primary rows, and it is absent.
+  - **Why it matters:** this understates the main unestimated error on the primary parts, which the student will repeat.
+  - **Fix:** state the limitation as `RESULTS.md` and DEF-0027 do (development evidence: shown negligible for only 5 of 18 parts; not negligible for 6; not certified for 7; the projection is stated, not applied), add the pointer, and refer the v3 §8 inconsistency to the owner.
+- **R5 (should fix): §7 claims completeness it does not have.**
+  - **Location:** line 279, "Every clip, floor, replacement and fallback counted by the run (PRIME.4)".
+  - **What is wrong:** the table holds only the main-system counters of `handling`. It omits:
+    - `skipped_variants` (0);
+    - the counters under `handling.robustness` (lorenz63, rossler);
+    - the result counts of `RESULTS.md` §Handling, among them floors and exclusions: `H1b/CP/n_floored` 79 / 92 / 114; `H2a/n_excluded_states` 312 / 72 / 361; `H1c/*/n_ineligible_states`; `H2b/noise/n_constant_states` 62 / 76 / 61; the gain-bound screen-outs (lorenz63: growth ≤ 0 136, covariance < 0 252).
+  - **Sentinels:** the table also does not mark the sentinel counters. All are 0, which I checked.
+  - **Fix:** reword to "the run's handling counters of the main systems", add `skipped_variants`, and either add the result counts (traced) or point to the `RESULTS.md` section and `handling.robustness` by name.
+- **R6 (should fix): quantities that v3 §2 says are "reported" are missing, although §1 says the document "reports what the pre-registered analysis returned" (line 12).**
+  - **H2a:** the excluded-state counts (312, 72, 361 of 1000), the per-span medians and counts (lorenz63 1-2: 0.0650 on 533 states; 1-2-4: 0.479 on 155), the complete-case {1, 2, 4} sensitivity (lorenz63 0.479 [0.390, 0.576]; rossler 0.377 [0.336, 0.411]; chua 0.407 [0.344, 0.493]) and the counts of w* = 0 and w* = 1 (285/22, 305/5, 284/16). The complete-case values sit far above the 0.1 bar while lorenz63 H2a(i) reads inconclusive at 0.113, so a reader needs them.
+  - **Others:** the H1a floor f; H1c's CP value; H1d's N̂ (Spearman 0.66, 0.61, 0.63 in `RESULTS.md`); the H3b stability fraction (0.91, 1.0, 1.0); the gain-bound screen-out counts.
+  - **H2c label:** the label "A4 − A1" is not explained. The stored `best_single` is A1 (PLP), chosen on the calibration split, on all three systems.
+  - **Fix:** add a traced "reported quantities (no verdict)" table, or state plainly which reported quantities are left to `RESULTS.md`.
+- **R7 (note): H2a reading and power.**
+  - **Location:** line 119.
+  - The v3 §7 reading of an H2a failure ("instability enters the weight through anisotropic seeds") is about part (ii). Rössler fails H2a through part (i) alone, the horizon range 0.2754 [0.2426, 0.3107]; both of its part (ii) words are inconclusive.
+  - **Suggestion:** write "v3 §7 pre-registered this interpretation; it is not tested here", and say which parts failed per system.
+  - **Suggestion:** add v3 §7's precision statement (DEF-0022): H2a's second part "can be refuted but essentially cannot pass". "Supported" was nearly unreachable by design, which matters for how the student reads "not supported".
+- **R8 (note): bullets after the overall table.**
+  - **Location:** lines 119 to 122.
+  - The H2c bullet sits among the primary bullets without a "secondary" label. H2e, the other supported row and a D10 highlight, has no bullet.
+  - **Suggestion:** label the bullet "H2c (secondary)", or add a short secondary block.
+- **R9 (note): F2 marker legend and tick labels.**
+  - The A4o − A2 "reported" panels use the square marker, which the caption reserves for "a Q-N reading" (line 273).
+  - The x tick labels overlap and cannot be read in the panels "H2c A4 − A2 chua" and "H2c A4o − A2 (reported)" lorenz63 and rossler. The markers do match the table.
+  - **Suggestion:** name the square for "reported" in the caption, and use fewer ticks or scientific offsets on those panels.
+- **R10 (note): the §8 "hw ratio" column is not explained.**
+  - It is hw1/hw0, GPU half-width over CPU half-width (compare text line 362).
+  - chua H3c reads 3.036: the GPU interval is three times wider. One sentence would prevent a misreading.
+- **R11 (note, governance and plan; owner to see).**
+  - **(a) Commit trailer.** The 0e55df8 message has no `Agent: <model id>` trailer (CLAUDE.md, Commits).
+  - **(b) Log placement.** The WU-0020.7 Log entry sits under `## Referral` instead of `## Log` in the unit file.
+  - **(c) Deliverable paths.** P1 and P2 are under `docs/agent/notes/`, while the plan and the D1 default name `docs/study/`. P3 lacks the 4 existing report figures, and P4 (the one-page summary) is not built, although WU-0020.7 says "build P1 to P4". This bears on the definition of done.
+  - **(d) A13 as written.** The first commit touching `runs/confirmatory/` (e754601, 08:41:12Z) precedes the release entry (seq 20, 08:43:08Z). It is the owner's own commit, not an agent's, but the mechanical check of A13 as written is not met.
+  - **(e) §9 and "another actor".** §9 says the regeneration is "by another actor" (v3 §9 item 4). Ledger seq 21 records the regeneration as run by the owner, who also ran run-1 (manifest). Whether that satisfies "another actor" is the owner's call before the dated §9 line is written.
+
+### Owner checkpoint
+
+- No code, seed or dependency changed in WU-0020.7.
+- R1 concerns verdict and report code (`report.py`, frozen): needs owner review before any change.
+- R2 needs a plan amendment (scope of `[CROSS-CHECK]`).
+- R4 needs an owner ruling on the v3 §8 wording.
