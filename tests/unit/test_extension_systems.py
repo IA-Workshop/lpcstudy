@@ -390,7 +390,11 @@ def _attractor_states(name: str, count: int) -> list[np.ndarray]:
 # in the table of the unit log for which the coarsest self-difference is below
 # 1e-3 and the three observed orders are in the asymptotic range; the
 # acceptance interval [3.8, 4.2] of the plan was not changed.
-COARSE_SUBSTEPS = {"rossler_hyper": 320, "lorenz63_r166": 640, "rossler_z": 160}
+# After the S1 re-specification (new lambda, so new attractor states) the S1
+# count was fixed again from a second scan (n = 160 gave orders 4.08, 4.43,
+# 3.75; 320 gave 4.04, 4.30, 3.88; 640 gives 4.02, 4.18, 3.94; 1280 gives
+# 4.01, 4.10, 3.97): 640 is the smallest count with all three in the interval.
+COARSE_SUBSTEPS = {"rossler_hyper": 640, "lorenz63_r166": 640, "rossler_z": 160}
 
 
 @pytest.mark.parametrize("name", EXTENSION)
