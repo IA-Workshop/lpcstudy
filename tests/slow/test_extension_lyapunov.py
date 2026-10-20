@@ -39,6 +39,10 @@ S2 ``lorenz63_r166``, S3 ``rossler_z``) this test checks three things.
    stricter, not looser; the specification note's own run agrees with the
    cached value within 1 SE. This is the correctness check, valid on any
    host; its tolerance is the 3 sigma above, not the 1e-12 of check 1.
+   The same reference also checks the volume identity (sum of the exponents
+   against the orbit mean of the divergence) for the systems whose divergence
+   varies along the orbit (S1, S3, S4: the check specification note 2 section
+   12 asks for S4).
 3. **A literature value is reported, and asserted only where confirmed.** S1:
    0.1121 (Ramasubramanian and Sriram, arXiv:chao-dyn/9909029, Table 1,
    standard method; the researcher read it directly; their second method gives
@@ -77,6 +81,7 @@ from lpcstudy.systems import SYSTEMS, lyapunov_guarded
 pytestmark = pytest.mark.slow
 
 N_BATCHES = 20
+VARIABLE_DIVERGENCE = ("rossler_hyper", "rossler_z", "hindmarsh_rose")
 BURN_IN = 5_000
 SUBSTEPS = 20  # interval = 20 max_dt, so exactly 20 RK4 substeps of max_dt
 
@@ -85,6 +90,10 @@ EXPECTED = {
     "rossler_hyper": 0.11220508610149857,
     "lorenz63_r166": 0.6217010154674514,
     "rossler_z": 0.07133265490530956,
+    # Specification note 2 section 0 (S4 to S6).
+    "hindmarsh_rose": 0.21688316515721046,
+    "hyper_jha": 0.3603046265219353,
+    "lorenz96_4": 1.2018430962199733,
 }
 
 
@@ -138,12 +147,86 @@ def _jac_s3(s):
     )
 
 
+def _field_s4(s):
+    # Relay of Dysts ``HindmarshRose._rhs`` (researcher note 2026-10-20).
+    x, y, z = s
+    a, b, c, d, sp, tx, tz = 0.49, 1.0, 0.0322, 1.0, 1.0, 0.03, 0.8
+    return jnp.stack(
+        [
+            -x + 1 / tx * y - a / tx * x**3 + b / tx * x**2 + 1 / tx * z,
+            -a * x**3 - (d - b) * x**2 + z,
+            -sp / tz * x - 1 / tz * z + c / tz,
+        ]
+    )
+
+
+def _jac_s4(s):
+    x, y, z = s
+    a, b, d, sp, tx, tz = 0.49, 1.0, 1.0, 1.0, 0.03, 0.8
+    return jnp.array(
+        [
+            [-1.0 + (-3 * a * x**2 + 2 * b * x) / tx, 1 / tx, 1 / tx],
+            [-3 * a * x**2 - 2 * (d - b) * x, 0.0, 1.0],
+            [-sp / tz, 0.0, -1 / tz],
+        ]
+    )
+
+
+def _field_s5(s):
+    # Relay of Dysts ``HyperJha._rhs``.
+    x, y, z, w = s
+    a, b, c, d = 10.0, 28.0, 2.667, 1.3
+    return jnp.stack([a * y - a * x + w, -x * z + b * x - y, x * y - c * z, -x * z + d * w])
+
+
+def _jac_s5(s):
+    x, y, z, w = s
+    a, b, c, d = 10.0, 28.0, 2.667, 1.3
+    return jnp.array(
+        [
+            [-a, a, 0.0, 1.0],
+            [-z + b, -1.0, -x, 0.0],
+            [y, x, -c, 0.0],
+            [-z, 0.0, -x, d],
+        ]
+    )
+
+
+def _field_s6(s):
+    # Relay of Dysts ``Lorenz96.rhs`` for N = 4, F = 20, written out.
+    x0, x1, x2, x3 = s
+    f = 20.0
+    return jnp.stack(
+        [
+            (x1 - x2) * x3 - x0 + f,
+            (x2 - x3) * x0 - x1 + f,
+            (x3 - x0) * x1 - x2 + f,
+            (x0 - x1) * x2 - x3 + f,
+        ]
+    )
+
+
+def _jac_s6(s):
+    x0, x1, x2, x3 = s
+    return jnp.array(
+        [
+            [-1.0, x3, -x3, x1 - x2],
+            [x2 - x3, -1.0, x0, -x0],
+            [-x1, x3 - x0, -1.0, x1],
+            [x2, -x2, x0 - x1, -1.0],
+        ]
+    )
+
+
 # name -> (field, Jacobian, initial state, max_dt), typed from the note
 # section 0 (not read from the registry).
 REFERENCE = {
     "rossler_hyper": (_field_s1, _jac_s1, (-10.0, -6.0, 0.0, 10.0), 0.005),
     "lorenz63_r166": (_field_s2, _jac_s2, (1.0, 1.0, 1.0), 0.002),
     "rossler_z": (_field_s3, _jac_s3, (0.0, 1.0, 1.0), 0.04),
+    "hindmarsh_rose": (_field_s4, _jac_s4, (0.1, 0.1, 0.1), 0.0025),
+    "hyper_jha": (_field_s5, _jac_s5, (1.0, 1.0, 1.0, 1.0), 0.0025),
+    "lorenz96_4": (_field_s6, _jac_s6, (20.0, 20.01, 20.0, 20.0), 0.005),
 }
 
 
@@ -188,9 +271,11 @@ def _post_burn_state(name, state):
 
 @partial(jax.jit, static_argnames=("name", "n_steps"))
 def _benettin_batch(name, state, n_steps):
-    """Average the log growth of the first QR direction over ``n_steps`` steps.
+    """Sum the log growth over ``n_steps`` steps.
 
-    Returns ``(sum of log |R_00|, final state, max |x| over the steps)``.
+    Returns ``(sums, final state, max |x| over the steps)`` where ``sums`` holds
+    the sum of ``log |R_00|`` (the largest exponent), of ``sum_i log |R_ii|``
+    (the sum of all exponents) and of the divergence ``trace J`` at the states.
     """
     identity = jnp.eye(state.shape[0])
 
@@ -198,15 +283,16 @@ def _benettin_batch(name, state, n_steps):
         s, q, big = carry
         s_next, tangent = _flow(name, s, q)
         q_next, r = jnp.linalg.qr(tangent)
-        # The sign convention of QR does not matter for log |R_00|.
-        return (s_next, q_next, jnp.maximum(big, jnp.abs(s[0]))), jnp.log(
-            jnp.abs(r[0, 0])
-        )
+        # The sign convention of QR does not matter for log |R_ii|.
+        logs = jnp.log(jnp.abs(jnp.diag(r)))
+        _, jac, _, _ = REFERENCE[name]
+        out = jnp.stack([logs[0], jnp.sum(logs), jnp.trace(jac(s))])
+        return (s_next, q_next, jnp.maximum(big, jnp.abs(s[0]))), out
 
     (state, _, big), growth = jax.lax.scan(
         body, (state, identity, jnp.asarray(0.0)), None, length=n_steps
     )
-    return jnp.sum(growth), state, big
+    return jnp.sum(growth, axis=0), state, big
 
 
 def reference_benettin(name: str, n_steps: int):
@@ -225,12 +311,19 @@ def reference_benettin(name: str, n_steps: int):
     for _ in range(N_BATCHES):
         starts.append(np.asarray(state))
         total, state, big = _benettin_batch(name, state, per_batch)
-        sums.append(float(total))
+        sums.append(np.asarray(total))
         biggest = max(biggest, float(big))
-    batch_lambda = np.asarray(sums) / (per_batch * interval)
+    sums = np.asarray(sums)
+    batch_lambda = sums[:, 0] / (per_batch * interval)
+    batch_sum = sums[:, 1] / (per_batch * interval)
+    batch_div = sums[:, 2] / per_batch  # mean divergence per unit time
     lam = float(np.mean(batch_lambda))
     se = float(np.std(batch_lambda, ddof=1) / math.sqrt(N_BATCHES))
-    return lam, se, starts, biggest
+    stats = {
+        "sum": (float(np.mean(batch_sum)), float(np.std(batch_sum, ddof=1) / math.sqrt(N_BATCHES))),
+        "div": (float(np.mean(batch_div)), float(np.std(batch_div, ddof=1) / math.sqrt(N_BATCHES))),
+    }
+    return lam, se, starts, biggest, stats
 
 
 # ------------------------------------------------------------------ test
@@ -303,8 +396,27 @@ def test_extension_lyapunov_matches_an_independent_benettin_run(
     n_steps = spec.lyapunov_steps
     interval = 20 * spec.max_dt
 
-    lam_ref, se_ref, starts, ref_max = reference_benettin(name, n_steps)
+    lam_ref, se_ref, starts, ref_max, stats = reference_benettin(name, n_steps)
     assert ref_max < spec.orbit_bound
+    # Volume identity of the reference itself (independent of the code): the
+    # sum of all exponents equals the orbit mean of the divergence. Asserted
+    # where the divergence varies along the orbit (S1, S3, S4): a statistical
+    # agreement of two estimates of the same mean, tolerance
+    # 3 sqrt(SE_sum^2 + SE_div^2) (20 batch means each; the RK4 volume error,
+    # relative (h lambda)^4 / 120 below 1e-4, is far below it). Where the
+    # divergence is constant (S2, S5, S6) the batch SEs are round-off size and
+    # the discretization error would set the tolerance, so it is printed only;
+    # the constants are pinned exactly by the unit test of the traces.
+    (spectrum_sum, se_sum), (mean_div, se_div) = stats["sum"], stats["div"]
+    volume_tolerance = 3.0 * math.sqrt(se_sum**2 + se_div**2)
+    with capsys.disabled():
+        print(
+            f"\n[A6 {name}] sum of exponents {spectrum_sum:.5f} +- "
+            f"{se_sum:.5f}, mean divergence {mean_div:.5f} +- {se_div:.5f}, "
+            f"tolerance {volume_tolerance:.2e}"
+        )
+    if name in VARIABLE_DIVERGENCE:
+        assert abs(spectrum_sum - mean_div) <= volume_tolerance
 
     per_batch = n_steps // N_BATCHES
     batch_code = []

@@ -202,7 +202,14 @@ def test_registry_holds_exactly_the_three_v3_systems() -> None:
     Tolerance: none; the check is equality of sets of strings.
     """
     frozen = {"lorenz63", "rossler", "chua"}
-    extension = {"rossler_hyper", "lorenz63_r166", "rossler_z"}
+    extension = {
+        "rossler_hyper",
+        "lorenz63_r166",
+        "rossler_z",
+        "hindmarsh_rose",
+        "hyper_jha",
+        "lorenz96_4",
+    }
     assert frozen <= set(SYSTEMS)
     assert set(SYSTEMS) - frozen == extension
     assert not hasattr(systems, "lorenz96_field")
@@ -341,7 +348,14 @@ def test_registry_bounds_are_the_ratified_ones() -> None:
     }
     assert {
         n: bounds[n] for n in set(bounds) - {"lorenz63", "rossler", "chua"}
-    } == {"rossler_hyper": 460.0, "lorenz63_r166": 185.0, "rossler_z": 50.0}
+    } == {
+        "rossler_hyper": 460.0,
+        "lorenz63_r166": 185.0,
+        "rossler_z": 50.0,
+        "hindmarsh_rose": 5.0,
+        "hyper_jha": 80.0,
+        "lorenz96_4": 60.0,
+    }
 
 
 def test_first_failing_step_on_an_analytic_orbit() -> None:
