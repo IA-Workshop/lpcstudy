@@ -157,8 +157,94 @@
 
 ## Review
 
-- **Reviewer:**
+- **Reviewer:** reviewer, claude-opus-5-5, fresh context, 2026-10-20 (WU-0021.7, round 1). Diff reviewed: `git diff 2b8240e..4967ed2` (lpcstudy/, tests/, this file). Read: this file, the specification note `2026-10-20-math-extension-specs.md` and its script directory, the researcher note `2026-10-20-researcher-dysts-extension.md`, DEC-0037, `.claude/CLAUDE.md`, `.claude/rules/test-discipline.md`.
+- **Runs by the reviewer (test-run checklist, §4.9, one line each):**
+  1. Change set: `git diff --name-only 2b8240e..HEAD`: `lpcstudy/{data,report,systems}.py`, `tests/unit/{test_extension_systems,test_systems,test_experiments,test_report}.py`, `tests/slow/{test_extension_lyapunov,test_start_states}.py`, this file; tree clean.
+  2. Radius: `python3 tools/test_impact.py --base 2b8240e --explain`: unit tier 27 files (rule: `systems.py`, `data.py` core; `report.py` pipeline) plus `tests/integration` (deferred, run-2 active; not run by me); slow files excluded by the tool and not rerun by me.
+  3. Already run on this code: yes, by the developer (U1 to U4, U6); run once more by the reviewer as its own review step, no repeat after that.
+  4. Device: CPU (wrapper). 5. `LPC_THREADS=1`, `nice -n 19`, unit limit 300 s. 6. run-2 (CPU) and the DEV-3 ensemble (GPU) active; nothing else of mine ran in parallel; no preset, no GPU. 7. `-q --tb=short -rfE` (wrapper). 8. `LPC_THREADS=1 nice -n 19 tools/run_tests.sh unit <the 27 files>`.
+  - Result: **`1155 passed in 62.21s`** (developer: 1 152 + the R11 test + 2 report tests = 1 155, consistent).
+  - R1 comparison rerun once (no preset): `python3 -I tools/leafdiff.py <ref>/results.json runs/ext-new2/smoke/results.json`: `leaves: A 14174, B 14174, common 14174, different 0, removed 0, added 0`; `python3 -I tools/compare_runs.py <ref> runs/ext-new2/smoke`: `tier: T0`, `equal 13914, different 0, one-sided 0`, `RESULT: PASS`; `diff` of the two `RESULTS.md`: provenance lines only (commit, argv, start/end, wall, RSS). Reference: `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-ref-fc49d5f/runs/ext-ref/smoke/` (sha256 `07d75aad…21d46`, as logged). `runs/ext-new2` is at 8080b6f, `dirty False`; `lpcstudy/` is unchanged from 8080b6f to 4967ed2.
+  - Diagnostic scripts, not tests, not evidence of a criterion (scratchpad `rev217/s1_escape_step.py` and `rev217/s1_sd1_halfstep.py`; CPU, one thread, `nice -n 19`, about 4 min in total): the S-D1 recipe of `tests/slow/test_start_states.py` for `rossler_hyper` (its own `_start_batch`, `_advance`, `_refused`, the same 400 synthetic starts), run at `max_dt`, `max_dt/2` and `max_dt/4`. Numbers in R1 below.
 - **Findings and resolution:**
+  - **R1 (blocker, S1 `rossler_hyper` only): the production step of S1 is unstable in the tail of the attractor, and the bound 300 lies inside the reachable range of |x|. The Log's diagnosis of the S-D1 failure ("escape to infinity", "S1 has no global trapping region", Referral: "raising the bound does not help (non-finite escapes)") is contradicted by measurement, and Ruling 2 rests on it.**
+    - Where: `lpcstudy/systems.py:270-280` (`max_dt=0.01`, `orbit_bound=300.0`, values of specification note §0, §1.1, §2); this file's Log (S1 start-state entry), Referral (second finding), Ruling 2; the xfail reason in `tests/slow/test_start_states.py:216-229`.
+    - Evidence, same 400 starts over `burn + 705 000` steps:
+      - At `max_dt` (h = 0.009875): 10 of 400 refused, 7 non-finite, max finite |x| 300.79. This reproduces the Log exactly.
+      - At `max_dt/2`: 14 refused, **0 non-finite**, max |x| 303.45, 40 starts above 200.
+      - At `max_dt/4`: 18 refused, **0 non-finite**, max |x| 303.74; the 99th percentile of the per-start max |x| is 302.8.
+    - Mechanism: in S1, ∂ż/∂z = x, and x goes deeply negative (mean −24.9, skew −0.95). The RK4 real-axis stability limit is h·x = −2.785, which is x = −282 at the production h. The attractor reaches x ≈ −304, converged in h (303.45 against 303.74), where h·x = −3.0. So the 7 non-finite orbits are RK4 instability, not dynamical escape.
+    - Below the limit the z-decay is already badly wrong, for example R(−2.5) = 0.648 against e^−2.5 = 0.082. This can feed spurious excursions.
+    - V6 (A4) cannot see this, because its 20 typical states have |x| well below 150.
+    - Independently, the bound 300 is inside the attractor: 14 to 18 of 400 converged orbits exceed it. The §1.1 rule ("1.72 × the largest excursion") came from one 4·10⁶-step orbit (max 174.1), which is too short to sample a tail that 41 of 400 long orbits enter above 200.
+    - Pointer, unverified by me: the Dysts HyperRossler metadata in the researcher note §B.1 (x mean −36.3, std 32.1, start x −93.7) also suggests a heavier tail than the study's statistics orbit.
+    - Why it matters:
+      - A pilot or full run of S1 at these values can abort on an integrator artifact, or on a bound that the true orbit legitimately crosses (DEF-0015 refusal).
+      - The recorded mechanism and the xfail reason would enter the record as a dynamical property of S1.
+      - "Accept the hazard" was decided on a wrong premise.
+    - Fix: refer S1's `max_dt` and `orbit_bound` back to the applied-mathematician, as a new specification under the PRIME.2 rule; this is not a code fix.
+      - `max_dt`: chosen so that h·|x|max stays inside the RK4 stability interval with margin over a multi-start tail. For example, the plan's provisional 0.005 gives h·304 ≈ 1.5.
+      - Bound: derived from a multi-start tail scan, not from one orbit.
+      - Then rerun A3, A4, A6, R11 (the cached λ changes with `max_dt`), S-D1 and A7 for S1, and correct the Log, Referral and xfail text.
+      - S1 must not go to .6 until then. S2 and S3 are unaffected: S-D1 passes for both, the S2 bound is analytic, and S3's ∂ż/∂z = x − c ≥ −16 gives h·|…| ≤ 0.62.
+  - **R2 (should fix): the `xfail(strict=True)` on S1's S-D1 case also covers the negative-control and count checks of that test, and it does not pin what was measured.**
+    - Where: `tests/slow/test_start_states.py:205-240`. The marker is added before `assert run["control_refused"].tolist() == [False, False, False, True]`.
+    - Why it matters: for S1, a broken vectorized guard (the "the control is vacuous" check) would now show as XFAIL, not FAIL. Any refusal count from 1 to 400 also reads the same. This is the silent masking that PRIME.4 forbids.
+    - Fix: assert `len(starts)` and the control row before the S1 branch, or split the control into its own unmarked test. If an xfail remains after R1, assert the measured count as a labeled regression guard, or keep the marker but compare the count in the reason.
+    - This is moot if R1's re-specification makes S-D1 pass.
+  - **R3 (should fix): A6's first check is code against code on a host-specific value, and it is not labeled as a regression guard.**
+    - Where: `tests/slow/test_extension_lyapunov.py:8-13, 76-80, 248-249`.
+    - The `EXPECTED` values were produced by the code's own `lyapunov_guarded` (specification note `lyap_long.py`). The docstring presents 1e-12 as "the cross-host rule (T1)", but a 10⁶- to 4·10⁶-step chaotic Benettin run decorrelates under any change of rounding, so on another host or XLA build it differs at the SE level (0.2 to 1%), not at 1e-12.
+    - Even on this host, the S1 value is not bitwise the note's: 0.11251662457254273 against …265.
+    - Why it matters: LPC.PC.21 requires self-comparisons to be labeled. As written, the test fails on any other machine for a reason unrelated to correctness.
+    - Fix: label the check as a host- and XLA-build-bound regression guard, name the host, and state that elsewhere only the independent Benettin comparison (check 2) applies. For example, skip with a stated reason when the build differs. Leave the tolerance unchanged.
+  - **R4 (should fix, governance): the owner checkpoint list is incomplete.**
+    - Besides the pending `report.verdicts` change, this diff touches:
+      - `data.lyapunov_record`, whose own docstring says "Needs owner review before freeze: it sets the study's time unit" (`lpcstudy/data.py:373-374`, the changed `n_steps` line 427);
+      - `tests/slow/test_start_states.py`, whose header says "Seed code: needs owner review before freeze" (line 19; the fixture control row and the xfail).
+    - The plan's checkpoints say "verdict … none; seed or provenance code: none".
+    - Fix: add both items to the owner request that the main session has open. Code verdict: the `data.py` change is correct and default-preserving (R1 bitwise), so this is a process item only.
+  - **R5 (should fix, before the .9 development note): text of the extension RESULTS.md, from the developer's list of eight plus one more.** The stored verdict words are correct: no extension run can store "supported" or "not supported". The text below is wrong or misleading in an extension report.
+    - Item (2): the explanatory text gives "χ²(dof) (18.47 for dof 4)" (`lpcstudy/report.py:1121-1122`). This is wrong for S1, where dof = 3 and the threshold is 16.27; the table beside it is right.
+    - Item (4): the S2 and S3 rows read "no confirmed published value … (known limitation, NVVUQ.13, DEC-0010)" (`report.py:840, 921`). DEC-0010 is the Chua retrieval decision and does not cover S2 or S3. This is a wrong provenance attribution.
+    - Item (3): "the three systems are mathematical models (NVVUQ.13)" (`report.py:962`) is a wrong count. The static Chua paragraph and memo row are irrelevant to an extension run.
+    - Not on the developer's list: the uncertainty-budget rows "Model form: exact model, three systems, scalar observable" and "Round-off … DEV-0 against the v1 pilot, M5". They carry three-system evidence (the round-off magnitude was calibrated on the frozen systems) into the extension report with no statement that it was not established for S1 to S3.
+    - Harmless:
+      - (1): INTRO, countered by the note directly below it; the note's text is accurate and appears only for per-system rows.
+      - (5): the verdict column header and the `HYPOTHESES` text.
+      - (6): 1 − 0.05/3 is the family of the three primary hypotheses H2a, H2b and H3c, not of the three systems, and it is unchanged by design (specification §5).
+      - (7) and (8): `compare_pilot.py` and the figures, which matter only if pointed at an extension run.
+    - Fix: state these limits in the .9 note, or batch them into a later report-text unit with the R9 cosmetic. No code change is needed before merge.
+  - **R6 (note): A3 for S2 uses n = 640, chosen after the scan, so its step (0.0013) is finer than production (0.002).** At production resolution the observed orders are 4.2 to 4.9. The interval and the premise window were not changed, and the choice is disclosed in the Log. It is acceptable, because A3 tests the integrator's order and V6 (A4) covers the production step. The development note should not cite A3 as an order check at the production step for S2.
+  - **R7 (note): record accuracy.**
+    - (a) The A6 entry says the S1 cached value differs from the note's by "relative difference 7e-17". That is the absolute difference (8.3e-17); the relative difference is 6.7e-16. Both are inside 1e-12.
+    - (b) The R1 rerun entry does not name its run directory. It is `runs/ext-new2/smoke/` (verified above).
+    - (c) A9 as worded (`git diff --name-only freeze-1`) lists `docs/agent/governance/ledger.jsonl` and `runs/confirmatory/…`, which come from develop's history, not from this branch. `git diff --name-only 2b8240e..HEAD` lists none of them. Record A9 against the branch base.
+  - **R8 (note, pre-existing design): the Lyapunov cache (`data.lyapunov_record`) is keyed by system name only.** If R1 changes S1's `max_dt`, any reused `<out>/cache/lyapunov.json` returns the old λ without recomputation. Runs use fresh output directories, so this does not arise today; .6 and .8 must keep fresh `--out` paths.
+- **Checked and found correct:**
+  - The values of all three specs equal specification §0 exactly: parameters, dim, start states, `max_dt`, bounds, `lyapunov_steps`, observed index 0, and S2 `field_fn` is `lorenz63_field`.
+  - The fields and Jacobians, re-derived by hand, match the code and the tests' references, including the A1 and A2 tolerance bounds.
+  - S3 is the registry Rössler under (x, y, z) → (z, x, y): start (1, 1, 0) → (0, 1, 1); the field is the same expression per component; the Jacobian rows are [x − c, z, 0], [−1, 0, −1], [0, 1, a]. `rossler_zfirst_field` is a new function (identity semantics hold), and `checked_bound` is untouched.
+  - R2: `--numstat` 1/1 `data.py` (the exception (i) line only), 64/0 `report.py`, 108/0 `systems.py`, checked hunk by hunk.
+  - R3: the literal pins equal `git show freeze-1` (all dataclass fields pinned, type-exact); the presets and `V3_SYSTEMS` are pinned. The three by-design registry tests remain exact, with nothing loosened.
+  - R1 is bitwise (rerun above).
+  - `report.verdicts`: the v3-only path is unchanged, and an unknown label still raises. Mixed v3 and extension runs give per-system words only, and `--report` regeneration uses the same function. `extension_note_lines` is empty for v3 results.
+  - The trapping-ball derivation (dV/dt identity, maximum on E at u = −c/(2(β − 1)), 181.88 and 39.25) is correct.
+  - The A6 independent reference imports nothing from `lpcstudy.systems`.
+  - Spot checks:
+    - S-D1 10 of 400 and 7 non-finite: reproduced.
+    - S1 cached λ 0.11251662457254273: reproduced.
+    - A7 smoke gate values (S1 V1 1.0e-8 and 3.6e-9, V6 1.9e-5, gate PASS; S2 and S3 V7 FAIL only): read from `runs/a7-*/smoke/results.json`.
+  - All 8 commits name the unit and carry `Agent: claude-sonnet-5-5`.
+  - No change to the ledger, seeds, `runs/confirmatory`, `tools/`, `config.py`, `statistics.py` or `__main__.py` on this branch.
+  - The direct-`pytest` slip is logged.
+  - float64 is kept, and no new randomness is introduced: the test RNG `default_rng(20261020)` draws only identity-check points.
+- **Verdict (round 1): changes required.**
+  - R1 is a blocker for S1: re-specification by the applied-mathematician, then reruns.
+  - R2 to R5 should be fixed. R4 and the `report.verdicts` change need owner review before freeze.
+  - R6 to R8 are notes.
+  - The S2 and S3 parts and the verdict-reporting change are correct as implemented.
+  - Findings: 8 (1 blocker, 4 should fix, 3 notes).
 
 ## Audit
 
