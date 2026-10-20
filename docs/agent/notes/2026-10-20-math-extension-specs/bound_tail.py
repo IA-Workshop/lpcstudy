@@ -15,7 +15,7 @@ from lpcstudy.systems import lyapunov_guarded, make_flow_step
 from ext_common import CANDIDATES
 
 LT = 30
-STEPS = {"S1": 4_000_000, "S2": 2_000_000, "S3": 2_000_000}
+STEPS = {"S1": 4_000_000, "S2": 2_000_000, "S3": 2_000_000, "S4": 2_000_000, "S5": 2_000_000, "S6": 2_000_000}
 which = sys.argv[1:] or list(CANDIDATES)
 for key in which:
     sp = CANDIDATES[key]()

@@ -75,7 +75,7 @@ def lm_efficiency(ctx, noise, n_states, n_draws, iters=15):
 
 
 cache = Path(tempfile.mkdtemp(prefix="ext-math-cache-"))
-which = sys.argv[1:] or ["S1", "S2", "S3"]
+which = sys.argv[1:] or ["S1", "S2", "S3"]  # pass ARGS="S4 S5 S6"
 for key in which:
     sp = CANDIDATES[key]()
     systems.SYSTEMS[sp.name] = sp  # in-process registration only

@@ -690,3 +690,15 @@ Entries DEC-0030, DEC-0031 and DEC-0032 were entered with owner brackets unfille
 4. **Development ensemble.** Launched 2026-10-20: full preset on the GPU for DEV-1, DEV-3 and DEV-4 in turn, from a clean detached worktree at develop 3dec086 (lpcstudy/ identical to freeze-1), through tools/run_preset.sh under the GPU lock, concurrently with the CPU regeneration run-2 (host load does not change a run's bits at fixed thread counts). Development evidence only, for the labeled development appendix.
 
 **Affects:** ROADMAP.md (new phase), queue.md, the findings document appendix A, the research statement, the poster outline. **Status:** owner instruction; recorded pending the owner's ledger entry. Amendments to ROADMAP.md need the owner's ledger `amendment` entry (ROADMAP.md is a governed file).
+
+## DEC-0038: Owner confirms the per-system-only verdict branch and the two further review items of the extension code (2026-10-20, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim, in answer to three items put by the main session: "Verdict code. Still pending: option (a), the per-system-only branch in report.verdicts. Owner review needed. Add these two items to the list: data.lyapunov_record (the lyapunov_steps field) and tests/slow/test_start_states.py. Timing risk. The S1 re-specification adds roughly an hour and a re-review. The ensemble is still on the GPU, so the 10/22 target holds if the batch can start tonight. Proceed with all."
+
+**Reading, for the owner to correct.**
+1. **Option (a) is approved:** in `lpcstudy/report.py`, a run that contains any extension system skips `statistics.overall_verdict` and stores per-system verdict words with the overall word "per-system only"; the path for runs inside the three frozen systems is unchanged (checked bitwise, WU-0021 Log). It may merge to `develop` after the independent review. It never goes to `main`.
+2. **The two further items stay on the owner's review list** (verdict, seed and statistics code needs owner review, LPC.PC.11): the additive field `lyapunov_steps` in `data.lyapunov_record` (default 100000: the frozen systems are unchanged) and the edit of `tests/slow/test_start_states.py` (the control row generalized to dimension 4, plus the three new cases). The owner's instruction is to proceed with implementation, review and the runs meanwhile; the owner's own read of these hunks is not claimed as done.
+3. **The S1 re-specification** (RK4 step and orbit bound, review finding R1 of WU-0021.7) and its re-review proceed; the batched GPU run starts after the ensemble when the code review of the extension is approved.
+4. **Retraction.** The main session's earlier ruling that accepted a "2 to 5% per seed abort hazard" for S1 rested on a wrong mechanism (an integrator instability at the production step, not an escape to infinity: review R1) and is withdrawn.
+
+**Affects:** WU-0021, WU-0023, the extension runs. **Status:** owner instruction; recorded pending the owner's ledger entry.

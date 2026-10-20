@@ -86,7 +86,7 @@ def lorenz_trapping_bound(sigma, r, beta):
 
 
 which = sys.argv[1:] or list(CANDIDATES)
-long_steps = {"S1": 1_000_000, "S2": 4_000_000, "S3": 1_000_000}
+long_steps = {"S1": 1_000_000, "S2": 4_000_000, "S3": 1_000_000, "S4": 1_000_000, "S5": 1_000_000, "S6": 1_000_000}
 for key in which:
     sp = CANDIDATES[key]()
     interval = 20 * sp.max_dt

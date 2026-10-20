@@ -1,0 +1,6 @@
+[S4] hindmarsh_rose: 2000000 steps x Delta 0.15252 = 305036 time units = 66667 LT; bound 5.0
+  max |x| 1.679; block maxima (100k steps each) quantiles 10/50/90% [1.68 1.68 1.68]; steps with |x| > 0.5 B: 0, > 0.75 B: 0; ratio B / max 2.98  [2 s]
+[S5] hyper_jha: 2000000 steps x Delta 0.09301 = 186024 time units = 66667 LT; bound 100.0
+  max |x| 38.091; block maxima (100k steps each) quantiles 10/50/90% [34.96 36.24 37.47]; steps with |x| > 0.5 B: 0, > 0.75 B: 0; ratio B / max 2.63  [1 s]
+[S6] lorenz96_4: 2000000 steps x Delta 0.02755 = 55106 time units = 66667 LT; bound 60.0
+  max |x| 19.414; block maxima (100k steps each) quantiles 10/50/90% [19.12 19.21 19.28]; steps with |x| > 0.5 B: 0, > 0.75 B: 0; ratio B / max 3.09  [3 s]

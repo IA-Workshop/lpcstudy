@@ -1,0 +1,6 @@
+S4: Delta 0.15252, 200000 steps = 30504 time units; x quantiles 1/10/50/90/99% [-0.722 -0.302  0.01   0.264  1.399]; z (slow) range [-0.457, 0.259]
+  x histogram counts: [4993, 4603, 5012, 7672, 15641, 33073, 77487, 26017, 11753, 5889, 1816, 903, 619, 503, 482, 484, 542, 727, 901, 883] edges [-0.76 -0.64 -0.52 -0.4  -0.28 -0.15 -0.03  0.09  0.21  0.33  0.46  0.58
+  0.7   0.82  0.95  1.07  1.19  1.31  1.43  1.56  1.68]
+  spike threshold 0.844; 2841 spikes; inter-spike interval (steps) quantiles 10/50/90% [ 49.  59. 111.]
+  burst gap 177 steps; 31 bursts; spikes per burst median 58 (p10 21, p90 224); burst duration median 4005 steps = 133.50 LT; quiet interval median 198 steps = 6.60 LT (p90 8.07 LT); burst period median 136.48 LT; quiet fraction of time 0.03
+  AMI delay 25 -> tau 5; window (D-1)tau = 30 steps against spike interval 59 steps and burst period 4094 steps

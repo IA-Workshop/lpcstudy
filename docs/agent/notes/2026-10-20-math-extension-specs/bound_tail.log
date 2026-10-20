@@ -1,6 +1,2 @@
-[S1] rossler_hyper: 4000000 steps x Delta 0.29693 = 1187729 time units = 133333 LT; bound 300.0
-  max |x| 174.097; block maxima (100k steps each) quantiles 10/50/90% [131.15 143.59 161.03]; steps with |x| > 0.5 B: 41, > 0.75 B: 0; ratio B / max 1.72  [4 s]
-[S2] lorenz63_r166: 2000000 steps x Delta 0.05372 = 107450 time units = 66667 LT; bound 185.0
-  max |x| 56.447; block maxima (100k steps each) quantiles 10/50/90% [52.42 53.52 54.75]; steps with |x| > 0.5 B: 0, > 0.75 B: 0; ratio B / max 3.28  [2 s]
-[S3] rossler_z: 2000000 steps x Delta 0.46166 = 923314 time units = 66667 LT; bound 50.0
-  max |x| 22.850; block maxima (100k steps each) quantiles 10/50/90% [22.83 22.84 22.85]; steps with |x| > 0.5 B: 0, > 0.75 B: 0; ratio B / max 2.19  [2 s]
+[S5] hyper_jha: 2000000 steps x Delta 0.09082 = 181639 time units = 66667 LT; bound 80.0
+  max |x| 38.082; block maxima (100k steps each) quantiles 10/50/90% [35.15 36.22 37.12]; steps with |x| > 0.5 B: 0, > 0.75 B: 0; ratio B / max 2.10  [2 s]

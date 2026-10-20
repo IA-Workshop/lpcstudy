@@ -53,6 +53,7 @@
 - **Drop rule.** If WU-0021 is not done by 10-22 end of day, .3 starts only after it. The set shrinks to what can be piloted by 10-25 18:00. Below one system, the unit is deferred and the appendix says so.
 
 ## Log
+- 2026-10-20 (main session, owner instruction after the researcher and specification notes): the owner keeps S2 (WU-0021) as a reference and asks for further candidates, run batched to save time. Candidates S4 Hindmarsh-Rose, S5 HyperJha, S6 4-D Lorenz-96 (F = 20), S7 coupled Lorenz (6-D, stretch) are taken from the researcher note (B.3, D.2) and are being specified by the applied-mathematician in `docs/agent/notes/2026-10-20-math-extension-specs-2.md` (staged: S4 and S5 first). Implementation follows the WU-0021 pattern, in a lane after the WU-0021 branch lands. Batching decision (main session; owner may overrule): after code review, all extension systems run in ONE invocation of the study command per development seed (`--systems <list> --skip-robustness`, GPU, one lock), the separate pilot stage of WU-0021.6 is folded into that full run (the full run carries the gate V1 to V7 per system); results stay provisional until the review of the code approves it, and a code change after the run means a rerun. Spare CPU cores (the regeneration run-2 ends this evening) may run the same systems on the CPU in parallel at LPC_THREADS 8 as a development cross-device check (TD tier), never replacing the GPU result. Target for the first batch moves from 10-26 to 10-23.
 
 ## Review
 

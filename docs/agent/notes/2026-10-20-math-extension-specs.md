@@ -1,5 +1,7 @@
 # Extension program: specifications of the additional attractors S1, S2 (and S3)
 
+**Correction 2026-10-20 (review WU-0021.7 R1):** the S1 values `max_dt = 0.01`, `orbit_bound = 300` and `lyapunov_steps = 1 000 000` of §0, §1.1 and §2 are superseded by `2026-10-20-math-extension-specs-2.md` §11 (max_dt 0.005, bound 460, 2·10⁶ steps, cached λ 0.11220508610149857): at h = 0.009875 RK4 is unstable where the attractor reaches x ≈ −304 (∂ż/∂z = x), and the bound 300 lay inside the attractor's reach. S2 and S3 are unchanged.
+
 **DEVELOPMENT / EXPLORATORY: not a hypothesis test.** No sealed seed, no sealed flag, no read of `runs/confirmatory`. Every computation here ran on CPU, one thread, `nice -n 19`, with no preset and no test tier, while the run-2 CPU job and the GPU ensemble were in progress. Nothing under `lpcstudy/`, `tools/`, `docs/study/`, `seeds/`, `ROADMAP.md`, the ledger or the records was changed. This note is WU-0021.2.
 
 - **Date:** 2026-10-20 (stage 1 committed at noon; this is the refined version). **Agent:** applied-mathematician (claude-fable-5-1). **Authorization:** DEC-0037. **Branch:** `wu/ext-math` from develop 22483b4.
