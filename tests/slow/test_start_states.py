@@ -202,9 +202,7 @@ def run(request, tmp_path_factory) -> dict:
     return out
 
 
-def test_sd1_no_start_is_refused_over_the_full_horizon(
-    run: dict, request: pytest.FixtureRequest
-) -> None:
+def test_sd1_no_start_is_refused_over_the_full_horizon(run: dict) -> None:
     """S-D1: 0 refusals for 400 starts over ``burn + 705 000`` steps; the
     control is refused.
 

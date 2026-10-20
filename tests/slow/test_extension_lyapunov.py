@@ -16,7 +16,7 @@ S2 ``lorenz63_r166``, S3 ``rossler_z``) this test checks three things.
    another CPU or XLA build the value differs at the level of its standard
    error (0.2% to 1%), not at 1e-12: the test is then skipped with the
    reason stated, and only check 2 applies. The tolerance is 1e-12 relative
-   (the observed difference on this host is 0 for S2 and S3 and 6.7e-16 for
+   (the observed difference on this host is 0 for S2 and S3 and 8.9e-16 for
    S1). The test name starts with ``test_regression_``.
 2. **The code agrees with an independent Benettin/QR implementation.** The
    reference below is written in this file and imports nothing from
@@ -274,7 +274,7 @@ def test_regression_cached_lambda_equals_the_recorded_value(cached) -> None:
     section 0, produced by ``lyapunov_guarded`` on the Intel i9-14900K, CPU,
     jax 0.11.2), so it is not correctness evidence; the independent Benettin
     test below is. Tolerance: relative 1e-12 (the observed differences are 0 for
-    S2 and S3 and 6.7e-16 for S1 on the recorded host). Skipped, with the
+    S2 and S3 and 8.9e-16 for S1 on the recorded host). Skipped, with the
     reason, on another CPU or XLA build, where the Benettin value differs at
     the level of its standard error. The orbit maximum must be below the bound.
     """
