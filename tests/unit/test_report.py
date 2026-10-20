@@ -2472,6 +2472,6 @@ def test_lyapunov_rows_of_extension_systems_do_not_cite_dec_0010() -> None:
     lines = report._lyapunov_lines(results, ["lorenz63_r166", "chua"])
     ext = [ln for ln in lines if ln.startswith("| lorenz63_r166")]
     assert len(ext) == 1 and "extension system" in ext[0]
-    assert "NVVUQ.13, DEC-0010" not in ext[0]
+    assert "DEC-0010" not in ext[0]
     chua = [ln for ln in lines if ln.startswith("| chua |")]
     assert len(chua) == 1 and "known limitation, NVVUQ.13, DEC-0010" in chua[0]

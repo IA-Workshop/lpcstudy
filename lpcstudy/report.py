@@ -915,12 +915,11 @@ def _lyapunov_lines(results: dict, systems: list[str]) -> list[str]:
         # A system without an entry raises (PRIME.4).
         references = LYAPUNOV_REFERENCES[s]
         if s in EXTENSION_SYSTEMS and not references:
-            # The DEC-0010 limitation concerns the Chua parameters only.
+            # DEC-0010 (the Chua retrieval decision) does not cover these.
             lines.append(
                 f"| {s} | {code} | none | no confirmed published value | "
                 "n/a | not validated: no confirmed published value at these "
-                "parameters (extension system, WU-0021; the DEC-0010 "
-                "limitation concerns the Chua parameters only) |"
+                "parameters (extension system, WU-0021) |"
             )
             continue
         if not references:
