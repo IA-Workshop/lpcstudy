@@ -230,29 +230,36 @@ REFERENCE = {
 }
 
 
-def _rk4_pair(field, jac, dt, s, q):
-    """One RK4 step of the state and of the tangent matrix ``q`` together."""
+def _rk4_pair(field, jac, dt, s, q, v):
+    """One RK4 step of the state, the tangent matrix ``q`` and ``v``.
+
+    ``v`` accumulates the integral of the divergence ``trace J`` along the
+    orbit with the same RK4 weights (the stages of the state), so that its
+    mean is a quadrature of the orbit mean of the divergence that does not
+    depend on the observation interval.
+    """
 
     def deriv(state, tangent):
-        return field(state), jac(state) @ tangent
+        return field(state), jac(state) @ tangent, jnp.trace(jac(state))
 
-    k1s, k1q = deriv(s, q)
-    k2s, k2q = deriv(s + 0.5 * dt * k1s, q + 0.5 * dt * k1q)
-    k3s, k3q = deriv(s + 0.5 * dt * k2s, q + 0.5 * dt * k2q)
-    k4s, k4q = deriv(s + dt * k3s, q + dt * k3q)
+    k1s, k1q, k1v = deriv(s, q)
+    k2s, k2q, k2v = deriv(s + 0.5 * dt * k1s, q + 0.5 * dt * k1q)
+    k3s, k3q, k3v = deriv(s + 0.5 * dt * k2s, q + 0.5 * dt * k2q)
+    k4s, k4q, k4v = deriv(s + dt * k3s, q + dt * k3q)
     s_next = s + dt / 6.0 * (k1s + 2.0 * k2s + 2.0 * k3s + k4s)
     q_next = q + dt / 6.0 * (k1q + 2.0 * k2q + 2.0 * k3q + k4q)
-    return s_next, q_next
+    v_next = v + dt / 6.0 * (k1v + 2.0 * k2v + 2.0 * k3v + k4v)
+    return s_next, q_next, v_next
 
 
 def _flow(name, s, q):
-    """One observation interval (``SUBSTEPS`` RK4 substeps) of state and tangent."""
+    """One observation interval (``SUBSTEPS`` RK4 substeps): state, tangent, v."""
     field, jac, _, dt = REFERENCE[name]
 
     def body(_, carry):
         return _rk4_pair(field, jac, dt, *carry)
 
-    return jax.lax.fori_loop(0, SUBSTEPS, body, (s, q))
+    return jax.lax.fori_loop(0, SUBSTEPS, body, (s, q, jnp.asarray(0.0)))
 
 
 @partial(jax.jit, static_argnames=("name",))
@@ -275,18 +282,17 @@ def _benettin_batch(name, state, n_steps):
 
     Returns ``(sums, final state, max |x| over the steps)`` where ``sums`` holds
     the sum of ``log |R_00|`` (the largest exponent), of ``sum_i log |R_ii|``
-    (the sum of all exponents) and of the divergence ``trace J`` at the states.
+    (the sum of all exponents) and of the RK4-integrated divergence ``trace J``.
     """
     identity = jnp.eye(state.shape[0])
 
     def body(carry, _):
         s, q, big = carry
-        s_next, tangent = _flow(name, s, q)
+        s_next, tangent, vol = _flow(name, s, q)
         q_next, r = jnp.linalg.qr(tangent)
         # The sign convention of QR does not matter for log |R_ii|.
         logs = jnp.log(jnp.abs(jnp.diag(r)))
-        _, jac, _, _ = REFERENCE[name]
-        out = jnp.stack([logs[0], jnp.sum(logs), jnp.trace(jac(s))])
+        out = jnp.stack([logs[0], jnp.sum(logs), vol])
         return (s_next, q_next, jnp.maximum(big, jnp.abs(s[0]))), out
 
     (state, _, big), growth = jax.lax.scan(
@@ -316,7 +322,7 @@ def reference_benettin(name: str, n_steps: int):
     sums = np.asarray(sums)
     batch_lambda = sums[:, 0] / (per_batch * interval)
     batch_sum = sums[:, 1] / (per_batch * interval)
-    batch_div = sums[:, 2] / per_batch  # mean divergence per unit time
+    batch_div = sums[:, 2] / (per_batch * interval)  # mean divergence per time
     lam = float(np.mean(batch_lambda))
     se = float(np.std(batch_lambda, ddof=1) / math.sqrt(N_BATCHES))
     stats = {
@@ -402,8 +408,11 @@ def test_extension_lyapunov_matches_an_independent_benettin_run(
     # sum of all exponents equals the orbit mean of the divergence. Asserted
     # where the divergence varies along the orbit (S1, S3, S4): a statistical
     # agreement of two estimates of the same mean, tolerance
-    # 3 sqrt(SE_sum^2 + SE_div^2) (20 batch means each; the RK4 volume error,
-    # relative (h lambda)^4 / 120 below 1e-4, is far below it). Where the
+    # 3 sqrt(SE_sum^2 + SE_div^2) (20 batch means each). The divergence is
+    # integrated along the orbit with the RK4 stage states (a first version
+    # sampled it at the observation instants, and S3's interval 0.47 aliased the
+    # spikes: sum -5.32023, divergence -5.32267, a quadrature error and not a
+    # defect; the sampled version is withdrawn, see the unit log). Where the
     # divergence is constant (S2, S5, S6) the batch SEs are round-off size and
     # the discretization error would set the tolerance, so it is printed only;
     # the constants are pinned exactly by the unit test of the traces.
