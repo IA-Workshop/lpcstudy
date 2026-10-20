@@ -23,7 +23,7 @@ Additive `SystemSpec` entries as in note 1 §0 (same `lyapunov_steps` field, sam
 | cached λ on this host (expected, bitwise) | 0.21688316515721046 | 0.3603046265219353 | 1.2018430962199733 |
 | Δ = 1/(30 λ); substeps | 0.153693; 62 | 0.092514; 38 | 0.027735; 6 |
 
-**S4 may not be implemented until R-S4-1 (the ẏ, ż equations) is confirmed by the researcher.** Everything else in this note about S4 is conditional on those equations.
+**S4 may not be implemented until R-S4-1 (the ẏ, ż equations) is confirmed by the researcher.** Everything else in this note about S4 is conditional on those equations. *(Resolved 2026-10-20: confirmed term by term, §12; the gate is lifted; S4 is named "Hindmarsh–Rose-type system in the Dysts parameterisation".)*
 
 ## 1. Exact definitions and derived units
 
@@ -230,4 +230,30 @@ The mechanism needs a Jacobian eigenvalue whose magnitude grows with the state (
 | S7 (not specified) | — | Lorenz-type: would behave as S2 | — | — | assess when specified |
 
 Rule for every future spec (added to the §1–§2 procedure of note 1): compute the frozen-coefficient margin along the orbit **and at the recorded extreme states of a multi-orbit tail study of at least 10⁸ time units at a step already known to be stable**, and choose max_dt so that the integrator is stable up to the orbit bound itself, not only on the typical orbit. S1 is the only candidate whose stiff eigenvalue is a bare coordinate with heavy excursions; the others have margins of 5–69 with tightly bounded orbits.
+
+## 12. The relayed Dysts equations (researcher note `2026-10-20-researcher-dysts-equations.md`): comparison, the S4 definition, the Lorenz-96 check, the gate on S4
+
+**(1) Term-by-term comparison** of the fields used in this note and in `ext_common.py` (`hindmarsh_rose_field`, `hyper_jha_field`, `lorenz96_field`) with the researcher's line-by-line relay of `dysts/flows.py`:
+
+| System | Relay (Dysts `_rhs`) | This note | Result |
+| --- | --- | --- | --- |
+| HindmarshRose | ẋ = −x + (1/t_x) y − (a/t_x) x³ + (b/t_x) x² + (1/t_x) z | −x + y/t_x − a x³/t_x + b x²/t_x + z/t_x | **equal**, term by term |
+| | ẏ = −a x³ − (d − b) x² + z | −a x³ − (d − b) x² + z | **equal** |
+| | ż = −(s/t_z) x − (1/t_z) z + c/t_z | (−s x − z + c)/t_z | **equal** algebraically; floating-point grouping differs (three divisions against one), a rounding-level difference, not a difference of the field |
+| HyperJha | ẋ = a y − a x + w; ẏ = −x z + b x − y; ż = x y − c z; ẇ = −x z + d w | a(y − x) + w; the other three identical | **equal**; the x equation's grouping differs at rounding level only |
+| Lorenz96 (N from the initial condition, 4) | Ẋ_i = (X_{i+1} − X_{i−2}) X_{i−1} − X_i + f, cyclic (the four explicit lines are the wrap-around of that one formula) | (roll(X, −1) − roll(X, 2)) · roll(X, 1) − X + F, with roll(X, −1)_i = X_{i+1}, roll(X, 2)_i = X_{i−2}, roll(X, 1)_i = X_{i−1} | **equal**, every index checked |
+
+No difference in any term of any of the three fields. The spectra, units, bounds, V6 grids, gate checks and readings of §§0–5 and §11 were computed with exactly these equations and stand. (The relay is a summariser's line-by-line copy, not raw bytes; the self-consistency checks below do not depend on it.)
+
+**(2) How S4 is defined and named.** The study needs an exact, stated vector field for PLP; it does not need agreement with the literature. S4 is therefore **"a Hindmarsh–Rose-type system in the Dysts parameterisation (Dysts `HindmarshRose`)"**, with the vector field written out in the `SystemSpec` docstring and in every table exactly as:
+
+    ẋ = −x + (y + z − a x³ + b x²)/t_x
+    ẏ = −a x³ − (d − b) x² + z
+    ż = (−s x − z + c)/t_z,   a = 0.49, b = 1, c = 0.0322, d = 1, s = 1, t_x = 0.03, t_z = 0.8,
+
+and the provenance **"relay of Dysts `_rhs` (researcher note 2026-10-20), verified by self-consistency, not against Marhl and Perc (2005), which was not read"**. The researcher's finding is adopted as stated: at t_x = 1 this is the standard Hindmarsh–Rose model in shifted variables (t_z = 1/r, c a composite constant); at t_x = 0.03 it is not shown to be a rescaling of the standard model, and the Dysts parameters are not the standard set. The name must not claim the standard model. Self-consistency of what was integrated: (i) the orbit average of the divergence ∇·f = −1 + (2b x − 3a x²)/t_x − 1/t_z over 10⁶ steps (10⁵ time units) is **−6.126 ± 0.014 against the spectrum sum −6.147 ± 0.011** (`hr_divergence.log`), an identity that holds only for the field as written and that the Dysts fields play no part in; (ii) the orbit mean and standard deviation (0.010, −0.093, 0.022) / (0.305, 0.131, 0.110) agree with the Dysts entry's (0.003, −0.106, 0.029) / (0.326, 0.148, 0.118) in sign and magnitude, with the standard deviations 7–12% lower here (the Dysts trajectory length and transient are unknown; this is a plausibility check, not a precision one). **For exactly these equations at the Dysts parameters:** chaos holds (λ = 0.2169 ± 0.0020 at the specified step; one positive exponent, one zero to 2·10⁻⁵ ± 1.7·10⁻⁴, d_KY 2.03); boundedness holds empirically (|x| ≤ 1.68 on every orbit seen, block maxima all 1.68, 2·10⁶ steps; no trapping region derived); the Lyapunov time 1/λ = 4.61 time units and Δ = 0.153693 hold with SE 0.9%. Nothing was computed with different equations, so nothing is recomputed. The researcher's note also records that the commented-out Dysts `_jac` disagrees with the active `_rhs` (−1/t_x against −1 in ∂ẋ/∂x); the code uses `jax.jacfwd` of the field, never that Jacobian, and V1 checks it against finite differences (3.2·10⁻⁶ and 5.8·10⁻⁵, §4).
+
+**(3) Lorenz-96 check.** The divergence of Ẋ_i = (X_{i+1} − X_{i−2}) X_{i−1} − X_i + F is Σ_i ∂Ẋ_i/∂X_i = −N exactly (the quadratic term never contains X_i itself), so the four exponents must sum to −4 and a flow has a zero exponent. My recomputed spectrum (`spectra_s456.log`, 10⁶ steps) is (+1.20184 ± 0.00349, +0.00000 ± 0.00009, −1.58820 ± 0.00275, −3.61363 ± 0.00272), **sum −3.99999**, with the zero exponent present. The Dysts spectrum (sum −2.95, no zero) fails both identities, as the researcher found; §1.3 already uses only the recomputed values.
+
+**(4) Gate R-S4-1: lifted.** The equations I used are the relayed Dysts equations term by term, the integrated field satisfies the divergence identity to 1.3 combined standard errors, and its moments agree with the Dysts entry; the residual uncertainty (a summariser relay, not raw bytes) is the same for S5 and S6, whose equations were accepted on the same basis, and it is covered by the unit test of §6 (the transcribed `_rhs` lines typed into the test from the researcher's quote, matched term by term against the field function, plus the divergence identity as an exact check for S5 and S6 and the orbit-average identity above as a tolerance check for S4). S4 may be implemented with the §0 values and the name and provenance of item (2). R-S4-2 (the three gate risks) stands.
 

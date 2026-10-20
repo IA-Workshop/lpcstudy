@@ -1,0 +1,2 @@
+S4 orbit-average divergence -6.1257 +- 0.0136 (10^5 time units); spectrum sum -6.1467 +- 0.011
+   orbit mean/std of (x, y, z): [0.0103, -0.0928, 0.0219] / [0.3049, 0.1306, 0.1103]; Dysts entry mean (0.0030, -0.1060, 0.0289), std (0.3265, 0.1481, 0.1180)
