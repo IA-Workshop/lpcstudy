@@ -483,6 +483,8 @@ compare_runs result: PASS (exit 0). What a TD pass does not mean: it does not re
 
 Regeneration of the official run by another actor (WU-0016, v3 §9 item 4): pending. One dated line is appended here after WU-0016.4.
 
+- 2026-10-20: The owner regenerated the official run on the same commit from a clean worktree (the owner ran both executions, as the owner ruled). The comparison reports that every compared leaf is equal, apart from the run-record and timing leaves it excludes (tier T zero, result pass), so the regeneration agrees bitwise with the official run.
+
 ## 10. Limitations
 
 All items of v3 §8 apply, plus the registered deficiencies and rulings listed here.
