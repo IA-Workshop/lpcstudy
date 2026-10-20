@@ -74,8 +74,91 @@
 
 ## Review
 
-- **Reviewer:**
-- **Findings and resolution:**
+### WU-0023 review
+
+- **Reviewer:** reviewer, claude-opus-5-5, fresh context, 2026-10-20.
+  - Diff: `git diff 0b27df1..f0c0e38` (merge base with develop): `lpcstudy/{systems,report}.py`, `tests/unit/{test_extension_systems,test_systems,test_experiments}.py`, `tests/slow/test_extension_lyapunov.py`, this file.
+  - Read: this plan and Log, specification note 2 §0, §1, §2, §4, §11.1 and §12, the researcher's equations relay `2026-10-20-researcher-dysts-equations.md`, `lpcstudy/validation.py` (V1), DEC-0037 and DEC-0038.
+- **Runs by the reviewer (§4.9; CPU, one thread, `nice -n 19`; run-2 and the GPU development runs active; no preset, no GPU, no integration tier):**
+  - **Unit radius, once.** Command: `python3 tools/test_impact.py --base 0b27df1` gives 24 unit files (core rule), plus `tests/integration`, which is deferred. Run: `LPC_THREADS=1 nice -n 19 tools/run_tests.sh unit <24 files>`. Result: **`883 passed in 55.00s`**.
+  - **R1 comparison, once.** Reference `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-ref-fc49d5f/runs/ext-ref/smoke/` against `runs/ext2-r1/smoke/` (commit fbb56d1, `dirty False`; `lpcstudy/` is unchanged from fbb56d1 to f0c0e38).
+    - leafdiff: `leaves: A 14174, B 14174, common 14174, different 0, removed 0, added 0`.
+    - compare_runs: `tier: T0`, `equal 13914, different 0, one-sided 0`, `RESULT: PASS`.
+    - `RESULTS.md` differs in provenance lines only.
+  - **Diagnostic scripts** (scratchpad `rev217/`; not tests and not evidence of any criterion):
+    - `sd1_any.py hyper_jha`: the S-D1 recipe with the test's own helpers, 400 starts over `burn + 705 000` steps. Result: **0 of 400 refused, 0 non-finite, max |x| 39.88**, as logged.
+    - `s456_stability.py`: frozen-coefficient RK4 margins along 2·10⁵-step orbits.
+    - `s4_v1_fdscan.py`: the smoke DEV-0 context of S4 rebuilt, and V1 repeated over a range of finite-difference (FD) steps.
+    - `s3_volume_h.py`: the A6 reference for S3 at h and h/2, 4·10⁵ steps each.
+- **Findings:**
+  - **R1 (blocker, S6 `lorenz96_4` only; owner ruling, not a code fix): Lorenz-96 is outside this unit's plan.**
+    - The plan written before execution lists "Lorenz-96 (LPC.PC.1, D3)" under **Out** (Plan, Scope). I found no owner ruling, ledger entry or plan amendment that brings it in.
+    - What I found instead:
+      - The Log says the main session took S6 "from the researcher note".
+      - DEC-0037 item 2 names only Lorenz-96 at N = 8, as a stretch candidate "not scheduled".
+      - Specification note 2 §1.3 argues that D3's reason (N > D − 1) does not reach N = 4. That is a sound mathematical argument, but it is not an authorization.
+    - The field was also renamed `lorenz96_ring_field` "so that the pinned absence of `lorenz96_field` ... still holds" (`lpcstudy/systems.py:262`; `tests/unit/test_systems.py:192`). That pin exists to record D3 ("Lorenz-96 is gone"), so the rename keeps the test green while defeating its intent.
+    - Fix:
+      - Either obtain an owner scope ruling (plan amendment) for S6 and restate the pin as what it really guards (no Lorenz-96 among the v3 core systems, and N = 8 excluded), or drop S6 from this merge.
+      - The S6 code and tests themselves are correct (below).
+  - **R2 (should fix, governance): the owner checkpoints miss one change.** The plan says "No verdict … change". This diff extends `report.EXTENSION_SYSTEMS` (`lpcstudy/report.py:159-166`), which decides which runs take the per-system-only verdict branch that DEC-0038 still holds for owner review. Fix: add this hunk to the DEC-0038 owner-review list. **Needs owner review before freeze.**
+  - **R3 (note; not a code defect): S4's smoke V1 failure is finite-difference truncation.**
+    - Evidence: I rebuilt the smoke DEV-0 context and reproduced the code's V1 exactly (1.1346e-4 and 6.8603e-4). Repeating it with other FD steps, the worst-state error scales as h²:
+      - delay map: 1.16e-2, 1.14e-4, 1.14e-6 at 10⁻⁵, 10⁻⁶ (the code's step), 10⁻⁷ × scale, levelling at 8.0e-7 (round-off) at 10⁻⁸;
+      - gain: 6.95e-2, 6.86e-4, 6.86e-6, then 6.2e-7.
+    - So the automatic Jacobian agrees with the FD limit to about 1e-6, as A2 (exact Jacobian of the field) also shows.
+    - The failing states are a high-curvature delay window (state 8 of 10) and a gain-90.8 state; the predicted 3.2e-6 and 5.8e-5 were for other states. This is risk R-S4-2 as pre-stated.
+    - By rule S4 is PROVISIONAL whenever V1 fails. The gate is not changed, and the failure is likely to recur at pilot and full size. Report it with this h² evidence.
+  - **R4 (note): S5's smoke V4 failure is smoke-size behavior.** The median half-width is 0.099 at `used_M` 30, while the criterion is defined at M = 200 (`config.py:174`, smoke 30). Scaling by √(30/200) projects about 0.04. Judge it at full size.
+  - **R5 (note): the S5 and S6 cached λ are not bitwise equal to §0, and this is not a defect.**
+    - Smoke values 0.3603046265219346 and 1.2018430962199782 against §0's …353 and …733: relative differences of 2e-15 and 4e-15.
+    - The field expressions are identical to `ext_common.py` (checked), and a rounding difference early in a chaotic 10⁶-step orbit would move λ by its SE (0.3–0.4%). The orbits are therefore the same and only the final reduction or compilation context differs (the same effect as S1 in WU-0021).
+    - The host-bound guard at 1e-12 is the right instrument. §0's "expected, bitwise" does not hold and should be recorded as such.
+  - **R6 (note, for reading the batch): at smoke size the LM estimator fails on most states for S4, S5 and S6.**
+    - LM diagnostics at ρ = 1% (core, oracle): median c/ρ² is **2.33e4 (S4), 2.44e4 (S5), 2.78e3 (S6)**. For S5 the fraction above the χ² 0.999 quantile is 0.83. By comparison, Lorenz-63, Rössler, S1 and S3 converge (median c/ρ² 4–6); S2 also fails (5.2e4).
+    - V7 efficiency medians at ρ = 1% are 162, 64 and 47, with slopes near 0.
+    - The specification's LM probe started from the true state and passed, so the suspect is the network start at smoke size. It is not evidence of a code defect.
+    - The Log reports "V7 FAIL" without these magnitudes; add them. If efficiency stays ≫ 1 at full size, every PLP result of that system is PROVISIONAL, and the estimator start is a finding to refer, not to retune.
+  - **R7 (note, for the applied-mathematician): S4's bound 5 lies beyond the RK4 stability limit on the negative side.**
+    - h·|∂ẋ/∂x| = 2.785 at x = −4.15, and it is 3.87 at x = −5. The §11.1 table evaluated the positive side (2.21 at +5).
+    - The attractor's minimum is x = −0.765 (5·10⁵ steps), a factor of 5.4, so there is no practical risk.
+    - However, the §11.1 rule "stable up to the orbit bound" is not met for S4. A non-finite refusal with x in (−5, −4.15) would be an integrator artifact, not a code defect. Record this, or use bound 4.
+    - The rest of §11.1 rechecked independently, along 2·10⁵-step orbits (40 000 states):
+      - S4: max |Re λ| 79.8, margin 14.1;
+      - S5: 22.1, margin 51.9;
+      - S6: 8.9, margin 68;
+      - max |R(hλ)| ≤ 1.000000 for decaying modes, which matches §11.1.
+  - **R8 (note, report text):**
+    - The S5 and S6 reports (dof 3) still print "(4 at D = 7: median 3.36, p95 9.49)", the residue of WU-0021 N1.
+    - The S4 to S6 Lyapunov rows read "(extension system, WU-0021…)" but belong to WU-0023 (`lpcstudy/report.py:929-938`).
+    - Text only.
+  - **R9 (note, A6 volume identity): the S4-only assertion is legitimate, but what the identity proves should be stated.**
+    - I checked the S3 explanation: the gap is +2.49e-3 at h = 0.04 and +1.26e-4 at h = 0.02, a ratio of 19.7, which is the h⁴ behaviour of the RK4 map. Its sign also fits: the discrete map contracts less than the flow. Removing the extra S1 and S3 assertions was therefore not a loosening; it is logged, and the specification asked for S4 only.
+    - However, Σλ = ⟨∇·f⟩ holds for any smooth field paired with its own Jacobian, so it checks the reference's Jacobian, integrator and QR consistency, not the transcribed equations. Specification §12's "an identity that holds only for the field as written" overstates this.
+    - The test's own label ("of the reference itself") is honest. `test_divergence_identities_pin_the_transcribed_equations` repeats A2's diagonal entries: it is redundant, not vacuous.
+- **Checked and found correct:**
+  - The values of all three specs equal §0: parameters (S5 c = 2.667, not 8/3), dim, start, `max_dt`, bound, `lyapunov_steps`, observed index 0.
+  - The fields match the relay term by term: S4 uses the relay's grouping (identical to `ext_common.py`); S6 `jnp.roll` indices check out (roll(−1) = X_{k+1}, roll(2) = X_{k−2}, roll(1) = X_{k−1}).
+  - I re-derived the Jacobians by hand:
+    - S4: ∂ẋ/∂x = −1 + (2bx − 3ax²)/t_x and ∂ẏ/∂x = −3ax² − 2(d − b)x;
+    - S5: rows [−a, a, 0, 1], [b − z, −1, −x, 0], [y, x, −c, 0], [−z, 0, −x, d];
+    - S6: the cyclic builder and the explicit `_jac_s6`, row by row.
+    - These equal the code (A2) and the A6 reference.
+  - The divergences are −a − 1 − c + d, −4, and the S4 closed form.
+  - The A1 references for S4 to S6 are the relay lines, and K = 8 for S4 is justified.
+  - A3 counts were fixed from a logged scan before the test, with the interval unchanged.
+  - R2 additivity: against freeze-1, 1/1 `data.py` (the WU-0021 exception), 146/0 `report.py`, 256/0 `systems.py`. Against the merge base, the only deleted line is in the WU-0021 `report.py` row template.
+  - R3 pins: the frozen literal test is unchanged. The registry and bounds tests stay exact (six entries).
+  - R1 is bitwise (rerun above).
+  - S-D1 is 0 of 400 for all three (S5 reproduced).
+  - All 5 WU-0023 commits (excluding the develop merge) name the unit and carry `Agent: claude-sonnet-5-5`.
+  - No change to seeds, `runs/confirmatory`, `tools/`, `config.py`, `statistics.py` or `__main__.py`. float64 is kept, and no new randomness is introduced.
+- **Verdict: changes required.**
+  - The blocker is R1, for S6 only: it needs an owner scope ruling or S6 must be dropped.
+  - S4 and S5 are approved as implemented.
+  - R2 is a should-fix for the record. The `report.py` change, together with DEC-0038's items, **needs owner review before freeze**.
+  - R3 to R9 are notes. No smoke-gate finding indicates a code defect: V1 on S4 is FD truncation (shown), V4 on S5 is smoke size, the cached λ differences are reduction-level, and V7 is to be judged at full size.
+  - Findings: 9 (1 blocker, 1 should fix, 7 notes).
 
 ## Audit
 
