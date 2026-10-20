@@ -45,7 +45,7 @@ for key in which:
     sp = CANDIDATES[key]()
     t0 = time.time()
     import os
-    steps = {"S1": 1_000_000, "S2": 4_000_000, "S3": 1_000_000}.get(key, 100_000) if os.environ.get("LYAP_LONG") else 100_000
+    steps = {"S1": 1_000_000, "S2": 4_000_000, "S3": 1_000_000, "S4": 2_000_000, "S5": 2_000_000, "S6": 1_000_000}.get(key, 100_000) if os.environ.get("LYAP_LONG") else 100_000
     lam, lyap_max = lyapunov_guarded(sp, 20 * sp.max_dt, steps, 5_000)
     print(f"[{key}] Benettin steps {steps}")
     interval = 1.0 / (LT * lam)

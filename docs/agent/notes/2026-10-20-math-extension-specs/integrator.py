@@ -19,7 +19,7 @@ from lpcstudy.systems import lyapunov_guarded, make_flow_step, simulate_trajecto
 from ext_common import CANDIDATES
 
 LT = 30
-GRID = {"S1": [0.02, 0.01, 0.005, 0.0025], "S2": [0.008, 0.004, 0.002, 0.001], "S3": [0.08, 0.04, 0.02]}
+GRID = {"S1": [0.02, 0.01, 0.005, 0.0025], "S2": [0.008, 0.004, 0.002, 0.001], "S3": [0.08, 0.04, 0.02], "S4": [0.02, 0.01, 0.005, 0.0025], "S5": [0.02, 0.01, 0.005, 0.0025], "S6": [0.02, 0.01, 0.005, 0.0025]}
 
 which = sys.argv[1:] or list(CANDIDATES)
 for key in which:

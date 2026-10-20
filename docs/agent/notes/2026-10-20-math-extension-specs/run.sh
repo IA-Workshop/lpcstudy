@@ -2,7 +2,7 @@
 # Run the scripts of the note 2026-10-20-math-extension-specs.md, single
 # threaded and niced, writing <script>.log beside it (REPRO.10). Development
 # only: no preset, no test tier, no GPU, no network, no confirmatory artefact.
-# A CPU run-2 job and a GPU ensemble were running: one thread, nice 19.
+# ARGS="S4 S5" passes selectors to the script. A CPU run-2 job and a GPU ensemble were running: one thread, nice 19.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 wt="$(cd "$here/../../../.." && pwd)"
@@ -13,6 +13,6 @@ export XLA_FLAGS="--xla_cpu_multi_thread_eigen=false intra_op_parallelism_thread
 export PYTHONPATH="$wt"
 for s in "$@"; do
   echo "== $s"
-  nice -n 19 "$py" -s "$here/$s" > "$here/${s%.py}.log" 2>&1 || echo "FAILED: $s (see log)"
+  nice -n 19 "$py" -s "$here/$s" ${ARGS:-} > "$here/${s%.py}.log" 2>&1 || echo "FAILED: $s (see log)"
   tail -n 3 "$here/${s%.py}.log"
 done
