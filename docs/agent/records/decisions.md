@@ -668,3 +668,13 @@ Entries DEC-0030, DEC-0031 and DEC-0032 were entered with owner brackets unfille
 3. **Future tool (idea, not planned, not for the sealed run).** A helper for human-recorded ledger entries: it would take the act (authorization, release, ruling), prefill the entry from the record it cites, check order against the commits and the run provenance, warn when an entry follows the act it records, and print the sequence number for the next step. The owner asked that it be considered in the future; nothing is built.
 
 **Affects:** WU-0015.3, WU-0015.4, WU-0016, the findings document section 9, the pre-promotion audit scope (A13 is not an open finding). **Status:** owner statements; recorded pending the owner's ledger entry.
+
+## DEC-0036: Owner approval of the handling of review findings R1 and R4 of WU-0020.8 (2026-10-20, owner statement relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim: "r1 is ok" and "r4 is ok", given in answer to the two questions put with fix round 1 of WU-0020.8.
+
+**Reading, for the owner to correct.**
+1. **R1 (Q-N).** The findings document shows both stored Q-N readings per system (logit part and zero-indicator part), traces both, and says that the stored overall word `verdicts.Q-N` is built from the logit part only. `lpcstudy/report.py` is not changed. The collapse is recorded here as a reporting observation of the frozen report code, not as a defect and not as a change request.
+2. **R4 (DEF-0027 count).** The findings document follows the official `RESULTS.md` and the DEF-0027 correction (negligible for 5 of 18 primary parts, not shown negligible for 13: not negligible 6, not certified 7; the projection is stated and not applied). `docs/study/proposal_and_methods_v3.md` section 8 is not edited. Its wording of the count differs from RESULTS.md; the difference is recorded here and in the constant's citation in `tools/findings/design_constants.json`.
+
+**Affects:** WU-0020.8, the findings document sections 4 and 10, the pre-promotion audit scope (the v3 section 8 wording is a known difference, not an open finding). **Status:** owner statements; recorded pending the owner's ledger entry.
