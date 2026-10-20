@@ -1,3 +1,4 @@
+[S1] Benettin steps 100000
 [S1] rossler_hyper: lambda(code cache) 0.11225907424447891, Delta 0.296932, substeps 30, dt 0.009898
   orbit maxima |s_i|: lyapunov orbit max|x| 135.363; statistics orbit (burn-in included) [129.361  85.72  322.782  63.947]; bound 300.0
   observable: mean -24.97696, sigma_x 21.71749; state mean [-24.977   -2.561    2.5568  25.6176]
@@ -15,6 +16,7 @@
   Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.3501 (se 0.0032), d = 2.857; floored 0; non-finite 0
   [3 s]
 
+[S2] Benettin steps 100000
 [S2] lorenz63_r166: lambda(code cache) 0.6204447073633099, Delta 0.053725, substeps 27, dt 0.001990
   orbit maxima |s_i|: lyapunov orbit max|x| 62.399; statistics orbit (burn-in included) [ 61.539 130.619 313.582]; bound 185.0
   observable: mean -0.01136, sigma_x 20.33684; state mean [-1.1365e-02 -1.2868e-02  1.5510e+02]
@@ -33,6 +35,7 @@
   Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.5369 (se 0.0082), d = 1.863; floored 0; non-finite 0
   [3 s]
 
+[S3] Benettin steps 100000
 [S3] rossler_z: lambda(code cache) 0.07220367383989693, Delta 0.461657, substeps 12, dt 0.038471
   orbit maxima |s_i|: lyapunov orbit max|x| 22.847; statistics orbit (burn-in included) [22.85  11.433 10.79 ]; bound 50.0
   observable: mean 0.88524, sigma_x 2.83530; state mean [ 0.8852  0.1772 -0.8859]
@@ -50,6 +53,7 @@
   Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.5230 (se 0.0057), d = 1.912; floored 0; non-finite 0
   [2 s]
 
+[L63] Benettin steps 100000
 [L63] lorenz63: lambda(code cache) 0.9054940534657817, Delta 0.036812, substeps 4, dt 0.009203
   orbit maxima |s_i|: lyapunov orbit max|x| 19.268; statistics orbit (burn-in included) [19.194 27.077 47.178]; bound 40.0
   observable: mean -0.01854, sigma_x 7.92491; state mean [-1.8544e-02 -1.8350e-02  2.3552e+01]
@@ -67,6 +71,7 @@
   Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.4869 (se 0.0026), d = 2.054; floored 0; non-finite 0
   [2 s]
 
+[ROS] Benettin steps 100000
 [ROS] rossler: lambda(code cache) 0.07193978510879935, Delta 0.463350, substeps 12, dt 0.038613
   orbit maxima |s_i|: lyapunov orbit max|x| 11.432; statistics orbit (burn-in included) [11.433 10.791 22.851]; bound 25.0
   observable: mean 0.17680, sigma_x 5.14996; state mean [ 0.1768 -0.8844  0.8843]
@@ -82,5 +87,5 @@
   Lambda_tilde histogram (bins of 0.25 from -1 to 4): [7, 12, 18, 22, 41, 41, 105, 220, 371, 317, 127, 21, 16, 8, 0, 0, 0, 0, 0, 0]
   g_H at 1 LT: median 3.32, p5 0.609, p95 7.43
   Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.5143 (se 0.0053), d = 1.944; floored 0; non-finite 0
-  [2 s]
+  [3 s]
 

@@ -44,7 +44,10 @@ which = sys.argv[1:] or list(CANDIDATES)
 for key in which:
     sp = CANDIDATES[key]()
     t0 = time.time()
-    lam, lyap_max = lyapunov_guarded(sp, 20 * sp.max_dt, 100_000, 5_000)
+    import os
+    steps = {"S1": 1_000_000, "S2": 4_000_000, "S3": 1_000_000}.get(key, 100_000) if os.environ.get("LYAP_LONG") else 100_000
+    lam, lyap_max = lyapunov_guarded(sp, 20 * sp.max_dt, steps, 5_000)
+    print(f"[{key}] Benettin steps {steps}")
     interval = 1.0 / (LT * lam)
     substeps = math.ceil(interval / sp.max_dt)
     step = make_flow_step(sp, sp.params, interval)
