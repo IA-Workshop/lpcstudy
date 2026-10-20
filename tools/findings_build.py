@@ -220,8 +220,9 @@ SOURCES = (
 # Which sources each section tag may quote (A6). Untagged sections may quote
 # the official run, the cross-check file and the constants (provenance).
 # ``official_words`` is the official results file under a second name. Only a
-# [CROSS-CHECK] section may quote it: the table of differing verdict words
-# there needs the official word beside the GPU word, while the source name
+# [CROSS-CHECK] section may quote it. It is meant for verdict words, readings
+# and the H3a regime count (the official value beside the GPU value); the
+# restriction is by section, not by leaf. The source name
 # ``official`` stays refused in that section (WU-0020.8, plan amendment).
 ALLOWED = {
     "PRE-REGISTERED": {"official", "official_md", "const", "meta"},

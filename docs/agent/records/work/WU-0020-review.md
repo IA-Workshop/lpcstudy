@@ -522,3 +522,102 @@ Reviewer scripts are in the session scratchpad: `variants4.py`, `freeslot.py` an
 - R1 concerns verdict and report code (`report.py`, frozen): needs owner review before any change.
 - R2 needs a plan amendment (scope of `[CROSS-CHECK]`).
 - R4 needs an owner ruling on the v3 §8 wording.
+
+## WU-0020.8 re-review after fix round 1 (reviewer, 2026-10-20)
+
+- **Reviewer:** `reviewer`, claude-opus-5-5, fresh context.
+- **Subject:** develop at ed6e4e1 (merge 1c86daf of `wu/prelim-fix1` 67a49c5).
+- **Scope:** R1 to R10 only. R11 is left to the owner and the main session (DEC-0035).
+- **Inputs:** `python3 tools/ledger.py verify` reports "ledger chain intact". The release is ledger seq 20, unchanged. `compare.txt` and F3 are unchanged since 0e55df8 (empty `git diff`). I read only the released paths, `RESULTS.md`, the records, the tool and its constants.
+- **Test radius:** `python3 tools/test_impact.py --base 0e55df8` selects `unit: tests/unit/test_tools_findings_build.py`, by the rules tools/<x>.py → its test and `TOOL_DATA_TESTS` for the template and JSON. `lpcstudy/` is unchanged, so there is no integration tier.
+- **Checklist before the run:**
+  - change set: the tool, template, constants and test file;
+  - not run before on this code by me;
+  - `JAX_PLATFORMS=cpu`, one thread, `nice -n 19`;
+  - the owner's run-2 is active, so I started no preset;
+  - quiet output.
+- **Run once:** `LPC_THREADS=1 … nice -n 19 tools/run_tests.sh unit tests/unit/test_tools_findings_build.py` gave `67 passed in 8.78s`. `git status` was clean afterwards.
+- **Verdict:** **approve**. R1 to R10 are all fixed. The re-review found 3 notes (N1 to N3), none blocking.
+
+### Status of R1 to R10
+
+- **R1: fixed.**
+  - Line 106 shows "logit: reduces; indicator: substantial" for every system. The cells are traced to `systems/<s>/Q-N/oracle/{logit_w_interior,w_zero_indicator}/reading` (trace ids 132 to 137), and the values equal the leaves.
+  - Line 117 quotes the stored `verdicts.Q-N.by_system` (ids 184 to 186, all "reduces") and says that the stored word collapses the two parts to the logit part. This matches `report.py`, which is left untouched.
+  - The owner ruling on the collapse is still open.
+- **R2: fixed.**
+  - Lines 410 to 476 add two `[CROSS-CHECK]` tables of differing stored words: 11 overall rows and 33 per-system rows.
+  - Completeness: an independent walk of both `results.json` files found every string leaf whose key contains "verdict" or is "reading", plus every string under `verdicts/`, that differs. That gives exactly 44 differences (11 under `verdicts/`, 33 under `systems/`), no one-sided leaves, and none under `robustness`. The set equals the document's 44 rows: 0 missing, 0 extra, every official and GPU word identical.
+  - Row binding: each row's `official_words` path equals its `crosscheck` path, and each row label (a `meta` value) is the suffix of that path (0 mismatches).
+  - Leaf count: 44 string words plus 9 differing `pass` booleans gives the 53 of the compare text, so the sentence at line 410 ("20 lines against 53 … which also include boolean flags") is correct.
+  - H3a regimes: lines 466 to 468 read `H3a/chosen_K` (6/4, 4/4, 6/6), consistent with the lengths of `n_per_regime` in each file.
+  - Line 476 carries the DEC-0028 item 4 sentence.
+  - The plan amendment for `official_words` still awaits the owner.
+- **R3: fixed.**
+  - Line 470: "No primary part exceeds the bound: failing parts 0, largest z (away) 2.21, bound 3.4".
+  - Line 472: the count of differing leaves.
+  - Line 474: the per-system GPU gate, with the conclusion "passed on every system".
+  - There is no disjunction left. The F3 caption (line 480) is conditional ("A row would name … if there were one").
+- **R4: fixed.**
+  - Line 499 states N 5 / X 6 / U 7 as `RESULTS.md` (line 429 and its parallels) and the DEF-0027 correction of 2026-10-18 do. It is labeled development evidence and points to `docs/study/lm_doubling_dev0_report_v3.md`.
+  - Line 156 adds the pointer under the primary table.
+  - The constant `lm_limitation` cites its sources and refers the v3 §8 wording to the owner. v3 is not edited, and that ruling is still open. See N1 for one wording slip.
+- **R5: fixed.**
+  - Line 338 now reads "handling counters of the main systems" and names `handling.robustness`.
+  - Line 370 adds `skipped_variants` 0.
+  - Lines 374 to 381 read eight result-count leaves of each system. The trace paths are correct, and every nonzero value equals the `RESULTS.md` Handling tables. For example: `H1b/CP/n_floored` 79/92/114; `H2a/n_excluded_states` 312/72/361; the gain-bound screen-outs 136/46/142, 252/316/250 and 0/1/2.
+  - See N2 for one wording slip.
+- **R6: fixed.**
+  - Lines 278 to 326 hold a traced table of 15 reported quantities per system. I checked each leaf mapping against its label, and the definitions against `analysis.py`: `stability` is "the share of the B resamples with D > 0", and `n_excluded_states = n_states − n_eligible`.
+  - The values equal the leaves and, where `RESULTS.md` prints them, its text: N̂ 0.656/0.6078/0.6295 against "N 0.66/0.61/0.63"; H1c CP 0.4947 [0.4664, 0.5374] against "CP 0.495 [0.466, 0.537]".
+  - Line 328 explains A4 − A1 from the stored `best_single` (A1 on all three systems; ids 839 to 841).
+- **R7: fixed.**
+  - Line 120 says the reading is "pre-registered … not tested here" and lists the failing parts per system, traced (ids 188 to 191): lorenz63 (ii) interior; rossler (i); chua (i) and (ii) interior. These equal the stored part words.
+  - The line quotes the v3 §7 precision sentence verbatim.
+- **R8: fixed.** "H2c (secondary)" is labeled, and H2e and H3a have bullets under "Secondary rows", whose words equal `verdicts`.
+- **R9: fixed.**
+  - The F2 caption (line 332) names the square for both Q-N readings and for "reported".
+  - In the rebuilt F2 every tick label is readable, with at most four ticks and a shared power-of-ten offset (×1e-2, ×1e-3, ×1e-4, ×1e-5). I re-read the markers against §6, for example "H2c A4o − A2 rossler" −0.925e-4 within [−2.04, −0.15]e-4, and "H2c A4 − A2 chua" −0.84e-3.
+  - In the rebuilt F1, the H2b(ii) panel at ×1e-2 matches its table.
+- **R10: fixed.** Line 385 explains the hw ratio. The direction is confirmed in `tools/compare_runs.py` (`hw1/hw0` with hw0 = REF = official), and recomputing from the two stored intervals for chua H3c gives 3.036.
+
+### Regression checks
+
+- **(a) Trace.**
+  - The independent resolver, now also mapping `official_words` to the official file, resolved all 1260 rows: 0 raw-value mismatches, 0 rounding mismatches, 0 position mismatches.
+  - There are 285 rows that are new or changed against the 0e55df8 trace, compared as (source, path, rendered, tag). I drew 20 with `random.Random(202610201).sample(...)`: ids 743, 762, 776, 788, 826, 835, 962, 968, 973, 981, 990, 1087, 1116, 1119, 1129, 1147, 1153, 1156, 1167 and 1205.
+  - I re-read each by direct key access in the CPU or GPU `results.json` or `design_constants.json`, and all equal the document. For example: 788 is rossler `complete_case/n_states` 657; 835 is chua `nhat/interval` [0.5753, 0.681]; 1119 is `verdicts/H2d/verdict` "inconclusive" beside GPU "not supported"; 1205 is chua `H2c/A4_minus_A1/verdict` pass → inconclusive.
+- **(b) Verdict-difference tables:** complete and exact, as stated under R2.
+- **(c) Q-N row, LM limitation and new tables:** checked against the JSON and `RESULTS.md`, as stated under R1, R4, R5 and R6.
+- **(d) `official_words`.**
+  - `ALLOWED` in `tools/findings_build.py` permits it only under `CROSS-CHECK`. The untagged set and the PRE-REGISTERED, DIAGNOSTIC, DEVELOPMENT and STUDENT sets exclude it.
+  - All 47 `official_words` rows in the trace are tagged CROSS-CHECK.
+  - `test_cross_tag_violation_is_refused` plants it in the PRE-REGISTERED, DIAGNOSTIC, DEVELOPMENT and untagged sections and requires "not allowed" each time; the test passed in my run. `check` re-renders the document, so a hand edit cannot place it elsewhere.
+  - No leak was found. See N3 for its breadth inside CROSS-CHECK.
+- **(e) F2 tick labels and legend:** see R9.
+- **(f) Labeling.**
+  - Lines 1 and 2 and every `#` heading are identical to 0e55df8 (`diff` empty), so the tags are unchanged.
+  - Appendix A still holds no development numbers. §11 is still the prompt, and §9 has no dated line.
+  - A case-insensitive grep for confirm, prove, demonstrat, signific, "shows that" and breakthrough finds only "confirmatory" in the label and provenance rows.
+
+### New findings
+
+- **N1 (note): the projection wording in the LM limitation is too narrow.**
+  - **Location:** line 499, constant `lm_limitation`.
+  - **What is wrong:** it says the projection uses "the square root of the ratio of the numbers of test states". For H2b(i) and H2b(ii), `RESULTS.md` projects by sweep states (lines 483 and 509: "300 → 1000 sweep states", ×1.83). Test states (×1.41) apply only to H2a and H3c.
+  - **Fix:** "of the numbers of test or sweep states", or quote √(n_full/n_pilot).
+- **N2 (note): "All result counts" overstates what `RESULTS.md` lists.**
+  - **Location:** line 338.
+  - **What is wrong:** the sentence says "All result counts are listed in the Handling section of RESULTS.md". `RESULTS.md` lists only nonzero result counts. For example, lorenz63 `gain_bound/n_screened_out/censored_single_forecaster` (0, shown at line 381) is absent from its lorenz63 table.
+  - **Fix:** "All nonzero result counts …".
+- **N3 (note): `official_words` is not limited to verdict words.**
+  - **Location:** `tools/findings_build.py`, `ALLOWED` and the comment at lines 222 to 225.
+  - **What is wrong:** the source is restricted by tag only. Inside `[CROSS-CHECK]` it can quote any official leaf in any format, and it already quotes a number (`H3a/chosen_K`, line 466).
+  - **Impact:** it cannot leak outside CROSS-CHECK, which (d) confirms.
+  - **Suggestion:** for the owner's reading of the A6 amendment, either say in the comment and the plan amendment that it covers verdict words and the regime count, or limit its leaves to `verdict`/`reading`/`chosen_K`.
+
+### Still open for the owner (not reviewer findings)
+
+- The A6 amendment (`official_words`).
+- The v3 §8 wording of the DEF-0027 count.
+- The Q-N collapse in `report.py` (verdict and report code: needs owner review before any change).
