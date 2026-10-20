@@ -1,0 +1,11 @@
+r = 166.1
+S2: 600000 steps = 32235 time units; 113492 z-maxima; mean cycle 0.284 time units = 0.18 LT
+  z_max quantiles 1/50/99% [187.74 200.24 236.87]
+  lag 2 differences of z_max; lag-1 median 25.75, lag-2 median 7.24
+  first 40 z_max: [204.4 194.7 228.1 194.1 201.6 192.9 228.3 195.4 209.  190.5 225.7 196.3 216.3 187.6 219.9 196.5 222.8 190.  210.8 196.  227.6 192.5 199.1 194.7 229.4 194.6 211.3 192.4 223.  196.5 229.8 188.4 228.9
+ 198.7 220.7 196.3 254.5 207.  187.2 205.4]
+  threshold 0.25: laminar fraction of cycles 0.016; 1837 laminar phases; length (cycles) median 1, p90 1, max 3; median length 0.2 LT; mean 0.2 LT
+  threshold 0.5: laminar fraction of cycles 0.033; 3713 laminar phases; length (cycles) median 1, p90 1, max 3; median length 0.2 LT; mean 0.2 LT
+  threshold 1.0: laminar fraction of cycles 0.067; 7468 laminar phases; length (cycles) median 1, p90 1, max 3; median length 0.2 LT; mean 0.2 LT
+  threshold 2.0: laminar fraction of cycles 0.133; 14664 laminar phases; length (cycles) median 1, p90 1, max 5; median length 0.2 LT; mean 0.2 LT
+  |dz_max| histogram edges [0.0, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 50.0, 300.0] counts [765, 1081, 1894, 3846, 7558, 23545, 34546, 39943, 312]

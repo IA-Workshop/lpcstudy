@@ -1,0 +1,3 @@
+bitwise equal rows: 37 of 5000; first differing step 37
+  at that step: registry array([4.33186228, 0.88943046, 0.12113843]), permuted array([4.33186228, 0.88943046, 0.12113843]), abs diff [8.88178420e-16 4.44089210e-16 4.16333634e-17]
+  one step from the same state: diff [8.88178420e-16 4.44089210e-16 4.16333634e-17]

@@ -1,0 +1,91 @@
+[S1] Benettin steps 100000
+[S1] rossler_hyper: lambda(code cache) 0.11225907424447891, Delta 0.296932, substeps 30, dt 0.009898
+  orbit maxima |s_i|: lyapunov orbit max|x| 135.363; statistics orbit (burn-in included) [129.361  85.72  322.782  63.947]; bound 300.0
+  observable: mean -24.97696, sigma_x 21.71749; state mean [-24.977   -2.561    2.5568  25.6176]
+  state std per coordinate [21.7175 20.2299 12.4993  8.495 ]; covariance eigenvalues [ 49.72789 147.11963 388.18922 524.26074]; condition 10.5; whitening scale sqrt(eig) [ 7.0518 12.1293 19.7025 22.8967]
+  observable quantiles 0.1/1/10/50/90/99/99.9%: [-110.561  -89.959  -55.357  -20.197   -1.824    8.714   14.396]; skewness -0.952; kurtosis 3.81
+  AMI first minimum 6 steps -> delay tau 5 (cap 5); window (D-1)tau = 30 steps = 1.00 LT
+  ACF 1/e envelope time 205 steps (6.83 LT; max_lag 1500); effective min(acf, 30) = 30; spacing 150 steps = 5.00 LT; block of 5 states = 25.0 LT
+  preset smoke: main trajectory 50831 steps (library segment 10271), estimator trajectory 25031, RK4 substeps (stats+main+est, burn-in included) 2.5 M, x dim 4
+  preset pilot: main trajectory 311831 steps (library segment 100271), estimator trajectory 200031, RK4 substeps (stats+main+est, burn-in included) 15.5 M, x dim 4
+  preset full: main trajectory 701831 steps (library segment 100271), estimator trajectory 500031, RK4 substeps (stats+main+est, burn-in included) 36.2 M, x dim 4
+  nu (D 7, tau 5) on 1333 thinned states: quantiles 1/5/25/50/75/95/99% = [ 1.149  1.246  1.463  1.91   2.046  7.85  20.002]; max 38.8; non-finite 0; ratio p99/p1 17.4
+  Lambda_tilde = 30 * slope of ln g_H over 1 LT: quantiles = [-0.064  0.397  0.82   1.068  1.797  2.531  3.354]; mean 1.307; fraction < 0.3: 0.038; fraction > 1.5: 0.368
+  Lambda_tilde histogram (bins of 0.25 from -1 to 4): [0, 2, 3, 15, 25, 46, 161, 387, 97, 107, 133, 115, 103, 67, 28, 15, 11, 7, 7, 3]
+  g_H at 1 LT: median 2.91, p5 0.821, p95 10.2
+  Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.3501 (se 0.0032), d = 2.857; floored 0; non-finite 0
+  [3 s]
+
+[S2] Benettin steps 100000
+[S2] lorenz63_r166: lambda(code cache) 0.6204447073633099, Delta 0.053725, substeps 27, dt 0.001990
+  orbit maxima |s_i|: lyapunov orbit max|x| 62.399; statistics orbit (burn-in included) [ 61.539 130.619 313.582]; bound 185.0
+  observable: mean -0.01136, sigma_x 20.33684; state mean [-1.1365e-02 -1.2868e-02  1.5510e+02]
+  state std per coordinate [20.3369 35.8629 34.97  ]; covariance eigenvalues [ 248.67999 1222.90037 1451.0557 ]; condition 5.8; whitening scale sqrt(eig) [15.7696 34.97   38.0927]
+  observable quantiles 0.1/1/10/50/90/99/99.9%: [-4.436e+01 -4.127e+01 -2.840e+01 -3.788e-02  2.841e+01  4.126e+01
+  4.411e+01]; skewness 0.000; kurtosis 2.32
+  AMI first minimum 5 steps -> delay tau 5 (cap 5); window (D-1)tau = 30 steps = 1.00 LT
+  ACF 1/e envelope time 191 steps (6.37 LT; max_lag 1500); effective min(acf, 30) = 30; spacing 150 steps = 5.00 LT; block of 5 states = 25.0 LT
+  preset smoke: main trajectory 50831 steps (library segment 10271), estimator trajectory 25031, RK4 substeps (stats+main+est, burn-in included) 2.2 M, x dim 3
+  preset pilot: main trajectory 311831 steps (library segment 100271), estimator trajectory 200031, RK4 substeps (stats+main+est, burn-in included) 14.0 M, x dim 3
+  preset full: main trajectory 701831 steps (library segment 100271), estimator trajectory 500031, RK4 substeps (stats+main+est, burn-in included) 32.6 M, x dim 3
+  nu (D 7, tau 5) on 1333 thinned states: quantiles 1/5/25/50/75/95/99% = [0.448 0.608 0.86  1.276 1.796 2.903 5.758]; max 15; non-finite 0; ratio p99/p1 12.9
+  Lambda_tilde = 30 * slope of ln g_H over 1 LT: quantiles = [-0.761 -0.48   0.135  0.868  1.852  4.881  6.174]; mean 1.298; fraction < 0.3: 0.294; fraction > 1.5: 0.303
+  Lambda_tilde histogram (bins of 0.25 from -1 to 4): [7, 42, 128, 102, 87, 107, 124, 132, 114, 78, 48, 48, 32, 29, 23, 25, 12, 14, 26, 18]
+  g_H at 1 LT: median 5.99, p5 0.384, p95 241
+  Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.5369 (se 0.0082), d = 1.863; floored 0; non-finite 0
+  [3 s]
+
+[S3] Benettin steps 100000
+[S3] rossler_z: lambda(code cache) 0.07220367383989693, Delta 0.461657, substeps 12, dt 0.038471
+  orbit maxima |s_i|: lyapunov orbit max|x| 22.847; statistics orbit (burn-in included) [22.85  11.433 10.79 ]; bound 50.0
+  observable: mean 0.88524, sigma_x 2.83530; state mean [ 0.8852  0.1772 -0.8859]
+  state std per coordinate [2.8353 5.1557 4.8435]; covariance eigenvalues [ 6.28668 21.50887 30.28392]; condition 4.8; whitening scale sqrt(eig) [2.5073 4.6378 5.5031]
+  observable quantiles 0.1/1/10/50/90/99/99.9%: [1.356e-02 1.384e-02 1.642e-02 4.159e-02 1.823e+00 1.681e+01 2.199e+01]; skewness 4.684; kurtosis 26.80
+  AMI first minimum 3 steps -> delay tau 3 (cap 5); window (D-1)tau = 18 steps = 0.60 LT
+  ACF 1/e envelope time 356 steps (11.87 LT; max_lag 1500); effective min(acf, 30) = 30; spacing 150 steps = 5.00 LT; block of 5 states = 25.0 LT
+  preset smoke: main trajectory 50735 steps (library segment 10259), estimator trajectory 25019, RK4 substeps (stats+main+est, burn-in included) 1.0 M, x dim 3
+  preset pilot: main trajectory 311735 steps (library segment 100259), estimator trajectory 200019, RK4 substeps (stats+main+est, burn-in included) 6.2 M, x dim 3
+  preset full: main trajectory 701735 steps (library segment 100259), estimator trajectory 500019, RK4 substeps (stats+main+est, burn-in included) 14.5 M, x dim 3
+  nu (D 7, tau 3) on 1334 thinned states: quantiles 1/5/25/50/75/95/99% = [  1.109   1.512   6.469  14.167  31.36   69.022 121.057]; max 190; non-finite 0; ratio p99/p1 109.1
+  Lambda_tilde = 30 * slope of ln g_H over 1 LT: quantiles = [-1.598 -1.084 -0.12   0.708  1.669  3.165  3.676]; mean 0.821; fraction < 0.3: 0.374; fraction > 1.5: 0.289
+  Lambda_tilde histogram (bins of 0.25 from -1 to 4): [54, 52, 73, 96, 98, 125, 86, 112, 72, 82, 67, 59, 55, 42, 43, 26, 38, 30, 14, 10]
+  g_H at 1 LT: median 0.044, p5 0.00326, p95 23.1
+  Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.5230 (se 0.0057), d = 1.912; floored 0; non-finite 0
+  [2 s]
+
+[L63] Benettin steps 100000
+[L63] lorenz63: lambda(code cache) 0.9054940534657817, Delta 0.036812, substeps 4, dt 0.009203
+  orbit maxima |s_i|: lyapunov orbit max|x| 19.268; statistics orbit (burn-in included) [19.194 27.077 47.178]; bound 40.0
+  observable: mean -0.01854, sigma_x 7.92491; state mean [-1.8544e-02 -1.8350e-02  2.3552e+01]
+  state std per coordinate [7.9249 9.0099 8.6204]; covariance eigenvalues [  8.51985  74.31131 135.46352]; condition 15.9; whitening scale sqrt(eig) [ 2.9189  8.6204 11.6389]
+  observable quantiles 0.1/1/10/50/90/99/99.9%: [-17.436 -15.65  -11.334  -0.019  11.339  15.648  17.381]; skewness 0.004; kurtosis 2.30
+  AMI first minimum 5 steps -> delay tau 5 (cap 5); window (D-1)tau = 30 steps = 1.00 LT
+  ACF 1/e envelope time 9 steps (0.30 LT; max_lag 1500); effective min(acf, 30) = 9; spacing 45 steps = 1.50 LT; block of 5 states = 7.5 LT
+  preset smoke: main trajectory 23846 steps (library segment 10271), estimator trajectory 25031, RK4 substeps (stats+main+est, burn-in included) 0.2 M, x dim 3
+  preset pilot: main trajectory 165146 steps (library segment 100271), estimator trajectory 200031, RK4 substeps (stats+main+est, burn-in included) 1.5 M, x dim 3
+  preset full: main trajectory 282146 steps (library segment 100271), estimator trajectory 500031, RK4 substeps (stats+main+est, burn-in included) 3.2 M, x dim 3
+  nu (D 7, tau 5) on 2000 thinned states: quantiles 1/5/25/50/75/95/99% = [0.719 0.893 1.245 1.665 2.069 4.238 6.652]; max 19.9; non-finite 0; ratio p99/p1 9.3
+  Lambda_tilde = 30 * slope of ln g_H over 1 LT: quantiles = [-1.16  -0.818  0.328  0.742  1.45   4.216  6.432]; mean 1.074; fraction < 0.3: 0.241; fraction > 1.5: 0.237
+  Lambda_tilde histogram (bins of 0.25 from -1 to 4): [65, 51, 59, 73, 153, 189, 367, 230, 141, 148, 92, 67, 41, 31, 28, 30, 20, 17, 23, 10]
+  g_H at 1 LT: median 2.46, p5 0.513, p95 25.3
+  Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.4869 (se 0.0026), d = 2.054; floored 0; non-finite 0
+  [2 s]
+
+[ROS] Benettin steps 100000
+[ROS] rossler: lambda(code cache) 0.07193978510879935, Delta 0.463350, substeps 12, dt 0.038613
+  orbit maxima |s_i|: lyapunov orbit max|x| 11.432; statistics orbit (burn-in included) [11.433 10.791 22.851]; bound 25.0
+  observable: mean 0.17680, sigma_x 5.14996; state mean [ 0.1768 -0.8844  0.8843]
+  state std per coordinate [5.15   4.8397 2.8469]; covariance eigenvalues [ 6.35629 21.46883 30.22416]; condition 4.8; whitening scale sqrt(eig) [2.5212 4.6334 5.4976]
+  observable quantiles 0.1/1/10/50/90/99/99.9%: [-9.066 -8.777 -6.521 -0.384  7.48  10.889 11.369]; skewness 0.222; kurtosis 2.10
+  AMI first minimum 3 steps -> delay tau 3 (cap 5); window (D-1)tau = 18 steps = 0.60 LT
+  ACF 1/e envelope time 1500 steps (50.00 LT; max_lag 1500); effective min(acf, 30) = 30; spacing 150 steps = 5.00 LT; block of 5 states = 25.0 LT
+  preset smoke: main trajectory 50735 steps (library segment 10259), estimator trajectory 25019, RK4 substeps (stats+main+est, burn-in included) 1.0 M, x dim 3
+  preset pilot: main trajectory 311735 steps (library segment 100259), estimator trajectory 200019, RK4 substeps (stats+main+est, burn-in included) 6.2 M, x dim 3
+  preset full: main trajectory 701735 steps (library segment 100259), estimator trajectory 500019, RK4 substeps (stats+main+est, burn-in included) 14.5 M, x dim 3
+  nu (D 7, tau 3) on 1334 thinned states: quantiles 1/5/25/50/75/95/99% = [ 0.784  0.843  0.996  1.127  1.204  5.166 10.128]; max 14; non-finite 0; ratio p99/p1 12.9
+  Lambda_tilde = 30 * slope of ln g_H over 1 LT: quantiles = [-0.807 -0.007  0.858  1.13   1.345  1.649  2.156]; mean 1.043; fraction < 0.3: 0.086; fraction > 1.5: 0.129
+  Lambda_tilde histogram (bins of 0.25 from -1 to 4): [7, 12, 18, 22, 41, 41, 105, 220, 371, 317, 127, 21, 16, 8, 0, 0, 0, 0, 0, 0]
+  g_H at 1 LT: median 3.32, p5 0.609, p95 7.43
+  Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.5143 (se 0.0053), d = 1.944; floored 0; non-finite 0
+  [3 s]
+
