@@ -105,6 +105,17 @@
 
 ## Log
 
+- **2026-10-20, WU-0021.3: freeze-1 three-system smoke reference (R1), developer claude-sonnet-5-5.**
+  - Test-run checklist (§4.9): no pytest run, this is a preset run. Command and device: the R1 reference command below, CPU, `LPC_THREADS=1`, `nice -n 19`, no GPU. Seed: DEV-0 through the registry. The sealed run-2 CPU regeneration (8 threads) and the GPU ensemble were active and were not touched. The run is not repeated (R1 text calls for a rerun only after a failed comparison).
+  - Worktree: clean detached `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-ref-fc49d5f` at develop fc49d5f (later than 22483b4), `.venv` symlinked; `git status --porcelain` empty; `git diff --quiet freeze-1 -- lpcstudy/` is true (exit 0).
+  - Command (from that worktree): `LPC_THREADS=1 nice -n 19 tools/run_preset.sh smoke DEV-0 runs/ext-ref --device cpu --systems lorenz63 rossler chua`. The first attempt exited 127 before any start (`/usr/bin/time` absent), so nothing ran and no `run.meta.json` was written; the second attempt is the reference.
+  - Result: exit 0; provenance in the run log: seed id DEV-0, commit fc49d5f101dd4e697c4ee4de59317623b8376f58, dirty False. Wall time 87 s (study 83 s; `run.meta.json` wall_seconds 86). Start 2026-10-20T09:45:30Z.
+  - Reference path: `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-ref-fc49d5f/runs/ext-ref/smoke/` (not committed).
+  - sha256 of `results.json`: `07d75aad92835990a62cf16b11c65642a9f25ddaf57da1a1dfa0f6bbde821d46`.
+  - Handling counters printed by the run (for example `zero_variance_corr_cp` in chua, 9 nonzero counters in 10 blocks) are the frozen pipeline's own reports and are part of the reference.
+  - Next: .5 compares the extension tip with `tools/leafdiff.py <ref> <new>`.
+  - Status of .4: not started. The specification note `docs/agent/notes/2026-10-20-math-extension-specs.md` did not exist at this time (the applied-mathematician's scripts directory `2026-10-20-math-extension-specs/` on `wu/ext-math` holds work in progress only).
+
 ## Review
 
 - **Reviewer:**
