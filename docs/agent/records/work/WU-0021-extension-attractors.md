@@ -267,6 +267,62 @@
   - The S2 and S3 parts and the verdict-reporting change are correct as implemented.
   - Findings: 8 (1 blocker, 4 should fix, 3 notes).
 
+### Re-review after fix round 1
+
+- **Reviewer:** reviewer, claude-opus-5-5, 2026-10-20. Scope: R1 to R8 and regressions from the change, at tip a90291c. The tip includes develop decf0bd, whose `lpcstudy/` equals freeze-1. Diff read: `git diff 832b783..a90291c` (`lpcstudy/{systems,report}.py`, five test files, this Log). Also read: specification note 2 §11 and DEC-0038.
+- **Runs by the reviewer (§4.9; one niced CPU thread, `LPC_THREADS=1`; run-2 and the GPU ensemble active; no preset, no GPU, no integration):**
+  - Unit radius, once: `tools/test_impact.py --base 2b8240e` gives 27 unit files (core rule, `systems.py` and `report.py` changed since my last run). Command: `LPC_THREADS=1 nice -n 19 tools/run_tests.sh unit <27 files>`. Result: **`1157 passed in 93.93s`**. This run also covers the 18 tests of `test_extension_systems.py` that the developer's `--lf` deselected after the A3 change.
+  - R1 comparison, once (no preset), reference `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-ref-fc49d5f/runs/ext-ref/smoke/` against `runs/ext-new5/smoke/`. That run is at commit 7e54adf, `dirty False`, `--systems lorenz63 rossler chua`; `lpcstudy/` is unchanged from 7e54adf to a90291c.
+    - leafdiff: `leaves: A 14174, B 14174, common 14174, different 0, removed 0, added 0`.
+    - compare_runs: `tier: T0`, `equal 13914, different 0, one-sided 0`, `RESULT: PASS`.
+    - `diff` of the two `RESULTS.md`: 12 lines, provenance only (commit, argv, start, end, wall, RSS).
+    - So the v3 path is byte-for-byte, and `extension_text` is not applied to it.
+  - Diagnostic, not a test: scratchpad `rev217/s1_sd1_halfstep.py` at the registry `max_dt` 0.005, with the S-D1 recipe and helpers of `tests/slow/test_start_states.py` and the same 400 starts over `burn + 705 000` steps. Interval 0.29707506577001874, h = 0.00495125 (60 substeps). Result: **0 of 400 refused, 0 non-finite**. The largest |x| is 303.30; 33 starts exceed 200, 13 exceed 300 and **0 exceed 304**. The per-start maximum is 161.9 at the median and 301.8 at the 99th percentile. This matches the developer's `3 passed` (max 303.30) and specification §11.
+- **Status of the round-1 findings:**
+  - **R1: fixed, verified.**
+    - The S1 literals in `lpcstudy/systems.py:273-283` equal §11: `max_dt=0.005`, `orbit_bound=460.0`, `lyapunov_steps=2_000_000`. The tests match too: `test_extension_systems.py` (the spec literals, `LAMBDA` 0.11220508610149857, `SIGMA_X` 21.58, R11 +0.09%), `test_systems.py` (460) and `test_extension_lyapunov.py` (`EXPECTED`, reference `max_dt` 0.005). No stale S1 value remains (grep for 300, 0.01, 21.68 and 0.1125).
+    - Stability, computed independently: Δ = 1/(30 λ) = 0.297075, so 60 substeps and h = 0.0049513, and the RK4 real-axis limit is |x| < 2.785/h = 562.5.
+      - At the measured ceiling 304: h·x = 1.505, a safety factor of 1.85; R = 0.273 against e^−1.505 = 0.222.
+      - At the bound 460: h·x = 2.28, a factor of 1.22.
+      - The guard therefore refuses an orbit before it can enter the unstable region.
+    - The ceiling is converged in h: 303.30, 303.45 and 303.74 at h, h_old/2 and h_old/4.
+    - The bound follows the plan's rule: 1.5 × 304, rounded up.
+    - The developer's Log and the main session (DEC-0038 item 4) withdraw the wrong mechanism.
+  - **R2: fixed.** The S1 xfail and its pins are removed, and the control-row and start-count asserts are unmarked for every system. The removal is justified by the measured 0 of 400, both the developer's and mine.
+  - **R3: fixed; the split is honest.**
+    - `test_regression_cached_lambda_equals_the_recorded_value` says it is code against its own earlier output and not correctness evidence. It skips with a stated reason off the recorded CPU, backend or jax version, and it asserts the bound check (which is not host-bound) before the skip.
+    - `test_extension_lyapunov_matches_an_independent_benettin_run` is the correctness check: it uses an independent field, Jacobian, RK4 and QR, with tolerance 3σ.
+    - Minor: the docstring names "jax and jaxlib 0.11.2", but only `jax.__version__` is checked (`tests/slow/test_extension_lyapunov.py:239-256`). This does not matter while the two are pinned together in `requirements.txt`.
+  - **R4: recorded.** DEC-0038 item 2 lists `data.lyapunov_record` and `tests/slow/test_start_states.py` beside `report.verdicts`. Still **needs owner review before freeze**; see N4.
+  - **R5: fixed, except N1.**
+    - `extension_text` runs only when a stored verdict is "per-system only" (the R1 evidence above shows the v3 path is unchanged).
+    - Each pattern must occur, or the function raises (no silent no-op), and the Chua lines are dropped only without Chua.
+    - S2 and S3 Lyapunov rows no longer cite DEC-0010. The Chua row is unchanged, and a test pins both.
+    - The `runs/a7d-rossler_hyper` report shows the new text.
+  - **R6 and R8:** noted in the Log.
+  - **R7:** corrections appended, not edited.
+- **New findings:**
+  - **N1 (note): one dof-4 number remains in S1's report.** `lpcstudy/report.py:1118-1119` still prints "dof = D − m … (4 at D = 7: median 3.36, p95 9.49)" in the S1 report (`runs/a7d-rossler_hyper/smoke/RESULTS.md:284`). For dof 3 the values are median 2.37 and p95 7.81. The replaced phrase in the same paragraph does give 16.27 for dof 3, and the table is right. Fix in the .9 note or with the R9 cosmetic batch; not a merge blocker.
+  - **N2 (note): the A3 change for S1 (n 320 → 640 after the U9 failure) is legitimate but tight.**
+    - It is legitimate because:
+      - the interval [3.8, 4.2] and the premise window are unchanged;
+      - the scan shows the pre-asymptotic signature: the worst state goes 4.43, 4.30, 4.18, 4.10 as n doubles;
+      - 640 is in effect the only count that meets both the premise floor (finest difference 1.7e-10, which falls to about 1e-11 at 1280) and the interval;
+      - the test's steps (0.0070, 0.0035, 0.0017) bracket production (0.00495).
+    - The margin is 0.02 at one state, and the states come from a 3 450-step chaotic orbit, so another host or build may move them. If A3 fails elsewhere, read it with this scan, not as a defect.
+  - **N3 (note, process): the test was edited after its evidence run.** The unused `request` argument of `test_sd1_no_start_is_refused_over_the_full_horizon` was removed after the S-D1 run of record, and the test was not rerun. The body is the one that passed, the Log says so, and it is acceptable.
+  - **N4 (should fix, main session, record accuracy): DEC-0038's reading contradicts the owner's verbatim words.** Item 1 of the reading says "Option (a) is approved". The owner's words say "Verdict code. Still pending: option (a) … Owner review needed." and "Proceed with all".
+    - Fix: append a correction stating that the owner authorized proceeding (implementation, review and merge to `develop`) while the owner's review of `report.verdicts`, `extension_text`, `data.lyapunov_record` and `tests/slow/test_start_states.py` stays pending.
+    - All four are **needs owner review before freeze**. The ledger `ruling` entry is the owner's to append.
+  - **N5 (note): `extension_text` raises if any pattern is absent, and it runs at the end of a run.** `results.json` is saved before `write_markdown` (`__main__.py:575-576`), and `--report` can regenerate the report, so a missing phrase costs the report, not the results. The pilot (.6) is the first run at pilot size; check its `RESULTS.md` there.
+  - No vacuous new assertion was found. The new report tests compare exact strings and both branches (with and without Chua, and a missing pattern raising), and the DEC-0010 test checks both absence and presence.
+- **Verdict (re-review, round 1): approve.**
+  - No blocker or should-fix remains in the developer's code or tests.
+  - N4 is for the main session.
+  - N1, N2, N3 and N5 are notes.
+  - Owner checkpoint: the verdict-reporting change (`report.verdicts`, `extension_text`), `data.lyapunov_record` and `tests/slow/test_start_states.py` **need owner review before freeze**; they are pending under DEC-0038.
+  - Findings: 5 (0 blocker, 1 should fix for the main session, 4 notes).
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
