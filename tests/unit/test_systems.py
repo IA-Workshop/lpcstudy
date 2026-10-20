@@ -328,7 +328,7 @@ def test_registry_bounds_are_the_ratified_ones() -> None:
 
     These are the ratified values (DEC-0017 Q1, DEC-0026 item 3). The extension
     systems of WU-0021 have their own bounds (specification note section 0:
-    S1 300, S2 185, S3 50). This test changed by design in WU-0021: it asserted
+    S1 460, S2 185, S3 50). This test changed by design in WU-0021: it asserted
     the dict of all registry bounds equal to the three frozen ones.
 
     Reference: the ratified numbers, typed here. Tolerance: none.
@@ -341,7 +341,7 @@ def test_registry_bounds_are_the_ratified_ones() -> None:
     }
     assert {
         n: bounds[n] for n in set(bounds) - {"lorenz63", "rossler", "chua"}
-    } == {"rossler_hyper": 300.0, "lorenz63_r166": 185.0, "rossler_z": 50.0}
+    } == {"rossler_hyper": 460.0, "lorenz63_r166": 185.0, "rossler_z": 50.0}
 
 
 def test_first_failing_step_on_an_analytic_orbit() -> None:

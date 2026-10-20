@@ -54,14 +54,14 @@ EXTENSION = ("rossler_hyper", "lorenz63_r166", "rossler_z")
 # Cached largest Lyapunov exponents of the specification note section 0 (used
 # only to set the observation interval 1 / (30 lambda) of the checks below).
 LAMBDA = {
-    "rossler_hyper": 0.11251662457254265,
+    "rossler_hyper": 0.11220508610149857,
     "lorenz63_r166": 0.6217010154674514,
     "rossler_z": 0.07133265490530956,
 }
 # Standard deviation of the observed coordinate, specification note section 1
-# (S1 21.68, S2 20.34, S3 2.850). A relative error of 10% changes nothing: the
+# (S1 21.58, S2 20.34, S3 2.850). A relative error of 10% changes nothing: the
 # V6 margin is at least 12 (note section 2).
-SIGMA_X = {"rossler_hyper": 21.68, "lorenz63_r166": 20.34, "rossler_z": 2.850}
+SIGMA_X = {"rossler_hyper": 21.58, "lorenz63_r166": 20.34, "rossler_z": 2.850}
 
 
 # ------------------------------------------------------------------ R3 pins
@@ -163,9 +163,9 @@ def test_extension_specs_equal_the_specification_values() -> None:
             dim=4,
             observed_index=0,
             initial_state=(-10.0, -6.0, 0.0, 10.0),
-            max_dt=0.01,
-            orbit_bound=300.0,
-            lyapunov_steps=1_000_000,
+            max_dt=0.005,
+            orbit_bound=460.0,
+            lyapunov_steps=2_000_000,
         ),
         "lorenz63_r166": dict(
             params={"sigma": 10.0, "rho": 166.1, "beta": 8.0 / 3.0},
@@ -589,9 +589,9 @@ def test_lyapunov_references_cover_every_registry_system() -> None:
     Reference: the specification note section 1.1 and section 7 R11,
     typed here: S1 0.1121 (Ramasubramanian and Sriram 1999, Table 1, standard
     method), tolerance 3%; S2 and S3 have no confirmed published value (empty
-    list). The table builder compares the cached S1 value 0.11251662 with
-    0.1121: the relative difference ``0.11251662 / 0.1121 - 1 = 0.003717`` is
-    computed here by hand and must print as ``+0.37%`` and PASS (3% > 0.37%).
+    list). The table builder compares the cached S1 value 0.11220509 with
+    0.1121: the relative difference ``0.11220509 / 0.1121 - 1 = 0.000937`` is
+    computed here by hand and must print as ``+0.09%`` and PASS (3% > 0.09%).
 
     Tolerance: none for the keys and constants; the printed text is exact.
     """
@@ -612,7 +612,7 @@ def test_lyapunov_references_cover_every_registry_system() -> None:
     }
     lines = report._lyapunov_lines(results, ["rossler_hyper", "lorenz63_r166"])
     hyper = [ln for ln in lines if ln.startswith("| rossler_hyper")]
-    assert len(hyper) == 1 and "+0.37%" in hyper[0] and "PASS" in hyper[0]
+    assert len(hyper) == 1 and "+0.09%" in hyper[0] and "PASS" in hyper[0]
     other = [ln for ln in lines if ln.startswith("| lorenz63_r166")]
     assert len(other) == 1
     assert "no confirmed published value" in other[0]

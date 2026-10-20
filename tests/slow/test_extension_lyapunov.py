@@ -82,7 +82,7 @@ SUBSTEPS = 20  # interval = 20 max_dt, so exactly 20 RK4 substeps of max_dt
 
 # Specification note section 0: expected cached exponents (this host, bitwise).
 EXPECTED = {
-    "rossler_hyper": 0.11251662457254265,
+    "rossler_hyper": 0.11220508610149857,
     "lorenz63_r166": 0.6217010154674514,
     "rossler_z": 0.07133265490530956,
 }
@@ -141,7 +141,7 @@ def _jac_s3(s):
 # name -> (field, Jacobian, initial state, max_dt), typed from the note
 # section 0 (not read from the registry).
 REFERENCE = {
-    "rossler_hyper": (_field_s1, _jac_s1, (-10.0, -6.0, 0.0, 10.0), 0.01),
+    "rossler_hyper": (_field_s1, _jac_s1, (-10.0, -6.0, 0.0, 10.0), 0.005),
     "lorenz63_r166": (_field_s2, _jac_s2, (1.0, 1.0, 1.0), 0.002),
     "rossler_z": (_field_s3, _jac_s3, (0.0, 1.0, 1.0), 0.04),
 }

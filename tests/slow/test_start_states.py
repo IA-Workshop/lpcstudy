@@ -220,26 +220,6 @@ def test_sd1_no_start_is_refused_over_the_full_horizon(
         False,
         True,
     ], "the control is vacuous"
-    if run["name"] == "rossler_hyper":
-        # Pre-stated criterion S-D1 not met by S1 (WU-0021): measured 10 of 400
-        # starts refused over burn + 705 000 steps, 7 of them non-finite. The
-        # mechanism is under review (WU-0021 review R1: RK4 stability at the
-        # production step and the bound). The owner's ruling keeps S1 and
-        # reports a refusal as a result; the criterion is not loosened. The
-        # start count and the control row are asserted above this branch, so a
-        # broken guard still fails. The next two asserts are a regression
-        # guard of the measured counts (this host and XLA build, the 400
-        # synthetic starts of this module): any other count is a failure, not
-        # an xfail. The xfail is strict: an unexpected pass is noticed.
-        assert int(run["refused"].sum()) == 10, "S1 refusal count changed"
-        assert int(np.isnan(run["largest"]).sum()) == 7, "S1 non-finite count"
-        request.node.add_marker(
-            pytest.mark.xfail(
-                strict=True,
-                reason="S-D1 not met by S1: 10 of 400 starts refused, 7 "
-                "non-finite (WU-0021 Referral and review R1)",
-            )
-        )
     assert not run["refused"].any(), (
         f"{run['name']}: {int(run['refused'].sum())} of {len(run['refused'])} starts refused; "
         f"max|x| {run['largest'].max():.6g}, bound {run['bound']:g}"

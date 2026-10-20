@@ -266,7 +266,10 @@ SYSTEMS: dict[str, SystemSpec] = {
     ),
     # Extension systems (WU-0021, DEC-0037; values from the specification note
     # docs/agent/notes/2026-10-20-math-extension-specs.md, section 0). They are
-    # exploratory and outside V3_SYSTEMS and every preset.
+    # exploratory and outside V3_SYSTEMS and every preset. S1 values after the
+    # re-specification of the review R1 (note 2026-10-20-math-extension-specs-2,
+    # section 11): RK4 is stable only for h |x| < 2.785 and |x| reaches 304, so
+    # max_dt 0.005 (stable to |x| = 563) and a bound of 460 (below that limit).
     "rossler_hyper": SystemSpec(
         name="rossler_hyper",
         field_fn=rossler_hyper_field,
@@ -274,9 +277,9 @@ SYSTEMS: dict[str, SystemSpec] = {
         dim=4,
         observed_index=0,
         initial_state=(-10.0, -6.0, 0.0, 10.0),
-        max_dt=0.01,
-        orbit_bound=300.0,
-        lyapunov_steps=1_000_000,
+        max_dt=0.005,
+        orbit_bound=460.0,
+        lyapunov_steps=2_000_000,
     ),
     "lorenz63_r166": SystemSpec(
         name="lorenz63_r166",

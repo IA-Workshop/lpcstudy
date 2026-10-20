@@ -865,7 +865,7 @@ LYAPUNOV_REFERENCES: dict[str, list[tuple[float, float, str]]] = {
     # sections 1.1 and 7 R11). S1: the largest exponent of the standard method
     # in Ramasubramanian and Sriram, arXiv:chao-dyn/9909029, Table 1 (read by
     # the researcher); their other method gives 0.1128 and the code's value is
-    # 0.4% away, so the 3% of the Rossler secondary source is generous.
+    # 0.1% away, so the 3% of the Rossler secondary source is generous.
     "rossler_hyper": [
         (
             0.1121,
