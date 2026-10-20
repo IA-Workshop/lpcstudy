@@ -2321,3 +2321,157 @@ def test_handling_section_labels_the_clip_sensitivity_sentinels_a7(
         f"{base}/n_floored_2L",
         "clip_sensitivity/n_caught_exceptions",
     }
+
+
+# --------------------------------------- extension systems (WU-0021, DEC-0037)
+
+
+def test_verdicts_of_an_extension_run_are_per_system_only() -> None:
+    """An extension system never yields "supported" or "not supported".
+
+    Reference: the specification note 2026-10-20 section 5 and the main
+    session's ruling on WU-0021 (verdict-reporting change): a run that contains
+    an extension system stores ``by_system`` and the word "per-system only" for
+    every decided row, with no ``missing_systems``, and never calls the v3
+    decision rule. Hand cases: each of pass, fail and inconclusive on one
+    extension system, and a mix of a v3 system and an extension system, all give
+    the same word whatever the flags are. The Q-N and gain-bound rows keep the
+    shape they have for v3 runs. A label outside the v3 and extension systems
+    still raises, with or without an extension system beside it. Exact checks.
+    """
+    from lpcstudy.report import EXTENSION_SYSTEMS, PER_SYSTEM_VERDICT
+    from lpcstudy.systems import SYSTEMS
+    from lpcstudy.statistics import V3_SYSTEMS
+
+    assert set(EXTENSION_SYSTEMS) == set(SYSTEMS) - set(V3_SYSTEMS)
+    assert PER_SYSTEM_VERDICT not in ("supported", "not supported")
+    config = dataclasses.replace(SMOKE, core_systems=("rossler_z",))
+
+    def results_with(flag: str, names: tuple) -> dict:
+        systems = {}
+        for name in names:
+            res = fake_system(config)
+            res["H2a"] = dict(res["H2a"], verdict=flag, reason=None)
+            systems[name] = res
+        return {"systems": systems}
+
+    for flag in ("pass", "fail", "inconclusive"):
+        out = verdicts(results_with(flag, ("rossler_z",)), config)
+        assert out["H2a"] == {
+            "by_system": {"rossler_z": flag},
+            "verdict": "per-system only",
+        }
+        decided = [
+            v["verdict"]
+            for k, v in out.items()
+            if k not in ("Q-N", "gain_bound")
+        ]
+        assert set(decided) == {"per-system only"}
+        assert not {"supported", "not supported"} & set(decided)
+        assert out["gain_bound"]["verdict"] == "reported (no pass/fail)"
+        assert out["Q-N"]["verdict"] == "estimate (read, no pass/fail)"
+    mixed = dataclasses.replace(
+        SMOKE, core_systems=("lorenz63", "rossler_hyper")
+    )
+    out = verdicts(results_with("fail", ("lorenz63", "rossler_hyper")), mixed)
+    assert out["H2a"] == {
+        "by_system": {"lorenz63": "fail", "rossler_hyper": "fail"},
+        "verdict": "per-system only",
+    }
+    odd = dataclasses.replace(SMOKE, core_systems=("lorenz96", "rossler_z"))
+    with pytest.raises(ValueError, match="lorenz96"):
+        verdicts(results_with("pass", ("lorenz96", "rossler_z")), odd)
+    # A run of v3 systems alone is unchanged: a lone pass is inconclusive and
+    # lists the missing systems; a fail is not supported (the pinned v3 rule).
+    lone = dataclasses.replace(SMOKE, core_systems=("lorenz63",))
+    assert verdicts(results_with("pass", ("lorenz63",)), lone)["H2a"] == {
+        "by_system": {"lorenz63": "pass"},
+        "verdict": "inconclusive",
+        "missing_systems": ["rossler", "chua"],
+    }
+    assert (
+        verdicts(results_with("fail", ("lorenz63",)), lone)["H2a"]["verdict"]
+        == "not supported"
+    )
+
+
+def test_extension_note_appears_only_for_per_system_runs() -> None:
+    """``extension_note_lines`` is empty for v3 results and non-empty otherwise.
+
+    Reference: the definition (hand-built verdict dicts). It keeps the report of
+    a run of the three v3 systems byte-for-byte as before. Exact checks.
+    """
+    from lpcstudy.report import EXTENSION_NOTE, extension_note_lines
+
+    v3 = {"verdicts": {"H2a": {"verdict": "supported"}, "Q-N": {"verdict": "x"}}}
+    assert extension_note_lines(v3) == []
+    assert extension_note_lines({}) == []
+    ext = {"verdicts": {"H2a": {"verdict": "per-system only"}}}
+    assert extension_note_lines(ext) == ["", EXTENSION_NOTE]
+    assert "no overall verdict" in EXTENSION_NOTE
+
+
+def test_extension_text_fixes_the_v3_only_wording_and_fails_on_drift() -> None:
+    """``extension_text`` rewrites the five v3-only phrases and drops Chua lines.
+
+    Reference: the phrases are copied from the generated report of the A7
+    smoke runs of WU-0021 (reviewed text, hand-typed here), and the expected
+    result is written by hand. The Chua paragraph and the Chua memo row go
+    only when Chua is not in the run. A pattern that is absent raises
+    ``ValueError`` (a silent no-op would hide a change of the report text).
+    Exact string checks.
+    """
+    from lpcstudy.report import EXTENSION_REPLACEMENTS, extension_text
+
+    lines = [
+        "the 0.999 quantile of χ²(dof) (18.47 for dof 4) is 0.001",
+        "Validation does not apply: the three systems are mathematical models (NVVUQ.13).",
+        "| Model form: exact model, three systems, scalar observable | e |",
+        "| Round-off | n | 0.0001 (DEVELOPMENT (DEV-0) against the v1 pilot, M5); excludes | 1 |",
+        "of the 18 parts of the five QoIs and three systems (this QoI: class N in 0 of 3 parts)",
+        "Chua at the study's own parameters (α=15.6) has no confirmed value",
+        "| chua, memo parameter set (α=9) | not computed |",
+        "| rossler_z | 0.07 | none | x |",
+    ]
+    out = extension_text(lines, ["rossler_z"])
+    assert out == [
+        "the 0.999 quantile of χ²(dof) (18.47 for dof 4, 16.27 for dof 3: the "
+        "dof of a system is D − m, listed in the table) is 0.001",
+        "Validation does not apply: the systems of this run are mathematical "
+        "models (NVVUQ.13).",
+        "| Model form: exact model, the systems of this run, scalar observable | e |",
+        "| Round-off | n | 0.0001 (DEVELOPMENT (DEV-0) against the v1 pilot, M5; "
+        "calibrated on the three v3 systems, not established for the extension "
+        "systems); excludes | 1 |",
+        "of the 18 parts of the five QoIs and the three v3 systems, not the "
+        "extension systems (this QoI, on the v3 systems: class N in 0 of 3 parts)",
+        "| rossler_z | 0.07 | none | x |",
+    ]
+    kept = extension_text(lines, ["rossler_z", "chua"])
+    assert len(kept) == len(lines)
+    assert len(EXTENSION_REPLACEMENTS) == 5
+    with pytest.raises(ValueError, match="pattern not found"):
+        extension_text(lines[1:], ["rossler_z"])
+
+
+def test_lyapunov_rows_of_extension_systems_do_not_cite_dec_0010() -> None:
+    """S2 and S3 have no published value and the row must not cite DEC-0010.
+
+    Reference: DEC-0010 is the Chua parameter retrieval decision (the study's
+    own Chua parameters); it does not cover the extension systems. Chua keeps
+    its row unchanged (known limitation, DEC-0010). Exact substring checks.
+    """
+    from lpcstudy import report
+
+    results = {
+        "systems": {
+            "lorenz63_r166": {"context": {"lambda_max": 0.6217}},
+            "chua": {"context": {"lambda_max": 0.33}},
+        }
+    }
+    lines = report._lyapunov_lines(results, ["lorenz63_r166", "chua"])
+    ext = [ln for ln in lines if ln.startswith("| lorenz63_r166")]
+    assert len(ext) == 1 and "extension system" in ext[0]
+    assert "DEC-0010" not in ext[0]
+    chua = [ln for ln in lines if ln.startswith("| chua |")]
+    assert len(chua) == 1 and "known limitation, NVVUQ.13, DEC-0010" in chua[0]

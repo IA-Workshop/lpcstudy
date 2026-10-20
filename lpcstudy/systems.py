@@ -120,6 +120,72 @@ def chua_field(state: jnp.ndarray, params: dict[str, float]) -> jnp.ndarray:
     )
 
 
+def rossler_hyper_field(
+    state: jnp.ndarray, params: dict[str, float]
+) -> jnp.ndarray:
+    """Evaluate the hyperchaotic Rossler (1979) vector field (extension S1).
+
+    The equations, as quoted in the researcher note of 2026-10-19 (request 1;
+    confirmed against Dysts ``HyperRossler`` on 2026-10-20), are
+    ``x' = -y - z``, ``y' = x + a y + w``, ``z' = b + x z``,
+    ``w' = -c z + d w``.
+
+    Parameters
+    ----------
+    state : jnp.ndarray
+        State ``(x, y, z, w)``.
+    params : dict[str, float]
+        Keys ``a``, ``b``, ``c``, ``d``.
+
+    Returns
+    -------
+    jnp.ndarray
+        Time derivative of the state.
+    """
+    x, y, z, w = state[0], state[1], state[2], state[3]
+    return jnp.stack(
+        [
+            -y - z,
+            x + params["a"] * y + w,
+            params["b"] + x * z,
+            -params["c"] * z + params["d"] * w,
+        ]
+    )
+
+
+def rossler_zfirst_field(
+    state: jnp.ndarray, params: dict[str, float]
+) -> jnp.ndarray:
+    """Evaluate the Rossler field with the state written as ``(z, x, y)``.
+
+    This is the registry Rossler system with its coordinates permuted so that
+    the observed coordinate (index 0) is the Rossler ``z`` (extension S3). The
+    orbit guard then applies to ``z`` with no change to ``checked_bound``.
+    The equations are ``z' = b + z (x - c)``, ``x' = -y - z``,
+    ``y' = x + a y``.
+
+    Parameters
+    ----------
+    state : jnp.ndarray
+        State ``(z, x, y)``.
+    params : dict[str, float]
+        Keys ``a``, ``b``, ``c``.
+
+    Returns
+    -------
+    jnp.ndarray
+        Time derivative of the state, in the order ``(z', x', y')``.
+    """
+    z, x, y = state[0], state[1], state[2]
+    return jnp.stack(
+        [
+            params["b"] + z * (x - params["c"]),
+            -y - z,
+            x + params["a"] * y,
+        ]
+    )
+
+
 @dataclass(frozen=True)
 class SystemSpec:
     """Static description of one dynamical system.
@@ -149,6 +215,11 @@ class SystemSpec:
         (``ValueError``): a spec without a bound is never silently unguarded.
         The bound is on the first coordinate only, because ``z`` exceeds ``B``
         on the Lorenz-63 and Chua attractors.
+    lyapunov_steps : int
+        Number of averaging steps of the Benettin estimate of the largest
+        Lyapunov exponent (``data.lyapunov_record``). The default 100 000 is
+        the value of the three frozen systems; an extension system may need a
+        longer run for a standard error of about 1% (WU-0021).
     """
 
     name: str
@@ -159,6 +230,7 @@ class SystemSpec:
     initial_state: tuple[float, ...]
     max_dt: float
     orbit_bound: float | None = None
+    lyapunov_steps: int = 100_000
 
 
 SYSTEMS: dict[str, SystemSpec] = {
@@ -191,6 +263,45 @@ SYSTEMS: dict[str, SystemSpec] = {
         initial_state=(0.7, 0.0, 0.0),
         max_dt=0.005,
         orbit_bound=3.0,
+    ),
+    # Extension systems (WU-0021, DEC-0037; values from the specification note
+    # docs/agent/notes/2026-10-20-math-extension-specs.md, section 0). They are
+    # exploratory and outside V3_SYSTEMS and every preset. S1 values after the
+    # re-specification of the review R1 (note 2026-10-20-math-extension-specs-2,
+    # section 11): RK4 is stable only for h |x| < 2.785 and |x| reaches 304, so
+    # max_dt 0.005 (stable to |x| = 563) and a bound of 460 (below that limit).
+    "rossler_hyper": SystemSpec(
+        name="rossler_hyper",
+        field_fn=rossler_hyper_field,
+        params={"a": 0.25, "b": 3.0, "c": 0.5, "d": 0.05},
+        dim=4,
+        observed_index=0,
+        initial_state=(-10.0, -6.0, 0.0, 10.0),
+        max_dt=0.005,
+        orbit_bound=460.0,
+        lyapunov_steps=2_000_000,
+    ),
+    "lorenz63_r166": SystemSpec(
+        name="lorenz63_r166",
+        field_fn=lorenz63_field,
+        params={"sigma": 10.0, "rho": 166.1, "beta": 8.0 / 3.0},
+        dim=3,
+        observed_index=0,
+        initial_state=(1.0, 1.0, 1.0),
+        max_dt=0.002,
+        orbit_bound=185.0,
+        lyapunov_steps=4_000_000,
+    ),
+    "rossler_z": SystemSpec(
+        name="rossler_z",
+        field_fn=rossler_zfirst_field,
+        params={"a": 0.2, "b": 0.2, "c": 5.7},
+        dim=3,
+        observed_index=0,
+        initial_state=(0.0, 1.0, 1.0),
+        max_dt=0.04,
+        orbit_bound=50.0,
+        lyapunov_steps=1_000_000,
     ),
 }
 

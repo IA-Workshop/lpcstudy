@@ -972,11 +972,18 @@ def test_no_configured_preset_changes_its_robustness_dimensions_def_0025() -> (
     from lpcstudy.systems import SYSTEMS
 
     expected = {"smoke": [], "pilot": [5, 10], "full": [5, 10]}
-    assert set(SYSTEMS) == {"lorenz63", "rossler", "chua"}
+    # Changed by design in WU-0021 (DEC-0037): this asserted
+    # ``set(SYSTEMS) == {"lorenz63", "rossler", "chua"}`` and ``spec.dim == 3``
+    # for every spec. The frozen three keep dim 3; the extension entries are
+    # listed separately (the hyperchaotic Rossler has dim 4, and 5 > 4 keeps
+    # the same lists).
+    frozen = {"lorenz63", "rossler", "chua"}
+    dims = {"rossler_hyper": 4, "lorenz63_r166": 3, "rossler_z": 3}
+    assert set(SYSTEMS) == frozen | set(dims)
     for config in (SMOKE, PILOT, FULL):
         assert config.embedding_dim == 7
         for name, spec in SYSTEMS.items():
-            assert spec.dim == 3
+            assert spec.dim == (3 if name in frozen else dims[name])
             kept, skipped = robustness_dimensions(config, spec.dim)
             assert (kept, skipped) == (expected[config.name], []), (
                 config.name,
