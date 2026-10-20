@@ -26,10 +26,6 @@
       "text": "3.4",
       "v3": "§9 item 3; DEC-0031; DEC-0027"
     },
-    "lm_flag_count": {
-      "text": "5 of 18",
-      "v3": "§8 (iterative error of PLP); DEF-0027"
-    },
     "v1_bar": {
       "text": "relative error < 10⁻⁴",
       "v3": "§6 V1"
@@ -75,11 +71,11 @@
       "v3": "§2, §6, §7"
     },
     "caption_F2": {
-      "text": "Figure F2 (experiments E2 to E5; v3 identifiers H1a to H1d, H2c to H2e, H3b and Q-N). One panel per secondary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples; H3b resamples construction states) at the level stated in each panel (95% unless the result stores another). The shaded region is the pass band of v3 §2. For Q-N no band is shaded: dashed lines mark the reading edges of v3 §7. Each panel states its level, and the three H2c panels are drawn one per system because the scales differ. Marker shape and text give the stored verdict or reading: filled circle pass, cross fail, open diamond inconclusive, square a Q-N reading. A system that failed the validation gate is marked PROVISIONAL.",
+      "text": "Figure F2 (experiments E2 to E5; v3 identifiers H1a to H1d, H2c to H2e, H3b and Q-N). One panel per secondary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples; H3b resamples construction states) at the level stated in each panel (95% unless the result stores another). The shaded region is the pass band of v3 §2. For Q-N no band is shaded: dashed lines mark the reading edges of v3 §7. Each panel states its level, and the three H2c panels are drawn one per system because the scales differ. Marker shape and text give the stored verdict or reading: filled circle pass, cross fail, open diamond inconclusive, square a Q-N reading (both readings, the logit part and the indicator part) or a quantity that is reported with no verdict. A system that failed the validation gate is marked PROVISIONAL.",
       "v3": "§2, §6, §7"
     },
     "caption_F3": {
-      "text": "Figure F3 (cross-check, information only; v3 §9 item 3, DEC-0031; experiments E1, E2, E4 and E5). For each of the 18 primary parts, the away-arm z value comparing the official CPU run with the GPU run of the same seed, from the compare_runs text (interval procedure: the 98.33% moving-block bootstrap intervals of the two runs). The dashed line is the bound 3.4. Each row names a failed GPU validation gate and a PROVISIONAL official system. This figure changes no verdict.",
+      "text": "Figure F3 (cross-check, information only; v3 §9 item 3, DEC-0031; experiments E1, E2, E4 and E5). For each of the 18 primary parts, the away-arm z value comparing the official CPU run with the GPU run of the same seed, from the compare_runs text (interval procedure: the 98.33% moving-block bootstrap intervals of the two runs). The dashed line is the bound 3.4. A row would name a failed GPU validation gate and a PROVISIONAL official system if there were one; the footer states the GPU gate of each system. This figure changes no verdict.",
       "v3": "§9 item 3; DEC-0031"
     },
     "coverage_limit": {
@@ -89,6 +85,30 @@
     "level_design_note": {
       "text": "design value, not stored",
       "v3": "§7 (levels); the results store no level for this part"
+    },
+    "lm_limitation": {
+      "text": "the iterative error of the fixed Levenberg–Marquardt budget of the PLP estimator (15 iterations) is not estimated for this run. On the development seed DEV-0, a study with 15, 30 and 60 iterations showed the iterative change below 10% of the sampling half-width for 5 of the 18 primary parts (class N) and did not show it below 10% for the other 13 (class X, not negligible, 6; class U, not certified, 7). The projection of its size against the half-width to the full preset, by the square root of the ratio of the numbers of test states, is stated and not applied. This is development evidence, not a result of this run.",
+      "v3": "RESULTS.md (the iterative-error text of the uncertainty budget); the DEF-0027 correction of 2026-10-18 in docs/agent/records/defects.md (N 5, X 6, U 7 on DEV-0; Lorenz-63 X 4, Chua X 2, Rossler X 0); docs/study/lm_doubling_dev0_report_v3.md sections 0 and 3. v3 §8 words the same count differently (\"not negligible ... for 5 of the 18 primary parts\"); that wording is referred to the owner and v3 is not edited here."
+    },
+    "lm_report_pointer": {
+      "text": "docs/study/lm_doubling_dev0_report_v3.md",
+      "v3": "DEF-0027 correction of 2026-10-18 (docs/agent/records/defects.md); RESULTS.md (iterative-error text); v3 §8 (iterative error of PLP)"
+    },
+    "dec28_item4": {
+      "text": "What a TD pass does not mean: it does not reproduce verdicts or the gate outcome.",
+      "v3": "DEC-0028 item 4 (docs/agent/records/decisions.md); v3 §9 item 3"
+    },
+    "hw_ratio_note": {
+      "text": "The hw ratio column is the half-width of the cross-check (GPU) interval divided by the half-width of the official (CPU) interval (the column hw1/hw0 of the compare_runs text, whose REF is the official run and NEW the cross-check), so a value above 1 means the GPU interval is wider.",
+      "v3": "§9 item 3 (the TD table); tools/compare_runs.py, column hw1/hw0"
+    },
+    "precision_h2a": {
+      "text": "H2a's second part can be refuted but essentially cannot pass: that would need a partial correlation within about 0.01 of zero.",
+      "v3": "§7 (Precision); DEF-0022"
+    },
+    "a1_is_plp": {
+      "text": "A1 is PLP alone (w = 0)",
+      "v3": "§5 (the forecaster table: A1, PLP alone)"
     }
   },
   "identifiers": [
@@ -631,12 +651,18 @@
     "supported": "Pass on all three systems in this preliminary, unpromoted run. The error of \"supported\" needs no further multiplicity correction (intersection–union).",
     "not supported": "Fail on at least one system. The error of \"not supported\" is not controlled this way (§7), and this is not a statement about systems beyond the three studied.",
     "inconclusive": "No system failed and at least one could not be decided at this precision. Inconclusive does not say the effect is absent.",
-    "reading:H2a": "Pre-registered reading of a failure (v3 §7): instability enters the weight through anisotropic seeds, and the size of the departure measures how far real attractors are from the separation assumption.",
+    "reading:H2a": "Pre-registered reading of a failure (v3 §7): instability enters the weight through anisotropic seeds, and the size of the departure measures how far real attractors are from the separation assumption. v3 §7 pre-registered this reading and it is not tested here.",
     "reading:H2c": "Pre-registered reading (v3 §7), to be applied by the reader from the reported A4o − A2 interval: if H2c fails but A4o beats A2, the theory is right and the deployable seed estimates limit it.",
     "gate_failure": "GATE FAILURE: at least one system failed the validation gate (E0). Its results are PROVISIONAL, its verdicts are shown as computed, and the failure is referred to the owner (DEC-0027, DEC-0031). Nothing proceeds to promotion until the owner rules.",
     "gate_ok": "Every system passed the validation gate, so no result carries the PROVISIONAL mark.",
-    "gpu_agree": "Every primary part is within the bound, no verdict-type leaf differs and the GPU gate passed on every system. The cross-check changes no verdict (DEC-0031).",
-    "gpu_disagree": "At least one primary part exceeds the bound, a verdict-type leaf differs or a GPU gate failed. This is reported here only and changes no verdict (DEC-0031)."
+    "gpu_bound_ok": "No primary part exceeds the bound: failing parts {failing}, largest z (away) {max_away}, bound {bound}.",
+    "gpu_bound_exceeded": "At least one primary part exceeds the bound: failing parts {failing}, largest z (away) {max_away}, bound {bound}.",
+    "gpu_diff_count": "Verdict-type leaves that differ between the two runs: {differing}. The stored verdict words among them are in the tables above; the official words stand.",
+    "gpu_gate_ok": "The GPU validation gate passed on every system.",
+    "gpu_gate_failed": "The GPU validation gate did not pass on {systems}, or its result is not recorded there. This is reported only (DEC-0031).",
+    "gpu_result": "compare_runs result: {result}. {dec28}",
+    "gpu_info_only": "All of this is reported only and changes no verdict (DEC-0031).",
+    "secondary_intro": "Secondary rows (v3 §2; each is read at the level {level} with no multiplicity adjustment, v3 §7):"
   },
   "banned_phrases": [
     "proves",
@@ -712,5 +738,134 @@
     "preregist",
     "developm",
     "preliminar"
+  ],
+  "result_counts": [
+    {
+      "leaf": "H1b/CP/n_floored",
+      "v3": "§8 (handling); RESULTS.md, Handling: result counts"
+    },
+    {
+      "leaf": "H2a/n_excluded_states",
+      "v3": "§2 H2a (i) (excluded states counted); RESULTS.md, Handling"
+    },
+    {
+      "leaf": "H1c/PLP/n_ineligible_states",
+      "v3": "§2 H1c; RESULTS.md, Handling"
+    },
+    {
+      "leaf": "H1c/CP/n_ineligible_states",
+      "v3": "§2 H1c; RESULTS.md, Handling"
+    },
+    {
+      "leaf": "H2b/noise/n_constant_states",
+      "v3": "§2 H2b (i); RESULTS.md, Handling"
+    },
+    {
+      "leaf": "gain_bound/n_screened_out/growth_nonpositive",
+      "v3": "§2 (hybrid's horizon gain), DEC-0033 M3; RESULTS.md, Handling"
+    },
+    {
+      "leaf": "gain_bound/n_screened_out/negative_covariance",
+      "v3": "§2 (hybrid's horizon gain), DEC-0033 M3; RESULTS.md, Handling"
+    },
+    {
+      "leaf": "gain_bound/n_screened_out/censored_single_forecaster",
+      "v3": "§2 (hybrid's horizon gain), DEC-0033 M3; RESULTS.md, Handling"
+    }
+  ],
+  "reported_quantities": [
+    {
+      "label": "H2a: test states excluded from part (i) (fewer than two leading horizons)",
+      "leaf": "H2a/n_excluded_states",
+      "fmt": "d",
+      "v3": "§2 H2a (i): excluded states are counted"
+    },
+    {
+      "label": "H2a: test states eligible for part (i)",
+      "leaf": "H2a/n_eligible_states",
+      "fmt": "d",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "label": "H2a: median range of w*, span of horizons {1, 2} LT",
+      "leaf": "H2a/range_by_span/1-2/median",
+      "fmt": ".4g",
+      "v3": "§2 H2a (i): medians and counts per span are reported"
+    },
+    {
+      "label": "H2a: states in the span {1, 2} LT",
+      "leaf": "H2a/range_by_span/1-2/n_states",
+      "fmt": "d",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "label": "H2a: median range of w*, span of horizons {1, 2, 4} LT",
+      "leaf": "H2a/range_by_span/1-2-4/median",
+      "fmt": ".4g",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "label": "H2a: states in the span {1, 2, 4} LT",
+      "leaf": "H2a/range_by_span/1-2-4/n_states",
+      "fmt": "d",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "label": "H2a: complete-case {1, 2, 4} LT range (a sensitivity), median and interval",
+      "leaf": "H2a/complete_case/median_range",
+      "ci": "H2a/complete_case/range_ci",
+      "fmt": ".4g",
+      "v3": "§2 H2a (i): the complete-case range is reported as a sensitivity"
+    },
+    {
+      "label": "H2a: states in the complete-case set",
+      "leaf": "H2a/complete_case/n_states",
+      "fmt": "d",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "label": "H2a: test states with w* = 0",
+      "leaf": "H2a/n_w_zero",
+      "fmt": "d",
+      "v3": "§2 H2a (ii): the counts of w* = 0 and w* = 1 are reported"
+    },
+    {
+      "label": "H2a: test states with w* = 1",
+      "leaf": "H2a/n_w_one",
+      "fmt": "d",
+      "v3": "§2 H2a (ii)"
+    },
+    {
+      "label": "H1a: floor f (r.m.s.) at rho 1%",
+      "leaf": "H1a/by_noise/0.01/floor_rms",
+      "fmt": ".4g",
+      "v3": "§2 H1a: the floor f is reported"
+    },
+    {
+      "label": "H1a: floor f (r.m.s.) at rho 2%",
+      "leaf": "H1a/by_noise/0.02/floor_rms",
+      "fmt": ".4g",
+      "v3": "§2 H1a"
+    },
+    {
+      "label": "H1c: CP median ratio and interval (reported; the tested part is PLP)",
+      "leaf": "H1c/CP/median_ratio",
+      "ci": "H1c/CP/ci",
+      "fmt": ".4g",
+      "v3": "§2 H1c (PLP only is tested); RESULTS.md"
+    },
+    {
+      "label": "H1d: N-hat Spearman correlation and interval (reported, not tested)",
+      "leaf": "H1d/rows/nhat/spearman",
+      "ci": "H1d/rows/nhat/interval",
+      "fmt": ".4g",
+      "v3": "§2 H1d, §8 (N-hat is reported, not tested)"
+    },
+    {
+      "label": "H3b: stability fraction (share of resamples with D > 0)",
+      "leaf": "H3b/stability",
+      "fmt": ".4g",
+      "v3": "§2 H3b (the stability index is reported)"
+    }
   ]
 }

@@ -115,6 +115,7 @@ def make_results(
                 s: {"error_clips": 0, "nu_cap_clips": 2} for s in SYSTEMS
             },
             "failed_variants": 0,
+            "skipped_variants": 0,
         },
     }
     words = ["pass", "fail", "inconclusive"]
@@ -140,6 +141,7 @@ def make_results(
             for _, leaf, _ in gate_row["stats"]:
                 set_path(block, leaf, 0.5)
         block["H3a"] = {
+            "chosen_K": 2,
             "n_per_regime": [10, 20],
             "n_events_per_regime": [4, 5],
             "n_censored_per_regime": [6, 15],
@@ -154,6 +156,19 @@ def make_results(
             "median_gain_lyapunov": 0.0,
             "max_gain_lyapunov": 2.0,
         }
+        for k, item in enumerate(CONSTANTS["result_counts"]):
+            set_path(block, item["leaf"], 100 * n + k)
+        planted = {item["leaf"] for item in CONSTANTS["result_counts"]}
+        for k, item in enumerate(CONSTANTS["reported_quantities"]):
+            if item["leaf"] in planted:
+                continue  # the same leaf is also a result count (planted above)
+            if item["fmt"] == "d":
+                set_path(block, item["leaf"], 7 * n + k)
+            else:
+                set_path(block, item["leaf"], 0.25 + 0.01 * k + 0.001 * n)
+            if "ci" in item:
+                set_path(block, item["ci"], [0.125, 0.375 + 0.01 * k])
+        set_path(block, "H2c/best_single", "A1")
     for item in CONSTANTS["identifiers"]:
         out["verdicts"][item["key"]] = {
             "by_system": {s: "pass" for s in SYSTEMS},
@@ -530,9 +545,12 @@ def test_absent_differing_count_is_never_a_number(tmp_path) -> None:
     out = fast_build(tmp_path / "r", td=make_td(None, tier=None))
     text = doc_of(out)
     assert "differ between the two runs: not available" in text
-    assert CONSTANTS["wording"]["gpu_disagree"] in text
-    assert CONSTANTS["wording"]["gpu_agree"] not in text
     assert "differ between the two runs: 0" not in text
+    # The count is unavailable, so no sentence may call it zero or agreement.
+    assert (
+        "differ between the two runs: not available (the compare_runs text"
+        in text
+    )
 
 
 def test_fmt_is_deterministic_and_strict() -> None:
@@ -1020,7 +1038,8 @@ def test_check_fails_on_every_perturbation(fast, bad, tmp_path) -> None:
     dropped = r"^(\| H2a \|.*?) PROVISIONAL"
     broken = {
         "gate box all-clear": swap(box, "> " + wording["gate_ok"]),
-        "gpu agree swapped": swap(wording["gpu_disagree"], wording["gpu_agree"]),
+        "gpu gate sentence swapped": swap(wording["gpu_gate_failed"].format(systems="chua"), wording["gpu_gate_ok"]),
+        "gpu bound sentence swapped": swap("No primary part exceeds the bound", "At least one primary part exceeds the bound"),
         "H2a sentence swapped": swap(wording["not supported"], wording["supported"]),
         "mark dropped on a chua row": swap("| chua PROVISIONAL | V1 |", "| chua | V1 |"),
         "verdict cell mark blanked": lambda t: re.sub(dropped, lambda m: m.group(1) + " " * 12, t, count=1, flags=re.M),
@@ -1077,6 +1096,17 @@ def test_cross_tag_violation_is_refused(fast) -> None:
         changed[int(row["id"])]["source"] = source
         problems = fb.check_rows(changed, lines, rebuilt(fast))
         assert any("not allowed" in p for p in problems), tag
+    # ``official_words`` is the official file under a second name, allowed in
+    # [CROSS-CHECK] only: every other tag refuses it (WU-0020.8, R2).
+    for tag in ("PRE-REGISTERED", "DIAGNOSTIC", "DEVELOPMENT", ""):
+        row = next(r for r in rows if r["tag"] == tag)
+        changed = [dict(r) for r in rows]
+        changed[int(row["id"])]["source"] = "official_words"
+        problems = fb.check_rows(changed, lines, rebuilt(fast))
+        assert any("not allowed" in p for p in problems), tag
+    assert {r["tag"] for r in rows if r["source"] == "official_words"} == {
+        "CROSS-CHECK"
+    }
     assert {r["tag"] for r in rows if r["source"] == "dev"} == {"DEVELOPMENT"}
     assert {r["tag"] for r in rows if r["source"] in ("td", "crosscheck")} == {
         "CROSS-CHECK",
@@ -1108,7 +1138,7 @@ def test_gate_failure_marks_system_provisional(bad) -> None:
     row = next(x for x in lines if x.startswith("| H2a | primary"))
     assert row.count("PROVISIONAL") == 1
     assert "GATE FAILURE" in text
-    assert CONSTANTS["wording"]["gpu_disagree"] in text
+    assert "The GPU validation gate did not pass on chua" in text
     assert "H2a**: not supported" in text
     assert CONSTANTS["wording"]["reading:H2a"] in text
 
@@ -2018,3 +2048,481 @@ def test_dotdot_paths_and_trailing_newline_commits_are_refused(
     with pytest.raises(fb.ToolError, match="40 hex"):
         fb.check_later_commit(ROOT, "a" * 40 + "\n", "b" * 40)
     assert not fb.FULL_COMMIT.fullmatch("a" * 40 + "\n")
+
+
+# --- WU-0020.8 fix round 1 (R1 to R10 of the review of the sealed document) --
+DECISIONS = ROOT / "docs/agent/records/decisions.md"
+DEFECTS = ROOT / "docs/agent/records/defects.md"
+LM_REPORT = ROOT / "docs/study/lm_doubling_dev0_report_v3.md"
+
+
+def line_of(text: str, start: str) -> str:
+    """Return the first line of a document that starts with ``start``."""
+    return next(x for x in text.split("\n") if x.startswith(start))
+
+
+def test_q_n_row_shows_both_readings_and_labels_the_stored_word(
+    tmp_path,
+) -> None:
+    """R1: the overall Q-N row has both stored readings per system.
+
+    Planted (not computed): the logit reading is "reduces" on lorenz63 and
+    "substantial" on rossler, and the indicator reading is "substantial" on
+    lorenz63 and "reduces" on rossler; the stored per-system words of
+    ``verdicts.Q-N`` are planted as "reduces". Reference: the planted leaves
+    and the v3 text, which says Q-N is read separately for its two parts.
+    """
+    results = make_results()
+    logit, indicator = CONSTANTS["qn_parts"][:2]
+    assert logit["verdict"] == "Q-N/oracle/logit_w_interior/reading"
+    assert indicator["verdict"] == "Q-N/oracle/w_zero_indicator/reading"
+    block = results["systems"]
+    set_path(block["lorenz63"], logit["verdict"], "reduces")
+    set_path(block["lorenz63"], indicator["verdict"], "substantial")
+    set_path(block["rossler"], logit["verdict"], "substantial")
+    set_path(block["rossler"], indicator["verdict"], "reduces")
+    results["verdicts"]["Q-N"] = {
+        "by_system": {s: "reduces" for s in SYSTEMS},
+        "verdict": "estimate (read, no pass/fail)",
+    }
+    out = fast_build(tmp_path, official=results)
+    text = doc_of(out)
+    row = line_of(text, "| Q-N | estimate |")
+    cells = [c.strip() for c in row.split("|")[3:6]]
+    assert cells[0] == "logit: reduces; indicator: substantial"
+    assert cells[1] == "logit: substantial; indicator: reduces"
+    assert "the stored per-system words are the logit part only" in row
+    assert (
+        "stored overall word `verdicts.Q-N` collapses them to the logit part"
+        in text
+    )
+    assert (
+        "its per-system words are lorenz63 reduces, rossler reduces, chua reduces"
+        in text
+    )
+    assert (
+        "separately for its two parts" in v3_text()
+        or "read separately" in v3_text()
+    )
+    paths = {r["path"] for r in trace_of(out) if r["source"] == "official"}
+    for s in SYSTEMS:
+        assert f"systems/{s}/{logit['verdict']}" in paths
+        assert f"systems/{s}/{indicator['verdict']}" in paths
+        assert f"verdicts/Q-N/by_system/{s}" in paths
+
+
+def test_is_word_key_equals_the_compare_runs_rule() -> None:
+    """The verdict-word key rule is the one of ``tools/compare_runs.py``.
+
+    Reference: ``compare_runs.is_verdict_str`` on keys typed here, both the
+    ones that count and ones that look alike.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "compare_runs_ref", ROOT / "tools" / "compare_runs.py"
+    )
+    cr = importlib.util.module_from_spec(spec)
+    sys.modules["compare_runs_ref"] = cr
+    spec.loader.exec_module(cr)
+    keys = [
+        "verdict", "verdict_2L", "part_i_verdict", "part_ii_verdict",
+        "reading", "status", "reason", "verdicts", "my_verdict_x", "pass",
+        "role", "Verdict", "readings", "statuses", "",
+    ]  # fmt: skip
+    for key in keys:
+        assert fb.is_word_key(key) == cr.is_verdict_str(key), key
+
+
+def test_cross_check_lists_every_differing_verdict_word(tmp_path) -> None:
+    """R2: a table of the stored words that differ, in the stated order.
+
+    Planted: overall H2c, a primary by-system word (H2a rossler) and a
+    secondary one (H1a chua) differ; lorenz63 has a primary part word (H3c),
+    a clip-sensitivity word (generic key ``verdict_2L``) that differ;
+    chua has a word that exists in the cross-check only and an H2d word.
+    Expected order, typed by hand from the rule "overall first, primary
+    hypotheses first; then each system, primary parts first, then the rest".
+    Words equal in the two files must not be listed. The words are shown as
+    stored (the intervals contradict some of them on purpose).
+    """
+    official, cross = make_results(), make_results(backend="gpu")
+    h3c = CONSTANTS["primary_parts"][5]["verdict"]
+    h2d = next(p for p in CONSTANTS["secondary_parts"] if p["name"] == "H2d")
+    clip = "clip_sensitivity/by_hypothesis/H2a/parts/zero/verdict_2L"
+    cross["verdicts"]["H2c"]["verdict"] = "not supported"
+    cross["verdicts"]["H2a"]["by_system"]["rossler"] = "fail"
+    cross["verdicts"]["H1a"]["by_system"]["chua"] = "inconclusive"
+    set_path(official["systems"]["lorenz63"], h3c, "inconclusive")
+    set_path(cross["systems"]["lorenz63"], h3c, "pass")
+    for run, word in ((official, "pass"), (cross, "fail")):
+        set_path(run["systems"]["lorenz63"], clip, word)
+    set_path(cross["systems"]["chua"], "H2b/extra_verdict", "fail")
+    set_path(official["systems"]["chua"], h2d["verdict"], "pass")
+    set_path(cross["systems"]["chua"], h2d["verdict"], "fail")
+    set_path(cross["systems"]["rossler"], "H3a/chosen_K", 3)
+    overall, per_system = fb.differing_words(official, cross, CONSTANTS)
+    assert ["/".join(p) for p in overall] == [
+        "verdicts/H2a/by_system/rossler",
+        "verdicts/H1a/by_system/chua",
+        "verdicts/H2c/verdict",
+    ]
+    assert ["/".join(p) for p in per_system] == [
+        "systems/lorenz63/H3c/verdict",
+        f"systems/lorenz63/{clip}",
+        "systems/chua/H2b/extra_verdict",
+        "systems/chua/H2d/verdict",
+    ]
+    out = fast_build(tmp_path, official=official, cross=cross)
+    text = doc_of(out)
+    assert (
+        "| H2c/verdict | supported (preliminary, unpromoted) | not supported |"
+        in text
+    )
+    assert "| H2a/by_system/rossler | pass | fail |" in text
+    assert "| lorenz63 | H3c/verdict | inconclusive | pass |" in text
+    assert f"| lorenz63 | {clip} | pass | fail |" in text
+    assert "| chua | H2b/extra_verdict | not recorded | fail |" in text
+    assert "| chua | H2d/verdict | pass | fail |" in text
+    assert "Overall rows: 3. Rows per system: 4." in text
+    assert "| rossler | 2 | 3 |" in text
+    assert "H2b/verdict" not in text.split("## 8.")[1].split("## 9.")[0]
+    assert "(1 lines against 2 verdict-type leaves counted" in text
+    assert CONSTANTS["constants"]["dec28_item4"]["text"] in text
+    # Primary overall rows come before the others, in the document too.
+    section = text.split("## 8.")[1]
+    assert section.index("H2a/by_system/rossler") < section.index(
+        "H1a/by_system/chua"
+    )
+    assert section.index("H3c/verdict") < section.index(clip)
+    assert section.index(clip) < section.index("H2b/extra_verdict")
+    rows = trace_of(out)
+    words = [r for r in rows if r["source"] == "official_words"]
+    assert words and {r["tag"] for r in words} == {"CROSS-CHECK"}
+
+
+def test_no_differing_word_is_said_plainly(fast) -> None:
+    """With identical words in both files the document says none differs."""
+    text = doc_of(fast)
+    assert "No overall stored verdict word differs." in text
+    assert "No stored verdict word of a system differs." in text
+    assert "Overall rows: 0. Rows per system: 0." in text
+
+
+def test_decision_sentence_is_quoted_from_decisions_md() -> None:
+    """The DEC-0028 item 4 sentence is the one in the decision record.
+
+    Reference: ``docs/agent/records/decisions.md``, DEC-0028 item 4: "What a
+    TD pass does not mean. It does not reproduce verdicts or the gate
+    outcome."
+    """
+    record = DECISIONS.read_text()
+    start = record.index("## DEC-0028")
+    item = record[start : record.index("**Evidence", start)]
+    assert "4. **What a TD pass does not mean.**" in item
+    assert "It does not reproduce verdicts or the gate outcome." in item
+    cited = CONSTANTS["constants"]["dec28_item4"]
+    assert cited["text"] == (
+        "What a TD pass does not mean: it does not reproduce verdicts or the "
+        "gate outcome."
+    )
+    assert "DEC-0028 item 4" in cited["v3"]
+
+
+def test_cross_check_sentences_follow_the_tokens(tmp_path) -> None:
+    """R3: one sentence per condition, each as stored; no fixed disjunction.
+
+    Conditions: (a) the failing-part token "0" or not, (b) the differing
+    count (a number, "none listed" or "not available"), (c) the GPU gate of
+    each system. Reference: the planted tokens of ``make_td`` and the planted
+    ``gate_pass`` flags.
+    """
+    fast_text = doc_of(fast_build(tmp_path / "ok"))
+    assert (
+        "No primary part exceeds the bound: failing parts 0, largest z (away) "
+        "1.23, bound 3.4." in fast_text
+    )
+    assert (
+        "Verdict-type leaves that differ between the two runs: 2." in fast_text
+    )
+    assert "The GPU validation gate passed on every system." in fast_text
+    assert "At least one primary part exceeds the bound" not in fast_text
+    assert "a verdict-type leaf differs or a GPU gate failed" not in fast_text
+    td = make_td(result="FAIL").replace(
+        "failing parts (z_away > 3.4) 0", "failing parts (z_away > 3.4) 2"
+    )
+    cross = make_results(gate={"rossler": False, "chua": False}, backend="gpu")
+    bad_text = doc_of(fast_build(tmp_path / "bad", td=td, cross=cross))
+    assert (
+        "At least one primary part exceeds the bound: failing parts 2"
+        in bad_text
+    )
+    assert "No primary part exceeds the bound" not in bad_text
+    assert "The GPU validation gate did not pass on rossler, chua" in bad_text
+    assert (
+        "GPU validation gate, stored gate_pass: lorenz63 yes, rossler no, chua no."
+        in bad_text
+    )
+    assert "The GPU validation gate passed on every system." not in bad_text
+    assert "compare_runs result: FAIL (exit 0)." in bad_text
+    caption = CONSTANTS["constants"]["caption_F3"]["text"]
+    assert "A row would name a failed GPU validation gate" in caption
+    assert "Each row names" not in caption
+
+
+def test_lm_limitation_states_the_corrected_count() -> None:
+    """R4: the DEF-0027 limitation reads as RESULTS.md and the record do.
+
+    Reference: the DEF-0027 correction of 2026-10-18 in ``defects.md`` and
+    ``docs/study/lm_doubling_dev0_report_v3.md``: N 5 / X 6 / U 7; the LM-row
+    flag (class N) is yes for 5 of 18 parts and no for 13.
+    """
+    defects, report = DEFECTS.read_text(), LM_REPORT.read_text()
+    assert "total N 5 / X 6 / U 7" in defects
+    assert "yes for 5 of 18 parts, no for 13" in report
+    assert "N 5 / X 6 / U 7" in report
+    cited = CONSTANTS["constants"]["lm_limitation"]
+    text = cited["text"]
+    assert "for 5 of the 18 primary parts (class N)" in text
+    assert "did not show it below 10% for the other 13" in text
+    assert "not negligible, 6" in text and "not certified, 7" in text
+    assert "stated and not applied" in text
+    assert "referred to the owner" in cited["v3"]
+    assert (
+        ROOT / CONSTANTS["constants"]["lm_report_pointer"]["text"]
+    ).is_file()
+    assert "flag was raised" not in json.dumps(CONSTANTS)
+
+
+def test_lm_limitation_and_pointer_are_in_the_document(fast) -> None:
+    """R4: the limitation and the pointer are in §10 and under the primary table."""
+    text = doc_of(fast)
+    pointer = CONSTANTS["constants"]["lm_report_pointer"]["text"]
+    limits = text.split("## 10.")[1].split("## 11.")[0]
+    assert pointer in limits and "not negligible, 6" in limits
+    primary = text.split("## 5.")[1].split("## 6.")[0]
+    assert pointer in primary
+    assert len([x for x in text.split("\n") if "LM iteration" in x]) == 18
+
+
+# Typed from the Handling section of the real RESULTS.md (table of result
+# counts of one system), not built from the constants.
+RESULT_COUNT_LEAVES = [
+    "H1b/CP/n_floored",
+    "H2a/n_excluded_states",
+    "H1c/PLP/n_ineligible_states",
+    "H1c/CP/n_ineligible_states",
+    "H2b/noise/n_constant_states",
+    "gain_bound/n_screened_out/growth_nonpositive",
+    "gain_bound/n_screened_out/negative_covariance",
+    "gain_bound/n_screened_out/censored_single_forecaster",
+]
+
+
+def test_handling_section_names_its_scope_and_lists_result_counts(fast) -> None:
+    """R5: the heading sentence is not complete and the counts are traced.
+
+    Planted values: ``100 * system_index + position`` (the first count is 0,
+    100, 200, so a zero is printed). Reference: the typed leaf list above and
+    the planted values.
+    """
+    assert [
+        i["leaf"] for i in CONSTANTS["result_counts"]
+    ] == RESULT_COUNT_LEAVES
+    text = doc_of(fast)
+    section = text.split("## 7.")[1].split("## 8.")[0]
+    assert "Every clip, floor, replacement and fallback" not in text
+    assert "handling counters of the main systems" in section
+    assert "`handling.robustness`" in section
+    assert "Handling section of RESULTS.md" in section
+    assert "Robustness variants not run (skipped_variants): 0." in section
+    for k, leaf in enumerate(RESULT_COUNT_LEAVES):
+        row = f"| {leaf} | {k} | {100 + k} | {200 + k} |"
+        assert row in section, row
+    paths = {r["path"] for r in trace_of(fast) if r["source"] == "official"}
+    assert "handling/skipped_variants" in paths
+    assert "systems/chua/H1b/CP/n_floored" in paths
+
+
+# Typed from the real results.json (leaf names printed by walking it).
+REPORTED_LEAVES = [
+    ("H2a/n_excluded_states", None),
+    ("H2a/n_eligible_states", None),
+    ("H2a/range_by_span/1-2/median", None),
+    ("H2a/range_by_span/1-2/n_states", None),
+    ("H2a/range_by_span/1-2-4/median", None),
+    ("H2a/range_by_span/1-2-4/n_states", None),
+    ("H2a/complete_case/median_range", "H2a/complete_case/range_ci"),
+    ("H2a/complete_case/n_states", None),
+    ("H2a/n_w_zero", None),
+    ("H2a/n_w_one", None),
+    ("H1a/by_noise/0.01/floor_rms", None),
+    ("H1a/by_noise/0.02/floor_rms", None),
+    ("H1c/CP/median_ratio", "H1c/CP/ci"),
+    ("H1d/rows/nhat/spearman", "H1d/rows/nhat/interval"),
+    ("H3b/stability", None),
+]
+
+
+def test_reported_quantities_table_and_h2c_label(fast) -> None:
+    """R6: reported quantities with no verdict, traced; the H2c label explained.
+
+    Reference: the typed leaf list above; planted values ``7 * system_index +
+    position`` for counts that are not also result counts and ``0.25 + 0.01 * position`` for the others, with
+    the interval [0.125, 0.375 + 0.01 * position].
+    """
+    mine = [(q["leaf"], q.get("ci")) for q in CONSTANTS["reported_quantities"]]
+    assert mine == REPORTED_LEAVES
+    text = doc_of(fast)
+    row = line_of(text, "| lorenz63 | H2a: complete-case")
+    assert row.endswith("| 0.31 | [0.125, 0.435] |")
+    row = line_of(text, "| chua | H2a: test states excluded")
+    assert row.endswith("| 201 |  |")  # also a result count: 100 * 2 + 1
+    row = line_of(text, "| chua | H2a: test states with w* = 0")
+    assert row.endswith("| 22 |  |")  # 7 * 2 + 8
+    assert "| lorenz63 | H3b: stability fraction" in text
+    assert (
+        "The H2c part labelled A4 - A1 is A4 minus the better single forecaster"
+        in text
+    )
+    assert (
+        "The stored best_single is lorenz63 A1, rossler A1, chua A1; A1 is PLP alone (w = 0)."
+        in text
+    )
+    assert "A1 | PLP alone" in v3_text()
+    assert (
+        "better single forecaster, chosen on the calibration split" in v3_text()
+    )
+    section = text.split("## 6.")[1].split("## 7.")[0]
+    assert "Reported quantities that carry no verdict" in section
+
+
+def test_h2a_bullet_names_failed_parts_and_the_precision_statement(
+    tmp_path,
+) -> None:
+    """R7: which H2a parts failed per system; the v3 precision sentence.
+
+    Planted words: lorenz63 fails only H2a(ii) interior, rossler only H2a(i),
+    chua nothing. In a build where chua failed the gate the chua entry carries
+    PROVISIONAL. Reference: the planted words and v3 section 7 (Precision).
+    """
+    official = make_results(gate={"chua": False})
+    by_part = {
+        "lorenz63": ("pass", "inconclusive", "fail"),
+        "rossler": ("fail", "inconclusive", "inconclusive"),
+        "chua": ("pass", "pass", "pass"),
+    }
+    for s, words in by_part.items():
+        for part, word in zip(CONSTANTS["primary_parts"][:3], words):
+            set_path(official["systems"][s], part["verdict"], word)
+    official["verdicts"]["H2a"]["verdict"] = "not supported"
+    text = doc_of(fast_build(tmp_path, official=official))
+    bullet = line_of(text, "- **H2a**: not supported.")
+    assert (
+        "Parts whose stored word is fail: lorenz63: H2a(ii) interior (fail); "
+        "rossler: H2a(i) (fail); chua PROVISIONAL: none." in bullet
+    )
+    assert (
+        "v3 §7 pre-registered this reading and it is not tested here." in bullet
+    )
+    sentence = CONSTANTS["constants"]["precision_h2a"]
+    assert sentence["text"] in v3_text()
+    assert f"Precision (v3 §7, DEF-0022): {sentence['text']}" in bullet
+    assert "DEF-0022" in sentence["v3"]
+
+
+def test_secondary_rows_have_their_own_labelled_block(fast) -> None:
+    """R8: H2c is labelled secondary and H2e has a bullet (and H3a)."""
+    text = doc_of(fast)
+    primary = text.split("Primary hypotheses, stored overall words:")[1]
+    primary = primary.split("Secondary rows (v3 §2;")[0]
+    assert "- **H2a**:" in primary and "- **H3c**:" in primary
+    assert "H2c" not in primary
+    block = text.split("Secondary rows (v3 §2;")[1].split("## 5.")[0]
+    assert "level 95% with no multiplicity adjustment, v3 §7)" in block
+    for key in ("H2c", "H2e", "H3a"):
+        assert f"- **{key} (secondary)**:" in block, key
+    assert (
+        "- **H2e (secondary)**: supported (preliminary, unpromoted)." in block
+    )
+
+
+def test_figure_square_is_named_and_tick_labels_do_not_overlap() -> None:
+    """R9: the caption names the square for both uses; no x labels collide.
+
+    Reference: the rendered geometry. Two panels of the kind that overlapped
+    in the sealed figure (a range of about 1e-2 and one of about 1e-3, bands
+    at zero) are drawn at the real panel width; the bounding boxes of
+    neighbouring x tick labels must not intersect. The values are planted
+    here, of the same magnitude only.
+    """
+    caption = CONSTANTS["constants"]["caption_F2"]["text"]
+    assert (
+        "square a Q-N reading (both readings, the logit part and the indicator part)"
+        in caption
+    )
+    assert "reported with no verdict" in caption
+    panels = [
+        {
+            "name": "tiny one",
+            "experiment": "E4",
+            "band": [None, 0.0],
+            "lines": [],
+            "level": "0.95",
+            "systems": ["lorenz63"],
+            "points": [(0.0041, -0.0035, 0.0162, "inconclusive")],
+        },
+        {
+            "name": "tiny two",
+            "experiment": "E4",
+            "band": [None, None],
+            "lines": [],
+            "level": "0.95",
+            "systems": ["chua"],
+            "points": [(-0.0007, -0.0019, -0.00004, "reported")],
+        },
+        {
+            "name": "tiny three",
+            "experiment": "E4",
+            "band": [None, 0.0],
+            "lines": [],
+            "level": "0.95",
+            "systems": ["rossler"],
+            "points": [(2.1e-05, -2.8e-05, 6.3e-05, "inconclusive")],
+        },
+    ]
+    fig = fb.draw_panels(panels, 5, "L", {s: False for s in SYSTEMS})
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    for ax in fig.axes[:3]:
+        boxes = sorted(
+            (
+                t.get_window_extent(renderer)
+                for t in ax.get_xticklabels()
+                if t.get_text()
+            ),
+            key=lambda b: b.x0,
+        )
+        assert len(boxes) >= 2
+        for left, right in zip(boxes, boxes[1:]):
+            assert left.x1 <= right.x0, ax.get_title()
+    plt.close(fig)
+
+
+def test_hw_ratio_column_is_explained() -> None:
+    """R10: the hw ratio is GPU half-width over CPU half-width.
+
+    Reference: ``tools/compare_runs.py``: ``hw0`` is the half-width of the
+    reference (first) interval, ``hw1`` of the new one, and the printed
+    column is ``hw1 / hw0``; the builder binds REF to the official run and
+    NEW to the cross-check (``bind_td``).
+    """
+    source = " ".join((ROOT / "tools/compare_runs.py").read_text().split())
+    assert (
+        "hw0, hw1 = 0.5 * (ci0[1] - ci0[0]), 0.5 * (ci1[1] - ci1[0])" in source
+    )
+    assert 'ratio = p["hw1"] / p["hw0"]' in source
+    note = CONSTANTS["constants"]["hw_ratio_note"]["text"]
+    assert (
+        "half-width of the cross-check (GPU) interval divided by the half-width of the official (CPU) interval"
+        in note
+    )
+    assert "wider" in note

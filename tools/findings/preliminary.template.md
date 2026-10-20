@@ -31,9 +31,11 @@ Each cell below is the stored verdict word. A "supported" verdict is always writ
 
 {{table:verdicts}}
 
-Q-N is read from the §7 table and is never pass or fail. The hybrid's horizon gain is {{const:gain_label}}.
+{{wording:qn}} The hybrid's horizon gain is {{const:gain_label}}.
 
 {{wording:primary}}
+
+{{wording:secondary}}
 
 ## 5. The three primary hypotheses (E1, E2, E4, E5) [PRE-REGISTERED]
 
@@ -65,21 +67,31 @@ Hybrid horizon gain against the P1 bound ({{const:gain_label}}):
 
 {{table:gain}}
 
+Reported quantities that carry no verdict (v3 §2 lists each as reported; each value is read from its stored leaf, and no verdict depends on it):
+
+{{table:reported}}
+
+{{wording:h2c_label}}
+
 {{fig:F2}}
 
 {{table:counts}}
 
 ## 7. Handling counters (nothing is silent) [DIAGNOSTIC]
 
-Every clip, floor, replacement and fallback counted by the run (PRIME.4). Zero counters are printed, never omitted.
+The handling counters of the main systems (PRIME.4). Zero counters are printed, never omitted. The counters of the robustness variants are not listed here: they are in `handling.robustness` of results.json. All result counts are listed in the Handling section of RESULTS.md; the floors, exclusions and screen-outs among them are read from their stored leaves in the table after the counters.
 
 {{table:handling}}
 
+{{table:resultcounts}}
+
 ## 8. GPU cross-check (information only) [CROSS-CHECK: information only]
 
-The GPU run of the same seed is a cross-check, never the result (v3 §9 item 3, DEC-0031). The z value uses the interval arm facing away from the other estimate, and a part disagrees if it exceeds the bound {{const:td_bound}}. The numbers below are copied from the compare_runs text.
+The GPU run of the same seed is a cross-check, never the result (v3 §9 item 3, DEC-0031). The z value uses the interval arm facing away from the other estimate, and a part disagrees if it exceeds the bound {{const:td_bound}}. The numbers in the first table are copied from the compare_runs text. {{const:hw_ratio_note}}
 
 {{table:crosscheck}}
+
+{{table:crossverdicts}}
 
 {{wording:gpu}}
 
@@ -102,7 +114,7 @@ All items of v3 §8 apply, plus the registered deficiencies and rulings listed h
 - Interval coverage (DEF-0020): {{const:coverage_limit}}
 - Slow dependence beyond five states cannot be resolved at these sample sizes.
 - Small regimes in H3a (DEF-0018): no minimum is set per regime, so counts are reported beside every p-value.
-- Iterative error of PLP (DEF-0027): the Levenberg–Marquardt flag was raised on {{const:lm_flag_count}} primary parts on a development seed. It is development evidence, projected and not corrected.
+- Iterative error of PLP (DEF-0027): {{const:lm_limitation}} The report is {{const:lm_report_pointer}}.
 - Per-seed gate risk (DEF-0026): V4 and V6 can fail on a given seed, and a failure is referred, never repaired.
 - lambda_max for Chua has no published reference value at the study's parameters.
 - Doubled thinning is not checked (Methods v2 §M16).

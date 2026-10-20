@@ -111,6 +111,13 @@ only checks that the hashes typed on the command line equal the files' hashes
 the main session must compare both with the committed manifest row and the
 ledger entry.
 
+The cross-check section also lists the stored verdict words that differ
+between the two results files (``differing_words``, a string comparison of
+stored leaves; nothing is recomputed). It needs the official word beside the
+GPU word, so the official file is also known as the source ``official_words``,
+which only a [CROSS-CHECK] section may quote; the source ``official`` stays
+refused there (WU-0020.8, plan amendment of 2026-10-20).
+
 Placeholders in the template look like ``{{official:systems/chua/H3c/ci|ci:.3g}}``:
 a source name, a leaf path and an optional format. Standard library plus
 matplotlib (already pinned).
@@ -138,6 +145,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.ticker import MaxNLocator  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 TEMPLATE_PATH = HERE / "findings" / "preliminary.template.md"
@@ -201,6 +209,7 @@ RELEASE_REF = re.compile(r"^ledger-seq-\d+$")
 SHA_HEX = re.compile(r"^[0-9a-f]{64}$")
 SOURCES = (
     "official",
+    "official_words",
     "official_md",
     "crosscheck",
     "td",
@@ -210,10 +219,14 @@ SOURCES = (
 )
 # Which sources each section tag may quote (A6). Untagged sections may quote
 # the official run, the cross-check file and the constants (provenance).
+# ``official_words`` is the official results file under a second name. Only a
+# [CROSS-CHECK] section may quote it: the table of differing verdict words
+# there needs the official word beside the GPU word, while the source name
+# ``official`` stays refused in that section (WU-0020.8, plan amendment).
 ALLOWED = {
     "PRE-REGISTERED": {"official", "official_md", "const", "meta"},
     "DIAGNOSTIC": {"official", "const", "meta"},
-    "CROSS-CHECK": {"crosscheck", "td", "const", "meta"},
+    "CROSS-CHECK": {"crosscheck", "official_words", "td", "const", "meta"},
     "DEVELOPMENT": {"dev", "const", "meta"},
     "STUDENT": set(),
     "": {"official", "official_md", "crosscheck", "const", "meta"},
@@ -434,6 +447,7 @@ def parse_td(path: Path) -> dict:
     out["total"].setdefault(
         "differing", NONE_LISTED if tier == "TD" else NOT_AVAILABLE
     )
+    out["total"]["listed"] = str(len(out["leaves"]))
     return out
 
 
@@ -445,6 +459,91 @@ def const_citation(tree: dict, path: str) -> str | None:
         if isinstance(node, dict) and "v3" in node:
             found = node["v3"]
     return found
+
+
+def is_word_key(key: str) -> bool:
+    """Return True if a string leaf with this key holds a verdict word.
+
+    The rule of ``tools/compare_runs.py`` for a verdict-type string leaf, typed
+    again here (a test compares the two): ``verdict``, ``verdict_2L``,
+    ``part_i_verdict``, ``reading`` and ``status``.
+    """
+    return (
+        key.startswith("verdict")
+        or key.endswith("_verdict")
+        or key in ("reading", "status")
+    )
+
+
+def string_leaves(tree: object, prefix: tuple = ()) -> list[tuple]:
+    """Return ``(path, text)`` for every string leaf of a nested dict or list."""
+    if isinstance(tree, dict):
+        return [
+            leaf
+            for k, v in tree.items()
+            for leaf in string_leaves(v, prefix + (k,))
+        ]
+    if isinstance(tree, list):
+        return [
+            leaf
+            for i, v in enumerate(tree)
+            for leaf in string_leaves(v, prefix + (str(i),))
+        ]
+    return [(prefix, tree)] if isinstance(tree, str) else []
+
+
+def differing_words(
+    official: dict, cross: dict, constants: dict
+) -> tuple[list[tuple], list[tuple]]:
+    """List the stored verdict words that differ between two results files.
+
+    A string comparison of stored leaves and nothing else (A3): the words
+    are those under ``verdicts`` and the string leaves of ``systems`` whose
+    key ``is_word_key``. A word that exists in one file only counts as
+    different. Returns ``(overall, per_system)`` as lists of path tuples. The
+    overall list holds the paths under ``verdicts``, the primary hypotheses
+    first. The per-system list is ordered by system, then primary parts (the
+    blocks of the primary rows) before the rest, then by path.
+    """
+    seen: dict[tuple, list] = {}
+    for side, tree in enumerate((official, cross)):
+        part = {k: tree[k] for k in ("verdicts", "systems") if k in tree}
+        for path, word in string_leaves(part):
+            if path[0] == "verdicts" or is_word_key(path[-1]):
+                seen.setdefault(path, [None, None])[side] = word
+    differ = [path for path, (a, b) in seen.items() if a != b]
+    keys = [i["key"] for i in constants["identifiers"]]
+    primary = {
+        i["key"] for i in constants["identifiers"] if i["role"] == "primary"
+    }
+    rows = {p["row"] for p in constants["primary_parts"]}
+    systems = list(constants["systems"])
+
+    def overall_rank(path: tuple) -> tuple:
+        key = path[1] if len(path) > 1 else ""
+        return (
+            0 if key in primary else 1,
+            keys.index(key) if key in keys else len(keys),
+            path,
+        )
+
+    def system_rank(path: tuple) -> tuple:
+        system = path[1] if len(path) > 1 else ""
+        block = path[2] if len(path) > 2 else ""
+        return (
+            systems.index(system) if system in systems else len(systems),
+            system,
+            0 if block in rows else 1,
+            path,
+        )
+
+    overall = sorted(
+        (p for p in differ if p[0] == "verdicts"), key=overall_rank
+    )
+    per_system = sorted(
+        (p for p in differ if p[0] != "verdicts"), key=system_rank
+    )
+    return overall, per_system
 
 
 # --- the document builder ---------------------------------------------
@@ -610,17 +709,35 @@ class Builder:
         ]
         for item in self.constants["identifiers"]:
             key = item["key"]
-            cells = [
-                self.ref("official", f"verdicts/{key}/by_system/{s}", "verdict")
-                + self.mark(s)
-                for s in self.systems
-            ]
+            overall = self.ref("official", f"verdicts/{key}/verdict", "verdict")
+            if key == "Q-N":
+                # v3 section 2 and 7 read the two parts separately; the stored
+                # overall word is built from the logit part alone (R1).
+                cells = [self.qn_cell(s) + self.mark(s) for s in self.systems]
+                overall += (
+                    "; the stored per-system words are the logit part only"
+                )
+            else:
+                cells = [
+                    self.ref(
+                        "official", f"verdicts/{key}/by_system/{s}", "verdict"
+                    )
+                    + self.mark(s)
+                    for s in self.systems
+                ]
             out.append(
                 f"| {key} | {item['role']} | {' | '.join(cells)} | "
-                f"{self.ref('official', f'verdicts/{key}/verdict', 'verdict')}"
-                f" | {self.ref('official_md', f'clip/{key}')} |"
+                f"{overall} | {self.ref('official_md', f'clip/{key}')} |"
             )
         return out
+
+    def qn_cell(self, system: str) -> str:
+        """Both stored Q-N readings of a system: the logit and the indicator."""
+        logit, indicator = self.constants["qn_parts"][:2]
+        return (
+            f"logit: {self.official(system, logit['verdict'])}; "
+            f"indicator: {self.official(system, indicator['verdict'])}"
+        )
 
     def parts_rows(
         self, parts_key: str, default_level: str, notes: bool
@@ -667,7 +784,16 @@ class Builder:
                 out.append("| " + " | ".join(cells) + " |")
         self.counter += 1
         count = self.meta_ref(f"design_levels_{self.counter}", str(designed))
-        return out + ["", f"Level cells that show a design value: {count}."]
+        out += ["", f"Level cells that show a design value: {count}."]
+        if notes:
+            out += [
+                "",
+                "Iterative error of the PLP estimator: not estimated for this "
+                "run. Development evidence is in "
+                f"{self.const('lm_report_pointer')} and in the limitation on "
+                "iterative error (DEF-0027) in §10.",
+            ]
+        return out
 
     def has_leaf(self, system: str, leaf: str) -> bool:
         """Return True if a leaf of the official run exists."""
@@ -783,7 +909,47 @@ class Builder:
                 f"{cells} |"
             )
         failed = self.ref("official", "handling/failed_variants", "d")
-        return out + ["", f"Failed robustness variants: {failed}."]
+        skipped = self.ref("official", "handling/skipped_variants", "d")
+        return out + [
+            "",
+            f"Failed robustness variants: {failed}. Robustness variants not "
+            f"run (skipped_variants): {skipped}.",
+        ]
+
+    def table_resultcounts(self) -> list[str]:
+        """Counts of floors, exclusions and screen-outs, from their leaves."""
+        out = [
+            "| Result count (leaf of each system) | "
+            + " | ".join(self.systems)
+            + " |",
+            "|---|" + "---|" * len(self.systems),
+        ]
+        for i, item in enumerate(self.constants["result_counts"]):
+            cells = " | ".join(
+                self.official(s, item["leaf"], "d") for s in self.systems
+            )
+            out.append(f"| {self.const(f'result_counts/{i}/leaf')} | {cells} |")
+        return out
+
+    def table_reported(self) -> list[str]:
+        """Reported quantities with no verdict (R6), one row per system."""
+        out = [
+            "| System | Quantity | Value | Interval |",
+            "|---|---|---|---|",
+        ]
+        for s in self.systems:
+            for i, item in enumerate(self.constants["reported_quantities"]):
+                value = self.official(s, item["leaf"], item["fmt"])
+                interval = (
+                    self.official(s, item["ci"], "ci:" + item["fmt"])
+                    if "ci" in item
+                    else ""
+                )
+                label = self.const(f"reported_quantities/{i}/label")
+                out.append(
+                    f"| {s}{self.mark(s)} | {label} | {value} | {interval} |"
+                )
+        return out
 
     def table_crosscheck(self) -> list[str]:
         """The TD table of the cross-check and its totals."""
@@ -800,25 +966,86 @@ class Builder:
                 )
                 out.append(f"| {s}{self.mark(s)} | {part['name']} | {cells} |")
         total = lambda name: self.ref("td", f"total/{name}")  # noqa: E731
-        gates = ", ".join(
-            f"{s} "
-            + self.ref(
-                "crosscheck", f"systems/{s}/validation/gate/gate_pass", "yn"
-            )
-            for s in self.systems
-        )
         out += [
             "",
             f"Parts computed {total('computed')} of {total('expected')}; "
             f"sum of z squared (away) {total('sum_away')}; "
             f"largest z (away) {total('max_away')}; "
             f"failing parts {total('failing')} (bound {self.const('td_bound')}).",
-            "",
-            f"Verdict-type leaves that differ between the two runs: "
-            f"{total('differing')}. compare_runs result: {total('result')}.",
-            "",
-            f"GPU validation gate passed: {gates}.",
         ]
+        return out
+
+    def table_crossverdicts(self) -> list[str]:
+        """Stored verdict words that differ between the two runs (R2).
+
+        A string comparison of the stored words of the two results files
+        (``differing_words``); no verdict is recomputed. Overall words come
+        first, then the words of each system with the primary parts first.
+        The regimes of H3a per system follow, because with a different
+        number of regimes some H3a leaves exist in one run only.
+        """
+        overall, per_system = differing_words(
+            self.sources["official"],
+            self.sources["crosscheck"],
+            self.constants,
+        )
+        total = lambda name: self.ref("td", f"total/{name}")  # noqa: E731
+        n_overall = self.meta_ref("cross_words_overall", str(len(overall)))
+        n_system = self.meta_ref("cross_words_system", str(len(per_system)))
+        out = [
+            "Stored verdict words that differ between the official (CPU) and "
+            "the cross-check (GPU) results files, read from the two files as "
+            "a string comparison of the stored words (nothing is "
+            f"recomputed). Overall rows: {n_overall}. Rows per system: "
+            f"{n_system}. The compare_runs text prints a limited number of "
+            f"leaf lines ({total('listed')} lines against {total('differing')} "
+            "verdict-type leaves counted, which also include boolean flags of "
+            "the verdict rows); the tables below are read from the results "
+            "files and list every string verdict word that differs.",
+            "",
+        ]
+        words = lambda path: (  # noqa: E731
+            f"{self.ref('official_words', '/'.join(path), 'verdict')} | "
+            f"{self.ref('crosscheck', '/'.join(path), 'verdict')}"
+        )
+        if overall:
+            out += [
+                "| Overall leaf | Official (CPU) | Cross-check (GPU) |",
+                "|---|---|---|",
+            ]
+        else:
+            out += ["No overall stored verdict word differs.", ""]
+        for k, path in enumerate(overall):
+            label = self.meta_ref(f"cross_label_o{k}", "/".join(path[1:]))
+            system = path[3] if len(path) > 3 and path[2] == "by_system" else ""
+            mark = self.mark(system) if system in self.provisional else ""
+            out.append(f"| {label}{mark} | {words(path)} |")
+        out.append("")
+        if per_system:
+            out += [
+                "| System | Leaf | Official (CPU) | Cross-check (GPU) |",
+                "|---|---|---|---|",
+            ]
+        else:
+            out += ["No stored verdict word of a system differs.", ""]
+        for k, path in enumerate(per_system):
+            label = self.meta_ref(f"cross_label_s{k}", "/".join(path[2:]))
+            mark = self.mark(path[1]) if path[1] in self.provisional else ""
+            out.append(f"| {path[1]}{mark} | {label} | {words(path)} |")
+        out += [
+            "",
+            "H3a regimes per system (the stored chosen_K of each run). When "
+            "the numbers differ, the regime-indexed H3a leaves of the longer "
+            "list have no counterpart in the other run; compare_runs lists "
+            "them with no per-leaf rule.",
+            "",
+            "| System | Regimes, official (CPU) | Regimes, cross-check (GPU) |",
+            "|---|---|---|",
+        ]
+        for s in self.systems:
+            first = self.ref("official_words", f"systems/{s}/H3a/chosen_K", "d")
+            second = self.ref("crosscheck", f"systems/{s}/H3a/chosen_K", "d")
+            out.append(f"| {s}{self.mark(s)} | {first} | {second} |")
         return out
 
     def table_labels(self) -> list[str]:
@@ -829,42 +1056,149 @@ class Builder:
         ]
 
     # --- text blocks --------------------------------------------------
-    def wording_primary(self) -> str:
-        """One sentence template per primary row, picked by the stored word."""
+    def stored_word(self, source: str, path: str) -> object:
+        """Return the stored leaf (None if it is absent or null)."""
+        try:
+            return walk(self.sources[source], path)
+        except Missing:
+            return None
+
+    def overall_bullet(self, key: str, label: str) -> str:
+        """One bullet: the stored overall word and the wording for that word.
+
+        The sentence is picked by looking the stored word up (a table of
+        sentences); nothing is compared with a band.
+        """
         wording = self.constants["wording"]
-        lines = []
-        for key in ("H2a", "H2b", "H3c", "H2c"):
-            path = f"verdicts/{key}/verdict"
-            try:
-                word = walk(self.sources["official"], path)
-            except Missing:
-                word = None
-            text = wording.get(word, NOT_RECORDED) if word else NOT_RECORDED
-            if word == "not supported" and f"reading:{key}" in wording:
-                text += " " + wording[f"reading:{key}"]
-            lines.append(
-                f"- **{key}**: {self.ref('official', path, 'verdict')}. {text}"
+        path = f"verdicts/{key}/verdict"
+        word = self.stored_word("official", path)
+        text = wording.get(word, NOT_RECORDED) if word else NOT_RECORDED
+        if word == "not supported" and f"reading:{key}" in wording:
+            text += " " + wording[f"reading:{key}"]
+        if key == "H2a":
+            text += (
+                f" Parts whose stored word is fail: {self.failed_parts(key)}. "
+                f"Precision (v3 §7, DEF-0022): {self.const('precision_h2a')}"
             )
+        return f"- **{label}**: {self.ref('official', path, 'verdict')}. {text}"
+
+    def failed_parts(self, row: str) -> str:
+        """Name, per system, the parts of a row whose stored word is fail.
+
+        A part whose leaf is absent or null is named too (with the words
+        "not recorded" or "not computed"), because its word is not known.
+        """
+        out = []
+        for s in self.systems:
+            names = []
+            for part in self.constants["primary_parts"]:
+                if part["row"] != row:
+                    continue
+                word = self.stored_word(
+                    "official", f"systems/{s}/{part['verdict']}"
+                )
+                if word is None or word == "fail":
+                    cell = self.official(s, part["verdict"], "verdict")
+                    names.append(f"{part['name']} ({cell})")
+            out.append(f"{s}{self.mark(s)}: {', '.join(names) or 'none'}")
+        return "; ".join(out)
+
+    def wording_primary(self) -> str:
+        """Bullets of the three primary rows (R7)."""
+        lines = ["Primary hypotheses, stored overall words:"]
+        lines += [
+            self.overall_bullet(key, key) for key in ("H2a", "H2b", "H3c")
+        ]
         return "\n".join(lines)
 
-    def wording_gpu(self) -> str:
-        """Agree or disagree sentence for the cross-check (no new verdict).
-
-        Agreement needs every TD token in its good state: no failing part,
-        no differing verdict leaf (a count of zero or the "none listed" text),
-        a PASS result and a passed GPU gate for each of the three systems.
-        Anything else, including an unavailable count, is the disagreement
-        sentence.
-        """
-        total = self.sources["td"]["total"]
-        gates = [self.gate_state("crosscheck", s) for s in self.systems]
-        bad = (
-            total["failing"] != "0"
-            or total["differing"] not in ("0", NONE_LISTED)
-            or not total.get("result", "").startswith("PASS")
-            or any(g is not True for g in gates)
+    def wording_secondary(self) -> str:
+        """Bullets of the secondary rows that are poster highlights (R8)."""
+        intro = self.constants["wording"]["secondary_intro"].format(
+            level=self.const("standard_level_pct")
         )
-        return self.constants["wording"]["gpu_disagree" if bad else "gpu_agree"]
+        lines = [intro]
+        lines += [
+            self.overall_bullet(key, f"{key} (secondary)")
+            for key in ("H2c", "H2e", "H3a")
+        ]
+        return "\n".join(lines)
+
+    def wording_qn(self) -> str:
+        """The Q-N sentence: two parts, and the stored overall word (R1)."""
+        words = ", ".join(
+            f"{s} {self.ref('official', f'verdicts/Q-N/by_system/{s}')}"
+            f"{self.mark(s)}"
+            for s in self.systems
+        )
+        return (
+            "Q-N is read by the table of v3 §7, separately for each of its two "
+            "parts (logit w* on the interior states, and the indicator of w* "
+            "at zero), and is never pass or fail; the Q-N row shows both "
+            "stored readings. v3 §2 and §7 read the two parts separately, but "
+            "the stored overall word `verdicts.Q-N` collapses them to the "
+            f"logit part: its per-system words are {words}."
+        )
+
+    def wording_h2c_label(self) -> str:
+        """Explain the H2c label "A4 - A1" (stored best_single) (R6)."""
+        best = ", ".join(
+            f"{s}{self.mark(s)} {self.official(s, 'H2c/best_single')}"
+            for s in self.systems
+        )
+        return (
+            "The H2c part labelled A4 - A1 is A4 minus the better single "
+            "forecaster, chosen on the calibration split (v3 §2 H2c). The "
+            f"stored best_single is {best}; {self.const('a1_is_plp')}."
+        )
+
+    def wording_gpu(self) -> str:
+        """One sentence per cross-check condition, each as stored (R3).
+
+        The conditions are the largest z against the bound, the number of
+        differing verdict-type leaves and the GPU gate of each system. The
+        sentence of a condition is picked by a string comparison of the
+        stored token (failing parts "0" or not; gate_pass true or not); an
+        unavailable count is printed as such and cannot read as agreement.
+        """
+        wording = self.constants["wording"]
+        total = self.sources["td"]["total"]
+        token = lambda name: self.ref("td", f"total/{name}")  # noqa: E731
+        bound_key = (
+            "gpu_bound_ok" if total["failing"] == "0" else "gpu_bound_exceeded"
+        )
+        bound = wording[bound_key].format(
+            failing=token("failing"),
+            max_away=token("max_away"),
+            bound=self.const("td_bound"),
+        )
+        differing = wording["gpu_diff_count"].format(
+            differing=token("differing")
+        )
+        gates = {s: self.gate_state("crosscheck", s) for s in self.systems}
+        listing = ", ".join(
+            f"{s} "
+            + self.ref(
+                "crosscheck", f"systems/{s}/validation/gate/gate_pass", "yn"
+            )
+            for s in self.systems
+        )
+        failed = [s for s, g in gates.items() if g is not True]
+        gate = (
+            wording["gpu_gate_failed"].format(systems=", ".join(failed))
+            if failed
+            else wording["gpu_gate_ok"]
+        )
+        result = wording["gpu_result"].format(
+            result=token("result"), dec28=self.const("dec28_item4")
+        )
+        return "\n\n".join(
+            [
+                bound,
+                differing,
+                f"GPU validation gate, stored gate_pass: {listing}. {gate}",
+                f"{result} {wording['gpu_info_only']}",
+            ]
+        )
 
     def gate_box(self) -> str:
         """The boxed gate sentence: failure branch or all-clear branch."""
@@ -1152,6 +1486,12 @@ def draw_panels(
             [n + (" PROVISIONAL" if provisional[n] else "") for n in names],
             fontsize=7,
         )
+        # Few ticks and a shared power of ten: panels with a tiny range
+        # (differences of 1e-5) printed overlapping labels (R9).
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+        ax.ticklabel_format(
+            axis="x", style="sci", scilimits=(-2, 3), useOffset=False
+        )
         ax.tick_params(axis="x", labelsize=7)
         ax.set_title(
             f"{panel['name']} ({panel['experiment']})\nlevel {panel['level']}",
@@ -1372,6 +1712,7 @@ def read_sources(
     }
     if "dev" in paths:
         sources["dev"] = read_json(paths["dev"])
+    sources["official_words"] = sources["official"]
     listed = sources["official"].get("config", {}).get("core_systems")
     if listed != constants["systems"]:
         raise ToolError(
