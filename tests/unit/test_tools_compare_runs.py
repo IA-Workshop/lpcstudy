@@ -2457,7 +2457,8 @@ def test_cli_isolated_subprocess_exit_codes_and_label(tmp_path: Path) -> None:
         "DEVELOPMENT: comparison of two runs, not a hypothesis test"
     )
     assert (
-        "needs owner review before freeze" in ok.stdout
+        "rules ratified by the owner" in ok.stdout
+        and "needs owner review" not in ok.stdout
         and "RESULT: PASS" in ok.stdout
     )
 
