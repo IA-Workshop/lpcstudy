@@ -1,0 +1,3537 @@
+{
+ "DEV-2 full/lorenz63": {
+  "label": "DEVELOPMENT (DEV-1, DEV-2): not a hypothesis test",
+  "system": "lorenz63",
+  "seed_id": "DEV-2",
+  "preset": "full",
+  "dump": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/r1-c9bb981/runs/r5-gpu-dev2/full/states/lorenz63.npz",
+  "n_states": 1000,
+  "horizons": [
+   8,
+   15,
+   30,
+   60,
+   120
+  ],
+  "nonfinite_in_E_C_E_P_C": 0,
+  "check_wstar_recomputed_max_abs_diff": 0.0,
+  "check_sweep_core_view_E_C_max_abs_diff": 0.0,
+  "check_sweep_core_view_w_star_max_abs_diff": 0.0,
+  "a_P1dprime": {
+   "n": 1000,
+   "grid": [
+    8,
+    15,
+    30,
+    60,
+    120
+   ],
+   "n_Tm_censored": 185,
+   "n_Th_censored": 199,
+   "lower_bound_violations_all_states": 0,
+   "study_rule_sqrt2_theta": {
+    "n_Tm_uncensored": 815,
+    "n_H1_censored(bound infinite, not testable)": 90,
+    "n_tested(C>=0 at H1)": 588,
+    "n_C_negative_at_H1(hypothesis fails)": 137,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 1,
+    "tested_gain_zero": 577,
+    "tested_gain_positive": 11,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 51,
+    "tested_gain_equals_bound_and_positive(tight)": 11,
+    "tested_gain_equals_bound_both_zero(vacuous)": 537,
+    "tested_bound_positive_and_gain_zero(slack)": 40,
+    "tested_gain_steps_distribution": {
+     "0": 577,
+     "15": 1,
+     "60": 8,
+     "90": 1,
+     "105": 1
+    },
+    "tested_bound_steps_distribution": {
+     "0": 537,
+     "15": 2,
+     "30": 2,
+     "60": 41,
+     "90": 3,
+     "105": 3
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 509,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 10
+   },
+   "noise_exact_sqrt2_theta_prime": {
+    "n_Tm_uncensored": 815,
+    "n_H1_censored(bound infinite, not testable)": 90,
+    "n_tested(C>=0 at H1)": 587,
+    "n_C_negative_at_H1(hypothesis fails)": 138,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 1,
+    "tested_gain_zero": 576,
+    "tested_gain_positive": 11,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 50,
+    "tested_gain_equals_bound_and_positive(tight)": 11,
+    "tested_gain_equals_bound_both_zero(vacuous)": 537,
+    "tested_bound_positive_and_gain_zero(slack)": 39,
+    "tested_gain_steps_distribution": {
+     "0": 576,
+     "15": 1,
+     "60": 8,
+     "90": 1,
+     "105": 1
+    },
+    "tested_bound_steps_distribution": {
+     "0": 537,
+     "15": 2,
+     "30": 2,
+     "60": 40,
+     "90": 3,
+     "105": 3
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 509,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 10
+   },
+   "note_resolution": "gains and bounds are differences of grid points {8,15,30,60,120}; adjacent gaps 7,15,30,60 steps (0.23, 0.5, 1, 2 LT)"
+  },
+  "b_N4": {
+   "identity_rows_interior": 3470,
+   "identity_rows_total": 5000,
+   "identity_max_abs_diff(V/min vs f)": 1.7763568394002505e-15,
+   "rows_with_C_gt_min(clipped, f not exact)": 1530,
+   "n_Tm_uncensored": 815,
+   "n_f_valid_at_crossing": 604,
+   "n_pred_uncensored": 590,
+   "n_hypothesis_met(f(T_pred)>=f_j)": 586,
+   "violations_of_bound_T_h<=T_pred": 0,
+   "f_at_crossing_quantiles5_25_50_75_95": [
+    0.4263567261569206,
+    0.6820015043241505,
+    0.8548624223077002,
+    0.9519577783443514,
+    0.997558104702473
+   ],
+   "rho_at_crossing_quantiles": [
+    -0.37944849302094796,
+    -0.03687406254433602,
+    0.18882354655358502,
+    0.4268552051148543,
+    0.6753866827352928
+   ],
+   "pred_gain_zero": 575,
+   "realized_gain_equals_pred(grid) among hyp": 586,
+   "realized_gain_less_than_pred among hyp": 0,
+   "realized_gain_zero among hyp": 575,
+   "pred_bound_steps_distribution": {
+    "0": 575,
+    "60": 8,
+    "90": 2,
+    "105": 1
+   },
+   "realized_gain_steps_distribution": {
+    "0": 575,
+    "60": 8,
+    "90": 2,
+    "105": 1
+   },
+   "library_dependence_H_ref": {
+    "rho=0.01|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.23,
+     "frac_interior(C<=min)": 0.687,
+     "median_varrho_raw": 0.15822261080390476,
+     "median_r": 0.08206513320739069,
+     "median_f(interior)": 0.9180982851593954,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9749907358790053,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.3363490869941008,
+     "n_exp_pred": 583
+    },
+    "rho=0.005|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.342,
+     "frac_interior(C<=min)": 0.718,
+     "median_varrho_raw": 0.05155018147935271,
+     "median_r": 0.03046477481051756,
+     "median_f(interior)": 0.9429412483454325,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9816350832476428,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.8740615366301574,
+     "n_exp_pred": 608
+    },
+    "rho=0.02|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.144,
+     "frac_interior(C<=min)": 0.673,
+     "median_varrho_raw": 0.3133858188113282,
+     "median_r": 0.18073517462770006,
+     "median_f(interior)": 0.9020890926694172,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9721323877376877,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.4865002135587422,
+     "n_exp_pred": 574
+    },
+    "rho=0.05|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.1,
+     "frac_interior(C<=min)": 0.709,
+     "median_varrho_raw": 0.40434737671134624,
+     "median_r": 0.3036371261800693,
+     "median_f(interior)": 0.9259673976899752,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9747117004116953,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.0323178130994042,
+     "n_exp_pred": 610
+    },
+    "rho=0.01|n_lib=1000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.374,
+     "frac_interior(C<=min)": 0.675,
+     "median_varrho_raw": 0.04251568066945205,
+     "median_r": 0.014730596997879323,
+     "median_f(interior)": 0.960495953070251,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9909147338019015,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.7317825330177253,
+     "n_exp_pred": 583
+    },
+    "rho=0.01|n_lib=3162": {
+     "n_states": 1000,
+     "frac_C_negative": 0.312,
+     "frac_interior(C<=min)": 0.679,
+     "median_varrho_raw": 0.07384703120322832,
+     "median_r": 0.03978793004586563,
+     "median_f(interior)": 0.932000064573576,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9834039888921776,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.1133866668281787,
+     "n_exp_pred": 578
+    },
+    "rho=0.01|n_lib=31623": {
+     "n_states": 1000,
+     "frac_C_negative": 0.141,
+     "frac_interior(C<=min)": 0.639,
+     "median_varrho_raw": 0.279036039517189,
+     "median_r": 0.16079413438459245,
+     "median_f(interior)": 0.8885382593540173,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9757275760002906,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.573254584715209,
+     "n_exp_pred": 546
+    },
+    "rho=0.01|n_lib=100000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.076,
+     "frac_interior(C<=min)": 0.631,
+     "median_varrho_raw": 0.40121175798412784,
+     "median_r": 0.24355614817098276,
+     "median_f(interior)": 0.9229003756680015,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9914414701280868,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.1983351927487145,
+     "n_exp_pred": 540
+    },
+    "rho=0.02|n_lib=1000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.297,
+     "frac_interior(C<=min)": 0.661,
+     "median_varrho_raw": 0.11351821211944131,
+     "median_r": 0.042751906800575515,
+     "median_f(interior)": 0.9230215118694258,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9846554913899066,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.3077013085954268,
+     "n_exp_pred": 568
+    },
+    "rho=0.02|n_lib=3162": {
+     "n_states": 1000,
+     "frac_C_negative": 0.212,
+     "frac_interior(C<=min)": 0.651,
+     "median_varrho_raw": 0.20084169896048915,
+     "median_r": 0.10312500698150867,
+     "median_f(interior)": 0.9008797419562384,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.975809890330473,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.3929625584061838,
+     "n_exp_pred": 554
+    },
+    "rho=0.02|n_lib=31623": {
+     "n_states": 1000,
+     "frac_C_negative": 0.083,
+     "frac_interior(C<=min)": 0.64,
+     "median_varrho_raw": 0.40771472959946364,
+     "median_r": 0.25991698857984524,
+     "median_f(interior)": 0.9189298128737281,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9825045771233722,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.153246859495467,
+     "n_exp_pred": 549
+    },
+    "rho=0.02|n_lib=100000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.042,
+     "frac_interior(C<=min)": 0.634,
+     "median_varrho_raw": 0.4629614901984832,
+     "median_r": 0.29030950079561046,
+     "median_f(interior)": 0.9508210500449257,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9900416081227554,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.7643818935725519,
+     "n_exp_pred": 542
+    }
+   },
+   "paired_library_change": {
+    "rho=0.01: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 439,
+     "median_paired_change_in_f": -0.01104611757481988,
+     "frac_f_increased": 0.43507972665148065,
+     "median_paired_change_in_varrho": 0.2873620675257069,
+     "frac_varrho_increased": 0.8747152619589977
+    },
+    "rho=0.02: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 434,
+     "median_paired_change_in_f": 0.010801658128288538,
+     "frac_f_increased": 0.5576036866359447,
+     "median_paired_change_in_varrho": 0.32669307324737745,
+     "frac_varrho_increased": 0.8940092165898618
+    }
+   }
+  },
+  "c_N6": {
+   "n_states": 1000,
+   "n_c_nonpositive_or_nonfinite": 0,
+   "frac_u_outside_[0,1](clipped states; N6 assumes none)": 0.313,
+   "frac_u_lt_0": 0.29,
+   "frac_u_gt_1": 0.023,
+   "R_c2": {
+    "all_states/oracle": {
+     "n_points": 1000,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.20917702815245168,
+     "excess_global_E[c(u-ubar)^2]": 0.03418338155861738,
+     "linear_weighted_R_c2(in-sample)": 0.611275942757939,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.4663074241796983,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.466524,
+       0.292512,
+       2
+      ],
+      "3": [
+       0.603451,
+       0.254293,
+       3
+      ],
+      "4": [
+       0.624912,
+       0.287484,
+       4
+      ],
+      "5": [
+       0.62914,
+       0.332142,
+       5
+      ],
+      "6": [
+       0.632251,
+       0.270442,
+       6
+      ],
+      "8": [
+       0.637442,
+       0.270165,
+       8
+      ],
+      "12": [
+       0.640752,
+       0.217836,
+       12
+      ],
+      "16": [
+       0.642525,
+       0.217241,
+       16
+      ]
+     }
+    },
+    "all_states/deployable": {
+     "n_points": 4000,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.20917702815245168,
+     "excess_global_E[c(u-ubar)^2]": 0.03418338155861737,
+     "linear_weighted_R_c2(in-sample)": 0.10285352753438282,
+     "linear_weighted_R_c2(cross_fit_halves)": -0.10670744282614497,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.03418338155861737,
+      "floor": 0.02356139588699855,
+      "between": 0.010621985671618829,
+      "R_c2": 0.3107353686879787,
+      "pythagoras_residual": -2.5982754754004793e-16,
+      "n_leaves": 8,
+      "regret_clip_leaf_map_in_sample": 0.023079347982307503,
+      "regret_clip_best_global": 0.03370133365392633
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.169745,
+       0.131503,
+       2
+      ],
+      "3": [
+       0.247857,
+       0.073892,
+       3
+      ],
+      "4": [
+       0.322233,
+       0.181768,
+       4
+      ],
+      "5": [
+       0.387274,
+       -0.029257,
+       5
+      ],
+      "6": [
+       0.438781,
+       -0.059048,
+       6
+      ],
+      "8": [
+       0.492786,
+       -0.025437,
+       8
+      ],
+      "12": [
+       0.53644,
+       0.053886,
+       12
+      ],
+      "16": [
+       0.558283,
+       0.041947,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/oracle": {
+     "n_points": 687,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.2907862926049982,
+     "excess_global_E[c(u-ubar)^2]": 0.020597277976752443,
+     "linear_weighted_R_c2(in-sample)": 0.6635485122752516,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.5685491540995911,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.462569,
+       0.232652,
+       2
+      ],
+      "3": [
+       0.624504,
+       -0.076961,
+       3
+      ],
+      "4": [
+       0.666502,
+       -0.053551,
+       4
+      ],
+      "5": [
+       0.674435,
+       -0.013796,
+       5
+      ],
+      "6": [
+       0.676489,
+       -0.017575,
+       6
+      ],
+      "8": [
+       0.681798,
+       -0.021054,
+       8
+      ],
+      "12": [
+       0.687636,
+       -0.031756,
+       12
+      ],
+      "16": [
+       0.690317,
+       -0.030936,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/deployable": {
+     "n_points": 2748,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.2907862926049982,
+     "excess_global_E[c(u-ubar)^2]": 0.02059727797675244,
+     "linear_weighted_R_c2(in-sample)": 0.13782404469460663,
+     "linear_weighted_R_c2(cross_fit_halves)": -0.0255399852597904,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.02059727797675244,
+      "floor": 0.014563491071527164,
+      "between": 0.006033786905225276,
+      "R_c2": 0.292940985310556,
+      "pythagoras_residual": 0.0,
+      "n_leaves": 8,
+      "regret_clip_leaf_map_in_sample": 0.014563491071527164,
+      "regret_clip_best_global": 0.02059727797675244
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.247122,
+       0.00636,
+       2
+      ],
+      "3": [
+       0.326768,
+       -0.240147,
+       3
+      ],
+      "4": [
+       0.387699,
+       -0.246379,
+       4
+      ],
+      "5": [
+       0.441959,
+       -0.351514,
+       5
+      ],
+      "6": [
+       0.468605,
+       -0.292787,
+       6
+      ],
+      "8": [
+       0.514453,
+       -0.197798,
+       8
+      ],
+      "12": [
+       0.573101,
+       -0.229111,
+       12
+      ],
+      "16": [
+       0.610599,
+       -0.255056,
+       16
+      ]
+     }
+    }
+   },
+   "observed_regret_H_ref": {
+    "A2": {
+     "mean_excess_oracle_moments": 0.033711934422291846,
+     "mean_realized_state_mse_minus_A*": 0.03959227814590626
+    },
+    "A3": {
+     "mean_excess_oracle_moments": 0.021129501687576824,
+     "mean_realized_state_mse_minus_A*": 0.024612183206557406
+    },
+    "A4": {
+     "mean_excess_oracle_moments": 0.03778147098765379,
+     "mean_realized_state_mse_minus_A*": 0.047168778784470886
+    },
+    "A5": {
+     "mean_excess_oracle_moments": 0.024362109464129582,
+     "mean_realized_state_mse_minus_A*": 0.02645398333707626
+    }
+   },
+   "A5_distinct_leaves_in_test": 8
+  },
+  "d_N8": {
+   "rho_levels": [
+    0.005,
+    0.01,
+    0.02,
+    0.05
+   ],
+   "n_states": 1000,
+   "median_positive_N": 1.2438732987459806,
+   "N_zero_threshold": 1e-09,
+   "frac_wstar_zero_at_all_levels": 0.067,
+   "groups": {
+    "N=0 (analog never changes under noise; stable proxy)": {
+     "n": 282,
+     "n_rank_corr_defined": 274,
+     "n_constant_w(undefined)": 8,
+     "median_spearman": 0.3999999999999999,
+     "q25_q75_spearman": [
+      -0.19999999999999996,
+      0.9999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.2737226277372263,
+     "frac_spearman_gt_0": 0.5802919708029197,
+     "frac_nondecreasing_in_rho": 0.3475177304964539,
+     "mean_frac_of_steps_increasing": 0.6217494089834514
+    },
+    "N>0 low (<= median positive N)": {
+     "n": 359,
+     "n_rank_corr_defined": 353,
+     "n_constant_w(undefined)": 6,
+     "median_spearman": 0.19999999999999996,
+     "q25_q75_spearman": [
+      -0.5999999999999999,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.1558073654390935,
+     "frac_spearman_gt_0": 0.5439093484419264,
+     "frac_nondecreasing_in_rho": 0.22841225626740946,
+     "mean_frac_of_steps_increasing": 0.5246053853296193
+    },
+    "N>0 high (> median positive N)": {
+     "n": 359,
+     "n_rank_corr_defined": 302,
+     "n_constant_w(undefined)": 57,
+     "median_spearman": 0.7745966692414834,
+     "q25_q75_spearman": [
+      0.026352313834736494,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.12582781456953643,
+     "frac_spearman_gt_0": 0.7483443708609272,
+     "frac_nondecreasing_in_rho": 0.520891364902507,
+     "mean_frac_of_steps_increasing": 0.4159702878365831
+    }
+   },
+   "median_wstar_by_rho": {
+    "0.005": 0.021554855754256114,
+    "0.01": 0.05088620788735026,
+    "0.02": 0.07833298242170941,
+    "0.05": 0.10691845304087448
+   }
+  }
+ },
+ "DEV-2 full/rossler": {
+  "label": "DEVELOPMENT (DEV-1, DEV-2): not a hypothesis test",
+  "system": "rossler",
+  "seed_id": "DEV-2",
+  "preset": "full",
+  "dump": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/r1-c9bb981/runs/r5-gpu-dev2/full/states/rossler.npz",
+  "n_states": 1000,
+  "horizons": [
+   8,
+   15,
+   30,
+   60,
+   120
+  ],
+  "nonfinite_in_E_C_E_P_C": 0,
+  "check_wstar_recomputed_max_abs_diff": 0.0,
+  "check_sweep_core_view_E_C_max_abs_diff": 0.0,
+  "check_sweep_core_view_w_star_max_abs_diff": 0.0,
+  "a_P1dprime": {
+   "n": 1000,
+   "grid": [
+    8,
+    15,
+    30,
+    60,
+    120
+   ],
+   "n_Tm_censored": 559,
+   "n_Th_censored": 606,
+   "lower_bound_violations_all_states": 0,
+   "study_rule_sqrt2_theta": {
+    "n_Tm_uncensored": 441,
+    "n_H1_censored(bound infinite, not testable)": 150,
+    "n_tested(C>=0 at H1)": 254,
+    "n_C_negative_at_H1(hypothesis fails)": 37,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 4,
+    "tested_gain_zero": 252,
+    "tested_gain_positive": 2,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 8,
+    "tested_gain_equals_bound_and_positive(tight)": 2,
+    "tested_gain_equals_bound_both_zero(vacuous)": 246,
+    "tested_bound_positive_and_gain_zero(slack)": 6,
+    "tested_gain_steps_distribution": {
+     "0": 252,
+     "60": 2
+    },
+    "tested_bound_steps_distribution": {
+     "0": 246,
+     "60": 8
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 252,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 2
+   },
+   "noise_exact_sqrt2_theta_prime": {
+    "n_Tm_uncensored": 441,
+    "n_H1_censored(bound infinite, not testable)": 150,
+    "n_tested(C>=0 at H1)": 254,
+    "n_C_negative_at_H1(hypothesis fails)": 37,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 4,
+    "tested_gain_zero": 252,
+    "tested_gain_positive": 2,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 8,
+    "tested_gain_equals_bound_and_positive(tight)": 2,
+    "tested_gain_equals_bound_both_zero(vacuous)": 246,
+    "tested_bound_positive_and_gain_zero(slack)": 6,
+    "tested_gain_steps_distribution": {
+     "0": 252,
+     "60": 2
+    },
+    "tested_bound_steps_distribution": {
+     "0": 246,
+     "60": 8
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 252,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 2
+   },
+   "note_resolution": "gains and bounds are differences of grid points {8,15,30,60,120}; adjacent gaps 7,15,30,60 steps (0.23, 0.5, 1, 2 LT)"
+  },
+  "b_N4": {
+   "identity_rows_interior": 3620,
+   "identity_rows_total": 5000,
+   "identity_max_abs_diff(V/min vs f)": 9.992007221626409e-16,
+   "rows_with_C_gt_min(clipped, f not exact)": 1380,
+   "n_Tm_uncensored": 441,
+   "n_f_valid_at_crossing": 349,
+   "n_pred_uncensored": 302,
+   "n_hypothesis_met(f(T_pred)>=f_j)": 300,
+   "violations_of_bound_T_h<=T_pred": 0,
+   "f_at_crossing_quantiles5_25_50_75_95": [
+    0.43818020981373146,
+    0.6710577922204152,
+    0.8253424900983538,
+    0.9330711051693501,
+    0.9963071521245852
+   ],
+   "rho_at_crossing_quantiles": [
+    -0.3175276954899925,
+    0.049314181963175885,
+    0.28440354959181935,
+    0.479622004852873,
+    0.7405492751004727
+   ],
+   "pred_gain_zero": 299,
+   "realized_gain_equals_pred(grid) among hyp": 300,
+   "realized_gain_less_than_pred among hyp": 0,
+   "realized_gain_zero among hyp": 299,
+   "pred_bound_steps_distribution": {
+    "0": 299,
+    "60": 1
+   },
+   "realized_gain_steps_distribution": {
+    "0": 299,
+    "60": 1
+   },
+   "library_dependence_H_ref": {
+    "rho=0.01|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.144,
+     "frac_interior(C<=min)": 0.704,
+     "median_varrho_raw": 0.2128495862946106,
+     "median_r": 0.16271516528243768,
+     "median_f(interior)": 0.8994405466762224,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.962068175639959,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.4521293866563634,
+     "n_exp_pred": 673
+    },
+    "rho=0.005|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.268,
+     "frac_interior(C<=min)": 0.748,
+     "median_varrho_raw": 0.07458044158739696,
+     "median_r": 0.06084436013514416,
+     "median_f(interior)": 0.9332593820094803,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9702990530422162,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.9952819404543894,
+     "n_exp_pred": 714
+    },
+    "rho=0.02|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.076,
+     "frac_interior(C<=min)": 0.702,
+     "median_varrho_raw": 0.3508776405395174,
+     "median_r": 0.2750846686560724,
+     "median_f(interior)": 0.8859666798975576,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9591731521150324,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.6532869476461765,
+     "n_exp_pred": 671
+    },
+    "rho=0.05|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.029,
+     "frac_interior(C<=min)": 0.752,
+     "median_varrho_raw": 0.4207241397884242,
+     "median_r": 0.3589083895886577,
+     "median_f(interior)": 0.9048449527524142,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9571212241470075,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.4049620026907563,
+     "n_exp_pred": 730
+    },
+    "rho=0.01|n_lib=1000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.338,
+     "frac_interior(C<=min)": 0.731,
+     "median_varrho_raw": 0.04839603110806032,
+     "median_r": 0.030591163347057276,
+     "median_f(interior)": 0.9477893732033089,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9763571019617105,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.7079908996071527,
+     "n_exp_pred": 712
+    },
+    "rho=0.01|n_lib=3162": {
+     "n_states": 1000,
+     "frac_C_negative": 0.288,
+     "frac_interior(C<=min)": 0.718,
+     "median_varrho_raw": 0.09409235931877134,
+     "median_r": 0.06577220398601663,
+     "median_f(interior)": 0.9278637506709265,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9671183376198685,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.1000980834385499,
+     "n_exp_pred": 691
+    },
+    "rho=0.01|n_lib=31623": {
+     "n_states": 1000,
+     "frac_C_negative": 0.078,
+     "frac_interior(C<=min)": 0.704,
+     "median_varrho_raw": 0.34229032823595473,
+     "median_r": 0.24995767679676523,
+     "median_f(interior)": 0.8997301427300002,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9657842441149181,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.4289529274742645,
+     "n_exp_pred": 675
+    },
+    "rho=0.01|n_lib=100000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.031,
+     "frac_interior(C<=min)": 0.681,
+     "median_varrho_raw": 0.4327228283543233,
+     "median_r": 0.2965323659038983,
+     "median_f(interior)": 0.9197302252596988,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9824623385977256,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.1240026806321513,
+     "n_exp_pred": 654
+    },
+    "rho=0.02|n_lib=1000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.271,
+     "frac_interior(C<=min)": 0.717,
+     "median_varrho_raw": 0.11397397058670339,
+     "median_r": 0.09865301821657295,
+     "median_f(interior)": 0.8912158429519617,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9565412969788183,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.622206195665443,
+     "n_exp_pred": 699
+    },
+    "rho=0.02|n_lib=3162": {
+     "n_states": 1000,
+     "frac_C_negative": 0.173,
+     "frac_interior(C<=min)": 0.7,
+     "median_varrho_raw": 0.2268364103267233,
+     "median_r": 0.16098121793922288,
+     "median_f(interior)": 0.8751760975192229,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9511799718449216,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.7950062121535622,
+     "n_exp_pred": 674
+    },
+    "rho=0.02|n_lib=31623": {
+     "n_states": 1000,
+     "frac_C_negative": 0.036,
+     "frac_interior(C<=min)": 0.705,
+     "median_varrho_raw": 0.43241584966728863,
+     "median_r": 0.3413907755495822,
+     "median_f(interior)": 0.9145101940986028,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9730453498832066,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.2365806275352045,
+     "n_exp_pred": 674
+    },
+    "rho=0.02|n_lib=100000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.014,
+     "frac_interior(C<=min)": 0.714,
+     "median_varrho_raw": 0.4597862549877494,
+     "median_r": 0.34902572101283214,
+     "median_f(interior)": 0.9372051028224877,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9803972142955051,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.9100415056336093,
+     "n_exp_pred": 686
+    }
+   },
+   "paired_library_change": {
+    "rho=0.01: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 521,
+     "median_paired_change_in_f": -0.009203625291680173,
+     "frac_f_increased": 0.46449136276391556,
+     "median_paired_change_in_varrho": 0.33612946553647105,
+     "frac_varrho_increased": 0.9385796545105566
+    },
+    "rho=0.02: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 540,
+     "median_paired_change_in_f": 0.02674016050959538,
+     "frac_f_increased": 0.5833333333333334,
+     "median_paired_change_in_varrho": 0.35159289825177265,
+     "frac_varrho_increased": 0.9222222222222223
+    }
+   }
+  },
+  "c_N6": {
+   "n_states": 1000,
+   "n_c_nonpositive_or_nonfinite": 0,
+   "frac_u_outside_[0,1](clipped states; N6 assumes none)": 0.296,
+   "frac_u_lt_0": 0.293,
+   "frac_u_gt_1": 0.003,
+   "R_c2": {
+    "all_states/oracle": {
+     "n_points": 1000,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.03447268679621818,
+     "excess_global_E[c(u-ubar)^2]": 0.00016184281919883058,
+     "linear_weighted_R_c2(in-sample)": 0.4301090554348851,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.4115376504576478,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.252342,
+       0.23774,
+       2
+      ],
+      "3": [
+       0.350236,
+       0.242401,
+       3
+      ],
+      "4": [
+       0.421519,
+       0.301462,
+       4
+      ],
+      "5": [
+       0.48636,
+       0.295276,
+       5
+      ],
+      "6": [
+       0.506514,
+       0.264141,
+       6
+      ],
+      "8": [
+       0.560028,
+       0.271181,
+       8
+      ],
+      "12": [
+       0.596827,
+       0.319439,
+       12
+      ],
+      "16": [
+       0.616764,
+       0.321378,
+       16
+      ]
+     }
+    },
+    "all_states/deployable": {
+     "n_points": 4000,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.03447268679621818,
+     "excess_global_E[c(u-ubar)^2]": 0.00016184281919883056,
+     "linear_weighted_R_c2(in-sample)": 0.1791231490102826,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.16504447425196844,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.00016184281919883056,
+      "floor": 0.00014984419748261652,
+      "between": 1.1998621716214065e-05,
+      "R_c2": 0.07413749819491988,
+      "pythagoras_residual": -1.0718569316601115e-16,
+      "n_leaves": 4,
+      "regret_clip_leaf_map_in_sample": 0.00013695887684090692,
+      "regret_clip_best_global": 0.000148079441622849
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.080737,
+       0.055835,
+       2
+      ],
+      "3": [
+       0.117031,
+       -0.031301,
+       3
+      ],
+      "4": [
+       0.139596,
+       -0.39086,
+       4
+      ],
+      "5": [
+       0.151965,
+       -0.375443,
+       5
+      ],
+      "6": [
+       0.196044,
+       -0.535293,
+       6
+      ],
+      "8": [
+       0.211509,
+       -0.516122,
+       8
+      ],
+      "12": [
+       0.233175,
+       -0.552498,
+       12
+      ],
+      "16": [
+       0.248527,
+       -0.559548,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/oracle": {
+     "n_points": 704,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.10687103076576532,
+     "excess_global_E[c(u-ubar)^2]": 0.00015683334258088566,
+     "linear_weighted_R_c2(in-sample)": 0.5063217276001706,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.5040228896913475,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.246984,
+       0.250718,
+       2
+      ],
+      "3": [
+       0.363318,
+       0.288563,
+       3
+      ],
+      "4": [
+       0.446058,
+       0.268033,
+       4
+      ],
+      "5": [
+       0.481729,
+       0.291881,
+       5
+      ],
+      "6": [
+       0.563801,
+       0.393796,
+       6
+      ],
+      "8": [
+       0.604665,
+       0.423093,
+       8
+      ],
+      "12": [
+       0.63936,
+       0.446562,
+       12
+      ],
+      "16": [
+       0.662034,
+       0.442307,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/deployable": {
+     "n_points": 2816,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.10687103076576535,
+     "excess_global_E[c(u-ubar)^2]": 0.00015683334258088566,
+     "linear_weighted_R_c2(in-sample)": 0.2227374894967341,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.1964291854421869,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.00015683334258088566,
+      "floor": 0.00015589026554539326,
+      "between": 9.430770354924239e-07,
+      "R_c2": 0.00601324322987018,
+      "pythagoras_residual": 3.9278890030784184e-18,
+      "n_leaves": 4,
+      "regret_clip_leaf_map_in_sample": 0.00015589026554539326,
+      "regret_clip_best_global": 0.00015683334258088566
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.077866,
+       -0.103582,
+       2
+      ],
+      "3": [
+       0.117382,
+       -0.442706,
+       3
+      ],
+      "4": [
+       0.168932,
+       -0.388053,
+       4
+      ],
+      "5": [
+       0.194025,
+       -0.585318,
+       5
+      ],
+      "6": [
+       0.204124,
+       -0.471834,
+       6
+      ],
+      "8": [
+       0.227008,
+       -0.499986,
+       8
+      ],
+      "12": [
+       0.248075,
+       -0.525672,
+       12
+      ],
+      "16": [
+       0.263355,
+       -0.534997,
+       16
+      ]
+     }
+    }
+   },
+   "observed_regret_H_ref": {
+    "A2": {
+     "mean_excess_oracle_moments": 0.00014810336115863608,
+     "mean_realized_state_mse_minus_A*": 0.00013715626215449956
+    },
+    "A3": {
+     "mean_excess_oracle_moments": 0.00017930487756959973,
+     "mean_realized_state_mse_minus_A*": 0.0001659337315878475
+    },
+    "A4": {
+     "mean_excess_oracle_moments": 0.00015767209421239315,
+     "mean_realized_state_mse_minus_A*": 0.00018182166261362958
+    },
+    "A5": {
+     "mean_excess_oracle_moments": 0.0001378090060739461,
+     "mean_realized_state_mse_minus_A*": 0.00014154380589808185
+    }
+   },
+   "A5_distinct_leaves_in_test": 4
+  },
+  "d_N8": {
+   "rho_levels": [
+    0.005,
+    0.01,
+    0.02,
+    0.05
+   ],
+   "n_states": 1000,
+   "median_positive_N": 1.077344920969268,
+   "N_zero_threshold": 1e-09,
+   "frac_wstar_zero_at_all_levels": 0.06,
+   "groups": {
+    "N=0 (analog never changes under noise; stable proxy)": {
+     "n": 112,
+     "n_rank_corr_defined": 109,
+     "n_constant_w(undefined)": 3,
+     "median_spearman": -0.19999999999999996,
+     "q25_q75_spearman": [
+      -0.7999999999999998,
+      0.7745966692414834
+     ],
+     "frac_spearman_eq_+1": 0.13761467889908258,
+     "frac_spearman_gt_0": 0.3944954128440367,
+     "frac_nondecreasing_in_rho": 0.17857142857142858,
+     "mean_frac_of_steps_increasing": 0.5208333333333333
+    },
+    "N>0 low (<= median positive N)": {
+     "n": 444,
+     "n_rank_corr_defined": 438,
+     "n_constant_w(undefined)": 6,
+     "median_spearman": 0.3999999999999999,
+     "q25_q75_spearman": [
+      -0.3999999999999999,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.1552511415525114,
+     "frac_spearman_gt_0": 0.589041095890411,
+     "frac_nondecreasing_in_rho": 0.20045045045045046,
+     "mean_frac_of_steps_increasing": 0.548048048048048
+    },
+    "N>0 high (> median positive N)": {
+     "n": 444,
+     "n_rank_corr_defined": 393,
+     "n_constant_w(undefined)": 51,
+     "median_spearman": 0.7745966692414834,
+     "q25_q75_spearman": [
+      -0.19999999999999996,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.11704834605597965,
+     "frac_spearman_gt_0": 0.7251908396946565,
+     "frac_nondecreasing_in_rho": 0.4527027027027027,
+     "mean_frac_of_steps_increasing": 0.44969969969969964
+    }
+   },
+   "median_wstar_by_rho": {
+    "0.005": 0.03574016057888625,
+    "0.01": 0.07510230360372794,
+    "0.02": 0.10188655776992969,
+    "0.05": 0.1350095198089312
+   }
+  }
+ },
+ "DEV-2 full/chua": {
+  "label": "DEVELOPMENT (DEV-1, DEV-2): not a hypothesis test",
+  "system": "chua",
+  "seed_id": "DEV-2",
+  "preset": "full",
+  "dump": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/r1-c9bb981/runs/r5-gpu-dev2/full/states/chua.npz",
+  "n_states": 1000,
+  "horizons": [
+   8,
+   15,
+   30,
+   60,
+   120
+  ],
+  "nonfinite_in_E_C_E_P_C": 0,
+  "check_wstar_recomputed_max_abs_diff": 0.0,
+  "check_sweep_core_view_E_C_max_abs_diff": 0.0,
+  "check_sweep_core_view_w_star_max_abs_diff": 0.0,
+  "a_P1dprime": {
+   "n": 1000,
+   "grid": [
+    8,
+    15,
+    30,
+    60,
+    120
+   ],
+   "n_Tm_censored": 339,
+   "n_Th_censored": 366,
+   "lower_bound_violations_all_states": 0,
+   "study_rule_sqrt2_theta": {
+    "n_Tm_uncensored": 661,
+    "n_H1_censored(bound infinite, not testable)": 93,
+    "n_tested(C>=0 at H1)": 482,
+    "n_C_negative_at_H1(hypothesis fails)": 86,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 4,
+    "tested_gain_zero": 475,
+    "tested_gain_positive": 7,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 39,
+    "tested_gain_equals_bound_and_positive(tight)": 7,
+    "tested_gain_equals_bound_both_zero(vacuous)": 443,
+    "tested_bound_positive_and_gain_zero(slack)": 32,
+    "tested_gain_steps_distribution": {
+     "0": 475,
+     "30": 4,
+     "60": 3
+    },
+    "tested_bound_steps_distribution": {
+     "0": 443,
+     "15": 1,
+     "30": 13,
+     "45": 3,
+     "60": 21,
+     "90": 1
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 411,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 5
+   },
+   "noise_exact_sqrt2_theta_prime": {
+    "n_Tm_uncensored": 661,
+    "n_H1_censored(bound infinite, not testable)": 93,
+    "n_tested(C>=0 at H1)": 482,
+    "n_C_negative_at_H1(hypothesis fails)": 86,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 4,
+    "tested_gain_zero": 475,
+    "tested_gain_positive": 7,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 39,
+    "tested_gain_equals_bound_and_positive(tight)": 7,
+    "tested_gain_equals_bound_both_zero(vacuous)": 443,
+    "tested_bound_positive_and_gain_zero(slack)": 32,
+    "tested_gain_steps_distribution": {
+     "0": 475,
+     "30": 4,
+     "60": 3
+    },
+    "tested_bound_steps_distribution": {
+     "0": 443,
+     "15": 1,
+     "30": 13,
+     "45": 3,
+     "60": 21,
+     "90": 1
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 411,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 5
+   },
+   "note_resolution": "gains and bounds are differences of grid points {8,15,30,60,120}; adjacent gaps 7,15,30,60 steps (0.23, 0.5, 1, 2 LT)"
+  },
+  "b_N4": {
+   "identity_rows_interior": 3543,
+   "identity_rows_total": 5000,
+   "identity_max_abs_diff(V/min vs f)": 7.771561172376096e-16,
+   "rows_with_C_gt_min(clipped, f not exact)": 1457,
+   "n_Tm_uncensored": 661,
+   "n_f_valid_at_crossing": 506,
+   "n_pred_uncensored": 479,
+   "n_hypothesis_met(f(T_pred)>=f_j)": 476,
+   "violations_of_bound_T_h<=T_pred": 0,
+   "f_at_crossing_quantiles5_25_50_75_95": [
+    0.463627133886012,
+    0.712250178394457,
+    0.8807750783070818,
+    0.9713349690432936,
+    0.9988384515634326
+   ],
+   "rho_at_crossing_quantiles": [
+    -0.34165224129947347,
+    0.04560696531632452,
+    0.26446249127956534,
+    0.45349693577769623,
+    0.6807878758940322
+   ],
+   "pred_gain_zero": 467,
+   "realized_gain_equals_pred(grid) among hyp": 476,
+   "realized_gain_less_than_pred among hyp": 0,
+   "realized_gain_zero among hyp": 467,
+   "pred_bound_steps_distribution": {
+    "0": 467,
+    "30": 3,
+    "60": 6
+   },
+   "realized_gain_steps_distribution": {
+    "0": 467,
+    "30": 3,
+    "60": 6
+   },
+   "library_dependence_H_ref": {
+    "rho=0.01|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.184,
+     "frac_interior(C<=min)": 0.694,
+     "median_varrho_raw": 0.2081822591335074,
+     "median_r": 0.13776155662900685,
+     "median_f(interior)": 0.906314488405509,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9688819079787545,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.4422859131182184,
+     "n_exp_pred": 586
+    },
+    "rho=0.005|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.291,
+     "frac_interior(C<=min)": 0.711,
+     "median_varrho_raw": 0.09128420907368608,
+     "median_r": 0.0644700715959059,
+     "median_f(interior)": 0.9334979981987125,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9765157897074179,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.0852149574189922,
+     "n_exp_pred": 592
+    },
+    "rho=0.02|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.124,
+     "frac_interior(C<=min)": 0.686,
+     "median_varrho_raw": 0.3332588331902907,
+     "median_r": 0.21087025363284026,
+     "median_f(interior)": 0.9122582227003313,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9721439516490138,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.1903279954337231,
+     "n_exp_pred": 594
+    },
+    "rho=0.05|n_lib=10000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.071,
+     "frac_interior(C<=min)": 0.777,
+     "median_varrho_raw": 0.36333416101943894,
+     "median_r": 0.34121339395041456,
+     "median_f(interior)": 0.9075298096470001,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9522155331038815,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.3927066495015281,
+     "n_exp_pred": 662
+    },
+    "rho=0.01|n_lib=1000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.335,
+     "frac_interior(C<=min)": 0.703,
+     "median_varrho_raw": 0.061619246823542875,
+     "median_r": 0.03672870859164125,
+     "median_f(interior)": 0.9266089550558791,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9784167773579282,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.0659797019215667,
+     "n_exp_pred": 592
+    },
+    "rho=0.01|n_lib=3162": {
+     "n_states": 1000,
+     "frac_C_negative": 0.256,
+     "frac_interior(C<=min)": 0.684,
+     "median_varrho_raw": 0.12780143971062527,
+     "median_r": 0.07386084557482853,
+     "median_f(interior)": 0.918344068666646,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9780926942261461,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.2138128766392304,
+     "n_exp_pred": 578
+    },
+    "rho=0.01|n_lib=31623": {
+     "n_states": 1000,
+     "frac_C_negative": 0.106,
+     "frac_interior(C<=min)": 0.655,
+     "median_varrho_raw": 0.32903976417544567,
+     "median_r": 0.19926370541231048,
+     "median_f(interior)": 0.9110246997360898,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9777332829304703,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.3593585906071444,
+     "n_exp_pred": 544
+    },
+    "rho=0.01|n_lib=100000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.078,
+     "frac_interior(C<=min)": 0.674,
+     "median_varrho_raw": 0.3962868332893279,
+     "median_r": 0.2395473673472473,
+     "median_f(interior)": 0.925920605153578,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9815439707833444,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.9981112413719655,
+     "n_exp_pred": 571
+    },
+    "rho=0.02|n_lib=1000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.265,
+     "frac_interior(C<=min)": 0.688,
+     "median_varrho_raw": 0.14676526440229615,
+     "median_r": 0.0946460342244629,
+     "median_f(interior)": 0.8779182843330917,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9673686660750878,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.5708304780935611,
+     "n_exp_pred": 586
+    },
+    "rho=0.02|n_lib=3162": {
+     "n_states": 1000,
+     "frac_C_negative": 0.168,
+     "frac_interior(C<=min)": 0.668,
+     "median_varrho_raw": 0.25992070723151417,
+     "median_r": 0.1488580958710985,
+     "median_f(interior)": 0.9022995840166996,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9765299649867232,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.5088574895349811,
+     "n_exp_pred": 573
+    },
+    "rho=0.02|n_lib=31623": {
+     "n_states": 1000,
+     "frac_C_negative": 0.071,
+     "frac_interior(C<=min)": 0.665,
+     "median_varrho_raw": 0.3983040896637492,
+     "median_r": 0.24678644043532855,
+     "median_f(interior)": 0.9184640976217301,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9818417223207756,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.0628310942257604,
+     "n_exp_pred": 567
+    },
+    "rho=0.02|n_lib=100000": {
+     "n_states": 1000,
+     "frac_C_negative": 0.055,
+     "frac_interior(C<=min)": 0.668,
+     "median_varrho_raw": 0.4276841915981423,
+     "median_r": 0.27529279203533696,
+     "median_f(interior)": 0.942031066602298,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9830551769457916,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.9217378261949026,
+     "n_exp_pred": 571
+    }
+   },
+   "paired_library_change": {
+    "rho=0.01: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 500,
+     "median_paired_change_in_f": 0.0010477115518465197,
+     "frac_f_increased": 0.51,
+     "median_paired_change_in_varrho": 0.26491539111772017,
+     "frac_varrho_increased": 0.85
+    },
+    "rho=0.02: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 500,
+     "median_paired_change_in_f": 0.026720382912225837,
+     "frac_f_increased": 0.594,
+     "median_paired_change_in_varrho": 0.2502816215807536,
+     "frac_varrho_increased": 0.82
+    }
+   }
+  },
+  "c_N6": {
+   "n_states": 1000,
+   "n_c_nonpositive_or_nonfinite": 0,
+   "frac_u_outside_[0,1](clipped states; N6 assumes none)": 0.306,
+   "frac_u_lt_0": 0.297,
+   "frac_u_gt_1": 0.009,
+   "R_c2": {
+    "all_states/oracle": {
+     "n_points": 1000,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.06283129750689115,
+     "excess_global_E[c(u-ubar)^2]": 0.0067923814217417085,
+     "linear_weighted_R_c2(in-sample)": 0.1142631452713696,
+     "linear_weighted_R_c2(cross_fit_halves)": -0.07545752958504304,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.085843,
+       -0.714348,
+       2
+      ],
+      "3": [
+       0.12942,
+       -0.728039,
+       3
+      ],
+      "4": [
+       0.156571,
+       -0.774336,
+       4
+      ],
+      "5": [
+       0.175814,
+       -0.865817,
+       5
+      ],
+      "6": [
+       0.188354,
+       -0.957925,
+       6
+      ],
+      "8": [
+       0.248312,
+       -0.963162,
+       8
+      ],
+      "12": [
+       0.330948,
+       -0.924134,
+       12
+      ],
+      "16": [
+       0.341184,
+       -0.947646,
+       16
+      ]
+     }
+    },
+    "all_states/deployable": {
+     "n_points": 4000,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.06283129750689115,
+     "excess_global_E[c(u-ubar)^2]": 0.00679238142174171,
+     "linear_weighted_R_c2(in-sample)": 0.06183774751606952,
+     "linear_weighted_R_c2(cross_fit_halves)": -0.08231018909565346,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.00679238142174171,
+      "floor": 0.006636404056461686,
+      "between": 0.00015597736528002431,
+      "R_c2": 0.02296357574690322,
+      "pythagoras_residual": -4.086280479889746e-17,
+      "n_leaves": 4,
+      "regret_clip_leaf_map_in_sample": 0.006464349646005999,
+      "regret_clip_best_global": 0.006620327011286023
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.046518,
+       -0.161284,
+       2
+      ],
+      "3": [
+       0.065314,
+       -0.452463,
+       3
+      ],
+      "4": [
+       0.130431,
+       -0.451153,
+       4
+      ],
+      "5": [
+       0.168001,
+       -0.481037,
+       5
+      ],
+      "6": [
+       0.17988,
+       -0.482844,
+       6
+      ],
+      "8": [
+       0.21801,
+       -0.495098,
+       8
+      ],
+      "12": [
+       0.236929,
+       -0.5212,
+       12
+      ],
+      "16": [
+       0.251331,
+       -0.561784,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/oracle": {
+     "n_points": 694,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.12117674655165953,
+     "excess_global_E[c(u-ubar)^2]": 0.004894613972164906,
+     "linear_weighted_R_c2(in-sample)": 0.1390921693200865,
+     "linear_weighted_R_c2(cross_fit_halves)": -0.5160271803570191,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.212474,
+       0.115439,
+       2
+      ],
+      "3": [
+       0.275499,
+       0.083285,
+       3
+      ],
+      "4": [
+       0.33362,
+       -0.182046,
+       4
+      ],
+      "5": [
+       0.364705,
+       -0.240554,
+       5
+      ],
+      "6": [
+       0.391345,
+       -0.295537,
+       6
+      ],
+      "8": [
+       0.644735,
+       -0.3433,
+       8
+      ],
+      "12": [
+       0.694364,
+       -0.27408,
+       12
+      ],
+      "16": [
+       0.716259,
+       -0.295496,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/deployable": {
+     "n_points": 2776,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.12117674655165955,
+     "excess_global_E[c(u-ubar)^2]": 0.004894613972164906,
+     "linear_weighted_R_c2(in-sample)": 0.11372753178408135,
+     "linear_weighted_R_c2(cross_fit_halves)": -0.12999932917909018,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.004894613972164906,
+      "floor": 0.004555798174917945,
+      "between": 0.00033881579724696074,
+      "R_c2": 0.06922216934241732,
+      "pythagoras_residual": 6.536756530148569e-17,
+      "n_leaves": 4,
+      "regret_clip_leaf_map_in_sample": 0.004555798174917945,
+      "regret_clip_best_global": 0.004894613972164906
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.126395,
+       -0.109678,
+       2
+      ],
+      "3": [
+       0.186368,
+       -0.91018,
+       3
+      ],
+      "4": [
+       0.241311,
+       -0.869232,
+       4
+      ],
+      "5": [
+       0.267554,
+       -0.840315,
+       5
+      ],
+      "6": [
+       0.329796,
+       -0.719576,
+       6
+      ],
+      "8": [
+       0.44687,
+       -0.737405,
+       8
+      ],
+      "12": [
+       0.493803,
+       -0.772911,
+       12
+      ],
+      "16": [
+       0.512645,
+       -0.785107,
+       16
+      ]
+     }
+    }
+   },
+   "observed_regret_H_ref": {
+    "A2": {
+     "mean_excess_oracle_moments": 0.0066963091818275705,
+     "mean_realized_state_mse_minus_A*": 0.006967105471579314
+    },
+    "A3": {
+     "mean_excess_oracle_moments": 0.006975574792973331,
+     "mean_realized_state_mse_minus_A*": 0.007216710709975958
+    },
+    "A4": {
+     "mean_excess_oracle_moments": 0.006918281926400572,
+     "mean_realized_state_mse_minus_A*": 0.007856462945320221
+    },
+    "A5": {
+     "mean_excess_oracle_moments": 0.006846983742439193,
+     "mean_realized_state_mse_minus_A*": 0.0071243934755883635
+    }
+   },
+   "A5_distinct_leaves_in_test": 4
+  },
+  "d_N8": {
+   "rho_levels": [
+    0.005,
+    0.01,
+    0.02,
+    0.05
+   ],
+   "n_states": 1000,
+   "median_positive_N": 1.1195922414142188,
+   "N_zero_threshold": 1e-09,
+   "frac_wstar_zero_at_all_levels": 0.057,
+   "groups": {
+    "N=0 (analog never changes under noise; stable proxy)": {
+     "n": 140,
+     "n_rank_corr_defined": 133,
+     "n_constant_w(undefined)": 7,
+     "median_spearman": 0.3999999999999999,
+     "q25_q75_spearman": [
+      -0.3999999999999999,
+      0.9999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.2556390977443609,
+     "frac_spearman_gt_0": 0.5864661654135338,
+     "frac_nondecreasing_in_rho": 0.32857142857142857,
+     "mean_frac_of_steps_increasing": 0.5785714285714286
+    },
+    "N>0 low (<= median positive N)": {
+     "n": 430,
+     "n_rank_corr_defined": 424,
+     "n_constant_w(undefined)": 6,
+     "median_spearman": 0.31622776601683794,
+     "q25_q75_spearman": [
+      -0.5999999999999999,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.1580188679245283,
+     "frac_spearman_gt_0": 0.5495283018867925,
+     "frac_nondecreasing_in_rho": 0.24186046511627907,
+     "mean_frac_of_steps_increasing": 0.5527131782945737
+    },
+    "N>0 high (> median positive N)": {
+     "n": 430,
+     "n_rank_corr_defined": 385,
+     "n_constant_w(undefined)": 45,
+     "median_spearman": 0.7745966692414834,
+     "q25_q75_spearman": [
+      -0.19999999999999996,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.12207792207792208,
+     "frac_spearman_gt_0": 0.7350649350649351,
+     "frac_nondecreasing_in_rho": 0.4511627906976744,
+     "mean_frac_of_steps_increasing": 0.4666666666666666
+    }
+   },
+   "median_wstar_by_rho": {
+    "0.005": 0.03248753813111084,
+    "0.01": 0.06292505990541564,
+    "0.02": 0.07910022960528013,
+    "0.05": 0.1688624228018865
+   }
+  }
+ },
+ "DEV-1 pilot/lorenz63": {
+  "label": "DEVELOPMENT (DEV-1, DEV-2): not a hypothesis test",
+  "system": "lorenz63",
+  "seed_id": "DEV-1",
+  "preset": "pilot",
+  "dump": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/r1-c9bb981/runs/r1-gpu-dev1/pilot/states/lorenz63.npz",
+  "n_states": 500,
+  "horizons": [
+   8,
+   15,
+   30,
+   60,
+   120
+  ],
+  "nonfinite_in_E_C_E_P_C": 0,
+  "check_wstar_recomputed_max_abs_diff": 0.0,
+  "check_sweep_core_view_E_C_max_abs_diff": 0.0,
+  "check_sweep_core_view_w_star_max_abs_diff": 0.0,
+  "a_P1dprime": {
+   "n": 500,
+   "grid": [
+    8,
+    15,
+    30,
+    60,
+    120
+   ],
+   "n_Tm_censored": 93,
+   "n_Th_censored": 108,
+   "lower_bound_violations_all_states": 0,
+   "study_rule_sqrt2_theta": {
+    "n_Tm_uncensored": 407,
+    "n_H1_censored(bound infinite, not testable)": 44,
+    "n_tested(C>=0 at H1)": 302,
+    "n_C_negative_at_H1(hypothesis fails)": 61,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 1,
+    "tested_gain_zero": 292,
+    "tested_gain_positive": 10,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 26,
+    "tested_gain_equals_bound_and_positive(tight)": 10,
+    "tested_gain_equals_bound_both_zero(vacuous)": 276,
+    "tested_bound_positive_and_gain_zero(slack)": 16,
+    "tested_gain_steps_distribution": {
+     "0": 292,
+     "60": 8,
+     "90": 2
+    },
+    "tested_bound_steps_distribution": {
+     "0": 276,
+     "60": 17,
+     "90": 7,
+     "105": 2
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 261,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 7
+   },
+   "noise_exact_sqrt2_theta_prime": {
+    "n_Tm_uncensored": 407,
+    "n_H1_censored(bound infinite, not testable)": 44,
+    "n_tested(C>=0 at H1)": 302,
+    "n_C_negative_at_H1(hypothesis fails)": 61,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 1,
+    "tested_gain_zero": 292,
+    "tested_gain_positive": 10,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 26,
+    "tested_gain_equals_bound_and_positive(tight)": 10,
+    "tested_gain_equals_bound_both_zero(vacuous)": 276,
+    "tested_bound_positive_and_gain_zero(slack)": 16,
+    "tested_gain_steps_distribution": {
+     "0": 292,
+     "60": 8,
+     "90": 2
+    },
+    "tested_bound_steps_distribution": {
+     "0": 276,
+     "60": 17,
+     "90": 7,
+     "105": 2
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 261,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 7
+   },
+   "note_resolution": "gains and bounds are differences of grid points {8,15,30,60,120}; adjacent gaps 7,15,30,60 steps (0.23, 0.5, 1, 2 LT)"
+  },
+  "b_N4": {
+   "identity_rows_interior": 1736,
+   "identity_rows_total": 2500,
+   "identity_max_abs_diff(V/min vs f)": 4.440892098500626e-16,
+   "rows_with_C_gt_min(clipped, f not exact)": 764,
+   "n_Tm_uncensored": 407,
+   "n_f_valid_at_crossing": 302,
+   "n_pred_uncensored": 287,
+   "n_hypothesis_met(f(T_pred)>=f_j)": 284,
+   "violations_of_bound_T_h<=T_pred": 0,
+   "f_at_crossing_quantiles5_25_50_75_95": [
+    0.45253067109576905,
+    0.675374921717622,
+    0.8235271796967263,
+    0.9529480224966214,
+    0.9970419185218323
+   ],
+   "rho_at_crossing_quantiles": [
+    -0.34948803399185036,
+    -0.023153397926142166,
+    0.2040224631318613,
+    0.41913574014615584,
+    0.6581663768282798
+   ],
+   "pred_gain_zero": 275,
+   "realized_gain_equals_pred(grid) among hyp": 284,
+   "realized_gain_less_than_pred among hyp": 0,
+   "realized_gain_zero among hyp": 275,
+   "pred_bound_steps_distribution": {
+    "0": 275,
+    "60": 8,
+    "90": 1
+   },
+   "realized_gain_steps_distribution": {
+    "0": 275,
+    "60": 8,
+    "90": 1
+   },
+   "library_dependence_H_ref": {
+    "rho=0.01|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.24,
+     "frac_interior(C<=min)": 0.6933333333333334,
+     "median_varrho_raw": 0.1381470321794932,
+     "median_r": 0.07954133178959974,
+     "median_f(interior)": 0.9053199957993927,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9713028214443843,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.5940754693829682,
+     "n_exp_pred": 170
+    },
+    "rho=0.005|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.32666666666666666,
+     "frac_interior(C<=min)": 0.7666666666666667,
+     "median_varrho_raw": 0.04172128032544105,
+     "median_r": 0.029924075831677298,
+     "median_f(interior)": 0.9506464586457879,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.982881936875581,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.6851134660109607,
+     "n_exp_pred": 192
+    },
+    "rho=0.02|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.13333333333333333,
+     "frac_interior(C<=min)": 0.63,
+     "median_varrho_raw": 0.30490414327038506,
+     "median_r": 0.1485334955879971,
+     "median_f(interior)": 0.9027379483414877,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.977031667480594,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.631188758706407,
+     "n_exp_pred": 158
+    },
+    "rho=0.05|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.07,
+     "frac_interior(C<=min)": 0.7166666666666667,
+     "median_varrho_raw": 0.37742159927817953,
+     "median_r": 0.28286532211503507,
+     "median_f(interior)": 0.9048746304060065,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9550310969138651,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.438194398334106,
+     "n_exp_pred": 183
+    },
+    "rho=0.01|n_lib=1000": {
+     "n_states": 300,
+     "frac_C_negative": 0.4033333333333333,
+     "frac_interior(C<=min)": 0.6966666666666667,
+     "median_varrho_raw": 0.02979101901825048,
+     "median_r": 0.01277010418122335,
+     "median_f(interior)": 0.967062848853506,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9897282959767253,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.6250424007642269,
+     "n_exp_pred": 185
+    },
+    "rho=0.01|n_lib=3162": {
+     "n_states": 300,
+     "frac_C_negative": 0.30666666666666664,
+     "frac_interior(C<=min)": 0.6866666666666666,
+     "median_varrho_raw": 0.06608518643832331,
+     "median_r": 0.03518880692789968,
+     "median_f(interior)": 0.9344069711376881,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.983957181410176,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.0720884549845793,
+     "n_exp_pred": 175
+    },
+    "rho=0.01|n_lib=31623": {
+     "n_states": 300,
+     "frac_C_negative": 0.12,
+     "frac_interior(C<=min)": 0.6233333333333333,
+     "median_varrho_raw": 0.30498248876698375,
+     "median_r": 0.15914416988298158,
+     "median_f(interior)": 0.8965491988574493,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9746627797268806,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.4342672794633649,
+     "n_exp_pred": 156
+    },
+    "rho=0.01|n_lib=100000": {
+     "n_states": 300,
+     "frac_C_negative": 0.05,
+     "frac_interior(C<=min)": 0.66,
+     "median_varrho_raw": 0.4190218812061702,
+     "median_r": 0.25180146285617566,
+     "median_f(interior)": 0.9235691168910196,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9807650870422309,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.1968617502226364,
+     "n_exp_pred": 167
+    },
+    "rho=0.02|n_lib=1000": {
+     "n_states": 300,
+     "frac_C_negative": 0.3466666666666667,
+     "frac_interior(C<=min)": 0.6533333333333333,
+     "median_varrho_raw": 0.09456501585527557,
+     "median_r": 0.049070412398663346,
+     "median_f(interior)": 0.9074695237457815,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9863556382447207,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.4368212883790834,
+     "n_exp_pred": 173
+    },
+    "rho=0.02|n_lib=3162": {
+     "n_states": 300,
+     "frac_C_negative": 0.24,
+     "frac_interior(C<=min)": 0.63,
+     "median_varrho_raw": 0.20139143314375813,
+     "median_r": 0.0803668348642182,
+     "median_f(interior)": 0.9137765244970386,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9806536642087915,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.7296251810973213,
+     "n_exp_pred": 163
+    },
+    "rho=0.02|n_lib=31623": {
+     "n_states": 300,
+     "frac_C_negative": 0.06666666666666667,
+     "frac_interior(C<=min)": 0.63,
+     "median_varrho_raw": 0.40631196639766015,
+     "median_r": 0.2321196429747442,
+     "median_f(interior)": 0.9297921238526219,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9870079351675306,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.2026328095684,
+     "n_exp_pred": 157
+    },
+    "rho=0.02|n_lib=100000": {
+     "n_states": 300,
+     "frac_C_negative": 0.05333333333333334,
+     "frac_interior(C<=min)": 0.6566666666666666,
+     "median_varrho_raw": 0.4423578549051372,
+     "median_r": 0.2863145361769385,
+     "median_f(interior)": 0.9391838265564278,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.987026542174632,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.0028088024202126,
+     "n_exp_pred": 163
+    }
+   },
+   "paired_library_change": {
+    "rho=0.01: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 133,
+     "median_paired_change_in_f": -0.023291690584382962,
+     "frac_f_increased": 0.40601503759398494,
+     "median_paired_change_in_varrho": 0.30284623026253243,
+     "frac_varrho_increased": 0.9172932330827067
+    },
+    "rho=0.02: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 125,
+     "median_paired_change_in_f": 0.015136746771503007,
+     "frac_f_increased": 0.584,
+     "median_paired_change_in_varrho": 0.3494520257418259,
+     "frac_varrho_increased": 0.864
+    }
+   }
+  },
+  "c_N6": {
+   "n_states": 500,
+   "n_c_nonpositive_or_nonfinite": 0,
+   "frac_u_outside_[0,1](clipped states; N6 assumes none)": 0.326,
+   "frac_u_lt_0": 0.302,
+   "frac_u_gt_1": 0.024,
+   "R_c2": {
+    "all_states/oracle": {
+     "n_points": 500,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.4430763334814405,
+     "excess_global_E[c(u-ubar)^2]": 0.03276277504872751,
+     "linear_weighted_R_c2(in-sample)": 0.9068185664607612,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.8756250282323187,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.888811,
+       0.916312,
+       2
+      ],
+      "3": [
+       0.922824,
+       0.892888,
+       3
+      ],
+      "4": [
+       0.93748,
+       0.903976,
+       4
+      ],
+      "5": [
+       0.945842,
+       0.91778,
+       5
+      ],
+      "6": [
+       0.947118,
+       0.919866,
+       6
+      ],
+      "8": [
+       0.949292,
+       0.914102,
+       8
+      ],
+      "12": [
+       0.951478,
+       0.897691,
+       12
+      ],
+      "16": [
+       0.952834,
+       0.897639,
+       16
+      ]
+     }
+    },
+    "all_states/deployable": {
+     "n_points": 1000,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.44307633348144054,
+     "excess_global_E[c(u-ubar)^2]": 0.03276277504872751,
+     "linear_weighted_R_c2(in-sample)": 0.5285416600630405,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.6133873802004676,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.03276277504872751,
+      "floor": 0.016379089083135904,
+      "between": 0.01638368596559161,
+      "R_c2": 0.500070154046,
+      "pythagoras_residual": 0.0,
+      "n_leaves": 6,
+      "regret_clip_leaf_map_in_sample": 0.016293124608659098,
+      "regret_clip_best_global": 0.03267681057425072
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.602385,
+       0.433337,
+       2
+      ],
+      "3": [
+       0.653138,
+       0.396469,
+       3
+      ],
+      "4": [
+       0.682347,
+       0.422062,
+       4
+      ],
+      "5": [
+       0.702592,
+       0.416847,
+       5
+      ],
+      "6": [
+       0.720366,
+       0.492147,
+       6
+      ],
+      "8": [
+       0.79993,
+       0.507985,
+       8
+      ],
+      "12": [
+       0.835069,
+       0.378241,
+       12
+      ],
+      "16": [
+       0.857553,
+       0.253398,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/oracle": {
+     "n_points": 337,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.48219931353128964,
+     "excess_global_E[c(u-ubar)^2]": 0.015308749332991955,
+     "linear_weighted_R_c2(in-sample)": 0.8147525999082349,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.8040856390242254,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.753202,
+       0.506006,
+       2
+      ],
+      "3": [
+       0.828342,
+       0.477006,
+       3
+      ],
+      "4": [
+       0.886053,
+       0.449192,
+       4
+      ],
+      "5": [
+       0.925196,
+       0.450329,
+       5
+      ],
+      "6": [
+       0.935511,
+       0.455283,
+       6
+      ],
+      "8": [
+       0.943968,
+       0.483618,
+       8
+      ],
+      "12": [
+       0.950395,
+       0.490839,
+       12
+      ],
+      "16": [
+       0.957302,
+       0.490571,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/deployable": {
+     "n_points": 674,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.4821993135312896,
+     "excess_global_E[c(u-ubar)^2]": 0.015308749332991955,
+     "linear_weighted_R_c2(in-sample)": 0.48969009153919496,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.3181659797190378,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.015308749332991955,
+      "floor": 0.006123689313018829,
+      "between": 0.009185060019973131,
+      "R_c2": 0.5999876162436315,
+      "pythagoras_residual": -3.4431869185124393e-16,
+      "n_leaves": 6,
+      "regret_clip_leaf_map_in_sample": 0.006123689313018829,
+      "regret_clip_best_global": 0.015308749332991955
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.66041,
+       0.443142,
+       2
+      ],
+      "3": [
+       0.713203,
+       0.443705,
+       3
+      ],
+      "4": [
+       0.760886,
+       0.413723,
+       4
+      ],
+      "5": [
+       0.786649,
+       0.420999,
+       5
+      ],
+      "6": [
+       0.805832,
+       0.417286,
+       6
+      ],
+      "8": [
+       0.826337,
+       0.071367,
+       8
+      ],
+      "12": [
+       0.845234,
+       0.050235,
+       12
+      ],
+      "16": [
+       0.859586,
+       0.055211,
+       16
+      ]
+     }
+    }
+   },
+   "observed_regret_H_ref": {
+    "A2": {
+     "mean_excess_oracle_moments": 0.03328832782038112,
+     "mean_realized_state_mse_minus_A*": 0.04314737593657396
+    },
+    "A3": {
+     "mean_excess_oracle_moments": 0.026955286650645713,
+     "mean_realized_state_mse_minus_A*": 0.038763926886733364
+    },
+    "A4": {
+     "mean_excess_oracle_moments": 0.056809735188639576,
+     "mean_realized_state_mse_minus_A*": 0.08199935569922999
+    },
+    "A5": {
+     "mean_excess_oracle_moments": 0.017998552572934735,
+     "mean_realized_state_mse_minus_A*": 0.02043714816416222
+    }
+   },
+   "A5_distinct_leaves_in_test": 6
+  },
+  "d_N8": {
+   "rho_levels": [
+    0.005,
+    0.01,
+    0.02,
+    0.05
+   ],
+   "n_states": 300,
+   "median_positive_N": 1.2319295177614416,
+   "N_zero_threshold": 1e-09,
+   "frac_wstar_zero_at_all_levels": 0.056666666666666664,
+   "groups": {
+    "N=0 (analog never changes under noise; stable proxy)": {
+     "n": 67,
+     "n_rank_corr_defined": 67,
+     "n_constant_w(undefined)": 0,
+     "median_spearman": 0.0,
+     "q25_q75_spearman": [
+      -0.3999999999999999,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.1791044776119403,
+     "frac_spearman_gt_0": 0.4925373134328358,
+     "frac_nondecreasing_in_rho": 0.23880597014925373,
+     "mean_frac_of_steps_increasing": 0.5920398009950248
+    },
+    "N>0 low (<= median positive N)": {
+     "n": 117,
+     "n_rank_corr_defined": 117,
+     "n_constant_w(undefined)": 0,
+     "median_spearman": 0.31622776601683794,
+     "q25_q75_spearman": [
+      -0.3999999999999999,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.18803418803418803,
+     "frac_spearman_gt_0": 0.5470085470085471,
+     "frac_nondecreasing_in_rho": 0.21367521367521367,
+     "mean_frac_of_steps_increasing": 0.5754985754985755
+    },
+    "N>0 high (> median positive N)": {
+     "n": 116,
+     "n_rank_corr_defined": 99,
+     "n_constant_w(undefined)": 17,
+     "median_spearman": 0.7745966692414834,
+     "q25_q75_spearman": [
+      -0.258113883008419,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.1111111111111111,
+     "frac_spearman_gt_0": 0.7171717171717171,
+     "frac_nondecreasing_in_rho": 0.47413793103448276,
+     "mean_frac_of_steps_increasing": 0.40804597701149414
+    }
+   },
+   "median_wstar_by_rho": {
+    "0.005": 0.02182289506470038,
+    "0.01": 0.04872014003846745,
+    "0.02": 0.07713977296117812,
+    "0.05": 0.12783512741466913
+   }
+  }
+ },
+ "DEV-1 pilot/rossler": {
+  "label": "DEVELOPMENT (DEV-1, DEV-2): not a hypothesis test",
+  "system": "rossler",
+  "seed_id": "DEV-1",
+  "preset": "pilot",
+  "dump": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/r1-c9bb981/runs/r1-gpu-dev1/pilot/states/rossler.npz",
+  "n_states": 500,
+  "horizons": [
+   8,
+   15,
+   30,
+   60,
+   120
+  ],
+  "nonfinite_in_E_C_E_P_C": 0,
+  "check_wstar_recomputed_max_abs_diff": 0.0,
+  "check_sweep_core_view_E_C_max_abs_diff": 0.0,
+  "check_sweep_core_view_w_star_max_abs_diff": 0.0,
+  "a_P1dprime": {
+   "n": 500,
+   "grid": [
+    8,
+    15,
+    30,
+    60,
+    120
+   ],
+   "n_Tm_censored": 271,
+   "n_Th_censored": 292,
+   "lower_bound_violations_all_states": 0,
+   "study_rule_sqrt2_theta": {
+    "n_Tm_uncensored": 229,
+    "n_H1_censored(bound infinite, not testable)": 66,
+    "n_tested(C>=0 at H1)": 143,
+    "n_C_negative_at_H1(hypothesis fails)": 20,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 2,
+    "tested_gain_zero": 143,
+    "tested_gain_positive": 0,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 4,
+    "tested_gain_equals_bound_and_positive(tight)": 0,
+    "tested_gain_equals_bound_both_zero(vacuous)": 139,
+    "tested_bound_positive_and_gain_zero(slack)": 4,
+    "tested_gain_steps_distribution": {
+     "0": 143
+    },
+    "tested_bound_steps_distribution": {
+     "0": 139,
+     "60": 4
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 140,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 0
+   },
+   "noise_exact_sqrt2_theta_prime": {
+    "n_Tm_uncensored": 229,
+    "n_H1_censored(bound infinite, not testable)": 66,
+    "n_tested(C>=0 at H1)": 143,
+    "n_C_negative_at_H1(hypothesis fails)": 20,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 2,
+    "tested_gain_zero": 143,
+    "tested_gain_positive": 0,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 4,
+    "tested_gain_equals_bound_and_positive(tight)": 0,
+    "tested_gain_equals_bound_both_zero(vacuous)": 139,
+    "tested_bound_positive_and_gain_zero(slack)": 4,
+    "tested_gain_steps_distribution": {
+     "0": 143
+    },
+    "tested_bound_steps_distribution": {
+     "0": 139,
+     "60": 4
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 140,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 0
+   },
+   "note_resolution": "gains and bounds are differences of grid points {8,15,30,60,120}; adjacent gaps 7,15,30,60 steps (0.23, 0.5, 1, 2 LT)"
+  },
+  "b_N4": {
+   "identity_rows_interior": 1843,
+   "identity_rows_total": 2500,
+   "identity_max_abs_diff(V/min vs f)": 6.661338147750939e-16,
+   "rows_with_C_gt_min(clipped, f not exact)": 657,
+   "n_Tm_uncensored": 229,
+   "n_f_valid_at_crossing": 179,
+   "n_pred_uncensored": 157,
+   "n_hypothesis_met(f(T_pred)>=f_j)": 157,
+   "violations_of_bound_T_h<=T_pred": 0,
+   "f_at_crossing_quantiles5_25_50_75_95": [
+    0.45120781182737046,
+    0.7031190284000676,
+    0.8163808724589016,
+    0.9446739023541203,
+    0.9983166995466161
+   ],
+   "rho_at_crossing_quantiles": [
+    -0.2416739439115479,
+    0.12267414790512968,
+    0.3207747158238666,
+    0.4977508384887842,
+    0.7591883439637014
+   ],
+   "pred_gain_zero": 157,
+   "realized_gain_equals_pred(grid) among hyp": 157,
+   "realized_gain_less_than_pred among hyp": 0,
+   "realized_gain_zero among hyp": 157,
+   "pred_bound_steps_distribution": {
+    "0": 157
+   },
+   "realized_gain_steps_distribution": {
+    "0": 157
+   },
+   "library_dependence_H_ref": {
+    "rho=0.01|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.17,
+     "frac_interior(C<=min)": 0.7366666666666667,
+     "median_varrho_raw": 0.1933618236582536,
+     "median_r": 0.16104670956551737,
+     "median_f(interior)": 0.8839262765514554,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9459669362376052,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.5608657046165084,
+     "n_exp_pred": 211
+    },
+    "rho=0.005|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.3333333333333333,
+     "frac_interior(C<=min)": 0.77,
+     "median_varrho_raw": 0.07485289913367027,
+     "median_r": 0.0673259467662279,
+     "median_f(interior)": 0.9211857553067715,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9597629417798453,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.0090690040110961,
+     "n_exp_pred": 220
+    },
+    "rho=0.02|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.08,
+     "frac_interior(C<=min)": 0.69,
+     "median_varrho_raw": 0.35141593109429614,
+     "median_r": 0.262851752853219,
+     "median_f(interior)": 0.8662174985512241,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9539983860809127,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.760865460912706,
+     "n_exp_pred": 199
+    },
+    "rho=0.05|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.04666666666666667,
+     "frac_interior(C<=min)": 0.7333333333333333,
+     "median_varrho_raw": 0.43483474726352717,
+     "median_r": 0.34766516974618883,
+     "median_f(interior)": 0.9087646467464408,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9708036669592864,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.2217529873747985,
+     "n_exp_pred": 213
+    },
+    "rho=0.01|n_lib=1000": {
+     "n_states": 300,
+     "frac_C_negative": 0.31333333333333335,
+     "frac_interior(C<=min)": 0.73,
+     "median_varrho_raw": 0.05243692623210533,
+     "median_r": 0.030400204876089312,
+     "median_f(interior)": 0.9441425107283371,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9786606233070411,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.6888339606313885,
+     "n_exp_pred": 211
+    },
+    "rho=0.01|n_lib=3162": {
+     "n_states": 300,
+     "frac_C_negative": 0.29,
+     "frac_interior(C<=min)": 0.7366666666666667,
+     "median_varrho_raw": 0.07669733980308888,
+     "median_r": 0.06924672247788564,
+     "median_f(interior)": 0.915913381146603,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9696827607501324,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.160969163665106,
+     "n_exp_pred": 213
+    },
+    "rho=0.01|n_lib=31623": {
+     "n_states": 300,
+     "frac_C_negative": 0.08333333333333333,
+     "frac_interior(C<=min)": 0.67,
+     "median_varrho_raw": 0.3383072184942219,
+     "median_r": 0.2334953654002271,
+     "median_f(interior)": 0.8893733550181814,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9741534117465543,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.5164540246345182,
+     "n_exp_pred": 193
+    },
+    "rho=0.01|n_lib=100000": {
+     "n_states": 300,
+     "frac_C_negative": 0.04,
+     "frac_interior(C<=min)": 0.72,
+     "median_varrho_raw": 0.4107961503200662,
+     "median_r": 0.30821568767423424,
+     "median_f(interior)": 0.9182708513429869,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9628745798357248,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.155968893770016,
+     "n_exp_pred": 205
+    },
+    "rho=0.02|n_lib=1000": {
+     "n_states": 300,
+     "frac_C_negative": 0.22,
+     "frac_interior(C<=min)": 0.7066666666666667,
+     "median_varrho_raw": 0.11057043252526991,
+     "median_r": 0.09604096599314092,
+     "median_f(interior)": 0.9065687980199675,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9614092172923792,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.333451847984433,
+     "n_exp_pred": 203
+    },
+    "rho=0.02|n_lib=3162": {
+     "n_states": 300,
+     "frac_C_negative": 0.15333333333333332,
+     "frac_interior(C<=min)": 0.71,
+     "median_varrho_raw": 0.19565558211103085,
+     "median_r": 0.1493975176729384,
+     "median_f(interior)": 0.8819115842072597,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9523827120345495,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.6601152474743213,
+     "n_exp_pred": 202
+    },
+    "rho=0.02|n_lib=31623": {
+     "n_states": 300,
+     "frac_C_negative": 0.03,
+     "frac_interior(C<=min)": 0.71,
+     "median_varrho_raw": 0.4055345050860969,
+     "median_r": 0.3162561517712126,
+     "median_f(interior)": 0.9194503865110881,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9760117811241751,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.204266801879108,
+     "n_exp_pred": 205
+    },
+    "rho=0.02|n_lib=100000": {
+     "n_states": 300,
+     "frac_C_negative": 0.016666666666666666,
+     "frac_interior(C<=min)": 0.75,
+     "median_varrho_raw": 0.442032133711441,
+     "median_r": 0.34280660756573544,
+     "median_f(interior)": 0.938603775929898,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.971491857805868,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.8798019406780114,
+     "n_exp_pred": 217
+    }
+   },
+   "paired_library_change": {
+    "rho=0.01: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 160,
+     "median_paired_change_in_f": -0.01725433819669947,
+     "frac_f_increased": 0.39375,
+     "median_paired_change_in_varrho": 0.3401576779812252,
+     "frac_varrho_increased": 0.95
+    },
+    "rho=0.02: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 168,
+     "median_paired_change_in_f": 0.027496984930343582,
+     "frac_f_increased": 0.5892857142857143,
+     "median_paired_change_in_varrho": 0.3035249391996842,
+     "frac_varrho_increased": 0.9226190476190477
+    }
+   }
+  },
+  "c_N6": {
+   "n_states": 500,
+   "n_c_nonpositive_or_nonfinite": 0,
+   "frac_u_outside_[0,1](clipped states; N6 assumes none)": 0.27,
+   "frac_u_lt_0": 0.268,
+   "frac_u_gt_1": 0.002,
+   "R_c2": {
+    "all_states/oracle": {
+     "n_points": 500,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.03768986579551617,
+     "excess_global_E[c(u-ubar)^2]": 0.00017410334208491684,
+     "linear_weighted_R_c2(in-sample)": 0.41893002952364067,
+     "linear_weighted_R_c2(cross_fit_halves)": -0.5134094089638463,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.396463,
+       0.305671,
+       2
+      ],
+      "3": [
+       0.48925,
+       0.342044,
+       3
+      ],
+      "4": [
+       0.572437,
+       0.373178,
+       4
+      ],
+      "5": [
+       0.63575,
+       0.434593,
+       5
+      ],
+      "6": [
+       0.667144,
+       0.452526,
+       6
+      ],
+      "8": [
+       0.714505,
+       0.533719,
+       8
+      ],
+      "12": [
+       0.753636,
+       0.476402,
+       12
+      ],
+      "16": [
+       0.772806,
+       0.455883,
+       16
+      ]
+     }
+    },
+    "all_states/deployable": {
+     "n_points": 1000,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.03768986579551617,
+     "excess_global_E[c(u-ubar)^2]": 0.00017410334208491684,
+     "linear_weighted_R_c2(in-sample)": 0.16490351569031358,
+     "linear_weighted_R_c2(cross_fit_halves)": -0.24023301486988302,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.00017410334208491684,
+      "floor": 0.00016587700830832564,
+      "between": 8.226333776591168e-06,
+      "R_c2": 0.04724971777152276,
+      "pythagoras_residual": 2.3913017938011317e-16,
+      "n_leaves": 4,
+      "regret_clip_leaf_map_in_sample": 0.00015131240549530773,
+      "regret_clip_best_global": 0.00015953873927189894
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.101877,
+       -0.058707,
+       2
+      ],
+      "3": [
+       0.173451,
+       -0.109471,
+       3
+      ],
+      "4": [
+       0.221754,
+       -0.006641,
+       4
+      ],
+      "5": [
+       0.26228,
+       -0.025155,
+       5
+      ],
+      "6": [
+       0.290272,
+       -0.062132,
+       6
+      ],
+      "8": [
+       0.325869,
+       -0.033548,
+       8
+      ],
+      "12": [
+       0.361225,
+       -0.080875,
+       12
+      ],
+      "16": [
+       0.393312,
+       -0.225059,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/oracle": {
+     "n_points": 365,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.11749145341918303,
+     "excess_global_E[c(u-ubar)^2]": 0.00015873720753936782,
+     "linear_weighted_R_c2(in-sample)": 0.6600444406913049,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.6684925325899289,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.412769,
+       0.370674,
+       2
+      ],
+      "3": [
+       0.49866,
+       0.362638,
+       3
+      ],
+      "4": [
+       0.571665,
+       0.442676,
+       4
+      ],
+      "5": [
+       0.639253,
+       0.493617,
+       5
+      ],
+      "6": [
+       0.683584,
+       0.518742,
+       6
+      ],
+      "8": [
+       0.708801,
+       0.466859,
+       8
+      ],
+      "12": [
+       0.735906,
+       0.365471,
+       12
+      ],
+      "16": [
+       0.752434,
+       0.357817,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/deployable": {
+     "n_points": 730,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.11749145341918302,
+     "excess_global_E[c(u-ubar)^2]": 0.00015873720753936782,
+     "linear_weighted_R_c2(in-sample)": 0.2246938418738993,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.21292789283698377,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.00015873720753936782,
+      "floor": 0.0001548001424098081,
+      "between": 3.937065129559699e-06,
+      "R_c2": 0.024802408903301987,
+      "pythagoras_residual": 8.233630042158224e-17,
+      "n_leaves": 4,
+      "regret_clip_leaf_map_in_sample": 0.0001548001424098081,
+      "regret_clip_best_global": 0.00015873720753936782
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.13025,
+       0.127898,
+       2
+      ],
+      "3": [
+       0.169104,
+       0.113046,
+       3
+      ],
+      "4": [
+       0.192159,
+       0.051776,
+       4
+      ],
+      "5": [
+       0.268191,
+       -0.017928,
+       5
+      ],
+      "6": [
+       0.290137,
+       -0.360002,
+       6
+      ],
+      "8": [
+       0.326927,
+       -0.361544,
+       8
+      ],
+      "12": [
+       0.389236,
+       -0.448166,
+       12
+      ],
+      "16": [
+       0.42367,
+       -0.499975,
+       16
+      ]
+     }
+    }
+   },
+   "observed_regret_H_ref": {
+    "A2": {
+     "mean_excess_oracle_moments": 0.00016165723650759617,
+     "mean_realized_state_mse_minus_A*": 0.0001681985654781964
+    },
+    "A3": {
+     "mean_excess_oracle_moments": 0.00028168004434495645,
+     "mean_realized_state_mse_minus_A*": 0.0003086268957737633
+    },
+    "A4": {
+     "mean_excess_oracle_moments": 0.00016479584817186613,
+     "mean_realized_state_mse_minus_A*": 0.00019681804480669825
+    },
+    "A5": {
+     "mean_excess_oracle_moments": 0.00015567424683183312,
+     "mean_realized_state_mse_minus_A*": 0.00016844811291681262
+    }
+   },
+   "A5_distinct_leaves_in_test": 4
+  },
+  "d_N8": {
+   "rho_levels": [
+    0.005,
+    0.01,
+    0.02,
+    0.05
+   ],
+   "n_states": 300,
+   "median_positive_N": 1.0361708749261713,
+   "N_zero_threshold": 1e-09,
+   "frac_wstar_zero_at_all_levels": 0.07666666666666666,
+   "groups": {
+    "N=0 (analog never changes under noise; stable proxy)": {
+     "n": 34,
+     "n_rank_corr_defined": 33,
+     "n_constant_w(undefined)": 1,
+     "median_spearman": -0.19999999999999996,
+     "q25_q75_spearman": [
+      -0.7999999999999998,
+      0.3999999999999999
+     ],
+     "frac_spearman_eq_+1": 0.0,
+     "frac_spearman_gt_0": 0.3333333333333333,
+     "frac_nondecreasing_in_rho": 0.029411764705882353,
+     "mean_frac_of_steps_increasing": 0.47058823529411764
+    },
+    "N>0 low (<= median positive N)": {
+     "n": 133,
+     "n_rank_corr_defined": 132,
+     "n_constant_w(undefined)": 1,
+     "median_spearman": 0.19999999999999996,
+     "q25_q75_spearman": [
+      -0.5999999999999999,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.1893939393939394,
+     "frac_spearman_gt_0": 0.5227272727272727,
+     "frac_nondecreasing_in_rho": 0.21052631578947367,
+     "mean_frac_of_steps_increasing": 0.5614035087719298
+    },
+    "N>0 high (> median positive N)": {
+     "n": 133,
+     "n_rank_corr_defined": 112,
+     "n_constant_w(undefined)": 21,
+     "median_spearman": 0.3999999999999999,
+     "q25_q75_spearman": [
+      -0.19999999999999996,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.13392857142857142,
+     "frac_spearman_gt_0": 0.7321428571428571,
+     "frac_nondecreasing_in_rho": 0.40601503759398494,
+     "mean_frac_of_steps_increasing": 0.4235588972431078
+    }
+   },
+   "median_wstar_by_rho": {
+    "0.005": 0.050938721096179626,
+    "0.01": 0.09605201107845138,
+    "0.02": 0.10421519349200276,
+    "0.05": 0.1115724267103029
+   }
+  }
+ },
+ "DEV-1 pilot/chua": {
+  "label": "DEVELOPMENT (DEV-1, DEV-2): not a hypothesis test",
+  "system": "chua",
+  "seed_id": "DEV-1",
+  "preset": "pilot",
+  "dump": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/r1-c9bb981/runs/r1-gpu-dev1/pilot/states/chua.npz",
+  "n_states": 500,
+  "horizons": [
+   8,
+   15,
+   30,
+   60,
+   120
+  ],
+  "nonfinite_in_E_C_E_P_C": 0,
+  "check_wstar_recomputed_max_abs_diff": 0.0,
+  "check_sweep_core_view_E_C_max_abs_diff": 0.0,
+  "check_sweep_core_view_w_star_max_abs_diff": 0.0,
+  "a_P1dprime": {
+   "n": 500,
+   "grid": [
+    8,
+    15,
+    30,
+    60,
+    120
+   ],
+   "n_Tm_censored": 144,
+   "n_Th_censored": 161,
+   "lower_bound_violations_all_states": 0,
+   "study_rule_sqrt2_theta": {
+    "n_Tm_uncensored": 356,
+    "n_H1_censored(bound infinite, not testable)": 42,
+    "n_tested(C>=0 at H1)": 262,
+    "n_C_negative_at_H1(hypothesis fails)": 52,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 4,
+    "tested_gain_zero": 256,
+    "tested_gain_positive": 6,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 29,
+    "tested_gain_equals_bound_and_positive(tight)": 4,
+    "tested_gain_equals_bound_both_zero(vacuous)": 233,
+    "tested_bound_positive_and_gain_zero(slack)": 23,
+    "tested_gain_steps_distribution": {
+     "0": 256,
+     "15": 1,
+     "30": 3,
+     "60": 2
+    },
+    "tested_bound_steps_distribution": {
+     "0": 233,
+     "7": 1,
+     "15": 3,
+     "30": 7,
+     "45": 2,
+     "60": 12,
+     "90": 3,
+     "105": 1
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 223,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 5
+   },
+   "noise_exact_sqrt2_theta_prime": {
+    "n_Tm_uncensored": 356,
+    "n_H1_censored(bound infinite, not testable)": 42,
+    "n_tested(C>=0 at H1)": 262,
+    "n_C_negative_at_H1(hypothesis fails)": 52,
+    "violations_among_tested": 0,
+    "violations_among_C_negative": 4,
+    "tested_gain_zero": 256,
+    "tested_gain_positive": 6,
+    "tested_bound_positive(informative: H1 in a later grid cell than T_m)": 29,
+    "tested_gain_equals_bound_and_positive(tight)": 4,
+    "tested_gain_equals_bound_both_zero(vacuous)": 233,
+    "tested_bound_positive_and_gain_zero(slack)": 23,
+    "tested_gain_steps_distribution": {
+     "0": 256,
+     "15": 1,
+     "30": 3,
+     "60": 2
+    },
+    "tested_bound_steps_distribution": {
+     "0": 233,
+     "7": 1,
+     "15": 3,
+     "30": 7,
+     "45": 2,
+     "60": 12,
+     "90": 3,
+     "105": 1
+    },
+    "certain_violations_after_bracketing_true_steps": 0,
+    "screen_ln2_over_2Lambda: n": 223,
+    "screen: gain > ln2/(2 Lambda_bar) (grid-resolved)": 5
+   },
+   "note_resolution": "gains and bounds are differences of grid points {8,15,30,60,120}; adjacent gaps 7,15,30,60 steps (0.23, 0.5, 1, 2 LT)"
+  },
+  "b_N4": {
+   "identity_rows_interior": 1729,
+   "identity_rows_total": 2500,
+   "identity_max_abs_diff(V/min vs f)": 1.3322676295501878e-15,
+   "rows_with_C_gt_min(clipped, f not exact)": 771,
+   "n_Tm_uncensored": 356,
+   "n_f_valid_at_crossing": 283,
+   "n_pred_uncensored": 265,
+   "n_hypothesis_met(f(T_pred)>=f_j)": 264,
+   "violations_of_bound_T_h<=T_pred": 0,
+   "f_at_crossing_quantiles5_25_50_75_95": [
+    0.46524206328532564,
+    0.6873060817451762,
+    0.8827480254447868,
+    0.971244892924148,
+    0.9980363815326915
+   ],
+   "rho_at_crossing_quantiles": [
+    -0.27279998663416627,
+    0.05273924731912788,
+    0.25470156591314047,
+    0.4425909743435699,
+    0.7172770783631206
+   ],
+   "pred_gain_zero": 256,
+   "realized_gain_equals_pred(grid) among hyp": 263,
+   "realized_gain_less_than_pred among hyp": 1,
+   "realized_gain_zero among hyp": 256,
+   "pred_bound_steps_distribution": {
+    "0": 256,
+    "15": 1,
+    "30": 3,
+    "45": 1,
+    "60": 3
+   },
+   "realized_gain_steps_distribution": {
+    "0": 256,
+    "15": 2,
+    "30": 3,
+    "60": 3
+   },
+   "library_dependence_H_ref": {
+    "rho=0.01|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.14,
+     "frac_interior(C<=min)": 0.6366666666666667,
+     "median_varrho_raw": 0.2514640798553478,
+     "median_r": 0.12630139248982386,
+     "median_f(interior)": 0.9093007872208998,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.980839137085451,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.275886172498241,
+     "n_exp_pred": 168
+    },
+    "rho=0.005|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.24,
+     "frac_interior(C<=min)": 0.6633333333333333,
+     "median_varrho_raw": 0.10440675269006171,
+     "median_r": 0.05294308111343848,
+     "median_f(interior)": 0.941898771030705,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9857077370579369,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.0539472721161627,
+     "n_exp_pred": 171
+    },
+    "rho=0.02|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.10666666666666667,
+     "frac_interior(C<=min)": 0.6733333333333333,
+     "median_varrho_raw": 0.35570494475673786,
+     "median_r": 0.214003963582512,
+     "median_f(interior)": 0.9288525458075871,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9789501185420193,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.3924317585819765,
+     "n_exp_pred": 171
+    },
+    "rho=0.05|n_lib=10000": {
+     "n_states": 300,
+     "frac_C_negative": 0.08333333333333333,
+     "frac_interior(C<=min)": 0.74,
+     "median_varrho_raw": 0.3575166483254856,
+     "median_r": 0.3049667755702521,
+     "median_f(interior)": 0.8997958799894121,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9546794410454631,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.376008979259427,
+     "n_exp_pred": 190
+    },
+    "rho=0.01|n_lib=1000": {
+     "n_states": 300,
+     "frac_C_negative": 0.37666666666666665,
+     "frac_interior(C<=min)": 0.6766666666666666,
+     "median_varrho_raw": 0.05897875227374901,
+     "median_r": 0.030647973787820165,
+     "median_f(interior)": 0.9339507184340561,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9832237365382146,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.1395907965376495,
+     "n_exp_pred": 174
+    },
+    "rho=0.01|n_lib=3162": {
+     "n_states": 300,
+     "frac_C_negative": 0.3,
+     "frac_interior(C<=min)": 0.6566666666666666,
+     "median_varrho_raw": 0.10985688142092771,
+     "median_r": 0.055801648960774705,
+     "median_f(interior)": 0.9145782250531368,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9772582024420228,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.3531225437944172,
+     "n_exp_pred": 167
+    },
+    "rho=0.01|n_lib=31623": {
+     "n_states": 300,
+     "frac_C_negative": 0.11333333333333333,
+     "frac_interior(C<=min)": 0.6566666666666666,
+     "median_varrho_raw": 0.3522769491042964,
+     "median_r": 0.2028170749647701,
+     "median_f(interior)": 0.9228563280383681,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9812783483645682,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.0276664216298022,
+     "n_exp_pred": 170
+    },
+    "rho=0.01|n_lib=100000": {
+     "n_states": 300,
+     "frac_C_negative": 0.06,
+     "frac_interior(C<=min)": 0.6833333333333333,
+     "median_varrho_raw": 0.3919443124085237,
+     "median_r": 0.2553019115514301,
+     "median_f(interior)": 0.9234059372738515,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9778813143488697,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.090544400805332,
+     "n_exp_pred": 181
+    },
+    "rho=0.02|n_lib=1000": {
+     "n_states": 300,
+     "frac_C_negative": 0.3,
+     "frac_interior(C<=min)": 0.6466666666666666,
+     "median_varrho_raw": 0.12437985213899602,
+     "median_r": 0.06020970302713052,
+     "median_f(interior)": 0.8939021428829915,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9745050799646513,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.639922877651962,
+     "n_exp_pred": 164
+    },
+    "rho=0.02|n_lib=3162": {
+     "n_states": 300,
+     "frac_C_negative": 0.21333333333333335,
+     "frac_interior(C<=min)": 0.62,
+     "median_varrho_raw": 0.2493478999079091,
+     "median_r": 0.10320042722111154,
+     "median_f(interior)": 0.8941620528271745,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9795408180716695,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.5739430615099528,
+     "n_exp_pred": 157
+    },
+    "rho=0.02|n_lib=31623": {
+     "n_states": 300,
+     "frac_C_negative": 0.07333333333333333,
+     "frac_interior(C<=min)": 0.6466666666666666,
+     "median_varrho_raw": 0.3892500768860967,
+     "median_r": 0.25126235283896803,
+     "median_f(interior)": 0.8893097726746124,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9760877015076515,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 1.3672169968603582,
+     "n_exp_pred": 167
+    },
+    "rho=0.02|n_lib=100000": {
+     "n_states": 300,
+     "frac_C_negative": 0.04666666666666667,
+     "frac_interior(C<=min)": 0.73,
+     "median_varrho_raw": 0.40680985908242345,
+     "median_r": 0.27082237323104996,
+     "median_f(interior)": 0.93585702915201,
+     "median_hybrid_ratio_V/min(clipped weight)": 0.9714207707279015,
+     "median_exp_gain_ln(1/f)/(2Lambda_bar)_steps(Lambda>0,interior)": 0.9075873182403975,
+     "n_exp_pred": 190
+    }
+   },
+   "paired_library_change": {
+    "rho=0.01: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 145,
+     "median_paired_change_in_f": 0.0022094740689965198,
+     "frac_f_increased": 0.5172413793103449,
+     "median_paired_change_in_varrho": 0.27030871496113984,
+     "frac_varrho_increased": 0.8827586206896552
+    },
+    "rho=0.02: n_lib 1000 -> 100000": {
+     "n_pairs(both interior)": 156,
+     "median_paired_change_in_f": 0.019330429323512366,
+     "frac_f_increased": 0.6089743589743589,
+     "median_paired_change_in_varrho": 0.29563838669360876,
+     "frac_varrho_increased": 0.9230769230769231
+    }
+   }
+  },
+  "c_N6": {
+   "n_states": 500,
+   "n_c_nonpositive_or_nonfinite": 0,
+   "frac_u_outside_[0,1](clipped states; N6 assumes none)": 0.362,
+   "frac_u_lt_0": 0.348,
+   "frac_u_gt_1": 0.014,
+   "R_c2": {
+    "all_states/oracle": {
+     "n_points": 500,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.21829311491508976,
+     "excess_global_E[c(u-ubar)^2]": 0.01238946490127366,
+     "linear_weighted_R_c2(in-sample)": 0.7633846701468585,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.6559228363661382,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.752202,
+       0.657886,
+       2
+      ],
+      "3": [
+       0.828855,
+       0.663397,
+       3
+      ],
+      "4": [
+       0.871109,
+       0.705381,
+       4
+      ],
+      "5": [
+       0.885682,
+       0.709288,
+       5
+      ],
+      "6": [
+       0.892333,
+       0.658257,
+       6
+      ],
+      "8": [
+       0.903416,
+       0.634314,
+       8
+      ],
+      "12": [
+       0.918413,
+       0.618307,
+       12
+      ],
+      "16": [
+       0.926664,
+       0.601574,
+       16
+      ]
+     }
+    },
+    "all_states/deployable": {
+     "n_points": 1000,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.21829311491508985,
+     "excess_global_E[c(u-ubar)^2]": 0.01238946490127366,
+     "linear_weighted_R_c2(in-sample)": 0.26867411598453406,
+     "linear_weighted_R_c2(cross_fit_halves)": -0.07514747431848012,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.01238946490127366,
+      "floor": 0.011663564155612547,
+      "between": 0.0007259007456611132,
+      "R_c2": 0.05859016119303817,
+      "pythagoras_residual": -4.480512409018664e-17,
+      "n_leaves": 5,
+      "regret_clip_leaf_map_in_sample": 0.011531091329295952,
+      "regret_clip_best_global": 0.012256992074957066
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.591649,
+       0.055546,
+       2
+      ],
+      "3": [
+       0.639034,
+       0.019472,
+       3
+      ],
+      "4": [
+       0.671577,
+       0.005904,
+       4
+      ],
+      "5": [
+       0.687747,
+       -0.006059,
+       5
+      ],
+      "6": [
+       0.696396,
+       -0.017376,
+       6
+      ],
+      "8": [
+       0.711893,
+       -0.041082,
+       8
+      ],
+      "12": [
+       0.721985,
+       -0.083016,
+       12
+      ],
+      "16": [
+       0.725477,
+       -0.136198,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/oracle": {
+     "n_points": 319,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.13045189000984284,
+     "excess_global_E[c(u-ubar)^2]": 0.003617621831488747,
+     "linear_weighted_R_c2(in-sample)": 0.43141338356825487,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.04077258507043624,
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.382519,
+       0.028265,
+       2
+      ],
+      "3": [
+       0.4644,
+       0.129822,
+       3
+      ],
+      "4": [
+       0.517634,
+       -0.336826,
+       4
+      ],
+      "5": [
+       0.568734,
+       -0.169513,
+       5
+      ],
+      "6": [
+       0.617379,
+       -0.691917,
+       6
+      ],
+      "8": [
+       0.668968,
+       -0.61303,
+       8
+      ],
+      "12": [
+       0.711324,
+       -0.53159,
+       12
+      ],
+      "16": [
+       0.731974,
+       -0.535859,
+       16
+      ]
+     }
+    },
+    "interior_only(u in [0,1])/deployable": {
+     "n_points": 638,
+     "n_nonfinite_profile_rows_dropped": 0,
+     "best_global_weight_ubar": 0.1304518900098428,
+     "excess_global_E[c(u-ubar)^2]": 0.003617621831488747,
+     "linear_weighted_R_c2(in-sample)": 0.413757391331235,
+     "linear_weighted_R_c2(cross_fit_halves)": 0.20572650601708087,
+     "stored_A5_leaf_map(in-sample on test)": {
+      "excess_global": 0.003617621831488747,
+      "floor": 0.0031368466459343607,
+      "between": 0.0004807751855543857,
+      "R_c2": 0.13289813251611615,
+      "pythagoras_residual": 1.4430708031366325e-16,
+      "n_leaves": 5,
+      "regret_clip_leaf_map_in_sample": 0.0031368466459343607,
+      "regret_clip_best_global": 0.003617621831488747
+     },
+     "cart_by_K(in_sample, cross_fit_halves, leaves)": {
+      "2": [
+       0.29448,
+       0.133574,
+       2
+      ],
+      "3": [
+       0.448257,
+       -0.516833,
+       3
+      ],
+      "4": [
+       0.494483,
+       -0.550723,
+       4
+      ],
+      "5": [
+       0.539575,
+       -0.485923,
+       5
+      ],
+      "6": [
+       0.576383,
+       -0.45949,
+       6
+      ],
+      "8": [
+       0.641776,
+       -0.448078,
+       8
+      ],
+      "12": [
+       0.703977,
+       0.056857,
+       12
+      ],
+      "16": [
+       0.736223,
+       0.010181,
+       16
+      ]
+     }
+    }
+   },
+   "observed_regret_H_ref": {
+    "A2": {
+     "mean_excess_oracle_moments": 0.013757456563145507,
+     "mean_realized_state_mse_minus_A*": 0.01166966993513516
+    },
+    "A3": {
+     "mean_excess_oracle_moments": 0.015277632960861353,
+     "mean_realized_state_mse_minus_A*": 0.013327368718869215
+    },
+    "A4": {
+     "mean_excess_oracle_moments": 0.014851122041425292,
+     "mean_realized_state_mse_minus_A*": 0.013591523141884984
+    },
+    "A5": {
+     "mean_excess_oracle_moments": 0.014972269534730605,
+     "mean_realized_state_mse_minus_A*": 0.013415400745092902
+    }
+   },
+   "A5_distinct_leaves_in_test": 5
+  },
+  "d_N8": {
+   "rho_levels": [
+    0.005,
+    0.01,
+    0.02,
+    0.05
+   ],
+   "n_states": 300,
+   "median_positive_N": 1.131521642895661,
+   "N_zero_threshold": 1e-09,
+   "frac_wstar_zero_at_all_levels": 0.03333333333333333,
+   "groups": {
+    "N=0 (analog never changes under noise; stable proxy)": {
+     "n": 37,
+     "n_rank_corr_defined": 35,
+     "n_constant_w(undefined)": 2,
+     "median_spearman": -0.19999999999999996,
+     "q25_q75_spearman": [
+      -0.5689323936863109,
+      0.8999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.2571428571428571,
+     "frac_spearman_gt_0": 0.42857142857142855,
+     "frac_nondecreasing_in_rho": 0.32432432432432434,
+     "mean_frac_of_steps_increasing": 0.5585585585585585
+    },
+    "N>0 low (<= median positive N)": {
+     "n": 132,
+     "n_rank_corr_defined": 131,
+     "n_constant_w(undefined)": 1,
+     "median_spearman": 0.3999999999999999,
+     "q25_q75_spearman": [
+      -0.3999999999999999,
+      0.7999999999999998
+     ],
+     "frac_spearman_eq_+1": 0.1450381679389313,
+     "frac_spearman_gt_0": 0.5954198473282443,
+     "frac_nondecreasing_in_rho": 0.22727272727272727,
+     "mean_frac_of_steps_increasing": 0.5631313131313131
+    },
+    "N>0 high (> median positive N)": {
+     "n": 131,
+     "n_rank_corr_defined": 122,
+     "n_constant_w(undefined)": 9,
+     "median_spearman": 0.7745966692414834,
+     "q25_q75_spearman": [
+      0.026352313834736494,
+      0.9486832980505138
+     ],
+     "frac_spearman_eq_+1": 0.11475409836065574,
+     "frac_spearman_gt_0": 0.7459016393442623,
+     "frac_nondecreasing_in_rho": 0.4961832061068702,
+     "mean_frac_of_steps_increasing": 0.4580152671755725
+    }
+   },
+   "median_wstar_by_rho": {
+    "0.005": 0.02324733034623859,
+    "0.01": 0.04393829870152705,
+    "0.02": 0.06714886618269789,
+    "0.05": 0.18220977912549968
+   }
+  }
+ }
+}
