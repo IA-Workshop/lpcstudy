@@ -50,3 +50,28 @@ No verdict, statistics, seed, provenance or dependency logic changed. The `compa
 ## Verdict
 
 **approve with fixes.** 6 findings: 1 major (R1), 5 minor (R2 to R6). No number, verdict, band or level changed, and nothing is claimed done that is not. Fix R1 and R2 before the owner rules on DEF-0022. Fix R3 before the owner runs WU-0017.1.
+
+## Re-review, fix round 1 (commit ec58392; diff 6c81bb7..ec58392)
+
+- **Reviewer:** `reviewer`, model `claude-opus-5-5`, fresh context, 2026-10-21. This covers R1 to R6 only.
+- **Ran:** `findings_build.py check docs/agent/notes --stem 2026-10-20-prelim-findings-conf1` (develop `.venv`, no rebuild) → `check passed: 1262 traced values, 0 problems`, tree clean afterwards. I compared the trace row by row against 6c81bb7: 1262 rows on both sides, and the only row that differs is `constants/def0022_proposed/text` (raw and rendered). `git diff 6c81bb7..ec58392` of the document changes only the section 10 DEF-0022 bullet (one line). `figures/` and `sources.json` are unchanged. The banned stems are absent. No test run: the author ran the radius (`test_tools_findings_build.py`, 67 passed), and nothing under `tools/*.py` or `tests/` changed.
+- **DEC-0041 (owner acceptance, option 1):** noted. The "PROPOSED for owner review, not ruled" opening is expected to go in the rebuild that follows the ledger entry, and I do not require it here.
+
+| Finding | Status | Evidence |
+|---|---|---|
+| R1 | **fixed** | The proposal (line 9) now gives the reason from `defects.md:271`, which supersedes line 264, with the R6 report reference and the WU-0003.3 report. I checked R6 lines 140-152: "v3 precision not reproduced" (margin reading) on 5 of 6 H2a(ii) parts, as quoted. It also adds the sealed Rossler interior interval [−0.04826, 0.1662] (width 0.2145 > 0.2). Option 1 now separates the anticipated qualitative finding from the projected margin that was not reproduced. The draft status line reads "accepted as a known limitation", and wording B drops "pre-registered in v3 section 7". The superseded framing remains only where it is quoted as superseded (lines 9, 48). The constant was edited, the document rebuilt, and `check` passes. One follow-up: R7. |
+| R2 | **fixed** | The bullet has no count ("The verdict words of its parts"). The proposal (line 30) says so, and wording B states that its counts must be traced in WU-0017.1. |
+| R3 | **fixed in substance** | The block now has `set -e`, `S=$(mktemp -d)`, a clean-tree test, a print of `lpcstudy.__file__`, input hashes before the runs, `test -s` on both `RESULTS.md`, and the final `git status`. The sealed directory is only read (`cp` source). A new directory each time removes the stale-output hazard. One follow-up: R8. |
+| R4 | **fixed** | WU-0015.2 now states that the launch path is not evidenced (no `run_preset.sh` meta file; the console log starts `nohup: ignoring input`). Note, not a finding: "a direct `nohup` launch by the owner" states the actor more firmly than the next line ("no record names who typed the launch command"). "by the owner, on every indication" would match. |
+| R5 | **fixed** | The plan title is back in the queue block and in the WU-0016 heading ("Regeneration by another actor (by ruling, the owner: DEC-0035) …"). The queue diff changes only a row of the 2026-10-21 block written on this branch. The 2026-10-10 rows are untouched. |
+| R6 | **fixed (forward)** | ec58392 names WU-0020, WU-0015, WU-0016 and WU-0017 and carries `Agent: claude-sonnet-5-5`. The report asks the merge commit to name the units for the four earlier commits. No history was rewritten. |
+
+### New findings from the fix (minor)
+
+**R7 (minor): the rebuilt bullet uses development evidence without the development label.** `tools/findings/design_constants.json` `def0022_proposed` (findings document line 513): "The margin that v3 §7 projects for it is not reproduced part by part at the full sample size (DEF-0022 status line; the full-size report of WU-0003)." That report is the R6 rehearsal, DEV-2 full on CPU (DEC-0028 evidence list): development evidence. The findings document keeps development material only behind the label "development seed … development evidence, not a result of this run" (owner answer B7; audit item 9, the DEF-0027 bullet). The bullet has no development number, but it makes a development claim with no label. Fix: in the rebuild after DEC-0041, add "(development evidence, DEV-2 rehearsal; not a result of this run)" after the reference, or the wording of the DEF-0027 bullet. The sealed-run sentence (Rossler interior) needs no label.
+
+**R8 (minor): `set -e` in a block written to be pasted into the owner's shell.** `WU-0017-v3-report.md` lines 28-42. If the block is pasted into an interactive terminal, `set -e` closes that terminal on the first non-zero exit, for example when `flock -n` exits 1 because the lock is held. The exit code the log asks for is then lost, and `echo "exit run N: $?"` can only ever print 0. It is safe (nothing is written to any tree), but the recording step does not work as described. Fix: run the block as `bash -e <<'EOF' … EOF` or in a subshell `( set -e; … )`, and say that a stop prints the failing exit code. Optionally use `sha256sum -c` against the two known hashes instead of reading them by eye.
+
+### Verdict (re-review)
+
+**approve with fixes.** R1 to R6: 6 of 6 fixed, R3 in substance. 2 new minor findings (R7, R8). Neither changes a number, a verdict or the safety of the sealed outputs. R7 can go into the DEC-0041 rebuild, and R8 should be fixed before the owner runs WU-0017.1. No further fix round is needed if the author applies both as stated.
