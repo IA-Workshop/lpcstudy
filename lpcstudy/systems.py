@@ -186,6 +186,108 @@ def rossler_zfirst_field(
     )
 
 
+def hindmarsh_rose_field(
+    state: jnp.ndarray, params: dict[str, float]
+) -> jnp.ndarray:
+    """Evaluate a Hindmarsh-Rose-type field in the Dysts parameterisation (S4).
+
+    This is not claimed to be the standard Hindmarsh-Rose model (at
+    ``tx = 0.03`` it is not shown to be a rescaling of it). Provenance: relay of
+    the Dysts ``HindmarshRose._rhs`` (researcher note 2026-10-20, equations
+    relay), checked term by term and by the divergence identity (specification
+    note 2, section 12); Marhl and Perc (2005) was not read. The field is
+    ``x' = -x + (y + z - a x^3 + b x^2) / tx``,
+    ``y' = -a x^3 - (d - b) x^2 + z``, ``z' = (-s x - z + c) / tz``.
+
+    Parameters
+    ----------
+    state : jnp.ndarray
+        State ``(x, y, z)``.
+    params : dict[str, float]
+        Keys ``a``, ``b``, ``c``, ``d``, ``s``, ``tx``, ``tz``.
+
+    Returns
+    -------
+    jnp.ndarray
+        Time derivative of the state.
+    """
+    x, y, z = state[0], state[1], state[2]
+    tx, tz = params["tx"], params["tz"]
+    return jnp.stack(
+        [
+            -x
+            + y / tx
+            - params["a"] * x**3 / tx
+            + params["b"] * x**2 / tx
+            + z / tx,
+            -params["a"] * x**3 - (params["d"] - params["b"]) * x**2 + z,
+            (-params["s"] * x - z + params["c"]) / tz,
+        ]
+    )
+
+
+def hyper_jha_field(
+    state: jnp.ndarray, params: dict[str, float]
+) -> jnp.ndarray:
+    """Evaluate the Dysts ``HyperJha`` vector field (extension S5).
+
+    The equations, as relayed in full from Dysts (researcher notes of
+    2026-10-20), are ``x' = a (y - x) + w``, ``y' = -x z + b x - y``,
+    ``z' = x y - c z``, ``w' = -x z + d w``. Its divergence is
+    ``-a - 1 - c + d``.
+
+    Parameters
+    ----------
+    state : jnp.ndarray
+        State ``(x, y, z, w)``.
+    params : dict[str, float]
+        Keys ``a``, ``b``, ``c``, ``d``.
+
+    Returns
+    -------
+    jnp.ndarray
+        Time derivative of the state.
+    """
+    x, y, z, w = state[0], state[1], state[2], state[3]
+    return jnp.stack(
+        [
+            params["a"] * (y - x) + w,
+            -x * z + params["b"] * x - y,
+            x * y - params["c"] * z,
+            -x * z + params["d"] * w,
+        ]
+    )
+
+
+def lorenz96_ring_field(
+    state: jnp.ndarray, params: dict[str, float]
+) -> jnp.ndarray:
+    """Evaluate the cyclic Lorenz-96 field of any length (extension S6).
+
+    ``X_k' = (X_{k+1} - X_{k-2}) X_{k-1} - X_k + F`` with indices modulo the
+    length of the state. Used only with ``N = 4`` (``F = 20``): the study's
+    exclusion of Lorenz-96 at ``N = 8`` (LPC.PC.1) rests on ``N > D - 1``, which
+    does not hold for ``N = 4``. The divergence is ``-N`` exactly.
+
+    Parameters
+    ----------
+    state : jnp.ndarray
+        State ``(X_1, ..., X_N)``.
+    params : dict[str, float]
+        Key ``F``.
+
+    Returns
+    -------
+    jnp.ndarray
+        Time derivative of the state.
+    """
+    return (
+        (jnp.roll(state, -1) - jnp.roll(state, 2)) * jnp.roll(state, 1)
+        - state
+        + params["F"]
+    )
+
+
 @dataclass(frozen=True)
 class SystemSpec:
     """Static description of one dynamical system.
@@ -301,6 +403,49 @@ SYSTEMS: dict[str, SystemSpec] = {
         initial_state=(0.0, 1.0, 1.0),
         max_dt=0.04,
         orbit_bound=50.0,
+        lyapunov_steps=1_000_000,
+    ),
+    # Further extension systems (WU-0023, DEC-0037; specification note
+    # 2026-10-20-math-extension-specs-2.md section 0 and section 12).
+    "hindmarsh_rose": SystemSpec(
+        name="hindmarsh_rose",
+        field_fn=hindmarsh_rose_field,
+        params={
+            "a": 0.49,
+            "b": 1.0,
+            "c": 0.0322,
+            "d": 1.0,
+            "s": 1.0,
+            "tx": 0.03,
+            "tz": 0.8,
+        },
+        dim=3,
+        observed_index=0,
+        initial_state=(0.1, 0.1, 0.1),
+        max_dt=0.0025,
+        orbit_bound=5.0,
+        lyapunov_steps=2_000_000,
+    ),
+    "hyper_jha": SystemSpec(
+        name="hyper_jha",
+        field_fn=hyper_jha_field,
+        params={"a": 10.0, "b": 28.0, "c": 2.667, "d": 1.3},
+        dim=4,
+        observed_index=0,
+        initial_state=(1.0, 1.0, 1.0, 1.0),
+        max_dt=0.0025,
+        orbit_bound=80.0,
+        lyapunov_steps=2_000_000,
+    ),
+    "lorenz96_4": SystemSpec(
+        name="lorenz96_4",
+        field_fn=lorenz96_ring_field,
+        params={"F": 20.0},
+        dim=4,
+        observed_index=0,
+        initial_state=(20.0, 20.01, 20.0, 20.0),
+        max_dt=0.005,
+        orbit_bound=60.0,
         lyapunov_steps=1_000_000,
     ),
 }

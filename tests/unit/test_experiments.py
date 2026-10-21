@@ -978,7 +978,14 @@ def test_no_configured_preset_changes_its_robustness_dimensions_def_0025() -> (
     # listed separately (the hyperchaotic Rossler has dim 4, and 5 > 4 keeps
     # the same lists).
     frozen = {"lorenz63", "rossler", "chua"}
-    dims = {"rossler_hyper": 4, "lorenz63_r166": 3, "rossler_z": 3}
+    dims = {
+        "rossler_hyper": 4,
+        "lorenz63_r166": 3,
+        "rossler_z": 3,
+        "hindmarsh_rose": 3,
+        "hyper_jha": 4,
+        "lorenz96_4": 4,
+    }
     assert set(SYSTEMS) == frozen | set(dims)
     for config in (SMOKE, PILOT, FULL):
         assert config.embedding_dim == 7

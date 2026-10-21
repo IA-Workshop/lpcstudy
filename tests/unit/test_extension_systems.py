@@ -49,7 +49,14 @@ EPS = 2.0**-52
 """Machine epsilon of float64 (round-off unit of the bounds below)."""
 
 FROZEN = ("lorenz63", "rossler", "chua")
-EXTENSION = ("rossler_hyper", "lorenz63_r166", "rossler_z")
+EXTENSION = (
+    "rossler_hyper",
+    "lorenz63_r166",
+    "rossler_z",
+    "hindmarsh_rose",
+    "hyper_jha",
+    "lorenz96_4",
+)
 
 # Cached largest Lyapunov exponents of the specification note section 0 (used
 # only to set the observation interval 1 / (30 lambda) of the checks below).
@@ -57,11 +64,23 @@ LAMBDA = {
     "rossler_hyper": 0.11220508610149857,
     "lorenz63_r166": 0.6217010154674514,
     "rossler_z": 0.07133265490530956,
+    "hindmarsh_rose": 0.21688316515721046,
+    "hyper_jha": 0.3603046265219353,
+    "lorenz96_4": 1.2018430962199733,
 }
 # Standard deviation of the observed coordinate, specification note section 1
 # (S1 21.58, S2 20.34, S3 2.850). A relative error of 10% changes nothing: the
 # V6 margin is at least 12 (note section 2).
-SIGMA_X = {"rossler_hyper": 21.58, "lorenz63_r166": 20.34, "rossler_z": 2.850}
+SIGMA_X = {
+    "rossler_hyper": 21.58,
+    "lorenz63_r166": 20.34,
+    "rossler_z": 2.850,
+    "hindmarsh_rose": 0.3057,
+    "hyper_jha": 9.656,
+    "lorenz96_4": 6.961,
+}
+# (S4 0.3057, S5 9.656, S6 6.961, specification note 2 section 1; the V6 margins
+# are 48, 26 and 180, so a 10% error changes nothing.)
 
 
 # ------------------------------------------------------------------ R3 pins
@@ -185,13 +204,53 @@ def test_extension_specs_equal_the_specification_values() -> None:
             orbit_bound=50.0,
             lyapunov_steps=1_000_000,
         ),
+        # Specification note 2, section 0 (S4 to S6).
+        "hindmarsh_rose": dict(
+            params={
+                "a": 0.49,
+                "b": 1.0,
+                "c": 0.0322,
+                "d": 1.0,
+                "s": 1.0,
+                "tx": 0.03,
+                "tz": 0.8,
+            },
+            dim=3,
+            observed_index=0,
+            initial_state=(0.1, 0.1, 0.1),
+            max_dt=0.0025,
+            orbit_bound=5.0,
+            lyapunov_steps=2_000_000,
+        ),
+        "hyper_jha": dict(
+            params={"a": 10.0, "b": 28.0, "c": 2.667, "d": 1.3},
+            dim=4,
+            observed_index=0,
+            initial_state=(1.0, 1.0, 1.0, 1.0),
+            max_dt=0.0025,
+            orbit_bound=80.0,
+            lyapunov_steps=2_000_000,
+        ),
+        "lorenz96_4": dict(
+            params={"F": 20.0},
+            dim=4,
+            observed_index=0,
+            initial_state=(20.0, 20.01, 20.0, 20.0),
+            max_dt=0.005,
+            orbit_bound=60.0,
+            lyapunov_steps=1_000_000,
+        ),
     }
     for name, fields in expected.items():
         spec = SYSTEMS[name]
         assert spec.name == name
         for key, value in fields.items():
             assert getattr(spec, key) == value, (name, key)
+    assert set(expected) == set(EXTENSION)
     assert SYSTEMS["lorenz63_r166"].field_fn is systems.lorenz63_field
+    assert SYSTEMS["hindmarsh_rose"].field_fn is systems.hindmarsh_rose_field
+    assert SYSTEMS["hyper_jha"].field_fn is systems.hyper_jha_field
+    assert SYSTEMS["lorenz96_4"].field_fn is systems.lorenz96_ring_field
 
 
 # ------------------------------------------------- A1 field, A2 Jacobian
@@ -221,7 +280,38 @@ STATES = {
         (0.0625, 9.0, 4.0),
         (3.0, -5.25, -9.75),
     ],
+    "hindmarsh_rose": [
+        (0.1015625, 0.0625, 0.125),
+        (0.5, -0.25, 0.125),
+        (-0.75, 0.375, -0.125),
+        (1.5, -0.125, 0.25),
+        (-0.0625, 0.5, -0.375),
+    ],
+    "hyper_jha": [
+        (1.0, 1.0, 1.0, 1.0),
+        (-12.5, 7.25, 30.0, -60.5),
+        (20.0, -15.125, 22.5, 150.0),
+        (0.125, 2.0, 10.0, -0.5),
+        (-30.5, -3.75, 40.25, 300.0),
+    ],
+    "lorenz96_4": [
+        (20.0, 20.01, 20.0, 20.0),
+        (2.5, -3.25, 8.0, 1.5),
+        (-10.5, 4.75, 12.0, -6.25),
+        (18.0, 0.5, -7.5, 9.0),
+        (0.125, 6.0, -14.5, 3.0),
+    ],
 }
+
+# Round-off bound factor K of A1 and A2: ``|diff| <= K eps sum|terms|``. Each
+# evaluation (code and reference) of a component with ``q`` floating-point
+# operations on the path of its worst term and ``n`` terms has a relative error
+# of at most ``(q + n - 1) eps / 2`` of ``sum|terms|``, and the difference of
+# two such evaluations at most ``(q + n - 1) eps``. For the sums of at most
+# three terms of two operations (S1 to S3, S5, S6) this is at most 4; for S4
+# (``a x^3 / tx`` is four operations, five terms) it is 8.
+TOLERANCE_FACTOR = {name: 4.0 for name in EXTENSION}
+TOLERANCE_FACTOR["hindmarsh_rose"] = 8.0
 
 
 def reference_field(name: str, state: np.ndarray, p: dict) -> tuple:
@@ -232,7 +322,8 @@ def reference_field(name: str, state: np.ndarray, p: dict) -> tuple:
     ``x' = -y - z, y' = x + a y + w, z' = b + x z, w' = -c z + d w``.
     S2 (Lorenz 1963): ``x' = sigma (y - x), y' = x (rho - z) - y,
     z' = x y - beta z``. S3 (Rossler 1976 with the state ordered (z, x, y)):
-    ``z' = b + z (x - c), x' = -y - z, y' = x + a y``.
+    ``z' = b + z (x - c), x' = -y - z, y' = x + a y``. S4 to S6: the relayed
+    Dysts ``_rhs`` lines, typed in the branches below.
     """
     s = [float(v) for v in state]
     if name == "rossler_hyper":
@@ -250,12 +341,45 @@ def reference_field(name: str, state: np.ndarray, p: dict) -> tuple:
             [x * p["rho"], -x * z, -y],
             [x * y, -p["beta"] * z],
         ]
-    else:
+    elif name == "rossler_z":
         z, x, y = s
         terms = [
             [p["b"], z * x, -z * p["c"]],
             [-y, -z],
             [x, p["a"] * y],
+        ]
+    elif name == "hindmarsh_rose":
+        # Typed from the relay of Dysts ``HindmarshRose._rhs`` (researcher note
+        # 2026-10-20, equations relay), lines 4 to 6 of the quoted class.
+        x, y, z = s
+        a, b, c, d = p["a"], p["b"], p["c"], p["d"]
+        sp, tx, tz = p["s"], p["tx"], p["tz"]
+        terms = [
+            [-x, 1 / tx * y, -a / tx * x**3, b / tx * x**2, 1 / tx * z],
+            [-a * x**3, -(d - b) * x**2, z],
+            [-sp / tz * x, -1 / tz * z, c / tz],
+        ]
+    elif name == "hyper_jha":
+        # Relay of Dysts ``HyperJha._rhs`` (same note), lines 4 to 7.
+        x, y, z, w = s
+        a, b, c, d = p["a"], p["b"], p["c"], p["d"]
+        terms = [
+            [a * y, -a * x, w],
+            [-x * z, b * x, -y],
+            [x * y, -c * z],
+            [-x * z, d * w],
+        ]
+    else:
+        # Relay of Dysts ``Lorenz96.rhs`` (same note), lines 4 to 7, written out
+        # for N = 4 (``X[-2] = X2``, ``X[-1] = X3``, ``X[-3] = X1``, and the
+        # slice ``Xdot[2:-1]`` is the single entry ``Xdot[2]``).
+        x0, x1, x2, x3 = s
+        f = p["F"]
+        terms = [
+            [(x1 - x2) * x3, -x0, f],
+            [(x2 - x3) * x0, -x1, f],
+            [(x3 - x0) * x1, -x2, f],
+            [(x0 - x1) * x2, -x3, f],
         ]
     value = np.array([sum(t) for t in terms])
     scale = np.array([sum(abs(v) for v in t) for t in terms])
@@ -268,10 +392,11 @@ def test_extension_fields_match_the_quoted_equations() -> None:
     Reference: ``reference_field`` (equations in its docstring), evaluated in
     float64 NumPy at five dyadic states per system, independent of the code.
 
-    Tolerance: ``|diff| <= 4 eps sum|terms|`` per component, the round-off
-    bound of a sum of at most three products (each product and each addition
-    adds at most eps/2 relative, so 2.5 eps would do; 4 eps leaves margin for
-    the order of summation inside XLA).
+    Tolerance: ``|diff| <= K eps sum|terms|`` per component with ``K`` from
+    ``TOLERANCE_FACTOR`` (derivation there: 4 for sums of at most three terms,
+    8 for S4). For S4 to S6 the reference is the relayed Dysts code (the
+    transcribed ``_rhs`` lines, which specification note 2 section 12 requires
+    to be matched term by term), so this test is that match.
     """
     for name in EXTENSION:
         spec = SYSTEMS[name]
@@ -281,7 +406,8 @@ def test_extension_fields_match_the_quoted_equations() -> None:
             )
             want, scale = reference_field(name, np.asarray(state), spec.params)
             assert got.shape == (spec.dim,)
-            assert np.all(np.abs(got - want) <= 4 * EPS * scale), (
+            factor = TOLERANCE_FACTOR[name]
+            assert np.all(np.abs(got - want) <= factor * EPS * scale), (
                 name,
                 state,
                 got - want,
@@ -314,7 +440,7 @@ def analytic_jacobian(name: str, state: tuple, p: dict) -> tuple:
             [abs(rho) + abs(z), 1.0, abs(x)],
             [abs(y), abs(x), abs(bt)],
         ]
-    else:
+    elif name == "rossler_z":
         z, x, y = state
         a, c = p["a"], p["c"]
         jac = [[x - c, z, 0.0], [-1.0, 0.0, -1.0], [0.0, 1.0, a]]
@@ -323,6 +449,56 @@ def analytic_jacobian(name: str, state: tuple, p: dict) -> tuple:
             [1.0, 0.0, 1.0],
             [0.0, 1.0, abs(a)],
         ]
+    elif name == "hindmarsh_rose":
+        x, y, z = state
+        a, b, d = p["a"], p["b"], p["d"]
+        sp, tx, tz = p["s"], p["tx"], p["tz"]
+        jac = [
+            [-1.0 + (-3 * a * x**2 + 2 * b * x) / tx, 1 / tx, 1 / tx],
+            [-3 * a * x**2 - 2 * (d - b) * x, 0.0, 1.0],
+            [-sp / tz, 0.0, -1 / tz],
+        ]
+        scale = [
+            [
+                1.0 + (3 * a * x**2 + 2 * abs(b * x)) / tx,
+                1 / tx,
+                1 / tx,
+            ],
+            [3 * a * x**2 + 2 * abs((d - b) * x), 0.0, 1.0],
+            [abs(sp) / tz, 0.0, 1 / tz],
+        ]
+    elif name == "hyper_jha":
+        x, y, z, w = state
+        a, b, c, d = p["a"], p["b"], p["c"], p["d"]
+        jac = [
+            [-a, a, 0.0, 1.0],
+            [-z + b, -1.0, -x, 0.0],
+            [y, x, -c, 0.0],
+            [-z, 0.0, -x, d],
+        ]
+        scale = [
+            [abs(a), abs(a), 0.0, 1.0],
+            [abs(z) + abs(b), 1.0, abs(x), 0.0],
+            [abs(y), abs(x), abs(c), 0.0],
+            [abs(z), 0.0, abs(x), abs(d)],
+        ]
+    else:
+        # X_k' = (X_{k+1} - X_{k-2}) X_{k-1} - X_k + F, indices mod 4:
+        # d/dX_{k+1} = X_{k-1}; d/dX_{k-2} = -X_{k-1}; d/dX_{k-1} =
+        # X_{k+1} - X_{k-2}; d/dX_k = -1.
+        n = 4
+        jac = np.zeros((n, n))
+        scale = np.zeros((n, n))
+        for k in range(n):
+            up, down, prev = (k + 1) % n, (k - 2) % n, (k - 1) % n
+            jac[k, up] += state[prev]
+            jac[k, down] -= state[prev]
+            jac[k, prev] += state[up] - state[down]
+            jac[k, k] -= 1.0
+            scale[k, up] += abs(state[prev])
+            scale[k, down] += abs(state[prev])
+            scale[k, prev] += abs(state[up]) + abs(state[down])
+            scale[k, k] += 1.0
     return np.array(jac), np.array(scale)
 
 
@@ -332,8 +508,9 @@ def test_extension_jacobians_match_the_analytic_ones() -> None:
     Reference: the partial derivatives of the equations of ``reference_field``,
     differentiated by hand in ``analytic_jacobian``, at the same states.
 
-    Tolerance: ``|diff| <= 4 eps sum|terms|`` per entry (each entry is at most
-    a difference of two products; autodiff adds no truncation error).
+    Tolerance: ``|diff| <= K eps sum|terms|`` per entry, ``K`` from
+    ``TOLERANCE_FACTOR`` (each entry is a sum of at most a few products;
+    autodiff adds no truncation error).
     """
     for name in EXTENSION:
         spec = SYSTEMS[name]
@@ -342,7 +519,8 @@ def test_extension_jacobians_match_the_analytic_ones() -> None:
             got = np.asarray(jac_fn(jnp.asarray(state)), dtype=float)
             want, scale = analytic_jacobian(name, state, spec.params)
             assert got.shape == (spec.dim, spec.dim)
-            assert np.all(np.abs(got - want) <= 4 * EPS * scale), (
+            factor = TOLERANCE_FACTOR[name]
+            assert np.all(np.abs(got - want) <= factor * EPS * scale), (
                 name,
                 state,
             )
@@ -370,6 +548,47 @@ def test_s3_is_the_registry_rossler_with_permuted_coordinates() -> None:
         assert np.all(np.abs(got - want) <= 4 * EPS * scale)
 
 
+def test_divergence_identities_pin_the_transcribed_equations() -> None:
+    """The trace of the Jacobian equals the closed-form divergence (S4 to S6).
+
+    Reference (specification note 2, sections 6 and 12): S5
+    ``-a - 1 - c + d`` (a constant, = -12.367), S6 ``-N`` = -4 exactly (the
+    quadratic term never contains ``X_k`` itself), S4
+    ``-1 + (2 b x - 3 a x^2) / tx - 1 / tz`` (state dependent). The sums are
+    typed here from the equations, not read from the code; the trace is taken
+    from ``jax.jacfwd`` of the code's field at the five dyadic states.
+
+    Tolerance: ``K eps sum|terms|`` with ``K`` from ``TOLERANCE_FACTOR`` times
+    the number of diagonal terms (a sum of ``m`` diagonal entries adds ``m - 1``
+    roundings of the same size): 4 * 4 eps for S5 and S6, 8 * 3 eps for S4.
+    """
+    for name in ("hindmarsh_rose", "hyper_jha", "lorenz96_4"):
+        spec = SYSTEMS[name]
+        p = spec.params
+        jac_fn = jax.jacfwd(lambda s, spec=spec: spec.field_fn(s, spec.params))
+        for state in STATES[name]:
+            trace = float(np.trace(np.asarray(jac_fn(jnp.asarray(state)))))
+            if name == "hyper_jha":
+                want = -p["a"] - 1.0 - p["c"] + p["d"]
+                scale = p["a"] + 1.0 + p["c"] + p["d"]
+            elif name == "lorenz96_4":
+                want, scale = -4.0, 4.0
+            else:
+                x = state[0]
+                want = (
+                    -1.0
+                    + (2 * p["b"] * x - 3 * p["a"] * x**2) / p["tx"]
+                    - 1.0 / p["tz"]
+                )
+                scale = (
+                    1.0
+                    + (2 * abs(p["b"] * x) + 3 * p["a"] * x**2) / p["tx"]
+                    + 1.0 / p["tz"]
+                )
+            bound = TOLERANCE_FACTOR[name] * spec.dim * EPS * scale
+            assert abs(trace - want) <= bound, (name, state, trace, want)
+
+
 # ------------------------------------------------------- A3 RK4 order
 
 
@@ -394,7 +613,19 @@ def _attractor_states(name: str, count: int) -> list[np.ndarray]:
 # count was fixed again from a second scan (n = 160 gave orders 4.08, 4.43,
 # 3.75; 320 gave 4.04, 4.30, 3.88; 640 gives 4.02, 4.18, 3.94; 1280 gives
 # 4.01, 4.10, 3.97): 640 is the smallest count with all three in the interval.
-COARSE_SUBSTEPS = {"rossler_hyper": 640, "lorenz63_r166": 640, "rossler_z": 160}
+COARSE_SUBSTEPS = {
+    "rossler_hyper": 640,
+    "lorenz63_r166": 640,
+    "rossler_z": 160,
+    # S4 to S6: the smallest count of the scan (n = 80 ... 1280, T = 0.5 LT) with
+    # all three observed orders in [3.8, 4.2], fixed before the test was written
+    # (S4: n = 80 gave 4.60, 3.88, 3.92, n = 160 gives 3.97, 3.94, 3.96; S5: 160
+    # gave 4.09, 3.78, 3.73, 320 gives 4.05, 3.90, 3.89; S6: 80 gives 3.96,
+    # 3.98, 4.04). Premise window met: e2 above 1e-11 and e1 below 1e-3.
+    "hindmarsh_rose": 160,
+    "hyper_jha": 320,
+    "lorenz96_4": 80,
+}
 
 
 @pytest.mark.parametrize("name", EXTENSION)
@@ -620,3 +851,30 @@ def test_lyapunov_references_cover_every_registry_system() -> None:
     other = [ln for ln in lines if ln.startswith("| lorenz63_r166")]
     assert len(other) == 1
     assert "no confirmed published value" in other[0]
+
+
+def test_lyapunov_rows_of_s4_to_s6_have_no_published_value() -> None:
+    """S4 to S6 have empty reference lists and print the no-value row.
+
+    Reference: specification note 2 section 6 (no published lambda for any of
+    the three; the Dysts Lyapunov fields are not references) and the main
+    session's brief: S6 is Lorenz-96 at N = 4, F = 20, and published Lorenz-96
+    spectra for other N and F are not this system. Exact substring checks.
+    """
+    from lpcstudy import report
+
+    names = ("hindmarsh_rose", "hyper_jha", "lorenz96_4")
+    for name in names:
+        assert report.LYAPUNOV_REFERENCES[name] == []
+    results = {
+        "systems": {n: {"context": {"lambda_max": LAMBDA[n]}} for n in names}
+    }
+    lines = report._lyapunov_lines(results, list(names))
+    for name in names:
+        row = [ln for ln in lines if ln.startswith(f"| {name} ")]
+        assert len(row) == 1
+        assert "no confirmed published value" in row[0]
+        assert "DEC-0010" not in row[0]
+        assert ("published Lorenz-96 spectra" in row[0]) == (
+            name == "lorenz96_4"
+        )

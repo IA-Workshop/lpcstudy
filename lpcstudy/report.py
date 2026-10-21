@@ -160,6 +160,9 @@ EXTENSION_SYSTEMS: tuple[str, ...] = (
     "rossler_hyper",
     "lorenz63_r166",
     "rossler_z",
+    "hindmarsh_rose",
+    "hyper_jha",
+    "lorenz96_4",
 )
 PER_SYSTEM_VERDICT = "per-system only"
 EXTENSION_NOTE = (
@@ -876,6 +879,13 @@ LYAPUNOV_REFERENCES: dict[str, list[tuple[float, float, str]]] = {
     ],
     "lorenz63_r166": [],
     "rossler_z": [],
+    # WU-0023: no confirmed published value for any of the three (the Dysts
+    # Lyapunov fields are not references, researcher notes 2026-10-20). S6 is
+    # Lorenz-96 at N = 4, F = 20: published Lorenz-96 spectra are for other
+    # N and F and are not this system.
+    "hindmarsh_rose": [],
+    "hyper_jha": [],
+    "lorenz96_4": [],
 }
 # A different Chua parameter set (alpha 9, beta 100/7, m0 -8/7, m1 -5/7):
 # 0.23 per circuit time of the memo, divided by 0.7 (tau = 0.7 t, derived),
@@ -916,10 +926,16 @@ def _lyapunov_lines(results: dict, systems: list[str]) -> list[str]:
         references = LYAPUNOV_REFERENCES[s]
         if s in EXTENSION_SYSTEMS and not references:
             # DEC-0010 (the Chua retrieval decision) does not cover these.
+            other = (
+                "; published Lorenz-96 spectra are for other N and F, not "
+                "this system (N = 4, F = 20)"
+                if s == "lorenz96_4"
+                else ""
+            )
             lines.append(
                 f"| {s} | {code} | none | no confirmed published value | "
                 "n/a | not validated: no confirmed published value at these "
-                "parameters (extension system, WU-0021) |"
+                f"parameters (extension system, WU-0021{other}) |"
             )
             continue
         if not references:
