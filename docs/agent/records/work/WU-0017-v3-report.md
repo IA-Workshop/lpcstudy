@@ -125,6 +125,43 @@ Result: 10 of 10 match to the printed digits (rows 3 and 4 and the interval rows
 
 NVVUQ.22 six items per QoI and NVVUQ.16 four items per interval: not checked here. WU-0017.3: pending; owner and student read.
 
+### 2026-10-21 (later) WU-0017.1: NVVUQ.22 and NVVUQ.16 item check, on the stored `RESULTS.md` (byte-equal to the regenerated one; `2a4c1d06...4577`)
+
+Items read from `docs/agent/governance/LVL1-profile-NVVUQ.md`: **NVVUQ.22** (six): value; interval or uncertainty budget; numerical-error estimate; verification and validation status (VV.5); confirmatory or exploratory; provenance of inputs. **NVVUQ.16** (four): procedure; level; dependence assumed; multiplicity adjustment. Method: reading the file with line numbers, plus one throwaway script that tests each interval-label line for the four keywords. "Present" means a statement for that QoI itself; a global statement is marked "global". Absent items are reported as gaps; nothing was edited.
+
+Where things are in `RESULTS.md`: header and provenance block lines 1-35 (global); verdict table with values and intervals lines 156-175; interval labels, one per row, lines 179-192 (and an intervals paragraph at line 215); QoI table with the "Confirmatory or exploratory" column lines 200-213; uncertainty budget tables (NVVUQ.15) only for H2a(i) line 405, H2a(ii) line 431, H2b(i) line 459, H2b(ii) line 485 and H3c line 511 (line 403: "the secondaries have no table yet"); the "partly unverified" statement under each budget table at lines 427, 455, 481, 507, 535; validation gate line 156 (global result) and lines 305-320.
+
+NVVUQ.22, per QoI (rows are the 14 identifiers of the QoI table):
+
+| QoI | 1 value | 2 interval or budget | 3 numerical-error estimate | 4 V&V status (VV.5) | 5 confirmatory or exploratory | 6 provenance |
+|---|---|---|---|---|---|---|
+| H2a(i), H2a(ii) | present (line 156 table) | present (156; label 184; budget 405, 431) | present (budget rows: bootstrap MC, RK4, round-off; the iterative LM row is "not estimated") | partial: per-QoI sentence "partly unverified (DEC-0024)" lines 427, 455; gate result global (156) | present (line 205: "primary, confirmatory by design") | global (lines 1-35) |
+| H2b(i), H2b(ii) | present | present (label 185; budget 459, 485) | present (same rows; LM "not estimated") | partial: lines 481, 507; gate global | present (line 206) | global |
+| H3c | present | present (label 192; budget 511) | present (LM "not estimated") | partial: line 535; gate global | present (line 213) | global |
+| H1a, H1b, H1c, H1d | present | present (labels 179-182) | **absent**: no budget table (line 403) | **absent per QoI**: gate global only | present (lines 200-203: "secondary, pre-registered ...; exploratory on development seeds") | global |
+| Q-N | present (two readings) | present (label 183) | **absent** | **absent per QoI** | present (line 204) | global |
+| H2c, H2d, H2e | present | present (labels 186-188) | **absent** | **absent per QoI** | present (lines 207-209) | global |
+| (reported) gain bound | present (fraction) | none by design: "reported with no interval" (label 189) | **absent** | **absent per QoI** | present (line 210: "reported only") | global |
+| H3a | present (p-values) | present (label 190: Holm p, no interval) | **absent** | **absent per QoI** | present (line 211) | global |
+| H3b | present | present (label 191) | **absent** | **absent per QoI** | present (line 212) | global |
+
+Gaps for NVVUQ.22 (reported, not edited): (G1) no per-QoI numerical-error estimate for the nine secondary or reported rows (the report itself says "the secondaries have no table yet", line 403); (G2) no per-QoI V&V status for those nine rows beyond the global validation gate and the LM and P2(c) diagnostics subsections (lines 339-399); the per-QoI "partly unverified" sentence exists only under the five primary budget tables; (G3) the status column of the secondaries reads "exploratory on development seeds" next to "pre-registered", which in a confirmatory run does not say whether the secondary is confirmatory in this run (the text on each primary says "confirmatory only in the confirmatory run"; a reader must infer it for the secondaries); (G4) provenance is given once for the file (header lines 1-35), not per QoI, which is how the file is built and probably acceptable, but it is global. v3 section 8 and the findings document carry the secondaries' limitations in words.
+
+NVVUQ.16, per interval label (lines 179-192, each tested by script for the four keywords `procedure:`, `level:`, `dependence:`, `multiplicity:`):
+
+| Interval (label line) | procedure | level | dependence | multiplicity |
+|---|---|---|---|---|
+| H1a 179, H1b 180, H1c 181, H1d 182, Q-N 183, H2c 186, H2d 187, H2e 188, H3b 191 | present | present (95%) | present (blocks of 5) | present ("none (secondary, unadjusted)" or "none (an estimate ...)"); intersection-union across systems stated |
+| H2a 184, H2b 185, H3c 192 (primaries) | present | present: 1 - 0.05/3 (98.33%) | present | present: Bonferroni over the three primaries (H2a, H2b, H3c); intersection-union across systems |
+| (reported) 189 | present: "none, a fraction ... reported with no interval" | "not applicable" | "not applicable" | present ("none") |
+| H3a 190 | present (Holm-adjusted log-rank, p-values, no interval) | present ("each adjusted p must be below 0.01") | present (states treated as independent, stated) | present (Holm within a system, intersection-union across) |
+
+Result: 14 of 14 labels carry all four items (the script found the four keywords in each of the 14 lines 179-192). No NVVUQ.16 gap in the labels. A figure that shows intervals must say what they are: none of the four `RESULTS.md` figures shows an interval (captions say so).
+
+The three primaries labeled with level 1 - 0.05/3 and the intersection-union rule stated: **met** for H2a, H2b and H3c (lines 184, 185, 192: "level: 1 - 0.05/3 (98.33%)", "Bonferroni over the three primaries (H2a, H2b, H3c)", "intersection-union across systems"; the same rule in the paragraph at line 215 and in the QoI table lines 205, 206, 213 "level 1 - 0.05/3 (v3 section 7)"). The verdict-rule paragraph at line 153 states the all-systems-must-pass rule in words ("supported if it passes on all three systems") without the term "intersection-union".
+
+WU-0017.1 status after this check: regeneration met; ten-number sample met; NVVUQ.16 met; NVVUQ.22 met for the five primary budget QoIs and with gaps G1 to G3 for the other nine rows (to the owner: state them as limitations in the promoted report text, or accept). The figure map proposal for WU-0017.2 is `docs/agent/notes/2026-10-21-promotion-figure-map.md`.
+
 ## Review
 
 - **Reviewer:** none yet.
