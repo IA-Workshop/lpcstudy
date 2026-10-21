@@ -733,3 +733,14 @@ The owner-review list of DEC-0038 addendum A1 gains: the names in `EXTENSION_SYS
 5. **Theorem items 1 to 3.** (1) The branches wu/theory-verify (WU-0027) and wu/theory-dumps (WU-0028) are merged to develop; WU-0029 (dump schema /3) is added to the ROADMAP. (2) The errata of the C1.2 draft are appended to `docs/study/theorem_program_lpc_v1.md` (dated, 6 October text unchanged); the C1.3 decision is taken as option C (keep the ln 2/(2Λ̄) row with the envelope and raw-C fixes, add P1(d′) as a verification row), implemented as WU-0031 on development seeds with acceptance criteria fixed in the draft, owner review of the statistics code before any use. (3) The audit and check fixes of WU-0027 (checks that cannot fail, stronger hypotheses than named, uncounted censored skips) go into WU-0029 and WU-0031 and are counted, not silent.
 
 **Affects:** WU-0015 to WU-0018, WU-0027 to WU-0031, the promotion path, the audit. **Status:** owner instruction; recorded pending the owner's ledger entries.
+
+## DEC-0041: Owner accepts DEF-0022 (the H2a(ii) power finding) as a known limitation and asks for proposals to improve the quality of the interval results (2026-10-21, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim, in answer to `docs/agent/notes/2026-10-21-def0022-proposal.md`: "Accept, and propose new intervals to improve the quality of the results".
+
+**Reading, for the owner to correct.**
+1. **Accepted: option 1** of the proposal (accept as a known limitation, with the full-size evidence stated; text B for the promoted report; the same wording in section 10 of the findings document; no change to any verdict, band, level or number of the sealed run). If the owner meant option 2 (a per-part interval line in the report), say so.
+2. **"New intervals to improve the quality of the results"** is read as a request for **proposals** for the design of future or development work, not as a change to the sealed analysis. The pre-registered intervals, levels, bands and rules of v3 and the sealed CONF-1 verdicts are not changed: a change after the result was seen would be a post hoc criterion (PRIME.2, VV.3). Proposals go to the applied-mathematician (WU-0032), are labeled post hoc and exploratory, are evaluated on development seeds or on stored sealed intervals only as arithmetic about power, and would apply to a future pre-registered study or to the development extension, after the owner's ruling.
+3. After the owner's ledger entry: the defects status line of the DEF-0022 proposal (ii) is appended by the owner, the findings document is rebuilt with the ruled wording and checked.
+
+**Affects:** DEF-0022, WU-0017 (report limitations list), WU-0032. **Status:** owner instruction; recorded pending the owner's ledger entry.
