@@ -370,3 +370,14 @@ Append, do not edit: a dated block listing WU-0009 to WU-0019 with the dependenc
 **Critical path (phase H).** WU-0021.2 → .4 → .5 → .6 → .7 → .8 → .9 (2026-10-22), then WU-0023.2 → .3 → .4 → .5 (2026-10-26), then WU-0025.5 → .6 (2026-10-27). WU-0022, WU-0024, WU-0025.1 to .4 and WU-0026 run beside it. Day-by-day schedule, the GPU queue, the CPU constraint and the drop order are in `docs/agent/notes/2026-10-20-extension-schedule.md`.
 
 **Out of scope for phase H.** Lorenz-96 (named in LPC.PC.1 and D3) and any misspecified-model arm. Maps, delay equations and PDEs, because the design's PLP is undefined for them (math note 2026-10-19 §A.2). Any change to the three studied systems' code paths, the verdict rules or the frozen presets. Installing `dysts` (O4: values are transcribed by hand with citations). Any confirmatory run on a new system: that would need a new sealed seed and a new freeze, which only the owner can decide.
+
+### Additions of 2026-10-21 (DEC-0040; take effect when the owner appends an `amendment` entry)
+
+| Id | Title | Owner | Depends on | Class | Serves | Radius | Effort |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| WU-0027 | Verification of the theorem proofs and checks (SymPy and numerics); drafts C1.2 and C1.3. Done, merged. | applied-mathematician | — | CSQ3 | theorem program | none | M |
+| WU-0028 | Theory checks on the existing per-state dumps (DEV-1, DEV-2). Done, merged. | developer | — | CSQ3 | theorem program | none | M |
+| WU-0029 | Dump schema /3 for N2, N3, N7, N4, N6, N8 (rho and theta in meta, per-horizon moments, A5 at every K, switching indicators, mismatch vector, Σ_s, Γ_H, competitor gaps, analog index, A, z, q); checks that can fail; censored skips counted. Development seeds. Owner review (provenance and statistics code). | developer | WU-0027, WU-0028 | CSQ3 | theorem program | per plan | L |
+| WU-0030 | One-command ledger entry tool `tools/enter.sh` and README process | developer | — | CSQ2 | PRIME.5, M2 of the audit | `tests/unit` for the tool | S |
+| WU-0031 | Gain screen option C: envelope and raw-C fixes and P1(d′) verification row (acceptance criteria in `2026-10-21-draft-gain-screen-decision.md` section 4). Reported-only quantity; no verdict depends on it. | developer | WU-0027 | CSQ3 | DEC-0033 M3, DEC-0040 | per plan | M |
+| WU-0015 to WU-0018 | Records and the report-only check (B1 of the audit) | main session | — | CSQ2 | promotion | none | S |
