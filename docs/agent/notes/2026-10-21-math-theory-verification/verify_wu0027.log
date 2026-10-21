@@ -1,0 +1,33 @@
+OK   A1.2 V = c(w-u)^2 + V(u)           
+OK   A1.3 c u = E_P - C ; c(1-u) = E_C - C 
+OK   A1.4 step 6-7 identity             
+OK   A1.5 counterexample V(1/2)=0 at (1,1,-1) 
+OK   L7(iii) minV/m^2 = 1/(1+r^2)       
+OK   A1.8 P1(d') upper, C>=0 at H_1 only, switching envelope evaluated 2676, violations 0
+OK   A1.8 P1(d') lower bound (optimal hybrid) violations 0
+OK   A1.8 noisy criterion: T_h <= T_m^clean(sqrt2 theta') n=2757, violations 0
+OK   A1.8 noisy criterion: naive T_m^noisy(sqrt2 theta) also ok? n=2757, violations of naive form 0 (info)
+OK   A1.8 draw-dependent rule beats min_w V (0.5 < 0.8) so 'every allocation rule' needs the weight to be independent of the draw
+OK   A1.8 two-phase: gain 86 steps vs 6.93 bound 86, ln2/(2Lambda_bar) 6.931, cont. 86.6
+OK   A2.3 dw*/dq = P n/(Qq+n)^2         
+OK   A2.3 shortfall 1 - n/c             
+OK   A4.4 lemma exact rational 20000    violations 0
+OK   A4.1/A4.4 v1 L10(iii) with unclipped w*: true V(w_k)-V(u_i)=c_i(w_k-u_i)^2<=c_i eps^2
+OK   A5.3 L_K ~ 50, certified 0.054 LT  L_K=50.0 (box [-20.7 -27.4   1.8]..[19.8 25.8 48. ]), certified 0.0542 LT, linearized 3.00 LT, ratio 55
+OK   A6.3 trace form affine-invariant, whitener-independent max rel 2.9e-09
+OK   N2(a) u formula                    
+OK   N2(b) |m|(|mu|-|m|) <= mu^2/4      
+OK   N3(b) rank-one pencil and range    max err 8.5e-14
+OK   N4 minV/b = f(rho, b/a)            
+OK   N4(a) f' numerator = 2(s-rho)(1-rho s) 
+OK   N4 denominator = (1-rho s)^2 + s^2(1-rho^2) > 0 
+OK   N4 hypothesis C<=b iff rho<=sqrt(b/a) rho sqrt(ab) <= b  <=>  rho <= sqrt(b/a)
+OK   N6 with R_c^2 defined independently max err 4.2e-17
+OK   N7 p_j exact (MC 4e5)              p_j=0.00111 mc=0.00114
+OK   N7 p_j <= Phibar(Delta/2rho)       1.113e-03 <= 1.350e-03
+OK   N8 formula at mbar = 0             
+OK   N8 CRN form u = (q - y mbar)/(y^2+q), y = A/rho + z - mbar 
+OK   N8 CRN du/dy numerator = mbar y^2 - 2 q y - mbar q 
+FAIL N8 sign can differ with finite-M mean mbar (example found) none in 2e5 trials
+
+30/31 items agree
