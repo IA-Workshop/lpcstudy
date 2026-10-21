@@ -25,16 +25,23 @@ Decision on where outputs go (made 2026-10-21): `--report-only` rewrites `result
 - **Command for the owner to run** (or for a session when the lock is free), exactly:
 
 ```
+set -e
 cd /home/brianm/projects/physics/chaos/lpcstudy-wt/run/regen-freeze-1
-S=/tmp/wu0017-reportonly   # any empty directory outside the repository trees
+test -z "$(git status --short)"                      # the worktree must be clean
+.venv/bin/python -c 'import lpcstudy; print(lpcstudy.__file__)'   # must be under this worktree (freeze-1 code)
+S=$(mktemp -d)                                        # a fresh empty directory outside the repository trees
 mkdir -p $S/ro1/full $S/ro2/full
 cp /home/brianm/projects/physics/chaos/lpcstudy/runs/confirmatory/run-1/full/results.json $S/ro1/full/
 cp /home/brianm/projects/physics/chaos/lpcstudy/runs/confirmatory/run-1/full/results.json $S/ro2/full/
-flock -n /tmp/lpcstudy-gpu.lock env JAX_PLATFORMS=cpu .venv/bin/python -m lpcstudy --preset full --report-only --out $S/ro1
-flock -n /tmp/lpcstudy-gpu.lock env JAX_PLATFORMS=cpu .venv/bin/python -m lpcstudy --preset full --report-only --out $S/ro2
+sha256sum $S/ro1/full/results.json $S/ro2/full/results.json   # both must read ae4b0fe5bf488f6c147bce6c91a2398e87408f6a5d372ae66d89bdfc90b0cebe
+flock -n /tmp/lpcstudy-gpu.lock env JAX_PLATFORMS=cpu .venv/bin/python -m lpcstudy --preset full --report-only --out $S/ro1; echo "exit run 1: $?"
+flock -n /tmp/lpcstudy-gpu.lock env JAX_PLATFORMS=cpu .venv/bin/python -m lpcstudy --preset full --report-only --out $S/ro2; echo "exit run 2: $?"
+test -s $S/ro1/full/RESULTS.md && test -s $S/ro2/full/RESULTS.md   # both files must have been written by these runs
 sha256sum $S/ro1/full/RESULTS.md $S/ro2/full/RESULTS.md $S/ro1/full/results.json $S/ro2/full/results.json
 git status --short    # must print nothing
 ```
+
+  With `set -e` a non-zero exit (for example `flock -n` exiting 1 because the lock is held) stops the block before any hash is read, and the directory is new each time, so no `RESULTS.md` of an earlier attempt can be hashed. Record both exit codes (0 and 0) and the printed `lpcstudy.__file__` in this log.
 
   Acceptance: the two `RESULTS.md` hashes are equal to each other and to `2a4c1d06859d07584b1633c6e7f1b5df205ffe445402509834383fb474649577` (the stored `RESULTS.md` of run-1); the rewritten `results.json` is equal to `ae4b0fe5bf488f6c147bce6c91a2398e87408f6a5d372ae66d89bdfc90b0cebe` or the difference is explained. If the lock is held by an extension run, wait for it (do not poll in a loop) or the owner decides on a CPU-only exemption.
 - **Open question for the run (not decided here).** `--report-only` builds its configuration with the seed id that the command line gives; without the sealed-run option that is the default development seed id, not CONF-1. The header of `RESULTS.md` is printed from the stored provenance block, so the output is expected to be identical, but the code passes `config` to `verdicts()` and to the writers, so only the run can show it. If the two `RESULTS.md` files differ from the stored one, the likely cause is this seed id; the repeat then needs the sealed-run option with the owner's own environment, which only the owner can supply (an agent must not). Record the outcome here when it is known.

@@ -66,3 +66,14 @@ Findings-document changes (diff vs HEAD before the rebuild): three band labels, 
    - **m3:** the plan amendment of 2026-10-20 (A6: the source name `official_words` may be quoted inside `[CROSS-CHECK]`; WU-0020 log and `WU-0020-review.md`) is "to be confirmed by the owner" and is unconfirmed. One owner line.
    - **m8:** v3 section 9 has two items numbered "4." (lines 416-417, frozen text). Cosmetic; cite "item 4 (regeneration)" in every document. v3 is not edited.
 8. Merge of `wu/b1-minors` into develop (not done by me).
+
+## Fix round 1 (review `2026-10-21-b1-minors-review.md`, commit 6c81bb7; WU-0015, WU-0016, WU-0017, WU-0020, WU-0016.3)
+
+- R1 fixed: the proposal note now gives why DEF-0022 is open (`defects.md` line 271 superseding line 264; "v3 precision not reproduced" on 5 of 6 parts at full size, full-size report of WU-0003 lines 143-152; the sealed Rossler interior interval is wider than the band), option 1 and wordings A and B no longer use the "accepted as pre-registered limitation" or "as the precision list states" framing; the constant `def0022_proposed` was edited and the findings document rebuilt: `check passed: 1262 traced values, 0 problems`.
+- R2 fixed: no count in the bullet; the note says so.
+- R3 fixed: the owner block in `WU-0017-v3-report.md` uses `mktemp -d`, `set -e`, clean-tree and import-path checks, hashes the input copies, and tests that both `RESULTS.md` exist.
+- R4 fixed: WU-0015.2 states that the `run_preset.sh` launch path is not evidenced.
+- R5 fixed: the plan title is restored in the queue block and in WU-0016.
+- R6: new commits name WU ids; no history rewrite. The merge should name WU-0015 to WU-0018, WU-0016.3 and WU-0020 for commits a6debea, 80ad369, 43a47c7 and 8d32fb9.
+- Tests: no file under `tools/*.py` or `tests/` changed in this round; `tools/findings/design_constants.json` changed (text of one constant), radius `tests/unit/test_tools_findings_build.py`, run once (result below).
+- Test result: `tests/unit/test_tools_findings_build.py` 67 passed in 7.63s (once).

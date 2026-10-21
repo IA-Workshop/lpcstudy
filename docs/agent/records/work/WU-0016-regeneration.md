@@ -1,4 +1,4 @@
-# WU-0016: Regeneration and run comparison
+# WU-0016: Regeneration by another actor (by ruling, the owner: DEC-0035) and run comparison
 
 | Field | Value |
 | --- | --- |

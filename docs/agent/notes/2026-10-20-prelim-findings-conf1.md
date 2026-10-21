@@ -510,7 +510,7 @@ All items of v3 §8 apply, plus the registered deficiencies and rulings listed h
 - One realization per system: one sealed seed gives one set of data per system, so no replicate variation is estimated.
 - The block-sensitive label (a primary verdict that widening the half-width would change) is not computable for the sealed run, because the sealed run writes no states dump (owner default D6).
 - Q-N and the gain bound are reported and carry no verdict.
-- PROPOSED for owner review, not ruled (DEF-0022): the second part of H2a (the partial-correlation margin test) has low power at these sample sizes. It can be refuted but essentially cannot pass, as the precision list of v3 §7 states. The verdict words of its six parts are in section 5; their intervals are wide against the margin band of v3 §2, so an inconclusive word there means the interval was too wide to decide. The pre-registered rule is kept.
+- PROPOSED for owner review, not ruled (DEF-0022): the second part of H2a (the partial-correlation margin test) has low power at these sample sizes: it can be refuted but essentially cannot pass, which v3 §7 anticipated. The margin that v3 §7 projects for it is not reproduced part by part at the full sample size (DEF-0022 status line; the full-size report of WU-0003). In this run the stored interval of the Rossler interior part is wider than the margin band of v3 §2, so that part could not pass at any estimate. The verdict words of its parts are in section 5; an inconclusive word there means the interval was too wide to decide. The pre-registered rule is kept.
 
 ## 11. What it means and does not mean [STUDENT]
 
