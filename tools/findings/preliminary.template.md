@@ -53,6 +53,8 @@ Endpoints are rounded to four-digit precision for printing; every verdict uses t
 
 {{table:secondary}}
 
+{{const:h3b_edge_note}}
+
 Q-N, oracle values, read by the table of v3 §7 (a reading, never pass or fail):
 
 {{table:qn}}
@@ -99,7 +101,7 @@ The GPU run of the same seed is a cross-check, never the result (v3 §9 item 3, 
 
 ## 9. Reproducibility
 
-Regeneration of the official run by another actor (WU-0016, v3 §9 item 4): pending. One dated line is appended here after WU-0016.4.
+Regeneration of the official run (WU-0016, v3 §9 item 4): each dated line below is appended after the event it reports.
 
 ## 10. Limitations
 
@@ -123,6 +125,7 @@ All items of v3 §8 apply, plus the registered deficiencies and rulings listed h
 - One realization per system: one sealed seed gives one set of data per system, so no replicate variation is estimated.
 - The block-sensitive label (a primary verdict that widening the half-width would change) is not computable for the sealed run, because the sealed run writes no states dump (owner default D6).
 - Q-N and the gain bound are reported and carry no verdict.
+- {{const:def0022_proposed}}
 
 ## 11. What it means and does not mean [STUDENT]
 

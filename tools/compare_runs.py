@@ -260,8 +260,8 @@ OF7_POINTER = (
 )
 LABEL = "DEVELOPMENT: comparison of two runs, not a hypothesis test"
 REVIEW = (
-    "needs owner review before freeze (tolerance and verdict-comparison code; "
-    "CSQ2 use in WU-0016)"
+    "tolerance and verdict-comparison code, rules ratified by the owner "
+    "(DEC-0030 OF-5 and OF-7, DEC-0032 B9); CSQ2 use in WU-0016"
 )
 EXIT_OK, EXIT_FAIL, EXIT_UNDETERMINED = 0, 1, 2
 

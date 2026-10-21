@@ -180,7 +180,7 @@ Endpoints are rounded to four-digit precision for printing; every verdict uses t
 | lorenz63 | H2d | 0.2474 | [0.01448, 0.7442] | 0.95 (design value, not stored) | upper bound ≤ 0.10 (closed) | inconclusive |
 | lorenz63 | H2e rho-1% | 0.3933 | [0.3648, 0.4137] | 0.9500 | lower bound > 0 (strict) | pass |
 | lorenz63 | H2e rho-2% | 0.3437 | [0.3211, 0.3751] | 0.9500 | lower bound > 0 (strict) | pass |
-| lorenz63 | H3b weight tree | 0.606 | [0.3489, 0.8444] | 0.9500 | interval inside [0, 0.2) (strict) | fail |
+| lorenz63 | H3b weight tree | 0.606 | [0.3489, 0.8444] | 0.9500 | interval inside [0, 0.2) (closed at 0, open at 0.2) | fail |
 | lorenz63 | H3b horizon tree D | 0.2378 | [-0.08951, 0.5894] | 0.9500 | lower bound > 0 (strict) | inconclusive |
 | rossler | H1a rho-1% | 0.9642 | [0.8898, 1.066] | 0.9500 | interval inside [0.75, 1.25] (closed) | pass |
 | rossler | H1a rho-2% | 0.9366 | [0.8168, 1.085] | 0.9500 | interval inside [0.75, 1.25] (closed) | pass |
@@ -195,7 +195,7 @@ Endpoints are rounded to four-digit precision for printing; every verdict uses t
 | rossler | H2d | -0.04043 | [-0.1052, 0.01674] | 0.95 (design value, not stored) | upper bound ≤ 0.10 (closed) | pass |
 | rossler | H2e rho-1% | 0.3564 | [0.3348, 0.377] | 0.9500 | lower bound > 0 (strict) | pass |
 | rossler | H2e rho-2% | 0.2838 | [0.2574, 0.3043] | 0.9500 | lower bound > 0 (strict) | pass |
-| rossler | H3b weight tree | 0 | [0, 0.1301] | 0.9500 | interval inside [0, 0.2) (strict) | pass |
+| rossler | H3b weight tree | 0 | [0, 0.1301] | 0.9500 | interval inside [0, 0.2) (closed at 0, open at 0.2) | pass |
 | rossler | H3b horizon tree D | 0.3878 | [0.2117, 0.5109] | 0.9500 | lower bound > 0 (strict) | pass |
 | chua | H1a rho-1% | 0.9453 | [0.8646, 1.029] | 0.9500 | interval inside [0.75, 1.25] (closed) | pass |
 | chua | H1a rho-2% | 0.8167 | [0.7281, 0.9318] | 0.9500 | interval inside [0.75, 1.25] (closed) | inconclusive |
@@ -210,10 +210,12 @@ Endpoints are rounded to four-digit precision for printing; every verdict uses t
 | chua | H2d | -0.04999 | [-0.09802, -0.01685] | 0.95 (design value, not stored) | upper bound ≤ 0.10 (closed) | pass |
 | chua | H2e rho-1% | 0.2985 | [0.2841, 0.3203] | 0.9500 | lower bound > 0 (strict) | pass |
 | chua | H2e rho-2% | 0.2302 | [0.2017, 0.2517] | 0.9500 | lower bound > 0 (strict) | pass |
-| chua | H3b weight tree | 0.2036 | [0.05085, 0.4111] | 0.9500 | interval inside [0, 0.2) (strict) | inconclusive |
+| chua | H3b weight tree | 0.2036 | [0.05085, 0.4111] | 0.9500 | interval inside [0, 0.2) (closed at 0, open at 0.2) | inconclusive |
 | chua | H3b horizon tree D | 0.7592 | [0.5718, 0.865] | 0.9500 | lower bound > 0 (strict) | pass |
 
 Level cells that show a design value: 15.
+
+The band of the H3b weight tree is [0, 0.2): closed at 0 and open at 0.2 (v3 §2). An interval whose lower bound is exactly 0 is therefore inside the band, and the verdict words in the table are the stored ones.
 
 Q-N, oracle values, read by the table of v3 §7 (a reading, never pass or fail):
 
@@ -481,9 +483,10 @@ compare_runs result: PASS (exit 0). What a TD pass does not mean: it does not re
 
 ## 9. Reproducibility
 
-Regeneration of the official run by another actor (WU-0016, v3 §9 item 4): pending. One dated line is appended here after WU-0016.4.
+Regeneration of the official run (WU-0016, v3 §9 item 4): each dated line below is appended after the event it reports.
 
 - 2026-10-20: The owner regenerated the official run on the same commit from a clean worktree (the owner ran both executions, as the owner ruled). The comparison reports that every compared leaf is equal, apart from the run-record and timing leaves it excludes (tier T zero, result pass), so the regeneration agrees bitwise with the official run.
+- 2026-10-21: The document was rebuilt after the audit of the same day, from the same stored result files and the same release reference, with the template edited in three places (the regeneration sentence above, a note on the H3b band edge with its band label, and a proposed limitation that awaits an owner ruling). The rebuild ran on the branch that carries the extension code, not on the frozen commit; the builder imports nothing from the study code and reads only the stored result files, so no result number changed.
 
 ## 10. Limitations
 
@@ -507,6 +510,7 @@ All items of v3 §8 apply, plus the registered deficiencies and rulings listed h
 - One realization per system: one sealed seed gives one set of data per system, so no replicate variation is estimated.
 - The block-sensitive label (a primary verdict that widening the half-width would change) is not computable for the sealed run, because the sealed run writes no states dump (owner default D6).
 - Q-N and the gain bound are reported and carry no verdict.
+- PROPOSED for owner review, not ruled (DEF-0022): the second part of H2a (the partial-correlation margin test) has low power at these sample sizes: it can be refuted but essentially cannot pass, which v3 §7 anticipated. The margin that v3 §7 projects for it is not reproduced part by part at the full sample size (DEF-0022 status line; the full-size report of WU-0003). In this run the stored interval of the Rossler interior part is wider than the margin band of v3 §2, so that part could not pass at any estimate. The verdict words of its parts are in section 5; an inconclusive word there means the interval was too wide to decide. The pre-registered rule is kept.
 
 ## 11. What it means and does not mean [STUDENT]
 
