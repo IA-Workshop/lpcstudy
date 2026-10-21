@@ -300,3 +300,73 @@ Refused or spun off under LPC.PC.1 and LPC.AI.11; an agent that finds one necess
 ## 7. Changes to `queue.md` (for WU-0009.4)
 
 Append, do not edit: a dated block listing WU-0009 to WU-0019 with the dependencies of §2, and a line under the existing table stating that WU-0001 to WU-0008 are executed as the sub-tasks of this roadmap, with status tracked per sub-task in each unit file.
+
+## 8. Phase H. Extension: additional attractors and Dysts context
+
+**Amended 2026-10-20 (owner instruction DEC-0037).** Proposed by the planner (claude-opus-5-5) on branch `wu/ext-plan`; sections 1 to 7 above are unchanged. The owner's words are quoted in DEC-0037. Phase H is **exploratory development work** (CSQ3): development seeds only, labeled `DEVELOPMENT (DEV-n): not a hypothesis test`, never beside the sealed result, never confirmatory. It does not touch the freeze, the sealed verdict, `main`, phases F and G, or the promotion. The documents of WU-0017 and WU-0018 are built from `freeze-1` code, never from extension code.
+
+**What the owner's ledger entries must cover.** ROADMAP.md is a governed file, so this section takes effect only when the owner appends the entries. The planner does not append to the ledger.
+
+1. **An `amendment` entry for ROADMAP.md.** It names this section 8 (phase H, units WU-0021 to WU-0026) and the new SHA-256 of the file.
+2. **A `ruling` entry for DEC-0037 that settles scope.** LPC.PC.1 (project constitution) lists "new hypotheses, systems or rules not in the v3 design" as out of scope, to be refused or spun off. Section 5 above says the same. A ROADMAP amendment cannot override the constitution. The ruling must therefore say one of the following:
+   - (a) Phase H is a **spin-off** under LPC.PC.1's own words. It is development-only and labeled, and it lives in this repository on `develop`. This is recommended, because it needs no constitution change.
+   - (b) An `amendment` of LPC.PC.1 that adds a scoped exception.
+
+   Either way, the entry restates three things:
+   - Lorenz-96 and a misspecified-model arm stay out of scope, because the constitution names them.
+   - No new hypothesis, criterion or verdict applies to the three studied systems.
+   - The readings for the new systems are pre-specified exploratory readings and not v3 hypotheses.
+3. **The owner decisions O1 to O9 of `docs/agent/notes/2026-10-20-extension-schedule.md` §5,** or the planner defaults stated there.
+
+**Phase row (as in the table of section 1).**
+
+| Phase | Content | Entry | Exit gate | Owner checkpoint |
+| --- | --- | --- | --- | --- |
+| H. Extension | WU-0021 two new attractors (S1 hyperchaotic Rössler, S2 Lorenz-63 at r = 166.1; S3 Rössler observed through z optional); WU-0022 Dysts cross-check of the three studied systems; WU-0023 further Dysts systems; WU-0024 descriptive comparison with the Dysts benchmark; WU-0025 entry into the 10/28 materials; WU-0026 development ensemble records | DEC-0037 ledger entries (above); for code, the WU-0021.3 smoke reference | WU-0021 done by 2026-10-22; the development appendix reviewed by 2026-10-27 | Scope ruling; O1 to O9; the S3 guard change (DEF-0015 guard) if S3 is taken |
+
+**Tasks.**
+
+| Id | Title | Owner | Depends on | Class | Serves | Radius | Effort |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| WU-0021.1 | Dysts and literature values for S1 and S2 (and S3): equations, parameters, published λ spectrum, d_KY, Dysts metadata; note `docs/agent/notes/2026-10-20-researcher-dysts-extension.md` (running) | researcher | — | CSQ3 | VV.2, NVVUQ.13; DEC-0037 item 2 | none | M |
+| WU-0021.2 | Specification per system: parameters, `max_dt` (V6), orbit bound, start state, Lyapunov run length and target SE, delay check, preset and seed, the pre-specified exploratory readings, the regression requirement; note `docs/agent/notes/2026-10-20-math-extension-specs.md` (running) | applied-mathematician | WU-0021.1 for values; may start from the 2026-10-19 note | CSQ3 | VV.3, LPC.PC.21; math note 2026-10-19 §A.4, §C.3 | none | M |
+| WU-0021.3 | Freeze-1 smoke reference of the three frozen systems: smoke, DEV-0, `--systems lorenz63 rossler chua`, CPU, `LPC_THREADS=1`, from a clean tree whose `lpcstudy/` equals `freeze-1` | developer | — | CSQ3 | DEC-0037 item 3; LPC.PC.18 | smoke (CPU) | S |
+| WU-0021.4 | Additive implementation: `SystemSpec` entries and fields, start state, orbit bound, per-system Lyapunov run length if the specification asks for one, report reference rows, tests that name independent references | developer | WU-0021.2 (values), WU-0021.3 | CSQ3 | DEC-0037 items 2, 3 | core-module radius (see unit file) plus `tests/integration/`; two new slow tests run once | M |
+| WU-0021.5 | Smoke evidence: bitwise regression against WU-0021.3; one smoke per new system (plumbing, gate keys present) | developer | WU-0021.4 | CSQ3 | DEC-0037 item 3 | smoke (CPU) | S |
+| WU-0021.6 | Pilot, DEV-3, both new systems, GPU under the lock, `--skip-robustness`; V1 to V7 read at the v3 §6 criteria | developer (dispatch), main session (polling) | WU-0021.5; GPU free | CSQ3 | v3 §6 E0; LPC.AUTH.3 | pilot (gpu) | S (wall clock about 1 h) |
+| WU-0021.7 | Independent review (fresh context), at most two fix rounds, then merge to `develop` | reviewer; main session | WU-0021.5 | CSQ3 | LPC.PC.11, LPC.AI.7 | per review | M |
+| WU-0021.8 | Labeled development run per new system: full preset, DEV-3, GPU under the lock, `--skip-robustness`, from a clean worktree at the merged commit | developer (dispatch), main session | WU-0021.6, WU-0021.7 | CSQ3 | DEC-0037 item 1 | full (gpu) | S (wall clock 1 to 1.5 h) |
+| WU-0021.9 | Development note: gate, readings as pre-specified in WU-0021.2, per-system stored verdict words, λ and time-unit uncertainty; mathematician reads the readings | main session; applied-mathematician | WU-0021.8 | CSQ3 | DEC-0037; D4 | none | M |
+| WU-0022.1 | Dysts entries of Lorenz-63, Rössler and Chua: parameters, time and sampling convention, published or estimated λ_max with method; table against the code's parameters and the DEV-0 reference λ | researcher | — | CSQ3 | VV.2, NVVUQ.13; DEC-0010 limitation | none | S |
+| WU-0022.2 | Attribution of the Chua exponent difference: each candidate cause tested by a scratch computation (one thread, niced) | applied-mathematician | WU-0022.1 | CSQ3 | NVVUQ.13 | none | S |
+| WU-0023.1 | Recommendation of further Dysts systems against fixed selection rules (unit file); count capped by the owner (O9) | researcher | WU-0021.1 | CSQ3 | DEC-0037 (owner's item 2) | none | S |
+| WU-0023.2 | Specification per selected system, as WU-0021.2 | applied-mathematician | WU-0023.1 | CSQ3 | VV.3 | none | S per system |
+| WU-0023.3 | Implementation per system, as WU-0021.4 and .5, including the bitwise regression | developer | WU-0021.7, WU-0023.2 | CSQ3 | DEC-0037 | as WU-0021.4 | S per system |
+| WU-0023.4 | Pilot per system, DEV-3, GPU under the lock, `--skip-robustness`; review of .3 | developer; reviewer | WU-0023.3 | CSQ3 | v3 §6 E0 | pilot (gpu) | S per system |
+| WU-0023.5 | First-set development appendix table (gate, stored verdict words, λ, VPT) | main session | WU-0023.4 | CSQ3 | D4 | none | S |
+| WU-0024.1 | Benchmark definitions and published values: Gilpin (2023) and Zhang & Gilpin (2026), VPT definition, time unit, noise, training length, metrics | researcher | — | CSQ3 | v3 §6 V3; VV.2 | none | S |
+| WU-0024.2 | Mapping of units, noise and metrics between the benchmark and this study; comparability per row | applied-mathematician | WU-0024.1 | CSQ3 | NVVUQ.22 | none | S |
+| WU-0024.3 | Descriptive table with development values (ensemble runs, WU-0026) and cited published values; no ranking claim | main session | WU-0024.2, WU-0026.2 | CSQ3 | D4 | none | S |
+| WU-0025.1 | `tools/findings_build.py`: several `--development` runs (the ensemble) and `--extension` runs (systems outside v3) in appendix A, with the tool's guarantees kept | developer | — | CSQ3 | WU-0020 A2, A3, A6, A12; D4 | `tests/unit/test_tools_findings_build.py` | M |
+| WU-0025.2 | Independent review of .1 | reviewer | WU-0025.1 | CSQ3 | LPC.PC.11 | per review | S |
+| WU-0025.3 | Research statement: number-free paragraph on the extension and the Dysts context | planner or developer drafts; student edits | WU-0021.2, WU-0022.1 | CSQ3 | WU-0020.10 | none | S |
+| WU-0025.4 | Poster outline: the "no new DEV ensemble" line replaced; appendix panel and slide for the ensemble, the extension and the Dysts context; honesty checklist items | planner drafts; student edits | WU-0025.1 | CSQ3 | WU-0020.5; D4 | none | S |
+| WU-0025.5 | Build of appendix A from the reviewed inputs; cutoff 2026-10-26 18:00 | main session | WU-0025.2, WU-0026.2, WU-0021.9, WU-0023.5, WU-0024.3 (each if ready) | CSQ3 | D4 | none | S |
+| WU-0025.6 | Fresh-context review of appendix A and the updated statement and outline | reviewer | WU-0025.5 | CSQ3 | LPC.PC.11 | none | S |
+| WU-0026.1 | Ensemble records: manifest rows (DEV-1, DEV-3, DEV-4; full; GPU; develop 3dec086), GPU hours added to the tally | main session | the runs end | CSQ3 | LPC.PC.15, LPC.AUTH.3 | none | S |
+| WU-0026.2 | Gate flags and completeness per run, read by one-line `python -c`; inputs for WU-0025.5 | main session | WU-0026.1 | CSQ3 | v3 §6 E0 | none | S |
+
+**Definition of done and acceptance criteria, phase H** (fixed now, VV.3; the unit files carry the full form; a tolerance the applied-mathematician confirms may be tightened, never loosened).
+
+| Id | Definition of done | Acceptance criteria (checkable) |
+| --- | --- | --- |
+| WU-0021 | S1 and S2 in `SYSTEMS` on `develop`; one labeled full development run per system; development note | **R1 bitwise regression:** a smoke run (DEV-0, `--systems lorenz63 rossler chua`, CPU, `LPC_THREADS=1`) at the extension tip, compared with the WU-0021.3 reference by `tools/leafdiff.py`, differs only in leaves under `provenance/` and in `seconds` leaves. Zero tolerance: same CPU, same thread count and same inputs (WU-0009.3). **R2 additivity:** `git diff --numstat freeze-1 -- lpcstudy/` deletes no line except the lines named in the unit file. **R3** frozen specs and presets pinned by a test against literals from `git show freeze-1:lpcstudy/systems.py`. **Field, Jacobian, RK4 order, V6, bound and λ checks** as in the unit file, each with an independent reference. **Gate** V1 to V7 read at v3 §6. A failure marks the system provisional and is reported, never retuned. |
+| WU-0022 | Table and attribution note | Every value carries a source, a quote and a status (confirmed or not); the code's λ comes from the DEV-0 reference leaf; agreement is judged by \|Δ\| ≤ 3 × combined SE where an SE exists, otherwise the difference is reported without a verdict word; every candidate cause is tested or marked untested. |
+| WU-0023 | Up to the owner's cap of further systems with a pilot each; appendix table | Selection rules of the unit file; R1 to R3 again per added system; gate per v3 §6, failures reported. |
+| WU-0024 | Mapping table and descriptive table | Every row cites the benchmark text and names the code symbol; comparability is yes, partly or no, with a reason; zero hits of the banned ranking words of the unit file. |
+| WU-0025 | Tool extended and reviewed; appendix built; statement and outline updated | **Tool regression:** a render without the new arguments is byte-identical to the committed DEV-2 dry-run outputs, and the main session's re-render of the sealed document passes `check`, byte-identical to the committed one. Every new number is traced. Nothing is recomputed. `[DEVELOPMENT]` sources appear only in appendix A. |
+| WU-0026 | Records complete | One manifest row per run with commit, seed id, device, wall clock and the SHA-256 of `results.json`; `git diff --quiet freeze-1 3dec086 -- lpcstudy/` recorded. |
+
+**Critical path (phase H).** WU-0021.2 → .4 → .5 → .6 → .7 → .8 → .9 (2026-10-22), then WU-0023.2 → .3 → .4 → .5 (2026-10-26), then WU-0025.5 → .6 (2026-10-27). WU-0022, WU-0024, WU-0025.1 to .4 and WU-0026 run beside it. Day-by-day schedule, the GPU queue, the CPU constraint and the drop order are in `docs/agent/notes/2026-10-20-extension-schedule.md`.
+
+**Out of scope for phase H.** Lorenz-96 (named in LPC.PC.1 and D3) and any misspecified-model arm. Maps, delay equations and PDEs, because the design's PLP is undefined for them (math note 2026-10-19 §A.2). Any change to the three studied systems' code paths, the verdict rules or the frozen presets. Installing `dysts` (O4: values are transcribed by hand with citations). Any confirmatory run on a new system: that would need a new sealed seed and a new freeze, which only the owner can decide.
