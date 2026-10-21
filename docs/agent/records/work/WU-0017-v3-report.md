@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | WU-0017.1 **not executed** (blocked: the two `--report-only` runs were refused by a hook, see the log; command for the owner below). WU-0017.2 not started. WU-0017.3 pending: owner and student read. |
+| Status | WU-0017.1 executed 2026-10-21 (second attempt, lock free): the two `--report-only` runs give a `RESULTS.md` byte-identical to the stored one (see the entry below); the earlier refusals are kept in the log. WU-0017.2: figures byte-identical, but the captions do not name an experiment or a v3 identifier (gap, see below). WU-0017.3 pending: owner and student read. |
 | Class | CSQ2 |
 | Agent(s) | claude-sonnet-5-5 (developer), 2026-10-21 |
 | Estimate | the two report-only runs are CPU, post-processing only (no recomputation; the figure and report code reads `results.json`) |
@@ -79,6 +79,52 @@ Not started. `--report-only` also rebuilds the figures; the acceptance (every ca
 
 **Pending; owner and student read.** Not done. No claim is made.
 
+### 2026-10-21 (later) WU-0017.1 executed with the hardened block (claude-sonnet-5-5)
+
+4.9 checklist: (1) no code or test change; records only. (2) No test to run. (3) Run lock: `pgrep` showed no `lpcstudy --preset` process; `flock -n /tmp/lpcstudy-gpu.lock` was taken by each run. (4) `JAX_PLATFORMS=cpu` (set in the command), CPU only, post-processing (no recomputation). (5) Outputs only in `/tmp/tmp.yvHoCJpzKH` (kept, outside every repository tree); the sealed directory was never an output; the sealed-run flag was not used or named. (6) The worktree `lpcstudy-wt/run/regen-freeze-1`: clean before and after (`git status --short` empty), HEAD `df8928f`; `lpcstudy.__file__` printed `.../run/regen-freeze-1/lpcstudy/__init__.py` (the freeze-1 code).
+
+The block of this file was run exactly as written (output of the two runs redirected to `$S/ro1.out` and `$S/ro2.out`, both empty).
+
+| Item | Result |
+|---|---|
+| Input copies, sha256 | both `ae4b0fe5bf488f6c147bce6c91a2398e87408f6a5d372ae66d89bdfc90b0cebe` (equal to the manifest) |
+| Exit code run 1, run 2 | 0 and 0 |
+| `ro1/full/RESULTS.md` sha256 | `2a4c1d06859d07584b1633c6e7f1b5df205ffe445402509834383fb474649577` |
+| `ro2/full/RESULTS.md` sha256 | `2a4c1d06859d07584b1633c6e7f1b5df205ffe445402509834383fb474649577` |
+| Stored `RESULTS.md` of run-1 | `2a4c1d06859d07584b1633c6e7f1b5df205ffe445402509834383fb474649577`: all three equal |
+| Rewritten `results.json` (ro1, ro2) | both `ae4b0fe5bf488f6c147bce6c91a2398e87408f6a5d372ae66d89bdfc90b0cebe`: equal to the stored one, no difference to explain (the verdicts recomputed by `--report-only` equal the stored ones; the default development seed id did not change any byte) |
+
+Result: WU-0017.1 acceptance "regenerates `RESULTS.md` identically on two runs": **met** (the two runs are byte-equal to each other and to the file of record). Provenance and label are printed from the stored block, so the header still reads `CONFIRMATORY: UNPROMOTED`. The open question of 2026-10-21 (seed id) is closed: no difference arose.
+
+**Acceptance sample of ten narrative numbers** (the regenerated `RESULTS.md` is the stored file byte for byte; leaves read from `results.json` `ae4b0fe5...cebe`, the GPU file `b768cb03...5887` and the compare text):
+
+| # | Group | Narrative number in `RESULTS.md` | Leaf | Leaf value |
+|---|---|---|---|---|
+| 1 | primary H2b | chua rho rank corr 0.26 | `systems/chua/H2b/noise/mean_state_spearman` | 0.25753480505742554 |
+| 2 | primary H3c | chua A5/A4 interval [0.9752, 1.062] | `systems/chua/H3c/ci` | [0.9751543853530962, 1.0622020621421788] |
+| 3 | primary H2a(ii) | lorenz63 zero interval [-0.047, 0.1] | `systems/lorenz63/H2a/part_ii/zero/ci` | [-0.04719450219020303, 0.10145835812962745] |
+| 4 | primary H2a(ii) | rossler interior interval [-0.048, 0.17] | `systems/rossler/H2a/part_ii/interior/ci` | [-0.048257975512058134, 0.16619322462551567] |
+| 5 | secondary H1b | chua PLP 0.98 [0.942, 1.02] | `systems/chua/H1b/PLP/slope`, `.../ci` | 0.9795509184294233, [0.942187171833557, 1.0191930543926104] |
+| 6 | secondary H1c | lorenz63 PLP 0.612 | `systems/lorenz63/H1c/PLP/median_ratio` | 0.6122381592173741 |
+| 7 | secondary H2d | chua A4/A3-1 = -5% | `systems/chua/H2d/in_distribution_excess` | -0.04998601632589905 |
+| 8 | secondary H2e | rossler rho=0.01 median change 0.36 | `systems/rossler/H2e/by_noise/0.01/median_change` | 0.35637111813376077 |
+| 9 | cross-check (GPU `RESULTS.md`) | lorenz63 H3c A5/A4 0.6824 [0.434, 0.9624], pass | GPU `systems/lorenz63/H3c/A5_over_A4_mse`, `.../verdict` | 0.6823587497808661, pass (CPU word: inconclusive) |
+| 10 | cross-check (compare text) | max z away 2.21 | `runs/confirmatory/run-1-compare.txt` line 381 (a printed statistic, not a results leaf) | 2.21 |
+
+Result: 10 of 10 match to the printed digits (rows 3 and 4 and the interval rows round endpoint values as printed).
+
+**Counts for H2a(ii)** from the stored verdict words, `systems/<s>/H2a/part_ii/<part>/verdict`: lorenz63 zero inconclusive, interior fail; rossler zero inconclusive, interior inconclusive; chua zero inconclusive, interior fail. Counter: **2 fail, 4 inconclusive, 0 pass** (6 parts). The two failing parts are the interior parts of lorenz63 and chua. The Rossler interior interval [-0.048257975512058134, 0.16619322462551567] has upper minus lower 0.2144 (arithmetic on the stored endpoints), more than the band width 0.2.
+
+### WU-0017.2 Figures (checked 2026-10-21, not closed)
+
+- `--report-only` rewrote four figures in each scratch directory: `kaplan_meier_by_rule.png`, `knob_response_library.png`, `regret_vs_regimes.png`, `separation_weight_vs_horizon.png`. All four are byte-identical to the stored `runs/confirmatory/run-1/full/figures/*` (`cmp`) and to each other (ro1 against ro2).
+- Banned references: `grep -i -E "shift|transfer|lorenz-?96|a4f"` over `lpcstudy/report.py`, `lpcstudy/budget.py` (where the captions live, `FIGURE_CAPTIONS`) and the regenerated `RESULTS.md`: no match. (`lpcstudy/figures.py` does not exist at `freeze-1`; `make_figures` is in `report.py`.)
+- **Gap against the acceptance text** ("every figure caption names its experiment, its v3 identifier and the interval procedure"): the four captions in `budget.FIGURE_CAPTIONS` name neither an experiment (E1 to E6) nor a v3 identifier. They state that no interval is shown (so no interval procedure applies). The frozen code is not edited (`lpcstudy/` is frozen at `freeze-1`; WU-0017's documents are built from `freeze-1`). The three figures of the findings document (F1, F2, F3) are made by `tools/findings_build.py` and do name experiments and v3 identifiers, but they are not the figures of the `RESULTS.md`. The owner decides: accept the four captions as sealed output, or have the promoted report state the experiment and identifier of each figure in its text (not in the PNGs). Not marked done.
+
+### Still not done in WU-0017.1
+
+NVVUQ.22 six items per QoI and NVVUQ.16 four items per interval: not checked here. WU-0017.3: pending; owner and student read.
+
 ## Review
 
 - **Reviewer:** none yet.
@@ -86,6 +132,6 @@ Not started. `--report-only` also rebuilds the figures; the acceptance (every ca
 
 ## Audit
 
-- Is the definition of done met? No: WU-0017.1 is not executed, WU-0017.2 not started, WU-0017.3 pending.
+- Is the definition of done met? No: WU-0017.1 regeneration and ten-number sample met, NVVUQ.22 and NVVUQ.16 item checks open; WU-0017.2 has the caption gap above; WU-0017.3 pending.
 - Defects recorded: none.
 - Notes for successors: the hook matches `--preset full` for a CPU-only `--report-only`; the run needs the GPU lock free or an owner decision (see above).
