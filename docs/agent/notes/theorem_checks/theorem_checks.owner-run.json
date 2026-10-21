@@ -1,0 +1,356 @@
+{
+ "seed": 20261020,
+ "results": [
+  {
+   "item": "L1",
+   "claim": "|F(s+xi) - F(s) - grad F . xi| <= (M2/2)|xi|^2 for F with |D^2F| <= M2",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 4000,
+    "max_excess": -2.8791595574908635e-08
+   }
+  },
+  {
+   "item": "L1",
+   "claim": "On the Lorenz-63 time-1-LT map the linearization remainder scales as |xi|^2",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "loglog_slope": 1.9980433417943615
+   }
+  },
+  {
+   "item": "L2(a)-(c)",
+   "claim": "L J = I for L = J+ + Z (ZJ = 0); LL^T - (J^TJ)^-1 is PSD; tr(J+ J+^T) = sum sigma_j^-2",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 2000,
+    "max_left_inverse_error": 1.1404606498873426e-10,
+    "min_eigenvalue_of_gap": 0.00032916942605110697,
+    "max_relative_trace_error": 3.341771304121721e-14
+   }
+  },
+  {
+   "item": "L2(d)",
+   "claim": "Cov(J+ eta) = rho^2 (J^TJ)^-1 for white noise of variance rho^2",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "draws": 400000,
+    "max_relative_error": 0.002693699881794561
+   }
+  },
+  {
+   "item": "L3",
+   "claim": "J = A Q^-1 implies (J^TJ)^-1 = Q (A^TA)^-1 Q^T (no inverse of Q needed)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 2000,
+    "max_relative_error": 1.8472482806943693e-10
+   }
+  },
+  {
+   "item": "L3 (strengthened)",
+   "claim": "Whitened nu^2 = tr[(J^TJ)^-1 C^-1] is invariant under every invertible affine change of state coordinates (not only orthogonal ones)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 2000,
+    "max_relative_change": 4.0907931255862077e-07
+   }
+  },
+  {
+   "item": "L3 (literal form)",
+   "claim": "tr[W(J^TJ)^-1W^T] with W -> UW changes under a shear U (why the v1 erratum restricted it to orthogonal U)",
+   "method": "construction",
+   "passed": true,
+   "detail": {
+    "before": 2.2175505769710835,
+    "after": 4.1658629801164055
+   }
+  },
+  {
+   "item": "L4",
+   "claim": "|a - s| <= 2 (R + |eta_t - eta_a|) / sigma_m whenever |a - s| <= sigma_m / L2",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 3000,
+    "max_excess": -0.029990728069506277
+   }
+  },
+  {
+   "item": "P1(a) / L5",
+   "claim": "V(w) = c (w - u)^2 + V(u), with V(u) = (E_C E_P - C^2)/c",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "P1(a) / L5",
+   "claim": "With copied noise orthogonal to e_P and e_C - xi: c >= rho^2/k > 0, and clip(u) minimizes V on [0, 1]",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 5000,
+    "min_of_c_minus_copied": 0.00037794527940482325,
+    "max_gap_clip_vs_grid_min": 0.0
+   }
+  },
+  {
+   "item": "P1(b)",
+   "claim": "u lies in [0, 1] iff C <= min(E_C, E_P)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 5000,
+    "mismatches": 0
+   }
+  },
+  {
+   "item": "P1(c) proof step",
+   "claim": "2V(u) - E_C = E_C(E_P - E_C) + 2C(E_C - C), times c > 0",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "P1(c) / L7(i)",
+   "claim": "C >= 0 implies min over [0,1] of V >= (1/2) min(E_C, E_P)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases_with_C_nonneg": 9940,
+    "min_slack": 4.7285054148200094e-09
+   }
+  },
+  {
+   "item": "P1(c) tightness",
+   "claim": "Equality at E_C = E_P, C = 0 (independent, equal errors): min V = 1/2",
+   "method": "construction",
+   "passed": true,
+   "detail": {
+    "min_V": 0.5
+   }
+  },
+  {
+   "item": "P1(e) / L7(iv)",
+   "claim": "E_C = E_P = 1, C = -1 (e_C = -e_P) gives min V = 0",
+   "method": "construction",
+   "passed": true,
+   "detail": {
+    "min_V": 0.0
+   }
+  },
+  {
+   "item": "L7(iii)",
+   "claim": "Uncorrelated proportional seeds: gain = ln(1 + r^2) / (2 Lambda), maximal (= ln 2 / (2 Lambda)) at r = 1",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "P1(d) / L7(ii)",
+   "claim": "Exponential growth and C >= 0: horizon gain <= ln 2 / (2 Lambda)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 2000,
+    "max_excess": -0.017166076600382246
+   }
+  },
+  {
+   "item": "P1(d') new",
+   "claim": "Any growth shape, C >= 0 at the single step T_env(sqrt2 tol): gain over the better-forecaster envelope <= T_env(sqrt2 tol) - T_env(tol)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 4000,
+    "max_excess_steps": 0,
+    "cases_where_ln2_over_2Lambda_screen_fails": 0
+   }
+  },
+  {
+   "item": "P1(d) vs P1(d')",
+   "claim": "Two-phase growth (fast for 2 LT, then slow): the gain far exceeds ln2/(2 Lambda_bar) from the first LT, and equals the P1(d') bound",
+   "method": "construction",
+   "passed": true,
+   "detail": {
+    "gain_steps": 86,
+    "p1d_prime_bound_steps": 86,
+    "ln2_over_2Lambda_bar_steps": 6.931471805599448
+   }
+  },
+  {
+   "item": "L6",
+   "claim": "Proportional seed covariances: w* is the same at every horizon (q_H cancels)",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "L6 transient",
+   "claim": "With copied noise n = rho^2/k: dw*/dq_H = (delta^2 - kappa) n / (...)^2 > 0 when delta^2 > kappa, and w* -> (delta^2 - kappa)/(eps^2 + delta^2 - 2 kappa)",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "L6 (hypothesis)",
+   "claim": "Proportional covariances: w* range over amplifier directions is 0; random anisotropic seeds: it is not",
+   "method": "construction",
+   "passed": true,
+   "detail": {
+    "max_range_proportional": 3.3306690738754696e-16,
+    "median_range_anisotropic": 0.6377125447835863
+   }
+  },
+  {
+   "item": "L8",
+   "claim": "g_H = e^(Lambda H): T = ln(theta'/e0)/Lambda, so dT/d ln(theta) = 1/Lambda",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "L8 bracket",
+   "claim": "(Lambda - e)H <= ln g_H <= (Lambda + e)H implies ln(theta'/e0)/(Lambda+e) <= T <= ln(theta'/e0)/(Lambda-e) (+1 step, discrete)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 3000,
+    "max_excess": -0.007403042107915425
+   }
+  },
+  {
+   "item": "L8'",
+   "claim": "Gronwall: |error(t)| <= |xi| e^(L_K t) on a convex box containing both orbits; certified horizon ln(theta/|xi|)/L_K",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "L_K_box_bound": 49.97488952149194,
+    "lambda_max": 0.905,
+    "certified_horizon_LT": 0.05424999902001632,
+    "linearized_horizon_LT": 2.9957322735539904,
+    "max_excess_sampled": -0.0032367091700178235
+   }
+  },
+  {
+   "item": "L9",
+   "claim": "(1/2H) mean ln g_i^2 <= (1/2H) ln mean g_i^2, equality iff all g_i equal",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 5000,
+    "max_excess": -1.3853909238255519e-08,
+    "gap_when_equal": 0.0
+   }
+  },
+  {
+   "item": "L10(i) corrected",
+   "claim": "V_i(w) - V_i(u_i) = c_i (w - u_i)^2 with the UNCLIPPED u_i",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "L10(i) as in v1",
+   "claim": "V(w) - V(w*) = c (w - w*)^2 with CLIPPED w* fails: u = 1.4, w = 0 gives excess 1.80, the v1 form gives 1.00 (understated)",
+   "method": "construction",
+   "passed": true,
+   "detail": {
+    "exact_excess": 1.7999999999999998,
+    "v1_excess": 1.0
+   }
+  },
+  {
+   "item": "P3(a) / L10(ii)",
+   "claim": "The regime weight clip(sum c_i u_i / sum c_i) minimizes sum_i V_i(w) on [0, 1]",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 3000,
+    "max_gap_vs_grid": 1.4210854715202004e-14
+   }
+  },
+  {
+   "item": "L10(iii)",
+   "claim": "|w_k - u_i| <= eps_w on the regime implies mean regret <= eps_w^2 max c_i",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 3000,
+    "max_excess": -0.0022099017671821635
+   }
+  },
+  {
+   "item": "L10(iv)",
+   "claim": "L-Lipschitz w* on a grid of K = n^p cells: mean regret <= c_max L^2 p K^(-2/p)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "max_excess": -0.034961470497599484
+   }
+  },
+  {
+   "item": "P3(b)",
+   "claim": "Every rule that is a function of the profile F has mean excess >= that of clip(E[c u | F] / E[c | F])",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 6000,
+    "min_slack": 8.541670315498351e-09
+   }
+  },
+  {
+   "item": "P2(a) / L11(b)(i)",
+   "claim": "|eta| < Delta/2 never changes the retrieved analog",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 3000,
+    "switches": 0
+   }
+  },
+  {
+   "item": "P2(a) tightness",
+   "claim": "Collinear library: |eta| = Delta/2 + 1e-9 toward the runner-up switches the analog, so the constant 1/2 cannot be improved",
+   "method": "construction",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "P2(b) / L11(b)(ii)",
+   "claim": "Pr(retrieval changes) <= Pr(|eta| >= Delta/2) <= 4 D rho^2 / Delta^2",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "states": 400,
+    "draws_per_state": 1000,
+    "max_excess_rate": -0.23249029018914052
+   }
+  },
+  {
+   "item": "P2(c) / L11(b)(iii)",
+   "claim": "N^2 <= (4/(rho^2 D)) E[(r1 + |eta|)^2 1{|eta| >= Delta/2}] (exact for the empirical law of the draws)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "states": 400,
+    "max_excess": 2.5703350984652367e-26
+   }
+  },
+  {
+   "item": "L11(a)",
+   "claim": "PLP noise sensitivity |Gamma_H J+| <= g_H nu: a function of observability and amplification only",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "max_excess": -0.030637507549223827
+   }
+  }
+ ]
+}
