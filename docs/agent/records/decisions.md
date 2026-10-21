@@ -710,3 +710,13 @@ The entry above says option (a) "is approved". The owner's words quoted there ar
 ### DEC-0038 addendum A2 (2026-10-21, main session; finding R2 of the WU-0023 independent review)
 
 The owner-review list of DEC-0038 addendum A1 gains: the names in `EXTENSION_SYSTEMS` in `lpcstudy/report.py` (verdict-reporting code; the new systems S4 `hindmarsh_rose`, S5 `hyper_jha`, S6 `lorenz96_4` are added there). Status: the owner's review is pending; the change never goes to `main` without it. Separately, S6 (4-variable Lorenz-96, F = 20) needs an owner ruling because LPC.PC.1 listed Lorenz-96 as out of scope; it is not merged to `develop` until the owner rules (WU-0023 review R1).
+
+## DEC-0039: Owner rules S6 (4-variable Lorenz-96) in scope and allows concurrent development runs (2026-10-21, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim: "S6 i sin scope. concurrent runs are allowed."
+
+**Reading, for the owner to correct.**
+1. **S6** (`lorenz96_4`, 4-variable Lorenz-96, F = 20) is in scope as a development-only extension system under DEC-0037 (an explicit exception to the earlier Lorenz-96 line of LPC.PC.1, for development seeds, never confirmatory, never main). WU-0023 review finding R1 is resolved by this ruling; the S4 to S6 branch may merge to `develop`.
+2. **Concurrent runs** are allowed for DEVELOPMENT runs: up to two at once on the GPU (a second lock slot, `LPC_GPU_LOCK=/tmp/lpcstudy-gpu-2.lock`, through the unchanged wrapper), each logged with its out-dir and start time in the work log. The one-job lock stays exclusive for the sealed run, its cross-check and any production run (DEC-0034); a production or sealed run starts only when both development slots are idle. The 12 h and GPU-hour limits of LPC.AUTH.3 stay for development runs as before.
+
+**Affects:** WU-0023, LPC.PC.1 reading, the run wrapper use, the second extension batch. **Status:** owner instruction; recorded pending the owner's ledger entry.
