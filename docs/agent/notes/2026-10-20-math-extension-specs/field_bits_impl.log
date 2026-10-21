@@ -1,0 +1,3 @@
+hyper_jha: field bitwise-equal rows 1000/1000 (max diff 0.00e+00); jacfwd bitwise-equal 1000/1000 (max diff 0.00e+00); one flow step bitwise-equal 1000/1000 (max diff 0.00e+00)
+lorenz96_4: field bitwise-equal rows 1000/1000 (max diff 0.00e+00); jacfwd bitwise-equal 1000/1000 (max diff 0.00e+00); one flow step bitwise-equal 1000/1000 (max diff 0.00e+00)
+hindmarsh_rose: field bitwise-equal rows 1000/1000 (max diff 0.00e+00); jacfwd bitwise-equal 1000/1000 (max diff 0.00e+00); one flow step bitwise-equal 1000/1000 (max diff 0.00e+00)
