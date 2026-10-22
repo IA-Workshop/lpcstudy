@@ -764,3 +764,11 @@ The owner-review list of DEC-0038 addendum A1 gains: the names in `EXTENSION_SYS
 4. **WU-0017 figures and gaps (seq 36).** The quote is read as: the owner accepts the gaps G1 to G3 (no numerical-error estimate or per-QoI V&V status for the secondary rows, and the unclear status wording of the secondaries) and the figure captions as sealed output, carrying the figure map in the report text, and notes that later runs will need different intervals and sample sizes (see DEC-0041 item 2: proposals, WU-0032). It is not read as a change to the sealed analysis. The unexplained 5% criterion line of `regret_vs_regimes.png` stays open and is not repeated as a criterion.
 
 **Affects:** WU-0017, WU-0018, WU-0020 (findings document section 10), DEF-0001, the promoted report's limitations and V&V status. **Status:** recorded from the owner's ledger entries; the reading is for the owner to correct.
+
+## DEC-0043: Owner chooses option (a) for the findings figures of the promoted copy (2026-10-22, owner instruction relayed by claude-sonnet-5-5 (main session))
+
+**Decision.** The owner's words, verbatim, in answer to the three options of section 9 of `docs/agent/notes/2026-10-22-promotion-proposal.md`: "option a".
+
+**Reading, for the owner to correct.** Option (a): the three findings figures F1 to F3 are re-rendered with a promoted status title for the promoted copy (WU-0034: `findings_build.py promote`, separate output folder, preliminary figures untouched, byte-reproduction and zero-tolerance pixel check outside the title band). The `RESULTS.md` figures are copied as they are (they carry no status text). The promoted report's provenance row keeps the stored label of the sealed file. Option (c) (omit the figures) is the fallback only if promotion has to precede WU-0034.
+
+**Affects:** WU-0033, WU-0034, WU-0018.2, WU-0018.3. **Status:** owner instruction; no ledger entry is required for this choice (a design choice for the report copy, no governed file changes); the owner may add a ledger `note` if wanted.
