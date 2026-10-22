@@ -2648,3 +2648,62 @@ def test_promote_command_prints_the_diff_summary(
     assert "R-WORD: 2 lines" in said and "R-TITLE: 1 lines" in said
     assert "R-RULE: 1 lines" in said and "R-RUN: 1 lines" in said
     assert "residual labels: 1 (kept: provenance label row)" in said
+    assert "checked on the bytes read back" in said
+
+
+def test_promote_command_fails_and_leaves_no_file_on_an_extra_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R1: the command's own check catches a change the rules do not allow.
+
+    The substitution is patched to change one digit as well; the check on the
+    bytes read back must fail (exit 1) and the output must be deleted.
+    """
+    real = fb.promote_lines
+
+    def tampered(text: str):
+        lines, counts = real(text)
+        return [ln.replace("0.2437", "0.2438") for ln in lines], counts
+
+    monkeypatch.setattr(fb, "promote_lines", tampered)
+    src = tmp_path / "pre.md"
+    src.write_text(PRE_DOC)
+    out = tmp_path / "o.md"
+    assert fb.main(["promote", "--document", str(src), "--out", str(out)]) == 1
+    assert not out.exists()
+    assert src.read_text() == PRE_DOC
+
+
+def _promote_refused(tmp_path: Path, text: str, code: int) -> None:
+    src = tmp_path / "pre.md"
+    src.write_text(text)
+    out = tmp_path / "o.md"
+    assert (
+        fb.main(["promote", "--document", str(src), "--out", str(out)]) == code
+    )
+    assert not out.exists()  # nothing written
+    assert src.read_text() == text
+
+
+def test_promote_command_refusals_write_nothing(tmp_path: Path) -> None:
+    """R4: header, unmatched-rule and residual-label refusals (exit 2)."""
+    _promote_refused(tmp_path, PRE_DOC.split("\n", 3)[3], 2)  # no header
+    _promote_refused(
+        tmp_path,
+        PRE_DOC.replace("Next sentence.", "The run is unpromoted."),
+        2,
+    )  # residual label
+    _promote_refused(
+        tmp_path, PRE_DOC.replace("# Preliminary findings", "# Findings"), 2
+    )  # R-TITLE matches nowhere
+
+
+def test_promote_refuses_a_dangling_symlink_output(tmp_path: Path) -> None:
+    """R5: the output is opened exclusively; a link is never followed."""
+    src = tmp_path / "pre.md"
+    src.write_text(PRE_DOC)
+    target = tmp_path / "elsewhere.md"
+    link = tmp_path / "o.md"
+    link.symlink_to(target)
+    assert fb.main(["promote", "--document", str(src), "--out", str(link)]) == 2
+    assert not target.exists()
