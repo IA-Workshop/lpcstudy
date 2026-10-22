@@ -115,6 +115,40 @@
     - files of a `promotion` entry are not listed.
   - Owner checkpoint: the change does not touch verdict, statistics, seed or provenance code in `lpcstudy/`, nor dependencies. The owner reviews the tool's output at WU-0018.3.
 - **Verdict: changes required** (R1 to R3 major; R4 to R6 minor; 6 findings).
+- **Re-review, fix round 1** (`reviewer`, claude-opus-5-5, 2026-10-22, diff 1b5e41a..eeb7123; covers R1 to R6 only).
+  - **Checks run.**
+    - Radius: `tools/run_tests.sh unit tests/unit/test_tools_findings_build.py`, run once: `82 passed in 8.31s`.
+    - Real document: `promote` into the session scratch directory. It exited 0 with the same summary as before.
+    - The output is byte-identical (`cmp`) to the round-0 output. The input's sha256 was the same before and after, and the worktree is clean.
+  - **R1 fixed.**
+    - `verify_label_diff` (`tools/findings_build.py:2605` ff.) no longer calls `promote_lines`/`promote_text`. It aligns the lines with `difflib.SequenceMatcher` (`autojunk=False`) after it has checked and removed the header. It accepts only `equal` hunks and equal-length `replace` hunks whose new lines equal the old lines under the separate `ALLOWED_EDITS` table, then scans for residual labels.
+    - `promote()` writes with mode `"x"`, checks the text read back from `--out`, and on a problem unlinks the file and exits 1.
+    - The new monkeypatch test shows the command's own check catching an extra digit: exit 1, no file left.
+    - Note, not a finding: the read-back goes through `read_text` (decoded, universal newlines), not raw bytes. A carriage return in the source would be normalized on both sides and not reported. The real document contains none (`grep -c $'\r'` gives 0), so this is immaterial here.
+  - **R2 fixed.**
+    - Proposal §8: `promote` is now the live command, and its precondition (WU-0033 merged) is stated.
+    - `sed -i '3,4d'` is correct for the official `RESULTS.md`, whose line 3 is `**CONFIRMATORY: UNPROMOTED**` and line 4 is blank. I checked on a scratch copy:
+      - `diff` prints exactly `3,4d2` and the two deleted lines;
+      - the `grep` then shows only the stored cells `| label | CONFIRMATORY: UNPROMOTED |` and `| promoted | false |`.
+  - **R3 fixed.**
+    - The facts in §9 are accurate:
+      - F1 to F3 are embedded at lines 158, 332 and 480;
+      - `status_title` is the suptitle of every findings figure (`:1501`, `:1550`);
+      - the `RESULTS.md` figures carry no status text;
+      - the links break under the step-3 copies;
+      - the provenance row and the stored cells are kept;
+      - the sentence is in Appendix C (heading at line 548, sentence at line 550, line 547 of the copy).
+    - The options and the recommendation, (a) with (c) as fallback, are stated fairly as the owner's decision.
+    - One constraint the follow-up unit must honour: `check` re-renders the figures and compares their bytes (`:2514`). So option (a) has to add a promoted title as a separate path; it cannot change the default `status_title`, or the preliminary document stops passing `check`. §9 states the requirement ("the preliminary document must still pass `check`").
+  - **R4 fixed.**
+    - The exit-code change is recorded in the Log as a dated note. I judge it acceptable, not a post-hoc loosening, for three reasons:
+      - the exit code appears in the Safeguards text, not in acceptance criteria 1 to 6;
+      - every refusal still exits non-zero with nothing written;
+      - the new split (1 = the check failed, 2 = input or usage error) gives more information.
+    - Command-level tests now cover the missing header, a residual label and an unmatched rule, each asserting that no file is written. Each of the three cases reaches only its intended refusal.
+  - **R5 fixed.** `dst.is_symlink()` refuses a dangling link before the open, and `open("x")` uses O_EXCL. The test confirms that the link's target is not created.
+  - **R6 fixed.** `find promoted/CONF-1 -type f | sort | xargs sha256sum` hashes the files inside `figures/`.
+  - **Re-review verdict: approve** (R1 to R6 fixed; no new findings).
 
 ## Audit
 
