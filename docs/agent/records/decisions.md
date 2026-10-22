@@ -744,3 +744,23 @@ The owner-review list of DEC-0038 addendum A1 gains: the names in `EXTENSION_SYS
 3. After the owner's ledger entry: the defects status line of the DEF-0022 proposal (ii) is appended by the owner, the findings document is rebuilt with the ruled wording and checked.
 
 **Affects:** DEF-0022, WU-0017 (report limitations list), WU-0032. **Status:** owner instruction; recorded pending the owner's ledger entry.
+
+**Ledger (appended 2026-10-22, claude-sonnet-5-5, for DEC-0040):** the owner's entries are seq 30 (`ruling`, M2, quote "M2 accept. the failure was the complexity of making the ledger entry.", 2026-10-21T08:34:06Z) and seq 31 (`waiver`, M3, scope "CONF-1 only", quote "because this is a small team development, it is not feasible to have more than one human actor. this may be waived for this case, and in the future, an agent session may launch.", 2026-10-21T08:34:06Z). Seq 29 is the `amendment` entry of the same time.
+
+**Ledger (appended 2026-10-22, claude-sonnet-5-5, for DEC-0041):** the owner's entry is seq 32 (`ruling`, source "decisions.md DEC-0041", quote "Accept, and propose new intervals to improve the quality of the results", 2026-10-22T08:14:14Z).
+
+## DEC-0042: Owner entries of 2026-10-22 on the audit items M1, M3, m3 and the WU-0017 figure and gap findings (2026-10-22, recorded by claude-sonnet-5-5 from ledger seq 33 to 36)
+
+**Decision.** The owner's words, verbatim, as they stand in the ledger (all 2026-10-22):
+- Seq 33, `waiver`, source "audit M1", 08:15:21Z: "results were spot checked for agreement".
+- Seq 34, `ruling`, source "audit M3", 08:16:26Z: "agent-based cross-checking is ok for this project".
+- Seq 35, `note`, source "audit m3", 08:17:04Z: "plan amendment approved".
+- Seq 36, `ruling`, source "promotion-figure-map.md; WU-0017 NVVUQ check", 08:18:05Z: "different intervals/dataset size will be needed in subsequent runs".
+
+**Reading, for the owner to correct.**
+1. **M1 (seq 33).** The entry is a `waiver` of the owner's code review of the verdict, statistics, seed and provenance code (LPC.PC.11 second tier; WU-0004.5; freeze checklist item 3). Its quote speaks of spot-checking results for agreement, not of reading the code. So the promoted report's verification and validation status must read: **"owner code review waived (ledger seq 33); results spot-checked by the owner; code covered by independent agent reviews"**. It must not say that the owner reviewed the code. DEF-0001 is not marked resolved by this entry (see the defects status line of the same date).
+2. **M3 (seq 34, with the waiver of seq 31).** The owner accepts agent-based cross-checking for this project. This does not change the facts: run-2 was by the same actor on the same host in the same environment and shows determinism (bitwise equal compared leaves), not an independent reproduction. The report says so (DEC-0040 item 2).
+3. **m3 (seq 35).** "Plan amendment approved" is read as approval of the amendment of 2026-10-20 (A6: the source name `official_words` may be quoted inside the cross-check section of the findings document; WU-0020 log and `WU-0020-review.md`). If it meant another amendment, say so.
+4. **WU-0017 figures and gaps (seq 36).** The quote is read as: the owner accepts the gaps G1 to G3 (no numerical-error estimate or per-QoI V&V status for the secondary rows, and the unclear status wording of the secondaries) and the figure captions as sealed output, carrying the figure map in the report text, and notes that later runs will need different intervals and sample sizes (see DEC-0041 item 2: proposals, WU-0032). It is not read as a change to the sealed analysis. The unexplained 5% criterion line of `regret_vs_regimes.png` stays open and is not repeated as a criterion.
+
+**Affects:** WU-0017, WU-0018, WU-0020 (findings document section 10), DEF-0001, the promoted report's limitations and V&V status. **Status:** recorded from the owner's ledger entries; the reading is for the owner to correct.

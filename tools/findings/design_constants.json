@@ -115,8 +115,24 @@
       "v3": "§2 H3b"
     },
     "def0022_proposed": {
-      "text": "PROPOSED for owner review, not ruled (DEF-0022): the second part of H2a (the partial-correlation margin test) has low power at these sample sizes: it can be refuted but essentially cannot pass, which v3 §7 anticipated. The margin that v3 §7 projects for it is not reproduced part by part at the full sample size (DEF-0022 status line; the full-size report of WU-0003). In this run the stored interval of the Rossler interior part is wider than the margin band of v3 §2, so that part could not pass at any estimate. The verdict words of its parts are in section 5; an inconclusive word there means the interval was too wide to decide. The pre-registered rule is kept.",
+      "text": "the second part of H2a (the partial-correlation margin test) has low power at these sample sizes: it can be refuted but essentially cannot pass, which v3 §7 anticipated. The owner accepted this as a known limitation (DEC-0041, ledger seq 32). The margin that v3 §7 projects for it is not reproduced part by part at the full sample size (DEF-0022 status line; the full-size report of WU-0003): this is development evidence, not a result of this run (owner answer B7). In this run the stored interval of the Rossler interior part is wider than the margin band of v3 §2, so that part could not pass at any estimate. The verdict words of its parts are in section 5; an inconclusive word there means the interval was too wide to decide. The pre-registered rule is kept.",
       "v3": "§7 (Precision); DEF-0022"
+    },
+    "same_host_limit": {
+      "text": "Regeneration (WU-0016): run-2 shows determinism, not an independent reproduction. The compared leaves are bitwise equal, and the same host, environment and actor produced both runs (DEC-0035). The owner waived the independent-actor requirement for this case (ledger seq 31) and accepted agent-based cross-checking for this project (ledger seq 34).",
+      "v3": "§9 item 4; DEC-0040 item 2"
+    },
+    "vv_status_limit": {
+      "text": "Verification and validation status of the code: owner code review waived (ledger seq 33); results spot-checked by the owner; code covered by independent agent reviews.",
+      "v3": "NVVUQ.22; DEC-0042 item 1"
+    },
+    "nvvuq_gaps_limit": {
+      "text": "Reporting gaps of the official RESULTS.md (NVVUQ.22), accepted by the owner (ledger seq 36): there is no numerical-error estimate (G1) and no per-QoI verification and validation status (G2) for the nine secondary or reported rows, which have no budget table; and the status wording of the secondaries (pre-registered, exploratory on development seeds) does not say whether a secondary is confirmatory in this run (G3). The five primary budget parts carry all six items.",
+      "v3": "NVVUQ.22; DEC-0042 item 4"
+    },
+    "figure_map_limit": {
+      "text": "Figures of the official RESULTS.md (WU-0017.2, ledger seq 36): the four captions name no experiment or v3 identifier and none shows an interval. The figure map of docs/agent/notes/2026-10-21-promotion-figure-map.md gives them: separation_weight_vs_horizon, E4, H2a; kaplan_meier_by_rule, E4, rules behind H2c, H2d and H3c, no verdict; regret_vs_regimes, E5, H3c; knob_response_library, E1 and E2, H2b. The dotted line of regret_vs_regimes that the caption calls a criterion has no source in v3 found by the developer, and its meaning is open.",
+      "v3": "§6 (E1 to E5); docs/agent/notes/2026-10-21-promotion-figure-map.md"
     }
   },
   "identifiers": [

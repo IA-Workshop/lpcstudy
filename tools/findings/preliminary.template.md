@@ -125,7 +125,11 @@ All items of v3 §8 apply, plus the registered deficiencies and rulings listed h
 - One realization per system: one sealed seed gives one set of data per system, so no replicate variation is estimated.
 - The block-sensitive label (a primary verdict that widening the half-width would change) is not computable for the sealed run, because the sealed run writes no states dump (owner default D6).
 - Q-N and the gain bound are reported and carry no verdict.
-- {{const:def0022_proposed}}
+- Power of H2a(ii) (DEF-0022): {{const:def0022_proposed}}
+- Regeneration by the same actor (DEC-0035): {{const:same_host_limit}}
+- {{const:vv_status_limit}}
+- {{const:nvvuq_gaps_limit}}
+- {{const:figure_map_limit}}
 
 ## 11. What it means and does not mean [STUDENT]
 

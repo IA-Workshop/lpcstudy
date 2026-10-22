@@ -1,5 +1,5 @@
 {
-  "cwd": "/home/brianm/projects/physics/chaos/lpcstudy-wt/wu/b1-minors",
+  "cwd": "/home/brianm/projects/physics/chaos/lpcstudy-wt/develop",
   "files": {
     "crosscheck": "/home/brianm/projects/physics/chaos/lpcstudy-wt/develop/runs/confirmatory/run-1-gpu/full/results.json",
     "official": "/home/brianm/projects/physics/chaos/lpcstudy-wt/develop/runs/confirmatory/run-1/full/results.json",
