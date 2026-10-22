@@ -560,8 +560,16 @@ class Builder:
     """
 
     def __init__(
-        self, sources: dict, constants: dict, directory: Path, stem: str
+        self,
+        sources: dict,
+        constants: dict,
+        directory: Path,
+        stem: str,
+        title: str | None = None,
+        figures_dir: Path | None = None,
     ):
+        self.title = title  # a promoted figure title (WU-0034), else None
+        self.figures_dir = figures_dir
         self.sources = sources
         self.meta = sources["meta"]
         self.constants = constants
@@ -1235,7 +1243,7 @@ class Builder:
 
     def figure(self, name: str) -> str:
         """Draw figure ``name`` (F1 to F3) and return its Markdown block."""
-        figures = self.directory / f"{self.stem}.figures"
+        figures = self.figures_dir or self.directory / f"{self.stem}.figures"
         figures.mkdir(parents=True, exist_ok=True)
         label = walk(self.sources["official"], "provenance/label")
         files = {
@@ -1247,7 +1255,12 @@ class Builder:
         if name == "F3":
             gates = {s: self.gate_state("crosscheck", s) for s in self.systems}
             fig = draw_crosscheck(
-                self.sources["td"], self.constants, label, marks, gates
+                self.sources["td"],
+                self.constants,
+                label,
+                marks,
+                gates,
+                self.title,
             )
         else:
             key = "primary_parts" if name == "F1" else "secondary_parts"
@@ -1256,7 +1269,14 @@ class Builder:
             panels = panel_data(
                 self.sources["official"], parts, self.systems, self.constants
             )
-            fig = draw_panels(panels, 3 if name == "F1" else 5, label, marks)
+            fig = draw_panels(
+                panels, 3 if name == "F1" else 5, label, marks, self.title
+            )
+        if self.title is not None:
+            banned = banned_figure_text(fig)
+            if banned:
+                plt.close(fig)
+                raise ToolError(f"figure {name} text has a pre-promotion label: {banned}")
         save_figure(fig, figures / f"{files[name]}.png")
         link = self.meta_ref(
             f"figure_{name}", f"{self.stem}.figures/{files[name]}.png"
@@ -1426,7 +1446,11 @@ def status_title(label: str) -> str:
 
 
 def draw_panels(
-    panels: list[dict], columns: int, label: str, provisional: dict
+    panels: list[dict],
+    columns: int,
+    label: str,
+    provisional: dict,
+    title: str | None = None,
 ) -> plt.Figure:
     """Draw one small panel per part: markers, interval bars and band.
 
@@ -1498,7 +1522,7 @@ def draw_panels(
             f"{panel['name']} ({panel['experiment']})\nlevel {panel['level']}",
             fontsize=7,
         )
-    fig.suptitle(status_title(label), fontsize=8)
+    fig.suptitle(status_title(label) if title is None else title, fontsize=8)
     fig.tight_layout()
     return fig
 
@@ -1517,7 +1541,12 @@ def crosscheck_points(
 
 
 def draw_crosscheck(
-    td: dict, constants: dict, label: str, provisional: dict, gpu_gate: dict
+    td: dict,
+    constants: dict,
+    label: str,
+    provisional: dict,
+    gpu_gate: dict,
+    title: str | None = None,
 ) -> plt.Figure:
     """Draw the cross-check z values, in gray, with the bound line.
 
@@ -1547,7 +1576,7 @@ def draw_crosscheck(
         f"{s} {'passed' if gpu_gate[s] is True else 'NOT passed'}"
         for s in constants["systems"]
     )
-    fig.suptitle(status_title(label), fontsize=8)
+    fig.suptitle(status_title(label) if title is None else title, fontsize=8)
     fig.text(0.01, 0.01, f"GPU validation gate: {gate_text}", fontsize=7)
     fig.tight_layout(rect=(0, 0.04, 1, 1))
     return fig
@@ -1557,6 +1586,36 @@ def save_figure(fig: plt.Figure, path: Path) -> None:
     """Save a PNG with no timestamp or software tag (byte-identical reruns)."""
     fig.savefig(path, dpi=130, metadata={"Software": None})
     plt.close(fig)
+
+
+BANNED_FIGURE_WORDS = re.compile(r"unpromoted|preliminary|confirmatory", re.I)
+
+
+def promoted_title(seed_id: str) -> str:
+    """Return the two-line figure title of the promoted copy (WU-0034).
+
+    Same number of lines and font size as the preliminary title, so the layout
+    of the figure is unchanged; no pre-promotion label. Line 1 is in capitals
+    because the preliminary line 1 has no descender: matplotlib sizes a text
+    line from its glyphs, and a descender (a "g") makes the title 0.56 px
+    taller, which moves every panel (found while writing WU-0034).
+    """
+    return (
+        f"FINDINGS FOR SEED {seed_id}\n"
+        "Result promoted by the owner (QA.11, LPC.PC.13)"
+    )
+
+
+def banned_figure_text(fig: plt.Figure) -> list[str]:
+    """Return the texts of a figure that hold a pre-promotion label word."""
+    from matplotlib.text import Text
+
+    found = [
+        t.get_text()
+        for t in fig.findobj(Text)
+        if BANNED_FIGURE_WORDS.search(t.get_text())
+    ]
+    return found
 
 
 # --- sources, guard and render -------------------------------------------
@@ -2451,13 +2510,13 @@ def check_text(lines: list[str], sources: dict, rows: list[dict]) -> list[str]:
     return problems
 
 
-def run_check(directory: Path, stem: str, override: dict) -> int:
-    """Check the document in ``directory``; print problems; return 0 or 1.
+def load_sources(
+    directory: Path, stem: str, override: dict
+) -> tuple[dict, dict, dict]:
+    """Read ``sources.json``, hash-check the sources and read them again.
 
-    Order: hash every source, apply the release guard again, render a fresh
-    copy (with figures) in a temporary directory, and compare it with the
-    document, the trace and the three PNG files; then run the independent
-    checks on the document text.
+    Returns ``(record, constants, sources)`` as ``run_check`` and the promoted
+    figures need them.
     """
     record = read_json(directory / f"{stem}.sources.json")
     constants = read_json(CONSTANTS_PATH)
@@ -2479,6 +2538,18 @@ def run_check(directory: Path, stem: str, override: dict) -> int:
         stem,
         HERE.parent,
     )
+    return record, constants, sources
+
+
+def run_check(directory: Path, stem: str, override: dict) -> int:
+    """Check the document in ``directory``; print problems; return 0 or 1.
+
+    Order: hash every source, apply the release guard again, render a fresh
+    copy (with figures) in a temporary directory, and compare it with the
+    document, the trace and the three PNG files; then run the independent
+    checks on the document text.
+    """
+    record, constants, sources = load_sources(directory, stem, override)
     actual = (directory / f"{stem}.md").read_text()
     with (directory / f"{stem}.trace.csv").open(newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -2527,13 +2598,14 @@ def run_check(directory: Path, stem: str, override: dict) -> int:
     return 1 if problems else 0
 
 
-# --- promoted copy (WU-0033) ------------------------------------------------
-# The exact list of pre-promotion labels (plan: docs/agent/records/work/
-# WU-0033-promoted-copy.md). This mode only writes a copy for the owner to
-# place after the promotion entry; nothing is removed automatically.
+# --- promoted copy (WU-0033, WU-0034) --------------------------------------
+# The exact list of pre-promotion labels and pointers (plans: docs/agent/
+# records/work/WU-0033-promoted-copy.md and WU-0034-promoted-figures.md). This
+# mode only writes a copy for the owner to place after the promotion entry;
+# nothing is removed automatically.
 BANNER_LINE = "**CONFIRMATORY: UNPROMOTED**"
 HEADER_LINES = [BANNER_LINE, PRELIMINARY_LINE, ""]
-PROMOTE_RULES = [
+LABEL_RULES = [
     ("R-TITLE", "# Preliminary findings for seed ", "# Findings for seed "),
     (
         "R-RULE",
@@ -2544,15 +2616,54 @@ PROMOTE_RULES = [
     ("R-WORD", "supported (preliminary, unpromoted)", "supported"),
     ("R-RUN", " in this preliminary, unpromoted run", " in this run"),
 ]
+TRACE_SENTENCE_NEW = (
+    "Every number quoted above is listed with its source and leaf path in "
+    "the trace file of the source document (the version before promotion), "
+    "which stays beside that document and not in this directory. The "
+    "`check` command of `tools/findings_build.py` verifies the source "
+    "document against the sources; it does not apply to this promoted "
+    "copy, whose only differences from it are the removed labels, the "
+    "three figure links and this sentence."
+)
 KEPT_LABEL_ROW = "| Label | CONFIRMATORY: UNPROMOTED |"
 RESIDUAL_LABEL = re.compile(r"preliminary|unpromoted", re.I)
 
 
-def promote_lines(text: str) -> tuple[list[str], dict[str, int]]:
+def trace_sentence_old(stem: str) -> str:
+    """Return the appendix C sentence of the preliminary document."""
+    return (
+        "Every number quoted above is listed with its source and leaf path "
+        f"in `{stem}.trace.csv`. Run the `check` command of "
+        "`tools/findings_build.py` on this directory to verify the document "
+        "against the sources."
+    )
+
+
+def promote_rules(src_stem: str | None, dst_stem: str | None) -> list:
+    """Return the substitutions (name, old, new); pointers need both stems."""
+    rules = list(LABEL_RULES)
+    if src_stem is not None and dst_stem is not None:
+        rules.append(
+            (
+                "E-FIG",
+                f"({src_stem}.figures/",
+                f"({dst_stem}.figures/",
+            )
+        )
+        rules.append(
+            ("E-TRACE", trace_sentence_old(src_stem), TRACE_SENTENCE_NEW)
+        )
+    return rules
+
+
+def promote_lines(
+    text: str, src_stem: str | None = None, dst_stem: str | None = None
+) -> tuple[list[str], dict[str, int]]:
     """Return the promoted lines and the lines changed by each rule.
 
     Raises ``ToolError`` if the header lines are missing, a rule matches
-    nowhere, or a label that the list does not know remains.
+    nowhere, or a label (or, with stems, a pointer to the preliminary
+    figures or trace) that the list does not know remains.
     """
     lines = text.split("\n")
     if lines[: len(HEADER_LINES)] != HEADER_LINES:
@@ -2561,17 +2672,19 @@ def promote_lines(text: str) -> tuple[list[str], dict[str, int]]:
             "(banner, PRELIMINARY line, blank line)"
         )
     body = lines[len(HEADER_LINES) :]
-    counts = {name: 0 for name, _, _ in PROMOTE_RULES}
+    rules = promote_rules(src_stem, dst_stem)
+    counts = {name: 0 for name, _, _ in rules}
     out = []
     for line in body:
-        for name, old, new in PROMOTE_RULES:
+        for name, old, new in rules:
             if old in line:
                 line = line.replace(old, new)
                 counts[name] += 1
         out.append(line)
     unmatched = [n for n, c in counts.items() if c == 0]
-    if unmatched:
-        raise ToolError(f"rule(s) {unmatched} matched nowhere")
+    required = [n for n in unmatched if n not in ("E-FIG", "E-TRACE")]
+    if required:
+        raise ToolError(f"rule(s) {required} matched nowhere")
     residual = [
         k + 1 + len(HEADER_LINES)
         for k, line in enumerate(out)
@@ -2581,16 +2694,29 @@ def promote_lines(text: str) -> tuple[list[str], dict[str, int]]:
         raise ToolError(
             f"residual label(s) not in the list at promoted lines {residual}"
         )
+    if src_stem is not None and src_stem != dst_stem:
+        left = [
+            k + 1 + len(HEADER_LINES)
+            for k, line in enumerate(out)
+            if f"{src_stem}.figures/" in line or f"{src_stem}.trace.csv" in line
+        ]
+        if left:
+            raise ToolError(
+                f"pointer(s) to the preliminary figures or trace remain at "
+                f"promoted lines {left}"
+            )
     return out, counts
 
 
-def promote_text(text: str) -> str:
+def promote_text(
+    text: str, src_stem: str | None = None, dst_stem: str | None = None
+) -> str:
     """Return the promoted copy of a preliminary document."""
-    return "\n".join(promote_lines(text)[0])
+    return "\n".join(promote_lines(text, src_stem, dst_stem)[0])
 
 
 # The independent check: a table of allowed character-level edits that is
-# written apart from PROMOTE_RULES and a line alignment by difflib. It does not
+# written apart from LABEL_RULES and a line alignment by difflib. It does not
 # call promote_lines or promote_text.
 ALLOWED_EDITS = [
     (' A "supported" verdict is always written "supported (preliminary, '
@@ -2601,14 +2727,29 @@ ALLOWED_EDITS = [
 ]  # fmt: skip
 
 
-def verify_label_diff(preliminary: str, promoted: str) -> list[str]:
+def allowed_edits(src_stem: str | None, dst_stem: str | None) -> list:
+    """Return the allowed edits, with the pointer edits when stems are given."""
+    edits = list(ALLOWED_EDITS)
+    if src_stem is not None and dst_stem is not None:
+        edits.append((f"({src_stem}.figures/", f"({dst_stem}.figures/"))
+        edits.append((trace_sentence_old(src_stem), TRACE_SENTENCE_NEW))
+    return edits
+
+
+def verify_label_diff(
+    preliminary: str,
+    promoted: str,
+    src_stem: str | None = None,
+    dst_stem: str | None = None,
+) -> list[str]:
     """Return the problems of a promoted text against its preliminary one.
 
     The line alignment of the two texts (difflib) may hold only: the deletion
     of the three header lines; lines that are equal; and replaced runs of
     equal length in which each new line is the old line with edits of
-    ``ALLOWED_EDITS`` only. A label outside the kept provenance row must be
-    gone. Everything else (a digit, a verdict word, an inserted or deleted
+    ``allowed_edits`` only. A label outside the kept provenance row must be
+    gone, and (with stems) no pointer to the preliminary figures or trace may
+    remain. Everything else (a digit, a verdict word, an inserted or deleted
     line, a label left or restored elsewhere) is a problem.
     """
     import difflib
@@ -2618,6 +2759,7 @@ def verify_label_diff(preliminary: str, promoted: str) -> list[str]:
     if old[: len(HEADER_LINES)] != HEADER_LINES:
         return ["the preliminary document lacks the three header lines"]
     old = old[len(HEADER_LINES) :]
+    edits = allowed_edits(src_stem, dst_stem)
     problems = []
     matcher = difflib.SequenceMatcher(None, old, new, autojunk=False)
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
@@ -2631,7 +2773,7 @@ def verify_label_diff(preliminary: str, promoted: str) -> list[str]:
             continue
         for k in range(i2 - i1):
             line = old[i1 + k]
-            for found, repl in ALLOWED_EDITS:
+            for found, repl in edits:
                 line = line.replace(found, repl)
             if line != new[j1 + k]:
                 problems.append(
@@ -2641,50 +2783,195 @@ def verify_label_diff(preliminary: str, promoted: str) -> list[str]:
     for k, line in enumerate(new):
         if RESIDUAL_LABEL.search(line) and line != KEPT_LABEL_ROW:
             problems.append(f"promoted line {k + 1}: a label remains")
+        if (
+            src_stem is not None
+            and src_stem != dst_stem
+            and (f"{src_stem}.figures/" in line or f"{src_stem}.trace.csv" in line)
+        ):
+            problems.append(f"promoted line {k + 1}: a pointer remains")
     return problems
+
+
+TITLE_LINES = 2  # the title has two lines (one run of ink rows each)
+
+
+def title_band_end(image) -> int:
+    """Return the number of top rows that hold the title of a figure image.
+
+    The band runs from row 0 to the end of the second run of rows that hold
+    ink (a non-white pixel), the two lines of the title. Measured on the
+    committed figures: F1 rows 16 to 47, F2 34 to 65, F3 21 to 52.
+    """
+    import numpy as np
+
+    ink = ~(image[..., :3] == 1.0).all(axis=-1).all(axis=-1)
+    runs = 0
+    for i in range(len(ink)):
+        if ink[i] and (i == 0 or not ink[i - 1]):
+            runs += 1
+        if runs == TITLE_LINES and ink[i] and (
+            i + 1 == len(ink) or not ink[i + 1]
+        ):
+            return i + 1
+    return 0
+
+
+def verify_title_only(original_png: Path, promoted_png: Path) -> list[str]:
+    """Return problems unless two figure PNGs differ only in the title band.
+
+    Reads both files as arrays (matplotlib ``imread``). The band is taken
+    from the original image (``title_band_end``). Outside the band the pixel
+    arrays must be exactly equal (tolerance zero); inside they must differ.
+    """
+    import numpy as np
+    from matplotlib import image as mpimg
+
+    a, b = mpimg.imread(original_png), mpimg.imread(promoted_png)
+    if a.shape != b.shape:
+        return [f"{promoted_png.name}: shape {b.shape} differs from {a.shape}"]
+    band = title_band_end(a)
+    problems = []
+    if band == 0:
+        problems.append(f"{original_png.name}: no title band found")
+    elif not np.array_equal(a[band:], b[band:]):
+        problems.append(
+            f"{promoted_png.name}: pixels differ outside the title band "
+            f"(rows 0 to {band})"
+        )
+    if band and np.array_equal(a[:band], b[:band]):
+        problems.append(f"{promoted_png.name}: the title did not change")
+    return problems
+
+
+FIGURE_FILES = ["F1_primary", "F2_secondary", "F3_crosscheck"]
+
+
+def render_promoted_figures(
+    directory: Path, stem: str, override: dict, out_dir: Path
+) -> list[Path]:
+    """Render F1 to F3 with the promoted title into ``out_dir``.
+
+    The sources are those of the preliminary build (hash-checked through its
+    ``sources.json``); only the title differs. Raises ``ToolError`` on any
+    problem, including a pre-promotion word in a figure text.
+    """
+    record, constants, sources = load_sources(directory, stem, override)
+    seed_id = walk(sources["official"], "provenance/seed_id")
+    with tempfile.TemporaryDirectory() as tmp:
+        builder = Builder(
+            sources,
+            constants,
+            Path(tmp),
+            stem,
+            title=promoted_title(str(seed_id)),
+            figures_dir=out_dir,
+        )
+        for name in ("F1", "F2", "F3"):
+            builder.figure(name)
+    return [out_dir / f"{n}.png" for n in FIGURE_FILES]
 
 
 def promote(args: argparse.Namespace) -> int:
     """Write the promoted copy of a document and check the difference.
 
-    Exit codes: 0 success; 1 the machine check failed (the output is
-    deleted, no file is left); 2 an input or usage error (nothing written).
+    With figures (the default when the document has image links) the three
+    findings figures are re-rendered with the promoted title into
+    ``<out stem>.figures`` next to ``--out``. Exit codes: 0 success; 1 a
+    machine check failed (nothing is left behind); 2 an input or usage
+    error (nothing written).
     """
+    import shutil
+
     src, dst = Path(args.document), Path(args.out)
     if not src.is_file():
         raise ToolError(f"{src} is not a file")
-    if dst.exists() or dst.is_symlink() or src.resolve() == dst.resolve():
-        raise ToolError(
-            f"{dst} exists or is the input: the preliminary document is "
-            "never overwritten and nothing is replaced"
-        )
+    figures_dst = dst.with_name(f"{dst.stem}.figures")
+    for target in (dst, figures_dst):
+        if target.exists() or target.is_symlink():
+            raise ToolError(
+                f"{target} exists: the preliminary files are never "
+                "overwritten and nothing is replaced"
+            )
+    if src.resolve() == dst.resolve():
+        raise ToolError("--out is the input document")
     pre = src.read_text()
-    lines, counts = promote_lines(pre)
+    with_figures = (
+        not args.no_figures and f"({src.stem}.figures/" in pre
+    )
+    src_stem = src.stem if not args.no_figures else None
+    dst_stem = dst.stem if not args.no_figures else None
+    if with_figures and not src.with_name(f"{src.stem}.sources.json").is_file():
+        raise ToolError(
+            "the document has image links but no sources file beside it to "
+            "re-render them (use --no-figures for a text-only copy)"
+        )
+    lines, counts = promote_lines(pre, src_stem, dst_stem)
+    figures_src = src.with_name(f"{src.stem}.figures")
+    before = {
+        p: p.read_bytes()
+        for p in [src, *figures_src.glob("*.png")]
+        if p.is_file()
+    }
+    created: list[Path] = []
     try:
-        with dst.open("x") as handle:  # O_EXCL: never follows a link
-            handle.write("\n".join(lines))
-    except FileExistsError as exc:
-        raise ToolError(f"{dst} exists: nothing replaced") from exc
-    problems = verify_label_diff(pre, dst.read_text())
+        with tempfile.TemporaryDirectory() as tmp:
+            problems: list[str] = []
+            if with_figures:
+                new_dir = Path(tmp) / "figures"
+                made = render_promoted_figures(src.parent, src.stem, {}, new_dir)
+                for png in made:
+                    original = figures_src / png.name
+                    if not original.is_file():
+                        problems.append(f"{original} is missing")
+                    else:
+                        problems += verify_title_only(original, png)
+            if not problems:
+                with dst.open("x") as handle:  # O_EXCL: never follows a link
+                    handle.write("\n".join(lines))
+                created.append(dst)
+                problems += verify_label_diff(
+                    pre, dst.read_text(), src_stem, dst_stem
+                )
+            if not problems and with_figures:
+                shutil.move(str(new_dir), str(figures_dst))
+                created.append(figures_dst)
+    except BaseException:
+        for path in created:
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink(missing_ok=True)
+        raise
     if problems:
-        dst.unlink()
+        for path in created:
+            path.unlink(missing_ok=True)
         print(
-            "check failed, the output was deleted:\n" + "\n".join(problems),
+            "check failed, nothing was left behind:\n" + "\n".join(problems),
             file=sys.stderr,
         )
         return 1
+    after = {p: p.read_bytes() for p in before}
+    if after != before:  # cannot happen: nothing here writes to them
+        raise ToolError("a preliminary file changed")
     kept = sum(1 for line in lines if RESIDUAL_LABEL.search(line))
     print(
         f"promoted copy written to {dst}\n"
-        f"lines: preliminary {len(pre.split(chr(10)))}, "
+        + (f"promoted figures written to {figures_dst}\n" if with_figures else "")
+        + f"lines: preliminary {len(pre.split(chr(10)))}, "
         f"promoted {len(lines)}\n"
         f"header lines deleted: {len(HEADER_LINES)}\n"
         + "\n".join(f"{n}: {c} lines" for n, c in counts.items())
         + f"\nresidual labels: {kept} (kept: provenance label row)"
-        + "\nchecked on the bytes read back from the output, by a line "
-        "alignment and a separate table of allowed edits: only the header "
-        "deletion and the label edits differ; trace, sources and figures "
-        "are not touched"
+        + "\nchecked on the bytes read back, by a line alignment and a "
+        "separate table of allowed edits: only the header deletion, the "
+        "label edits and the pointer edits differ"
+        + (
+            "; figures: pixels equal outside the title band, tolerance zero"
+            if with_figures
+            else ""
+        )
+        + "; the preliminary document, trace, sources and figures are not "
+        "touched"
     )
     return 0
 
@@ -2727,6 +3014,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     pro.add_argument("--document", required=True, help="preliminary .md")
     pro.add_argument("--out", required=True, help="new file, never replaced")
+    pro.add_argument(
+        "--no-figures",
+        action="store_true",
+        help="text only: no figures, image links and trace sentence kept",
+    )
     args = parser.parse_args(argv)
     try:
         if args.command == "render":

@@ -119,19 +119,20 @@ python3 tools/ledger.py append --type promotion \
 #    "- <date>, <owner> (WU-0018.3): CONF-1 run-1 PROMOTED by ledger entry <N>; Status: promoted."
 
 # 3. promoted copies; the labels are removed on the COPIES only, the originals stay as they are
-#    precondition: WU-0033 (branch wu/promoted-copy) is reviewed and merged to develop, so that `promote` exists
+#    preconditions: WU-0033 (branch wu/promoted-copy) AND WU-0034 (branch wu/promoted-figures) are reviewed and merged to develop
 mkdir -p promoted/CONF-1
 cp -r runs/confirmatory/run-1/full/figures promoted/CONF-1/figures
 cp runs/confirmatory/run-1/full/results.json promoted/CONF-1/results.json
 cp runs/confirmatory/run-1/full/RESULTS.md promoted/CONF-1/RESULTS.md
 python3 tools/findings_build.py promote --document docs/agent/notes/2026-10-20-prelim-findings-conf1.md --out promoted/CONF-1/report.md
-#    (writes only the new file, checks the difference on the bytes read back, and deletes the file with exit 1 if anything but the listed labels differs)
+#    writes promoted/CONF-1/report.md and promoted/CONF-1/report.figures/ (F1 to F3 re-rendered with the promoted title; the image links of the copy point there),
+#    replaces the appendix C pointer sentence, checks the difference on the bytes read back and the figure pixels outside the title band (tolerance zero),
+#    and leaves nothing behind (exit 1) if anything but the listed edits differs; it never writes to the preliminary document, trace, sources or figures
 #    RESULTS.md copy: remove its header label by hand on the COPY: line 3 `**CONFIRMATORY: UNPROMOTED**` and the blank line 4 after it
 sed -i '3,4d' promoted/CONF-1/RESULTS.md
 diff runs/confirmatory/run-1/full/RESULTS.md promoted/CONF-1/RESULTS.md    # must print exactly: 3,4d2 and the two deleted lines, nothing else
 grep -n -i "unpromoted\|promoted" promoted/CONF-1/RESULTS.md              # must show only the two stored provenance cells (label, promoted false)
-#    the owner's decision on the findings figures F1 to F3 is in section 9 below; do this step after it
-find promoted/CONF-1 -type f | sort | xargs sha256sum    # record in the manifest line (includes the files inside figures/)
+find promoted/CONF-1 -type f | sort | xargs sha256sum    # record in the manifest line (includes the files inside figures/ and report.figures/)
 
 # 4. verify and sync
 python3 tools/ledger.py verify
@@ -140,21 +141,15 @@ python3 tools/ledger.py verify
 
 The sketch is a sketch: the folder name `promoted/` and the form of the label removal are proposals, not an adopted procedure.
 
-## 9. Owner decision: the findings figures and what the promoted copy still says (new, 2026-10-22)
+## 9. Owner decision: the findings figures and what the promoted copy still says (decided 2026-10-22: option (a))
 
-Facts (checked on the files):
+The owner chose option (a): the three findings figures are re-rendered with a promoted title. It is implemented as WU-0034 (branch `wu/promoted-figures`, on top of WU-0033), inside the same `promote` command; **WU-0033 and WU-0034 must both be reviewed and merged before the owner uses it**. What the command does, and what it checks:
 
-- The findings document embeds three images, F1, F2, F3 (document lines 158, 332, 480: `2026-10-20-prelim-findings-conf1.figures/F1_primary.png`, `F2_secondary.png`, `F3_crosscheck.png`). They are drawn by `tools/findings_build.py` with a title that reads "CONFIRMATORY: UNPROMOTED / PRELIMINARY: internal to the owner and the student until promotion (QA.11, LPC.PC.13)." (`status_title`). `promote` does not touch them. The four figures of the official `RESULTS.md` carry no status text (their captions are in the text) and can be copied as they are.
-- In the promoted copy the image links of F1 to F3 point to a folder that the step-3 commands above do not copy (they copy `runs/confirmatory/run-1/full/figures` only).
-- The provenance row of section 2 still reads `| Label | CONFIRMATORY: UNPROMOTED |`: it quotes the label stored in the sealed `results.json` and is kept on purpose (ROADMAP: only the header label is removed on the copy). The promoted report will therefore contain that string once; the same holds for the stored cells `label` and `promoted false` of the promoted `RESULTS.md`.
-- Appendix C of the document (line 550 of the preliminary document, line 547 of the promoted copy) says the trace file sits "in this directory" and that the `check` command verifies the document against the sources. For the promoted copy that is not true (`check` refuses an edited document). `promote` leaves this sentence unchanged, because it is not in the allowed-edit table of the plan (adding it needs a reviewed change to the plan and the table).
+- F1, F2 and F3 are drawn again by the same builder code from the same sources (hash-checked through the document's `sources.json`), with the title `FINDINGS FOR SEED CONF-1` and `Result promoted by the owner (QA.11, LPC.PC.13)`; the experiment and identifier labels, the levels and the interval-procedure texts in panels and captions are unchanged. Line 1 is in capitals on purpose: the original line 1 has no descender, and a lower-case "g" made the title 0.56 px taller and moved every panel (found and measured in WU-0034).
+- The figures go to `report.figures/` next to `--out`; the three image links of the copy point there. The preliminary figures directory is never touched (the command checks the hashes before and after).
+- Checks: re-rendering with the ORIGINAL title reproduces the committed PNG bytes (the existing `check` and a test), so the title is the only change; every promoted figure equals the committed one in all pixels outside the title band (the first two runs of ink rows, measured 48, 66 and 53 rows), tolerance zero; no figure text or PNG metadata holds "unpromoted", "preliminary" or "confirmatory".
+- Appendix C pointer: the sentence about the trace and `check` is replaced by a defined text (no digits): "Every number quoted above is listed with its source and leaf path in the trace file of the source document (the version before promotion), which stays beside that document and not in this directory. The `check` command of `tools/findings_build.py` verifies the source document against the sources; it does not apply to this promoted copy, whose only differences from it are the removed labels, the three figure links and this sentence." It is in the allowed-edit table of the independent check.
+- Still true: the promoted report keeps the provenance row `| Label | CONFIRMATORY: UNPROMOTED |` once (it quotes the sealed file's stored label), and the promoted `RESULTS.md` keeps its stored cells `label` and `promoted false`.
+- The copy cannot pass `findings_build.py check` (it refuses an edited document); the `promote` checks replace it, and `check` still passes on the preliminary document.
 
-Options for the figures:
-
-| Option | What it does | Consequence |
-|---|---|---|
-| (a) Re-render F1 to F3 with a promoted status title | A reviewed change to `status_title` in the builder (a follow-up unit, for example WU-0034, not implemented here): new PNGs, same numbers; the same unit can add a rule that rewrites the appendix C sentence | The promoted report is free of the pre-promotion labels except the kept provenance row; new PNG hashes to record; builder change needs a review and the preliminary document must still pass `check` |
-| (b) Copy F1 to F3 as they are, with a dated note | `cp -r` of the `.figures/` folder plus a dated line in the promoted copy | Fast, no tool change; the promoted report then shows three images that call themselves unpromoted and internal, which contradicts the text; the note has to say so, and the promoted copy is no longer made by `promote` alone |
-| (c) Omit the images | Remove the three image links (and their captions) from the promoted copy | No contradiction; the report loses three figures, whose numbers stay in the tables; also needs an edit that `promote` does not make (a follow-up allowed-edit rule) |
-
-Recommendation (stated as asked): **(a)**, as a follow-up unit before the promotion transaction if the owner is not pressed for time; the change is a title string in the builder and the numbers are untouched. If the promotion must come first, take **(c)** with the dated note rather than (b), because (b) places statements in a promoted report that the report itself denies. Either way the promoted report keeps the provenance row string "CONFIRMATORY: UNPROMOTED" once, and the owner should know this before placing the copy.
+For reference, the options that were put to the owner were (a) re-render, (b) copy with a dated note, (c) omit the images; (a) was recommended and chosen.
