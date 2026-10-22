@@ -120,3 +120,7 @@ Nothing on this list touches a number, a verdict, a band, a level, the frozen co
 - **Extension and development numbers beside the sealed result:** none.
 - **Ledger status and verify:** clean in both trees; the develop entries 32 to 36 are uncommitted.
 - **Premature-promotion risks found:** WU-0017.3 pending (M-C); the undefined promoted artifact (M-A); the waiver form (M-B); the uncommitted ledger (M-D). No open referral; no tracked defect without a limitation in substance.
+
+## Correction appended 2026-10-22 (auditor, after the commit of this file)
+
+While this file was being written, the owner committed the ledger entries seq 32 to 36 on develop (`3d1a7f3`, 2026-10-22 05:39:52 −04:00, "Ledger: DEF-0022 ruling (DEC-0041); audit M1 waiver, M3 and m3; WU-0017 figures and gaps", 5 lines added to `ledger.jsonl`, nothing else). `tools/ledger.py verify` on that commit is unchanged in substance (36 entries, chain intact). **M-D is therefore reduced to its second half:** main's ledger still stops at 28, and the proposal and promotion entries must go on this committed chain and be synced to main after the transaction. Item 2 of "What remains" is done; nothing else in this audit changes.
