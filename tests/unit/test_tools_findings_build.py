@@ -2661,8 +2661,8 @@ def test_promote_command_fails_and_leaves_no_file_on_an_extra_change(
     """
     real = fb.promote_lines
 
-    def tampered(text: str):
-        lines, counts = real(text)
+    def tampered(text: str, *stems):
+        lines, counts = real(text, *stems)
         return [ln.replace("0.2437", "0.2438") for ln in lines], counts
 
     monkeypatch.setattr(fb, "promote_lines", tampered)
@@ -2707,3 +2707,242 @@ def test_promote_refuses_a_dangling_symlink_output(tmp_path: Path) -> None:
     link.symlink_to(target)
     assert fb.main(["promote", "--document", str(src), "--out", str(link)]) == 2
     assert not target.exists()
+
+
+# --- WU-0034: promoted figures and pointers ---------------------------------
+# References: (1) the committed-style PNGs themselves: the figures of the
+# preliminary build are the originals; (2) hand-typed expected texts for the
+# two pointer edits; (3) a pixel comparison done here with numpy on arrays read
+# by matplotlib's imread, with its own band rule (rows of the first two runs of
+# ink rows = the two title lines). Tolerance for pixels: zero (exact equality).
+FIG_PRE = (
+    PRE_DOC
+    + "\n![F1](doc.figures/F1_primary.png)\n\n"
+    "Every number quoted above is listed with its source and leaf path in "
+    "`doc.trace.csv`. Run the `check` command of `tools/findings_build.py` "
+    "on this directory to verify the document against the sources.\n"
+)
+FIG_PROMOTED = (
+    PROMOTED_DOC
+    + "\n![F1](out.figures/F1_primary.png)\n\n"
+    "Every number quoted above is listed with its source and leaf path in "
+    "the trace file of the source document (the version before promotion), "
+    "which stays beside that document and not in this directory. The "
+    "`check` command of `tools/findings_build.py` verifies the source "
+    "document against the sources; it does not apply to this promoted "
+    "copy, whose only differences from it are the removed labels, the "
+    "three figure links and this sentence.\n"
+)
+
+
+def test_pointer_edits_equal_the_hand_written_copy() -> None:
+    """The figure link and the appendix C sentence are rewritten exactly."""
+    assert fb.promote_text(FIG_PRE, "doc", "out") == FIG_PROMOTED
+    assert fb.verify_label_diff(FIG_PRE, FIG_PROMOTED, "doc", "out") == []
+    # an extra change, or a pointer left behind, is a problem
+    assert fb.verify_label_diff(
+        FIG_PRE, FIG_PROMOTED.replace("out.figures", "other.figures"), "doc", "out"
+    )
+    assert fb.verify_label_diff(
+        FIG_PRE, FIG_PROMOTED.replace("out.figures", "doc.figures"), "doc", "out"
+    )
+    assert fb.verify_label_diff(
+        FIG_PRE, FIG_PROMOTED.replace("three figure links", "two"), "doc", "out"
+    )
+    assert not re.search(r"\d", fb.TRACE_SENTENCE_NEW)
+
+
+@pytest.fixture(scope="module")
+def conf_built(tmp_path_factory):
+    """A confirmatory build with the real figures (original title)."""
+    tmp = tmp_path_factory.mktemp("confbuilt")
+    mp = pytest.MonkeyPatch()
+    mp.setattr(fb, "git_freeze_commit", lambda root: "c" * 40)
+    args = conf_args(tmp)
+    base = tmp
+    args.manifest_official = fb.sha256_of(base / "official" / "results.json")
+    args.manifest_official_md = fb.sha256_of(base / "official" / "RESULTS.md")
+    args.manifest_crosscheck = fb.sha256_of(base / "cross" / "results.json")
+    args.release_ref = "ledger-seq-17"
+    assert fb.render(args) == 0
+    yield Path(args.out)
+    mp.undo()
+
+
+def _hashes(out: Path) -> dict:
+    files = [p for p in sorted(out.rglob("*")) if p.is_file()]
+    return {str(p): fb.sha256_of(p) for p in files}
+
+
+def _title_rows(image) -> int:
+    """Own band rule: end row of the second run of rows that have ink."""
+    import numpy as np
+
+    ink = ~(image[..., :3] == 1.0).all(axis=-1).all(axis=-1)
+    edges = np.flatnonzero(np.diff(np.concatenate(([0], ink.astype(int), [0]))))
+    return int(edges[3])  # stop of the second run
+
+
+def test_original_title_reproduces_the_committed_png_bytes(conf_built) -> None:
+    """(i) Re-rendering with the original title gives the same PNG bytes.
+
+    The committed figures were written by the build; ``load_sources`` and a
+    Builder with no title override draw them again, and the bytes are equal,
+    so the title is the only thing a promoted figure can change.
+    """
+    _, constants, sources = fb.load_sources(conf_built, "doc", {})
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(fb, "git_freeze_commit", lambda root: "c" * 40)
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            builder = fb.Builder(sources, constants, Path(tmp), "doc")
+            for name in ("F1", "F2", "F3"):
+                builder.figure(name)
+            for stem in fb.FIGURE_FILES:
+                new = (Path(tmp) / "doc.figures" / f"{stem}.png").read_bytes()
+                old = (conf_built / "doc.figures" / f"{stem}.png").read_bytes()
+                assert new == old, stem
+    assert fb.run_check(conf_built, "doc", {}) == 0
+
+
+def test_promote_figures_differ_only_in_the_title_band(
+    conf_built, tmp_path
+) -> None:
+    """(ii), (iii), (v): pixels, words and untouched sources."""
+    import numpy as np
+    from matplotlib import image as mpimg
+    from PIL import Image
+
+    before = _hashes(conf_built)
+    out = tmp_path / "report.md"
+    assert fb.main(["promote", "--document", str(conf_built / "doc.md"), "--out", str(out)]) == 0
+    assert _hashes(conf_built) == before  # (v) nothing of the build changed
+    figures = tmp_path / "report.figures"
+    assert sorted(p.name for p in figures.iterdir()) == [
+        f"{s}.png" for s in fb.FIGURE_FILES
+    ]
+    text = out.read_text()
+    assert "(report.figures/F1_primary.png)" in text
+    assert "doc.figures" not in text and "doc.trace.csv" not in text
+    for stem in fb.FIGURE_FILES:
+        a = mpimg.imread(conf_built / "doc.figures" / f"{stem}.png")
+        b = mpimg.imread(figures / f"{stem}.png")
+        assert a.shape == b.shape
+        band = _title_rows(a)
+        assert 20 < band < 80  # the two title lines (measured 48, 66, 53)
+        assert np.array_equal(a[band:], b[band:])  # tolerance zero
+        assert not np.array_equal(a[:band], b[:band])  # the title changed
+        info = Image.open(figures / f"{stem}.png").info
+        assert not re.search(
+            r"unpromoted|preliminary|confirmatory",
+            " ".join(str(v) for v in info.values()),
+            re.I,
+        )
+
+
+def test_promoted_figure_texts_hold_no_pre_promotion_word(conf_built) -> None:
+    """(iii): every text object of the promoted figures, and the title."""
+    banned = re.compile(r"unpromoted|preliminary|confirmatory", re.I)
+    assert not banned.search(fb.promoted_title("CONF-1"))
+    seen: list[str] = []
+    real = fb.save_figure
+
+    def spy(fig, path):
+        from matplotlib.text import Text
+
+        seen.extend(t.get_text() for t in fig.findobj(Text))
+        real(fig, path)
+
+    _, constants, sources = fb.load_sources(conf_built, "doc", {})
+    import tempfile
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(fb, "git_freeze_commit", lambda root: "c" * 40)
+        mp.setattr(fb, "save_figure", spy)
+        with tempfile.TemporaryDirectory() as tmp:
+            builder = fb.Builder(
+                sources,
+                constants,
+                Path(tmp),
+                "doc",
+                title=fb.promoted_title("CONF-1"),
+                figures_dir=Path(tmp) / "f",
+            )
+            for name in ("F1", "F2", "F3"):
+                builder.figure(name)
+    assert any("FINDINGS FOR SEED CONF-1" in t for t in seen)
+    assert not [t for t in seen if banned.search(t)]
+
+
+@pytest.mark.parametrize("how", ["raise", "banned word", "moved panel"])
+def test_promote_fails_closed_on_a_figure_problem(
+    conf_built, tmp_path, monkeypatch, how
+) -> None:
+    """(iv): no promoted file and no figures directory are left behind."""
+    real = fb.draw_panels
+    if how == "raise":
+
+        def bad_draw(*a, **k):
+            raise RuntimeError("render failure")
+
+        monkeypatch.setattr(fb, "draw_panels", bad_draw)
+    elif how == "banned word":
+        monkeypatch.setattr(fb, "promoted_title", lambda seed: "UNPROMOTED\nx")
+    else:
+
+        def moved(*a, **k):
+            fig = real(*a, **k)
+            fig.axes[0].set_xlim(-5, 5)  # changes pixels outside the title
+            return fig
+
+        monkeypatch.setattr(fb, "draw_panels", moved)
+    before = _hashes(conf_built)
+    out = tmp_path / "report.md"
+    argv = ["promote", "--document", str(conf_built / "doc.md"), "--out", str(out)]
+    if how == "raise":
+        with pytest.raises(RuntimeError):
+            fb.main(argv)
+    else:  # a banned word and a moved panel are failed checks (exit 1)
+        assert fb.main(argv) == 1
+    assert list(tmp_path.iterdir()) == []  # nothing left behind
+    assert _hashes(conf_built) == before
+
+
+def test_promote_leaves_nothing_when_the_final_move_fails(
+    conf_built, tmp_path, monkeypatch
+) -> None:
+    """R2: a move that fails midway leaves no copy and no partial folder."""
+
+    def half_move(src: str, dst: str) -> None:
+        Path(dst).mkdir()
+        (Path(dst) / "F1_primary.png").write_bytes(b"partial")
+        raise OSError("disk full")
+
+    import shutil
+
+    monkeypatch.setattr(shutil, "move", half_move)
+    out = tmp_path / "report.md"
+    before = _hashes(conf_built)
+    with pytest.raises(OSError):
+        fb.main(["promote", "--document", str(conf_built / "doc.md"), "--out", str(out)])
+    assert list(tmp_path.iterdir()) == []
+    assert _hashes(conf_built) == before
+
+
+def test_promote_reads_the_pointer_edits_from_its_own_table() -> None:
+    """R4: the check table holds the two pointer sentences as literals."""
+    old, new = fb.allowed_edits("doc", "out")[-1]
+    assert old != fb.trace_sentence_old("zzz") and "doc.trace.csv" in old
+    assert new == fb.TRACE_SENTENCE_NEW and not re.search(r"\d", new)
+
+
+def test_promote_needs_the_sources_file_for_the_figures(tmp_path) -> None:
+    """A document with image links and no sources file is refused (exit 2)."""
+    src = tmp_path / "doc.md"
+    src.write_text(FIG_PRE)
+    out = tmp_path / "out.md"
+    assert fb.main(["promote", "--document", str(src), "--out", str(out)]) == 2
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["doc.md"]
+    assert fb.main(["promote", "--document", str(src), "--out", str(out), "--no-figures"]) == 0
+    assert "(doc.figures/F1_primary.png)" in out.read_text()
