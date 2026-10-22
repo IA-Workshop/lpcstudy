@@ -2903,12 +2903,38 @@ def test_promote_fails_closed_on_a_figure_problem(
     if how == "raise":
         with pytest.raises(RuntimeError):
             fb.main(argv)
-    elif how == "banned word":
-        assert fb.main(argv) == 2
-    else:
+    else:  # a banned word and a moved panel are failed checks (exit 1)
         assert fb.main(argv) == 1
     assert list(tmp_path.iterdir()) == []  # nothing left behind
     assert _hashes(conf_built) == before
+
+
+def test_promote_leaves_nothing_when_the_final_move_fails(
+    conf_built, tmp_path, monkeypatch
+) -> None:
+    """R2: a move that fails midway leaves no copy and no partial folder."""
+
+    def half_move(src: str, dst: str) -> None:
+        Path(dst).mkdir()
+        (Path(dst) / "F1_primary.png").write_bytes(b"partial")
+        raise OSError("disk full")
+
+    import shutil
+
+    monkeypatch.setattr(shutil, "move", half_move)
+    out = tmp_path / "report.md"
+    before = _hashes(conf_built)
+    with pytest.raises(OSError):
+        fb.main(["promote", "--document", str(conf_built / "doc.md"), "--out", str(out)])
+    assert list(tmp_path.iterdir()) == []
+    assert _hashes(conf_built) == before
+
+
+def test_promote_reads_the_pointer_edits_from_its_own_table() -> None:
+    """R4: the check table holds the two pointer sentences as literals."""
+    old, new = fb.allowed_edits("doc", "out")[-1]
+    assert old != fb.trace_sentence_old("zzz") and "doc.trace.csv" in old
+    assert new == fb.TRACE_SENTENCE_NEW and not re.search(r"\d", new)
 
 
 def test_promote_needs_the_sources_file_for_the_figures(tmp_path) -> None:

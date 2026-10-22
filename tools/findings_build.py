@@ -253,6 +253,10 @@ class ToolError(Exception):
     """An unreadable input or a usage error (exit code 2)."""
 
 
+class FigureLabelError(Exception):
+    """A pre-promotion label word in a promoted figure (a failed check)."""
+
+
 class Missing(KeyError):
     """A leaf path that is not in a source."""
 
@@ -1276,7 +1280,9 @@ class Builder:
             banned = banned_figure_text(fig)
             if banned:
                 plt.close(fig)
-                raise ToolError(f"figure {name} text has a pre-promotion label: {banned}")
+                raise FigureLabelError(
+                    f"figure {name} text has a pre-promotion label: {banned}"
+                )
         save_figure(fig, figures / f"{files[name]}.png")
         link = self.meta_ref(
             f"figure_{name}", f"{self.stem}.figures/{files[name]}.png"
@@ -2728,11 +2734,30 @@ ALLOWED_EDITS = [
 
 
 def allowed_edits(src_stem: str | None, dst_stem: str | None) -> list:
-    """Return the allowed edits, with the pointer edits when stems are given."""
+    """Return the allowed edits, with the pointer edits when stems are given.
+
+    The two pointer edits are written out here as their own literals, not
+    taken from the substitution's constants (WU-0034 review R4).
+    """
     edits = list(ALLOWED_EDITS)
     if src_stem is not None and dst_stem is not None:
         edits.append((f"({src_stem}.figures/", f"({dst_stem}.figures/"))
-        edits.append((trace_sentence_old(src_stem), TRACE_SENTENCE_NEW))
+        edits.append(
+            (
+                "Every number quoted above is listed with its source and "
+                f"leaf path in `{src_stem}.trace.csv`. Run the `check` "
+                "command of `tools/findings_build.py` on this directory to "
+                "verify the document against the sources.",
+                "Every number quoted above is listed with its source and "
+                "leaf path in the trace file of the source document (the "
+                "version before promotion), which stays beside that document "
+                "and not in this directory. The `check` command of "
+                "`tools/findings_build.py` verifies the source document "
+                "against the sources; it does not apply to this promoted "
+                "copy, whose only differences from it are the removed "
+                "labels, the three figure links and this sentence.",
+            )
+        )
     return edits
 
 
@@ -2885,6 +2910,8 @@ def promote(args: argparse.Namespace) -> int:
     src, dst = Path(args.document), Path(args.out)
     if not src.is_file():
         raise ToolError(f"{src} is not a file")
+    if not dst.parent.is_dir():
+        raise ToolError(f"the folder of --out does not exist: {dst.parent}")
     figures_dst = dst.with_name(f"{dst.stem}.figures")
     for target in (dst, figures_dst):
         if target.exists() or target.is_symlink():
@@ -2914,11 +2941,19 @@ def promote(args: argparse.Namespace) -> int:
     }
     created: list[Path] = []
     try:
-        with tempfile.TemporaryDirectory() as tmp:
+        # the temporary directory is beside the output, so the final move is
+        # a rename on one filesystem (review R2)
+        with tempfile.TemporaryDirectory(dir=dst.parent) as tmp:
             problems: list[str] = []
             if with_figures:
                 new_dir = Path(tmp) / "figures"
-                made = render_promoted_figures(src.parent, src.stem, {}, new_dir)
+                try:
+                    made = render_promoted_figures(
+                        src.parent, src.stem, {}, new_dir
+                    )
+                except FigureLabelError as exc:
+                    made = []
+                    problems.append(str(exc))
                 for png in made:
                     original = figures_src / png.name
                     if not original.is_file():
@@ -2933,8 +2968,8 @@ def promote(args: argparse.Namespace) -> int:
                     pre, dst.read_text(), src_stem, dst_stem
                 )
             if not problems and with_figures:
+                created.append(figures_dst)  # cleaned up if the move fails
                 shutil.move(str(new_dir), str(figures_dst))
-                created.append(figures_dst)
     except BaseException:
         for path in created:
             if path.is_dir():
