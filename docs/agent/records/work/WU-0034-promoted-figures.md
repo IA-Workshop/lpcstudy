@@ -42,8 +42,74 @@ The owner chose option (a) of `docs/agent/notes/2026-10-22-promotion-proposal.md
 
 ## Review
 
-- **Reviewer:**
+- **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-22, commits ef38a8f and 79442d4 (diff eeb7123..79442d4).
+- **Checks run** (worktree clean before and after; ledger and main untouched).
+  - **(i) Byte reproduction.** `findings_build.py check docs/agent/notes --stem 2026-10-20-prelim-findings-conf1` with the project venv printed `check passed: 1266 traced values, 0 problems` (exit 0). It re-renders F1 to F3 with the original title and compares their bytes. The committed document was not rebuilt.
+  - **(v) Untouched.** I took the sha256 of the preliminary `.md`, `.trace.csv`, `.sources.json`, `.compare.txt` and the three PNGs, then ran `promote --out <scratch>/out/report.md`. It exited 0 with E-FIG 3 and E-TRACE 1 and wrote `report.figures/`. Afterwards all 7 hashes were `OK`.
+  - **(ii) Independent pixel check.** My own script reads both PNG sets with PIL as uint8 arrays, not with matplotlib's `imread`.
+    - For each of F1, F2 and F3 the shapes are equal.
+    - The rows that differ are exactly 16–47, 34–65 and 21–52 (26 rows each). These are the two title ink runs of the original: (16,27)+(33,48), (34,45)+(51,66) and (21,32)+(38,53).
+    - The next ink run (panel titles) starts at row 74, 74 and 76, so the band ends 26, 8 and 23 white rows above any panel content.
+    - The promoted images have the same ink-run structure, so the layout did not move.
+    - The PNG metadata of both sets holds only `dpi`.
+  - **Visual check.** I viewed all three promoted PNGs. Each title reads "FINDINGS FOR SEED CONF-1 / Result promoted by the owner (QA.11, LPC.PC.13)". Panels, markers, verdict words, levels, the F3 bound line and the F3 gate footer look the same as the committed F1.
+  - **(vi) Tests.** `tools/run_tests.sh unit tests/unit/test_tools_findings_build.py`, run once: `90 passed in 13.04s`.
+- **Judgments asked for.**
+  - **Capitalized title line (plan amendment): legitimate.**
+    - It changes the product (the title string), not the criterion. Tolerance stays 0 outside the band.
+    - The cause is recorded with the measurement (27.79 against 27.23 px).
+    - My pixel check confirms that layout and ink rows are identical.
+    - The owner should know that line 1 is in capitals for this reason.
+  - **Band rule: legitimate in substance, but not recorded in the criterion (R1).**
+    - Criterion 2 defined the band as "the rows of the original title text". Its literal rule (first white row after the first ink) stopped between the two title lines, so the rule contradicted its own stated intent.
+    - The final rule (end of the second ink run) is taken from the original image only. It covers exactly the two title lines and no panel content (verified above).
+    - The developer rejected a rule that would have loosened the check: the 12-white-row run, which on F2 would have reached into the panels.
+    - It is not a loosening. It is a mis-specified criterion corrected to its own intent, and it should be written as such.
+  - **(iii) Banned words.**
+    - `banned_figure_text` runs inside `Builder.figure`, so on its own it is not independent of the render code.
+    - Independence comes from two other checks: the zero-tolerance pixel comparison (everything outside the title is identical to the committed figures, which carry no banned word outside the title), and `promoted_title` checked at its source.
+    - PNG metadata is checked independently with PIL, in the test only.
+    - Acceptable. See R4 on how the proposal words this.
+  - **(iv) New Appendix C wording.** It has no digits and none of the words "preliminary", "unpromoted" or "confirmatory".
+    - "Source document (the version before promotion)" is accurate.
+    - "Only differences from it are the removed labels, the three figure links and this sentence" is accurate for the text: the title rename and the R-RULE sentence count as label removals.
+    - It does not mention that the linked images carry a different title, and it does not say where the source document is. These are wording choices for the owner, not inaccuracies.
 - **Findings and resolution:**
+  - **R1 (minor). The band rule in acceptance criterion 2 differs from the rule implemented, and the plan text was not amended.** The plan's criterion 2 still states the first-white-row rule. The rule actually used (`title_band_end`, `tools/findings_build.py:2798`) appears only in Log (b).
+    - Why it matters: a criterion changed after measuring must be visible where the criterion is stated (PRIME.2), and the judgment above depends on it.
+    - Fix: add a dated amendment under criterion 2 that states:
+      - the rule used (end of the second ink run of the original image);
+      - the reason (the literal rule cut through the title, contrary to "the rows of the original title text");
+      - the rejected alternative;
+      - the measured bands (48, 66, 53) and the white margin to the panels.
+  - **R2 (minor). There is a fail-closed gap on a move across filesystems.** `:2917`, `:2936`–`:2937`.
+    - The figures are rendered in `tempfile.TemporaryDirectory()`, which defaults to `/tmp`, and are then moved with `shutil.move` to `report.figures/` in the repository.
+    - Across filesystems this is a copy followed by a delete. If the copy fails partway, `figures_dst` is not yet in `created`, so a partial directory is left behind next to the copy whose text has already been written. That contradicts "nothing is left behind".
+    - Fix: either create the temporary directory in `dst.parent` (`tempfile.TemporaryDirectory(dir=dst.parent)`, so the move is an atomic rename), or append `figures_dst` to `created` before the move. Add a test that makes the move raise.
+  - **R3 (minor). The exit code for a banned word differs from the plan.** The plan's Fail-closed paragraph lists "banned word in a figure text" among the failures that exit 1. The code raises `ToolError` (`:1279`), so the command exits 2, and the test asserts 2.
+    - Fix: either make it a counted check problem (exit 1), or record the deviation as a dated plan note, as was done for WU-0033.
+  - **R4 (minor). The pointer edits share constants with the substitution, and the proposal overstates what the command checks.**
+    - `allowed_edits` (`:2730`) builds E-FIG and E-TRACE from the same `trace_sentence_old` and `TRACE_SENTENCE_NEW` that `promote_rules` uses. Unlike the label edits of `ALLOWED_EDITS`, these two edits are not an independently written table. The hand-typed `FIG_PROMOTED` test reference does pin both sentences, which limits the risk.
+    - Fix: write the old and new Appendix C sentences, and the link form, as their own literals in the check table.
+    - Separately, proposal §9 line 150 lists "no figure text or PNG metadata holds ..." among the things the command checks. The command checks figure texts (in the renderer) but not the PNG metadata, which only the test checks.
+    - Fix: say "(metadata: tested)", or add a metadata read-back in `verify_title_only`.
+  - **R5 (minor, for the main session). The owner's choice of option (a) is not on record.**
+    - Proposal §9 is headed "decided 2026-10-22: option (a)", and the plan opens with "The owner chose option (a)". I found no entry for this choice in `docs/agent/records/decisions.md` or in the ledger.
+    - Why it matters: the content of the promoted report is an owner judgment (GOV.50), and the agent text should cite the owner's words.
+    - Fix: the main session records the owner's words in the decision log, and §9 cites that entry.
+- **Items checked with no finding.**
+  - **(vii) Proposal §8 is runnable in order** once WU-0033 and WU-0034 are merged: mkdir, three `cp` commands, `promote` (writes `report.md` and `report.figures/`; it refuses if either exists), `sed`, `diff`, `grep`, then `find | xargs sha256sum`, which hashes `figures/` and `report.figures/`.
+  - **Fail-closed.** The command refuses an existing `--out` or an existing figures directory, a symlink, an input used as output, and a missing `sources.json` (exit 2). It renders and checks before it writes. On a failed check it removes the copy. A pointer left behind is a problem.
+  - **The tests.**
+    - They use hand-typed pointer texts.
+    - The band is computed by the tests' own code, with a sanity range.
+    - PIL checks the metadata.
+    - The fail-closed cases are: the renderer raises, a banned word is planted, a panel is moved.
+    - The build directory is hash-checked.
+    - No test compares the code with itself.
+  - **Reproducibility and scope.** float64 is untouched, and no randomness is involved. Commit trailers are present. Changes are confined to `tools/`, `tests/` and the notes. `lpcstudy/`, the ledger and the sealed files are untouched.
+  - **Owner checkpoint.** No verdict, statistics, seed or provenance code and no dependencies are touched. The owner inspects the promoted figures at WU-0018.3.
+- **Verdict: approve with fixes** (R1 to R5 minor; 5 findings).
 
 ## Audit
 
