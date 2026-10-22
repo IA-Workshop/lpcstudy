@@ -39,8 +39,75 @@
 
 ## Review
 
-- **Reviewer:**
+- **Reviewer:** `reviewer`, claude-opus-5-5, fresh context, 2026-10-22, commits 032e543 and abdf0b5 against develop 8eb3995.
+- **Checks run.**
+  - Radius: `tools/run_tests.sh unit tests/unit/test_tools_findings_build.py`, run once with `.venv/bin` on PATH: `79 passed in 8.76s`.
+  - Real document: `python3 -I tools/findings_build.py promote` into the session scratch directory. It exited 0 with the same summary as the Log (553 to 550 lines; R-TITLE 1, R-RULE 1, R-WORD 4, R-RUN 2; 1 residual).
+  - Hand `diff`: header lines 1 to 3 deleted, and 6 changed lines (6, 98, 108, 111, 121, 126), all of them exactly the rules.
+  - The input's sha256 was the same before and after. `git status` of the worktree is clean.
+  - `ledger.py append --files` was tested on a scratch copy of the tool and of the first 3 ledger lines. The real ledger was not touched.
+- **Label list (item 1): complete for this document.**
+  - I searched the document for `prelim|unpromot|promot|internal to|provisional|draft|development|appendix|PROPOSED|status`. Besides the five rules, the only hits are file names (`prelim-findings-conf1.*`, `promotion-figure-map.md`), the PROVISIONAL gate wording (not a status label), the `## A. Development context [DEVELOPMENT]` appendix label (it must stay, owner ruling D4), and the kept provenance row.
+  - The template (`preliminary.template.md` lines 2, 6, 30), `format_value` (`"supported (preliminary, unpromoted)"`) and the constant `wording.supported` (`in this preliminary, unpromoted run`) are the only sources of labels, and each is covered.
+  - Keeping `| Label | CONFIRMATORY: UNPROMOTED |` is consistent with ROADMAP WU-0018.3 ("header label removed from the promoted copy only") and with the proposal's treatment of the `RESULTS.md` provenance cells. The exemption is an exact line match, so it is tight. The owner should still know that the promoted report's §2 table will read "Label: CONFIRMATORY: UNPROMOTED" (see R3).
 - **Findings and resolution:**
+  - **R1 (major). The command's byte-for-byte check verifies the substitution with itself, and the planned independent check was not implemented.** `tools/findings_build.py:2601`, `:2630` to `:2632`.
+    - `promote()` builds `promoted` from `promote_lines(pre)`. It then calls `verify_label_diff(pre, promoted)`, which recomputes `expected = promote_text(pre)`, that is, `promote_lines(pre)` again, and compares the two. The comparison is deterministic and always equal, so the `return 1` branch cannot be reached. The printed claim "verified: ... byte for byte" (`:2645`) therefore carries no evidence.
+    - The plan (Machine check) specified something different. The check was to align the preliminary and promoted lines with `difflib` and accept only: the header deletion as the first hunk; `replace` hunks of equal line count; everything else equal.
+    - The tests do pin the output to an independent hand-written reference (acceptance criterion 1). They also show that `verify_label_diff` rejects a tampered text (criterion 2). They do not cover the command's own check.
+    - Why it matters: promotion is the owner's irreversible act, and the tool's stated purpose is a machine check that nothing but the labels differs.
+    - Fix:
+      - Implement the planned check without calling `promote_lines`/`promote_text`. Use `difflib.SequenceMatcher` opcodes on the line lists: exactly one `delete` of lines 0 to 2, then only `equal` and equal-length `replace` hunks.
+      - For each replaced pair, require that the character-level difference consists only of (old, new) fragments from a separately written allowed-edit table. For example `("Preliminary f", "F")`, `(" (preliminary, unpromoted)", "")` and `("preliminary, unpromoted ", "")`, plus the R-RULE sentence.
+      - Run it on the bytes read back from `--out` after writing (delete the file and exit 1 on any problem), or write to a temporary name and rename only after it passes.
+      - Add one test in which the substitution is monkeypatched to make one extra change, and show that the command then exits non-zero with no file left at `--out`.
+  - **R2 (major). In section 8 of the proposal, the label-bearing copy stays the executable line.** `docs/agent/notes/2026-10-22-promotion-proposal.md:126` to `:130`.
+    - `cp docs/agent/notes/2026-10-20-prelim-findings-conf1.md promoted/CONF-1/report.md` is still an active command, and the `promote` command at `:128` is a comment.
+    - Run as written, `report.md` is the copy that still carries the labels, and its hash goes into the append-only manifest line (`:130`). Running the commented `promote` afterwards is refused, because `--out` exists.
+    - The `RESULTS.md` label removal "by hand" (`:129`) names neither the exact line(s) nor how the hand edit is checked.
+    - Fix:
+      - Delete the `cp` line of the report and make `promote` an uncommented command.
+      - Add "WU-0033 merged to develop" to the step-0 preconditions.
+      - For `RESULTS.md`, name the line(s) to delete (line 3, `**CONFIRMATORY: UNPROMOTED**`, and decide on the following blank line), then check with `diff` that these are the only differences.
+  - **R3 (major, owner decision to be surfaced). The findings figures and the trace pointer in the promoted copy.**
+    - What the promoted report would show:
+      - The document embeds `2026-10-20-prelim-findings-conf1.figures/F1_primary.png`, `F2_secondary.png` and `F3_crosscheck.png` (document lines 158, 332, 480). Section 8 copies only `runs/confirmatory/run-1/full/figures` (the four `RESULTS.md` figures) into `promoted/CONF-1/`.
+      - So `promoted/CONF-1/report.md` would have three broken image links.
+      - If the `.figures/` folder is copied too, each of F1 to F3 carries the drawn suptitle "CONFIRMATORY: UNPROMOTED / PRELIMINARY: internal to the owner and the student until promotion (QA.11, LPC.PC.13)." I inspected F1, and `status_title` is used in `draw_panels` and in the F3 builder. A promoted report would then show three images that declare it internal and unpromoted.
+      - The `RESULTS.md` figures carry no status text: I checked `regret_vs_regimes.png`, and `lpcstudy/` draws no label into titles. They can be copied as they are.
+      - Line 550 of the copy also says that the trace file sits in "this directory" and that `check` verifies the document. Neither holds for the promoted copy, which `check` refuses (as the plan states).
+    - Fix (developer):
+      - State these facts in proposal section 6 item 4 and in section 8, with the options for the owner:
+        - (a) re-render F1 to F3 with a promoted status title through a separate reviewed builder change: new PNG hashes, numbers unchanged;
+        - (b) copy them as they are, with a dated note that the figure titles show the status before promotion;
+        - (c) leave them out of the promoted set.
+      - Add the matching `cp` of the `.figures/` folder (and of the trace, if wanted) to section 8.
+      - Tell the owner that the promoted report keeps the provenance row `Label | CONFIRMATORY: UNPROMOTED`.
+    - Plan scope note: the plan placed the figures out of scope, which is legitimate for the tool. But the proposal, which this commit edits, must not imply that the promoted set is label-free.
+  - **R4 (minor). Plan deviations and untested safeguards.**
+    - The plan says failures exit 1. Header, unmatched-rule and residual failures, and the `--out` refusals, exit 2 through the `ToolError` handler (`:2704`). The test asserts 2.
+    - The "rule matched nowhere" refusal has no test.
+    - The header and residual refusals are tested only on `promote_text`, not on the command with "nothing written".
+    - Fix: either record the exit-code deviation in the Log, or align the code with the plan. Add the unmatched-rule test and one command-level failure test that asserts no file exists at `--out`.
+  - **R5 (minor). The existence check and the write are separate steps.** `:2624`, `:2636`.
+    - `dst.exists()` is False for a dangling symlink, and `write_text` then follows the link and writes to its target. That contradicts "never writes anywhere else". The two steps also leave a check-then-write race.
+    - Fix: open the output with mode `"x"` (O_CREAT|O_EXCL, which does not follow a final symlink).
+  - **R6 (minor, pre-existing line in the section this commit edits). `sha256sum promoted/CONF-1/*` does not hash the files inside `figures/`.** Proposal `:130`.
+    - It prints "Is a directory", so the figure hashes are missing from the manifest line.
+    - Fix: `find promoted/CONF-1 -type f | sort | xargs sha256sum`.
+- **Items checked with no finding.**
+  - The refusal of `--out` when it equals the input or already exists; that the input bytes stay unchanged; that the trace, sources and figures are not touched.
+  - The 12 tests: an independent hand-written reference, byte-exact tolerance justified, and seven kinds of extra change (digit, verdict word, insert, other text, deleted line, restored title label, restored banner). Each of the seven fails `verify_label_diff`. No test compares the code with itself.
+  - No criterion was loosened: the plan is unchanged between 032e543 and abdf0b5.
+  - Commit trailers are present.
+  - Proposal section 7 on `--files`. I checked it against `tools/ledger.py` lines 142 to 196 and on a scratch copy, and every claim is accurate:
+    - any existing file is accepted, and an absolute path is stored as typed;
+    - a missing file exits with "governed file not found" and no entry;
+    - `verify` checks only the chain;
+    - `status` lists proposal files as "NOT ADOPTED";
+    - files of a `promotion` entry are not listed.
+  - Owner checkpoint: the change does not touch verdict, statistics, seed or provenance code in `lpcstudy/`, nor dependencies. The owner reviews the tool's output at WU-0018.3.
+- **Verdict: changes required** (R1 to R3 major; R4 to R6 minor; 6 findings).
 
 ## Audit
 
