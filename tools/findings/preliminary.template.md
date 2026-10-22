@@ -110,7 +110,7 @@ All items of v3 §8 apply, plus the registered deficiencies and rulings listed h
 - Deployable closed form: the deployable closed form A4 depends almost only on recurrence distance in noise units.
 - Exact model: with an exact model, PLP usually wins after one Lyapunov time.
 - Deployable features carry little of the information in the exact ones.
-- N̂ measures retrieval sensitivity at the observed (noisy) query, not at the true one, so it is reported, not tested.
+- N̂ measures retrieval sensitivity at the observed (noisy) query, not at the true one, so it is reported, not tested (DEF-0008).
 - The seed × amplifier test (H1b) assumes isotropic seeds and is applied to PLP only.
 - Same attractors, fresh seeds: this is not a new set of systems.
 - Interval coverage (DEF-0020): {{const:coverage_limit}}
@@ -119,7 +119,7 @@ All items of v3 §8 apply, plus the registered deficiencies and rulings listed h
 - Iterative error of PLP (DEF-0027): {{const:lm_limitation}} The report is {{const:lm_report_pointer}}.
 - Per-seed gate risk (DEF-0026): V4 and V6 can fail on a given seed, and a failure is referred, never repaired.
 - lambda_max for Chua has no published reference value at the study's parameters.
-- Doubled thinning is not checked (Methods v2 §M16).
+- Doubled thinning is not checked (Methods v2 §M16; DEF-0009).
 - Bitwise agreement at the official size is extrapolated from smoke size (DEC-0033 M2).
 - The gain-bound screen is reported only, computed with the v1 statistic, and the v3 screen is pending (DEC-0033 M3).
 - One realization per system: one sealed seed gives one set of data per system, so no replicate variation is estimated.
