@@ -2526,3 +2526,125 @@ def test_hw_ratio_column_is_explained() -> None:
         in note
     )
     assert "wider" in note
+
+
+# --- WU-0033: promoted copy --------------------------------------------------
+# Reference: a small preliminary document and its promoted copy, both typed by
+# hand from the label list of the unit plan (docs/agent/records/work/
+# WU-0033-promoted-copy.md); nothing is computed by the code under test.
+# Tolerance: byte-exact string equality (no numbers are involved).
+PRE_DOC = (
+    "**CONFIRMATORY: UNPROMOTED**\n"
+    "PRELIMINARY: internal to the owner and the student until promotion "
+    "(QA.11, LPC.PC.13).\n"
+    "\n"
+    "Source: the official CPU run. Verdicts are read from the file.\n"
+    "\n"
+    "# Preliminary findings for seed CONF-1\n"
+    "\n"
+    "| Item | Value |\n"
+    "|---|---|\n"
+    "| Label | CONFIRMATORY: UNPROMOTED |\n"
+    "\n"
+    "Each cell is the stored word. A \"supported\" verdict is always written "
+    "\"supported (preliminary, unpromoted)\". Next sentence.\n"
+    "\n"
+    "| H2b | primary | pass | supported (preliminary, unpromoted) |\n"
+    "- **H2b**: supported (preliminary, unpromoted). Pass on all three "
+    "systems in this preliminary, unpromoted run. The value is 0.2437.\n"
+)
+PROMOTED_DOC = (
+    "Source: the official CPU run. Verdicts are read from the file.\n"
+    "\n"
+    "# Findings for seed CONF-1\n"
+    "\n"
+    "| Item | Value |\n"
+    "|---|---|\n"
+    "| Label | CONFIRMATORY: UNPROMOTED |\n"
+    "\n"
+    "Each cell is the stored word. Next sentence.\n"
+    "\n"
+    "| H2b | primary | pass | supported |\n"
+    "- **H2b**: supported. Pass on all three "
+    "systems in this run. The value is 0.2437.\n"
+)
+
+
+def test_promote_text_equals_the_hand_written_copy() -> None:
+    """The promoted text is exactly the hand-written expected text."""
+    assert fb.promote_text(PRE_DOC) == PROMOTED_DOC
+    assert fb.verify_label_diff(PRE_DOC, PROMOTED_DOC) == []
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda t: t.replace("0.2437", "0.2438"),
+        lambda t: t.replace("| pass | supported |", "| pass | inconclusive |"),
+        lambda t: t + "An inserted line.\n",
+        lambda t: t.replace("Source: the official CPU run.", "Source: x."),
+        lambda t: t.replace("\n\n# Findings", "\n# Findings"),
+        lambda t: t.replace("# Findings for", "# Preliminary findings for"),
+        lambda t: "**CONFIRMATORY: UNPROMOTED**\n" + t,
+    ],
+    ids=[
+        "digit",
+        "verdict word",
+        "insert",
+        "other text",
+        "deleted blank line",
+        "label restored",
+        "banner restored",
+    ],
+)
+def test_any_extra_change_fails_the_label_diff(edit) -> None:
+    """A change outside the label rules is reported as a problem."""
+    bad = edit(PROMOTED_DOC)
+    assert bad != PROMOTED_DOC
+    assert fb.verify_label_diff(PRE_DOC, bad) != []
+
+
+def test_promote_refuses_an_unknown_residual_label() -> None:
+    """A label the list does not know makes the promotion fail (no copy)."""
+    text = PRE_DOC.replace("Next sentence.", "The run is unpromoted.")
+    with pytest.raises(fb.ToolError, match="residual"):
+        fb.promote_text(text)
+
+
+def test_promote_refuses_a_document_without_the_header() -> None:
+    """The three header lines must be there."""
+    with pytest.raises(fb.ToolError, match="header"):
+        fb.promote_text(PRE_DOC.split("\n", 3)[3])
+
+
+def test_promote_command_leaves_the_input_unchanged(tmp_path: Path) -> None:
+    """The command writes only the new path; the input bytes are unchanged."""
+    src = tmp_path / "pre.md"
+    src.write_text(PRE_DOC)
+    before = src.read_bytes()
+    out = tmp_path / "promoted.md"
+    assert fb.main(["promote", "--document", str(src), "--out", str(out)]) == 0
+    assert src.read_bytes() == before
+    assert out.read_text() == PROMOTED_DOC
+    assert sorted(p.name for p in tmp_path.iterdir()) == [
+        "pre.md",
+        "promoted.md",
+    ]
+    # an existing output and the input itself are refused, nothing is written
+    assert fb.main(["promote", "--document", str(src), "--out", str(out)]) == 2
+    assert fb.main(["promote", "--document", str(src), "--out", str(src)]) == 2
+    assert src.read_bytes() == before and out.read_text() == PROMOTED_DOC
+
+
+def test_promote_command_prints_the_diff_summary(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    """The summary names the deleted header lines and the rule counts."""
+    src = tmp_path / "pre.md"
+    src.write_text(PRE_DOC)
+    fb.main(["promote", "--document", str(src), "--out", str(tmp_path / "o.md")])
+    said = capsys.readouterr().out
+    assert "header lines deleted: 3" in said
+    assert "R-WORD: 2 lines" in said and "R-TITLE: 1 lines" in said
+    assert "R-RULE: 1 lines" in said and "R-RUN: 1 lines" in said
+    assert "residual labels: 1 (kept: provenance label row)" in said

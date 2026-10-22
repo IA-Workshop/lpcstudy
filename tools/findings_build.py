@@ -2527,6 +2527,128 @@ def run_check(directory: Path, stem: str, override: dict) -> int:
     return 1 if problems else 0
 
 
+# --- promoted copy (WU-0033) ------------------------------------------------
+# The exact list of pre-promotion labels (plan: docs/agent/records/work/
+# WU-0033-promoted-copy.md). This mode only writes a copy for the owner to
+# place after the promotion entry; nothing is removed automatically.
+BANNER_LINE = "**CONFIRMATORY: UNPROMOTED**"
+HEADER_LINES = [BANNER_LINE, PRELIMINARY_LINE, ""]
+PROMOTE_RULES = [
+    ("R-TITLE", "# Preliminary findings for seed ", "# Findings for seed "),
+    (
+        "R-RULE",
+        ' A "supported" verdict is always written '
+        '"supported (preliminary, unpromoted)".',
+        "",
+    ),
+    ("R-WORD", "supported (preliminary, unpromoted)", "supported"),
+    ("R-RUN", " in this preliminary, unpromoted run", " in this run"),
+]
+KEPT_LABEL_ROW = "| Label | CONFIRMATORY: UNPROMOTED |"
+RESIDUAL_LABEL = re.compile(r"preliminary|unpromoted", re.I)
+
+
+def promote_lines(text: str) -> tuple[list[str], dict[str, int]]:
+    """Return the promoted lines and the lines changed by each rule.
+
+    Raises ``ToolError`` if the header lines are missing, a rule matches
+    nowhere, or a label that the list does not know remains.
+    """
+    lines = text.split("\n")
+    if lines[: len(HEADER_LINES)] != HEADER_LINES:
+        raise ToolError(
+            "the document does not start with the three header lines "
+            "(banner, PRELIMINARY line, blank line)"
+        )
+    body = lines[len(HEADER_LINES) :]
+    counts = {name: 0 for name, _, _ in PROMOTE_RULES}
+    out = []
+    for line in body:
+        for name, old, new in PROMOTE_RULES:
+            if old in line:
+                line = line.replace(old, new)
+                counts[name] += 1
+        out.append(line)
+    unmatched = [n for n, c in counts.items() if c == 0]
+    if unmatched:
+        raise ToolError(f"rule(s) {unmatched} matched nowhere")
+    residual = [
+        k + 1 + len(HEADER_LINES)
+        for k, line in enumerate(out)
+        if RESIDUAL_LABEL.search(line) and line != KEPT_LABEL_ROW
+    ]
+    if residual:
+        raise ToolError(
+            f"residual label(s) not in the list at promoted lines {residual}"
+        )
+    return out, counts
+
+
+def promote_text(text: str) -> str:
+    """Return the promoted copy of a preliminary document."""
+    return "\n".join(promote_lines(text)[0])
+
+
+def verify_label_diff(preliminary: str, promoted: str) -> list[str]:
+    """Return the problems of a promoted text against its preliminary one.
+
+    The promoted text must equal the preliminary one with exactly the
+    header deletion and the rule substitutions, byte for byte. Every other
+    difference (a digit, a verdict word, an inserted or deleted line, a
+    label restored elsewhere) is listed as a problem.
+    """
+    try:
+        expected = promote_text(preliminary)
+    except ToolError as exc:
+        return [str(exc)]
+    if promoted == expected:
+        return []
+    import difflib
+
+    diff = difflib.unified_diff(
+        expected.split("\n"),
+        promoted.split("\n"),
+        "expected from the label list",
+        "promoted",
+        n=0,
+        lineterm="",
+    )
+    return ["not explained by the label list:"] + list(diff)[:40]
+
+
+def promote(args: argparse.Namespace) -> int:
+    """Write the promoted copy of a document and check the difference."""
+    src, dst = Path(args.document), Path(args.out)
+    if not src.is_file():
+        raise ToolError(f"{src} is not a file")
+    if dst.exists() or src.resolve() == dst.resolve():
+        raise ToolError(
+            f"{dst} exists or is the input: the preliminary document is "
+            "never overwritten and nothing is replaced"
+        )
+    pre = src.read_text()
+    lines, counts = promote_lines(pre)
+    promoted = "\n".join(lines)
+    problems = verify_label_diff(pre, promoted)
+    if problems:
+        print("\n".join(problems), file=sys.stderr)
+        return 1
+    dst.write_text(promoted)
+    kept = sum(1 for line in lines if RESIDUAL_LABEL.search(line))
+    print(
+        f"promoted copy written to {dst}\n"
+        f"lines: preliminary {len(pre.split(chr(10)))}, "
+        f"promoted {len(lines)}\n"
+        f"header lines deleted: {len(HEADER_LINES)}\n"
+        + "\n".join(f"{n}: {c} lines" for n, c in counts.items())
+        + f"\nresidual labels: {kept} (kept: provenance label row)"
+        + "\nverified: the promoted copy equals the preliminary document "
+        "with the label list applied, byte for byte; trace, sources and "
+        "figures are not touched"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the command line and return the exit code."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -2559,10 +2681,18 @@ def main(argv: list[str] | None = None) -> int:
         chk.add_argument(
             f"--{name}", help=f"use this {name} file (hash is checked)"
         )
+    pro = sub.add_parser(
+        "promote",
+        help="write a copy of the document without the pre-promotion labels",
+    )
+    pro.add_argument("--document", required=True, help="preliminary .md")
+    pro.add_argument("--out", required=True, help="new file, never replaced")
     args = parser.parse_args(argv)
     try:
         if args.command == "render":
             return render(args)
+        if args.command == "promote":
+            return promote(args)
         override = {
             n: getattr(args, n)
             for n in ("official", "official_md", "crosscheck", "td", "dev")

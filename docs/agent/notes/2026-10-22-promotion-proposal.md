@@ -88,12 +88,12 @@ python3 tools/ledger.py append --type proposal \
   --actor "Brian J. McDermott" --role "human owner" \
   --authority "LPC.PC.13; ROADMAP WU-0018.2" \
   --summary "WU-0018.2: proposal to promote the CONF-1 result (run-1 official CPU files and the findings document as report text); regeneration run-2 T0 20766 of 20766 equal; two audits; waivers seq 31 and 33; rulings seq 30, 32, 34, 36" \
-  --files docs/agent/notes/2026-10-22-promotion-proposal.md docs/agent/notes/2026-10-20-prelim-findings-conf1.md \
+  --files docs/agent/notes/2026-10-22-promotion-proposal.md docs/agent/notes/2026-10-20-prelim-findings-conf1.md runs/confirmatory/run-1/full/results.json runs/confirmatory/run-1/full/RESULTS.md runs/confirmatory/run-2-compare.txt docs/agent/records/results-manifest.md \
   --data '{"seed_id":"CONF-1","manifest":"docs/agent/records/results-manifest.md lines 29 and 30","results_sha256":"ae4b0fe5bf488f6c147bce6c91a2398e87408f6a5d372ae66d89bdfc90b0cebe","results_md_sha256":"2a4c1d06859d07584b1633c6e7f1b5df205ffe445402509834383fb474649577","regeneration_compare_sha256":"11007a4e1d169946f431a447018b92f94705352700c10d1eb155c6006b646df5","audits":["docs/agent/notes/2026-10-21-audit-pre-promotion-conf1.md","docs/agent/notes/2026-10-22-audit-promotion-conf1.md"],"waivers":[31,33],"rulings":[30,32,34,36],"promoted":false}'
 python3 tools/ledger.py verify
 ```
 
-(I did not run the command, so I do not know whether `--files` accepts files that are not governed instruments; if the tool refuses them, drop `--files` and put the hashes in `--data`.)
+`--files` behavior (tested 2026-10-22 on a temporary copy of the tool and of the ledger, not on the real ledger): the tool accepts any existing file, governed instrument or not (run outputs, the findings document, the manifest), given relative to the repository root (an absolute path is also accepted); it stores each name as typed with its sha256 in the entry's `files` object, so the hashes of the sealed run files are recorded in the entry itself; a name that does not exist stops the command with "governed file not found" and no entry is written. Two side effects: `ledger.py verify` checks only the chain and does not re-hash these files; and `ledger.py status` lists every file named in a `proposal` entry as "proposed (entry n), NOT ADOPTED" (cosmetic noise, because the proposal files are not instruments); a `promotion` entry's files are not listed by `status`. The `--files` list above therefore also records the hashes of `results.json`, `RESULTS.md`, `run-2-compare.txt`, the manifest and the findings document at the time of the proposal; recompute them at the entry. In the promotion command of section 8, add the same run files to `--files` if the owner wants their hashes inside the promotion entry.
 
 (If the proposal is to be entered as an agent's, the actor is the agent with its model id and the owner still runs the command, as the ledger is owner-only.)
 
@@ -124,7 +124,9 @@ cp -r runs/confirmatory/run-1/full/figures promoted/CONF-1/figures
 cp runs/confirmatory/run-1/full/results.json promoted/CONF-1/results.json
 cp runs/confirmatory/run-1/full/RESULTS.md promoted/CONF-1/RESULTS.md
 cp docs/agent/notes/2026-10-20-prelim-findings-conf1.md promoted/CONF-1/report.md
-#    remove the header label line of each copy by hand or with a one-line sed on the copy; see section 6 item 4
+#    findings document copy: use the promoted-copy mode instead of the plain cp of the report (WU-0033, branch wu/promoted-copy; merge first):
+#      python3 tools/findings_build.py promote --document docs/agent/notes/2026-10-20-prelim-findings-conf1.md --out promoted/CONF-1/report.md
+#    it removes only the listed labels and checks the diff byte for byte; the RESULTS.md copy keeps its stored provenance cells; remove its header label line by hand on the copy; the PNG figures are not re-rendered (see WU-0033 plan, out of scope)
 sha256sum promoted/CONF-1/*    # record in the manifest line
 
 # 4. verify and sync

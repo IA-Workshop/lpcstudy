@@ -31,6 +31,12 @@
 
 ## Log
 
+- 2026-10-22 4.9 checklist: (1) change set `tools/findings_build.py`, `tests/unit/test_tools_findings_build.py`, this file, `docs/agent/notes/2026-10-22-promotion-proposal.md`. (2) Radius `tests/unit/test_tools_findings_build.py` (rule: tool to its test file), once. (3) Already run on this code: no. (4) CPU. (5) The ledger and the sealed files were not touched; the real document was promoted into a scratch directory only.
+- Tests (written before the code): 12 new (hand-written reference and expected copy; seven kinds of extra change each fail the check; unknown residual label refused; missing header refused; the command leaves the input bytes unchanged and refuses an existing or identical `--out`; the summary lines). Result: `79 passed in 7.94s` (67 existing plus 12 new); no test failed on the first run.
+- Real document at this commit, `promote` into a scratch directory: exit 0; preliminary 553 lines, promoted 550; header lines deleted 3; R-TITLE 1, R-RULE 1, R-WORD 4, R-RUN 2 lines; one residual label kept (the provenance label row); `diff` shows 15 changed lines, all of them the rules above (checked by eye once). The preliminary document, trace and sources are unchanged (`git status`). Acceptance criteria 1 to 6 met.
+- `black` is not installed in the project venv; the code was written in the file's style (not run through black).
+- `ledger.py append --files` question (answered on a temporary copy of the tool and of the ledger): see the proposal note section 7; it accepts any existing file and records name and sha256; no entry is written for a missing file; the real ledger was not run.
+
 ## Review
 
 - **Reviewer:**
