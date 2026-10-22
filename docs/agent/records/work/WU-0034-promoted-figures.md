@@ -114,6 +114,41 @@ The owner chose option (a) (recorded as DEC-0043) of `docs/agent/notes/2026-10-2
   - **Reproducibility and scope.** float64 is untouched, and no randomness is involved. Commit trailers are present. Changes are confined to `tools/`, `tests/` and the notes. `lpcstudy/`, the ledger and the sealed files are untouched.
   - **Owner checkpoint.** No verdict, statistics, seed or provenance code and no dependencies are touched. The owner inspects the promoted figures at WU-0018.3.
 - **Verdict: approve with fixes** (R1 to R5 minor; 5 findings).
+- **Re-review, fix round 1** (`reviewer`, claude-opus-5-5, 2026-10-22, diff 19ad101..2432a3c; covers R1 to R5 only).
+  - **Checks run.**
+    - Radius: `tools/run_tests.sh unit tests/unit/test_tools_findings_build.py`, run once: `92 passed in 14.04s`.
+    - Real document: `promote` into a new scratch folder. It exited 0 with the same counts as before.
+    - All 4 output files (`report.md` and the three PNGs) are sha256-identical to the round-0 output.
+    - No temporary folder is left beside `--out`.
+    - The 7 preliminary files (document, trace, sources, compare, F1 to F3) have unchanged hashes, and the worktree is clean.
+  - **R1 fixed.** The dated amendment under criterion 2 states the rule, the reason, the rejected alternative and the measured values, and all of them are accurate:
+    - **rule:** the end of the second ink run of the original image;
+    - **reason:** the literal rule cut between the title lines, contrary to "the rows of the original title text";
+    - **rejected alternative:** 12 white rows. It holds on F1 and F3. On F2 the title-to-panel gap is 8 rows, so that band would reach into the panels.
+    - **bands:** 48, 66 and 53 rows;
+    - **margins:** 26, 8 and 23 rows. I checked these against my own PIL ink-run measurement: the first panel ink starts at rows 74, 74 and 76, so 74−48=26, 74−66=8 and 76−53=23.
+  - **R2 fixed.**
+    - `TemporaryDirectory(dir=dst.parent)` makes the final move a same-filesystem rename.
+    - `figures_dst` is registered for cleanup before `shutil.move`.
+    - A missing output folder is refused (exit 2).
+    - The new test patches `shutil.move` to leave a partial folder and raise. It shows that neither the copy nor the folder is left behind and that the build's hashes are unchanged.
+  - **R3 fixed.**
+    - `FigureLabelError` is caught around the render and counted as a problem, so nothing is written and the command exits 1.
+    - The plan's Fail-closed text now says this, and the test expects 1.
+  - **R4 fixed.**
+    - `allowed_edits` writes the old and new Appendix C sentences as their own literals.
+    - Proposal §9 now says the command checks the figure text objects, while PNG metadata (resolution only) is checked in the tests.
+    - Note, not a finding: `test_promote_reads_the_pointer_edits_from_its_own_table` asserts `new == fb.TRACE_SENTENCE_NEW`, which compares two copies in the code with each other. It is a consistency guard, not evidence. The independent reference remains the hand-typed `FIG_PROMOTED`. Labelling the docstring "regression guard" would make that explicit.
+  - **R5 fixed.**
+    - DEC-0043 exists on develop at 52a6f2e, with the owner's verbatim words "option a".
+    - It is cited in the plan's first line and in the heading of proposal §9.
+    - Its reading matches §9:
+      - F1 to F3 are re-rendered with a promoted title into a separate folder, and the preliminary figures are untouched;
+      - the checks are byte reproduction and zero tolerance outside the title band;
+      - the `RESULTS.md` figures are copied as they are;
+      - the provenance row keeps the stored label.
+    - The DEC-0043 text itself is on develop, not on this branch; it arrives with the merge.
+  - **Re-review verdict: approve** (R1 to R5 fixed; no new findings).
 
 ## Audit
 
