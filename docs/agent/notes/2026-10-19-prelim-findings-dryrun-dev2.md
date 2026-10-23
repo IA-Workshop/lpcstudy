@@ -180,7 +180,7 @@ Endpoints are rounded to four-digit precision for printing; every verdict uses t
 | lorenz63 | H2d | 0.1684 | [-0.009443, 0.5028] | 0.95 (design value, not stored) | upper bound ≤ 0.10 (closed) | inconclusive |
 | lorenz63 | H2e rho-1% | 0.3554 | [0.335, 0.3764] | 0.9500 | lower bound > 0 (strict) | pass |
 | lorenz63 | H2e rho-2% | 0.3124 | [0.2845, 0.341] | 0.9500 | lower bound > 0 (strict) | pass |
-| lorenz63 | H3b weight tree | 0.1072 | [0, 0.8625] | 0.9500 | interval inside [0, 0.2) (strict) | inconclusive |
+| lorenz63 | H3b weight tree | 0.1072 | [0, 0.8625] | 0.9500 | interval inside [0, 0.2) (closed at 0, open at 0.2) | inconclusive |
 | lorenz63 | H3b horizon tree D | -0.2192 | [-0.4297, 0.2398] | 0.9500 | lower bound > 0 (strict) | inconclusive |
 | rossler | H1a rho-1% | 0.9209 | [0.8622, 0.9942] | 0.9500 | interval inside [0.75, 1.25] (closed) | pass |
 | rossler | H1a rho-2% | 0.786 | [0.6999, 0.8695] | 0.9500 | interval inside [0.75, 1.25] (closed) | inconclusive |
@@ -195,7 +195,7 @@ Endpoints are rounded to four-digit precision for printing; every verdict uses t
 | rossler | H2d | 0.001396 | [-0.05371, 0.04521] | 0.95 (design value, not stored) | upper bound ≤ 0.10 (closed) | pass |
 | rossler | H2e rho-1% | 0.3537 | [0.3338, 0.3775] | 0.9500 | lower bound > 0 (strict) | pass |
 | rossler | H2e rho-2% | 0.2515 | [0.2263, 0.2817] | 0.9500 | lower bound > 0 (strict) | pass |
-| rossler | H3b weight tree | 0.07115 | [0, 0.1846] | 0.9500 | interval inside [0, 0.2) (strict) | pass |
+| rossler | H3b weight tree | 0.07115 | [0, 0.1846] | 0.9500 | interval inside [0, 0.2) (closed at 0, open at 0.2) | pass |
 | rossler | H3b horizon tree D | 0.3903 | [0.1772, 0.5221] | 0.9500 | lower bound > 0 (strict) | pass |
 | chua | H1a rho-1% | 0.7458 | [0.6611, 0.8214] | 0.9500 | interval inside [0.75, 1.25] (closed) | inconclusive |
 | chua | H1a rho-2% | 0.5827 | [0.4981, 0.6783] | 0.9500 | interval inside [0.75, 1.25] (closed) | fail |
@@ -210,10 +210,12 @@ Endpoints are rounded to four-digit precision for printing; every verdict uses t
 | chua | H2d | -0.01179 | [-0.06308, 0.05348] | 0.95 (design value, not stored) | upper bound ≤ 0.10 (closed) | pass |
 | chua | H2e rho-1% | 0.3095 | [0.283, 0.3312] | 0.9500 | lower bound > 0 (strict) | pass |
 | chua | H2e rho-2% | 0.2192 | [0.1923, 0.241] | 0.9500 | lower bound > 0 (strict) | pass |
-| chua | H3b weight tree | 0.4676 | [0, 0.5301] | 0.9500 | interval inside [0, 0.2) (strict) | inconclusive |
+| chua | H3b weight tree | 0.4676 | [0, 0.5301] | 0.9500 | interval inside [0, 0.2) (closed at 0, open at 0.2) | inconclusive |
 | chua | H3b horizon tree D | 0.8076 | [0.6553, 0.8935] | 0.9500 | lower bound > 0 (strict) | pass |
 
 Level cells that show a design value: 15.
+
+The band of the H3b weight tree is [0, 0.2): closed at 0 and open at 0.2 (v3 §2). An interval whose lower bound is exactly 0 is therefore inside the band, and the verdict words in the table are the stored ones.
 
 Q-N, oracle values, read by the table of v3 §7 (a reading, never pass or fail):
 
@@ -333,7 +335,7 @@ Cells written "not recorded" so far: 30. Null leaves written "not computed" so f
 
 ## 7. Handling counters (nothing is silent) [DIAGNOSTIC]
 
-The handling counters of the main systems (PRIME.4). Zero counters are printed, never omitted. The counters of the robustness variants are not listed here: they are in `handling.robustness` of results.json. All result counts are listed in the Handling section of RESULTS.md; the floors, exclusions and screen-outs among them are read from their stored leaves in the table after the counters.
+The handling counters of the main systems (PRIME.4). Zero counters are printed, never omitted. The counters of the robustness variants are not listed here: they are in `handling.robustness` of results.json. All nonzero result counts are listed in the Handling section of RESULTS.md; the floors, exclusions and screen-outs among them are read from their stored leaves in the table after the counters.
 
 | Counter | Total | lorenz63 | rossler | chua |
 |---|---|---|---|---|
@@ -476,7 +478,7 @@ compare_runs result: PASS (exit 0). What a TD pass does not mean: it does not re
 
 ## 9. Reproducibility
 
-Regeneration of the official run by another actor (WU-0016, v3 §9 item 4): pending. One dated line is appended here after WU-0016.4.
+Regeneration of the official run (WU-0016, v3 §9 item 4): each dated line below is appended after the event it reports.
 
 ## 10. Limitations
 
@@ -485,21 +487,26 @@ All items of v3 §8 apply, plus the registered deficiencies and rulings listed h
 - Deployable closed form: the deployable closed form A4 depends almost only on recurrence distance in noise units.
 - Exact model: with an exact model, PLP usually wins after one Lyapunov time.
 - Deployable features carry little of the information in the exact ones.
-- N̂ measures retrieval sensitivity at the observed (noisy) query, not at the true one, so it is reported, not tested.
+- N̂ measures retrieval sensitivity at the observed (noisy) query, not at the true one, so it is reported, not tested (DEF-0008).
 - The seed × amplifier test (H1b) assumes isotropic seeds and is applied to PLP only.
 - Same attractors, fresh seeds: this is not a new set of systems.
 - Interval coverage (DEF-0020): The block-5 percentile intervals undercover at these sample sizes: about 0.938 to 0.947 at 95% with independent states and 0.923 to 0.931 at lag-1 autocorrelation 0.3, which adds about 1 to 2 percentage points of false-verdict probability under dependence (v3 §8; DEF-0020). The pre-registered intervals and block length are kept.
 - Slow dependence beyond five states cannot be resolved at these sample sizes.
 - Small regimes in H3a (DEF-0018): no minimum is set per regime, so counts are reported beside every p-value.
-- Iterative error of PLP (DEF-0027): the iterative error of the fixed Levenberg–Marquardt budget of the PLP estimator (15 iterations) is not estimated for this run. On the development seed DEV-0, a study with 15, 30 and 60 iterations showed the iterative change below 10% of the sampling half-width for 5 of the 18 primary parts (class N) and did not show it below 10% for the other 13 (class X, not negligible, 6; class U, not certified, 7). The projection of its size against the half-width to the full preset, by the square root of the ratio of the numbers of test states, is stated and not applied. This is development evidence, not a result of this run. The report is docs/study/lm_doubling_dev0_report_v3.md.
+- Iterative error of PLP (DEF-0027): the iterative error of the fixed Levenberg–Marquardt budget of the PLP estimator (15 iterations) is not estimated for this run. On the development seed DEV-0, a study with 15, 30 and 60 iterations showed the iterative change below 10% of the sampling half-width for 5 of the 18 primary parts (class N) and did not show it below 10% for the other 13 (class X, not negligible, 6; class U, not certified, 7). The projection of its size against the half-width to the full preset, by the square root of the ratio of the numbers of states (test states for H2a and H3c, sweep states for H2b), is stated and not applied. This is development evidence, not a result of this run. The report is docs/study/lm_doubling_dev0_report_v3.md.
 - Per-seed gate risk (DEF-0026): V4 and V6 can fail on a given seed, and a failure is referred, never repaired.
 - lambda_max for Chua has no published reference value at the study's parameters.
-- Doubled thinning is not checked (Methods v2 §M16).
+- Doubled thinning is not checked (Methods v2 §M16; DEF-0009).
 - Bitwise agreement at the official size is extrapolated from smoke size (DEC-0033 M2).
 - The gain-bound screen is reported only, computed with the v1 statistic, and the v3 screen is pending (DEC-0033 M3).
 - One realization per system: one sealed seed gives one set of data per system, so no replicate variation is estimated.
 - The block-sensitive label (a primary verdict that widening the half-width would change) is not computable for the sealed run, because the sealed run writes no states dump (owner default D6).
 - Q-N and the gain bound are reported and carry no verdict.
+- Power of H2a(ii) (DEF-0022): the second part of H2a (the partial-correlation margin test) has low power at these sample sizes: it can be refuted but essentially cannot pass, which v3 §7 anticipated. The owner accepted this as a known limitation (DEC-0041, ledger seq 32). The margin that v3 §7 projects for it is not reproduced part by part at the full sample size (DEF-0022 status line; the full-size report of WU-0003): this is development evidence, not a result of this run (owner answer B7). In this run the stored interval of the Rossler interior part is wider than the margin band of v3 §2, so that part could not pass at any estimate. The verdict words of its parts are in section 5; an inconclusive word there means the interval was too wide to decide. The pre-registered rule is kept.
+- Regeneration by the same actor (DEC-0035): Run-2 (WU-0016) shows determinism, not an independent reproduction. The compared leaves are bitwise equal, and the same host, environment and actor produced both runs (DEC-0035). Results depend on the thread count and on the BLAS kernel of the host (DEF-0023, DEF-0024), which is why a second host may differ. The owner waived the independent-actor requirement for this case (ledger seq 31) and accepted agent-based cross-checking for this project (ledger seq 34).
+- Verification and validation status of the code: owner code review waived (ledger seq 33); results spot-checked by the owner; code covered by independent agent reviews. DEF-0001 stays open until the owner closes it.
+- Reporting gaps of the official RESULTS.md (NVVUQ.22), accepted by the owner (ledger seq 36): there is no numerical-error estimate (G1) and no per-QoI verification and validation status (G2) for the nine secondary or reported rows, which have no budget table; and the status wording of the secondaries (pre-registered, exploratory on development seeds) does not say whether a secondary is confirmatory in this run (G3). The five primary budget parts carry all six items.
+- Figures of the official RESULTS.md (WU-0017.2, ledger seq 36): the four captions name no experiment or v3 identifier and none shows an interval. The figure map of docs/agent/notes/2026-10-21-promotion-figure-map.md gives them: separation_weight_vs_horizon, E4, H2a; kaplan_meier_by_rule, E4, rules behind H2c, H2d and H3c, no verdict; regret_vs_regimes, E5, H3c; knob_response_library, E1 and E2, H2b. The dotted line of regret_vs_regimes, which the caption calls a criterion, is a reference line drawn at 5.0 by the code (axhline(5.0), report.py at the frozen commit); it is not a pre-registered criterion for the plotted quantity (regret as a percent of the best-single MSE). The K rule of v3 §5 (1.05 times the minimum calibration excess MSE) is a different quantity.
 
 ## 11. What it means and does not mean [STUDENT]
 
