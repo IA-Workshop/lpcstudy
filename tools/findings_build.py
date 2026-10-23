@@ -111,6 +111,30 @@ only checks that the hashes typed on the command line equal the files' hashes
 the main session must compare both with the committed manifest row and the
 ledger entry.
 
+Appendix A from several development runs (WU-0025.1). ``--development`` may
+be given once (the appendix of the sealed build, source ``dev``) or several
+times (the ensemble: each file lists the three systems of v3 and has its own
+seed id), and ``--extension`` any number of times (development runs of
+systems outside v3, none of which may be a v3 system). With more than one
+``--development`` or any ``--extension`` the sources are ``dev:<seed id>`` and
+``ext:<system names joined by +>``, valid in the [DEVELOPMENT] section only
+and ordered by name, not by the command line. Appendix A.1 shows the ensemble
+side by side by seed and A.2 the extension systems per system. The appendix
+shows stored leaves only: run provenance and completeness, the stored gate
+flags (a system whose stored ``gate_pass`` is not true is marked PROVISIONAL
+on every line), reported values, the stored per-system verdict words, and in
+A.1 the primary-part estimates. It never quotes an overall verdict
+(``verdicts/<id>/verdict``), forms no aggregate across runs and compares
+nothing with the official run. Every table is headed by "Development
+context: not a hypothesis test", the seed ids and "development seeds,
+exploratory, not confirmatory" (A.2 adds "per-system only, no overall
+verdict"). A file is refused if it is not a complete development run, if it
+is named twice (realpath or SHA-256, also against the official and
+cross-check files), if two ensemble runs share a seed id, if an ensemble run
+does not list the three v3 systems, or if an extension run is empty, holds a
+v3 system or shares a system with another extension run. Without these
+arguments the output is byte-identical to the build before WU-0025.1.
+
 The cross-check section also lists the stored verdict words that differ
 between the two results files (``differing_words``, a string comparison of
 stored leaves; nothing is recomputed). It needs the official word beside the
@@ -170,6 +194,7 @@ MARK = re.compile("\x00(\\d+)\x01(.*?)\x02", re.S)
 IDENTIFIER = re.compile(
     r"§\s*M?\d+(?:\.\d+)?(?![\d%])"
     r"|^#{1,6} \d+\."
+    r"|^### A\.\d(?=\s)"
     r"|\bitem \d+\b(?![.\d%])"
     r"|\b(?:DEC|DEF)-\d{4}\b"
     r"|\bWU-\d{4}(?:\.\d)?\b"
@@ -232,6 +257,31 @@ ALLOWED = {
     "STUDENT": set(),
     "": {"official", "official_md", "crosscheck", "const", "meta"},
 }
+# Appendix A in appendix mode (WU-0025.1). The sources ``dev:<seed id>`` and
+# ``ext:<system names joined by +>`` are the development runs of the ensemble
+# and the extension runs. Both are valid in a [DEVELOPMENT] section only.
+APPENDIX_KINDS = ("dev", "ext")
+APPENDIX_LABEL = "Development context: not a hypothesis test."
+APPENDIX_WORDS = "development seeds, exploratory, not confirmatory"
+APPENDIX_EXT_WORDS = (
+    "systems outside the v3 design; exploratory readings pre-specified in "
+    "WU-0021.2"
+)
+APPENDIX_PER_SYSTEM = "per-system only, no overall verdict"
+APPENDIX_OVERALL = re.compile(r"verdicts/[^/]+/verdict")
+APPENDIX_SYSTEM = re.compile(
+    r"systems/([^/]+)/|verdicts/[^/]+/by_system/([^/]+)$"
+)
+# Reported values per run and system: (column, leaf under systems/<s>/, format)
+APPENDIX_REPORTED = [
+    ("lambda_max (stored)", "context/lambda_max", ".4g"),
+    (
+        "CP median VPT (V3, reported, no bar)",
+        "validation/cp_median_vpt_lyapunov",
+        ".3g",
+    ),
+    ("V7 median slope", "V7/median_slope", ".4f"),
+]
 TD_ROW = re.compile(
     r"^\s+(\w+)\s+(H\d[a-z]\S*(?: (?:zero|interior))?)"
     r"\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$"
@@ -288,6 +338,19 @@ class Row:
 
 
 # --- reading leaves and formatting them ---------------------------------
+def is_appendix_source(name: str) -> bool:
+    """Return True for ``dev:<seed id>`` and ``ext:<systems>`` (WU-0025.1)."""
+    kind, colon, rest = name.partition(":")
+    return bool(colon and rest and kind in APPENDIX_KINDS)
+
+
+def source_allowed(tag: str, source: str) -> bool:
+    """Return True if a section with this tag may quote this source (A6)."""
+    if source in ALLOWED.get(tag, set()):
+        return True
+    return tag == "DEVELOPMENT" and is_appendix_source(source)
+
+
 def walk(tree: object, path: str) -> object:
     """Return the leaf at a ``/``-separated path (list items by index)."""
     node = tree
@@ -1220,7 +1283,14 @@ class Builder:
         return "> " + wording["gate_failure" if failed else "gate_ok"]
 
     def dev_appendix(self) -> str:
-        """The development appendix: verdict words of a development run."""
+        """The development appendix: verdict words of a development run.
+
+        With ``dev:`` or ``ext:`` sources (several development runs or
+        extension runs) the appendix of WU-0025.1 is written; with the single
+        source ``dev`` or none, the text of the sealed build (unchanged).
+        """
+        if any(is_appendix_source(name) for name in self.sources):
+            return self.app_text()
         if "dev" not in self.sources:
             return (
                 "No development appendix in this build. Development-seed "
@@ -1244,6 +1314,333 @@ class Builder:
             )
             out.append(f"| {key} | {cells} |")
         return "\n".join(out)
+
+    # --- appendix A, several runs (WU-0025.1) ---------------------------
+    # Everything below copies stored leaves. It makes no aggregate across
+    # runs and no verdict, and it imports nothing that computes one.
+    def app_sources(self, kind: str) -> list[str]:
+        """Return the sources of a kind in a fixed order (not the command line's)."""
+        return sorted(n for n in self.sources if n.startswith(f"{kind}:"))
+
+    def app_systems(self, source: str) -> list[str]:
+        """Return the stored ``config.core_systems`` of a run."""
+        return list(walk(self.sources[source], "config/core_systems"))
+
+    def app_mark(self, source: str, system: str) -> str:
+        """Return the PROVISIONAL mark if the stored ``gate_pass`` is not true."""
+        return (
+            " PROVISIONAL" if self.gate_state(source, system) is not True else ""
+        )
+
+    def app_system(self, source: str, index: int, system: str) -> str:
+        """Quote the system name (a traced leaf) and add the mark."""
+        return self.ref(source, f"config/core_systems/{index}") + self.app_mark(
+            source, system
+        )
+
+    def app_pairs(self, kind: str) -> list[tuple[str, int, str]]:
+        """Return ``(source, index, system)``: system-major for the ensemble."""
+        sources = self.app_sources(kind)
+        if kind == "dev":
+            return [
+                (src, k, s)
+                for k, s in enumerate(self.systems)
+                for src in sources
+            ]
+        return [
+            (src, k, s)
+            for src in sources
+            for k, s in enumerate(self.app_systems(src))
+        ]
+
+    def app_seeds(self, kind: str) -> str:
+        """Quote the seed ids of a kind (a builder string, saved in meta)."""
+        seen: list[str] = []
+        for src in self.app_sources(kind):
+            seed = str(walk(self.sources[src], "provenance/seed_id"))
+            if seed not in seen:
+                seen.append(seed)
+        return self.meta_ref(f"seeds_{kind}", ", ".join(sorted(seen)))
+
+    def app_lead(self, kind: str, title: str) -> str:
+        """The label line that heads a table: label, seeds, words."""
+        line = (
+            f"{APPENDIX_LABEL} Seeds: {self.app_seeds(kind)}; "
+            f"{APPENDIX_WORDS}"
+        )
+        if kind == "ext":
+            line += f"; {APPENDIX_EXT_WORDS}; {APPENDIX_PER_SYSTEM}"
+        return f"{line}. {title}"
+
+    def app_table(
+        self, kind: str, title: str, head: list[str], cells
+    ) -> list[str]:
+        """One labeled table with a row per (run, system); ``cells`` fills it."""
+        out = [
+            self.app_lead(kind, title),
+            "",
+            "| System | Seed | " + " | ".join(head) + " |",
+            "|" + "---|" * (len(head) + 2),
+        ]
+        for src, k, s in self.app_pairs(kind):
+            row = [
+                self.app_system(src, k, s),
+                self.ref(src, "provenance/seed_id"),
+            ] + cells(src, s)
+            out.append("| " + " | ".join(row) + " |")
+        return out
+
+    def app_runs(self, kind: str) -> list[str]:
+        """The run table: provenance and completeness of every run (WU-0026.2)."""
+        head = [
+            "Seed", "Systems", "Label", "Preset", "Commit", "Backend",
+            "Complete", "Dirty", "Wall seconds", "Start (UTC)", "End (UTC)",
+            "SHA-256 of results.json",
+        ]
+        out = [
+            self.app_lead(kind, "Runs: provenance and completeness."),
+            "",
+            "| " + " | ".join(head) + " |",
+            "|" + "---|" * len(head),
+        ]
+        for src in self.app_sources(kind):
+            names = ", ".join(
+                self.ref(src, f"config/core_systems/{k}")
+                for k in range(len(self.app_systems(src)))
+            )
+            sha = self.meta_ref(f"sha_{src}", self.meta[f"sha_{src}"])
+            cells = [
+                self.ref(src, "provenance/seed_id"),
+                names,
+                self.ref(src, "provenance/label"),
+                self.ref(src, "provenance/preset"),
+                self.ref(src, "provenance/commit"),
+                self.ref(src, "provenance/device/backend"),
+                self.ref(src, "provenance/complete", "yn"),
+                self.ref(src, "provenance/dirty", "yn"),
+                self.ref(src, "provenance/wall_seconds", ".0f"),
+                self.ref(src, "provenance/start_utc"),
+                self.ref(src, "provenance/end_utc"),
+                sha,
+            ]
+            out.append("| " + " | ".join(cells) + " |")
+        return out
+
+    def app_flags(self) -> dict[str, str]:
+        """The gate checks that carry a stored pass flag, with their leaf."""
+        return {
+            g["check"]: g["pass"]
+            for g in self.constants["gate_rows"]
+            if g["pass"]
+        }
+
+    def app_failing(self, kind: str) -> str:
+        """List, from the stored flags, the systems marked PROVISIONAL."""
+        flags = self.app_flags()
+        items = []
+        for src, _, s in self.app_pairs(kind):
+            if self.gate_state(src, s) is True:
+                continue
+            bad = []
+            for check, leaf in flags.items():
+                try:
+                    value = walk(self.sources[src], f"systems/{s}/{leaf}")
+                except Missing:
+                    value = None
+                if value is False:
+                    bad.append(check)
+                elif value is not True:
+                    bad.append(f"{check} not recorded")
+            seed = walk(self.sources[src], "provenance/seed_id")
+            items.append(
+                f"{s} (seed {seed}: "
+                f"{', '.join(bad) if bad else 'gate_pass not true'})"
+            )
+        return self.meta_ref(f"provisional_{kind}", "; ".join(items) or "none")
+
+    def app_gate(self, kind: str) -> list[str]:
+        """Stored gate flags, reported values and the PROVISIONAL remark."""
+        flags = self.app_flags()
+        head = list(flags) + ["gate_pass"]
+
+        def gate_cells(src: str, s: str) -> list[str]:
+            leaves = [
+                self.ref(src, f"systems/{s}/{leaf}", "yn")
+                for leaf in flags.values()
+            ]
+            return leaves + [
+                self.ref(src, f"systems/{s}/validation/gate/gate_pass", "yn")
+            ]
+
+        def reported_cells(src: str, s: str) -> list[str]:
+            return [
+                self.ref(src, f"systems/{s}/{leaf}", spec)
+                for _, leaf, spec in APPENDIX_REPORTED
+            ]
+
+        out = self.app_table(
+            kind, "Validation gate: stored flags (V3 is reported, no bar).",
+            head, gate_cells,
+        )
+        out += [
+            "",
+            "A system whose stored gate_pass is not true is marked PROVISIONAL "
+            "on every line below that belongs to it. Its words are shown as "
+            "stored and the failure is reported, never repaired (v3 §6, E0, "
+            "DEC-0027, DEC-0031). Marked in this part: "
+            f"{self.app_failing(kind)}.",
+            "",
+        ]
+        out += self.app_table(
+            kind, "Reported values (no bar).",
+            [name for name, _, _ in APPENDIX_REPORTED], reported_cells,
+        )
+        return out
+
+    def app_words(self, kind: str) -> list[str]:
+        """Stored per-system verdict words: primary, secondary, Q-N readings."""
+        ids = self.constants["identifiers"]
+        groups = (
+            ("Stored per-system verdict words, primary hypotheses.", "primary"),
+            (
+                "Stored per-system verdict words, secondary hypotheses.",
+                "secondary",
+            ),
+        )
+        out: list[str] = []
+        for title, role in groups:
+            keys = [i["key"] for i in ids if i["role"] == role]
+            out += self.app_table(
+                kind, title, keys,
+                lambda src, s, keys=keys: [
+                    self.ref(src, f"verdicts/{k}/by_system/{s}", "verdict")
+                    for k in keys
+                ],
+            )
+            out.append("")
+        logit, indicator = self.constants["qn_parts"][:2]
+        out += self.app_table(
+            kind,
+            "Q-N readings and the reported gain bound (read, no pass or fail).",
+            ["Q-N logit", "Q-N indicator", "gain_bound"],
+            lambda src, s: [
+                self.ref(src, f"systems/{s}/{logit['verdict']}"),
+                self.ref(src, f"systems/{s}/{indicator['verdict']}"),
+                self.ref(src, f"verdicts/gain_bound/by_system/{s}", "verdict"),
+            ],
+        )
+        return out
+
+    def app_parts(self) -> list[str]:
+        """The primary-part estimates of the ensemble, seed by seed (A.1)."""
+        head = ["System", "Seed", "Part", "Estimate", "Interval", "Level"]
+        head += ["Band", "Verdict"]
+        out = [
+            self.app_lead(
+                "dev",
+                "Primary parts: stored estimate, interval and verdict.",
+            ),
+            "",
+            "| " + " | ".join(head) + " |",
+            "|" + "---|" * len(head),
+        ]
+        designed = 0
+        sources = self.app_sources("dev")
+        for k, s in enumerate(self.systems):
+            for src in sources:
+                for i, part in enumerate(self.constants["primary_parts"]):
+                    level = part["level"]
+                    stored = False
+                    if level:
+                        try:
+                            walk(self.sources[src], f"systems/{s}/{level}")
+                            stored = True
+                        except Missing:
+                            pass
+                    if stored:
+                        level_cell = self.ref(
+                            src, f"systems/{s}/{level}", ".4f"
+                        )
+                    else:
+                        designed += 1
+                        level_cell = (
+                            f"{self.const('primary_level')} "
+                            f"({self.const('level_design_note')})"
+                        )
+                    cells = [
+                        self.app_system(src, k, s),
+                        self.ref(src, "provenance/seed_id"),
+                        part["name"],
+                        self.ref(src, f"systems/{s}/{part['estimate']}", ".4g"),
+                        self.ref(
+                            src, f"systems/{s}/{part['interval']}", "ci:.4g"
+                        ),
+                        level_cell,
+                        self.const(f"primary_parts/{i}/band_text"),
+                        self.ref(
+                            src, f"systems/{s}/{part['verdict']}", "verdict"
+                        ),
+                    ]
+                    out.append("| " + " | ".join(cells) + " |")
+        count = self.meta_ref("design_levels_dev", str(designed))
+        return out + ["", f"Level cells that show a design value: {count}."]
+
+    def app_text(self) -> str:
+        """The appendix of WU-0025.1: A.1 the ensemble, A.2 the extension."""
+        out = [
+            f"{APPENDIX_LABEL} This appendix holds {APPENDIX_WORDS}. Every "
+            "value in it is a stored leaf of a development "
+            "run, copied as stored and listed in the trace. No mean, spread, "
+            "range, count of passes, pooled or overall verdict is made, and "
+            "nothing is compared with the official result (owner ruling D4). "
+            "Development numbers appear only here."
+        ]
+        dev, ext = self.app_sources("dev"), self.app_sources("ext")
+        out += ["", "### A.1 Ensemble by seed (the three systems of v3)", ""]
+        if dev:
+            out += [
+                "Runs of the full preset on development seeds, shown side by "
+                "side by seed, one system after another. The rows of a system "
+                "are the seeds; nothing is combined across them.",
+                "",
+            ]
+            for block in (
+                self.app_runs("dev"),
+                self.app_gate("dev"),
+                self.app_words("dev"),
+                self.app_parts(),
+            ):
+                out += block + [""]
+        else:
+            out += ["No ensemble run was given in this build.", ""]
+        out += [
+            "### A.2 Extension systems (outside the v3 design)",
+            "",
+        ]
+        if ext:
+            names = self.meta_ref(
+                "systems_ext",
+                ", ".join(
+                    s for src in ext for s in self.app_systems(src)
+                ),
+            )
+            out += [
+                f"{APPENDIX_EXT_WORDS[0].upper()}{APPENDIX_EXT_WORDS[1:]}. "
+                f"{APPENDIX_PER_SYSTEM[0].upper()}{APPENDIX_PER_SYSTEM[1:]}: "
+                "the stored per-system words are shown, no word is formed "
+                "across systems and the decision rule of v3 §7 is not "
+                f"applied. Systems: {names}.",
+                "",
+            ]
+            for block in (
+                self.app_runs("ext"),
+                self.app_gate("ext"),
+                self.app_words("ext"),
+            ):
+                out += block + [""]
+        else:
+            out += ["No extension run was given in this build.", ""]
+        return "\n".join(out).rstrip("\n")
 
     def figure(self, name: str) -> str:
         """Draw figure ``name`` (F1 to F3) and return its Markdown block."""
@@ -1756,6 +2153,67 @@ def classify(provenance: dict, what: str) -> str:
     )
 
 
+def check_appendix_sources(
+    sources: dict, paths: dict[str, Path], constants: dict
+) -> None:
+    """Refuse an appendix run that does not fit its role (WU-0025.1, E-5).
+
+    Applies to the sources ``dev:<seed>`` and ``ext:<systems>`` only. Each
+    must be a complete development run. An ensemble run lists exactly the
+    three systems of v3. An extension run lists at least one system and none
+    of v3, and no two extension runs share a system. No file may be named
+    twice, nor be the official or cross-check file (realpath).
+    """
+    names = [n for n in sources if is_appendix_source(n)]
+    seen: dict[Path, str] = {}
+    for name in ["official", "crosscheck", *sorted(names)]:
+        real = paths[name].resolve()
+        if real in seen:
+            raise ToolError(
+                f"duplicate file: {name} and {seen[real]} are the same file "
+                "(realpath): refused"
+            )
+        seen[real] = name
+    shared: dict[str, str] = {}
+    for name in sorted(names):
+        kind = name.split(":")[0]
+        flag = "--development" if kind == "dev" else "--extension"
+        prov = sources[name].get("provenance") or {}
+        if classify(prov, f"{flag} file {name}") != "development":
+            raise ToolError(f"{flag} file {name} must be a development run: refused")
+        if prov.get("complete") is not True:
+            raise ToolError(
+                f"{flag} file {name} is not complete (provenance.complete "
+                f"is {prov.get('complete')!r}): refused, an incomplete run "
+                "is not used in the appendix"
+            )
+        listed = (sources[name].get("config") or {}).get("core_systems")
+        if kind == "dev":
+            if listed != constants["systems"]:
+                raise ToolError(
+                    f"{flag} file {name}: config.core_systems is {listed!r}, "
+                    f"not the three systems of v3 {constants['systems']!r}: "
+                    "refused"
+                )
+            continue
+        if not isinstance(listed, list) or not listed:
+            raise ToolError(
+                f"{flag} file {name} has no core_systems: refused"
+            )
+        for system in listed:
+            if system in constants["systems"]:
+                raise ToolError(
+                    f"{flag} file {name} holds {system}, a system of v3: "
+                    "refused (extension runs are for systems outside v3)"
+                )
+            if system in shared:
+                raise ToolError(
+                    f"system {system} is shared by two --extension runs "
+                    f"({shared[system]} and {name}): refused"
+                )
+            shared[system] = name
+
+
 def read_sources(
     paths: dict[str, Path], constants: dict, base: Path | None = None
 ) -> dict:
@@ -1778,6 +2236,9 @@ def read_sources(
     }
     if "dev" in paths:
         sources["dev"] = read_json(paths["dev"])
+    appendix_names = [n for n in paths if is_appendix_source(n)]
+    for name in appendix_names:
+        sources[name] = read_json(paths[name])
     sources["official_words"] = sources["official"]
     listed = sources["official"].get("config", {}).get("core_systems")
     if listed != constants["systems"]:
@@ -1787,6 +2248,7 @@ def read_sources(
         )
     if sources["official_md"]["banner"] is None:
         raise ToolError("RESULTS.md has no label line")
+    check_appendix_sources(sources, paths, constants)
     if paths["official"].resolve() == paths["crosscheck"].resolve():
         raise ToolError("the cross-check file is the official file: refused")
     strict = (
@@ -1969,6 +2431,19 @@ def make_meta(
         dev = sources["dev"].get("provenance") or {}
         if classify(dev, "--development file") != "development":
             raise ToolError("--development must be a development run: refused")
+    appendix = sorted(n for n in sources if is_appendix_source(n))
+    # official against cross-check is refused further down, with its own text
+    hashed: dict[str, str] = {
+        shas["official"]: "official",
+        shas["crosscheck"]: "crosscheck",
+    }
+    for name in appendix:
+        if shas[name] in hashed:
+            raise ToolError(
+                f"duplicate file: {name} and {hashed[shas[name]]} have the "
+                "same SHA-256: refused"
+            )
+        hashed[shas[name]] = name
     if sources["official_md"]["banner"] != banner_rule(official):
         raise ToolError("RESULTS.md label line differs from provenance.label")
     confirmatory = mode == "confirmatory"
@@ -2004,7 +2479,9 @@ def make_meta(
         )
     else:
         later = "not checked (development run)"
+    appendix_meta = {f"sha_{name}": shas[name] for name in appendix}
     return {
+        **appendix_meta,
         "mode": mode,
         "freeze_check": freeze,
         "official_sha": shas["official"],
@@ -2097,9 +2574,48 @@ def paths_of(args: argparse.Namespace) -> dict[str, Path]:
         "crosscheck": cross,
         "td": Path(args.td),
     }
-    if args.development:
-        dev = Path(args.development)
+    development = getattr(args, "development", None) or []
+    if isinstance(development, str):
+        development = [development]
+    extension = getattr(args, "extension", None) or []
+    if isinstance(extension, str):
+        extension = [extension]
+    if len(development) == 1 and not extension:
+        # the sealed build's appendix: one run, source name ``dev``
+        dev = Path(development[0])
         paths["dev"] = dev / "results.json" if dev.is_dir() else dev
+    else:
+        for flag, given in (("development", development), ("extension", extension)):
+            for text in given:
+                path = Path(text)
+                path = path / "results.json" if path.is_dir() else path
+                if not path.is_file():
+                    raise ToolError(f"--{flag} file not found: {path}")
+                data = read_json(path)
+                if flag == "development":
+                    seed = (data.get("provenance") or {}).get("seed_id")
+                    key = f"dev:{seed}"
+                    what = f"seed id {seed}"
+                else:
+                    listed = (data.get("config") or {}).get("core_systems")
+                    if not isinstance(listed, list) or not listed:
+                        raise ToolError(
+                            f"--extension file {path} has no core_systems: refused"
+                        )
+                    key = "ext:" + "+".join(str(x) for x in listed)
+                    what = f"systems {', '.join(map(str, listed))}"
+                if not is_appendix_source(key) or key.endswith(":None"):
+                    raise ToolError(f"--{flag} file {path} has no usable name: refused")
+                if key in paths and paths[key].resolve() == path.resolve():
+                    raise ToolError(
+                        f"duplicate file: --{flag} names {path} twice: refused"
+                    )
+                if key in paths:
+                    raise ToolError(
+                        f"two --{flag} runs have the same {what} ({paths[key]} "
+                        f"and {path}): refused"
+                    )
+                paths[key] = path
     for name, path in paths.items():
         if not path.is_file():
             raise ToolError(f"{name} file not found: {path}")
@@ -2383,7 +2899,7 @@ def check_rows(rows: list[dict], lines: list[str], sources: dict) -> list[str]:
             if r["source"] not in sources:
                 problems.append(f"{where}: unknown source")
                 continue
-            if r["source"] not in ALLOWED.get(r["tag"], set()):
+            if not source_allowed(r["tag"], r["source"]):
                 problems.append(
                     f"{where}: source not allowed in a "
                     f"{r['tag'] or 'plain'} section"
@@ -2455,7 +2971,7 @@ def check_text(lines: list[str], sources: dict, rows: list[dict]) -> list[str]:
         problems.append("line 2 is not the PRELIMINARY line")
     tags = section_tags("\n".join(lines))
     for k, (line, tag) in enumerate(zip(lines, tags)):
-        if tag == "PRE-REGISTERED":
+        if tag in ("PRE-REGISTERED", "DEVELOPMENT"):
             for phrase in constants["banned_phrases"]:
                 if phrase.lower() in line.lower():
                     problems.append(f"line {k + 1}: banned phrase {phrase!r}")
@@ -2513,6 +3029,72 @@ def check_text(lines: list[str], sources: dict, rows: list[dict]) -> list[str]:
             problems.append(f"handling counter {name} missing")
     if ("official", "handling/failed_variants") not in paths:
         problems.append("failed_variants missing")
+    problems += check_appendix(lines, sources, rows)
+    return problems
+
+
+def check_appendix(lines: list[str], sources: dict, rows: list[dict]) -> list[str]:
+    """Check appendix A (appendix mode) on the text, apart from the re-render.
+
+    Four rules, each read from the text and the stored flags, not from the
+    builder: every table is headed by the development label, the seed ids
+    and the words ``development seeds, exploratory, not confirmatory`` (and
+    the extension words under A.2); no row quotes an overall verdict
+    (``verdicts/<id>/verdict``); a line that quotes a system whose stored
+    ``gate_pass`` is not true carries PROVISIONAL; and a row of a ``dev:`` or
+    ``ext:`` source lies in a [DEVELOPMENT] section. Does nothing when the
+    build has no such source.
+    """
+    names = [n for n in sources if is_appendix_source(n)]
+    if not names:
+        return []
+    problems = []
+    tags = section_tags("\n".join(lines))
+    ext = False
+    for k, line in enumerate(lines):
+        if tags[k] != "DEVELOPMENT":
+            continue
+        if line.startswith("### "):
+            ext = line.startswith("### A.2")
+        if not (line.startswith("|") and not lines[k - 1].startswith("|")):
+            continue
+        lead = next((x for x in reversed(lines[:k]) if x.strip()), "")
+        wanted = [APPENDIX_LABEL, "Seeds: ", APPENDIX_WORDS]
+        if ext:
+            wanted += [APPENDIX_EXT_WORDS, APPENDIX_PER_SYSTEM]
+        if not lead.startswith(APPENDIX_LABEL) or any(w not in lead for w in wanted):
+            problems.append(
+                f"line {k + 1}: an appendix table lacks its development "
+                f"label (needs {wanted})"
+            )
+    for r in rows:
+        source = r["source"]
+        if not is_appendix_source(source):
+            continue
+        where = f"row {r.get('id')} ({source}:{r['path']})"
+        if r["tag"] != "DEVELOPMENT":
+            problems.append(f"{where}: outside a [DEVELOPMENT] section")
+        if APPENDIX_OVERALL.fullmatch(r["path"]):
+            problems.append(f"{where}: an overall verdict is quoted")
+        found = APPENDIX_SYSTEM.match(r["path"])
+        if not found or source not in sources:
+            continue
+        system = found.group(1) or found.group(2)
+        try:
+            state = walk(
+                sources[source], f"systems/{system}/validation/gate/gate_pass"
+            )
+        except Missing:
+            state = None
+        try:
+            line = lines[int(r["line"]) - 1]
+        except (ValueError, IndexError):
+            continue  # a malformed row is reported by ``check_rows``
+        if state is not True and "PROVISIONAL" not in line:
+            problems.append(
+                f"{where}: the gate of {system} did not pass but the line "
+                "lacks PROVISIONAL"
+            )
     return problems
 
 
@@ -3023,7 +3605,18 @@ def main(argv: list[str] | None = None) -> int:
         "--crosscheck", required=True, help="run dir or results.json"
     )
     ren.add_argument("--td", required=True, help="compare_runs text file")
-    ren.add_argument("--development", help="development run dir (appendix A)")
+    ren.add_argument(
+        "--development",
+        action="append",
+        help="development run dir (appendix A); repeat it for an ensemble "
+        "(the three systems of v3, one seed each)",
+    )
+    ren.add_argument(
+        "--extension",
+        action="append",
+        help="development run dir of systems outside v3 (appendix A.2); "
+        "repeat it for several runs",
+    )
     ren.add_argument("--out", required=True)
     ren.add_argument("--stem", default="preliminary_findings")
     ren.add_argument("--release-ref", help="ledger-seq-<n>; confirmatory only")
