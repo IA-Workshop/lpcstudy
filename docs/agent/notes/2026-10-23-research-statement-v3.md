@@ -2,7 +2,7 @@
 
 Draft by claude-sonnet-5-5 (WU-0025.3), 2026-10-23, from `2026-10-23-research-statement-v2.md` and DEC-0045, for the internal proposal due 2026-10-28. The student (Deem Albaty) writes the interpretation and owns the final text (D8). `[STUDENT: ...]` marks words only the student can supply, `[OWNER: ...]` words only the owner can supply. Sections 1 to 10 and the glossary are the statement. Everything after "For the author" is not part of the submission.
 
-**Number rule.** The statement body has no number from any run. Result words are copied from section 4 of the promoted report (`promoted/CONF-1/report.md` §4, lines 91 to 125; checked against the file on develop at cc27d31). Where the student wants an estimate, it is copied from §5 of the promoted report with its interval and level, and cited by section and row; none is quoted here. Development numbers (ensemble, extension systems, Dysts tables) never appear in the body; they are in the standalone development appendix A (`docs/agent/notes/2026-10-23-appendix-a-standalone.md`, 1073 traced values) and are reached only by pointer. The digits left in the body are design constants of v3, dates, system names, and one ratio of two published or v3-stated values (Chua exponent, §9, tag U9).
+**Number rule.** The statement body has no number from any run. Result words are copied from section 4 of the promoted report (`promoted/CONF-1/report.md` §4, lines 91 to 125; checked against the file on develop at cc27d31). Where the student wants an estimate, it is copied from §5 of the promoted report with its interval and level, and cited by section and row; none is quoted here. Development numbers (ensemble, extension systems, Dysts tables) never appear in the body; they are in the standalone development appendix A (`docs/agent/notes/2026-10-23-appendix-a-standalone.md`, 1073 traced values) and are reached only by pointer. The digits left in the body are design constants of v3, dates and system names; section 9 has none except system names. The V3 threshold (0.4 of the standard deviation) is a code literal, not a v3 constant, and is stated only in the panel 12 caption of the poster outline.
 
 Tags: `{S#}` are the v1 trace rows (v1 file `2026-10-19-research-statement-draft.md`), `{T#}` the v2 rows, `{U#}` new rows; all three are in the trace table at the end. Remove the tags in the final text.
 
@@ -20,7 +20,7 @@ Tags: `{S#}` are the v1 trace rows (v1 file `2026-10-19-research-statement-draft
 | §9 Extension | "[OWNER: confirm names]", gate not mentioned | names fixed by appendix A.2 (six systems); all but one failed gate check V7 and are marked PROVISIONAL; verdict-reporting code is development-only and not owner-reviewed | DEC-0045 items 2 and 3; appendix A.2; ensemble summary |
 | §9 Dysts context | Chua difference "could not be found" | the Chua sentence of the mathematician's attribution note; V3 stated with its threshold and its target; Dysts tables and benchmark mapping incorporated without any development value | `2026-10-23-math-chua-attribution.md` §5; `2026-10-23-math-benchmark-mapping.md` §1 and F1, F4; `2026-10-23-researcher-dysts-tables.md` |
 | §9 appendix pointer | "descriptive table in the development appendix" | appendix A holds the ensemble and the extension; the Dysts descriptive table is separate (WU-0024.3, not in the standalone appendix as built) | appendix A section list |
-| §10 | status to promotion | same dates; AI-use statement now says agents reviewed the code | {T6} |
+| §10 | status to promotion | same dates; roles as a student slot | {T6} |
 | Counting of PROVISIONAL | v2 §7 says no result is provisional (true for the three studied systems) | v3 says "the three studied systems" explicitly, so it cannot be read as covering the extension, where five of six systems are PROVISIONAL (appendix A.2) | DEC-0045 item 2. v2 has no sentence saying "two PROVISIONAL"; the wording is made exact so none can be read in |
 
 ## 1. The research question
@@ -45,7 +45,7 @@ The hybrid is w times CP plus (1 minus w) times PLP; the blend weight w, from 0 
 Each is a property of one state, and each has a precise definition in v3.
 
 - **Recurrence:** how close the nearest matching past state is to the present one (the distance to the best analog in the library). {U2}
-- **Observability:** how well the hidden state can be recovered from noisy measurements (large when the measurements pin the state down poorly). {U3}
+- **Observability:** how well the hidden state can be recovered from noisy measurements; it is measured by a noise-amplification factor that is large when the measurements pin the state down poorly. {U3}
 - **Instability:** how fast small errors grow along the forecast (the amplifier that makes both forecasters' errors grow). {U4}
 - **Noise sensitivity:** how much the chosen past match moves when the noise changes; it is defined on the analog side only. {U5} Theorem P2 shows the match is stable while the noise is smaller than half the gap between the nearest and second-nearest candidates. {S17}
 
@@ -53,7 +53,7 @@ Recurrence and observability set the two forecasters' starting errors; instabili
 
 ## 5. The three test systems
 
-Lorenz-63, Rössler, and Chua's circuit (an electronic circuit with a piecewise-linear diode) each have exactly known equations, so true hidden states and every condition can be computed. {S18} We chose them because their equations are exact, they are standard chaotic systems that other forecasting benchmarks also use, and they differ in shape and in how fast errors grow; Chua's has a piecewise-linear part where the other two are smooth. {U6} We observe one variable, x, and score forecasts against the noise-free truth. {S19} Time is counted in Lyapunov times (1 divided by the largest Lyapunov exponent, the long-run growth rate of small errors), set to 30 steps in every system. {S20} [STUDENT: if your own reason for these three differs from the one above, replace it; v3 itself gives only "exact models".]
+Lorenz-63, Rössler, and Chua's circuit (an electronic circuit with a piecewise-linear diode) each have exactly known equations, so true hidden states and every condition can be computed. {S18} The design uses them because their equations are exact. They are also standard chaotic systems that forecasting benchmarks use, and they differ in shape and in how fast errors grow; Chua's has a piecewise-linear part. {U6} We observe one variable, x, and score forecasts against the noise-free truth. {S19} Time is counted in Lyapunov times (1 divided by the largest Lyapunov exponent, the long-run growth rate of small errors), set to 30 steps in every system. {S20} [STUDENT: your own reason for choosing these three, if you have one.]
 
 ## 6. The design in plain words
 
@@ -61,7 +61,7 @@ Lorenz-63, Rössler, and Chua's circuit (an electronic circuit with a piecewise-
 - **Sealed fresh seed.** The confirmatory run used a sealed random-number seed: new noise, libraries and trajectories on the same three systems. {S24}
 - **Intervals.** Each statistic has a confidence interval (a range of plausible values) from a moving-block bootstrap (resampling blocks of 5 neighboring test states, 2000 times). {S25} Primaries use level 1 − 0.05/3, stricter because there are three; the rest use 95%. {S26}
 - **Verdict rule.** Per system, a hypothesis passes if its interval lies inside the pre-set band (acceptable range) or wholly on the predicted side of a bound, fails if wholly outside, and is otherwise inconclusive. {S27} Each hypothesis then gets one overall word: "supported" only if all three systems pass, "not supported" if at least one fails, and "inconclusive" otherwise. {S28, T2}
-- **Validity gates.** Seven checks (V1 to V7) confirm the numerical tools first. A failure marks that system's results provisional, is reported to the owner, and is never repaired by retuning or rerunning. {S29}
+- **Validity gates.** Checks V1 to V7 test the numerical tools first (V3 is only reported). A failure marks that system's results provisional, is reported to the owner, and is never repaired by retuning or rerunning. {S29}
 - **Cross-checks.** The official run was on a CPU. A GPU run of the same seed is an information-only cross-check and changes no verdict. {S30, T11} The design asked another person to regenerate the official run. With only one person on the team able to run it, the owner regenerated it on the same computer: every compared value was equal, which shows the run is deterministic, not that it reproduces on another computer. {T5}
 - **All outcomes are reported,** failures included. {S31}
 
@@ -71,7 +71,7 @@ Header for this section and every copy of it: **Confirmatory result, seed CONF-1
 
 All three studied systems passed the validity gate (checks V1 to V7; V3 is only reported), so no result of the pre-registered study is marked provisional. {T4}
 
-- **H2a: not supported.** It failed on all three systems. "Not supported" is not "disproved", and it says nothing about systems beyond the three studied. v3 fixed in advance how a failure would be read (instability enters the weight through uneven starting errors); that reading was not itself tested. {T2} The second part of H2a can be refuted but essentially cannot pass at these sample sizes, as v3 anticipated. {S38, T7}
+- **H2a: not supported.** It failed on all three systems. "Not supported" is not "disproved", and it says nothing about systems beyond the three studied. v3 fixed in advance how a failure would be read (instability enters the weight through starting errors that are larger in some directions than in others); that reading was not itself tested. {T2} The second part of H2a can be refuted but essentially cannot pass at these sample sizes, as v3 anticipated. {S38, T7}
 - **H2b: supported.** It passed on all three systems in this run. {T2}
 - **H3c: inconclusive.** It passed on Rössler; on Lorenz-63 and Chua it could not be decided at this precision; no system failed. Inconclusive does not mean the effect is absent. {T2}
 - [OPTIONAL, one line, the pre-fixed secondary highlights in their §4 words: H2c inconclusive, H2e supported, H3a inconclusive (it cannot fail by design), Q-N an estimate read from the v3 table, not pass or fail. {T3}]
@@ -82,43 +82,59 @@ All three studied systems passed the validity gate (checks V1 to V7; V3 is only 
 
 ## 8. What is claimed and what is not
 
-"Supported" means: on these three systems, with an exact physics model and one measured variable, the pre-registered prediction held in this run. {S32} It does not show the same for a physics model that is wrong or only approximate (the model here is exact), for real measured data (every series here is simulated), or for higher-dimensional systems (all three studied have three dimensions); v3 lists these as future work. It also does not show that the same pattern holds for other seeds, because one sealed seed gives one realization per system. {U8, S34} "Not supported" means at least one system failed a pre-set test; its error is not controlled the same way and, with 95% intervals, can reach about 7.3% over three systems. {S33} "Inconclusive" is not "no effect".
+"Supported" means: on these three systems, with an exact physics model and one measured variable, the pre-registered prediction held in this run. {S32} It does not show the same for a physics model that is wrong or only approximate (the model here is exact), for real measured data (every series here is simulated), or for higher-dimensional systems (all three studied have three dimensions); v3 lists the first and the last of these as future work, and every series here is a simulation. It also does not show that the same pattern holds for other seeds, because one sealed seed gives one realization per system. {U8, S34} "Not supported" means at least one system failed a pre-set test; its error is not controlled the same way and, with 95% intervals, can reach about 7.3% over three systems. {S33} "Inconclusive" is not "no effect".
 
-Limits stated in advance by v3 (tags S34 to S39), plus the limits the owner ruled on before promotion:
+Limits stated in advance by v3, plus the limits the owner ruled on before promotion:
 
 - Three low-dimensional systems, one observable, one sealed seed, so one realization per system. {S34}
 - Same systems with fresh random numbers: more precision, not new systems. {S35}
 - Practical (non-exact) features carry little of the information in the exact ones, so allocation results are limited by them, not by theory. {S36}
 - H3a cannot fail; the second part of H2a has low power: it can be refuted but essentially cannot pass. The owner accepted this as a known limitation. {S38, T7}
 - The intervals cover slightly less often than their nominal level. {S39}
+- The error left by the fixed number of fitting steps in the physics-based forecaster was not estimated for the official run; on a development seed it was not shown to be negligible for most primary parts. {R3}
+- H2e was added after the pilot showed the effect, and is tested on fresh seeds. {R3}
 - The regeneration was by the same person on the same computer: it shows determinism, not an independent reproduction. Results depend on the thread count and the computer's linear-algebra library, so another computer may differ. {T5}
 - The owner did not review the code; the owner spot-checked the results, and the code was covered by independent AI-agent reviews. {T6}
-- For the secondary and reported rows the official results file gives no numerical-error estimate and no per-quantity verification status. {T8}
+- For the secondary and reported rows the official results file gives no numerical-error estimate and no per-quantity verification status, and the status wording of the secondary hypotheses does not say whether a secondary is confirmatory in this run. {T8}
 - The four built-in report figures name no experiment or hypothesis and show no interval; a dotted line in the regret figure is a reference line, not a pre-registered criterion. {T9}
 - A subsequent pre-registered study will need different intervals and sample sizes; this changes nothing in the present analysis. {T10, U11}
 
 ## 9. Beyond the pre-registered study (development, exploratory)
 
-Header for this section and every copy of it: **DEVELOPMENT CONTEXT: not a hypothesis test.** (Drafting rule, criterion E8 of WU-0025: the paragraphs below contain no digit except in system names and the one ratio of tag U9; the tags are removed in the final text.)
+Header for this section and every copy of it: **DEVELOPMENT CONTEXT: not a hypothesis test.**
 
-**Extension.** After the pre-registered run, and on development seeds only, we asked whether the same patterns appear in chaotic systems that differ from the three studied in a qualitative way. Six systems were run: a higher-dimensional Rössler system with two directions of error growth; a Lorenz system in a regime with intermittent bursts; Rössler observed through a different variable; and three further systems from the Dysts collection (a Hindmarsh-Rose neuron model, a hyperchaotic Lorenz-family system called HyperJha, and a four-variable Lorenz-96 system). {T12, U12} The forecasters, the tests and the decision thresholds were the same as in the pre-registered study, and the readings were written down before any extension run. {T13} Only the higher-dimensional Rössler system passed the validity gate; the other systems failed check V7 (the check that the state estimator reaches its theoretical accuracy floor) and are marked PROVISIONAL, with their words shown as stored and the failure reported, not repaired. {U13} Each extension system is read on its own: there is no overall verdict, no ranking of systems, and nothing here changes or adds to the pre-registered result. Each system was run on one development seed only, so seed-to-seed variation is not known for them. A confirmatory claim about any of these systems would need its own sealed seed and freeze. {T12, T13, T19} The code that reports the extension's verdicts is development-only and has not been reviewed by the owner. {U14}
+**Extension.** After the pre-registered run, and on development seeds only, we asked whether the same patterns appear in chaotic systems that differ from the three studied in a qualitative way. Six systems were run: a higher-dimensional Rössler system with two directions of error growth; a Lorenz system in a regime with intermittent bursts; Rössler observed through a different variable; and three further systems from the Dysts collection (a Hindmarsh-Rose neuron model, a hyperchaotic Lorenz-family system called HyperJha, and a four-variable Lorenz-96 system). {T12, U12} The forecasters, the tests and the decision thresholds were the same as in the pre-registered study, and the readings were written down before any extension run. {T13} Only the higher-dimensional Rössler system passed the validity gate; the other systems failed the check on the state estimator's efficiency (that its error matches its theoretical prediction) and are marked PROVISIONAL, with their words shown as stored and the failure reported, not repaired. {U13} Each extension system is read on its own: there is no overall verdict, no ranking of systems, and nothing here changes or adds to the pre-registered result. Each system was run on one development seed only, so seed-to-seed variation is not known for them. A confirmatory claim about any of these systems would need its own sealed seed and freeze. {T12, T13, T19} The code that reports the extension's verdicts is development-only and has not been reviewed by the owner. {U14}
 
 **Development ensemble.** We also repeated the full study on several development seeds for the three studied systems, to see how much the readings move from seed to seed. Those runs are shown side by side in development appendix A, without any average or range, and are not a test. {T14}
 
-**Dysts context.** Dysts is a public collection of chaotic systems with published forecasting benchmarks, which our design document cites. {T15} Its entries for Lorenz-63, Rössler and Chua use the same equations as ours, with parameters equal up to rounding. {U15} The Dysts database's stored maximum Lyapunov exponent for Chua differs from ours by a factor of about 2.85; our value is reproduced by an independent estimator; the cause of the Dysts value is not determined. {U9} We tested and excluded differences of equations, parameters, time unit, attractor and integration settings, and Dysts' own Lyapunov spectrum entry for the same system is near our value; no published reference value for Chua at our parameters exists, so neither Dysts number validates ours. {U9} The benchmark measures error, time and noise in different units, scores forecasts with a percentage error that depends on the size of the signal, reports averages over many systems, and has no forecaster with known equations like PLP, so its values are context only and cannot be compared directly with ours. {T17, U16} Where we quote our analog forecaster's valid-prediction time (check V3), it counts a forecast as valid until its error first exceeds 0.4 of the standard deviation of the observed variable, and the error is measured against the noisy verifying observation, not the noise-free truth; it is reported for context and is not a gate. {U17} All values, and the separate descriptive table of the Dysts definitions, are in the development appendix and its companion table, not here. {U18}
+**Dysts context.** Dysts is a public collection of chaotic systems with published forecasting benchmarks, which our design document cites. {T15} Its entries for Lorenz-63, Rössler and Chua use the same equations as ours, with parameters equal up to rounding. {U15} The Dysts database's stored maximum Lyapunov exponent for Chua is about three times ours, and our value is reproduced by an independent implementation. The stored value was probably produced by a simpler Dysts estimator that follows the separation of two nearby trajectories without renormalising it; this is our inference from Dysts' published code and an older results file, not something Dysts states, and why that estimator gives a larger value is not shown. Differences of equations, parameters, time unit, attractor and the settings of our own exponent method were tested and excluded, and Dysts' own spectrum entry for the system is near our value; no published reference value exists for Chua at our parameters, so neither Dysts number validates ours. {U9} The benchmark measures error and time differently from us (noise is absent from its main benchmark and defined in a way not known to match ours), scores forecasts with a percentage error that depends on the size of the signal, reports averages over many systems, and has no forecaster with known equations, in the texts we read; so its values are context only and cannot be compared directly with ours. {T17, U16} All values, and the separate descriptive table of the Dysts definitions, are in the development appendix and its companion table, not here. {U18}
 
 [STUDENT: one sentence, marked as interpretation if it is one, on why you wanted to look beyond the three systems.]
 
 ## 10. Status and timeline
 
-The design was frozen before the confirmatory run. The official run used the sealed seed on 2026-10-19 (CPU); the GPU cross-check and the regeneration followed on 2026-10-20; two audits followed; the owner promoted the result on 2026-10-23. {T18} [STUDENT: next steps and the dates you commit to.] Deem leads the questions, proofs of P1 and P2, interpretation and presentation; Brian reviews and runs the computation; an AI assistant (Claude) helped with drafting, reference checks, code and code review, and the author reviewed it. {S41} [STUDENT: confirm roles and the AI-use statement in your words; it must say that AI agents also reviewed the code, because the owner's code review was waived. {T6}]
+The design was frozen before the confirmatory run. The official run used the sealed seed on 2026-10-19 (CPU); the GPU cross-check and the regeneration followed on 2026-10-20; two audits followed; the owner promoted the result on 2026-10-23. {T18} [STUDENT: next steps and the dates you commit to.] [STUDENT: roles, in your words. Draft: Deem leads the questions, proofs of P1 and P2, interpretation and presentation; Brian reviews and runs the computation.]
 
-## Glossary (v1 glossary plus additions)
-
-The v1 glossary (chaotic system, Lyapunov exponent and time, observable, delay vector, CP, PLP, mean squared error, w\*, forecast horizon, theorems P1 and P2, pre-registration, seed, confidence interval and moving-block bootstrap, band and verdict, validation gate, cross-check) is unchanged. Additions:
+## Glossary
 
 | Term | Plain meaning |
 | --- | --- |
+| Chaotic system | A deterministic system whose forecasts get worse fast because tiny starting errors grow (§1). |
+| Lyapunov exponent, Lyapunov time | The long-run growth rate of small errors; its inverse, 1 Lyapunov time, is our unit of time, 30 steps (§4). |
+| Observable | The one measured quantity we get to see, here the variable x with noise added (§4). |
+| Delay vector | A short window of recent measurements stacked into one point (§4). |
+| Analog forecast (CP) | Find the most similar past delay vector and copy what followed (§1, §4). |
+| PLP | Estimate the hidden state, then integrate the known equations forward (§4). |
+| Mean squared error | The average of the squared forecast errors (§3). |
+| Blend weight w\* | The weight on CP, between 0 and 1, that gives the least mean squared error at a state (§3, §5). |
+| Forecast horizon | How far ahead a forecast stays within a chosen error (§6). |
+| Theorem (P1, P2) | A statement proved from assumptions; P1 gives w\* and the limit on blending, P2 explains noise sensitivity (§3). |
+| Pre-registration | Writing the hypotheses and decision rules down before the data are produced (§7, §9). |
+| Random-number seed vs. "seed" of an error | The sealed seed fixes the computer's random numbers (§9). In v3 the "seeds" of the forecasters are their starting errors (§3). |
+| Confidence interval, moving-block bootstrap | A range of plausible values, found by resampling blocks of neighboring test states (§7). |
+| Band, verdict | The pre-set pass range; the result "supported", "not supported" or "inconclusive" (§7). |
+| Validation gate | Seven numerical checks that must pass before a system's results are trusted (§6). |
+| Cross-check | An information-only repeat on a GPU to see whether it agrees (§9). |
 | Promotion | The owner's recorded decision that a checked result may be reported as the study's result. |
 | Development seed | Random numbers used for building and exploring, never for the pre-registered test. |
 | Exploratory | Looked at to learn, not to test a prediction fixed in advance. |
@@ -131,6 +147,8 @@ The v1 glossary (chaotic system, Lyapunov exponent and time, observable, delay v
 ---
 
 ## For the author (not part of the statement)
+
+**Final-round changes (review WU-0025.6, R1 to R9).** Section 9 made number-free and V3 definition moved to poster panel 12; Chua/Dysts wording replaced using `2026-10-23-researcher-dysts-lyapunov-script.md` (inference, not stated by Dysts); G3, DEF-0027 and H2e added to §8 {R3}; §5 reason restated as what the records support (F2 is resolved as description, intent unconfirmed); wording fixes R6 to R8. Rows U6, U9, U17 of the trace table below are superseded by these (U9: attribution note §5 and script note §§2 to 4; U17: poster panel 12 caption). Row R3: v3 §8, report §10, DEC-0042 item 4, DEC-0044.
 
 ### A. Recommended wording for the four v1 flags (now in the text; the evidence)
 
@@ -166,7 +184,7 @@ The v1 glossary (chaotic system, Lyapunov exponent and time, observable, delay v
 - [x] PROVISIONAL counts are right: body says "the three studied systems" passed all gates; "only the higher-dimensional Rössler" passed among the extension systems; the others failed V7. Evidence: appendix A.2 gate table (rossler_hyper yes; the other five V7 no).
 - [x] "Subsequent pre-registered study", not "v4". Evidence: grep "v4" returns no hit in the body.
 - [x] Dysts and Chua sentences match their sources (attribution note §5 sentence; tables note A.1 and A.2).
-- [ ] Interpretation is the student's and is marked as such; the AI-use statement is updated. (The student's act; slots in §2, §5, §7, §9, §10.)
+- [ ] Interpretation is the student's and is marked as such(The student's act; slots in §2, §5, §7, §9, §10.)
 - [ ] Owner confirms the §5 and §1 intent wording (items 1 and 2 below).
 
 ### D. Trace table. Every sentence with a number or a verdict word maps to a source. Kind: Q near-quote, P paraphrase, A assembled.
@@ -202,7 +220,7 @@ Owner:
 2. Whether you can attest, from your own knowledge, that nobody looked at the confirmatory data before the run; if so, add that sentence to §1 in your name. The records show only the sealed seed and the freeze.
 3. Whether the Chua ratio may be quoted as "about 2.85" (value of the DEV-0 and v3 table) or as a number-free "about three times", given that the ensemble value gives a slightly different ratio.
 4. Recording the V3 threshold 0.4 in a v3 amendment (mapping note F1) is the owner's decision; until then the text states it as a code constant.
-5. Placement of panel 12 (see the poster outline): the fair's rules decide.
+5. Placement of panel 12 (see the poster outline): handout or back of the board.
 6. The final promotion label, if you want other than the DEC-0045 wording.
 7. Any statement of owner code review: none is made; the extension code review is still the owner's pending act (DEC-0045 item 3).
 8. Names of the roles in §10 as the proposal wants them.
@@ -210,8 +228,7 @@ Owner:
 
 Student:
 
-1. Every `[STUDENT]` slot: §2 why it matters; §5 your reason if different; §7 interpretation and any quoted estimate; §9 why look beyond three systems; §10 next steps, dates, roles and AI-use statement.
+1. Every `[STUDENT]` slot: §2 why it matters; §5 your reason if different; §7 interpretation and any quoted estimate; §9 why look beyond three systems; §10 next steps, dates and roles.
 2. The whole text in your own voice, one to two pages; read each sentence aloud and rewrite it.
 3. Whether the observability gloss in §4 reads right to you.
-4. Personal text for the fair submission (name, school, category) if the form asks.
-5. The fair's own format and length rules, which only the fair supplies (still open from v1).
+4. Personal text for the submission (name, school, category) if asked.
