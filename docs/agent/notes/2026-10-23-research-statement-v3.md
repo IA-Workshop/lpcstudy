@@ -1,6 +1,6 @@
 # Research statement v3 (final draft for the owner and the student to edit): when should a forecaster trust the past, and when the physics?
 
-Draft by claude-sonnet-5-5 (WU-0025.3), 2026-10-23, from `2026-10-23-research-statement-v2.md` and DEC-0045, for the internal proposal due 2026-10-28. The student (Deem Albaty) writes the interpretation and owns the final text (D8). `[STUDENT: ...]` marks words only the student can supply, `[OWNER: ...]` words only the owner can supply. Sections 1 to 10 and the glossary are the statement. Everything after "For the author" is not part of the submission.
+Draft by claude-sonnet-5-5 (WU-0025.3), 2026-10-23, from `2026-10-23-research-statement-v2.md` and DEC-0045, for the internal proposal due 2026-10-28. The student (Deem Albaty) writes the interpretation and owns the final text (D8). `` marks words only the student can supply, `[OWNER: ...]` words only the owner can supply. Sections 1 to 10 and the glossary are the statement. Everything after "For the author" is not part of the submission.
 
 **Number rule.** The statement body has no number from any run. Result words are copied from section 4 of the promoted report (`promoted/CONF-1/report.md` §4, lines 91 to 125; checked against the file on develop at cc27d31). Where the student wants an estimate, it is copied from §5 of the promoted report with its interval and level, and cited by section and row; none is quoted here. Development numbers (ensemble, extension systems, Dysts tables) never appear in the body; they are in the standalone development appendix A (`docs/agent/notes/2026-10-23-appendix-a-standalone.md`, 1073 traced values) and are reached only by pointer. The digits left in the body are design constants of v3, dates and system names; section 9 has none except system names. The V3 threshold (0.4 of the standard deviation) is a code literal, not a v3 constant, and is stated only in the panel 12 caption of the poster outline.
 
@@ -29,7 +29,7 @@ Can four measurable local conditions of a chaotic system decide, state by state,
 
 ## 2. Why it matters
 
-A chaotic system is deterministic, but a tiny error in its starting state grows quickly, so every forecast of it eventually fails. {S3} Forecasting such systems matters from sensing to climate. {S4} Analog forecasters find the past situation most like the present and copy what followed; they improve with more data. Physics-based forecasters integrate known equations, but must first estimate the hidden current state from noisy measurements. {S5} Most hybrids combine the two in a fixed way, and we know of no earlier work that decides, state by state, which to trust. {S6} [STUDENT: one sentence, in your words, on why this matters to you or a reader.]
+A chaotic system is deterministic, but a tiny error in its starting state grows quickly, so every forecast of it eventually fails. {S3} Forecasting such systems matters from sensing to climate. {S4} Analog forecasters find the past situation most like the present and copy what followed; they improve with more data. Physics-based forecasters integrate known equations, but must first estimate the hidden current state from noisy measurements. {S5} Most hybrids combine the two in a fixed way, and we know of no earlier work that decides, state by state, which to trust. {S6}
 
 ## 3. The two forecasters and the blend weight
 
@@ -53,12 +53,12 @@ Recurrence and observability set the two forecasters' starting errors; instabili
 
 ## 5. The three test systems
 
-Lorenz-63, Rössler, and Chua's circuit (an electronic circuit with a piecewise-linear diode) each have exactly known equations, so true hidden states and every condition can be computed. {S18} The design uses them because their equations are exact. They are also standard chaotic systems that forecasting benchmarks use, and they differ in shape and in how fast errors grow; Chua's has a piecewise-linear part. {U6} We observe one variable, x, and score forecasts against the noise-free truth. {S19} Time is counted in Lyapunov times (1 divided by the largest Lyapunov exponent, the long-run growth rate of small errors), set to 30 steps in every system. {S20} [STUDENT: your own reason for choosing these three, if you have one.]
+Lorenz-63, Rössler, and Chua's circuit (an electronic circuit with a piecewise-linear diode) each have exactly known equations, so true hidden states and every condition can be computed. {S18} We chose them because their equations are exact, because they are standard chaotic systems that forecasting benchmarks use, and because they differ in shape and in how fast errors grow; Chua's has a piecewise-linear part. {U6} We observe one variable, x, and score forecasts against the noise-free truth. {S19} Time is counted in Lyapunov times (1 divided by the largest Lyapunov exponent, the long-run growth rate of small errors), set to 30 steps in every system. {S20}
 
 ## 6. The design in plain words
 
 - **Pre-registered hypotheses.** Hypotheses, statistics and decision rules were fixed before the confirmatory run. {S21} The three primary ones: (H2a) given the starting errors, the best weight does not depend on horizon or instability; (H2b) it rises with noise level and library size; (H3c) a few regimes (groups of similar states) lose almost nothing against the closed-form rule. {S22} Nine secondary hypotheses and one estimate are also pre-registered. {S23}
-- **Sealed fresh seed.** The confirmatory run used a sealed random-number seed: new noise, libraries and trajectories on the same three systems. {S24}
+- **Sealed fresh seed.** The confirmatory run used a sealed random-number seed: new noise, libraries and trajectories on the same three systems. No author saw the data of that seed before the run. {S24}
 - **Intervals.** Each statistic has a confidence interval (a range of plausible values) from a moving-block bootstrap (resampling blocks of 5 neighboring test states, 2000 times). {S25} Primaries use level 1 − 0.05/3, stricter because there are three; the rest use 95%. {S26}
 - **Verdict rule.** Per system, a hypothesis passes if its interval lies inside the pre-set band (acceptable range) or wholly on the predicted side of a bound, fails if wholly outside, and is otherwise inconclusive. {S27} Each hypothesis then gets one overall word: "supported" only if all three systems pass, "not supported" if at least one fails, and "inconclusive" otherwise. {S28, T2}
 - **Validity gates.** Checks V1 to V7 test the numerical tools first (V3 is only reported). A failure marks that system's results provisional, is reported to the owner, and is never repaired by retuning or rerunning. {S29}
@@ -76,9 +76,9 @@ All three studied systems passed the validity gate (checks V1 to V7; V3 is only 
 - **H3c: inconclusive.** It passed on Rössler; on Lorenz-63 and Chua it could not be decided at this precision; no system failed. Inconclusive does not mean the effect is absent. {T2}
 - [OPTIONAL, one line, the pre-fixed secondary highlights in their §4 words: H2c inconclusive, H2e supported, H3a inconclusive (it cannot fail by design), Q-N an estimate read from the v3 table, not pass or fail. {T3}]
 
-[STUDENT: if you quote an estimate, copy it with its interval and level from §5 of the promoted report and cite the row. Otherwise leave numbers to the poster figure F1.]
 
-[STUDENT: your reading of what these three words mean, and what surprised you, marked as interpretation.]
+
+
 
 ## 8. What is claimed and what is not
 
@@ -109,11 +109,11 @@ Header for this section and every copy of it: **DEVELOPMENT CONTEXT: not a hypot
 
 **Dysts context.** Dysts is a public collection of chaotic systems with published forecasting benchmarks, which our design document cites. {T15} Its entries for Lorenz-63, Rössler and Chua use the same equations as ours, with parameters equal up to rounding. {U15} The Dysts database's stored maximum Lyapunov exponent for Chua is about three times ours, and our value is reproduced by an independent implementation. The stored value was probably produced by a simpler Dysts estimator that follows the separation of two nearby trajectories without renormalising it; this is our inference from Dysts' published code and an older results file, not something Dysts states, and why that estimator gives a larger value is not shown. Differences of equations, parameters, time unit, attractor and the settings of our own exponent method were tested and excluded, and Dysts' own spectrum entry for the system is near our value; no published reference value exists for Chua at our parameters, so neither Dysts number validates ours. {U9} The benchmark measures error and time differently from us (noise is absent from its main benchmark and defined in a way not known to match ours), scores forecasts with a percentage error that depends on the size of the signal, reports averages over many systems, and has no forecaster with known equations, in the texts we read; so its values are context only and cannot be compared directly with ours. {T17, U16} All values, and the separate descriptive table of the Dysts definitions, are in the development appendix and its companion table, not here. {U18}
 
-[STUDENT: one sentence, marked as interpretation if it is one, on why you wanted to look beyond the three systems.]
+
 
 ## 10. Status and timeline
 
-The design was frozen before the confirmatory run. The official run used the sealed seed on 2026-10-19 (CPU); the GPU cross-check and the regeneration followed on 2026-10-20; two audits followed; the owner promoted the result on 2026-10-23. {T18} [STUDENT: next steps and the dates you commit to.] [STUDENT: roles, in your words. Draft: Deem leads the questions, proofs of P1 and P2, interpretation and presentation; Brian reviews and runs the computation.]
+The design was frozen before the confirmatory run. The official run used the sealed seed on 2026-10-19 (CPU); the GPU cross-check and the regeneration followed on 2026-10-20; two audits followed; the owner promoted the result on 2026-10-23. {T18}
 
 ## Glossary
 
