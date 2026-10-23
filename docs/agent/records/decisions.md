@@ -772,3 +772,17 @@ The owner-review list of DEC-0038 addendum A1 gains: the names in `EXTENSION_SYS
 **Reading, for the owner to correct.** Option (a): the three findings figures F1 to F3 are re-rendered with a promoted status title for the promoted copy (WU-0034: `findings_build.py promote`, separate output folder, preliminary figures untouched, byte-reproduction and zero-tolerance pixel check outside the title band). The `RESULTS.md` figures are copied as they are (they carry no status text). The promoted report's provenance row keeps the stored label of the sealed file. Option (c) (omit the figures) is the fallback only if promotion has to precede WU-0034.
 
 **Affects:** WU-0033, WU-0034, WU-0018.2, WU-0018.3. **Status:** owner instruction; no ledger entry is required for this choice (a design choice for the report copy, no governed file changes); the owner may add a ledger `note` if wanted.
+
+## DEC-0044: Promotion of the CONF-1 run-1 result (2026-10-23, recorded by claude-sonnet-5-5 from ledger seq 37 to 40)
+
+**Decision.** The CONF-1 run-1 result (official CPU run, `ae4b0fe5bf488f6c147bce6c91a2398e87408f6a5d372ae66d89bdfc90b0cebe`; `RESULTS.md` `2a4c1d06859d07584b1633c6e7f1b5df205ffe445402509834383fb474649577`) is promoted. The owner's act is the ledger entry, not words recorded here: seq 40, type `promotion`, 2026-10-23T09:37:12+00:00, `promoted` true, `proposal_seq` 39, `reading_recorded` "WU-0017.3 dated line" (commit 03edc09). Seq 39 is the proposal (WU-0018.2; `promoted` false, rulings 30, 32, 34, 36, waivers 31, 33).
+
+**Audits.** `docs/agent/notes/2026-10-21-audit-pre-promotion-conf1.md` and `docs/agent/notes/2026-10-22-audit-promotion-conf1.md` (zero blockers; GO for the proposal; promotion deferred to the owner-side items, now done).
+
+**Ruled limitations carried by the promoted report.** Same host, environment and actor for run-1 and run-2: determinism, not independence (waiver seq 31, ruling seq 34, DEC-0035); owner code review waived, results spot-checked by the owner, DEF-0001 open (waiver seq 33); the risk and expiry of waivers 31 and 33 (note seq 37/38: expiry at the owner code review record or the end-of-project governance review, WU-0019.2); retroactive authorization of the official run accepted (seq 15, ruling seq 30); DEF-0022 power finding accepted as a known limitation, labeled development evidence (ruling seq 32); NVVUQ.22 gaps G1 to G3 and the four sealed figure captions with the figure map in the report text (ruling seq 36); Q-N two readings (DEC-0036, seq 24); DEF-0027 iterative error not estimated.
+
+**Duplicate entries.** Seq 37 (2026-10-22T09:56:05Z) and seq 38 (2026-10-23T09:31:31Z) are the same owner note (waivers 31 and 33: risk accepted and expiry); it was entered twice. The wording of seq 38 is the fuller one. The duplicate is harmless: the chain is intact and both name the same waivers. No entry is altered.
+
+**Files.** Promoted copies in `promoted/CONF-1/`, hashes in `promoted/CONF-1.sha256`; manifest line of 2026-10-23 names entry 40; originals under `runs/confirmatory/run-1/` unchanged. Main synced at d75b8be. Close-out: `docs/agent/notes/2026-10-23-promotion-closeout.md`.
+
+**Affects:** WU-0015 to WU-0018, results manifest, what may be stated publicly. **Status:** recorded from the ledger; the owner's act is seq 40.

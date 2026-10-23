@@ -209,3 +209,14 @@ The rows below supersede the "planned" status of the WU-0015 to WU-0018 rows of 
 
 - 2026-10-21 (later), claude-sonnet-5-5: WU-0017.1 executed (hardened block, CPU, scratch copies, freeze-1 worktree): `RESULTS.md` sha256 `2a4c1d06...4577` on both runs, equal to the stored file; rewritten `results.json` `ae4b0fe5...cebe` equal to the stored one; ten-number sample 10 of 10; H2a(ii) 2 fail, 4 inconclusive. WU-0017.2: figures byte-identical; captions name no experiment or v3 identifier (gap, owner decision). WU-0017.3 pending; owner and student read. WU-0018.1 pending.
 - 2026-10-22, claude-sonnet-5-5: status after the promotion audit (`docs/agent/notes/2026-10-22-audit-promotion-conf1.md`: zero blockers, GO for the proposal). WU-0015 and WU-0016: done as events, records as of 2026-10-21 (M2 ruled seq 30; M3 waiver seq 31 and ruling seq 34). WU-0017: .1 and .2 done with the ruled exceptions of seq 36; .3 pending; owner and student read. WU-0018: .1 audit by 2026-10-22 (zero blockers); .2 proposal drafted in `docs/agent/notes/2026-10-22-promotion-proposal.md` (not a ledger entry); .3 not started, premature until WU-0017.3, the waiver note (seq 31 and 33) and the ledger sync are done.
+
+## Added 2026-10-23: close-out of the CONF-1 promotion (claude-sonnet-5-5, developer; append-only, earlier rows stay as written; ROADMAP.md not edited)
+
+| Unit | Status (2026-10-23) |
+| --- | --- |
+| WU-0015 | done as events; promoted result (ledger seq 40) |
+| WU-0016 | done; T0 20766 of 20766 equal; same actor and host by waiver seq 31 |
+| WU-0017 | .1, .2 done with the exceptions of seq 36; .3 done (commit 03edc09) |
+| WU-0018 | done: .1 audit 2026-10-22, .2 proposal seq 39, .3 promotion seq 40 |
+
+Decision DEC-0044; note `docs/agent/notes/2026-10-23-promotion-closeout.md`. Remaining and owner-held: WU-0019 (retention, governance review), DEF-0001 open, DEC-0043 (WU-0034 re-rendered figures in use), m8, open items listed in the note.

@@ -58,3 +58,8 @@ All times: the ledger and provenance times are UTC; the manifest and `run.log` t
 - Is the definition of done met? The run, the cross-check, the manifest entries and the release exist and are consistent. Not met as written in the ROADMAP: the pre-run checklist record and the contemporaneous per-action authorization quoting the owner's words (M2).
 - Defects recorded: none opened here.
 - Notes for successors: future ledger entries for runs should carry an explicit UTC zone (audit M2).
+
+**2026-10-23 entries (developer claude-sonnet-5-5; the lines above are not edited)**
+- Status: done as events; the result is promoted by ledger seq 40 (proposal seq 39). Audit M2 closed by ruling seq 30.
+- Review: promotion audit `docs/agent/notes/2026-10-22-audit-promotion-conf1.md` (zero blockers).
+- Audit: the definition of done is met with the ruled exception of the retroactive authorization (seq 15, ruling seq 30). The pre-run checklist record remains not recorded.

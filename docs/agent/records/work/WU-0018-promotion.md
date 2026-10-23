@@ -27,3 +27,8 @@
 - Is the definition of done met? No.
 - Defects recorded:
 - Notes for successors: WU-0018.1 re-audits the v3 report after WU-0017.2.
+
+**2026-10-23 entries (developer claude-sonnet-5-5; the lines above are not edited)**
+- Status: done. .1 audit `docs/agent/notes/2026-10-22-audit-promotion-conf1.md` (zero blockers); .2 proposal ledger seq 39; .3 promotion ledger seq 40 (`promoted` true, `proposal_seq` 39). Promoted copies in `promoted/CONF-1/` (commit a3b0b65), manifest line of 2026-10-23, main synced at d75b8be.
+- Review: the two audits (2026-10-21, 2026-10-22).
+- Audit: the definition of done is met. Recorded in DEC-0044. Seq 37 and 38 are one owner note entered twice.

@@ -51,3 +51,8 @@ The plan is `ROADMAP.md` phase F, rows WU-0016.1 to WU-0016.4 and the phase F ac
 - Is the definition of done met? Tier T0 on the same platform: yes (20766 of 20766 compared leaves equal, 0 different, PASS). Per-action authorization: seq 21, before the run. "Another actor": met by ruling, not by independence (M3).
 - Defects recorded: none opened.
 - Notes for successors: none.
+
+**2026-10-23 entries (developer claude-sonnet-5-5; the lines above are not edited)**
+- Status: done; run-2 compared T0, 20766 of 20766 equal. The result is promoted by ledger seq 40.
+- Review: promotion audit `docs/agent/notes/2026-10-22-audit-promotion-conf1.md` (zero blockers).
+- Audit: "another actor" is met by waiver seq 31 and ruling seq 34, not by independence; risk and expiry in the owner note seq 37/38 (the same note entered twice).
