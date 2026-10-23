@@ -3573,3 +3573,226 @@ def test_regression_promoted_copy_equals_the_committed_report() -> None:
     assert promoted.encode() == copy_.read_bytes()
     listed = (ROOT / "promoted/CONF-1.sha256").read_text()
     assert f"{fb.sha256_of(copy_)}  promoted/CONF-1/report.md" in listed
+
+
+# --- WU-0025.1 fix round 1 (R1, R4, R5) and WU-0025.7 (standalone appendix) ---
+def test_opening_paragraph_is_true_for_any_host(appendix) -> None:
+    """The opening sentences name no "official result" (review R1).
+
+    The host of the fixture is a development run (DEV-9), so a sentence that
+    compares nothing "with the official result" or says the numbers appear
+    "only here" next to development sections would be false. Reference: the
+    text of the document, read by the test.
+    """
+    _, out = appendix
+    lines = appendix_lines(out)
+    opening = next(x for x in lines[1:] if x.strip())
+    assert opening.startswith(APP_LABEL) and APP_WORDS in opening
+    assert "official" not in opening.lower()
+    assert "appear only here" not in opening
+    assert "only in this appendix" in opening
+
+
+def test_part_and_seed_ids_are_checked_from_the_trace(appendix) -> None:
+    """A wrong seed id, or a removed A.2 heading, fails ``check_appendix`` (R4)."""
+    _, out = appendix
+    rows = trace_of(out)
+    lines = doc_of(out).split("\n")
+    sources = rebuilt(out)
+    ext_lead = max(
+        k for k, x in enumerate(lines) if x.startswith(APP_LABEL) and PER_SYSTEM in x
+    )
+    wrong = list(lines)
+    wrong[ext_lead] = wrong[ext_lead].replace("Seeds: DEV-3;", "Seeds: DEV-9;")
+    assert any("seed ids" in p for p in fb.check_appendix(wrong, sources, rows))
+    dev_lead = next(
+        k for k, x in enumerate(lines) if "Seeds: DEV-1, DEV-3, DEV-4;" in x
+    )
+    short = list(lines)
+    short[dev_lead] = short[dev_lead].replace("DEV-1, DEV-3, DEV-4", "DEV-1, DEV-3")
+    assert any("seed ids" in p for p in fb.check_appendix(short, sources, rows))
+    # the A.2 heading removed and the extension words cut from every A.2 lead
+    bare = [x for x in lines if not x.startswith("### A.2")]
+    bare = [
+        x.replace(f"; {EXT_WORDS}; {PER_SYSTEM}", "") if x.startswith(APP_LABEL) else x
+        for x in bare
+    ]
+    # the rows moved up by one line: shift the trace the same way
+    cut = next(k for k, x in enumerate(lines) if x.startswith("### A.2"))
+    moved = [
+        dict(r, line=str(int(r["line"]) - (1 if int(r["line"]) > cut + 1 else 0)))
+        for r in rows
+    ]
+    assert any("label" in p for p in fb.check_appendix(bare, sources, moved))
+
+
+def test_run_table_names_carry_the_provisional_mark(appendix) -> None:
+    """The mark follows each failing system name in the run table (R5, E-9)."""
+    _, out = appendix
+    rows = trace_of(out)
+    lines = doc_of(out).split("\n")
+    sources = rebuilt(out)
+    run = row_line(out, "ext:lorenz63_r166", "provenance/commit")
+    assert "| lorenz63_r166 PROVISIONAL |" in run
+    ok = row_line(out, "ext:hyper_zeta", "provenance/commit")
+    assert "| hyper_zeta |" in ok
+    dev = row_line(out, "dev:DEV-3", "provenance/commit")
+    assert "lorenz63, rossler, chua PROVISIONAL |" in dev
+    bad = [
+        x.replace("lorenz63_r166 PROVISIONAL |", "lorenz63_r166 |")
+        if "provenance" not in x and x.startswith("| DEV-3 | lorenz63_r166") else x
+        for x in lines
+    ]
+    assert bad != lines
+    assert any("PROVISIONAL" in p for p in fb.check_appendix(bad, sources, rows))
+    spurious = [
+        x.replace("| hyper_zeta |", "| hyper_zeta PROVISIONAL |")
+        if x.startswith("| DEV-3 | hyper_zeta") else x
+        for x in lines
+    ]
+    assert any("PROVISIONAL" in p for p in fb.check_appendix(spurious, sources, rows))
+
+
+def standalone_args(tmp: Path, dev=None, ext=None, **extra) -> Namespace:
+    """Arguments of ``appendix`` over synthetic runs written under ``tmp``."""
+    if dev is None and ext is None:
+        dev, ext = app_runs()
+    dev, ext = dev or {}, ext or {}
+    return Namespace(
+        development=[str(write_run(tmp / f"d_{n}", r)) for n, r in dev.items()] or None,
+        extension=[str(write_run(tmp / f"x_{n}", r)) for n, r in ext.items()] or None,
+        out=str(tmp / "out"),
+        stem="app",
+        **extra,
+    )
+
+
+@pytest.fixture(scope="module")
+def standalone(tmp_path_factory):
+    tmp = tmp_path_factory.mktemp("standalone")
+    args = standalone_args(tmp)
+    assert fb.appendix(args) == 0
+    return tmp, Path(args.out)
+
+
+def test_standalone_document_has_no_host_content(standalone) -> None:
+    """The standalone appendix has no findings-document content (S-1)."""
+    _, out = standalone
+    text = (out / "app.md").read_text()
+    lines = text.split("\n")
+    assert lines[0] == "**DEVELOPMENT APPENDIX: not a hypothesis test**"
+    assert lines[2] == "# Development appendix: not a hypothesis test"
+    for phrase in ("Preliminary findings", "PRE-REGISTERED", "until promotion",
+                   "UNPROMOTED", "CROSS-CHECK", "official"):
+        assert phrase not in text, phrase
+    rows = list(csv.DictReader((out / "app.trace.csv").open(newline="")))
+    kinds = {r["source"].split(":")[0] for r in rows}
+    assert kinds == {"dev", "ext", "const", "meta"}
+    assert {r["tag"] for r in rows if r["source"][:3] in ("dev", "ext")} == {"DEVELOPMENT"}
+    assert not [r for r in rows if re.fullmatch(r"verdicts/[^/]+/verdict", r["path"])]
+    assert [x for x in lines if x.startswith("## ")] == [
+        "## A. Development context [DEVELOPMENT]",
+        "## B. Trace",
+    ]
+    assert not (out / "app.figures").exists()
+    record = json.loads((out / "app.sources.json").read_text())
+    assert record["kind"] == "appendix"
+    assert set(record["files"]) == {
+        "dev:DEV-1", "dev:DEV-3", "dev:DEV-4", "ext:hyper_zeta", "ext:lorenz63_r166"
+    }
+    # the A.1 and A.2 text equals the hosted appendix text built from the same runs
+    assert "chua (seed DEV-3: V7)" in text
+
+
+def test_standalone_check_passes_and_fails_on_planted_defects(
+    standalone, tmp_path
+) -> None:
+    """``check`` is detected from sources.json and fails each planted defect (S-2)."""
+    _, out = standalone
+    assert fb.run_check(out, "app", {}) == 0
+    assert fb.main(["check", str(out), "--stem", "app"]) == 0
+
+    def edited(name: str, edit) -> int:
+        copy_dir = tmp_path / name
+        shutil.copytree(out, copy_dir)
+        path = copy_dir / "app.md"
+        text = path.read_text()
+        new = edit(text)
+        assert new != text, name
+        path.write_text(new)
+        return fb.run_check(copy_dir, "app", {})
+
+    assert edited("word", lambda t: t.replace("| pass |", "| fail |", 1)) == 1
+    assert edited("label", lambda t: t.replace(APP_LABEL, "A label.", 1)) == 1
+    assert edited("seed", lambda t: t.replace("Seeds: DEV-3;", "Seeds: DEV-9;", 1)) == 1
+    assert edited("mark", lambda t: t.replace(" PROVISIONAL", "", 1)) == 1
+    assert edited("banned", lambda t: t.replace(
+        "Every value in it", "This shows that the method works. Every value in it", 1)) == 1
+    assert edited("host", lambda t: t.replace(
+        "## B. Trace", "## 4. Overall verdicts [PRE-REGISTERED]\n\n## B. Trace", 1)) == 1
+    assert edited("number", lambda t: t.replace("Every value", "Every 7 value", 1)) == 1
+    # an edited development file: the hash is re-checked
+    record = json.loads((out / "app.sources.json").read_text())
+    changed = tmp_path / "results.json"
+    changed.write_bytes(Path(record["files"]["ext:hyper_zeta"]).read_bytes() + b" ")
+    with pytest.raises(fb.ToolError, match="changed since the build"):
+        fb.run_check(out, "app", {"ext:hyper_zeta": str(changed)})
+    # planted rows on the independent text check
+    rows = list(csv.DictReader((out / "app.trace.csv").open(newline="")))
+    lines = (out / "app.md").read_text().split("\n")
+    sources, _ = fb.load_appendix_sources(out, "app", {})
+    row = dict(rows[0], source="official", tag="DEVELOPMENT")
+    assert any("official" in p for p in fb.check_appendix_document(lines, sources, [row]))
+    overall = dict(
+        next(r for r in rows if r["source"].startswith("ext:")),
+        path="verdicts/H2a/verdict",
+    )
+    assert any(
+        "overall" in p for p in fb.check_appendix_document(lines, sources, [overall])
+    )
+
+
+def test_standalone_refusals_and_determinism(tmp_path) -> None:
+    """The standalone command shares the refusals and is deterministic (S-3, S-4)."""
+    dev, ext = app_runs()
+    first = standalone_args(tmp_path / "a", dev, ext)
+    second = standalone_args(
+        tmp_path / "b",
+        dict(reversed(list(dev.items()))),
+        dict(reversed(list(ext.items()))),
+    )
+    for args in (first, second):
+        assert fb.appendix(args) == 0
+    for name in ("app.md", "app.trace.csv"):
+        assert (Path(first.out) / name).read_bytes() == (Path(second.out) / name).read_bytes()
+    one = json.loads((Path(first.out) / "app.sources.json").read_text())
+    two = json.loads((Path(second.out) / "app.sources.json").read_text())
+    assert one["meta"] == two["meta"]
+    # one run alone is enough; none is refused
+    only = standalone_args(tmp_path / "c", {}, {"x": make_ext("solo_sys")})
+    assert fb.appendix(only) == 0
+    with pytest.raises(fb.ToolError, match="no --development or --extension"):
+        fb.appendix(standalone_args(tmp_path / "d", {}, {}))
+    assert not (tmp_path / "d" / "out").exists()
+    conf = make_results("confirmatory")
+    for name, kwargs, match in (
+        ("e", dict(dev={**dev, "c": conf}, ext=ext), "must be a development run"),
+        ("f", dict(dev=dev, ext={**ext, "chua": make_ext("chua", 2)}), "system of v3"),
+    ):
+        args = standalone_args(tmp_path / name, **kwargs)
+        with pytest.raises(fb.ToolError, match=match):
+            fb.appendix(args)
+        assert not Path(args.out).exists()
+    incomplete = make_dev("DEV-5", 5)
+    incomplete["provenance"]["complete"] = False
+    args = standalone_args(tmp_path / "g", {**dev, "DEV-5": incomplete}, ext)
+    with pytest.raises(fb.ToolError, match="is not complete"):
+        fb.appendix(args)
+    # the command line
+    argv = ["appendix", "--out", str(tmp_path / "cli"), "--stem", "app"]
+    for path in first.development:
+        argv += ["--development", path]
+    for path in first.extension:
+        argv += ["--extension", path]
+    assert fb.main(argv) == 0
+    assert (tmp_path / "cli" / "app.md").read_bytes() == (Path(first.out) / "app.md").read_bytes()

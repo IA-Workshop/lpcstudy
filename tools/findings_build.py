@@ -135,6 +135,16 @@ does not list the three v3 systems, or if an extension run is empty, holds a
 v3 system or shares a system with another extension run. Without these
 arguments the output is byte-identical to the build before WU-0025.1.
 
+Standalone appendix (WU-0025.7). ``appendix --development ... --extension ...
+--out DIR --stem NAME`` writes the development appendix as its own document
+with its own trace and ``sources.json`` (``"kind": "appendix"``): the banner
+and title "Development appendix: not a hypothesis test", one [DEVELOPMENT]
+section and the trace section. It has no host document, no official or
+cross-check file, no decision rule and no figure. ``check`` detects the kind
+from ``sources.json``, re-renders from the hashed files, requires byte
+equality, and applies the appendix rules, the banned wording to every line
+and a refusal of any source but ``dev:``, ``ext:``, constants and meta.
+
 The cross-check section also lists the stored verdict words that differ
 between the two results files (``differing_words``, a string comparison of
 stored leaves; nothing is recomputed). It needs the official word beside the
@@ -1405,8 +1415,8 @@ class Builder:
         ]
         for src in self.app_sources(kind):
             names = ", ".join(
-                self.ref(src, f"config/core_systems/{k}")
-                for k in range(len(self.app_systems(src)))
+                self.app_system(src, k, s)
+                for k, s in enumerate(self.app_systems(src))
             )
             sha = self.meta_ref(f"sha_{src}", self.meta[f"sha_{src}"])
             cells = [
@@ -1591,9 +1601,10 @@ class Builder:
             f"{APPENDIX_LABEL} This appendix holds {APPENDIX_WORDS}. Every "
             "value in it is a stored leaf of a development "
             "run, copied as stored and listed in the trace. No mean, spread, "
-            "range, count of passes, pooled or overall verdict is made, and "
-            "nothing is compared with the official result (owner ruling D4). "
-            "Development numbers appear only here."
+            "range, count of passes, pooled or overall verdict is made. The "
+            "values of these runs appear only in this appendix, and none is "
+            "compared with the result of any other section of this document "
+            "(owner ruling D4)."
         ]
         dev, ext = self.app_sources("dev"), self.app_sources("ext")
         out += ["", "### A.1 Ensemble by seed (the three systems of v3)", ""]
@@ -2166,7 +2177,7 @@ def check_appendix_sources(
     """
     names = [n for n in sources if is_appendix_source(n)]
     seen: dict[Path, str] = {}
-    for name in ["official", "crosscheck", *sorted(names)]:
+    for name in [*(n for n in ("official", "crosscheck") if n in paths), *sorted(names)]:
         real = paths[name].resolve()
         if real in seen:
             raise ToolError(
@@ -2562,6 +2573,48 @@ TRACE_COLUMNS = [
 ]
 
 
+def appendix_paths(development: list, extension: list) -> dict[str, Path]:
+    """Name the appendix files: ``dev:<seed id>`` and ``ext:<systems>``.
+
+    The name is read from the file (its ``provenance.seed_id`` or its
+    ``config.core_systems``). Raises ``ToolError`` for a missing file, a
+    nameless file, the same file twice, and two files with one name.
+    """
+    paths: dict[str, Path] = {}
+    for flag, given in (("development", development), ("extension", extension)):
+        for text in given:
+            path = Path(text)
+            path = path / "results.json" if path.is_dir() else path
+            if not path.is_file():
+                raise ToolError(f"--{flag} file not found: {path}")
+            data = read_json(path)
+            if flag == "development":
+                seed = (data.get("provenance") or {}).get("seed_id")
+                key = f"dev:{seed}"
+                what = f"seed id {seed}"
+            else:
+                listed = (data.get("config") or {}).get("core_systems")
+                if not isinstance(listed, list) or not listed:
+                    raise ToolError(
+                        f"--extension file {path} has no core_systems: refused"
+                    )
+                key = "ext:" + "+".join(str(x) for x in listed)
+                what = f"systems {', '.join(map(str, listed))}"
+            if not is_appendix_source(key) or key.endswith(":None"):
+                raise ToolError(f"--{flag} file {path} has no usable name: refused")
+            if key in paths and paths[key].resolve() == path.resolve():
+                raise ToolError(
+                    f"duplicate file: --{flag} names {path} twice: refused"
+                )
+            if key in paths:
+                raise ToolError(
+                    f"two --{flag} runs have the same {what} ({paths[key]} "
+                    f"and {path}): refused"
+                )
+            paths[key] = path
+    return paths
+
+
 def paths_of(args: argparse.Namespace) -> dict[str, Path]:
     """Return the source files named on the command line."""
     official = Path(args.official)
@@ -2585,37 +2638,7 @@ def paths_of(args: argparse.Namespace) -> dict[str, Path]:
         dev = Path(development[0])
         paths["dev"] = dev / "results.json" if dev.is_dir() else dev
     else:
-        for flag, given in (("development", development), ("extension", extension)):
-            for text in given:
-                path = Path(text)
-                path = path / "results.json" if path.is_dir() else path
-                if not path.is_file():
-                    raise ToolError(f"--{flag} file not found: {path}")
-                data = read_json(path)
-                if flag == "development":
-                    seed = (data.get("provenance") or {}).get("seed_id")
-                    key = f"dev:{seed}"
-                    what = f"seed id {seed}"
-                else:
-                    listed = (data.get("config") or {}).get("core_systems")
-                    if not isinstance(listed, list) or not listed:
-                        raise ToolError(
-                            f"--extension file {path} has no core_systems: refused"
-                        )
-                    key = "ext:" + "+".join(str(x) for x in listed)
-                    what = f"systems {', '.join(map(str, listed))}"
-                if not is_appendix_source(key) or key.endswith(":None"):
-                    raise ToolError(f"--{flag} file {path} has no usable name: refused")
-                if key in paths and paths[key].resolve() == path.resolve():
-                    raise ToolError(
-                        f"duplicate file: --{flag} names {path} twice: refused"
-                    )
-                if key in paths:
-                    raise ToolError(
-                        f"two --{flag} runs have the same {what} ({paths[key]} "
-                        f"and {path}): refused"
-                    )
-                paths[key] = path
+        paths.update(appendix_paths(development, extension))
     for name, path in paths.items():
         if not path.is_file():
             raise ToolError(f"{name} file not found: {path}")
@@ -2658,6 +2681,202 @@ def render(args: argparse.Namespace) -> int:
         f"{len(set(builder.nulls))} null leaves"
     )
     return run_check(out, args.stem, {})
+
+
+# --- standalone development appendix (WU-0025.7) -----------------------------
+STANDALONE_BANNER = "**DEVELOPMENT APPENDIX: not a hypothesis test**"
+STANDALONE_TITLE = "# Development appendix: not a hypothesis test"
+STANDALONE_FORBIDDEN = ("Preliminary findings", "PRE-REGISTERED", "until promotion")
+STANDALONE_TEMPLATE = (
+    STANDALONE_BANNER
+    + """
+
+"""
+    + STANDALONE_TITLE
+    + """
+
+This document is built by `tools/findings_build.py appendix` from the development run files listed in its sources file. It holds the development appendix only: no host document, no result of the sealed run and no decision rule. `check` re-renders it from those files and accepts no other text.
+
+## A. Development context [DEVELOPMENT]
+
+{{dev_appendix}}
+
+## B. Trace
+
+Every number quoted above is listed with its source and leaf path in `{{meta:trace_name}}`. Run the `check` command of `tools/findings_build.py` on this directory to verify the document against the development files.
+
+{{table:missing}}
+"""
+)
+
+
+class AppendixBuilder(Builder):
+    """The builder of the standalone appendix: development sources only."""
+
+    def __init__(self, sources: dict, constants: dict, stem: str):
+        self.title = None
+        self.figures_dir = None
+        self.sources = sources
+        self.meta = sources["meta"]
+        self.constants = constants
+        self.directory = Path(".")
+        self.stem = stem
+        self.rows: list[Row] = []
+        self.missing: list[str] = []
+        self.nulls: list[str] = []
+        self.counter = 0
+        self.systems = list(constants["systems"])
+        self.provisional = {}
+
+
+def read_appendix_sources(paths: dict[str, Path], constants: dict) -> dict:
+    """Load the development files of a standalone appendix and apply the guards."""
+    if not paths:
+        raise ToolError(
+            "no --development or --extension run given: refused"
+        )
+    sources = {name: read_json(path) for name, path in paths.items()}
+    sources["const"] = constants
+    check_appendix_sources(sources, paths, constants)
+    return sources
+
+
+def make_appendix_meta(sources: dict, shas: dict, stem: str) -> dict:
+    """Return the ``meta`` values of a standalone appendix (hashes, trace name)."""
+    names = sorted(n for n in sources if is_appendix_source(n))
+    seen: dict[str, str] = {}
+    for name in names:
+        if shas[name] in seen:
+            raise ToolError(
+                f"duplicate file: {name} and {seen[shas[name]]} have the "
+                "same SHA-256: refused"
+            )
+        seen[shas[name]] = name
+    return {
+        **{f"sha_{n}": shas[n] for n in names},
+        "trace_name": f"{stem}.trace.csv",
+    }
+
+
+def build_appendix(sources: dict, constants: dict, stem: str) -> tuple[str, Builder]:
+    """Fill the standalone template."""
+    builder = AppendixBuilder(sources, constants, stem)
+    return builder.finalize(builder.expand(STANDALONE_TEMPLATE)), builder
+
+
+def appendix(args: argparse.Namespace) -> int:
+    """Write the standalone appendix, its trace and sources file; then check."""
+    constants = read_json(CONSTANTS_PATH)
+    development = getattr(args, "development", None) or []
+    extension = getattr(args, "extension", None) or []
+    paths = appendix_paths(development, extension)
+    sources = read_appendix_sources(paths, constants)
+    shas = {n: sha256_of(p) for n, p in paths.items()}
+    sources["meta"] = make_appendix_meta(sources, shas, args.stem)
+    text, builder = build_appendix(sources, constants, args.stem)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / f"{args.stem}.md").write_text(text)
+    write_trace(builder.rows, out / f"{args.stem}.trace.csv")
+    record = {
+        "kind": "appendix",
+        "files": {n: str(p.resolve()) for n, p in paths.items()},
+        "sha256": shas,
+        "meta": builder.meta,
+    }
+    (out / f"{args.stem}.sources.json").write_text(
+        json.dumps(record, indent=2, sort_keys=True) + "\n"
+    )
+    print(
+        f"rendered {args.stem} (standalone appendix): {len(builder.rows)} "
+        f"traced values, {len(set(builder.missing))} leaves not recorded, "
+        f"{len(set(builder.nulls))} null leaves"
+    )
+    return run_check(out, args.stem, {})
+
+
+def load_appendix_sources(
+    directory: Path, stem: str, override: dict
+) -> tuple[dict, dict]:
+    """Read ``sources.json`` of a standalone appendix, hash-check, read again."""
+    record = read_json(directory / f"{stem}.sources.json")
+    constants = read_json(CONSTANTS_PATH)
+    paths = {
+        name: Path(override.get(name) or path)
+        for name, path in record["files"].items()
+    }
+    for name, path in paths.items():
+        if not path.is_file() or sha256_of(path) != record["sha256"][name]:
+            raise ToolError(f"{name} changed since the build: {path}")
+    sources = read_appendix_sources(paths, constants)
+    sources["meta"] = make_appendix_meta(sources, record["sha256"], stem)
+    return sources, record
+
+
+def check_appendix_document(
+    lines: list[str], sources: dict, rows: list[dict]
+) -> list[str]:
+    """Independent checks of a standalone appendix on its text and rows.
+
+    No host content, only development, constant and meta sources, the banner
+    and title, the banned wording over every line, and ``check_appendix``.
+    """
+    problems = []
+    if not lines or lines[0] != STANDALONE_BANNER:
+        problems.append("line 1 is not the development appendix banner")
+    if len(lines) < 3 or lines[2] != STANDALONE_TITLE:
+        problems.append("line 3 is not the development appendix title")
+    text = "\n".join(lines)
+    for phrase in STANDALONE_FORBIDDEN:
+        if phrase in text:
+            problems.append(f"host-document wording {phrase!r} is in the appendix")
+    for k, line in enumerate(lines):
+        for phrase in sources["const"]["banned_phrases"]:
+            if phrase.lower() in line.lower():
+                problems.append(f"line {k + 1}: banned phrase {phrase!r}")
+    for r in rows:
+        if not (is_appendix_source(r["source"]) or r["source"] in ("const", "meta")):
+            problems.append(
+                f"row {r.get('id')}: source {r['source']!r} is not allowed in "
+                "a standalone appendix"
+            )
+    return problems + check_appendix(lines, sources, rows)
+
+
+def run_appendix_check(directory: Path, stem: str, override: dict) -> int:
+    """Check a standalone appendix; print problems; return 0 or 1."""
+    sources, _ = load_appendix_sources(directory, stem, override)
+    record = read_json(directory / f"{stem}.sources.json")
+    actual = (directory / f"{stem}.md").read_text()
+    with (directory / f"{stem}.trace.csv").open(newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    problems = []
+    fresh, builder = build_appendix(sources, sources["const"], stem)
+    if fresh != actual:
+        first = next(
+            (k for k, (x, y) in enumerate(zip(fresh.split("\n"), actual.split("\n"))) if x != y),
+            min(fresh.count("\n"), actual.count("\n")),
+        )
+        problems.append(f"the document differs from a fresh render at its line {first + 1}")
+    if builder.meta != record["meta"]:
+        problems.append("meta values differ from a fresh render")
+    expected = [
+        [str(k), r.tag, r.source, r.path, r.spec, r.raw, r.rendered, str(r.line), str(r.col)]
+        for k, r in enumerate(builder.rows)
+    ]
+    if expected != [[r.get(c, "") for c in TRACE_COLUMNS] for r in rows]:
+        problems.append("the trace file differs from a fresh render")
+    lines = actual.split("\n")
+    problems += check_rows(rows, lines, sources)
+    problems += untraced_numbers(lines, rows)
+    problems += check_appendix_document(lines, sources, rows)
+    for p in problems[:50]:
+        print(f"CHECK FAIL: {p}")
+    print(
+        f"check {'FAILED' if problems else 'passed'}: {len(rows)} traced "
+        f"values, {len(problems)} problems"
+    )
+    return 1 if problems else 0
 
 
 # --- check ------------------------------------------------------------
@@ -3036,36 +3255,78 @@ def check_text(lines: list[str], sources: dict, rows: list[dict]) -> list[str]:
 def check_appendix(lines: list[str], sources: dict, rows: list[dict]) -> list[str]:
     """Check appendix A (appendix mode) on the text, apart from the re-render.
 
-    Four rules, each read from the text and the stored flags, not from the
-    builder: every table is headed by the development label, the seed ids
-    and the words ``development seeds, exploratory, not confirmatory`` (and
-    the extension words under A.2); no row quotes an overall verdict
-    (``verdicts/<id>/verdict``); a line that quotes a system whose stored
-    ``gate_pass`` is not true carries PROVISIONAL; and a row of a ``dev:`` or
-    ``ext:`` source lies in a [DEVELOPMENT] section. Does nothing when the
-    build has no such source.
+    Rules, each read from the text, the trace rows and the stored flags, not
+    from the builder:
+
+    * every table is headed by the development label and the words
+      ``development seeds, exploratory, not confirmatory``; its part is read
+      from the ``dev:`` or ``ext:`` trace rows inside the table (exactly one
+      kind), and the seed ids after ``Seeds: `` must be the sorted seed ids
+      of that kind's sources; an extension table also needs the extension
+      words and ``per-system only, no overall verdict``;
+    * no row quotes an overall verdict (``verdicts/<id>/verdict``);
+    * a line that quotes a system whose stored ``gate_pass`` is not true
+      carries PROVISIONAL, and a system name of ``config/core_systems`` has
+      the mark right after it exactly when its gate did not pass;
+    * a row of a ``dev:`` or ``ext:`` source lies in a [DEVELOPMENT] section.
+
+    Does nothing when the build has no such source.
     """
     names = [n for n in sources if is_appendix_source(n)]
     if not names:
         return []
     problems = []
     tags = section_tags("\n".join(lines))
-    ext = False
+    by_line: dict[int, list[dict]] = {}
+    for r in rows:
+        try:
+            by_line.setdefault(int(r["line"]), []).append(r)
+        except (KeyError, ValueError, TypeError):
+            continue  # a malformed row is reported by ``check_rows``
     for k, line in enumerate(lines):
         if tags[k] != "DEVELOPMENT":
             continue
-        if line.startswith("### "):
-            ext = line.startswith("### A.2")
         if not (line.startswith("|") and not lines[k - 1].startswith("|")):
             continue
+        end = k
+        while end + 1 < len(lines) and lines[end + 1].startswith("|"):
+            end += 1
+        kinds = {
+            r["source"].split(":")[0]
+            for n in range(k + 1, end + 2)
+            for r in by_line.get(n, [])
+            if is_appendix_source(r["source"])
+        }
         lead = next((x for x in reversed(lines[:k]) if x.strip()), "")
-        wanted = [APPENDIX_LABEL, "Seeds: ", APPENDIX_WORDS]
-        if ext:
+        if len(kinds) != 1:
+            problems.append(
+                f"line {k + 1}: an appendix table must quote exactly one kind "
+                f"of appendix source, found {sorted(kinds)}"
+            )
+            continue
+        kind = kinds.pop()
+        wanted = [APPENDIX_LABEL, APPENDIX_WORDS]
+        if kind == "ext":
             wanted += [APPENDIX_EXT_WORDS, APPENDIX_PER_SYSTEM]
         if not lead.startswith(APPENDIX_LABEL) or any(w not in lead for w in wanted):
             problems.append(
                 f"line {k + 1}: an appendix table lacks its development "
                 f"label (needs {wanted})"
+            )
+        seeds = sorted(
+            {
+                str(walk(sources[n], "provenance/seed_id"))
+                for n in names
+                if n.startswith(f"{kind}:")
+                and (sources[n].get("provenance") or {}).get("seed_id") is not None
+            }
+        )
+        named = re.search(r"Seeds: ([^;]*);", lead)
+        if not named or named.group(1) != ", ".join(seeds):
+            problems.append(
+                f"line {k + 1}: the seed ids of the label are "
+                f"{named.group(1) if named else None!r}, the sources of this "
+                f"table have {', '.join(seeds)!r}"
             )
     for r in rows:
         source = r["source"]
@@ -3076,11 +3337,18 @@ def check_appendix(lines: list[str], sources: dict, rows: list[dict]) -> list[st
             problems.append(f"{where}: outside a [DEVELOPMENT] section")
         if APPENDIX_OVERALL.fullmatch(r["path"]):
             problems.append(f"{where}: an overall verdict is quoted")
-        found = APPENDIX_SYSTEM.match(r["path"])
-        if not found or source not in sources:
+        if source not in sources:
             continue
-        system = found.group(1) or found.group(2)
+        listed = re.fullmatch(r"config/core_systems/(\d+)", r["path"])
+        found = APPENDIX_SYSTEM.match(r["path"])
         try:
+            system = (
+                walk(sources[source], r["path"])
+                if listed
+                else (found.group(1) or found.group(2)) if found else None
+            )
+            if system is None:
+                continue
             state = walk(
                 sources[source], f"systems/{system}/validation/gate/gate_pass"
             )
@@ -3088,15 +3356,20 @@ def check_appendix(lines: list[str], sources: dict, rows: list[dict]) -> list[st
             state = None
         try:
             line = lines[int(r["line"]) - 1]
-        except (ValueError, IndexError):
+            after = line[int(r["col"]) + len(r["rendered"]) :]
+        except (ValueError, IndexError, KeyError):
             continue  # a malformed row is reported by ``check_rows``
-        if state is not True and "PROVISIONAL" not in line:
+        marked = after.startswith(" PROVISIONAL") if listed else "PROVISIONAL" in line
+        if state is not True and not marked:
             problems.append(
                 f"{where}: the gate of {system} did not pass but the line "
                 "lacks PROVISIONAL"
             )
+        if listed and state is True and marked:
+            problems.append(
+                f"{where}: {system} passed its gate but is marked PROVISIONAL"
+            )
     return problems
-
 
 def load_sources(
     directory: Path, stem: str, override: dict
@@ -3137,6 +3410,8 @@ def run_check(directory: Path, stem: str, override: dict) -> int:
     document, the trace and the three PNG files; then run the independent
     checks on the document text.
     """
+    if read_json(directory / f"{stem}.sources.json").get("kind") == "appendix":
+        return run_appendix_check(directory, stem, override)
     record, constants, sources = load_sources(directory, stem, override)
     actual = (directory / f"{stem}.md").read_text()
     with (directory / f"{stem}.trace.csv").open(newline="") as handle:
@@ -3629,6 +3904,14 @@ def main(argv: list[str] | None = None) -> int:
     ren.add_argument(
         "--manifest-crosscheck", help="manifest SHA-256, cross-check"
     )
+    app = sub.add_parser(
+        "appendix",
+        help="write the development appendix alone (no host document)",
+    )
+    app.add_argument("--development", action="append", help="development run dir; repeat")
+    app.add_argument("--extension", action="append", help="extension run dir; repeat")
+    app.add_argument("--out", required=True)
+    app.add_argument("--stem", default="development_appendix")
     chk = sub.add_parser("check", help="verify a rendered document")
     chk.add_argument("directory")
     chk.add_argument("--stem", default="preliminary_findings")
@@ -3653,6 +3936,8 @@ def main(argv: list[str] | None = None) -> int:
             return render(args)
         if args.command == "promote":
             return promote(args)
+        if args.command == "appendix":
+            return appendix(args)
         override = {
             n: getattr(args, n)
             for n in ("official", "official_md", "crosscheck", "td", "dev")

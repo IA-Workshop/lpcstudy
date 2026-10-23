@@ -2013,53 +2013,53 @@ id,tag,source,path,spec,raw,rendered,line,col
 2011,DEVELOPMENT,meta,systems_ext,,"'hindmarsh_rose, hyper_jha, lorenz63_r166, lorenz96_4, rossler_hyper, rossler_z'","hindmarsh_rose, hyper_jha, lorenz63_r166, lorenz96_4, rossler_hyper, rossler_z",666,245
 2012,DEVELOPMENT,meta,seeds_ext,,'DEV-3',DEV-3,668,51
 2013,DEVELOPMENT,ext:hindmarsh_rose,config/core_systems/0,,'hindmarsh_rose',hindmarsh_rose,672,10
-2014,DEVELOPMENT,meta,sha_ext:hindmarsh_rose,,'090f82e0ba16aed9f01666d2ab4043f394f32c6cebc2273c7d804059f7b1b8e4',090f82e0ba16aed9f01666d2ab4043f394f32c6cebc2273c7d804059f7b1b8e4,672,202
+2014,DEVELOPMENT,meta,sha_ext:hindmarsh_rose,,'090f82e0ba16aed9f01666d2ab4043f394f32c6cebc2273c7d804059f7b1b8e4',090f82e0ba16aed9f01666d2ab4043f394f32c6cebc2273c7d804059f7b1b8e4,672,214
 2015,DEVELOPMENT,ext:hindmarsh_rose,provenance/seed_id,,'DEV-3',DEV-3,672,2
-2016,DEVELOPMENT,ext:hindmarsh_rose,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,672,27
-2017,DEVELOPMENT,ext:hindmarsh_rose,provenance/preset,,'full',full,672,72
-2018,DEVELOPMENT,ext:hindmarsh_rose,provenance/commit,,'392a069d25a8efd2d9d74d46d3475ba17f010bbf',392a069d25a8efd2d9d74d46d3475ba17f010bbf,672,79
-2019,DEVELOPMENT,ext:hindmarsh_rose,provenance/device/backend,,'gpu',gpu,672,122
-2020,DEVELOPMENT,ext:hindmarsh_rose,provenance/complete,yn,True,yes,672,128
-2021,DEVELOPMENT,ext:hindmarsh_rose,provenance/dirty,yn,False,no,672,134
-2022,DEVELOPMENT,ext:hindmarsh_rose,provenance/wall_seconds,.0f,5166.773296765983,5167,672,139
-2023,DEVELOPMENT,ext:hindmarsh_rose,provenance/start_utc,,'2026-10-21T08:00:41+00:00',2026-10-21T08:00:41+00:00,672,146
-2024,DEVELOPMENT,ext:hindmarsh_rose,provenance/end_utc,,'2026-10-21T09:26:48+00:00',2026-10-21T09:26:48+00:00,672,174
+2016,DEVELOPMENT,ext:hindmarsh_rose,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,672,39
+2017,DEVELOPMENT,ext:hindmarsh_rose,provenance/preset,,'full',full,672,84
+2018,DEVELOPMENT,ext:hindmarsh_rose,provenance/commit,,'392a069d25a8efd2d9d74d46d3475ba17f010bbf',392a069d25a8efd2d9d74d46d3475ba17f010bbf,672,91
+2019,DEVELOPMENT,ext:hindmarsh_rose,provenance/device/backend,,'gpu',gpu,672,134
+2020,DEVELOPMENT,ext:hindmarsh_rose,provenance/complete,yn,True,yes,672,140
+2021,DEVELOPMENT,ext:hindmarsh_rose,provenance/dirty,yn,False,no,672,146
+2022,DEVELOPMENT,ext:hindmarsh_rose,provenance/wall_seconds,.0f,5166.773296765983,5167,672,151
+2023,DEVELOPMENT,ext:hindmarsh_rose,provenance/start_utc,,'2026-10-21T08:00:41+00:00',2026-10-21T08:00:41+00:00,672,158
+2024,DEVELOPMENT,ext:hindmarsh_rose,provenance/end_utc,,'2026-10-21T09:26:48+00:00',2026-10-21T09:26:48+00:00,672,186
 2025,DEVELOPMENT,ext:hyper_jha,config/core_systems/0,,'hyper_jha',hyper_jha,673,10
-2026,DEVELOPMENT,meta,sha_ext:hyper_jha,,'5edfd1deb91eac73e56701cbc8ee9abaa852b1c714e1571cd1e96be87c603b7a',5edfd1deb91eac73e56701cbc8ee9abaa852b1c714e1571cd1e96be87c603b7a,673,197
+2026,DEVELOPMENT,meta,sha_ext:hyper_jha,,'5edfd1deb91eac73e56701cbc8ee9abaa852b1c714e1571cd1e96be87c603b7a',5edfd1deb91eac73e56701cbc8ee9abaa852b1c714e1571cd1e96be87c603b7a,673,209
 2027,DEVELOPMENT,ext:hyper_jha,provenance/seed_id,,'DEV-3',DEV-3,673,2
-2028,DEVELOPMENT,ext:hyper_jha,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,673,22
-2029,DEVELOPMENT,ext:hyper_jha,provenance/preset,,'full',full,673,67
-2030,DEVELOPMENT,ext:hyper_jha,provenance/commit,,'392a069d25a8efd2d9d74d46d3475ba17f010bbf',392a069d25a8efd2d9d74d46d3475ba17f010bbf,673,74
-2031,DEVELOPMENT,ext:hyper_jha,provenance/device/backend,,'gpu',gpu,673,117
-2032,DEVELOPMENT,ext:hyper_jha,provenance/complete,yn,True,yes,673,123
-2033,DEVELOPMENT,ext:hyper_jha,provenance/dirty,yn,False,no,673,129
-2034,DEVELOPMENT,ext:hyper_jha,provenance/wall_seconds,.0f,4039.9301625769585,4040,673,134
-2035,DEVELOPMENT,ext:hyper_jha,provenance/start_utc,,'2026-10-21T08:00:41+00:00',2026-10-21T08:00:41+00:00,673,141
-2036,DEVELOPMENT,ext:hyper_jha,provenance/end_utc,,'2026-10-21T09:08:01+00:00',2026-10-21T09:08:01+00:00,673,169
+2028,DEVELOPMENT,ext:hyper_jha,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,673,34
+2029,DEVELOPMENT,ext:hyper_jha,provenance/preset,,'full',full,673,79
+2030,DEVELOPMENT,ext:hyper_jha,provenance/commit,,'392a069d25a8efd2d9d74d46d3475ba17f010bbf',392a069d25a8efd2d9d74d46d3475ba17f010bbf,673,86
+2031,DEVELOPMENT,ext:hyper_jha,provenance/device/backend,,'gpu',gpu,673,129
+2032,DEVELOPMENT,ext:hyper_jha,provenance/complete,yn,True,yes,673,135
+2033,DEVELOPMENT,ext:hyper_jha,provenance/dirty,yn,False,no,673,141
+2034,DEVELOPMENT,ext:hyper_jha,provenance/wall_seconds,.0f,4039.9301625769585,4040,673,146
+2035,DEVELOPMENT,ext:hyper_jha,provenance/start_utc,,'2026-10-21T08:00:41+00:00',2026-10-21T08:00:41+00:00,673,153
+2036,DEVELOPMENT,ext:hyper_jha,provenance/end_utc,,'2026-10-21T09:08:01+00:00',2026-10-21T09:08:01+00:00,673,181
 2037,DEVELOPMENT,ext:lorenz63_r166,config/core_systems/0,,'lorenz63_r166',lorenz63_r166,674,10
-2038,DEVELOPMENT,meta,sha_ext:lorenz63_r166,,'183a151966ae5c851bd1bde05ab1e8ff7b82c7da13a0974a2896ef8e60671e4c',183a151966ae5c851bd1bde05ab1e8ff7b82c7da13a0974a2896ef8e60671e4c,674,201
+2038,DEVELOPMENT,meta,sha_ext:lorenz63_r166,,'183a151966ae5c851bd1bde05ab1e8ff7b82c7da13a0974a2896ef8e60671e4c',183a151966ae5c851bd1bde05ab1e8ff7b82c7da13a0974a2896ef8e60671e4c,674,213
 2039,DEVELOPMENT,ext:lorenz63_r166,provenance/seed_id,,'DEV-3',DEV-3,674,2
-2040,DEVELOPMENT,ext:lorenz63_r166,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,674,26
-2041,DEVELOPMENT,ext:lorenz63_r166,provenance/preset,,'full',full,674,71
-2042,DEVELOPMENT,ext:lorenz63_r166,provenance/commit,,'974519a81a4a53e62069b85ab04c8ce783e17106',974519a81a4a53e62069b85ab04c8ce783e17106,674,78
-2043,DEVELOPMENT,ext:lorenz63_r166,provenance/device/backend,,'gpu',gpu,674,121
-2044,DEVELOPMENT,ext:lorenz63_r166,provenance/complete,yn,True,yes,674,127
-2045,DEVELOPMENT,ext:lorenz63_r166,provenance/dirty,yn,False,no,674,133
-2046,DEVELOPMENT,ext:lorenz63_r166,provenance/wall_seconds,.0f,2721.1165150810266,2721,674,138
-2047,DEVELOPMENT,ext:lorenz63_r166,provenance/start_utc,,'2026-10-20T11:55:08+00:00',2026-10-20T11:55:08+00:00,674,145
-2048,DEVELOPMENT,ext:lorenz63_r166,provenance/end_utc,,'2026-10-20T12:40:29+00:00',2026-10-20T12:40:29+00:00,674,173
+2040,DEVELOPMENT,ext:lorenz63_r166,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,674,38
+2041,DEVELOPMENT,ext:lorenz63_r166,provenance/preset,,'full',full,674,83
+2042,DEVELOPMENT,ext:lorenz63_r166,provenance/commit,,'974519a81a4a53e62069b85ab04c8ce783e17106',974519a81a4a53e62069b85ab04c8ce783e17106,674,90
+2043,DEVELOPMENT,ext:lorenz63_r166,provenance/device/backend,,'gpu',gpu,674,133
+2044,DEVELOPMENT,ext:lorenz63_r166,provenance/complete,yn,True,yes,674,139
+2045,DEVELOPMENT,ext:lorenz63_r166,provenance/dirty,yn,False,no,674,145
+2046,DEVELOPMENT,ext:lorenz63_r166,provenance/wall_seconds,.0f,2721.1165150810266,2721,674,150
+2047,DEVELOPMENT,ext:lorenz63_r166,provenance/start_utc,,'2026-10-20T11:55:08+00:00',2026-10-20T11:55:08+00:00,674,157
+2048,DEVELOPMENT,ext:lorenz63_r166,provenance/end_utc,,'2026-10-20T12:40:29+00:00',2026-10-20T12:40:29+00:00,674,185
 2049,DEVELOPMENT,ext:lorenz96_4,config/core_systems/0,,'lorenz96_4',lorenz96_4,675,10
-2050,DEVELOPMENT,meta,sha_ext:lorenz96_4,,'8aaac680997ae24407526cba6f5cc55f7b5744d47330596e4ec03323c4da2e6b',8aaac680997ae24407526cba6f5cc55f7b5744d47330596e4ec03323c4da2e6b,675,198
+2050,DEVELOPMENT,meta,sha_ext:lorenz96_4,,'8aaac680997ae24407526cba6f5cc55f7b5744d47330596e4ec03323c4da2e6b',8aaac680997ae24407526cba6f5cc55f7b5744d47330596e4ec03323c4da2e6b,675,210
 2051,DEVELOPMENT,ext:lorenz96_4,provenance/seed_id,,'DEV-3',DEV-3,675,2
-2052,DEVELOPMENT,ext:lorenz96_4,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,675,23
-2053,DEVELOPMENT,ext:lorenz96_4,provenance/preset,,'full',full,675,68
-2054,DEVELOPMENT,ext:lorenz96_4,provenance/commit,,'392a069d25a8efd2d9d74d46d3475ba17f010bbf',392a069d25a8efd2d9d74d46d3475ba17f010bbf,675,75
-2055,DEVELOPMENT,ext:lorenz96_4,provenance/device/backend,,'gpu',gpu,675,118
-2056,DEVELOPMENT,ext:lorenz96_4,provenance/complete,yn,True,yes,675,124
-2057,DEVELOPMENT,ext:lorenz96_4,provenance/dirty,yn,False,no,675,130
-2058,DEVELOPMENT,ext:lorenz96_4,provenance/wall_seconds,.0f,1301.6521443240345,1302,675,135
-2059,DEVELOPMENT,ext:lorenz96_4,provenance/start_utc,,'2026-10-21T09:08:43+00:00',2026-10-21T09:08:43+00:00,675,142
-2060,DEVELOPMENT,ext:lorenz96_4,provenance/end_utc,,'2026-10-21T09:30:25+00:00',2026-10-21T09:30:25+00:00,675,170
+2052,DEVELOPMENT,ext:lorenz96_4,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,675,35
+2053,DEVELOPMENT,ext:lorenz96_4,provenance/preset,,'full',full,675,80
+2054,DEVELOPMENT,ext:lorenz96_4,provenance/commit,,'392a069d25a8efd2d9d74d46d3475ba17f010bbf',392a069d25a8efd2d9d74d46d3475ba17f010bbf,675,87
+2055,DEVELOPMENT,ext:lorenz96_4,provenance/device/backend,,'gpu',gpu,675,130
+2056,DEVELOPMENT,ext:lorenz96_4,provenance/complete,yn,True,yes,675,136
+2057,DEVELOPMENT,ext:lorenz96_4,provenance/dirty,yn,False,no,675,142
+2058,DEVELOPMENT,ext:lorenz96_4,provenance/wall_seconds,.0f,1301.6521443240345,1302,675,147
+2059,DEVELOPMENT,ext:lorenz96_4,provenance/start_utc,,'2026-10-21T09:08:43+00:00',2026-10-21T09:08:43+00:00,675,154
+2060,DEVELOPMENT,ext:lorenz96_4,provenance/end_utc,,'2026-10-21T09:30:25+00:00',2026-10-21T09:30:25+00:00,675,182
 2061,DEVELOPMENT,ext:rossler_hyper,config/core_systems/0,,'rossler_hyper',rossler_hyper,676,10
 2062,DEVELOPMENT,meta,sha_ext:rossler_hyper,,'ac588151e6aad4efabf1be0e9977c4d3366d895d605722cf6a1c660c054ceffc',ac588151e6aad4efabf1be0e9977c4d3366d895d605722cf6a1c660c054ceffc,676,201
 2063,DEVELOPMENT,ext:rossler_hyper,provenance/seed_id,,'DEV-3',DEV-3,676,2
@@ -2073,17 +2073,17 @@ id,tag,source,path,spec,raw,rendered,line,col
 2071,DEVELOPMENT,ext:rossler_hyper,provenance/start_utc,,'2026-10-20T12:41:10+00:00',2026-10-20T12:41:10+00:00,676,145
 2072,DEVELOPMENT,ext:rossler_hyper,provenance/end_utc,,'2026-10-20T13:28:23+00:00',2026-10-20T13:28:23+00:00,676,173
 2073,DEVELOPMENT,ext:rossler_z,config/core_systems/0,,'rossler_z',rossler_z,677,10
-2074,DEVELOPMENT,meta,sha_ext:rossler_z,,'f95ae88a22bccfe04dba48aa1f23632243a5b3c8cd740b261f098a17c5fdbf93',f95ae88a22bccfe04dba48aa1f23632243a5b3c8cd740b261f098a17c5fdbf93,677,196
+2074,DEVELOPMENT,meta,sha_ext:rossler_z,,'f95ae88a22bccfe04dba48aa1f23632243a5b3c8cd740b261f098a17c5fdbf93',f95ae88a22bccfe04dba48aa1f23632243a5b3c8cd740b261f098a17c5fdbf93,677,208
 2075,DEVELOPMENT,ext:rossler_z,provenance/seed_id,,'DEV-3',DEV-3,677,2
-2076,DEVELOPMENT,ext:rossler_z,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,677,22
-2077,DEVELOPMENT,ext:rossler_z,provenance/preset,,'full',full,677,67
-2078,DEVELOPMENT,ext:rossler_z,provenance/commit,,'974519a81a4a53e62069b85ab04c8ce783e17106',974519a81a4a53e62069b85ab04c8ce783e17106,677,74
-2079,DEVELOPMENT,ext:rossler_z,provenance/device/backend,,'gpu',gpu,677,117
-2080,DEVELOPMENT,ext:rossler_z,provenance/complete,yn,True,yes,677,123
-2081,DEVELOPMENT,ext:rossler_z,provenance/dirty,yn,False,no,677,129
-2082,DEVELOPMENT,ext:rossler_z,provenance/wall_seconds,.0f,903.7883676120546,904,677,134
-2083,DEVELOPMENT,ext:rossler_z,provenance/start_utc,,'2026-10-20T11:39:06+00:00',2026-10-20T11:39:06+00:00,677,140
-2084,DEVELOPMENT,ext:rossler_z,provenance/end_utc,,'2026-10-20T11:54:10+00:00',2026-10-20T11:54:10+00:00,677,168
+2076,DEVELOPMENT,ext:rossler_z,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,677,34
+2077,DEVELOPMENT,ext:rossler_z,provenance/preset,,'full',full,677,79
+2078,DEVELOPMENT,ext:rossler_z,provenance/commit,,'974519a81a4a53e62069b85ab04c8ce783e17106',974519a81a4a53e62069b85ab04c8ce783e17106,677,86
+2079,DEVELOPMENT,ext:rossler_z,provenance/device/backend,,'gpu',gpu,677,129
+2080,DEVELOPMENT,ext:rossler_z,provenance/complete,yn,True,yes,677,135
+2081,DEVELOPMENT,ext:rossler_z,provenance/dirty,yn,False,no,677,141
+2082,DEVELOPMENT,ext:rossler_z,provenance/wall_seconds,.0f,903.7883676120546,904,677,146
+2083,DEVELOPMENT,ext:rossler_z,provenance/start_utc,,'2026-10-20T11:39:06+00:00',2026-10-20T11:39:06+00:00,677,152
+2084,DEVELOPMENT,ext:rossler_z,provenance/end_utc,,'2026-10-20T11:54:10+00:00',2026-10-20T11:54:10+00:00,677,180
 2085,DEVELOPMENT,meta,seeds_ext,,'DEV-3',DEV-3,679,51
 2086,DEVELOPMENT,ext:hindmarsh_rose,config/core_systems/0,,'hindmarsh_rose',hindmarsh_rose,683,2
 2087,DEVELOPMENT,ext:hindmarsh_rose,provenance/seed_id,,'DEV-3',DEV-3,683,31

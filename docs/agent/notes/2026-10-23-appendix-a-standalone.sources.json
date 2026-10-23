@@ -1,0 +1,46 @@
+{
+  "files": {
+    "dev:DEV-1": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ens-3dec086/runs/dev/ens-DEV-1/full/results.json",
+    "dev:DEV-3": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ens-3dec086/runs/dev/ens-DEV-3/full/results.json",
+    "dev:DEV-4": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ens-3dec086/runs/dev/ens-DEV-4/full/results.json",
+    "ext:hindmarsh_rose": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-run-392a069/runs/dev/ext-hindmarsh_rose-gpu/full/results.json",
+    "ext:hyper_jha": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-run-392a069/runs/dev/ext-hyper_jha-gpu/full/results.json",
+    "ext:lorenz63_r166": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-run-974519a/runs/dev/ext-lorenz63_r166-gpu/full/results.json",
+    "ext:lorenz96_4": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-run-392a069/runs/dev/ext-lorenz96_4-gpu/full/results.json",
+    "ext:rossler_hyper": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-run-974519a/runs/dev/ext-rossler_hyper-gpu/full/results.json",
+    "ext:rossler_z": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/ext-run-974519a/runs/dev/ext-rossler_z-gpu/full/results.json"
+  },
+  "kind": "appendix",
+  "meta": {
+    "design_levels_dev": "36",
+    "missing_paths": [],
+    "missing_total": "0",
+    "nulls_total": "0",
+    "provisional_dev": "none",
+    "provisional_ext": "hindmarsh_rose (seed DEV-3: V7); hyper_jha (seed DEV-3: V7); lorenz63_r166 (seed DEV-3: V7); lorenz96_4 (seed DEV-3: V7); rossler_z (seed DEV-3: V7)",
+    "seeds_dev": "DEV-1, DEV-3, DEV-4",
+    "seeds_ext": "DEV-3",
+    "sha_dev:DEV-1": "0a4ef215c7262340cef3e95cc073c4b7a374c73d688a12ad68ed5517d6102860",
+    "sha_dev:DEV-3": "24a7c4b77a253ec34a1a6e301a932d3171ec22c1a70568941158c9a6787af247",
+    "sha_dev:DEV-4": "8eadc3992bcbffbeb399c46523eb308d351eb081937a622029119f68861c5655",
+    "sha_ext:hindmarsh_rose": "090f82e0ba16aed9f01666d2ab4043f394f32c6cebc2273c7d804059f7b1b8e4",
+    "sha_ext:hyper_jha": "5edfd1deb91eac73e56701cbc8ee9abaa852b1c714e1571cd1e96be87c603b7a",
+    "sha_ext:lorenz63_r166": "183a151966ae5c851bd1bde05ab1e8ff7b82c7da13a0974a2896ef8e60671e4c",
+    "sha_ext:lorenz96_4": "8aaac680997ae24407526cba6f5cc55f7b5744d47330596e4ec03323c4da2e6b",
+    "sha_ext:rossler_hyper": "ac588151e6aad4efabf1be0e9977c4d3366d895d605722cf6a1c660c054ceffc",
+    "sha_ext:rossler_z": "f95ae88a22bccfe04dba48aa1f23632243a5b3c8cd740b261f098a17c5fdbf93",
+    "systems_ext": "hindmarsh_rose, hyper_jha, lorenz63_r166, lorenz96_4, rossler_hyper, rossler_z",
+    "trace_name": "2026-10-23-appendix-a-standalone.trace.csv"
+  },
+  "sha256": {
+    "dev:DEV-1": "0a4ef215c7262340cef3e95cc073c4b7a374c73d688a12ad68ed5517d6102860",
+    "dev:DEV-3": "24a7c4b77a253ec34a1a6e301a932d3171ec22c1a70568941158c9a6787af247",
+    "dev:DEV-4": "8eadc3992bcbffbeb399c46523eb308d351eb081937a622029119f68861c5655",
+    "ext:hindmarsh_rose": "090f82e0ba16aed9f01666d2ab4043f394f32c6cebc2273c7d804059f7b1b8e4",
+    "ext:hyper_jha": "5edfd1deb91eac73e56701cbc8ee9abaa852b1c714e1571cd1e96be87c603b7a",
+    "ext:lorenz63_r166": "183a151966ae5c851bd1bde05ab1e8ff7b82c7da13a0974a2896ef8e60671e4c",
+    "ext:lorenz96_4": "8aaac680997ae24407526cba6f5cc55f7b5744d47330596e4ec03323c4da2e6b",
+    "ext:rossler_hyper": "ac588151e6aad4efabf1be0e9977c4d3366d895d605722cf6a1c660c054ceffc",
+    "ext:rossler_z": "f95ae88a22bccfe04dba48aa1f23632243a5b3c8cd740b261f098a17c5fdbf93"
+  }
+}

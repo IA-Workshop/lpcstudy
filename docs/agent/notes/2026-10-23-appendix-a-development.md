@@ -514,7 +514,7 @@ The student writes this section in their own words. Prompts only, with no result
 
 ## A. Development context [DEVELOPMENT]
 
-Development context: not a hypothesis test. This appendix holds development seeds, exploratory, not confirmatory. Every value in it is a stored leaf of a development run, copied as stored and listed in the trace. No mean, spread, range, count of passes, pooled or overall verdict is made, and nothing is compared with the official result (owner ruling D4). Development numbers appear only here.
+Development context: not a hypothesis test. This appendix holds development seeds, exploratory, not confirmatory. Every value in it is a stored leaf of a development run, copied as stored and listed in the trace. No mean, spread, range, count of passes, pooled or overall verdict is made. The values of these runs appear only in this appendix, and none is compared with the result of any other section of this document (owner ruling D4).
 
 ### A.1 Ensemble by seed (the three systems of v3)
 
@@ -669,12 +669,12 @@ Development context: not a hypothesis test. Seeds: DEV-3; development seeds, exp
 
 | Seed | Systems | Label | Preset | Commit | Backend | Complete | Dirty | Wall seconds | Start (UTC) | End (UTC) | SHA-256 of results.json |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| DEV-3 | hindmarsh_rose | DEVELOPMENT (DEV-3): not a hypothesis test | full | 392a069d25a8efd2d9d74d46d3475ba17f010bbf | gpu | yes | no | 5167 | 2026-10-21T08:00:41+00:00 | 2026-10-21T09:26:48+00:00 | 090f82e0ba16aed9f01666d2ab4043f394f32c6cebc2273c7d804059f7b1b8e4 |
-| DEV-3 | hyper_jha | DEVELOPMENT (DEV-3): not a hypothesis test | full | 392a069d25a8efd2d9d74d46d3475ba17f010bbf | gpu | yes | no | 4040 | 2026-10-21T08:00:41+00:00 | 2026-10-21T09:08:01+00:00 | 5edfd1deb91eac73e56701cbc8ee9abaa852b1c714e1571cd1e96be87c603b7a |
-| DEV-3 | lorenz63_r166 | DEVELOPMENT (DEV-3): not a hypothesis test | full | 974519a81a4a53e62069b85ab04c8ce783e17106 | gpu | yes | no | 2721 | 2026-10-20T11:55:08+00:00 | 2026-10-20T12:40:29+00:00 | 183a151966ae5c851bd1bde05ab1e8ff7b82c7da13a0974a2896ef8e60671e4c |
-| DEV-3 | lorenz96_4 | DEVELOPMENT (DEV-3): not a hypothesis test | full | 392a069d25a8efd2d9d74d46d3475ba17f010bbf | gpu | yes | no | 1302 | 2026-10-21T09:08:43+00:00 | 2026-10-21T09:30:25+00:00 | 8aaac680997ae24407526cba6f5cc55f7b5744d47330596e4ec03323c4da2e6b |
+| DEV-3 | hindmarsh_rose PROVISIONAL | DEVELOPMENT (DEV-3): not a hypothesis test | full | 392a069d25a8efd2d9d74d46d3475ba17f010bbf | gpu | yes | no | 5167 | 2026-10-21T08:00:41+00:00 | 2026-10-21T09:26:48+00:00 | 090f82e0ba16aed9f01666d2ab4043f394f32c6cebc2273c7d804059f7b1b8e4 |
+| DEV-3 | hyper_jha PROVISIONAL | DEVELOPMENT (DEV-3): not a hypothesis test | full | 392a069d25a8efd2d9d74d46d3475ba17f010bbf | gpu | yes | no | 4040 | 2026-10-21T08:00:41+00:00 | 2026-10-21T09:08:01+00:00 | 5edfd1deb91eac73e56701cbc8ee9abaa852b1c714e1571cd1e96be87c603b7a |
+| DEV-3 | lorenz63_r166 PROVISIONAL | DEVELOPMENT (DEV-3): not a hypothesis test | full | 974519a81a4a53e62069b85ab04c8ce783e17106 | gpu | yes | no | 2721 | 2026-10-20T11:55:08+00:00 | 2026-10-20T12:40:29+00:00 | 183a151966ae5c851bd1bde05ab1e8ff7b82c7da13a0974a2896ef8e60671e4c |
+| DEV-3 | lorenz96_4 PROVISIONAL | DEVELOPMENT (DEV-3): not a hypothesis test | full | 392a069d25a8efd2d9d74d46d3475ba17f010bbf | gpu | yes | no | 1302 | 2026-10-21T09:08:43+00:00 | 2026-10-21T09:30:25+00:00 | 8aaac680997ae24407526cba6f5cc55f7b5744d47330596e4ec03323c4da2e6b |
 | DEV-3 | rossler_hyper | DEVELOPMENT (DEV-3): not a hypothesis test | full | 974519a81a4a53e62069b85ab04c8ce783e17106 | gpu | yes | no | 2833 | 2026-10-20T12:41:10+00:00 | 2026-10-20T13:28:23+00:00 | ac588151e6aad4efabf1be0e9977c4d3366d895d605722cf6a1c660c054ceffc |
-| DEV-3 | rossler_z | DEVELOPMENT (DEV-3): not a hypothesis test | full | 974519a81a4a53e62069b85ab04c8ce783e17106 | gpu | yes | no | 904 | 2026-10-20T11:39:06+00:00 | 2026-10-20T11:54:10+00:00 | f95ae88a22bccfe04dba48aa1f23632243a5b3c8cd740b261f098a17c5fdbf93 |
+| DEV-3 | rossler_z PROVISIONAL | DEVELOPMENT (DEV-3): not a hypothesis test | full | 974519a81a4a53e62069b85ab04c8ce783e17106 | gpu | yes | no | 904 | 2026-10-20T11:39:06+00:00 | 2026-10-20T11:54:10+00:00 | f95ae88a22bccfe04dba48aa1f23632243a5b3c8cd740b261f098a17c5fdbf93 |
 
 Development context: not a hypothesis test. Seeds: DEV-3; development seeds, exploratory, not confirmatory; systems outside the v3 design; exploratory readings pre-specified in WU-0021.2; per-system only, no overall verdict. Validation gate: stored flags (V3 is reported, no bar).
 
