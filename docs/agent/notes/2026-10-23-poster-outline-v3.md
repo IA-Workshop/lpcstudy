@@ -21,9 +21,9 @@ Sections and panels not listed here are unchanged from v1 (panels 1, 2 and 11 ex
 
 ## 0. Status and release rule (replaces v1 §0 and v2 §0)
 
-- **The CONF-1 result is promoted** (ledger entry 40, 2026-10-23; manifest line of the same date). Sealed results may appear on the poster and slides, subject to the fair's own rules (open item O2).
+- **The CONF-1 result is promoted** (ledger entry 40, 2026-10-23; manifest line of the same date). Sealed results may appear on the poster and slides.
 - **Source of every sealed item: `promoted/CONF-1/` only** (on develop): `report.md`, `report.figures/` (F1 to F3 with the promoted title), `figures/` (the four RESULTS.md figures, R1 to R4), `RESULTS.md`, `results.json`. Never the figures in `docs/agent/notes/2026-10-20-prelim-findings-conf1.figures/`: they carry the unpromoted title.
-- **Header on every result panel and slide:** **Confirmatory result, seed CONF-1, promoted by the owner on 2026-10-23.** The headers `CONFIRMATORY: UNPROMOTED` and "(preliminary, unpromoted)" are retired. Section 2 of the promoted report still shows the row "Label: CONFIRMATORY: UNPROMOTED"; it quotes the stored label of the sealed file and is not a status. Do not copy it.
+- **Header on every result panel and slide:** **Confirmatory result, seed CONF-1, promoted by the owner on 2026-10-23.**
 - **Development material** (the ensemble DEV-1, DEV-3, DEV-4; the six extension systems; the Dysts descriptive table) appears only in panel 12 and appendix slides A1 to A4, titled `Development context: not a hypothesis test`, never on or beside F1, F2 or F3, and only after review WU-0025.6. Its numbers come only from appendix A (standalone) and the reviewed Dysts table.
 
 ## 1. Figures (changes to v1 §1)
@@ -45,7 +45,7 @@ Sections and panels not listed here are unchanged from v1 (panels 1, 2 and 11 ex
 - Noise sensitivity: how much the chosen past match moves when the noise changes; defined on the analog side.
 Add, for P1: "under the conditions stated in the theorem, blending can extend the horizon by at most half an error-doubling time" (theorem program errata of 2026-10-21).
 
-**Panel 4. Three test systems.** Reason (F2 resolved): exact equations, so every hidden state and every condition is known; standard chaotic systems that other forecasting benchmarks also use; different in shape and in how fast errors grow, and Chua's has a piecewise-linear part. v3 itself gives only "exact models" and calls the choice "deliberately narrow"; the other two reasons are the owner's or the student's to confirm.
+**Panel 4. Three test systems.** Why these systems (exact equations: v3 §4; the other two points are description, not recorded intent): exact equations, so every hidden state and every condition is known; standard chaotic systems that forecasting benchmarks use; different in shape and in how fast errors grow, and Chua's has a piecewise-linear part. The student may add their own reason.
 
 **Panel 5. How the test works.** As v1, plus: the sealed seed was drawn by the owner and recorded only as a salted hash before the run, separate from every development seed, with the rules and code frozen first (F5 resolved from DEC-0001 and the run's freeze check); do not say "nobody ever saw it" unless the owner attests it. Add one line: the regeneration was by the same person on the same computer, which shows determinism, not an independent reproduction (report §10).
 
@@ -56,21 +56,22 @@ Must answer, in the words of report §4: H2a not supported (fail on all three sy
 
 **Panel 8. What it means, and what it does not.** Student text. Prompts as v1, plus: "Which of the ruled limits (panel 9) matters most for H2a and H3c?" and the recommended wording of what a pass does not show (F9 resolved): "supported" means that on these three systems, with an exact physics model and one measured variable, the prediction held in this run; it does not show the same for a wrong or approximate physics model, for real measured data, for higher-dimensional systems, or for other seeds (v3 §8 scope and future work; report §10, one realization per system).
 
-**Panel 9. Limits.** v1 list, plus the ruled items of report §10: H2a part (ii) has low power and essentially cannot pass (DEF-0022, accepted by the owner); same-host, same-person regeneration (determinism only); owner code review waived, results spot-checked by the owner, code covered by independent agent reviews; no numerical-error estimate or per-quantity status for the secondary rows (NVVUQ.22 gaps); figure captions R1 to R4 carry no experiment, identifier or interval; a subsequent pre-registered study will need different intervals and sample sizes (owner, ledger seq 36).
+**Panel 9. Limits.** v1 list, plus the ruled items of report §10: H2a part (ii) has low power and essentially cannot pass (DEF-0022, accepted by the owner); same-host, same-person regeneration (determinism only); owner code review waived, results spot-checked by the owner, code covered by independent agent reviews; no numerical-error estimate or per-quantity status for the secondary rows, and the status wording of the secondaries does not say whether a secondary is confirmatory in this run (NVVUQ.22 gaps G1 to G3); the error of the fixed number of fitting steps in the physics-based forecaster is not estimated for the official run (DEF-0027, v3 §8); H2e was added after the pilot showed the effect; figure captions R1 to R4 carry no experiment, identifier or interval; a subsequent pre-registered study will need different intervals and sample sizes (owner, ledger seq 36).
 
 **Panel 10. Cross-check and checks.** F3 (promoted), grey, "information only", "changes no verdict" (DEC-0031). The verdict words stored in the GPU file are not shown.
 
-**Panel 11. What next, and thanks.** As v1; the AI-use statement says that AI agents also reviewed the code (the owner's code review was waived). Future work wording: "a subsequent pre-registered study", never "v4".
+**Panel 11. What next, and thanks.** As v1; Future work wording: "a subsequent pre-registered study".
 
 **Panel 12 (new, appendix handout). Development context: not a hypothesis test.** Placement (DEC-0045): a handout, or the back of the board, physically apart from panels 6, 7 and 10 and from F1 to F3. Text and tables only, no figure. Header on the sheet and on every table: `Development context: not a hypothesis test`; each table names its seed ids.
 Fixed sentences:
 - "These are development runs on development seeds, exploratory, not confirmatory. Nothing here changes or adds to the promoted result."
 - "For the pre-registered result, read section 5 of the promoted report. This sheet does not reprint any value from it." (the pointer; the built appendix has none)
 - "The code that reports the verdicts of the extension systems is development-only and has not been reviewed by the owner." (DEC-0045 item 3)
+Fixed caption sentence for every table and slide A1, A2 and A3 that prints V3 (R4): "V3: the analog forecaster's valid-prediction time, the first step at which its error against the noisy verifying observation exceeds theta = 0.4 of the standard deviation of the observed variable, Kaplan-Meier median in Lyapunov times; reported, not a gate." Also under D2: "S1 to S3: exploratory readings pre-specified in WU-0021.2; S4 to S6: in WU-0023.2."
 Must answer:
 - (D1) What is a development seed, and why are these runs not tests? How much do the stored words and values move between development seeds on the three studied systems? Side by side, no mean, spread or range (appendix A.1).
 - (D2) Which other systems did we try, and why? Six systems outside the v3 design (a higher-dimensional Rössler system, a Lorenz system in an intermittent regime, Rössler observed through a different variable, and three Dysts systems), in appendix A.2. Per system only: gate and stored per-system words; no overall verdict; one development seed (DEV-3) each; the readings were fixed before the runs. **Only S1 (`rossler_hyper`) passed the validity gate; S2 to S6 failed V7 and are PROVISIONAL**, so their words are shown as stored with the failure reported, never repaired. The extension table also says "systems outside the v3 design; exploratory readings pre-specified in WU-0021.2".
-- (D3) How does Dysts relate? Same equations for the three studied systems, parameters equal up to rounding. One difference is reported: "the Dysts stored maximum exponent for Chua differs from ours by a factor of about 2.85; our value is reproduced by an independent estimator; the cause of the Dysts value is not determined" (attribution note §5; the researcher's script note `2026-10-23-researcher-dysts-lyapunov-script.md` is not on develop at cc27d31, so nothing more is said). The benchmark uses a percentage error that depends on the signal size, its own time unit, averages over many systems, and has no forecaster with known equations; so it is descriptive, not directly comparable, not a ranking. Wherever V3 (the analog forecaster's valid-prediction time) is quoted, the caption states: threshold theta = 0.4 sigma_x, measured against the noisy verifying observation, reported and not gated.
+- (D3) How does Dysts relate? Same equations for the three studied systems, parameters equal up to rounding. One difference is reported: the Dysts stored maximum exponent for Chua is about three times ours (a number may be added if the owner chooses); our value is reproduced by an independent implementation; the stored value was probably produced by a simpler Dysts estimator without renormalisation (our inference from Dysts' code and an older results file, not stated by Dysts), and why it is larger is not shown; differences of equations, parameters, time unit, attractor and the settings of our own exponent method were excluded (attribution note §5; script note §§2 to 4). The benchmark uses a percentage error that depends on the signal size, its own time unit, noise defined in a way not known to match ours, averages over many systems, and has no forecaster with known equations in the texts we read; so it is descriptive, not directly comparable, not a ranking. Wherever V3 (the analog forecaster's valid-prediction time) is quoted, the caption states: threshold theta = 0.4 sigma_x, measured against the noisy verifying observation, reported and not gated.
 
 ## 3. Ten-slide variant, with appendix slides (replaces v1 §4 and v2 §3)
 
@@ -81,7 +82,7 @@ Must answer:
 | 7 | Secondary highlights | panel 7; header | F2 (promoted), R2 if needed, captioned from the map |
 | 8 | What it means, and does not mean | panel 8 (student) | none |
 | 9 | Limits and the CPU/GPU cross-check | panels 9 and 10; "information only" | F3 (promoted) |
-| 10 | What next, thanks, AI-use statement | panel 11; agents also reviewed the code | none |
+| 10 | What next, thanks | panel 11 | none |
 | A1 | Development context: not a hypothesis test (ensemble) | D1, side by side | none |
 | A2 | Development context: not a hypothesis test (extension) | D2, per system, S2 to S6 PROVISIONAL, code status sentence | none |
 | A3 | Development context: not a hypothesis test (Dysts) | D3 | none |
@@ -102,6 +103,7 @@ Presenting rules: one message per slide; interval before word; slides A1 to A3 a
 - [x] Panel 9 lists every v1 limit and every ruled limit.
 - [x] R1 to R4 captions name experiment and identifier from the figure map, say "no interval", and do not call the R3 dotted line a criterion.
 - [x] No claim of independent reproduction; no claim that the owner reviewed the code, including the extension's verdict-reporting code. Evidence: panels 5, 9, 11 and 12 wording.
+- [ ] V3 caption present on every table and slide that prints V3 (uses the panel 12 caption sentence, not a tool change).
 - [x] Appendix: every development table is headed "Development context: not a hypothesis test" and names its seed ids (rule in panel 12; the built appendix does this, appendix A section headers).
 - [x] Appendix: the ensemble is shown side by side with no mean, standard deviation or range. Evidence: appendix A.1 text "nothing is combined across them".
 - [x] Appendix: extension systems per system only; no overall verdict; no "supported" or "not supported" for them; one development seed each; S2 to S6 marked PROVISIONAL; code status sentence present. Evidence: panel 12 and A2.
@@ -110,7 +112,7 @@ Presenting rules: one message per slide; interval before word; slides A1 to A3 a
 - [x] Appendix: no sealed value is reprinted in appendix A. Evidence: grep of the standalone appendix for the sealed H2a, H2b and H3c point estimates, 0 hits.
 - [ ] Appendix: every number is from appendix A or the reviewed Dysts table, traced, and `check` exit 0. (Main session at the build; the `check` could not be run in this worktree, matplotlib is not installed here.)
 - [x] The highlights are exactly the v1 §3 list, whatever they show.
-- [ ] Interpretation is the student's and marked; the AI-use statement is updated. (The student's act.)
+- [ ] Interpretation is the student's and marked. (The student's act.)
 - [ ] Figures readable in grey; Okabe-Ito palette; verdicts also by marker and text. (Checked on the built figures.)
 - [x] V3 is never quoted without theta = 0.4 sigma_x and "against the noisy verifying observation"; and V3 is not quoted numerically in this file.
 
@@ -159,8 +161,7 @@ Presenting rules: one message per slide; interval before word; slides A1 to A3 a
 ## 7. Open items for the owner and the student (only they can supply these)
 
 Owner:
-- **O1.** Whether the poster may carry panel 12 on the back of the board or only on a handout, per the fair's rules (DEC-0045 chooses "a handout or the back of the board"; the fair decides which is allowed).
-- **O2.** The fair's own rules on exploratory results, AI-use disclosure, date and poster size (still unanswered from v1; the researcher can look them up on request).
+- **O1.** Whether the poster may carry panel 12 on the back of the board or only on a handout, (DEC-0045 chooses "a handout or the back of the board").
 - **O3.** Whether the reasons given in panel 4 are the reasons you chose the three systems.
 - **O4.** Whether you can attest, from your own knowledge, that nobody looked at the confirmatory data before the run; if so, add it in your name (panel 5).
 - **O5.** The final cutoff: appendix A is built from the files of 2026-10-26 18:00; confirm the systems listed in panel 12 then.
@@ -169,6 +170,5 @@ Owner:
 - **O8.** The extension code review (DEC-0038 A1, A2) is the owner's pending act; panel 12 says it is not done.
 
 Student:
-- **ST1.** All panel and slide prose; the interpretation (panel 8) and the motivation in panel 12; the F4 schematic; the attractor pictures; the AI-use statement in your words (agents also reviewed the code).
-- **ST2.** Personal text and fair-specific entries (name, school, category, QR and contact if allowed).
-- **ST3.** The fair's required format and size, which only the fair supplies.
+- **ST1.** All panel and slide prose; the interpretation (panel 8) and the motivation in panel 12; the F4 schematic; the attractor pictures; .
+- **ST2.** Personal text and entries (name, school, category).
