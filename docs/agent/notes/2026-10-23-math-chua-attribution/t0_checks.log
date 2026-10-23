@@ -1,0 +1,4 @@
+max |tangent - central FD| of one RK4 step (no breakpoint crossed): 7.259657984351811e-11
+inner |x|<1 (m0) eigenvalues: [ 3.4756+0.j    -1.1224+4.088j -1.1224-4.088j] trace 1.2308
+outer |x|>1 (m1) eigenvalues: [-6.0726+0.j      0.3055+4.5253j  0.3055-4.5253j] trace -5.4616
+time per interval, N=16: 0.0010872713724772135 s

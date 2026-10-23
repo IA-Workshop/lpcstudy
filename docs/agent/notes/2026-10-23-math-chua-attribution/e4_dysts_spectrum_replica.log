@@ -1,0 +1,4 @@
+backward_euler T=42.71; single-run lam1 mean 0.4171 sd 0.0813; spectrum mean [ 0.4171 -0.0151 -4.1977]
+   weighted 20-start recipe over 20 reps: lam1 mean 0.3797 sd 0.051 min 0.2978 max 0.5025 ; spectrum [ 0.3797 -0.     -4.2452] ; median top-weight share 0.741
+rk4_tangent T=42.71; single-run lam1 mean 0.4349 sd 0.0800; spectrum mean [ 0.4349  0.0113 -4.2306]
+   weighted 20-start recipe over 20 reps: lam1 mean 0.4496 sd 0.0537 min 0.3642 max 0.5646 ; spectrum [ 4.4960e-01  1.0000e-03 -4.2411e+00] ; median top-weight share 0.762

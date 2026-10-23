@@ -1,0 +1,20 @@
+SE_code (batch SE, independent run from (0.7,0,0), T=1e4): 0.00459
+spread check: sd over 7 distinct starts 0.00465 (should match SE_code)
+batch SE per start: [0.0046 0.0051 0.0062 0.0048 0.0048 0.0046 0.0048]
+code 0.43113 vs independent ensemble 0.43470+-0.00176: diff -0.00357, combined SE 0.00491, |diff|/c 0.73
+code vs independent same-start run 0.44085: diff -0.00972, |diff|/combined SE 1.50
+params dysts: ensemble 0.43455+-0.00178, minus ours -0.00014 (combined SE 0.00250)
+params exact: ensemble 0.43374+-0.00237, minus ours -0.00096 (combined SE 0.00295)
+Dysts max - code = +0.79898 = 174 SE_code; ratio 2.853
+Dysts spec0 - code = +0.02941 = 6.4 SE_code; ratio 1.0682
+E4 replica (rk4_tangent): 0.4496 sd 0.0537; (Dysts spec0 - replica mean)/sd = +0.20; (Dysts max - replica mean)/sd = +14.5
+E4 replica (backward_euler): 0.3797 sd 0.0510; (Dysts spec0 - replica mean)/sd = +1.59; (Dysts max - replica mean)/sd = +16.7
+Spectrum: ours [ 4.3470e-01 -1.8000e-03 -4.2469e+00] sum -3.8141 ; KY ours 2.1019
+  implied time fraction in |x|<1 from sum -3.8141 (ours): 0.2462
+  implied time fraction in |x|<1 from sum -3.8563 (Dysts spectrum): 0.2399
+Step refinement (E2a):
+  h=0.01     0.43833 +- 0.00224
+  h=0.005    0.43467 +- 0.00201  diff to previous -0.00366 +- 0.00301
+  h=0.0025   0.42976 +- 0.00190  diff to previous -0.00491 +- 0.00276
+  h=0.00125  0.43245 +- 0.00269  diff to previous +0.00270 +- 0.00329
+  h=0.005 minus h=0.00125: +0.00221 +- 0.00336; 2-sigma bound on |error at h=0.005|: 0.0089
