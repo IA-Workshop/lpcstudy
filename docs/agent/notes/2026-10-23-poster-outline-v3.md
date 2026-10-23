@@ -2,7 +2,7 @@
 
 Draft by claude-sonnet-5-5 (WU-0025.4), 2026-10-23, from `2026-10-23-poster-outline-v2.md`, `2026-10-19-prelim-poster-outline.md` ("v1") and DEC-0045, for the internal proposal due 2026-10-28. The student (Deem Albaty) writes all poster and slide prose and the interpretation (D8). This file gives structure, sources and rules. **It contains no number from any run.** Result words come from section 4 of the promoted report only (`promoted/CONF-1/report.md`, lines 91 to 125, checked on develop at cc27d31); numbers reach the poster only through the figures and tables built from the promoted copy, and the development numbers only through the standalone appendix A.
 
-Sections and panels not listed here are unchanged from v1 (panels 1, 2 and 11 except where stated below, the glossary of v1 §7).
+
 
 ## What changed from v2
 
@@ -19,14 +19,14 @@ Sections and panels not listed here are unchanged from v1 (panels 1, 2 and 11 ex
 | Panel 12 (D3) | Dysts one-liner | incorporates the Dysts tables note, the benchmark mapping and the Chua attribution; V3 always quoted with theta = 0.4 sigma_x and against the noisy verifying observation | `2026-10-23-researcher-dysts-tables.md`; `2026-10-23-math-benchmark-mapping.md` §1, F1, F4; `2026-10-23-math-chua-attribution.md` §5 |
 | "later study", "v4" | "a later study" | "a subsequent pre-registered study" | DEC-0045 item 2 |
 
-## 0. Status and release rule (replaces v1 §0 and v2 §0)
+## 0. Status and release rule 
 
 - **The CONF-1 result is promoted** (ledger entry 40, 2026-10-23; manifest line of the same date). Sealed results may appear on the poster and slides.
 - **Source of every sealed item: `promoted/CONF-1/` only** (on develop): `report.md`, `report.figures/` (F1 to F3 with the promoted title), `figures/` (the four RESULTS.md figures, R1 to R4), `RESULTS.md`, `results.json`. Never the figures in `docs/agent/notes/2026-10-20-prelim-findings-conf1.figures/`: they carry the unpromoted title.
 - **Header on every result panel and slide:** **Confirmatory result, seed CONF-1, promoted by the owner on 2026-10-23.**
 - **Development material** (the ensemble DEV-1, DEV-3, DEV-4; the six extension systems; the Dysts descriptive table) appears only in panel 12 and appendix slides A1 to A4, titled `Development context: not a hypothesis test`, never on or beside F1, F2 or F3, and only after review WU-0025.6. Its numbers come only from appendix A (standalone) and the reviewed Dysts table.
 
-## 1. Figures (changes to v1 §1)
+## 1. Figures 
 
 | Slot | Source now | Notes |
 | --- | --- | --- |
@@ -38,7 +38,18 @@ Sections and panels not listed here are unchanged from v1 (panels 1, 2 and 11 ex
 
 ## 2. Panels that change (tri-fold)
 
-**Panel 3. Four conditions and a blend weight.** Use these one-line definitions (F1 resolved, each from v3):
+**Panel 1. The question.** Slot: F4 (small) or a photo or sketch of a chaotic trajectory.
+Must answer: What is predictability, and why does a chaotic system limit it? What exactly do we ask? (Can four measurable local conditions decide, state by state, how much to trust an analog forecaster against a physics-based one, and for how long?) Why does anyone care? What is new (v3 §1: no prior state-dependent blend under partial observation)?
+Terms: chaos, Lyapunov time, forecast horizon.
+
+**Panel 2. Two ways to forecast.** Slot: F4.
+Must answer: What does CP do (copies the future of the nearest past pattern in a library)? What does PLP do (estimates the hidden state, then integrates the known equations)? Why can each one fail (CP: few or noisy neighbors; PLP: state error grows)? Both see only one noisy measurement of a three-dimensional system: say why that matters.
+Terms: analog forecast, delay vector, library size, state estimate, noise level, observable.
+
+**Panel 3. Four conditions and a blend weight.** Slot: F4 (conditions around the weight).
+Must answer: What are the four local conditions, each in one everyday sentence? What is the blend weight w\* (weight on CP, between 0 and 1) and what is "optimal" (least mean squared error)? What was proved (P1: closed-form optimal weight; P2: retrieval of the nearest analog is stable while the noise is below half the nearest-neighbor margin)?
+Terms: mean squared error, blend, theorem, w\*, noise sensitivity.
+Use these one-line definitions (each from v3):
 - Recurrence: how close the nearest matching past state is to the present one.
 - Observability: how well the hidden state can be recovered from noisy measurements.
 - Instability: how fast small errors grow along the forecast.
@@ -47,20 +58,25 @@ Add, for P1: "under the conditions stated in the theorem, blending can extend th
 
 **Panel 4. Three test systems.** Why these systems (exact equations: v3 §4; the other two points are description, not recorded intent): exact equations, so every hidden state and every condition is known; standard chaotic systems that forecasting benchmarks use; different in shape and in how fast errors grow, and Chua's has a piecewise-linear part. The student may add their own reason.
 
-**Panel 5. How the test works.** As v1, plus: the sealed seed was drawn by the owner and recorded only as a salted hash before the run, separate from every development seed, with the rules and code frozen first (F5 resolved from DEC-0001 and the run's freeze check); do not say "nobody ever saw it" unless the owner attests it. Add one line: the regeneration was by the same person on the same computer, which shows determinism, not an independent reproduction (report §10).
+**Panel 5. How the test works.** Slot: none, or a timeline strip.
+Must answer: What does pre-registered mean and why does it protect against fooling ourselves? What are the three primary hypotheses in one line each (H2a: the weight depends on the starting errors, not on horizon or instability; H2b: noise level and library size move the weight the predicted way; H3c: a few regimes lose almost nothing against the closed form)? What does a verdict mean: "supported" only if all three systems pass; "not supported" if any system fails; "inconclusive" otherwise, including a system with no result. State that the error of "not supported" is not controlled the same way (v3 §7). What does an interval tell you, and what is the band?
+Terms: pre-registration, hypothesis, seed (random number seed), confidence interval, bootstrap, band, verdict.
+Also say: the sealed seed was drawn by the owner and recorded only as a salted hash before the run, separate from every development seed, with the rules and code frozen first (F5 resolved from DEC-0001 and the run's freeze check); do not say "nobody ever saw it" unless the owner attests it. Add one line: the regeneration was by the same person on the same computer, which shows determinism, not an independent reproduction (report §10).
 
 **Panel 6. What we found (primary).** Slot F1 (promoted). Header required.
 Must answer, in the words of report §4: H2a not supported (fail on all three systems); H2b supported (pass on all three systems in this run); H3c inconclusive (pass on Rössler; not decidable at this precision on Lorenz-63 and Chua; no system failed). None of the three studied systems is PROVISIONAL (report §3). Read each interval before its word. Say once: "not supported" is not "disproved"; "inconclusive" is not "no effect"; the error of "not supported" is not controlled the same way (v3 §7).
 
-**Panel 7. Highlights (secondary).** Slot F2 (promoted). The fixed list of v1 §3 with its §4 words: H2c inconclusive, H2e supported, H3a inconclusive (cannot fail by design), Q-N an estimate with two readings, never pass or fail. No substitution.
+**Panel 7. Highlights (secondary).** Slot F2 (promoted). The fixed list below (chosen before any sealed output existed; shown whatever it says) with its report §4 words: H2c inconclusive, H2e supported, H3a inconclusive (cannot fail by design), Q-N an estimate with two readings, never pass or fail. No substitution. The list: H2c (closed-form allocator against a global weight and the better single forecaster), H2e (noise matching: error correlation as the library grows), H3a (regimes separate horizons; with events and censored states per regime), Q-N (what noise sensitivity adds; its reading from the v3 §7 table, never pass or fail). The other secondaries (H1a to H1d, H2d, H3b, gain bound) appear in F2 but are not highlighted; the gain bound only as "reported, v1 statistic, v3 screen pending". Any additional highlight needs an owner ruling recorded first.
+Must answer: What do the four highlights say, each read with its interval and its verdict or table reading? Remind the judge that these are secondary and not the main test.
+Terms: secondary hypothesis, Kaplan-Meier curve, log-rank test, noise matching.
 
-**Panel 8. What it means, and what it does not.** Student text. Prompts as v1, plus: "Which of the ruled limits (panel 9) matters most for H2a and H3c?" and the recommended wording of what a pass does not show (F9 resolved): "supported" means that on these three systems, with an exact physics model and one measured variable, the prediction held in this run; it does not show the same for a wrong or approximate physics model, for real measured data, for higher-dimensional systems, or for other seeds (v3 §8 scope and future work; report §10, one realization per system).
+**Panel 8. What it means, and what it does not.** Student text. Prompts: What does the verdict allow us to say about the four conditions? What does it not say? What would "not supported" or "inconclusive" mean, and why is it not "disproved" or "no effect"? What surprised you, stated as your own reading and marked as interpretation? Also: "Which of the ruled limits (panel 9) matters most for H2a and H3c?" and the recommended wording of what a pass does not show (F9 resolved): "supported" means that on these three systems, with an exact physics model and one measured variable, the prediction held in this run; it does not show the same for a wrong or approximate physics model, for real measured data, for higher-dimensional systems, or for other seeds (v3 §8 scope and future work; report §10, one realization per system).
 
-**Panel 9. Limits.** v1 list, plus the ruled items of report §10: H2a part (ii) has low power and essentially cannot pass (DEF-0022, accepted by the owner); same-host, same-person regeneration (determinism only); owner code review waived, results spot-checked by the owner, code covered by independent agent reviews; no numerical-error estimate or per-quantity status for the secondary rows, and the status wording of the secondaries does not say whether a secondary is confirmatory in this run (NVVUQ.22 gaps G1 to G3); the error of the fixed number of fitting steps in the physics-based forecaster is not estimated for the official run (DEF-0027, v3 §8); H2e was added after the pilot showed the effect; figure captions R1 to R4 carry no experiment, identifier or interval; a subsequent pre-registered study will need different intervals and sample sizes (owner, ledger seq 36).
+**Panel 9. Limits.** Exact model, three systems, one realization each; proxies carry little of the exact information (deployable allocation is limited by proxies, not theory); block-bootstrap intervals undercover slightly; H3a cannot fail and small regimes; the gain bound is reported only; the block-sensitive label is not computable for the sealed run; bitwise CPU/GPU agreement at full size is extrapolated; plus the ruled items of report §10: H2a part (ii) has low power and essentially cannot pass (DEF-0022, accepted by the owner); same-host, same-person regeneration (determinism only); owner code review waived, results spot-checked by the owner, code covered by independent agent reviews; no numerical-error estimate or per-quantity status for the secondary rows, and the status wording of the secondaries does not say whether a secondary is confirmatory in this run (NVVUQ.22 gaps G1 to G3); the error of the fixed number of fitting steps in the physics-based forecaster is not estimated for the official run (DEF-0027, v3 §8); H2e was added after the pilot showed the effect; figure captions R1 to R4 carry no experiment, identifier or interval; a subsequent pre-registered study will need different intervals and sample sizes (owner, ledger seq 36).
 
 **Panel 10. Cross-check and checks.** F3 (promoted), grey, "information only", "changes no verdict" (DEC-0031). The verdict words stored in the GPU file are not shown.
 
-**Panel 11. What next, and thanks.** As v1; Future work wording: "a subsequent pre-registered study".
+**Panel 11. What next, and thanks.** Must answer: What is future work (v3 §8: misspecified physics model, higher-dimensional system, independent trajectory replicates, deployable noise-sensitivity estimate, break-even library size, Lean-checked theorems; and a subsequent pre-registered study)? Who helped? Contact and QR to the repository, if allowed. [STUDENT: thanks and contact.]
 
 **Panel 12 (new, appendix handout). Development context: not a hypothesis test.** Placement (DEC-0045): a handout, or the back of the board, physically apart from panels 6, 7 and 10 and from F1 to F3. Text and tables only, no figure. Header on the sheet and on every table: `Development context: not a hypothesis test`; each table names its seed ids.
 Fixed sentences:
@@ -73,11 +89,15 @@ Must answer:
 - (D2) Which other systems did we try, and why? Six systems outside the v3 design (a higher-dimensional Rössler system, a Lorenz system in an intermittent regime, Rössler observed through a different variable, and three Dysts systems), in appendix A.2. Per system only: gate and stored per-system words; no overall verdict; one development seed (DEV-3) each; the readings were fixed before the runs. **Only S1 (`rossler_hyper`) passed the validity gate; S2 to S6 failed V7 and are PROVISIONAL**, so their words are shown as stored with the failure reported, never repaired. The extension table also says "systems outside the v3 design; exploratory readings pre-specified in WU-0021.2".
 - (D3) How does Dysts relate? Same equations for the three studied systems, parameters equal up to rounding. One difference is reported: the Dysts stored maximum exponent for Chua is about three times ours (a number may be added if the owner chooses); our value is reproduced by an independent implementation; the stored value was probably produced by a simpler Dysts estimator without renormalisation (our inference from Dysts' code and an older results file, not stated by Dysts), and why it is larger is not shown; differences of equations, parameters, time unit, attractor and the settings of our own exponent method were excluded (attribution note §5; script note §§2 to 4). The benchmark uses a percentage error that depends on the signal size, its own time unit, noise defined in a way not known to match ours, averages over many systems, and has no forecaster with known equations in the texts we read; so it is descriptive, not directly comparable, not a ranking. Wherever V3 (the analog forecaster's valid-prediction time) is quoted, the caption states: threshold theta = 0.4 sigma_x, measured against the noisy verifying observation, reported and not gated.
 
-## 3. Ten-slide variant, with appendix slides (replaces v1 §4 and v2 §3)
+## 3. Ten-slide variant, with appendix slides 
 
 | # | Slide | Content | Figure |
 | --- | --- | --- | --- |
-| 1 to 5 | As v1 | panels 1 to 5; slide 3 carries the four definitions; slide 4 the reason for the three systems; slide 5 the determinism line and the sealed-seed wording | as v1 |
+| 1 | The question | panel 1 questions; title, names | F4 (small) |
+| 2 | The two forecasters | CP and PLP, panel 2 questions | F4 |
+| 3 | The four conditions and w\* | panel 3 with the four definitions; what is proved | F4 |
+| 4 | The three systems | panel 4 with the reason for the three systems | attractor pictures |
+| 5 | Pre-registration, sealed seed, verdict rule | panel 5 with the determinism line and the sealed-seed wording; "supported" only if all three systems pass | timeline strip (optional) |
 | 6 | Primary verdicts | panel 6; header | F1 (promoted) |
 | 7 | Secondary highlights | panel 7; header | F2 (promoted), R2 if needed, captioned from the map |
 | 8 | What it means, and does not mean | panel 8 (student) | none |
