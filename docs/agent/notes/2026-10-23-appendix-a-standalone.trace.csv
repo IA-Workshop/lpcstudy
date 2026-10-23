@@ -1,0 +1,1074 @@
+id,tag,source,path,spec,raw,rendered,line,col
+0,DEVELOPMENT,meta,seeds_dev,,"'DEV-1, DEV-3, DEV-4'","DEV-1, DEV-3, DEV-4",15,51
+1,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,19,10
+2,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,19,20
+3,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,19,29
+4,DEVELOPMENT,meta,sha_dev:DEV-1,,'0a4ef215c7262340cef3e95cc073c4b7a374c73d688a12ad68ed5517d6102860',0a4ef215c7262340cef3e95cc073c4b7a374c73d688a12ad68ed5517d6102860,19,211
+5,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,19,2
+6,DEVELOPMENT,dev:DEV-1,provenance/label,,'DEVELOPMENT (DEV-1): not a hypothesis test',DEVELOPMENT (DEV-1): not a hypothesis test,19,36
+7,DEVELOPMENT,dev:DEV-1,provenance/preset,,'full',full,19,81
+8,DEVELOPMENT,dev:DEV-1,provenance/commit,,'3dec0864dcb2dc11e09ff82cc8016e9d7b9bc2ed',3dec0864dcb2dc11e09ff82cc8016e9d7b9bc2ed,19,88
+9,DEVELOPMENT,dev:DEV-1,provenance/device/backend,,'gpu',gpu,19,131
+10,DEVELOPMENT,dev:DEV-1,provenance/complete,yn,True,yes,19,137
+11,DEVELOPMENT,dev:DEV-1,provenance/dirty,yn,False,no,19,143
+12,DEVELOPMENT,dev:DEV-1,provenance/wall_seconds,.0f,2774.507416971028,2775,19,148
+13,DEVELOPMENT,dev:DEV-1,provenance/start_utc,,'2026-10-20T09:31:52+00:00',2026-10-20T09:31:52+00:00,19,155
+14,DEVELOPMENT,dev:DEV-1,provenance/end_utc,,'2026-10-20T10:18:06+00:00',2026-10-20T10:18:06+00:00,19,183
+15,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,20,10
+16,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,20,20
+17,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,20,29
+18,DEVELOPMENT,meta,sha_dev:DEV-3,,'24a7c4b77a253ec34a1a6e301a932d3171ec22c1a70568941158c9a6787af247',24a7c4b77a253ec34a1a6e301a932d3171ec22c1a70568941158c9a6787af247,20,211
+19,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,20,2
+20,DEVELOPMENT,dev:DEV-3,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,20,36
+21,DEVELOPMENT,dev:DEV-3,provenance/preset,,'full',full,20,81
+22,DEVELOPMENT,dev:DEV-3,provenance/commit,,'3dec0864dcb2dc11e09ff82cc8016e9d7b9bc2ed',3dec0864dcb2dc11e09ff82cc8016e9d7b9bc2ed,20,88
+23,DEVELOPMENT,dev:DEV-3,provenance/device/backend,,'gpu',gpu,20,131
+24,DEVELOPMENT,dev:DEV-3,provenance/complete,yn,True,yes,20,137
+25,DEVELOPMENT,dev:DEV-3,provenance/dirty,yn,False,no,20,143
+26,DEVELOPMENT,dev:DEV-3,provenance/wall_seconds,.0f,2447.2160226179985,2447,20,148
+27,DEVELOPMENT,dev:DEV-3,provenance/start_utc,,'2026-10-20T10:18:54+00:00',2026-10-20T10:18:54+00:00,20,155
+28,DEVELOPMENT,dev:DEV-3,provenance/end_utc,,'2026-10-20T10:59:41+00:00',2026-10-20T10:59:41+00:00,20,183
+29,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,21,10
+30,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,21,20
+31,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,21,29
+32,DEVELOPMENT,meta,sha_dev:DEV-4,,'8eadc3992bcbffbeb399c46523eb308d351eb081937a622029119f68861c5655',8eadc3992bcbffbeb399c46523eb308d351eb081937a622029119f68861c5655,21,211
+33,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,21,2
+34,DEVELOPMENT,dev:DEV-4,provenance/label,,'DEVELOPMENT (DEV-4): not a hypothesis test',DEVELOPMENT (DEV-4): not a hypothesis test,21,36
+35,DEVELOPMENT,dev:DEV-4,provenance/preset,,'full',full,21,81
+36,DEVELOPMENT,dev:DEV-4,provenance/commit,,'3dec0864dcb2dc11e09ff82cc8016e9d7b9bc2ed',3dec0864dcb2dc11e09ff82cc8016e9d7b9bc2ed,21,88
+37,DEVELOPMENT,dev:DEV-4,provenance/device/backend,,'gpu',gpu,21,131
+38,DEVELOPMENT,dev:DEV-4,provenance/complete,yn,True,yes,21,137
+39,DEVELOPMENT,dev:DEV-4,provenance/dirty,yn,False,no,21,143
+40,DEVELOPMENT,dev:DEV-4,provenance/wall_seconds,.0f,2315.890752981999,2316,21,148
+41,DEVELOPMENT,dev:DEV-4,provenance/start_utc,,'2026-10-20T10:59:56+00:00',2026-10-20T10:59:56+00:00,21,155
+42,DEVELOPMENT,dev:DEV-4,provenance/end_utc,,'2026-10-20T11:38:32+00:00',2026-10-20T11:38:32+00:00,21,183
+43,DEVELOPMENT,meta,seeds_dev,,"'DEV-1, DEV-3, DEV-4'","DEV-1, DEV-3, DEV-4",23,51
+44,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,27,2
+45,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,27,13
+46,DEVELOPMENT,dev:DEV-1,systems/lorenz63/validation/gate/V1,yn,True,yes,27,21
+47,DEVELOPMENT,dev:DEV-1,systems/lorenz63/validation/gate/V2,yn,True,yes,27,27
+48,DEVELOPMENT,dev:DEV-1,systems/lorenz63/validation/gate/V4,yn,True,yes,27,33
+49,DEVELOPMENT,dev:DEV-1,systems/lorenz63/validation/gate/V5,yn,True,yes,27,39
+50,DEVELOPMENT,dev:DEV-1,systems/lorenz63/validation/gate/V6,yn,True,yes,27,45
+51,DEVELOPMENT,dev:DEV-1,systems/lorenz63/validation/gate/V7,yn,True,yes,27,51
+52,DEVELOPMENT,dev:DEV-1,systems/lorenz63/validation/gate/gate_pass,yn,True,yes,27,57
+53,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,28,2
+54,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,28,13
+55,DEVELOPMENT,dev:DEV-3,systems/lorenz63/validation/gate/V1,yn,True,yes,28,21
+56,DEVELOPMENT,dev:DEV-3,systems/lorenz63/validation/gate/V2,yn,True,yes,28,27
+57,DEVELOPMENT,dev:DEV-3,systems/lorenz63/validation/gate/V4,yn,True,yes,28,33
+58,DEVELOPMENT,dev:DEV-3,systems/lorenz63/validation/gate/V5,yn,True,yes,28,39
+59,DEVELOPMENT,dev:DEV-3,systems/lorenz63/validation/gate/V6,yn,True,yes,28,45
+60,DEVELOPMENT,dev:DEV-3,systems/lorenz63/validation/gate/V7,yn,True,yes,28,51
+61,DEVELOPMENT,dev:DEV-3,systems/lorenz63/validation/gate/gate_pass,yn,True,yes,28,57
+62,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,29,2
+63,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,29,13
+64,DEVELOPMENT,dev:DEV-4,systems/lorenz63/validation/gate/V1,yn,True,yes,29,21
+65,DEVELOPMENT,dev:DEV-4,systems/lorenz63/validation/gate/V2,yn,True,yes,29,27
+66,DEVELOPMENT,dev:DEV-4,systems/lorenz63/validation/gate/V4,yn,True,yes,29,33
+67,DEVELOPMENT,dev:DEV-4,systems/lorenz63/validation/gate/V5,yn,True,yes,29,39
+68,DEVELOPMENT,dev:DEV-4,systems/lorenz63/validation/gate/V6,yn,True,yes,29,45
+69,DEVELOPMENT,dev:DEV-4,systems/lorenz63/validation/gate/V7,yn,True,yes,29,51
+70,DEVELOPMENT,dev:DEV-4,systems/lorenz63/validation/gate/gate_pass,yn,True,yes,29,57
+71,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,30,2
+72,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,30,12
+73,DEVELOPMENT,dev:DEV-1,systems/rossler/validation/gate/V1,yn,True,yes,30,20
+74,DEVELOPMENT,dev:DEV-1,systems/rossler/validation/gate/V2,yn,True,yes,30,26
+75,DEVELOPMENT,dev:DEV-1,systems/rossler/validation/gate/V4,yn,True,yes,30,32
+76,DEVELOPMENT,dev:DEV-1,systems/rossler/validation/gate/V5,yn,True,yes,30,38
+77,DEVELOPMENT,dev:DEV-1,systems/rossler/validation/gate/V6,yn,True,yes,30,44
+78,DEVELOPMENT,dev:DEV-1,systems/rossler/validation/gate/V7,yn,True,yes,30,50
+79,DEVELOPMENT,dev:DEV-1,systems/rossler/validation/gate/gate_pass,yn,True,yes,30,56
+80,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,31,2
+81,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,31,12
+82,DEVELOPMENT,dev:DEV-3,systems/rossler/validation/gate/V1,yn,True,yes,31,20
+83,DEVELOPMENT,dev:DEV-3,systems/rossler/validation/gate/V2,yn,True,yes,31,26
+84,DEVELOPMENT,dev:DEV-3,systems/rossler/validation/gate/V4,yn,True,yes,31,32
+85,DEVELOPMENT,dev:DEV-3,systems/rossler/validation/gate/V5,yn,True,yes,31,38
+86,DEVELOPMENT,dev:DEV-3,systems/rossler/validation/gate/V6,yn,True,yes,31,44
+87,DEVELOPMENT,dev:DEV-3,systems/rossler/validation/gate/V7,yn,True,yes,31,50
+88,DEVELOPMENT,dev:DEV-3,systems/rossler/validation/gate/gate_pass,yn,True,yes,31,56
+89,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,32,2
+90,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,32,12
+91,DEVELOPMENT,dev:DEV-4,systems/rossler/validation/gate/V1,yn,True,yes,32,20
+92,DEVELOPMENT,dev:DEV-4,systems/rossler/validation/gate/V2,yn,True,yes,32,26
+93,DEVELOPMENT,dev:DEV-4,systems/rossler/validation/gate/V4,yn,True,yes,32,32
+94,DEVELOPMENT,dev:DEV-4,systems/rossler/validation/gate/V5,yn,True,yes,32,38
+95,DEVELOPMENT,dev:DEV-4,systems/rossler/validation/gate/V6,yn,True,yes,32,44
+96,DEVELOPMENT,dev:DEV-4,systems/rossler/validation/gate/V7,yn,True,yes,32,50
+97,DEVELOPMENT,dev:DEV-4,systems/rossler/validation/gate/gate_pass,yn,True,yes,32,56
+98,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,33,2
+99,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,33,9
+100,DEVELOPMENT,dev:DEV-1,systems/chua/validation/gate/V1,yn,True,yes,33,17
+101,DEVELOPMENT,dev:DEV-1,systems/chua/validation/gate/V2,yn,True,yes,33,23
+102,DEVELOPMENT,dev:DEV-1,systems/chua/validation/gate/V4,yn,True,yes,33,29
+103,DEVELOPMENT,dev:DEV-1,systems/chua/validation/gate/V5,yn,True,yes,33,35
+104,DEVELOPMENT,dev:DEV-1,systems/chua/validation/gate/V6,yn,True,yes,33,41
+105,DEVELOPMENT,dev:DEV-1,systems/chua/validation/gate/V7,yn,True,yes,33,47
+106,DEVELOPMENT,dev:DEV-1,systems/chua/validation/gate/gate_pass,yn,True,yes,33,53
+107,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,34,2
+108,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,34,9
+109,DEVELOPMENT,dev:DEV-3,systems/chua/validation/gate/V1,yn,True,yes,34,17
+110,DEVELOPMENT,dev:DEV-3,systems/chua/validation/gate/V2,yn,True,yes,34,23
+111,DEVELOPMENT,dev:DEV-3,systems/chua/validation/gate/V4,yn,True,yes,34,29
+112,DEVELOPMENT,dev:DEV-3,systems/chua/validation/gate/V5,yn,True,yes,34,35
+113,DEVELOPMENT,dev:DEV-3,systems/chua/validation/gate/V6,yn,True,yes,34,41
+114,DEVELOPMENT,dev:DEV-3,systems/chua/validation/gate/V7,yn,True,yes,34,47
+115,DEVELOPMENT,dev:DEV-3,systems/chua/validation/gate/gate_pass,yn,True,yes,34,53
+116,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,35,2
+117,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,35,9
+118,DEVELOPMENT,dev:DEV-4,systems/chua/validation/gate/V1,yn,True,yes,35,17
+119,DEVELOPMENT,dev:DEV-4,systems/chua/validation/gate/V2,yn,True,yes,35,23
+120,DEVELOPMENT,dev:DEV-4,systems/chua/validation/gate/V4,yn,True,yes,35,29
+121,DEVELOPMENT,dev:DEV-4,systems/chua/validation/gate/V5,yn,True,yes,35,35
+122,DEVELOPMENT,dev:DEV-4,systems/chua/validation/gate/V6,yn,True,yes,35,41
+123,DEVELOPMENT,dev:DEV-4,systems/chua/validation/gate/V7,yn,True,yes,35,47
+124,DEVELOPMENT,dev:DEV-4,systems/chua/validation/gate/gate_pass,yn,True,yes,35,53
+125,DEVELOPMENT,meta,provisional_dev,,'none',none,37,234
+126,DEVELOPMENT,meta,seeds_dev,,"'DEV-1, DEV-3, DEV-4'","DEV-1, DEV-3, DEV-4",39,51
+127,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,43,2
+128,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,43,13
+129,DEVELOPMENT,dev:DEV-1,systems/lorenz63/context/lambda_max,.4g,0.905668542691417,0.9057,43,21
+130,DEVELOPMENT,dev:DEV-1,systems/lorenz63/validation/cp_median_vpt_lyapunov,.3g,2.0,2,43,30
+131,DEVELOPMENT,dev:DEV-1,systems/lorenz63/V7/median_slope,.4f,1.0011913230920595,1.0012,43,34
+132,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,44,2
+133,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,44,13
+134,DEVELOPMENT,dev:DEV-3,systems/lorenz63/context/lambda_max,.4g,0.905668542691417,0.9057,44,21
+135,DEVELOPMENT,dev:DEV-3,systems/lorenz63/validation/cp_median_vpt_lyapunov,.3g,2.033333333333333,2.03,44,30
+136,DEVELOPMENT,dev:DEV-3,systems/lorenz63/V7/median_slope,.4f,1.0008676523758526,1.0009,44,37
+137,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,45,2
+138,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,45,13
+139,DEVELOPMENT,dev:DEV-4,systems/lorenz63/context/lambda_max,.4g,0.905668542691417,0.9057,45,21
+140,DEVELOPMENT,dev:DEV-4,systems/lorenz63/validation/cp_median_vpt_lyapunov,.3g,2.033333333333333,2.03,45,30
+141,DEVELOPMENT,dev:DEV-4,systems/lorenz63/V7/median_slope,.4f,1.0011039646979867,1.0011,45,37
+142,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,46,2
+143,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,46,12
+144,DEVELOPMENT,dev:DEV-1,systems/rossler/context/lambda_max,.4g,0.07171891954365615,0.07172,46,20
+145,DEVELOPMENT,dev:DEV-1,systems/rossler/validation/cp_median_vpt_lyapunov,.3g,3.3,3.3,46,30
+146,DEVELOPMENT,dev:DEV-1,systems/rossler/V7/median_slope,.4f,1.0000334699626598,1.0000,46,36
+147,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,47,2
+148,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,47,12
+149,DEVELOPMENT,dev:DEV-3,systems/rossler/context/lambda_max,.4g,0.07171891954365615,0.07172,47,20
+150,DEVELOPMENT,dev:DEV-3,systems/rossler/validation/cp_median_vpt_lyapunov,.3g,3.1333333333333333,3.13,47,30
+151,DEVELOPMENT,dev:DEV-3,systems/rossler/V7/median_slope,.4f,1.0000337387624838,1.0000,47,37
+152,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,48,2
+153,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,48,12
+154,DEVELOPMENT,dev:DEV-4,systems/rossler/context/lambda_max,.4g,0.07171891954365615,0.07172,48,20
+155,DEVELOPMENT,dev:DEV-4,systems/rossler/validation/cp_median_vpt_lyapunov,.3g,3.2333333333333334,3.23,48,30
+156,DEVELOPMENT,dev:DEV-4,systems/rossler/V7/median_slope,.4f,1.0000671374048757,1.0001,48,37
+157,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,49,2
+158,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,49,9
+159,DEVELOPMENT,dev:DEV-1,systems/chua/context/lambda_max,.4g,0.4408520035546002,0.4409,49,17
+160,DEVELOPMENT,dev:DEV-1,systems/chua/validation/cp_median_vpt_lyapunov,.3g,2.9,2.9,49,26
+161,DEVELOPMENT,dev:DEV-1,systems/chua/V7/median_slope,.4f,1.0003901337609307,1.0004,49,32
+162,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,50,2
+163,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,50,9
+164,DEVELOPMENT,dev:DEV-3,systems/chua/context/lambda_max,.4g,0.4408520035546001,0.4409,50,17
+165,DEVELOPMENT,dev:DEV-3,systems/chua/validation/cp_median_vpt_lyapunov,.3g,2.9,2.9,50,26
+166,DEVELOPMENT,dev:DEV-3,systems/chua/V7/median_slope,.4f,1.0002986975483168,1.0003,50,32
+167,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,51,2
+168,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,51,9
+169,DEVELOPMENT,dev:DEV-4,systems/chua/context/lambda_max,.4g,0.4408520035546002,0.4409,51,17
+170,DEVELOPMENT,dev:DEV-4,systems/chua/validation/cp_median_vpt_lyapunov,.3g,2.966666666666667,2.97,51,26
+171,DEVELOPMENT,dev:DEV-4,systems/chua/V7/median_slope,.4f,1.000182190610166,1.0002,51,33
+172,DEVELOPMENT,meta,seeds_dev,,"'DEV-1, DEV-3, DEV-4'","DEV-1, DEV-3, DEV-4",53,51
+173,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,57,2
+174,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,57,13
+175,DEVELOPMENT,dev:DEV-1,verdicts/H2a/by_system/lorenz63,verdict,'inconclusive',inconclusive,57,21
+176,DEVELOPMENT,dev:DEV-1,verdicts/H2b/by_system/lorenz63,verdict,'pass',pass,57,36
+177,DEVELOPMENT,dev:DEV-1,verdicts/H3c/by_system/lorenz63,verdict,'pass',pass,57,43
+178,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,58,2
+179,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,58,13
+180,DEVELOPMENT,dev:DEV-3,verdicts/H2a/by_system/lorenz63,verdict,'inconclusive',inconclusive,58,21
+181,DEVELOPMENT,dev:DEV-3,verdicts/H2b/by_system/lorenz63,verdict,'pass',pass,58,36
+182,DEVELOPMENT,dev:DEV-3,verdicts/H3c/by_system/lorenz63,verdict,'inconclusive',inconclusive,58,43
+183,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,59,2
+184,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,59,13
+185,DEVELOPMENT,dev:DEV-4,verdicts/H2a/by_system/lorenz63,verdict,'inconclusive',inconclusive,59,21
+186,DEVELOPMENT,dev:DEV-4,verdicts/H2b/by_system/lorenz63,verdict,'pass',pass,59,36
+187,DEVELOPMENT,dev:DEV-4,verdicts/H3c/by_system/lorenz63,verdict,'inconclusive',inconclusive,59,43
+188,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,60,2
+189,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,60,12
+190,DEVELOPMENT,dev:DEV-1,verdicts/H2a/by_system/rossler,verdict,'fail',fail,60,20
+191,DEVELOPMENT,dev:DEV-1,verdicts/H2b/by_system/rossler,verdict,'pass',pass,60,27
+192,DEVELOPMENT,dev:DEV-1,verdicts/H3c/by_system/rossler,verdict,'pass',pass,60,34
+193,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,61,2
+194,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,61,12
+195,DEVELOPMENT,dev:DEV-3,verdicts/H2a/by_system/rossler,verdict,'fail',fail,61,20
+196,DEVELOPMENT,dev:DEV-3,verdicts/H2b/by_system/rossler,verdict,'pass',pass,61,27
+197,DEVELOPMENT,dev:DEV-3,verdicts/H3c/by_system/rossler,verdict,'pass',pass,61,34
+198,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,62,2
+199,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,62,12
+200,DEVELOPMENT,dev:DEV-4,verdicts/H2a/by_system/rossler,verdict,'fail',fail,62,20
+201,DEVELOPMENT,dev:DEV-4,verdicts/H2b/by_system/rossler,verdict,'pass',pass,62,27
+202,DEVELOPMENT,dev:DEV-4,verdicts/H3c/by_system/rossler,verdict,'pass',pass,62,34
+203,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,63,2
+204,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,63,9
+205,DEVELOPMENT,dev:DEV-1,verdicts/H2a/by_system/chua,verdict,'fail',fail,63,17
+206,DEVELOPMENT,dev:DEV-1,verdicts/H2b/by_system/chua,verdict,'pass',pass,63,24
+207,DEVELOPMENT,dev:DEV-1,verdicts/H3c/by_system/chua,verdict,'pass',pass,63,31
+208,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,64,2
+209,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,64,9
+210,DEVELOPMENT,dev:DEV-3,verdicts/H2a/by_system/chua,verdict,'fail',fail,64,17
+211,DEVELOPMENT,dev:DEV-3,verdicts/H2b/by_system/chua,verdict,'pass',pass,64,24
+212,DEVELOPMENT,dev:DEV-3,verdicts/H3c/by_system/chua,verdict,'inconclusive',inconclusive,64,31
+213,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,65,2
+214,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,65,9
+215,DEVELOPMENT,dev:DEV-4,verdicts/H2a/by_system/chua,verdict,'fail',fail,65,17
+216,DEVELOPMENT,dev:DEV-4,verdicts/H2b/by_system/chua,verdict,'inconclusive',inconclusive,65,24
+217,DEVELOPMENT,dev:DEV-4,verdicts/H3c/by_system/chua,verdict,'inconclusive',inconclusive,65,39
+218,DEVELOPMENT,meta,seeds_dev,,"'DEV-1, DEV-3, DEV-4'","DEV-1, DEV-3, DEV-4",67,51
+219,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,71,2
+220,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,71,13
+221,DEVELOPMENT,dev:DEV-1,verdicts/H1a/by_system/lorenz63,verdict,'inconclusive',inconclusive,71,21
+222,DEVELOPMENT,dev:DEV-1,verdicts/H1b/by_system/lorenz63,verdict,'pass',pass,71,36
+223,DEVELOPMENT,dev:DEV-1,verdicts/H1c/by_system/lorenz63,verdict,'fail',fail,71,43
+224,DEVELOPMENT,dev:DEV-1,verdicts/H1d/by_system/lorenz63,verdict,'pass',pass,71,50
+225,DEVELOPMENT,dev:DEV-1,verdicts/H2c/by_system/lorenz63,verdict,'fail',fail,71,57
+226,DEVELOPMENT,dev:DEV-1,verdicts/H2d/by_system/lorenz63,verdict,'fail',fail,71,64
+227,DEVELOPMENT,dev:DEV-1,verdicts/H2e/by_system/lorenz63,verdict,'pass',pass,71,71
+228,DEVELOPMENT,dev:DEV-1,verdicts/H3a/by_system/lorenz63,verdict,'inconclusive',inconclusive,71,78
+229,DEVELOPMENT,dev:DEV-1,verdicts/H3b/by_system/lorenz63,verdict,'inconclusive',inconclusive,71,93
+230,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,72,2
+231,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,72,13
+232,DEVELOPMENT,dev:DEV-3,verdicts/H1a/by_system/lorenz63,verdict,'inconclusive',inconclusive,72,21
+233,DEVELOPMENT,dev:DEV-3,verdicts/H1b/by_system/lorenz63,verdict,'pass',pass,72,36
+234,DEVELOPMENT,dev:DEV-3,verdicts/H1c/by_system/lorenz63,verdict,'fail',fail,72,43
+235,DEVELOPMENT,dev:DEV-3,verdicts/H1d/by_system/lorenz63,verdict,'inconclusive',inconclusive,72,50
+236,DEVELOPMENT,dev:DEV-3,verdicts/H2c/by_system/lorenz63,verdict,'fail',fail,72,65
+237,DEVELOPMENT,dev:DEV-3,verdicts/H2d/by_system/lorenz63,verdict,'fail',fail,72,72
+238,DEVELOPMENT,dev:DEV-3,verdicts/H2e/by_system/lorenz63,verdict,'pass',pass,72,79
+239,DEVELOPMENT,dev:DEV-3,verdicts/H3a/by_system/lorenz63,verdict,'inconclusive',inconclusive,72,86
+240,DEVELOPMENT,dev:DEV-3,verdicts/H3b/by_system/lorenz63,verdict,'inconclusive',inconclusive,72,101
+241,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,73,2
+242,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,73,13
+243,DEVELOPMENT,dev:DEV-4,verdicts/H1a/by_system/lorenz63,verdict,'pass',pass,73,21
+244,DEVELOPMENT,dev:DEV-4,verdicts/H1b/by_system/lorenz63,verdict,'inconclusive',inconclusive,73,28
+245,DEVELOPMENT,dev:DEV-4,verdicts/H1c/by_system/lorenz63,verdict,'fail',fail,73,43
+246,DEVELOPMENT,dev:DEV-4,verdicts/H1d/by_system/lorenz63,verdict,'pass',pass,73,50
+247,DEVELOPMENT,dev:DEV-4,verdicts/H2c/by_system/lorenz63,verdict,'inconclusive',inconclusive,73,57
+248,DEVELOPMENT,dev:DEV-4,verdicts/H2d/by_system/lorenz63,verdict,'inconclusive',inconclusive,73,72
+249,DEVELOPMENT,dev:DEV-4,verdicts/H2e/by_system/lorenz63,verdict,'pass',pass,73,87
+250,DEVELOPMENT,dev:DEV-4,verdicts/H3a/by_system/lorenz63,verdict,'inconclusive',inconclusive,73,94
+251,DEVELOPMENT,dev:DEV-4,verdicts/H3b/by_system/lorenz63,verdict,'fail',fail,73,109
+252,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,74,2
+253,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,74,12
+254,DEVELOPMENT,dev:DEV-1,verdicts/H1a/by_system/rossler,verdict,'pass',pass,74,20
+255,DEVELOPMENT,dev:DEV-1,verdicts/H1b/by_system/rossler,verdict,'fail',fail,74,27
+256,DEVELOPMENT,dev:DEV-1,verdicts/H1c/by_system/rossler,verdict,'pass',pass,74,34
+257,DEVELOPMENT,dev:DEV-1,verdicts/H1d/by_system/rossler,verdict,'pass',pass,74,41
+258,DEVELOPMENT,dev:DEV-1,verdicts/H2c/by_system/rossler,verdict,'inconclusive',inconclusive,74,48
+259,DEVELOPMENT,dev:DEV-1,verdicts/H2d/by_system/rossler,verdict,'pass',pass,74,63
+260,DEVELOPMENT,dev:DEV-1,verdicts/H2e/by_system/rossler,verdict,'pass',pass,74,70
+261,DEVELOPMENT,dev:DEV-1,verdicts/H3a/by_system/rossler,verdict,'inconclusive',inconclusive,74,77
+262,DEVELOPMENT,dev:DEV-1,verdicts/H3b/by_system/rossler,verdict,'inconclusive',inconclusive,74,92
+263,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,75,2
+264,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,75,12
+265,DEVELOPMENT,dev:DEV-3,verdicts/H1a/by_system/rossler,verdict,'pass',pass,75,20
+266,DEVELOPMENT,dev:DEV-3,verdicts/H1b/by_system/rossler,verdict,'fail',fail,75,27
+267,DEVELOPMENT,dev:DEV-3,verdicts/H1c/by_system/rossler,verdict,'pass',pass,75,34
+268,DEVELOPMENT,dev:DEV-3,verdicts/H1d/by_system/rossler,verdict,'pass',pass,75,41
+269,DEVELOPMENT,dev:DEV-3,verdicts/H2c/by_system/rossler,verdict,'inconclusive',inconclusive,75,48
+270,DEVELOPMENT,dev:DEV-3,verdicts/H2d/by_system/rossler,verdict,'pass',pass,75,63
+271,DEVELOPMENT,dev:DEV-3,verdicts/H2e/by_system/rossler,verdict,'pass',pass,75,70
+272,DEVELOPMENT,dev:DEV-3,verdicts/H3a/by_system/rossler,verdict,'inconclusive',inconclusive,75,77
+273,DEVELOPMENT,dev:DEV-3,verdicts/H3b/by_system/rossler,verdict,'pass',pass,75,92
+274,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,76,2
+275,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,76,12
+276,DEVELOPMENT,dev:DEV-4,verdicts/H1a/by_system/rossler,verdict,'pass',pass,76,20
+277,DEVELOPMENT,dev:DEV-4,verdicts/H1b/by_system/rossler,verdict,'fail',fail,76,27
+278,DEVELOPMENT,dev:DEV-4,verdicts/H1c/by_system/rossler,verdict,'pass',pass,76,34
+279,DEVELOPMENT,dev:DEV-4,verdicts/H1d/by_system/rossler,verdict,'pass',pass,76,41
+280,DEVELOPMENT,dev:DEV-4,verdicts/H2c/by_system/rossler,verdict,'fail',fail,76,48
+281,DEVELOPMENT,dev:DEV-4,verdicts/H2d/by_system/rossler,verdict,'pass',pass,76,55
+282,DEVELOPMENT,dev:DEV-4,verdicts/H2e/by_system/rossler,verdict,'pass',pass,76,62
+283,DEVELOPMENT,dev:DEV-4,verdicts/H3a/by_system/rossler,verdict,'inconclusive',inconclusive,76,69
+284,DEVELOPMENT,dev:DEV-4,verdicts/H3b/by_system/rossler,verdict,'pass',pass,76,84
+285,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,77,2
+286,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,77,9
+287,DEVELOPMENT,dev:DEV-1,verdicts/H1a/by_system/chua,verdict,'pass',pass,77,17
+288,DEVELOPMENT,dev:DEV-1,verdicts/H1b/by_system/chua,verdict,'pass',pass,77,24
+289,DEVELOPMENT,dev:DEV-1,verdicts/H1c/by_system/chua,verdict,'fail',fail,77,31
+290,DEVELOPMENT,dev:DEV-1,verdicts/H1d/by_system/chua,verdict,'inconclusive',inconclusive,77,38
+291,DEVELOPMENT,dev:DEV-1,verdicts/H2c/by_system/chua,verdict,'fail',fail,77,53
+292,DEVELOPMENT,dev:DEV-1,verdicts/H2d/by_system/chua,verdict,'pass',pass,77,60
+293,DEVELOPMENT,dev:DEV-1,verdicts/H2e/by_system/chua,verdict,'pass',pass,77,67
+294,DEVELOPMENT,dev:DEV-1,verdicts/H3a/by_system/chua,verdict,'pass',pass,77,74
+295,DEVELOPMENT,dev:DEV-1,verdicts/H3b/by_system/chua,verdict,'inconclusive',inconclusive,77,81
+296,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,78,2
+297,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,78,9
+298,DEVELOPMENT,dev:DEV-3,verdicts/H1a/by_system/chua,verdict,'pass',pass,78,17
+299,DEVELOPMENT,dev:DEV-3,verdicts/H1b/by_system/chua,verdict,'pass',pass,78,24
+300,DEVELOPMENT,dev:DEV-3,verdicts/H1c/by_system/chua,verdict,'fail',fail,78,31
+301,DEVELOPMENT,dev:DEV-3,verdicts/H1d/by_system/chua,verdict,'inconclusive',inconclusive,78,38
+302,DEVELOPMENT,dev:DEV-3,verdicts/H2c/by_system/chua,verdict,'inconclusive',inconclusive,78,53
+303,DEVELOPMENT,dev:DEV-3,verdicts/H2d/by_system/chua,verdict,'pass',pass,78,68
+304,DEVELOPMENT,dev:DEV-3,verdicts/H2e/by_system/chua,verdict,'pass',pass,78,75
+305,DEVELOPMENT,dev:DEV-3,verdicts/H3a/by_system/chua,verdict,'pass',pass,78,82
+306,DEVELOPMENT,dev:DEV-3,verdicts/H3b/by_system/chua,verdict,'inconclusive',inconclusive,78,89
+307,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,79,2
+308,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,79,9
+309,DEVELOPMENT,dev:DEV-4,verdicts/H1a/by_system/chua,verdict,'inconclusive',inconclusive,79,17
+310,DEVELOPMENT,dev:DEV-4,verdicts/H1b/by_system/chua,verdict,'pass',pass,79,32
+311,DEVELOPMENT,dev:DEV-4,verdicts/H1c/by_system/chua,verdict,'fail',fail,79,39
+312,DEVELOPMENT,dev:DEV-4,verdicts/H1d/by_system/chua,verdict,'inconclusive',inconclusive,79,46
+313,DEVELOPMENT,dev:DEV-4,verdicts/H2c/by_system/chua,verdict,'inconclusive',inconclusive,79,61
+314,DEVELOPMENT,dev:DEV-4,verdicts/H2d/by_system/chua,verdict,'pass',pass,79,76
+315,DEVELOPMENT,dev:DEV-4,verdicts/H2e/by_system/chua,verdict,'pass',pass,79,83
+316,DEVELOPMENT,dev:DEV-4,verdicts/H3a/by_system/chua,verdict,'inconclusive',inconclusive,79,90
+317,DEVELOPMENT,dev:DEV-4,verdicts/H3b/by_system/chua,verdict,'inconclusive',inconclusive,79,105
+318,DEVELOPMENT,meta,seeds_dev,,"'DEV-1, DEV-3, DEV-4'","DEV-1, DEV-3, DEV-4",81,51
+319,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,85,2
+320,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,85,13
+321,DEVELOPMENT,dev:DEV-1,systems/lorenz63/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,85,21
+322,DEVELOPMENT,dev:DEV-1,systems/lorenz63/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,85,31
+323,DEVELOPMENT,dev:DEV-1,verdicts/gain_bound/by_system/lorenz63,verdict,'reported',reported,85,45
+324,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,86,2
+325,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,86,13
+326,DEVELOPMENT,dev:DEV-3,systems/lorenz63/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,86,21
+327,DEVELOPMENT,dev:DEV-3,systems/lorenz63/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,86,31
+328,DEVELOPMENT,dev:DEV-3,verdicts/gain_bound/by_system/lorenz63,verdict,'reported',reported,86,45
+329,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,87,2
+330,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,87,13
+331,DEVELOPMENT,dev:DEV-4,systems/lorenz63/Q-N/oracle/logit_w_interior/reading,,'substantial',substantial,87,21
+332,DEVELOPMENT,dev:DEV-4,systems/lorenz63/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,87,35
+333,DEVELOPMENT,dev:DEV-4,verdicts/gain_bound/by_system/lorenz63,verdict,'reported',reported,87,49
+334,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,88,2
+335,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,88,12
+336,DEVELOPMENT,dev:DEV-1,systems/rossler/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,88,20
+337,DEVELOPMENT,dev:DEV-1,systems/rossler/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,88,30
+338,DEVELOPMENT,dev:DEV-1,verdicts/gain_bound/by_system/rossler,verdict,'reported',reported,88,44
+339,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,89,2
+340,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,89,12
+341,DEVELOPMENT,dev:DEV-3,systems/rossler/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,89,20
+342,DEVELOPMENT,dev:DEV-3,systems/rossler/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,89,30
+343,DEVELOPMENT,dev:DEV-3,verdicts/gain_bound/by_system/rossler,verdict,'reported',reported,89,44
+344,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,90,2
+345,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,90,12
+346,DEVELOPMENT,dev:DEV-4,systems/rossler/Q-N/oracle/logit_w_interior/reading,,'undetermined',undetermined,90,20
+347,DEVELOPMENT,dev:DEV-4,systems/rossler/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,90,35
+348,DEVELOPMENT,dev:DEV-4,verdicts/gain_bound/by_system/rossler,verdict,'reported',reported,90,49
+349,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,91,2
+350,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,91,9
+351,DEVELOPMENT,dev:DEV-1,systems/chua/Q-N/oracle/logit_w_interior/reading,,'undetermined',undetermined,91,17
+352,DEVELOPMENT,dev:DEV-1,systems/chua/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,91,32
+353,DEVELOPMENT,dev:DEV-1,verdicts/gain_bound/by_system/chua,verdict,'reported',reported,91,46
+354,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,92,2
+355,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,92,9
+356,DEVELOPMENT,dev:DEV-3,systems/chua/Q-N/oracle/logit_w_interior/reading,,'undetermined',undetermined,92,17
+357,DEVELOPMENT,dev:DEV-3,systems/chua/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,92,32
+358,DEVELOPMENT,dev:DEV-3,verdicts/gain_bound/by_system/chua,verdict,'reported',reported,92,46
+359,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,93,2
+360,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,93,9
+361,DEVELOPMENT,dev:DEV-4,systems/chua/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,93,17
+362,DEVELOPMENT,dev:DEV-4,systems/chua/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,93,27
+363,DEVELOPMENT,dev:DEV-4,verdicts/gain_bound/by_system/chua,verdict,'reported',reported,93,41
+364,DEVELOPMENT,meta,seeds_dev,,"'DEV-1, DEV-3, DEV-4'","DEV-1, DEV-3, DEV-4",95,51
+365,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,99,60
+366,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",99,68
+367,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,99,2
+368,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,99,13
+369,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2a/median_range,.4g,0.09618452543105956,0.09618,99,30
+370,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2a/range_ci,ci:.4g,"[0.07453271648352827, 0.11722514986385335]","[0.07453, 0.1172]",99,40
+371,DEVELOPMENT,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),99,96
+372,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2a/part_i_verdict,verdict,'inconclusive',inconclusive,99,126
+373,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,100,68
+374,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",100,76
+375,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,100,2
+376,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,100,13
+377,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2a/part_ii/zero/partial_corr,.4g,0.024411871459778904,0.02441,100,36
+378,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2a/part_ii/zero/ci,ci:.4g,"[-0.04988020949475458, 0.0993861420977679]","[-0.04988, 0.09939]",100,46
+379,DEVELOPMENT,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",100,104
+380,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2a/part_ii/zero/verdict,verdict,'pass',pass,100,143
+381,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,101,69
+382,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",101,77
+383,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,101,2
+384,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,101,13
+385,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2a/part_ii/interior/partial_corr,.4g,0.13724451131272472,0.1372,101,40
+386,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2a/part_ii/interior/ci,ci:.4g,"[0.043825964039584636, 0.2322272074745064]","[0.04383, 0.2322]",101,49
+387,DEVELOPMENT,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",101,105
+388,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,101,144
+389,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,102,58
+390,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",102,66
+391,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,102,2
+392,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,102,13
+393,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2b/noise/mean_state_spearman,.4g,0.23518639969071345,0.2352,102,30
+394,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2b/noise/ci,ci:.4g,"[0.18855865263880928, 0.2783302193217403]","[0.1886, 0.2783]",102,39
+395,DEVELOPMENT,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),102,94
+396,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2b/noise/verdict,verdict,'pass',pass,102,121
+397,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2b/library_change/level,.4f,0.9833333333333333,0.9833,103,62
+398,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,103,2
+399,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,103,13
+400,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2b/library_change/mean_change,.4g,0.07039442833292345,0.07039,103,31
+401,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2b/library_change/ci,ci:.4g,"[0.050012931383474755, 0.09155979376035546]","[0.05001, 0.09156]",103,41
+402,DEVELOPMENT,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),103,71
+403,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H2b/library_change/verdict,verdict,'pass',pass,103,98
+404,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H3c/level,.4f,0.9833333333333333,0.9833,104,55
+405,DEVELOPMENT,dev:DEV-1,config/core_systems/0,,'lorenz63',lorenz63,104,2
+406,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,104,13
+407,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H3c/A5_over_A4_mse,.4g,0.7105358885462272,0.7105,104,27
+408,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H3c/ci,ci:.4g,"[0.527133003432663, 0.8958308244236441]","[0.5271, 0.8958]",104,36
+409,DEVELOPMENT,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),104,64
+410,DEVELOPMENT,dev:DEV-1,systems/lorenz63/H3c/verdict,verdict,'pass',pass,104,94
+411,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,105,59
+412,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",105,67
+413,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,105,2
+414,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,105,13
+415,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2a/median_range,.4g,0.12690149029153133,0.1269,105,30
+416,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2a/range_ci,ci:.4g,"[0.09375689398285972, 0.1532637387879134]","[0.09376, 0.1533]",105,39
+417,DEVELOPMENT,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),105,95
+418,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2a/part_i_verdict,verdict,'inconclusive',inconclusive,105,125
+419,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,106,68
+420,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",106,76
+421,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,106,2
+422,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,106,13
+423,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2a/part_ii/zero/partial_corr,.4g,-0.05011707267091094,-0.05012,106,36
+424,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2a/part_ii/zero/ci,ci:.4g,"[-0.11720726007051707, 0.03020855237854981]","[-0.1172, 0.03021]",106,47
+425,DEVELOPMENT,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",106,104
+426,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2a/part_ii/zero/verdict,verdict,'inconclusive',inconclusive,106,143
+427,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,107,68
+428,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",107,76
+429,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,107,2
+430,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,107,13
+431,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2a/part_ii/interior/partial_corr,.4g,0.17296008483648354,0.173,107,40
+432,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2a/part_ii/interior/ci,ci:.4g,"[0.07993000456537196, 0.27208381143835264]","[0.07993, 0.2721]",107,48
+433,DEVELOPMENT,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",107,104
+434,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,107,143
+435,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,108,58
+436,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",108,66
+437,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,108,2
+438,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,108,13
+439,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2b/noise/mean_state_spearman,.4g,0.24712117049865787,0.2471,108,30
+440,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2b/noise/ci,ci:.4g,"[0.1977871040087363, 0.2934184495560213]","[0.1978, 0.2934]",108,39
+441,DEVELOPMENT,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),108,94
+442,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2b/noise/verdict,verdict,'pass',pass,108,121
+443,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2b/library_change/level,.4f,0.9833333333333333,0.9833,109,62
+444,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,109,2
+445,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,109,13
+446,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2b/library_change/mean_change,.4g,0.05910927458673803,0.05911,109,31
+447,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2b/library_change/ci,ci:.4g,"[0.03659288663285137, 0.08475557791441281]","[0.03659, 0.08476]",109,41
+448,DEVELOPMENT,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),109,71
+449,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H2b/library_change/verdict,verdict,'pass',pass,109,98
+450,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H3c/level,.4f,0.9833333333333333,0.9833,110,54
+451,DEVELOPMENT,dev:DEV-3,config/core_systems/0,,'lorenz63',lorenz63,110,2
+452,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,110,13
+453,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H3c/A5_over_A4_mse,.4g,0.7939452265999172,0.7939,110,27
+454,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H3c/ci,ci:.4g,"[0.5886207983618316, 1.1245549942903765]","[0.5886, 1.125]",110,36
+455,DEVELOPMENT,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),110,63
+456,DEVELOPMENT,dev:DEV-3,systems/lorenz63/H3c/verdict,verdict,'inconclusive',inconclusive,110,93
+457,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,111,60
+458,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",111,68
+459,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,111,2
+460,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,111,13
+461,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2a/median_range,.4g,0.0993783825507217,0.09938,111,30
+462,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2a/range_ci,ci:.4g,"[0.08136017522833339, 0.12048557067278025]","[0.08136, 0.1205]",111,40
+463,DEVELOPMENT,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),111,96
+464,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2a/part_i_verdict,verdict,'inconclusive',inconclusive,111,126
+465,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,112,67
+466,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",112,75
+467,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,112,2
+468,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,112,13
+469,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2a/part_ii/zero/partial_corr,.4g,0.043316510757660825,0.04332,112,36
+470,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2a/part_ii/zero/ci,ci:.4g,"[-0.03229125774477527, 0.11673638076899324]","[-0.03229, 0.1167]",112,46
+471,DEVELOPMENT,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",112,103
+472,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2a/part_ii/zero/verdict,verdict,'inconclusive',inconclusive,112,142
+473,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,113,68
+474,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",113,76
+475,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,113,2
+476,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,113,13
+477,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2a/part_ii/interior/partial_corr,.4g,0.15598944375331794,0.156,113,40
+478,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2a/part_ii/interior/ci,ci:.4g,"[0.043340866281652, 0.26611143582037694]","[0.04334, 0.2661]",113,48
+479,DEVELOPMENT,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",113,104
+480,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,113,143
+481,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,114,57
+482,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",114,65
+483,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,114,2
+484,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,114,13
+485,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2b/noise/mean_state_spearman,.4g,0.2587368091364368,0.2587,114,30
+486,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2b/noise/ci,ci:.4g,"[0.21094602134440463, 0.30696449237909107]","[0.2109, 0.307]",114,39
+487,DEVELOPMENT,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),114,93
+488,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2b/noise/verdict,verdict,'pass',pass,114,120
+489,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2b/library_change/level,.4f,0.9833333333333333,0.9833,115,61
+490,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,115,2
+491,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,115,13
+492,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2b/library_change/mean_change,.4g,0.06757058070080407,0.06757,115,31
+493,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2b/library_change/ci,ci:.4g,"[0.04520430214615505, 0.08874793758229232]","[0.0452, 0.08875]",115,41
+494,DEVELOPMENT,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),115,70
+495,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H2b/library_change/verdict,verdict,'pass',pass,115,97
+496,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H3c/level,.4f,0.9833333333333333,0.9833,116,54
+497,DEVELOPMENT,dev:DEV-4,config/core_systems/0,,'lorenz63',lorenz63,116,2
+498,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,116,13
+499,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H3c/A5_over_A4_mse,.4g,0.9983013992180175,0.9983,116,27
+500,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H3c/ci,ci:.4g,"[0.811825576324791, 1.2390065569284854]","[0.8118, 1.239]",116,36
+501,DEVELOPMENT,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),116,63
+502,DEVELOPMENT,dev:DEV-4,systems/lorenz63/H3c/verdict,verdict,'inconclusive',inconclusive,116,93
+503,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,117,57
+504,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",117,65
+505,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,117,2
+506,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,117,12
+507,DEVELOPMENT,dev:DEV-1,systems/rossler/H2a/median_range,.4g,0.26309047475448927,0.2631,117,29
+508,DEVELOPMENT,dev:DEV-1,systems/rossler/H2a/range_ci,ci:.4g,"[0.23316931215801018, 0.30677809709246373]","[0.2332, 0.3068]",117,38
+509,DEVELOPMENT,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),117,93
+510,DEVELOPMENT,dev:DEV-1,systems/rossler/H2a/part_i_verdict,verdict,'fail',fail,117,123
+511,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,118,67
+512,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",118,75
+513,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,118,2
+514,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,118,12
+515,DEVELOPMENT,dev:DEV-1,systems/rossler/H2a/part_ii/zero/partial_corr,.4g,-0.04122957826937662,-0.04123,118,35
+516,DEVELOPMENT,dev:DEV-1,systems/rossler/H2a/part_ii/zero/ci,ci:.4g,"[-0.12234520327555927, 0.04559074974693973]","[-0.1223, 0.04559]",118,46
+517,DEVELOPMENT,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",118,103
+518,DEVELOPMENT,dev:DEV-1,systems/rossler/H2a/part_ii/zero/verdict,verdict,'inconclusive',inconclusive,118,142
+519,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,119,70
+520,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",119,78
+521,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,119,2
+522,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,119,12
+523,DEVELOPMENT,dev:DEV-1,systems/rossler/H2a/part_ii/interior/partial_corr,.4g,-0.02020037091241019,-0.0202,119,39
+524,DEVELOPMENT,dev:DEV-1,systems/rossler/H2a/part_ii/interior/ci,ci:.4g,"[-0.11667025793130266, 0.07393105324717344]","[-0.1167, 0.07393]",119,49
+525,DEVELOPMENT,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",119,106
+526,DEVELOPMENT,dev:DEV-1,systems/rossler/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,119,145
+527,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,120,58
+528,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",120,66
+529,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,120,2
+530,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,120,12
+531,DEVELOPMENT,dev:DEV-1,systems/rossler/H2b/noise/mean_state_spearman,.4g,0.11411422083719325,0.1141,120,29
+532,DEVELOPMENT,dev:DEV-1,systems/rossler/H2b/noise/ci,ci:.4g,"[0.06474554293528927, 0.16767434447737084]","[0.06475, 0.1677]",120,38
+533,DEVELOPMENT,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),120,94
+534,DEVELOPMENT,dev:DEV-1,systems/rossler/H2b/noise/verdict,verdict,'pass',pass,120,121
+535,DEVELOPMENT,dev:DEV-1,systems/rossler/H2b/library_change/level,.4f,0.9833333333333333,0.9833,121,61
+536,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,121,2
+537,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,121,12
+538,DEVELOPMENT,dev:DEV-1,systems/rossler/H2b/library_change/mean_change,.4g,0.0649166891944218,0.06492,121,30
+539,DEVELOPMENT,dev:DEV-1,systems/rossler/H2b/library_change/ci,ci:.4g,"[0.04269427365591796, 0.08973193145066195]","[0.04269, 0.08973]",121,40
+540,DEVELOPMENT,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),121,70
+541,DEVELOPMENT,dev:DEV-1,systems/rossler/H2b/library_change/verdict,verdict,'pass',pass,121,97
+542,DEVELOPMENT,dev:DEV-1,systems/rossler/H3c/level,.4f,0.9833333333333333,0.9833,122,53
+543,DEVELOPMENT,dev:DEV-1,config/core_systems/1,,'rossler',rossler,122,2
+544,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,122,12
+545,DEVELOPMENT,dev:DEV-1,systems/rossler/H3c/A5_over_A4_mse,.4g,0.9685208824111349,0.9685,122,26
+546,DEVELOPMENT,dev:DEV-1,systems/rossler/H3c/ci,ci:.4g,"[0.92239249048592, 1.0138952933902228]","[0.9224, 1.014]",122,35
+547,DEVELOPMENT,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),122,62
+548,DEVELOPMENT,dev:DEV-1,systems/rossler/H3c/verdict,verdict,'pass',pass,122,92
+549,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,123,55
+550,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",123,63
+551,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,123,2
+552,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,123,12
+553,DEVELOPMENT,dev:DEV-3,systems/rossler/H2a/median_range,.4g,0.2762589145686989,0.2763,123,29
+554,DEVELOPMENT,dev:DEV-3,systems/rossler/H2a/range_ci,ci:.4g,"[0.2390397426789975, 0.3090082393336122]","[0.239, 0.309]",123,38
+555,DEVELOPMENT,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),123,91
+556,DEVELOPMENT,dev:DEV-3,systems/rossler/H2a/part_i_verdict,verdict,'fail',fail,123,121
+557,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,124,67
+558,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",124,75
+559,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,124,2
+560,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,124,12
+561,DEVELOPMENT,dev:DEV-3,systems/rossler/H2a/part_ii/zero/partial_corr,.4g,-0.023256232258638484,-0.02326,124,35
+562,DEVELOPMENT,dev:DEV-3,systems/rossler/H2a/part_ii/zero/ci,ci:.4g,"[-0.10942679996599956, 0.06863692404436904]","[-0.1094, 0.06864]",124,46
+563,DEVELOPMENT,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",124,103
+564,DEVELOPMENT,dev:DEV-3,systems/rossler/H2a/part_ii/zero/verdict,verdict,'inconclusive',inconclusive,124,142
+565,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,125,70
+566,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",125,78
+567,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,125,2
+568,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,125,12
+569,DEVELOPMENT,dev:DEV-3,systems/rossler/H2a/part_ii/interior/partial_corr,.4g,-0.05579716861962219,-0.0558,125,39
+570,DEVELOPMENT,dev:DEV-3,systems/rossler/H2a/part_ii/interior/ci,ci:.4g,"[-0.16292512768232487, 0.04627503572924542]","[-0.1629, 0.04628]",125,49
+571,DEVELOPMENT,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",125,106
+572,DEVELOPMENT,dev:DEV-3,systems/rossler/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,125,145
+573,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,126,57
+574,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",126,65
+575,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,126,2
+576,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,126,12
+577,DEVELOPMENT,dev:DEV-3,systems/rossler/H2b/noise/mean_state_spearman,.4g,0.1987164392402632,0.1987,126,29
+578,DEVELOPMENT,dev:DEV-3,systems/rossler/H2b/noise/ci,ci:.4g,"[0.1468168660917034, 0.2506509797359003]","[0.1468, 0.2507]",126,38
+579,DEVELOPMENT,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),126,93
+580,DEVELOPMENT,dev:DEV-3,systems/rossler/H2b/noise/verdict,verdict,'pass',pass,126,120
+581,DEVELOPMENT,dev:DEV-3,systems/rossler/H2b/library_change/level,.4f,0.9833333333333333,0.9833,127,60
+582,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,127,2
+583,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,127,12
+584,DEVELOPMENT,dev:DEV-3,systems/rossler/H2b/library_change/mean_change,.4g,0.0535260021301348,0.05353,127,30
+585,DEVELOPMENT,dev:DEV-3,systems/rossler/H2b/library_change/ci,ci:.4g,"[0.02880345669595855, 0.07507000596109008]","[0.0288, 0.07507]",127,40
+586,DEVELOPMENT,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),127,69
+587,DEVELOPMENT,dev:DEV-3,systems/rossler/H2b/library_change/verdict,verdict,'pass',pass,127,96
+588,DEVELOPMENT,dev:DEV-3,systems/rossler/H3c/level,.4f,0.9833333333333333,0.9833,128,53
+589,DEVELOPMENT,dev:DEV-3,config/core_systems/1,,'rossler',rossler,128,2
+590,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,128,12
+591,DEVELOPMENT,dev:DEV-3,systems/rossler/H3c/A5_over_A4_mse,.4g,0.9897140659600201,0.9897,128,26
+592,DEVELOPMENT,dev:DEV-3,systems/rossler/H3c/ci,ci:.4g,"[0.9457217936363592, 1.0354453687969498]","[0.9457, 1.035]",128,35
+593,DEVELOPMENT,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),128,62
+594,DEVELOPMENT,dev:DEV-3,systems/rossler/H3c/verdict,verdict,'pass',pass,128,92
+595,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,129,57
+596,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",129,65
+597,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,129,2
+598,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,129,12
+599,DEVELOPMENT,dev:DEV-4,systems/rossler/H2a/median_range,.4g,0.27435640142845213,0.2744,129,29
+600,DEVELOPMENT,dev:DEV-4,systems/rossler/H2a/range_ci,ci:.4g,"[0.24855753847030282, 0.30557210254966233]","[0.2486, 0.3056]",129,38
+601,DEVELOPMENT,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),129,93
+602,DEVELOPMENT,dev:DEV-4,systems/rossler/H2a/part_i_verdict,verdict,'fail',fail,129,123
+603,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,130,67
+604,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",130,75
+605,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,130,2
+606,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,130,12
+607,DEVELOPMENT,dev:DEV-4,systems/rossler/H2a/part_ii/zero/partial_corr,.4g,-0.0461357103092817,-0.04614,130,35
+608,DEVELOPMENT,dev:DEV-4,systems/rossler/H2a/part_ii/zero/ci,ci:.4g,"[-0.12255498263312857, 0.02962708218495373]","[-0.1226, 0.02963]",130,46
+609,DEVELOPMENT,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",130,103
+610,DEVELOPMENT,dev:DEV-4,systems/rossler/H2a/part_ii/zero/verdict,verdict,'inconclusive',inconclusive,130,142
+611,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,131,70
+612,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",131,78
+613,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,131,2
+614,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,131,12
+615,DEVELOPMENT,dev:DEV-4,systems/rossler/H2a/part_ii/interior/partial_corr,.4g,0.06591154884495978,0.06591,131,39
+616,DEVELOPMENT,dev:DEV-4,systems/rossler/H2a/part_ii/interior/ci,ci:.4g,"[-0.0151499880096077, 0.15376826740305305]","[-0.01515, 0.1538]",131,49
+617,DEVELOPMENT,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",131,106
+618,DEVELOPMENT,dev:DEV-4,systems/rossler/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,131,145
+619,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,132,56
+620,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",132,64
+621,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,132,2
+622,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,132,12
+623,DEVELOPMENT,dev:DEV-4,systems/rossler/H2b/noise/mean_state_spearman,.4g,0.23306968789716223,0.2331,132,29
+624,DEVELOPMENT,dev:DEV-4,systems/rossler/H2b/noise/ci,ci:.4g,"[0.18482775674650095, 0.2829582048453944]","[0.1848, 0.283]",132,38
+625,DEVELOPMENT,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),132,92
+626,DEVELOPMENT,dev:DEV-4,systems/rossler/H2b/noise/verdict,verdict,'pass',pass,132,119
+627,DEVELOPMENT,dev:DEV-4,systems/rossler/H2b/library_change/level,.4f,0.9833333333333333,0.9833,133,61
+628,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,133,2
+629,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,133,12
+630,DEVELOPMENT,dev:DEV-4,systems/rossler/H2b/library_change/mean_change,.4g,0.05443488572251862,0.05443,133,30
+631,DEVELOPMENT,dev:DEV-4,systems/rossler/H2b/library_change/ci,ci:.4g,"[0.030181195208610328, 0.07794155377240332]","[0.03018, 0.07794]",133,40
+632,DEVELOPMENT,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),133,70
+633,DEVELOPMENT,dev:DEV-4,systems/rossler/H2b/library_change/verdict,verdict,'pass',pass,133,97
+634,DEVELOPMENT,dev:DEV-4,systems/rossler/H3c/level,.4f,0.9833333333333333,0.9833,134,54
+635,DEVELOPMENT,dev:DEV-4,config/core_systems/1,,'rossler',rossler,134,2
+636,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,134,12
+637,DEVELOPMENT,dev:DEV-4,systems/rossler/H3c/A5_over_A4_mse,.4g,0.950745501333976,0.9507,134,26
+638,DEVELOPMENT,dev:DEV-4,systems/rossler/H3c/ci,ci:.4g,"[0.9082607450565331, 0.9905548593145301]","[0.9083, 0.9906]",134,35
+639,DEVELOPMENT,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),134,63
+640,DEVELOPMENT,dev:DEV-4,systems/rossler/H3c/verdict,verdict,'pass',pass,134,93
+641,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,135,54
+642,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",135,62
+643,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,135,2
+644,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,135,9
+645,DEVELOPMENT,dev:DEV-1,systems/chua/H2a/median_range,.4g,0.1647843238227654,0.1648,135,26
+646,DEVELOPMENT,dev:DEV-1,systems/chua/H2a/range_ci,ci:.4g,"[0.12771093776906717, 0.1973458248308774]","[0.1277, 0.1973]",135,35
+647,DEVELOPMENT,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),135,90
+648,DEVELOPMENT,dev:DEV-1,systems/chua/H2a/part_i_verdict,verdict,'fail',fail,135,120
+649,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,136,62
+650,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",136,70
+651,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,136,2
+652,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,136,9
+653,DEVELOPMENT,dev:DEV-1,systems/chua/H2a/part_ii/zero/partial_corr,.4g,-0.015547269464834276,-0.01555,136,32
+654,DEVELOPMENT,dev:DEV-1,systems/chua/H2a/part_ii/zero/ci,ci:.4g,"[-0.09249814702592478, 0.06699596006833654]","[-0.0925, 0.067]",136,43
+655,DEVELOPMENT,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",136,98
+656,DEVELOPMENT,dev:DEV-1,systems/chua/H2a/part_ii/zero/verdict,verdict,'pass',pass,136,137
+657,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,137,65
+658,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",137,73
+659,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,137,2
+660,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,137,9
+661,DEVELOPMENT,dev:DEV-1,systems/chua/H2a/part_ii/interior/partial_corr,.4g,0.1926239899721608,0.1926,137,36
+662,DEVELOPMENT,dev:DEV-1,systems/chua/H2a/part_ii/interior/ci,ci:.4g,"[0.08444371267419563, 0.29219673563108345]","[0.08444, 0.2922]",137,45
+663,DEVELOPMENT,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",137,101
+664,DEVELOPMENT,dev:DEV-1,systems/chua/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,137,140
+665,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,138,52
+666,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",138,60
+667,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,138,2
+668,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,138,9
+669,DEVELOPMENT,dev:DEV-1,systems/chua/H2b/noise/mean_state_spearman,.4g,0.22976764567846675,0.2298,138,26
+670,DEVELOPMENT,dev:DEV-1,systems/chua/H2b/noise/ci,ci:.4g,"[0.17398871762471368, 0.2790182718365296]","[0.174, 0.279]",138,35
+671,DEVELOPMENT,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),138,88
+672,DEVELOPMENT,dev:DEV-1,systems/chua/H2b/noise/verdict,verdict,'pass',pass,138,115
+673,DEVELOPMENT,dev:DEV-1,systems/chua/H2b/library_change/level,.4f,0.9833333333333333,0.9833,139,58
+674,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,139,2
+675,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,139,9
+676,DEVELOPMENT,dev:DEV-1,systems/chua/H2b/library_change/mean_change,.4g,0.057565987760747075,0.05757,139,27
+677,DEVELOPMENT,dev:DEV-1,systems/chua/H2b/library_change/ci,ci:.4g,"[0.035042042921516456, 0.07961584024099333]","[0.03504, 0.07962]",139,37
+678,DEVELOPMENT,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),139,67
+679,DEVELOPMENT,dev:DEV-1,systems/chua/H2b/library_change/verdict,verdict,'pass',pass,139,94
+680,DEVELOPMENT,dev:DEV-1,systems/chua/H3c/level,.4f,0.9833333333333333,0.9833,140,50
+681,DEVELOPMENT,dev:DEV-1,config/core_systems/2,,'chua',chua,140,2
+682,DEVELOPMENT,dev:DEV-1,provenance/seed_id,,'DEV-1',DEV-1,140,9
+683,DEVELOPMENT,dev:DEV-1,systems/chua/H3c/A5_over_A4_mse,.4g,0.9532728403914541,0.9533,140,23
+684,DEVELOPMENT,dev:DEV-1,systems/chua/H3c/ci,ci:.4g,"[0.9026106060203649, 1.001455127235949]","[0.9026, 1.001]",140,32
+685,DEVELOPMENT,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),140,59
+686,DEVELOPMENT,dev:DEV-1,systems/chua/H3c/verdict,verdict,'pass',pass,140,89
+687,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,141,54
+688,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",141,62
+689,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,141,2
+690,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,141,9
+691,DEVELOPMENT,dev:DEV-3,systems/chua/H2a/median_range,.4g,0.18819992397314067,0.1882,141,26
+692,DEVELOPMENT,dev:DEV-3,systems/chua/H2a/range_ci,ci:.4g,"[0.14741324514390192, 0.22366438651753534]","[0.1474, 0.2237]",141,35
+693,DEVELOPMENT,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),141,90
+694,DEVELOPMENT,dev:DEV-3,systems/chua/H2a/part_i_verdict,verdict,'fail',fail,141,120
+695,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,142,64
+696,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",142,72
+697,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,142,2
+698,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,142,9
+699,DEVELOPMENT,dev:DEV-3,systems/chua/H2a/part_ii/zero/partial_corr,.4g,-0.06326715343512905,-0.06327,142,32
+700,DEVELOPMENT,dev:DEV-3,systems/chua/H2a/part_ii/zero/ci,ci:.4g,"[-0.14342188831912428, 0.015018798327367813]","[-0.1434, 0.01502]",142,43
+701,DEVELOPMENT,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",142,100
+702,DEVELOPMENT,dev:DEV-3,systems/chua/H2a/part_ii/zero/verdict,verdict,'inconclusive',inconclusive,142,139
+703,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,143,63
+704,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",143,71
+705,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,143,2
+706,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,143,9
+707,DEVELOPMENT,dev:DEV-3,systems/chua/H2a/part_ii/interior/partial_corr,.4g,0.14399695243333308,0.144,143,36
+708,DEVELOPMENT,dev:DEV-3,systems/chua/H2a/part_ii/interior/ci,ci:.4g,"[0.040149827556270966, 0.2510175271460189]","[0.04015, 0.251]",143,44
+709,DEVELOPMENT,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",143,99
+710,DEVELOPMENT,dev:DEV-3,systems/chua/H2a/part_ii/interior/verdict,verdict,'inconclusive',inconclusive,143,138
+711,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,144,54
+712,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",144,62
+713,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,144,2
+714,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,144,9
+715,DEVELOPMENT,dev:DEV-3,systems/chua/H2b/noise/mean_state_spearman,.4g,0.24592766164155896,0.2459,144,26
+716,DEVELOPMENT,dev:DEV-3,systems/chua/H2b/noise/ci,ci:.4g,"[0.19614263239033522, 0.2995738747899857]","[0.1961, 0.2996]",144,35
+717,DEVELOPMENT,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),144,90
+718,DEVELOPMENT,dev:DEV-3,systems/chua/H2b/noise/verdict,verdict,'pass',pass,144,117
+719,DEVELOPMENT,dev:DEV-3,systems/chua/H2b/library_change/level,.4f,0.9833333333333333,0.9833,145,58
+720,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,145,2
+721,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,145,9
+722,DEVELOPMENT,dev:DEV-3,systems/chua/H2b/library_change/mean_change,.4g,0.04153818457941084,0.04154,145,27
+723,DEVELOPMENT,dev:DEV-3,systems/chua/H2b/library_change/ci,ci:.4g,"[0.015247240700848801, 0.06636352906963744]","[0.01525, 0.06636]",145,37
+724,DEVELOPMENT,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),145,67
+725,DEVELOPMENT,dev:DEV-3,systems/chua/H2b/library_change/verdict,verdict,'pass',pass,145,94
+726,DEVELOPMENT,dev:DEV-3,systems/chua/H3c/level,.4f,0.9833333333333333,0.9833,146,49
+727,DEVELOPMENT,dev:DEV-3,config/core_systems/2,,'chua',chua,146,2
+728,DEVELOPMENT,dev:DEV-3,provenance/seed_id,,'DEV-3',DEV-3,146,9
+729,DEVELOPMENT,dev:DEV-3,systems/chua/H3c/A5_over_A4_mse,.4g,1.0544257252213103,1.054,146,23
+730,DEVELOPMENT,dev:DEV-3,systems/chua/H3c/ci,ci:.4g,"[0.9793655994600373, 1.1569364927490433]","[0.9794, 1.157]",146,31
+731,DEVELOPMENT,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),146,58
+732,DEVELOPMENT,dev:DEV-3,systems/chua/H3c/verdict,verdict,'inconclusive',inconclusive,146,88
+733,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,147,54
+734,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",147,62
+735,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,147,2
+736,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,147,9
+737,DEVELOPMENT,dev:DEV-4,systems/chua/H2a/median_range,.4g,0.1726953204738046,0.1727,147,26
+738,DEVELOPMENT,dev:DEV-4,systems/chua/H2a/range_ci,ci:.4g,"[0.14619768895421972, 0.20524756927600274]","[0.1462, 0.2052]",147,35
+739,DEVELOPMENT,const,primary_parts/0/band_text,,'interval below 0.1 (strict)',interval below 0.1 (strict),147,90
+740,DEVELOPMENT,dev:DEV-4,systems/chua/H2a/part_i_verdict,verdict,'fail',fail,147,120
+741,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,148,64
+742,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",148,72
+743,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,148,2
+744,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,148,9
+745,DEVELOPMENT,dev:DEV-4,systems/chua/H2a/part_ii/zero/partial_corr,.4g,-0.04580708170812134,-0.04581,148,32
+746,DEVELOPMENT,dev:DEV-4,systems/chua/H2a/part_ii/zero/ci,ci:.4g,"[-0.12142978864609985, 0.029151187763168884]","[-0.1214, 0.02915]",148,43
+747,DEVELOPMENT,const,primary_parts/1/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",148,100
+748,DEVELOPMENT,dev:DEV-4,systems/chua/H2a/part_ii/zero/verdict,verdict,'inconclusive',inconclusive,148,139
+749,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,149,64
+750,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",149,72
+751,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,149,2
+752,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,149,9
+753,DEVELOPMENT,dev:DEV-4,systems/chua/H2a/part_ii/interior/partial_corr,.4g,0.22354266863385358,0.2235,149,36
+754,DEVELOPMENT,dev:DEV-4,systems/chua/H2a/part_ii/interior/ci,ci:.4g,"[0.1327441391354221, 0.3164365484227924]","[0.1327, 0.3164]",149,45
+755,DEVELOPMENT,const,primary_parts/2/band_text,,"'interval inside (−0.1, 0.1) (strict)'","interval inside (−0.1, 0.1) (strict)",149,100
+756,DEVELOPMENT,dev:DEV-4,systems/chua/H2a/part_ii/interior/verdict,verdict,'fail',fail,149,139
+757,DEVELOPMENT,const,constants/primary_level/text,,'0.9833',0.9833,150,53
+758,DEVELOPMENT,const,constants/level_design_note/text,,"'design value, not stored'","design value, not stored",150,61
+759,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,150,2
+760,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,150,9
+761,DEVELOPMENT,dev:DEV-4,systems/chua/H2b/noise/mean_state_spearman,.4g,0.25904723865918383,0.259,150,26
+762,DEVELOPMENT,dev:DEV-4,systems/chua/H2b/noise/ci,ci:.4g,"[0.20926067485423128, 0.310286664784854]","[0.2093, 0.3103]",150,34
+763,DEVELOPMENT,const,primary_parts/3/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),150,89
+764,DEVELOPMENT,dev:DEV-4,systems/chua/H2b/noise/verdict,verdict,'pass',pass,150,116
+765,DEVELOPMENT,dev:DEV-4,systems/chua/H2b/library_change/level,.4f,0.9833333333333333,0.9833,151,58
+766,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,151,2
+767,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,151,9
+768,DEVELOPMENT,dev:DEV-4,systems/chua/H2b/library_change/mean_change,.4g,0.022350557596018904,0.02235,151,27
+769,DEVELOPMENT,dev:DEV-4,systems/chua/H2b/library_change/ci,ci:.4g,"[-0.005069523138538133, 0.047198191041867975]","[-0.00507, 0.0472]",151,37
+770,DEVELOPMENT,const,primary_parts/4/band_text,,'lower bound > 0 (strict)',lower bound > 0 (strict),151,67
+771,DEVELOPMENT,dev:DEV-4,systems/chua/H2b/library_change/verdict,verdict,'inconclusive',inconclusive,151,94
+772,DEVELOPMENT,dev:DEV-4,systems/chua/H3c/level,.4f,0.9833333333333333,0.9833,152,49
+773,DEVELOPMENT,dev:DEV-4,config/core_systems/2,,'chua',chua,152,2
+774,DEVELOPMENT,dev:DEV-4,provenance/seed_id,,'DEV-4',DEV-4,152,9
+775,DEVELOPMENT,dev:DEV-4,systems/chua/H3c/A5_over_A4_mse,.4g,1.0248578146163159,1.025,152,23
+776,DEVELOPMENT,dev:DEV-4,systems/chua/H3c/ci,ci:.4g,"[0.9513259162228915, 1.0889662564096056]","[0.9513, 1.089]",152,31
+777,DEVELOPMENT,const,primary_parts/5/band_text,,'upper bound ≤ 1.05 (closed)',upper bound ≤ 1.05 (closed),152,58
+778,DEVELOPMENT,dev:DEV-4,systems/chua/H3c/verdict,verdict,'inconclusive',inconclusive,152,88
+779,DEVELOPMENT,meta,design_levels_dev,,'36',36,154,38
+780,DEVELOPMENT,meta,systems_ext,,"'hindmarsh_rose, hyper_jha, lorenz63_r166, lorenz96_4, rossler_hyper, rossler_z'","hindmarsh_rose, hyper_jha, lorenz63_r166, lorenz96_4, rossler_hyper, rossler_z",158,245
+781,DEVELOPMENT,meta,seeds_ext,,'DEV-3',DEV-3,160,51
+782,DEVELOPMENT,ext:hindmarsh_rose,config/core_systems/0,,'hindmarsh_rose',hindmarsh_rose,164,10
+783,DEVELOPMENT,meta,sha_ext:hindmarsh_rose,,'090f82e0ba16aed9f01666d2ab4043f394f32c6cebc2273c7d804059f7b1b8e4',090f82e0ba16aed9f01666d2ab4043f394f32c6cebc2273c7d804059f7b1b8e4,164,214
+784,DEVELOPMENT,ext:hindmarsh_rose,provenance/seed_id,,'DEV-3',DEV-3,164,2
+785,DEVELOPMENT,ext:hindmarsh_rose,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,164,39
+786,DEVELOPMENT,ext:hindmarsh_rose,provenance/preset,,'full',full,164,84
+787,DEVELOPMENT,ext:hindmarsh_rose,provenance/commit,,'392a069d25a8efd2d9d74d46d3475ba17f010bbf',392a069d25a8efd2d9d74d46d3475ba17f010bbf,164,91
+788,DEVELOPMENT,ext:hindmarsh_rose,provenance/device/backend,,'gpu',gpu,164,134
+789,DEVELOPMENT,ext:hindmarsh_rose,provenance/complete,yn,True,yes,164,140
+790,DEVELOPMENT,ext:hindmarsh_rose,provenance/dirty,yn,False,no,164,146
+791,DEVELOPMENT,ext:hindmarsh_rose,provenance/wall_seconds,.0f,5166.773296765983,5167,164,151
+792,DEVELOPMENT,ext:hindmarsh_rose,provenance/start_utc,,'2026-10-21T08:00:41+00:00',2026-10-21T08:00:41+00:00,164,158
+793,DEVELOPMENT,ext:hindmarsh_rose,provenance/end_utc,,'2026-10-21T09:26:48+00:00',2026-10-21T09:26:48+00:00,164,186
+794,DEVELOPMENT,ext:hyper_jha,config/core_systems/0,,'hyper_jha',hyper_jha,165,10
+795,DEVELOPMENT,meta,sha_ext:hyper_jha,,'5edfd1deb91eac73e56701cbc8ee9abaa852b1c714e1571cd1e96be87c603b7a',5edfd1deb91eac73e56701cbc8ee9abaa852b1c714e1571cd1e96be87c603b7a,165,209
+796,DEVELOPMENT,ext:hyper_jha,provenance/seed_id,,'DEV-3',DEV-3,165,2
+797,DEVELOPMENT,ext:hyper_jha,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,165,34
+798,DEVELOPMENT,ext:hyper_jha,provenance/preset,,'full',full,165,79
+799,DEVELOPMENT,ext:hyper_jha,provenance/commit,,'392a069d25a8efd2d9d74d46d3475ba17f010bbf',392a069d25a8efd2d9d74d46d3475ba17f010bbf,165,86
+800,DEVELOPMENT,ext:hyper_jha,provenance/device/backend,,'gpu',gpu,165,129
+801,DEVELOPMENT,ext:hyper_jha,provenance/complete,yn,True,yes,165,135
+802,DEVELOPMENT,ext:hyper_jha,provenance/dirty,yn,False,no,165,141
+803,DEVELOPMENT,ext:hyper_jha,provenance/wall_seconds,.0f,4039.9301625769585,4040,165,146
+804,DEVELOPMENT,ext:hyper_jha,provenance/start_utc,,'2026-10-21T08:00:41+00:00',2026-10-21T08:00:41+00:00,165,153
+805,DEVELOPMENT,ext:hyper_jha,provenance/end_utc,,'2026-10-21T09:08:01+00:00',2026-10-21T09:08:01+00:00,165,181
+806,DEVELOPMENT,ext:lorenz63_r166,config/core_systems/0,,'lorenz63_r166',lorenz63_r166,166,10
+807,DEVELOPMENT,meta,sha_ext:lorenz63_r166,,'183a151966ae5c851bd1bde05ab1e8ff7b82c7da13a0974a2896ef8e60671e4c',183a151966ae5c851bd1bde05ab1e8ff7b82c7da13a0974a2896ef8e60671e4c,166,213
+808,DEVELOPMENT,ext:lorenz63_r166,provenance/seed_id,,'DEV-3',DEV-3,166,2
+809,DEVELOPMENT,ext:lorenz63_r166,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,166,38
+810,DEVELOPMENT,ext:lorenz63_r166,provenance/preset,,'full',full,166,83
+811,DEVELOPMENT,ext:lorenz63_r166,provenance/commit,,'974519a81a4a53e62069b85ab04c8ce783e17106',974519a81a4a53e62069b85ab04c8ce783e17106,166,90
+812,DEVELOPMENT,ext:lorenz63_r166,provenance/device/backend,,'gpu',gpu,166,133
+813,DEVELOPMENT,ext:lorenz63_r166,provenance/complete,yn,True,yes,166,139
+814,DEVELOPMENT,ext:lorenz63_r166,provenance/dirty,yn,False,no,166,145
+815,DEVELOPMENT,ext:lorenz63_r166,provenance/wall_seconds,.0f,2721.1165150810266,2721,166,150
+816,DEVELOPMENT,ext:lorenz63_r166,provenance/start_utc,,'2026-10-20T11:55:08+00:00',2026-10-20T11:55:08+00:00,166,157
+817,DEVELOPMENT,ext:lorenz63_r166,provenance/end_utc,,'2026-10-20T12:40:29+00:00',2026-10-20T12:40:29+00:00,166,185
+818,DEVELOPMENT,ext:lorenz96_4,config/core_systems/0,,'lorenz96_4',lorenz96_4,167,10
+819,DEVELOPMENT,meta,sha_ext:lorenz96_4,,'8aaac680997ae24407526cba6f5cc55f7b5744d47330596e4ec03323c4da2e6b',8aaac680997ae24407526cba6f5cc55f7b5744d47330596e4ec03323c4da2e6b,167,210
+820,DEVELOPMENT,ext:lorenz96_4,provenance/seed_id,,'DEV-3',DEV-3,167,2
+821,DEVELOPMENT,ext:lorenz96_4,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,167,35
+822,DEVELOPMENT,ext:lorenz96_4,provenance/preset,,'full',full,167,80
+823,DEVELOPMENT,ext:lorenz96_4,provenance/commit,,'392a069d25a8efd2d9d74d46d3475ba17f010bbf',392a069d25a8efd2d9d74d46d3475ba17f010bbf,167,87
+824,DEVELOPMENT,ext:lorenz96_4,provenance/device/backend,,'gpu',gpu,167,130
+825,DEVELOPMENT,ext:lorenz96_4,provenance/complete,yn,True,yes,167,136
+826,DEVELOPMENT,ext:lorenz96_4,provenance/dirty,yn,False,no,167,142
+827,DEVELOPMENT,ext:lorenz96_4,provenance/wall_seconds,.0f,1301.6521443240345,1302,167,147
+828,DEVELOPMENT,ext:lorenz96_4,provenance/start_utc,,'2026-10-21T09:08:43+00:00',2026-10-21T09:08:43+00:00,167,154
+829,DEVELOPMENT,ext:lorenz96_4,provenance/end_utc,,'2026-10-21T09:30:25+00:00',2026-10-21T09:30:25+00:00,167,182
+830,DEVELOPMENT,ext:rossler_hyper,config/core_systems/0,,'rossler_hyper',rossler_hyper,168,10
+831,DEVELOPMENT,meta,sha_ext:rossler_hyper,,'ac588151e6aad4efabf1be0e9977c4d3366d895d605722cf6a1c660c054ceffc',ac588151e6aad4efabf1be0e9977c4d3366d895d605722cf6a1c660c054ceffc,168,201
+832,DEVELOPMENT,ext:rossler_hyper,provenance/seed_id,,'DEV-3',DEV-3,168,2
+833,DEVELOPMENT,ext:rossler_hyper,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,168,26
+834,DEVELOPMENT,ext:rossler_hyper,provenance/preset,,'full',full,168,71
+835,DEVELOPMENT,ext:rossler_hyper,provenance/commit,,'974519a81a4a53e62069b85ab04c8ce783e17106',974519a81a4a53e62069b85ab04c8ce783e17106,168,78
+836,DEVELOPMENT,ext:rossler_hyper,provenance/device/backend,,'gpu',gpu,168,121
+837,DEVELOPMENT,ext:rossler_hyper,provenance/complete,yn,True,yes,168,127
+838,DEVELOPMENT,ext:rossler_hyper,provenance/dirty,yn,False,no,168,133
+839,DEVELOPMENT,ext:rossler_hyper,provenance/wall_seconds,.0f,2833.3614234649576,2833,168,138
+840,DEVELOPMENT,ext:rossler_hyper,provenance/start_utc,,'2026-10-20T12:41:10+00:00',2026-10-20T12:41:10+00:00,168,145
+841,DEVELOPMENT,ext:rossler_hyper,provenance/end_utc,,'2026-10-20T13:28:23+00:00',2026-10-20T13:28:23+00:00,168,173
+842,DEVELOPMENT,ext:rossler_z,config/core_systems/0,,'rossler_z',rossler_z,169,10
+843,DEVELOPMENT,meta,sha_ext:rossler_z,,'f95ae88a22bccfe04dba48aa1f23632243a5b3c8cd740b261f098a17c5fdbf93',f95ae88a22bccfe04dba48aa1f23632243a5b3c8cd740b261f098a17c5fdbf93,169,208
+844,DEVELOPMENT,ext:rossler_z,provenance/seed_id,,'DEV-3',DEV-3,169,2
+845,DEVELOPMENT,ext:rossler_z,provenance/label,,'DEVELOPMENT (DEV-3): not a hypothesis test',DEVELOPMENT (DEV-3): not a hypothesis test,169,34
+846,DEVELOPMENT,ext:rossler_z,provenance/preset,,'full',full,169,79
+847,DEVELOPMENT,ext:rossler_z,provenance/commit,,'974519a81a4a53e62069b85ab04c8ce783e17106',974519a81a4a53e62069b85ab04c8ce783e17106,169,86
+848,DEVELOPMENT,ext:rossler_z,provenance/device/backend,,'gpu',gpu,169,129
+849,DEVELOPMENT,ext:rossler_z,provenance/complete,yn,True,yes,169,135
+850,DEVELOPMENT,ext:rossler_z,provenance/dirty,yn,False,no,169,141
+851,DEVELOPMENT,ext:rossler_z,provenance/wall_seconds,.0f,903.7883676120546,904,169,146
+852,DEVELOPMENT,ext:rossler_z,provenance/start_utc,,'2026-10-20T11:39:06+00:00',2026-10-20T11:39:06+00:00,169,152
+853,DEVELOPMENT,ext:rossler_z,provenance/end_utc,,'2026-10-20T11:54:10+00:00',2026-10-20T11:54:10+00:00,169,180
+854,DEVELOPMENT,meta,seeds_ext,,'DEV-3',DEV-3,171,51
+855,DEVELOPMENT,ext:hindmarsh_rose,config/core_systems/0,,'hindmarsh_rose',hindmarsh_rose,175,2
+856,DEVELOPMENT,ext:hindmarsh_rose,provenance/seed_id,,'DEV-3',DEV-3,175,31
+857,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/validation/gate/V1,yn,True,yes,175,39
+858,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/validation/gate/V2,yn,True,yes,175,45
+859,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/validation/gate/V4,yn,True,yes,175,51
+860,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/validation/gate/V5,yn,True,yes,175,57
+861,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/validation/gate/V6,yn,True,yes,175,63
+862,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/validation/gate/V7,yn,False,no,175,69
+863,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/validation/gate/gate_pass,yn,False,no,175,74
+864,DEVELOPMENT,ext:hyper_jha,config/core_systems/0,,'hyper_jha',hyper_jha,176,2
+865,DEVELOPMENT,ext:hyper_jha,provenance/seed_id,,'DEV-3',DEV-3,176,26
+866,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/validation/gate/V1,yn,True,yes,176,34
+867,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/validation/gate/V2,yn,True,yes,176,40
+868,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/validation/gate/V4,yn,True,yes,176,46
+869,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/validation/gate/V5,yn,True,yes,176,52
+870,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/validation/gate/V6,yn,True,yes,176,58
+871,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/validation/gate/V7,yn,False,no,176,64
+872,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/validation/gate/gate_pass,yn,False,no,176,69
+873,DEVELOPMENT,ext:lorenz63_r166,config/core_systems/0,,'lorenz63_r166',lorenz63_r166,177,2
+874,DEVELOPMENT,ext:lorenz63_r166,provenance/seed_id,,'DEV-3',DEV-3,177,30
+875,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/validation/gate/V1,yn,True,yes,177,38
+876,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/validation/gate/V2,yn,True,yes,177,44
+877,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/validation/gate/V4,yn,True,yes,177,50
+878,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/validation/gate/V5,yn,True,yes,177,56
+879,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/validation/gate/V6,yn,True,yes,177,62
+880,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/validation/gate/V7,yn,False,no,177,68
+881,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/validation/gate/gate_pass,yn,False,no,177,73
+882,DEVELOPMENT,ext:lorenz96_4,config/core_systems/0,,'lorenz96_4',lorenz96_4,178,2
+883,DEVELOPMENT,ext:lorenz96_4,provenance/seed_id,,'DEV-3',DEV-3,178,27
+884,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/validation/gate/V1,yn,True,yes,178,35
+885,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/validation/gate/V2,yn,True,yes,178,41
+886,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/validation/gate/V4,yn,True,yes,178,47
+887,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/validation/gate/V5,yn,True,yes,178,53
+888,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/validation/gate/V6,yn,True,yes,178,59
+889,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/validation/gate/V7,yn,False,no,178,65
+890,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/validation/gate/gate_pass,yn,False,no,178,70
+891,DEVELOPMENT,ext:rossler_hyper,config/core_systems/0,,'rossler_hyper',rossler_hyper,179,2
+892,DEVELOPMENT,ext:rossler_hyper,provenance/seed_id,,'DEV-3',DEV-3,179,18
+893,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/validation/gate/V1,yn,True,yes,179,26
+894,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/validation/gate/V2,yn,True,yes,179,32
+895,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/validation/gate/V4,yn,True,yes,179,38
+896,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/validation/gate/V5,yn,True,yes,179,44
+897,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/validation/gate/V6,yn,True,yes,179,50
+898,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/validation/gate/V7,yn,True,yes,179,56
+899,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/validation/gate/gate_pass,yn,True,yes,179,62
+900,DEVELOPMENT,ext:rossler_z,config/core_systems/0,,'rossler_z',rossler_z,180,2
+901,DEVELOPMENT,ext:rossler_z,provenance/seed_id,,'DEV-3',DEV-3,180,26
+902,DEVELOPMENT,ext:rossler_z,systems/rossler_z/validation/gate/V1,yn,True,yes,180,34
+903,DEVELOPMENT,ext:rossler_z,systems/rossler_z/validation/gate/V2,yn,True,yes,180,40
+904,DEVELOPMENT,ext:rossler_z,systems/rossler_z/validation/gate/V4,yn,True,yes,180,46
+905,DEVELOPMENT,ext:rossler_z,systems/rossler_z/validation/gate/V5,yn,True,yes,180,52
+906,DEVELOPMENT,ext:rossler_z,systems/rossler_z/validation/gate/V6,yn,True,yes,180,58
+907,DEVELOPMENT,ext:rossler_z,systems/rossler_z/validation/gate/V7,yn,False,no,180,64
+908,DEVELOPMENT,ext:rossler_z,systems/rossler_z/validation/gate/gate_pass,yn,False,no,180,69
+909,DEVELOPMENT,meta,provisional_ext,,'hindmarsh_rose (seed DEV-3: V7); hyper_jha (seed DEV-3: V7); lorenz63_r166 (seed DEV-3: V7); lorenz96_4 (seed DEV-3: V7); rossler_z (seed DEV-3: V7)',hindmarsh_rose (seed DEV-3: V7); hyper_jha (seed DEV-3: V7); lorenz63_r166 (seed DEV-3: V7); lorenz96_4 (seed DEV-3: V7); rossler_z (seed DEV-3: V7),182,234
+910,DEVELOPMENT,meta,seeds_ext,,'DEV-3',DEV-3,184,51
+911,DEVELOPMENT,ext:hindmarsh_rose,config/core_systems/0,,'hindmarsh_rose',hindmarsh_rose,188,2
+912,DEVELOPMENT,ext:hindmarsh_rose,provenance/seed_id,,'DEV-3',DEV-3,188,31
+913,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/context/lambda_max,.4g,0.21678000879703424,0.2168,188,39
+914,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/validation/cp_median_vpt_lyapunov,.3g,0.8666666666666667,0.867,188,48
+915,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/V7/median_slope,.4f,0.40539500898306063,0.4054,188,56
+916,DEVELOPMENT,ext:hyper_jha,config/core_systems/0,,'hyper_jha',hyper_jha,189,2
+917,DEVELOPMENT,ext:hyper_jha,provenance/seed_id,,'DEV-3',DEV-3,189,26
+918,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/context/lambda_max,.4g,0.3596491603967948,0.3596,189,34
+919,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/validation/cp_median_vpt_lyapunov,.3g,0.36666666666666664,0.367,189,43
+920,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/V7/median_slope,.4f,1.004658532372246,1.0047,189,51
+921,DEVELOPMENT,ext:lorenz63_r166,config/core_systems/0,,'lorenz63_r166',lorenz63_r166,190,2
+922,DEVELOPMENT,ext:lorenz63_r166,provenance/seed_id,,'DEV-3',DEV-3,190,30
+923,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/context/lambda_max,.4g,0.6224320098292552,0.6224,190,38
+924,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/validation/cp_median_vpt_lyapunov,.3g,3.3666666666666667,3.37,190,47
+925,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/V7/median_slope,.4f,0.9267583101623744,0.9268,190,54
+926,DEVELOPMENT,ext:lorenz96_4,config/core_systems/0,,'lorenz96_4',lorenz96_4,191,2
+927,DEVELOPMENT,ext:lorenz96_4,provenance/seed_id,,'DEV-3',DEV-3,191,27
+928,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/context/lambda_max,.4g,1.1964213277385642,1.196,191,35
+929,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/validation/cp_median_vpt_lyapunov,.3g,0.9,0.9,191,43
+930,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/V7/median_slope,.4f,1.0108860158817845,1.0109,191,49
+931,DEVELOPMENT,ext:rossler_hyper,config/core_systems/0,,'rossler_hyper',rossler_hyper,192,2
+932,DEVELOPMENT,ext:rossler_hyper,provenance/seed_id,,'DEV-3',DEV-3,192,18
+933,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/context/lambda_max,.4g,0.11272865874045755,0.1127,192,26
+934,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/validation/cp_median_vpt_lyapunov,.3g,1.5666666666666667,1.57,192,35
+935,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/V7/median_slope,.4f,1.000388116491035,1.0004,192,42
+936,DEVELOPMENT,ext:rossler_z,config/core_systems/0,,'rossler_z',rossler_z,193,2
+937,DEVELOPMENT,ext:rossler_z,provenance/seed_id,,'DEV-3',DEV-3,193,26
+938,DEVELOPMENT,ext:rossler_z,systems/rossler_z/context/lambda_max,.4g,0.07165017999321659,0.07165,193,34
+939,DEVELOPMENT,ext:rossler_z,systems/rossler_z/validation/cp_median_vpt_lyapunov,.3g,0.4666666666666667,0.467,193,44
+940,DEVELOPMENT,ext:rossler_z,systems/rossler_z/V7/median_slope,.4f,0.8718117191726448,0.8718,193,52
+941,DEVELOPMENT,meta,seeds_ext,,'DEV-3',DEV-3,195,51
+942,DEVELOPMENT,ext:hindmarsh_rose,config/core_systems/0,,'hindmarsh_rose',hindmarsh_rose,199,2
+943,DEVELOPMENT,ext:hindmarsh_rose,provenance/seed_id,,'DEV-3',DEV-3,199,31
+944,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H2a/by_system/hindmarsh_rose,verdict,'inconclusive',inconclusive,199,39
+945,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H2b/by_system/hindmarsh_rose,verdict,'fail',fail,199,54
+946,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H3c/by_system/hindmarsh_rose,verdict,'pass',pass,199,61
+947,DEVELOPMENT,ext:hyper_jha,config/core_systems/0,,'hyper_jha',hyper_jha,200,2
+948,DEVELOPMENT,ext:hyper_jha,provenance/seed_id,,'DEV-3',DEV-3,200,26
+949,DEVELOPMENT,ext:hyper_jha,verdicts/H2a/by_system/hyper_jha,verdict,'fail',fail,200,34
+950,DEVELOPMENT,ext:hyper_jha,verdicts/H2b/by_system/hyper_jha,verdict,'pass',pass,200,41
+951,DEVELOPMENT,ext:hyper_jha,verdicts/H3c/by_system/hyper_jha,verdict,'pass',pass,200,48
+952,DEVELOPMENT,ext:lorenz63_r166,config/core_systems/0,,'lorenz63_r166',lorenz63_r166,201,2
+953,DEVELOPMENT,ext:lorenz63_r166,provenance/seed_id,,'DEV-3',DEV-3,201,30
+954,DEVELOPMENT,ext:lorenz63_r166,verdicts/H2a/by_system/lorenz63_r166,verdict,'fail',fail,201,38
+955,DEVELOPMENT,ext:lorenz63_r166,verdicts/H2b/by_system/lorenz63_r166,verdict,'inconclusive',inconclusive,201,45
+956,DEVELOPMENT,ext:lorenz63_r166,verdicts/H3c/by_system/lorenz63_r166,verdict,'pass',pass,201,60
+957,DEVELOPMENT,ext:lorenz96_4,config/core_systems/0,,'lorenz96_4',lorenz96_4,202,2
+958,DEVELOPMENT,ext:lorenz96_4,provenance/seed_id,,'DEV-3',DEV-3,202,27
+959,DEVELOPMENT,ext:lorenz96_4,verdicts/H2a/by_system/lorenz96_4,verdict,'fail',fail,202,35
+960,DEVELOPMENT,ext:lorenz96_4,verdicts/H2b/by_system/lorenz96_4,verdict,'pass',pass,202,42
+961,DEVELOPMENT,ext:lorenz96_4,verdicts/H3c/by_system/lorenz96_4,verdict,'pass',pass,202,49
+962,DEVELOPMENT,ext:rossler_hyper,config/core_systems/0,,'rossler_hyper',rossler_hyper,203,2
+963,DEVELOPMENT,ext:rossler_hyper,provenance/seed_id,,'DEV-3',DEV-3,203,18
+964,DEVELOPMENT,ext:rossler_hyper,verdicts/H2a/by_system/rossler_hyper,verdict,'fail',fail,203,26
+965,DEVELOPMENT,ext:rossler_hyper,verdicts/H2b/by_system/rossler_hyper,verdict,'pass',pass,203,33
+966,DEVELOPMENT,ext:rossler_hyper,verdicts/H3c/by_system/rossler_hyper,verdict,'inconclusive',inconclusive,203,40
+967,DEVELOPMENT,ext:rossler_z,config/core_systems/0,,'rossler_z',rossler_z,204,2
+968,DEVELOPMENT,ext:rossler_z,provenance/seed_id,,'DEV-3',DEV-3,204,26
+969,DEVELOPMENT,ext:rossler_z,verdicts/H2a/by_system/rossler_z,verdict,'fail',fail,204,34
+970,DEVELOPMENT,ext:rossler_z,verdicts/H2b/by_system/rossler_z,verdict,'fail',fail,204,41
+971,DEVELOPMENT,ext:rossler_z,verdicts/H3c/by_system/rossler_z,verdict,'pass',pass,204,48
+972,DEVELOPMENT,meta,seeds_ext,,'DEV-3',DEV-3,206,51
+973,DEVELOPMENT,ext:hindmarsh_rose,config/core_systems/0,,'hindmarsh_rose',hindmarsh_rose,210,2
+974,DEVELOPMENT,ext:hindmarsh_rose,provenance/seed_id,,'DEV-3',DEV-3,210,31
+975,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H1a/by_system/hindmarsh_rose,verdict,'fail',fail,210,39
+976,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H1b/by_system/hindmarsh_rose,verdict,'fail',fail,210,46
+977,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H1c/by_system/hindmarsh_rose,verdict,'fail',fail,210,53
+978,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H1d/by_system/hindmarsh_rose,verdict,'fail',fail,210,60
+979,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H2c/by_system/hindmarsh_rose,verdict,'fail',fail,210,67
+980,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H2d/by_system/hindmarsh_rose,verdict,'fail',fail,210,74
+981,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H2e/by_system/hindmarsh_rose,verdict,'inconclusive',inconclusive,210,81
+982,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H3a/by_system/hindmarsh_rose,verdict,'inconclusive',inconclusive,210,96
+983,DEVELOPMENT,ext:hindmarsh_rose,verdicts/H3b/by_system/hindmarsh_rose,verdict,'inconclusive',inconclusive,210,111
+984,DEVELOPMENT,ext:hyper_jha,config/core_systems/0,,'hyper_jha',hyper_jha,211,2
+985,DEVELOPMENT,ext:hyper_jha,provenance/seed_id,,'DEV-3',DEV-3,211,26
+986,DEVELOPMENT,ext:hyper_jha,verdicts/H1a/by_system/hyper_jha,verdict,'inconclusive',inconclusive,211,34
+987,DEVELOPMENT,ext:hyper_jha,verdicts/H1b/by_system/hyper_jha,verdict,'fail',fail,211,49
+988,DEVELOPMENT,ext:hyper_jha,verdicts/H1c/by_system/hyper_jha,verdict,'fail',fail,211,56
+989,DEVELOPMENT,ext:hyper_jha,verdicts/H1d/by_system/hyper_jha,verdict,'fail',fail,211,63
+990,DEVELOPMENT,ext:hyper_jha,verdicts/H2c/by_system/hyper_jha,verdict,'fail',fail,211,70
+991,DEVELOPMENT,ext:hyper_jha,verdicts/H2d/by_system/hyper_jha,verdict,'inconclusive',inconclusive,211,77
+992,DEVELOPMENT,ext:hyper_jha,verdicts/H2e/by_system/hyper_jha,verdict,'fail',fail,211,92
+993,DEVELOPMENT,ext:hyper_jha,verdicts/H3a/by_system/hyper_jha,verdict,'pass',pass,211,99
+994,DEVELOPMENT,ext:hyper_jha,verdicts/H3b/by_system/hyper_jha,verdict,'fail',fail,211,106
+995,DEVELOPMENT,ext:lorenz63_r166,config/core_systems/0,,'lorenz63_r166',lorenz63_r166,212,2
+996,DEVELOPMENT,ext:lorenz63_r166,provenance/seed_id,,'DEV-3',DEV-3,212,30
+997,DEVELOPMENT,ext:lorenz63_r166,verdicts/H1a/by_system/lorenz63_r166,verdict,'fail',fail,212,38
+998,DEVELOPMENT,ext:lorenz63_r166,verdicts/H1b/by_system/lorenz63_r166,verdict,'fail',fail,212,45
+999,DEVELOPMENT,ext:lorenz63_r166,verdicts/H1c/by_system/lorenz63_r166,verdict,'fail',fail,212,52
+1000,DEVELOPMENT,ext:lorenz63_r166,verdicts/H1d/by_system/lorenz63_r166,verdict,'fail',fail,212,59
+1001,DEVELOPMENT,ext:lorenz63_r166,verdicts/H2c/by_system/lorenz63_r166,verdict,'fail',fail,212,66
+1002,DEVELOPMENT,ext:lorenz63_r166,verdicts/H2d/by_system/lorenz63_r166,verdict,'inconclusive',inconclusive,212,73
+1003,DEVELOPMENT,ext:lorenz63_r166,verdicts/H2e/by_system/lorenz63_r166,verdict,'inconclusive',inconclusive,212,88
+1004,DEVELOPMENT,ext:lorenz63_r166,verdicts/H3a/by_system/lorenz63_r166,verdict,'pass',pass,212,103
+1005,DEVELOPMENT,ext:lorenz63_r166,verdicts/H3b/by_system/lorenz63_r166,verdict,'fail',fail,212,110
+1006,DEVELOPMENT,ext:lorenz96_4,config/core_systems/0,,'lorenz96_4',lorenz96_4,213,2
+1007,DEVELOPMENT,ext:lorenz96_4,provenance/seed_id,,'DEV-3',DEV-3,213,27
+1008,DEVELOPMENT,ext:lorenz96_4,verdicts/H1a/by_system/lorenz96_4,verdict,'inconclusive',inconclusive,213,35
+1009,DEVELOPMENT,ext:lorenz96_4,verdicts/H1b/by_system/lorenz96_4,verdict,'fail',fail,213,50
+1010,DEVELOPMENT,ext:lorenz96_4,verdicts/H1c/by_system/lorenz96_4,verdict,'inconclusive',inconclusive,213,57
+1011,DEVELOPMENT,ext:lorenz96_4,verdicts/H1d/by_system/lorenz96_4,verdict,'fail',fail,213,72
+1012,DEVELOPMENT,ext:lorenz96_4,verdicts/H2c/by_system/lorenz96_4,verdict,'fail',fail,213,79
+1013,DEVELOPMENT,ext:lorenz96_4,verdicts/H2d/by_system/lorenz96_4,verdict,'inconclusive',inconclusive,213,86
+1014,DEVELOPMENT,ext:lorenz96_4,verdicts/H2e/by_system/lorenz96_4,verdict,'inconclusive',inconclusive,213,101
+1015,DEVELOPMENT,ext:lorenz96_4,verdicts/H3a/by_system/lorenz96_4,verdict,'pass',pass,213,116
+1016,DEVELOPMENT,ext:lorenz96_4,verdicts/H3b/by_system/lorenz96_4,verdict,'fail',fail,213,123
+1017,DEVELOPMENT,ext:rossler_hyper,config/core_systems/0,,'rossler_hyper',rossler_hyper,214,2
+1018,DEVELOPMENT,ext:rossler_hyper,provenance/seed_id,,'DEV-3',DEV-3,214,18
+1019,DEVELOPMENT,ext:rossler_hyper,verdicts/H1a/by_system/rossler_hyper,verdict,'pass',pass,214,26
+1020,DEVELOPMENT,ext:rossler_hyper,verdicts/H1b/by_system/rossler_hyper,verdict,'fail',fail,214,33
+1021,DEVELOPMENT,ext:rossler_hyper,verdicts/H1c/by_system/rossler_hyper,verdict,'pass',pass,214,40
+1022,DEVELOPMENT,ext:rossler_hyper,verdicts/H1d/by_system/rossler_hyper,verdict,'pass',pass,214,47
+1023,DEVELOPMENT,ext:rossler_hyper,verdicts/H2c/by_system/rossler_hyper,verdict,'inconclusive',inconclusive,214,54
+1024,DEVELOPMENT,ext:rossler_hyper,verdicts/H2d/by_system/rossler_hyper,verdict,'inconclusive',inconclusive,214,69
+1025,DEVELOPMENT,ext:rossler_hyper,verdicts/H2e/by_system/rossler_hyper,verdict,'pass',pass,214,84
+1026,DEVELOPMENT,ext:rossler_hyper,verdicts/H3a/by_system/rossler_hyper,verdict,'pass',pass,214,91
+1027,DEVELOPMENT,ext:rossler_hyper,verdicts/H3b/by_system/rossler_hyper,verdict,'fail',fail,214,98
+1028,DEVELOPMENT,ext:rossler_z,config/core_systems/0,,'rossler_z',rossler_z,215,2
+1029,DEVELOPMENT,ext:rossler_z,provenance/seed_id,,'DEV-3',DEV-3,215,26
+1030,DEVELOPMENT,ext:rossler_z,verdicts/H1a/by_system/rossler_z,verdict,'fail',fail,215,34
+1031,DEVELOPMENT,ext:rossler_z,verdicts/H1b/by_system/rossler_z,verdict,'pass',pass,215,41
+1032,DEVELOPMENT,ext:rossler_z,verdicts/H1c/by_system/rossler_z,verdict,'fail',fail,215,48
+1033,DEVELOPMENT,ext:rossler_z,verdicts/H1d/by_system/rossler_z,verdict,'fail',fail,215,55
+1034,DEVELOPMENT,ext:rossler_z,verdicts/H2c/by_system/rossler_z,verdict,'inconclusive',inconclusive,215,62
+1035,DEVELOPMENT,ext:rossler_z,verdicts/H2d/by_system/rossler_z,verdict,'pass',pass,215,77
+1036,DEVELOPMENT,ext:rossler_z,verdicts/H2e/by_system/rossler_z,verdict,'pass',pass,215,84
+1037,DEVELOPMENT,ext:rossler_z,verdicts/H3a/by_system/rossler_z,verdict,'inconclusive',inconclusive,215,91
+1038,DEVELOPMENT,ext:rossler_z,verdicts/H3b/by_system/rossler_z,verdict,'fail',fail,215,106
+1039,DEVELOPMENT,meta,seeds_ext,,'DEV-3',DEV-3,217,51
+1040,DEVELOPMENT,ext:hindmarsh_rose,config/core_systems/0,,'hindmarsh_rose',hindmarsh_rose,221,2
+1041,DEVELOPMENT,ext:hindmarsh_rose,provenance/seed_id,,'DEV-3',DEV-3,221,31
+1042,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,221,39
+1043,DEVELOPMENT,ext:hindmarsh_rose,systems/hindmarsh_rose/Q-N/oracle/w_zero_indicator/reading,,'undetermined',undetermined,221,49
+1044,DEVELOPMENT,ext:hindmarsh_rose,verdicts/gain_bound/by_system/hindmarsh_rose,verdict,'reported',reported,221,64
+1045,DEVELOPMENT,ext:hyper_jha,config/core_systems/0,,'hyper_jha',hyper_jha,222,2
+1046,DEVELOPMENT,ext:hyper_jha,provenance/seed_id,,'DEV-3',DEV-3,222,26
+1047,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,222,34
+1048,DEVELOPMENT,ext:hyper_jha,systems/hyper_jha/Q-N/oracle/w_zero_indicator/reading,,'reduces',reduces,222,44
+1049,DEVELOPMENT,ext:hyper_jha,verdicts/gain_bound/by_system/hyper_jha,verdict,'reported',reported,222,54
+1050,DEVELOPMENT,ext:lorenz63_r166,config/core_systems/0,,'lorenz63_r166',lorenz63_r166,223,2
+1051,DEVELOPMENT,ext:lorenz63_r166,provenance/seed_id,,'DEV-3',DEV-3,223,30
+1052,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,223,38
+1053,DEVELOPMENT,ext:lorenz63_r166,systems/lorenz63_r166/Q-N/oracle/w_zero_indicator/reading,,'undetermined',undetermined,223,48
+1054,DEVELOPMENT,ext:lorenz63_r166,verdicts/gain_bound/by_system/lorenz63_r166,verdict,'reported',reported,223,63
+1055,DEVELOPMENT,ext:lorenz96_4,config/core_systems/0,,'lorenz96_4',lorenz96_4,224,2
+1056,DEVELOPMENT,ext:lorenz96_4,provenance/seed_id,,'DEV-3',DEV-3,224,27
+1057,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/Q-N/oracle/logit_w_interior/reading,,'substantial',substantial,224,35
+1058,DEVELOPMENT,ext:lorenz96_4,systems/lorenz96_4/Q-N/oracle/w_zero_indicator/reading,,'undetermined',undetermined,224,49
+1059,DEVELOPMENT,ext:lorenz96_4,verdicts/gain_bound/by_system/lorenz96_4,verdict,'reported',reported,224,64
+1060,DEVELOPMENT,ext:rossler_hyper,config/core_systems/0,,'rossler_hyper',rossler_hyper,225,2
+1061,DEVELOPMENT,ext:rossler_hyper,provenance/seed_id,,'DEV-3',DEV-3,225,18
+1062,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,225,26
+1063,DEVELOPMENT,ext:rossler_hyper,systems/rossler_hyper/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,225,36
+1064,DEVELOPMENT,ext:rossler_hyper,verdicts/gain_bound/by_system/rossler_hyper,verdict,'reported',reported,225,50
+1065,DEVELOPMENT,ext:rossler_z,config/core_systems/0,,'rossler_z',rossler_z,226,2
+1066,DEVELOPMENT,ext:rossler_z,provenance/seed_id,,'DEV-3',DEV-3,226,26
+1067,DEVELOPMENT,ext:rossler_z,systems/rossler_z/Q-N/oracle/logit_w_interior/reading,,'reduces',reduces,226,34
+1068,DEVELOPMENT,ext:rossler_z,systems/rossler_z/Q-N/oracle/w_zero_indicator/reading,,'substantial',substantial,226,44
+1069,DEVELOPMENT,ext:rossler_z,verdicts/gain_bound/by_system/rossler_z,verdict,'reported',reported,226,58
+1070,,meta,trace_name,,'2026-10-23-appendix-a-standalone.trace.csv',2026-10-23-appendix-a-standalone.trace.csv,230,70
+1071,,meta,missing_total,,'0',0,232,57
+1072,,meta,nulls_total,,'0',0,232,96

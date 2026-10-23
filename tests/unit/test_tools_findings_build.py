@@ -2946,3 +2946,853 @@ def test_promote_needs_the_sources_file_for_the_figures(tmp_path) -> None:
     assert sorted(p.name for p in tmp_path.iterdir()) == ["doc.md"]
     assert fb.main(["promote", "--document", str(src), "--out", str(out), "--no-figures"]) == 0
     assert "(doc.figures/F1_primary.png)" in out.read_text()
+
+
+# --- WU-0025.1: appendix A from several development runs and extension runs ---
+# References. Every expected string below is typed from the values planted by
+# ``make_dev`` and ``make_ext`` (hand-chosen numbers and words), never read
+# back from the tool. Every comparison is exact, so no tolerance is involved.
+# Two regression guards (named ``test_regression_*``) compare the new tool
+# with older code: the base commit's tool and the committed promoted copy.
+BASE_COMMIT = "a3b0b65"
+APP_LABEL = "Development context: not a hypothesis test."
+APP_WORDS = "development seeds, exploratory, not confirmatory"
+EXT_WORDS = (
+    "systems outside the v3 design; exploratory readings pre-specified in "
+    "WU-0021.2"
+)
+PER_SYSTEM = "per-system only, no overall verdict"
+GATE_CHECKS = ("V1", "V2", "V4", "V5", "V6", "V7")
+WORDS = ["pass", "fail", "inconclusive"]
+
+
+def make_dev(seed: str, shift: int, gate: dict | None = None) -> dict:
+    """A development run of the three v3 systems with planted, distinct values.
+
+    Seed ``DEV-k`` has shift k. Verdict words rotate with k, ``lambda_max`` of
+    system n is ``0.5 + 0.1 n + 0.01 k`` and the CP median VPT is
+    ``2 + n + 0.25 k``.
+    """
+    out = make_results(gate=gate)
+    out["provenance"].update(
+        seed_id=seed,
+        label=f"DEVELOPMENT ({seed}): not a hypothesis test",
+        commit="d" * 40,
+        wall_seconds=1000.0 + shift,
+        device={"backend": "gpu"},
+    )
+    for n, s in enumerate(SYSTEMS):
+        block = out["systems"][s]
+        set_path(block, "context/lambda_max", 0.5 + 0.1 * n + 0.01 * shift)
+        set_path(
+            block, "validation/cp_median_vpt_lyapunov", 2 + n + 0.25 * shift
+        )
+        for k, item in enumerate(CONSTANTS["identifiers"]):
+            out["verdicts"][item["key"]]["by_system"][s] = WORDS[
+                (shift + n + k) % 3
+            ]
+        for part in CONSTANTS["primary_parts"]:
+            est = 0.2 + 0.01 * n + 0.001 * shift
+            set_path(block, part["estimate"], est)
+            set_path(block, part["interval"], [est - 0.05, est + 0.05])
+    return out
+
+
+def make_ext(
+    system: str, shift: int = 0, flags: dict | None = None
+) -> dict:
+    """An extension run (one system outside v3) with planted values.
+
+    ``flags`` overrides stored gate flags, for example ``{"V7": False}``
+    (gate_pass is then written False as well). The stored overall word is
+    "per-system only", as the real runs store it.
+    """
+    out = make_results()
+    block = out["systems"]["lorenz63"]
+    out["systems"] = {system: block}
+    out["config"] = {"core_systems": [system]}
+    out["provenance"].update(
+        seed_id="DEV-3",
+        label="DEVELOPMENT (DEV-3): not a hypothesis test",
+        commit="e" * 40,
+        wall_seconds=900.0 + shift,
+        device={"backend": "gpu"},
+    )
+    gate = block["validation"]["gate"]
+    for key, value in (flags or {}).items():
+        gate[key] = value
+        if value is False:
+            gate["gate_pass"] = False
+    set_path(block, "context/lambda_max", 0.07 + 0.01 * shift)
+    set_path(block, "validation/cp_median_vpt_lyapunov", 3.5 + shift)
+    out["handling"]["by_system"] = {system: out["handling"]["by_system"]["chua"]}
+    for k, item in enumerate(CONSTANTS["identifiers"]):
+        word = WORDS[(shift + k) % 3]
+        out["verdicts"][item["key"]] = {
+            "by_system": {system: word},
+            "verdict": "per-system only",
+        }
+    return out
+
+
+def app_args(
+    tmp: Path,
+    dev: dict | None = None,
+    ext: dict | None = None,
+    **extra,
+) -> Namespace:
+    """Arguments of ``render`` with several development and extension runs.
+
+    ``dev`` maps a seed id to its results, ``ext`` maps a name to its results;
+    the order of the dicts is the order on the command line.
+    """
+    dev = {"DEV-1": make_dev("DEV-1", 1)} if dev is None else dev
+    ext = {} if ext is None else ext
+    dev_paths = []
+    for name, results in dev.items():
+        dev_paths.append(str(write_run(tmp / f"d_{name}", results)))
+    ext_paths = []
+    for name, results in ext.items():
+        ext_paths.append(str(write_run(tmp / f"x_{name}", results)))
+    return render_args(
+        tmp, development=dev_paths or None, extension=ext_paths or None, **extra
+    )
+
+
+def app_runs(provisional: bool = True) -> tuple[dict, dict]:
+    """The ensemble DEV-1, DEV-3, DEV-4 (chua of DEV-3 fails V7) and two ext runs."""
+    dev = {
+        "DEV-1": make_dev("DEV-1", 1),
+        "DEV-3": make_dev("DEV-3", 3),
+        "DEV-4": make_dev("DEV-4", 4),
+    }
+    if provisional:
+        gate = dev["DEV-3"]["systems"]["chua"]["validation"]["gate"]
+        gate.update(V7=False, gate_pass=False)
+    ext = {
+        "hyper_zeta": make_ext("hyper_zeta", 0),
+        "lorenz63_r166": make_ext("lorenz63_r166", 1, {"V7": False}),
+    }
+    return dev, ext
+
+
+@pytest.fixture(scope="module")
+def appendix(tmp_path_factory):
+    """One build with the ensemble and two extension runs (stub figures)."""
+    tmp = tmp_path_factory.mktemp("appendix")
+    dev, ext = app_runs()
+    return tmp, fast_build_args(app_args(tmp, dev, ext))
+
+
+def fast_build_args(args: Namespace) -> Path:
+    with stub_figures():
+        assert fb.render(args) == 0
+    return Path(args.out)
+
+
+def appendix_lines(out: Path) -> list[str]:
+    """The lines of the document from the heading of appendix A to B."""
+    lines = doc_of(out).split("\n")
+    start = next(k for k, x in enumerate(lines) if x.startswith("## A."))
+    end = next(k for k, x in enumerate(lines) if x.startswith("## B."))
+    return lines[start:end]
+
+
+def row_line(out: Path, source: str, path: str) -> str:
+    """The document line of the first trace row of a source and path."""
+    lines = doc_of(out).split("\n")
+    row = next(
+        r for r in trace_of(out) if r["source"] == source and r["path"] == path
+    )
+    return lines[int(row["line"]) - 1]
+
+
+def test_arguments_repeat_and_order_does_not_matter(tmp_path) -> None:
+    """The command line takes ``--development`` and ``--extension`` repeatedly.
+
+    Reference: the command-line parser itself plus byte equality of two
+    builds whose arguments are in opposite orders (E-6).
+    """
+    dev, ext = app_runs()
+    first = app_args(tmp_path / "a", dev, ext)
+    second = app_args(
+        tmp_path / "b",
+        dict(reversed(list(dev.items()))),
+        dict(reversed(list(ext.items()))),
+    )
+    outs = []
+    for args in (first, second):
+        outs.append(fast_build_args(args))
+    for name in ("doc.md", "doc.trace.csv"):
+        assert (outs[0] / name).read_bytes() == (outs[1] / name).read_bytes()
+    one = json.loads((outs[0] / "doc.sources.json").read_text())
+    two = json.loads((outs[1] / "doc.sources.json").read_text())
+    assert one["meta"] == two["meta"]
+    # the compare_runs text names the two build directories, so it differs
+    for key in one["sha256"]:
+        if key != "td":
+            assert one["sha256"][key] == two["sha256"][key], key
+    assert sorted(one["files"]) == sorted(two["files"])
+    assert {n for n in one["files"] if ":" in n} == {
+        "dev:DEV-1",
+        "dev:DEV-3",
+        "dev:DEV-4",
+        "ext:hyper_zeta",
+        "ext:lorenz63_r166",
+    }
+    # the command line itself
+    argv = ["render", "--official", first.official, "--crosscheck",
+            first.crosscheck, "--td", first.td, "--out",
+            str(tmp_path / "cli"), "--stem", "doc"]
+    for path in first.development:
+        argv += ["--development", path]
+    for path in first.extension:
+        argv += ["--extension", path]
+    with stub_figures():
+        assert fb.main(argv) == 0
+
+
+def test_appendix_shows_the_planted_values_side_by_side(appendix) -> None:
+    """Gate flags, lambda_max, VPT and verdict words are the planted ones (E-2)."""
+    _, out = appendix
+    lines = appendix_lines(out)
+    text = "\n".join(lines)
+    # system-major order: the three seeds of a system are adjacent rows
+    for n, system in enumerate(SYSTEMS):
+        found = [
+            k for k, x in enumerate(lines)
+            if x.startswith(f"| {system}") and "lambda" not in x
+            and f"{0.5 + 0.1 * n + 0.01 * 1:.4g}" in x
+        ]
+        assert found, system
+    for seed, shift in (("DEV-1", 1), ("DEV-3", 3), ("DEV-4", 4)):
+        for n, system in enumerate(SYSTEMS):
+            line = row_line(
+                out, f"dev:{seed}", f"systems/{system}/context/lambda_max"
+            )
+            assert line.startswith(f"| {system}")
+            assert f"| {seed} |" in line
+            assert f"{0.5 + 0.1 * n + 0.01 * shift:.4g}" in line
+            assert f"{2 + n + 0.25 * shift:.3g}" in line
+            for k, item in enumerate(CONSTANTS["identifiers"]):
+                if item["role"] != "primary":
+                    continue
+                v = row_line(
+                    out, f"dev:{seed}", f"verdicts/{item['key']}/by_system/{system}"
+                )
+                word = WORDS[(shift + n + k) % 3]
+                assert f"| {system}" in v and f"| {word}" in v
+    # the stored flags, as yes and no
+    chua = row_line(out, "dev:DEV-3", "systems/chua/validation/gate/V7")
+    cells = [c.strip() for c in chua.strip().strip("|").split("|")]
+    assert "PROVISIONAL" in cells[0] and cells[7:9] == ["no", "no"]  # V7, gate_pass
+    for system, source in (("hyper_zeta", "ext:hyper_zeta"),
+                           ("lorenz63_r166", "ext:lorenz63_r166")):
+        line = row_line(out, source, f"systems/{system}/context/lambda_max")
+        assert line.startswith(f"| {system}") and "| DEV-3 |" in line
+    assert f"{0.07 + 0.01 * 1:.4g}" in row_line(
+        out, "ext:lorenz63_r166", "systems/lorenz63_r166/context/lambda_max"
+    )
+    # the 18 primary parts per seed: estimate and interval as planted
+    for seed, shift in (("DEV-1", 1), ("DEV-3", 3), ("DEV-4", 4)):
+        for n, system in enumerate(SYSTEMS):
+            est = row_line(
+                out, f"dev:{seed}", f"systems/{system}/{CONSTANTS['primary_parts'][0]['estimate']}"
+            )
+            e = 0.2 + 0.01 * n + 0.001 * shift
+            assert f"{e:.4g}" in est and f"[{e - 0.05:.4g}, {e + 0.05:.4g}]" in est
+    assert "No development appendix" not in text
+
+
+def test_labels_head_every_appendix_table(appendix) -> None:
+    """Every table is preceded by the development label naming the seeds (E-7)."""
+    _, out = appendix
+    lines = appendix_lines(out)
+    in_ext = False
+    tables = 0
+    for k, line in enumerate(lines):
+        in_ext = line.startswith("### A.2") or (in_ext and not line.startswith("### A.1"))
+        if line.startswith("|") and not lines[k - 1].startswith("|"):
+            tables += 1
+            lead = next(x for x in reversed(lines[:k]) if x.strip())
+            assert lead.startswith(APP_LABEL), lead
+            assert APP_WORDS in lead and "Seeds: " in lead
+            if in_ext:
+                assert "Seeds: DEV-3;" in lead
+                assert EXT_WORDS in lead and PER_SYSTEM in lead
+            else:
+                assert "Seeds: DEV-1, DEV-3, DEV-4;" in lead
+    assert tables >= 10
+    assert any(x.startswith("### A.1") for x in lines)
+    assert any(x.startswith("### A.2") for x in lines)
+    assert APP_LABEL in lines[2] and APP_WORDS in lines[2]
+
+
+def test_no_overall_verdict_and_no_aggregate(appendix) -> None:
+    """The stored overall word is never quoted, and nothing is pooled (E-8)."""
+    _, out = appendix
+    rows = trace_of(out)
+    app = [r for r in rows if r["source"].startswith(("dev:", "ext:"))]
+    assert app and all(r["tag"] == "DEVELOPMENT" for r in app)
+    assert not [
+        r for r in app if re.fullmatch(r"verdicts/[^/]+/verdict", r["path"])
+    ]
+    lines = appendix_lines(out)
+    assert any(PER_SYSTEM in x for x in lines)  # the label, from the tool
+    for line in lines:
+        if line.startswith("|"):  # a table row holds stored values only
+            for word in ("mean", "average", "pooled", "overall"):
+                assert word not in line, line
+
+
+def test_provisional_marks_follow_the_stored_flags(appendix) -> None:
+    """A failed stored gate marks every line of that run and system (E-9)."""
+    _, out = appendix
+    rows = trace_of(out)
+    lines = doc_of(out).split("\n")
+    sources = rebuilt(out)
+    marked = set()
+    for r in rows:
+        if not r["source"].startswith(("dev:", "ext:")):
+            continue
+        m = re.match(r"systems/([^/]+)/|verdicts/[^/]+/by_system/([^/]+)$", r["path"])
+        if not m:
+            continue
+        system = m.group(1) or m.group(2)
+        line = lines[int(r["line"]) - 1]
+        if (r["source"], system) in {
+            ("dev:DEV-3", "chua"),
+            ("ext:lorenz63_r166", "lorenz63_r166"),
+        }:
+            assert "PROVISIONAL" in line, (r["source"], r["path"])
+            marked.add((r["source"], system))
+        else:
+            assert "PROVISIONAL" not in line, (r["source"], r["path"])
+    assert marked == {("dev:DEV-3", "chua"), ("ext:lorenz63_r166", "lorenz63_r166")}
+    text = "\n".join(appendix_lines(out))
+    assert "chua (seed DEV-3: V7)" in text
+    assert "lorenz63_r166 (seed DEV-3: V7)" in text
+    assert "hyper_zeta (seed" not in text
+    assert fb.check_appendix(lines, sources, rows) == []
+
+
+def test_all_flags_true_but_gate_pass_false_is_shown_as_stored(tmp_path) -> None:
+    """The tool reads gate_pass and does not recompute it from V1 to V7 (E-3)."""
+    ext = make_ext("odd_sys")
+    ext["systems"]["odd_sys"]["validation"]["gate"]["gate_pass"] = False
+    out = fast_build_args(app_args(tmp_path, {}, {"odd": ext}))
+    line = row_line(
+        out, "ext:odd_sys", "systems/odd_sys/validation/gate/gate_pass"
+    )
+    cells = [c.strip() for c in line.strip().strip("|").split("|")]
+    assert "PROVISIONAL" in cells[0] and cells[2:8] == ["yes"] * 6
+    assert cells[8] == "no"
+    assert "odd_sys (seed DEV-3: gate_pass not true)" in doc_of(out)
+    # a word that disagrees with its estimate is copied as stored
+    word = row_line(out, "ext:odd_sys", "verdicts/H2a/by_system/odd_sys")
+    assert f"| {WORDS[(0 + 5) % 3]}" in word  # H2a is identifier index 5
+
+
+def test_equal_hash_under_another_name_is_refused(appendix) -> None:
+    """``make_meta`` refuses an appendix file with the hash of another (E-5)."""
+    _, out = appendix
+    record = json.loads((out / "doc.sources.json").read_text())
+    shas = dict(record["sha256"])
+    sources = rebuilt(out)
+    for twin in ("official", "crosscheck", "ext:hyper_zeta"):
+        changed = dict(shas, **{"dev:DEV-1": shas[twin]})
+        with pytest.raises(fb.ToolError, match="same SHA-256"):
+            fb.make_meta(sources, changed, record["manifest"], None, "doc", ROOT)
+
+
+def test_new_code_does_not_recompute_anything() -> None:
+    """The appendix code reads and formats; it has no statistic or verdict (E-3).
+
+    Reference: a scan of the source text of the new functions for the tokens
+    of a computation.
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    names = [n for n in dir(fb.Builder) if n.startswith("app_")]
+    assert len(names) >= 8
+    trees = [
+        ast.parse(textwrap.dedent(inspect.getsource(getattr(fb.Builder, n))))
+        for n in names
+    ]
+    trees += [
+        ast.parse(inspect.getsource(f))
+        for f in (fb.check_appendix, fb.check_appendix_sources)
+    ]
+    used = set()
+    for tree in trees:  # names and attributes, not the words of the prose
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name):
+                used.add(node.id)
+            elif isinstance(node, ast.Attribute):
+                used.add(node.attr)
+    forbidden = {"mean", "median", "std", "var", "sum", "max", "min", "np",
+                 "numpy", "statistics", "lpcstudy", "float", "round",
+                 "percentile", "quantile", "compare_runs", "differing_words"}
+    assert not used & forbidden, used & forbidden
+
+
+def test_new_sources_are_valid_only_in_the_development_section(appendix) -> None:
+    """One planted wrong-source row per new kind fails the row check (E-4)."""
+    _, out = appendix
+    rows = trace_of(out)
+    lines = doc_of(out).split("\n")
+    sources = rebuilt(out)
+    for tag in ("PRE-REGISTERED", "CROSS-CHECK", "DIAGNOSTIC", ""):
+        for source in ("dev:DEV-1", "ext:hyper_zeta"):
+            row = next(r for r in rows if r["tag"] == tag)
+            changed = [dict(r) for r in rows]
+            changed[int(row["id"])]["source"] = source
+            problems = fb.check_rows(changed, lines, sources)
+            assert any("not allowed" in p for p in problems), (tag, source)
+    for source in ("official", "crosscheck", "official_words", "td"):
+        row = next(
+            r for r in rows if r["source"].startswith("dev:")
+        )
+        changed = [dict(r) for r in rows]
+        changed[int(row["id"])]["source"] = source
+        problems = fb.check_rows(changed, lines, sources)
+        assert any("not allowed" in p for p in problems), source
+    kinds = {r["source"].split(":")[0] for r in rows if ":" in r["source"]}
+    assert kinds == {"dev", "ext"}
+
+
+def test_independent_appendix_checks_fail_on_planted_defects(appendix) -> None:
+    """Label, overall verdict, PROVISIONAL and wording are checked on the text (E-7 to E-10)."""
+    _, out = appendix
+    rows = trace_of(out)
+    lines = doc_of(out).split("\n")
+    sources = rebuilt(out)
+    assert fb.check_appendix(lines, sources, rows) == []
+    # a label line removed
+    k = next(k for k, x in enumerate(lines) if x.startswith(APP_LABEL) and k > 0
+             and lines[k + 2].startswith("| System"))
+    cut = lines[:k] + ["Some other line."] + lines[k + 1 :]
+    assert any("label" in p for p in fb.check_appendix(cut, sources, rows))
+    # the ext words removed from an A.2 label
+    k2 = max(k2 for k2, x in enumerate(lines)
+             if x.startswith(APP_LABEL) and PER_SYSTEM in x)
+    weak = list(lines)
+    weak[k2] = weak[k2].replace(PER_SYSTEM, "")
+    assert any("label" in p for p in fb.check_appendix(weak, sources, rows))
+    # an overall verdict row
+    extra = [dict(r) for r in rows]
+    extra.append(dict(extra[-1], source="ext:hyper_zeta", path="verdicts/H2a/verdict",
+                      tag="DEVELOPMENT"))
+    assert any("overall" in p for p in fb.check_appendix(lines, sources, extra))
+    # a mark blanked
+    bad = [x.replace(" PROVISIONAL", "") if x.startswith("| chua") else x for x in lines]
+    assert any("PROVISIONAL" in p for p in fb.check_appendix(bad, sources, rows))
+    # banned wording inside the development section (all modes)
+    k3 = next(k for k, x in enumerate(lines) if x.startswith("### A.1"))
+    said = list(lines)
+    said[k3 + 2] = said[k3 + 2] + " This shows that the method works."
+    problems = fb.check_text(said, sources, rows)
+    assert any("banned phrase" in p for p in problems)
+
+
+def test_edited_development_file_fails_check(appendix, tmp_path) -> None:
+    """The SHA-256 of every development file is recorded and re-checked (E-2)."""
+    _, out = appendix
+    record = json.loads((out / "doc.sources.json").read_text())
+    assert set(record["sha256"]) >= {"dev:DEV-1", "ext:hyper_zeta"}
+    original = Path(record["files"]["dev:DEV-3"])
+    changed = tmp_path / "results.json"
+    changed.write_bytes(original.read_bytes() + b" ")
+    with pytest.raises(fb.ToolError, match="changed since the build"):
+        fb.run_check(out, "doc", {"dev:DEV-3": str(changed)})
+    meta = record["meta"]
+    assert meta["sha_dev:DEV-3"] == record["sha256"]["dev:DEV-3"]
+    assert record["sha256"]["dev:DEV-3"] in doc_of(out)
+
+
+def test_appendix_mode_changes_only_the_development_section(tmp_path) -> None:
+    """Sealed sections and their trace rows are the same with and without (E-11)."""
+    dev, ext = app_runs()
+    plain = fast_build_args(render_args(tmp_path / "p"))
+    full = fast_build_args(app_args(tmp_path / "f", dev, ext))
+    a, b = doc_of(plain), doc_of(full)
+    head = a[: a.index("## A. ")]
+    assert b.startswith(head)
+    tail_a = a[a.index("## B. ") : a.index("## C. ")]
+    tail_b = b[b.index("## B. ") : b.index("## C. ")]
+    assert tail_a == tail_b
+    rows_a, rows_b = trace_of(plain), trace_of(full)
+    n = next(k for k, r in enumerate(rows_a) if r["tag"] == "DEVELOPMENT" or k > 0 and rows_a[k]["line"] and int(rows_a[k]["line"]) > a[: a.index("## A. ")].count("\n"))
+    assert [dict(r) for r in rows_a[:n]] == [dict(r) for r in rows_b[:n]]
+    assert not [r for r in rows_b[:n] if ":" in r["source"]]
+    # the figures of the sealed part are the same bytes
+    for name in ("F1_primary", "F2_secondary", "F3_crosscheck"):
+        assert (plain / "doc.figures" / f"{name}.png").read_bytes() == (
+            full / "doc.figures" / f"{name}.png"
+        ).read_bytes()
+
+
+def refused(tmp: Path, match: str, dev=None, ext=None, edit=None) -> None:
+    args = app_args(tmp, dev, ext)
+    if edit:
+        edit(args)
+    with pytest.raises(fb.ToolError, match=match):
+        with stub_figures():
+            fb.render(args)
+    assert not Path(args.out).exists()
+
+
+def test_refusals(tmp_path) -> None:
+    """Each refusal exits with a ToolError and writes nothing (E-5)."""
+    dev, ext = app_runs(provisional=False)
+    conf = make_results("confirmatory")
+    refused(tmp_path / "a", "must be a development run", {**dev, "DEV-9x": conf}, ext)
+    refused(tmp_path / "b", "must be a development run", dev,
+            {"c": conf})
+    incomplete = make_dev("DEV-5", 5)
+    incomplete["provenance"]["complete"] = False
+    refused(tmp_path / "c", "is not complete", {**dev, "DEV-5": incomplete}, ext)
+    other = make_ext("fresh_sys", 1)
+    other["provenance"]["complete"] = False
+    refused(tmp_path / "d", "is not complete", dev, {**ext, "z": other})
+    # a duplicate: the same SHA-256 under another name, and the same path
+    same = make_dev("DEV-1", 1)
+    refused(tmp_path / "e", "same seed id", {"DEV-1": dev["DEV-1"], "DEV-1b": same}, ext)
+    twin = copy.deepcopy(dev["DEV-3"])
+    twin["provenance"]["seed_id"] = "DEV-3"
+    refused(tmp_path / "f", "same seed id|duplicate", {**dev, "twin": twin}, ext)
+
+    def repeat_path(args: Namespace) -> None:
+        args.development = [args.development[0], args.development[0]]
+
+    refused(tmp_path / "g", "duplicate", dev, ext, repeat_path)
+
+    def official_again(args: Namespace) -> None:
+        args.development = [*args.development, args.official]
+
+    refused(tmp_path / "h", "duplicate|same seed id|must be", dev, ext, official_again)
+    # the same bytes at another path
+    def copy_bytes(args: Namespace) -> None:
+        clone = Path(args.development[1]).parent / "clone"
+        clone.mkdir()
+        shutil.copy(Path(args.development[1]) / "results.json", clone / "results.json")
+        args.development = [*args.development, str(clone)]
+
+    refused(tmp_path / "i", "duplicate|same seed id", dev, ext, copy_bytes)
+    wrong = make_dev("DEV-6", 6)
+    wrong["config"]["core_systems"] = ["lorenz63", "rossler"]
+    refused(tmp_path / "j", "core_systems", {**dev, "DEV-6": wrong}, ext)
+    v3 = make_ext("chua", 2)
+    refused(tmp_path / "k", "system of v3", dev, {**ext, "chua": v3})
+    empty = make_ext("hyper_two", 2)
+    empty["config"]["core_systems"] = []
+    refused(tmp_path / "l", "no core_systems", dev, {**ext, "e": empty})
+    shared = make_ext("lorenz63_r166", 5)
+    shared["provenance"]["commit"] = "f" * 40
+    refused(tmp_path / "m", "shared|same systems", dev, {**ext, "s": shared})
+
+
+def test_regression_no_new_arguments_equals_the_base_tool(tmp_path) -> None:
+    """Without the new arguments the tool writes what the base tool wrote (R-1).
+
+    This is a regression guard, not correctness evidence: the reference is
+    the tool at the base commit (``git show``), run on the same inputs with
+    the same stub figures. The document, trace, ``sources.json`` and the
+    figure files must be byte-identical, with no development run and with
+    exactly one (the legacy appendix, source name ``dev``).
+    """
+    shown = subprocess.run(
+        ["git", "show", f"{BASE_COMMIT}:tools/findings_build.py"],
+        cwd=ROOT,
+        capture_output=True,
+    )
+    if shown.returncode != 0:
+        pytest.skip(f"commit {BASE_COMMIT} is not in this repository")
+    folder = tmp_path / "base" / "tools"
+    folder.mkdir(parents=True)
+    (folder / "findings_build.py").write_bytes(shown.stdout)
+    shutil.copytree(ROOT / "tools" / "findings", folder / "findings")
+    spec = importlib.util.spec_from_file_location(
+        "findings_base", folder / "findings_build.py"
+    )
+    base = importlib.util.module_from_spec(spec)
+    sys.modules["findings_base"] = base
+    spec.loader.exec_module(base)
+    for name, with_dev in (("none", False), ("one", True)):
+        outs = []
+        for label, module in (("base", base), ("new", fb)):
+            tmp = tmp_path / f"{name}-{label}"
+            args = render_args(tmp)
+            if with_dev:
+                write_run(tmp / "dev", make_results())
+                args.development = str(tmp / "dev")
+            with pytest.MonkeyPatch.context() as mp:
+                for fn in ("draw_panels", "draw_crosscheck"):
+                    mp.setattr(
+                        module, fn, lambda *a, **k: plt.figure(figsize=(1, 1))
+                    )
+                assert module.render(args) == 0
+            outs.append(Path(args.out))
+        files = sorted(p.relative_to(outs[0]) for p in outs[0].rglob("*") if p.is_file())
+        assert files and files == sorted(
+            p.relative_to(outs[1]) for p in outs[1].rglob("*") if p.is_file()
+        )
+        for rel in files:
+            one, two = (outs[0] / rel).read_bytes(), (outs[1] / rel).read_bytes()
+            if rel.name == "doc.sources.json":
+                # the two runs sit in different folders: the paths, and the
+                # hash of the compare_runs text that names them, differ
+                one, two = (
+                    json.loads(
+                        x.decode().replace(str(tmp_path / f"{name}-{lab}"), "T")
+                    )
+                    for x, lab in ((one, "base"), (two, "new"))
+                )
+                for tree in (one, two):
+                    del tree["sha256"]["td"]
+            assert one == two, (name, str(rel))
+    assert '"dev"' in (outs[1] / "doc.sources.json").read_text()
+
+
+def test_regression_promoted_copy_equals_the_committed_report() -> None:
+    """``promote_text`` of the committed findings document gives the committed copy (R-4).
+
+    A regression guard on the text path of ``promote`` (no sealed result is
+    read: the figures are not re-rendered here). Reference: the committed
+    ``promoted/CONF-1/report.md``, whose SHA-256 is in ``promoted/CONF-1.sha256``.
+    """
+    src = ROOT / "docs/agent/notes/2026-10-20-prelim-findings-conf1.md"
+    copy_ = ROOT / "promoted/CONF-1/report.md"
+    if not src.is_file() or not copy_.is_file():
+        pytest.skip("the committed findings document or promoted copy is absent")
+    promoted = fb.promote_text(
+        src.read_text(), "2026-10-20-prelim-findings-conf1", "report"
+    )
+    assert promoted.encode() == copy_.read_bytes()
+    listed = (ROOT / "promoted/CONF-1.sha256").read_text()
+    assert f"{fb.sha256_of(copy_)}  promoted/CONF-1/report.md" in listed
+
+
+# --- WU-0025.1 fix round 1 (R1, R4, R5) and WU-0025.7 (standalone appendix) ---
+def test_opening_paragraph_is_true_for_any_host(appendix) -> None:
+    """The opening sentences name no "official result" (review R1).
+
+    The host of the fixture is a development run (DEV-9), so a sentence that
+    compares nothing "with the official result" or says the numbers appear
+    "only here" next to development sections would be false. Reference: the
+    text of the document, read by the test.
+    """
+    _, out = appendix
+    lines = appendix_lines(out)
+    opening = next(x for x in lines[1:] if x.strip())
+    assert opening.startswith(APP_LABEL) and APP_WORDS in opening
+    assert "official" not in opening.lower()
+    assert "appear only here" not in opening
+    assert "only in this appendix" in opening
+
+
+def test_part_and_seed_ids_are_checked_from_the_trace(appendix) -> None:
+    """A wrong seed id, or a removed A.2 heading, fails ``check_appendix`` (R4)."""
+    _, out = appendix
+    rows = trace_of(out)
+    lines = doc_of(out).split("\n")
+    sources = rebuilt(out)
+    ext_lead = max(
+        k for k, x in enumerate(lines) if x.startswith(APP_LABEL) and PER_SYSTEM in x
+    )
+    wrong = list(lines)
+    wrong[ext_lead] = wrong[ext_lead].replace("Seeds: DEV-3;", "Seeds: DEV-9;")
+    assert any("seed ids" in p for p in fb.check_appendix(wrong, sources, rows))
+    dev_lead = next(
+        k for k, x in enumerate(lines) if "Seeds: DEV-1, DEV-3, DEV-4;" in x
+    )
+    short = list(lines)
+    short[dev_lead] = short[dev_lead].replace("DEV-1, DEV-3, DEV-4", "DEV-1, DEV-3")
+    assert any("seed ids" in p for p in fb.check_appendix(short, sources, rows))
+    # the A.2 heading removed and the extension words cut from every A.2 lead
+    bare = [x for x in lines if not x.startswith("### A.2")]
+    bare = [
+        x.replace(f"; {EXT_WORDS}; {PER_SYSTEM}", "") if x.startswith(APP_LABEL) else x
+        for x in bare
+    ]
+    # the rows moved up by one line: shift the trace the same way
+    cut = next(k for k, x in enumerate(lines) if x.startswith("### A.2"))
+    moved = [
+        dict(r, line=str(int(r["line"]) - (1 if int(r["line"]) > cut + 1 else 0)))
+        for r in rows
+    ]
+    assert any("label" in p for p in fb.check_appendix(bare, sources, moved))
+
+
+def test_run_table_names_carry_the_provisional_mark(appendix) -> None:
+    """The mark follows each failing system name in the run table (R5, E-9)."""
+    _, out = appendix
+    rows = trace_of(out)
+    lines = doc_of(out).split("\n")
+    sources = rebuilt(out)
+    run = row_line(out, "ext:lorenz63_r166", "provenance/commit")
+    assert "| lorenz63_r166 PROVISIONAL |" in run
+    ok = row_line(out, "ext:hyper_zeta", "provenance/commit")
+    assert "| hyper_zeta |" in ok
+    dev = row_line(out, "dev:DEV-3", "provenance/commit")
+    assert "lorenz63, rossler, chua PROVISIONAL |" in dev
+    bad = [
+        x.replace("lorenz63_r166 PROVISIONAL |", "lorenz63_r166 |")
+        if "provenance" not in x and x.startswith("| DEV-3 | lorenz63_r166") else x
+        for x in lines
+    ]
+    assert bad != lines
+    assert any("PROVISIONAL" in p for p in fb.check_appendix(bad, sources, rows))
+    spurious = [
+        x.replace("| hyper_zeta |", "| hyper_zeta PROVISIONAL |")
+        if x.startswith("| DEV-3 | hyper_zeta") else x
+        for x in lines
+    ]
+    assert any("PROVISIONAL" in p for p in fb.check_appendix(spurious, sources, rows))
+
+
+def standalone_args(tmp: Path, dev=None, ext=None, **extra) -> Namespace:
+    """Arguments of ``appendix`` over synthetic runs written under ``tmp``."""
+    if dev is None and ext is None:
+        dev, ext = app_runs()
+    dev, ext = dev or {}, ext or {}
+    return Namespace(
+        development=[str(write_run(tmp / f"d_{n}", r)) for n, r in dev.items()] or None,
+        extension=[str(write_run(tmp / f"x_{n}", r)) for n, r in ext.items()] or None,
+        out=str(tmp / "out"),
+        stem="app",
+        **extra,
+    )
+
+
+@pytest.fixture(scope="module")
+def standalone(tmp_path_factory):
+    tmp = tmp_path_factory.mktemp("standalone")
+    args = standalone_args(tmp)
+    assert fb.appendix(args) == 0
+    return tmp, Path(args.out)
+
+
+def test_standalone_document_has_no_host_content(standalone) -> None:
+    """The standalone appendix has no findings-document content (S-1)."""
+    _, out = standalone
+    text = (out / "app.md").read_text()
+    lines = text.split("\n")
+    assert lines[0] == "**DEVELOPMENT APPENDIX: not a hypothesis test**"
+    assert lines[2] == "# Development appendix: not a hypothesis test"
+    for phrase in ("Preliminary findings", "PRE-REGISTERED", "until promotion",
+                   "UNPROMOTED", "CROSS-CHECK", "official"):
+        assert phrase not in text, phrase
+    rows = list(csv.DictReader((out / "app.trace.csv").open(newline="")))
+    kinds = {r["source"].split(":")[0] for r in rows}
+    assert kinds == {"dev", "ext", "const", "meta"}
+    assert {r["tag"] for r in rows if r["source"][:3] in ("dev", "ext")} == {"DEVELOPMENT"}
+    assert not [r for r in rows if re.fullmatch(r"verdicts/[^/]+/verdict", r["path"])]
+    assert [x for x in lines if x.startswith("## ")] == [
+        "## A. Development context [DEVELOPMENT]",
+        "## B. Trace",
+    ]
+    assert not (out / "app.figures").exists()
+    record = json.loads((out / "app.sources.json").read_text())
+    assert record["kind"] == "appendix"
+    assert set(record["files"]) == {
+        "dev:DEV-1", "dev:DEV-3", "dev:DEV-4", "ext:hyper_zeta", "ext:lorenz63_r166"
+    }
+    # the A.1 and A.2 text equals the hosted appendix text built from the same runs
+    assert "chua (seed DEV-3: V7)" in text
+
+
+def test_standalone_check_passes_and_fails_on_planted_defects(
+    standalone, tmp_path
+) -> None:
+    """``check`` is detected from sources.json and fails each planted defect (S-2)."""
+    _, out = standalone
+    assert fb.run_check(out, "app", {}) == 0
+    assert fb.main(["check", str(out), "--stem", "app"]) == 0
+
+    def edited(name: str, edit) -> int:
+        copy_dir = tmp_path / name
+        shutil.copytree(out, copy_dir)
+        path = copy_dir / "app.md"
+        text = path.read_text()
+        new = edit(text)
+        assert new != text, name
+        path.write_text(new)
+        return fb.run_check(copy_dir, "app", {})
+
+    assert edited("word", lambda t: t.replace("| pass |", "| fail |", 1)) == 1
+    assert edited("label", lambda t: t.replace(APP_LABEL, "A label.", 1)) == 1
+    assert edited("seed", lambda t: t.replace("Seeds: DEV-3;", "Seeds: DEV-9;", 1)) == 1
+    assert edited("mark", lambda t: t.replace(" PROVISIONAL", "", 1)) == 1
+    assert edited("banned", lambda t: t.replace(
+        "Every value in it", "This shows that the method works. Every value in it", 1)) == 1
+    assert edited("host", lambda t: t.replace(
+        "## B. Trace", "## 4. Overall verdicts [PRE-REGISTERED]\n\n## B. Trace", 1)) == 1
+    assert edited("number", lambda t: t.replace("Every value", "Every 7 value", 1)) == 1
+    # an edited development file: the hash is re-checked
+    record = json.loads((out / "app.sources.json").read_text())
+    changed = tmp_path / "results.json"
+    changed.write_bytes(Path(record["files"]["ext:hyper_zeta"]).read_bytes() + b" ")
+    with pytest.raises(fb.ToolError, match="changed since the build"):
+        fb.run_check(out, "app", {"ext:hyper_zeta": str(changed)})
+    # planted rows on the independent text check
+    rows = list(csv.DictReader((out / "app.trace.csv").open(newline="")))
+    lines = (out / "app.md").read_text().split("\n")
+    sources, _ = fb.load_appendix_sources(out, "app", {})
+    row = dict(rows[0], source="official", tag="DEVELOPMENT")
+    assert any("official" in p for p in fb.check_appendix_document(lines, sources, [row]))
+    overall = dict(
+        next(r for r in rows if r["source"].startswith("ext:")),
+        path="verdicts/H2a/verdict",
+    )
+    assert any(
+        "overall" in p for p in fb.check_appendix_document(lines, sources, [overall])
+    )
+
+
+def test_standalone_refusals_and_determinism(tmp_path) -> None:
+    """The standalone command shares the refusals and is deterministic (S-3, S-4)."""
+    dev, ext = app_runs()
+    first = standalone_args(tmp_path / "a", dev, ext)
+    second = standalone_args(
+        tmp_path / "b",
+        dict(reversed(list(dev.items()))),
+        dict(reversed(list(ext.items()))),
+    )
+    for args in (first, second):
+        assert fb.appendix(args) == 0
+    for name in ("app.md", "app.trace.csv"):
+        assert (Path(first.out) / name).read_bytes() == (Path(second.out) / name).read_bytes()
+    one = json.loads((Path(first.out) / "app.sources.json").read_text())
+    two = json.loads((Path(second.out) / "app.sources.json").read_text())
+    assert one["meta"] == two["meta"]
+    # one run alone is enough; none is refused
+    only = standalone_args(tmp_path / "c", {}, {"x": make_ext("solo_sys")})
+    assert fb.appendix(only) == 0
+    with pytest.raises(fb.ToolError, match="no --development or --extension"):
+        fb.appendix(standalone_args(tmp_path / "d", {}, {}))
+    assert not (tmp_path / "d" / "out").exists()
+    conf = make_results("confirmatory")
+    for name, kwargs, match in (
+        ("e", dict(dev={**dev, "c": conf}, ext=ext), "must be a development run"),
+        ("f", dict(dev=dev, ext={**ext, "chua": make_ext("chua", 2)}), "system of v3"),
+    ):
+        args = standalone_args(tmp_path / name, **kwargs)
+        with pytest.raises(fb.ToolError, match=match):
+            fb.appendix(args)
+        assert not Path(args.out).exists()
+    incomplete = make_dev("DEV-5", 5)
+    incomplete["provenance"]["complete"] = False
+    args = standalone_args(tmp_path / "g", {**dev, "DEV-5": incomplete}, ext)
+    with pytest.raises(fb.ToolError, match="is not complete"):
+        fb.appendix(args)
+    # the command line
+    argv = ["appendix", "--out", str(tmp_path / "cli"), "--stem", "app"]
+    for path in first.development:
+        argv += ["--development", path]
+    for path in first.extension:
+        argv += ["--extension", path]
+    assert fb.main(argv) == 0
+    assert (tmp_path / "cli" / "app.md").read_bytes() == (Path(first.out) / "app.md").read_bytes()
