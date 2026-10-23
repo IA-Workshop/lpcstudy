@@ -1,0 +1,11 @@
+system    R=max/ours  R/P      R*P     max/spec0  KY(from spectrum)  KY stored
+lorenz63     0.9848   0.6562   1.4780    0.8173      2.07516      2.07516
+rossler      2.0934   0.3543  12.3689    1.9730      2.01461      2.01461
+chua         2.8532   2.0044   4.0616    2.6710      2.10714      2.10727
+log-base factors: 1/ln2 = 1.4427  ln10 = 2.3026
+grid-spacing ratios available: 5 (P/100 vs P/500), 10 (dt/10), 50, 100, 500, 5000
+Chua coincidences (look-elsewhere: many expressions tried):
+   2P = 2.847  vs R = 2.8532
+   inner-region divergence -alpha(1+m0)-1 with ours m0: 1.2308  vs Dysts max 1.23012
+   inner-region divergence -alpha(1+m0)-1 with Dysts m0: 1.22857  vs Dysts max 1.23012
+   same rule for Lorenz: divergence -(sigma+1+beta) = -13.6667 vs Dysts max 0.8917098035724058

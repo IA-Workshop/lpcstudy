@@ -1,0 +1,19 @@
+   diverged: 0
+a_h=0.01                       mean +0.43833  SE 0.00224  sd 0.01265  min +0.40904 max +0.47094
+   diverged: 0
+a_h=0.005                      mean +0.43467  SE 0.00201  sd 0.01137  min +0.41525 max +0.45881
+   diverged: 0
+a_h=0.0025                     mean +0.42976  SE 0.00190  sd 0.01072  min +0.40432 max +0.45396
+   diverged: 0
+a_h=0.00125                    mean +0.43245  SE 0.00269  sd 0.01524  min +0.39689 max +0.45944
+base_h=0.005_iv=0.1            mean +0.43606  SE 0.00314  sd 0.01257  min +0.41525 max +0.45881
+b_interval=0.01                mean +0.43606  SE 0.00314  sd 0.01257  min +0.41525 max +0.45881
+b_interval=0.01_minus_base     mean -0.00000  SE 0.00000  sd 0.00000  min -0.00000 max +0.00000
+b_interval=1.0                 mean +0.43606  SE 0.00314  sd 0.01257  min +0.41525 max +0.45881
+b_interval=1.0_minus_base      mean -0.00000  SE 0.00000  sd 0.00000  min -0.00000 max +0.00000
+d_pair_d0=1e-8                 mean +0.43658  SE 0.00314  sd 0.01255  min +0.41538 max +0.45949
+d_pair_minus_base              mean +0.00051  SE 0.00012  sd 0.00046  min -0.00023 max +0.00126
+e_jac=swapped                  mean +2.09707  SE 0.00687  sd 0.02746  min +2.04201 max +2.13232
+e_jac=nohalf                   mean +2.09027  SE 0.00911  sd 0.03644  min +2.04557 max +2.17993
+f_burn=0_T=100                 mean +0.41579  SE 0.00880  sd 0.03521  min +0.35671 max +0.46452
+f_burn=5000_T=100              mean +0.45369  SE 0.01661  sd 0.06646  min +0.34741 max +0.62943

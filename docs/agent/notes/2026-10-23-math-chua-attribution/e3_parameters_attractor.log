@@ -1,0 +1,25 @@
+alpha=8.0          diverged 0/4  lam1 [-0.1474 -0.1474 -0.1474 -0.1474]  pos_frac [1. 1. 1. 0.]  switches [0 0 0 0]  max|x| [1.5 1.5 1.5 1.5]
+alpha=8.5          diverged 0/4  lam1 [-0.1113 -0.1113 -0.1113 -0.1113]  pos_frac [1. 1. 1. 0.]  switches [0 0 0 0]  max|x| [1.5 1.5 1.5 1.5]
+alpha=9.0          diverged 0/4  lam1 [-0.0762 -0.0762 -0.0762 -0.0762]  pos_frac [1. 1. 1. 0.]  switches [0 0 0 0]  max|x| [1.5 1.5 1.5 1.5]
+alpha=10.0         diverged 0/4  lam1 [-0.007 -0.007 -0.007 -0.007]  pos_frac [1. 1. 1. 0.]  switches [0 0 0 0]  max|x| [1.6  1.53 1.5  1.56]
+alpha=11.0         diverged 0/4  lam1 [ 0.0005 -0.0002 -0.0001 -0.0019]  pos_frac [1. 1. 1. 0.]  switches [0 0 0 0]  max|x| [2.12 2.12 2.12 2.12]
+alpha=12.0         diverged 0/4  lam1 [ 0.0001 -0.0004 -0.     -0.0007]  pos_frac [1. 1. 1. 0.]  switches [0 0 0 0]  max|x| [2.13 2.13 2.13 2.13]
+alpha=13.0         diverged 0/4  lam1 [ 0.0003 -0.0009 -0.0007 -0.0002]  pos_frac [1. 1. 1. 0.]  switches [0 0 0 0]  max|x| [2.12 2.12 2.12 2.12]
+alpha=14.0         diverged 0/4  lam1 [0.2727 0.2998 0.2945 0.3049]  pos_frac [0.93 0.93 0.93 0.07]  switches [1 0 0 0]  max|x| [2.22 2.22 2.22 2.22]
+alpha=15.0         diverged 0/4  lam1 [0.3366 0.3664 0.3652 0.3601]  pos_frac [0.51 0.51 0.47 0.56]  switches [152 142 140 147]  max|x| [2.25 2.24 2.25 2.24]
+alpha=15.6         diverged 0/4  lam1 [0.4408 0.4535 0.4368 0.4262]  pos_frac [0.53 0.54 0.46 0.5 ]  switches [165 156 171 166]  max|x| [2.26 2.26 2.26 2.26]
+alpha=16.0         diverged 0/4  lam1 [0.1444 0.1495 0.1476 0.1514]  pos_frac [0.5 0.5 0.5 0.5]  switches [266 266 266 265]  max|x| [2.27 2.27 2.27 2.27]
+alpha=17.0         diverged 0/4  lam1 [0.5252 0.5162 0.5338 0.5313]  pos_frac [0.49 0.5  0.51 0.51]  switches [313 315 317 299]  max|x| [2.3 2.3 2.3 2.3]
+alpha=18.0         diverged 0/4  lam1 [0.7134 0.7422 0.727  0.7722]  pos_frac [0.52 0.51 0.52 0.48]  switches [331 363 347 356]  max|x| [2.33 2.33 2.33 2.33]
+alpha=18.5         diverged 4/4
+alpha=19.0         diverged 4/4
+alpha=19.5         diverged 4/4
+alpha=20.0         diverged 4/4
+beta=20.0          diverged 4/4
+beta=24.0          diverged 0/4  lam1 [0.6196 0.6009 0.5881 0.5962]  pos_frac [0.49 0.44 0.53 0.47]  switches [255 263 253 268]  max|x| [2.32 2.32 2.32 2.32]
+beta=26.0          diverged 0/4  lam1 [0.4971 0.5204 0.4835 0.509 ]  pos_frac [0.5  0.51 0.49 0.5 ]  switches [215 213 212 225]  max|x| [2.29 2.29 2.29 2.29]
+beta=30.0          diverged 0/4  lam1 [-0.0001  0.0005  0.0001  0.0007]  pos_frac [0.5 0.5 0.5 0.5]  switches [210 211 210 211]  max|x| [2.24 2.24 2.24 2.24]
+beta=32.0          diverged 0/4  lam1 [0.4088 0.4034 0.3969 0.4147]  pos_frac [0.93 0.93 0.93 0.07]  switches [0 0 0 0]  max|x| [2.22 2.22 2.22 2.22]
+beta=35.0          diverged 0/4  lam1 [0.0006 0.001  0.0013 0.0014]  pos_frac [1. 1. 1. 0.]  switches [0 0 0 0]  max|x| [2.18 2.18 2.18 2.18]
+slopes_swapped     diverged 0/4  lam1 [0.4898 0.5118 0.5206 0.5148]  pos_frac [0.5  0.5  0.49 0.5 ]  switches [902 921 912 914]  max|x| [3.72 3.71 3.72 3.72]
+classic_9_100/7    diverged 0/4  lam1 [0.3318 0.3295 0.3161 0.3317]  pos_frac [0.49 0.44 0.47 0.53]  switches [85 87 81 92]  max|x| [2.24 2.24 2.24 2.24]
