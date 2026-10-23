@@ -69,6 +69,8 @@
 
 ## Log
 
+- 2026-10-23, claude-opus-5-5 (planner), branch `wu/statement` from develop a3b0b65: **.3 and .4 drafted** after the promotion of CONF-1 (ledger entry 40): `docs/agent/notes/2026-10-23-research-statement-v2.md` and `docs/agent/notes/2026-10-23-poster-outline-v2.md`, drafts for the owner and the student. No number from any run; result words from findings §4 only; development numbers only by pointer to appendix A (not yet present). E8 checked by grep on statement §9 (no digit outside system names). No tests (documents only). Not committed by the planner (read-only shell); open questions in both files.
+
 ## Review
 
 - **Reviewer:**
