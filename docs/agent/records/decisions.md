@@ -786,3 +786,14 @@ The owner-review list of DEC-0038 addendum A1 gains: the names in `EXTENSION_SYS
 **Files.** Promoted copies in `promoted/CONF-1/`, hashes in `promoted/CONF-1.sha256`; manifest line of 2026-10-23 names entry 40; originals under `runs/confirmatory/run-1/` unchanged. Main synced at d75b8be. Close-out: `docs/agent/notes/2026-10-23-promotion-closeout.md`.
 
 **Affects:** WU-0015 to WU-0018, results manifest, what may be stated publicly. **Status:** recorded from the ledger; the owner's act is seq 40.
+
+## DEC-0045: Development appendix A is a standalone document; recommended answers applied to the 10/28 materials (2026-10-23, main session, under the owner's instruction)
+
+**Decision.** The owner's words, verbatim: "fix all open questions with the recommended fixes. for the purposes of this study, no further bureaucracy is needed from me. advance as quicklly as possible to the definition of done".
+
+**Reading, for the owner to correct.**
+1. **Standalone appendix.** The review of WU-0025.1 (finding R2) showed that a rendering hosted by the DEV-2 development run cannot serve as the poster handout. The main session decided, under the instruction above, that appendix A is a **standalone document** built by `tools/findings_build.py appendix` (WU-0025.7), not a section of the sealed findings document. ROADMAP WU-0025.5 and its definition of done ("with the sealed inputs", "the sealed document is rebuilt with appendix A") are superseded in practice by this decision; ROADMAP.md is a governed file and is not edited (an `amendment` would be the owner's act if wanted). The sealed findings document and the promoted copy are unchanged.
+2. **Recommended answers applied** to the open questions of the research statement and poster drafts: promotion label "Confirmatory result, seed CONF-1, promoted by the owner on 2026-10-23"; appendix A includes S1 to S6 with S2 to S6 marked PROVISIONAL (stored gate V7 false); panel 12 goes on a handout or the back of the board, apart from F1 to F3; appendix A reprints no sealed value and points to section 5 of the promoted report; panel 12 says the extension's verdict-reporting code is development-only and not owner-reviewed; the student text says "a subsequent pre-registered study", not "v4".
+3. **Not waived.** The owner's pending review of the extension code (DEC-0038 A1, A2) is not waived by this instruction; it requires a ledger entry. The extension code stays development-only and never goes to main.
+
+**Affects:** WU-0025, the 10/28 materials. **Status:** owner instruction; no ledger entry required for these design choices.
