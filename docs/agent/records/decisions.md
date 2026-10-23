@@ -645,3 +645,155 @@ Entries DEC-0030, DEC-0031 and DEC-0032 were entered with owner brackets unfille
 - **DEC-0032 item 8, B11:** the governance reread (LPC.PC.25, WU-0004.8) is performed by the human owner; the owner's name is entered in the ledger note of that entry.
 
 **Status:** owner answers; recorded pending the owner's ledger entry (the `ruling` entry of `tools/owner_freeze_run.sh ledger` covers DEC-0028 to DEC-0033 and this addendum).
+
+## DEC-0034: Owner lifts the compute caps for production runs (2026-10-19, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `authorization` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim: "all caps are hereby lifted for all production runs. caps were to limit churn and resource wastage during development".
+
+**Reading, for the owner to correct.** The caps are the limits of LPC.AUTH.3 (`authorizations.md`, row "Limits"): each run under 12 hours wall-clock, and at most 60 GPU-hours per calendar week. They no longer bind a production run: the sealed official CPU run, its GPU cross-check (WU-0015.2b), and any further run the owner designates as production. The earlier lift of the LPC.AUTH.2 page cap (DEC-0009) stands. The caps were set to limit churn and wasted resources during development, so they stay in force for development runs started through `tools/run_preset.sh` (its `timeout 12h` and the weekly check of `tools/gpu_hours.py`) until the owner says otherwise.
+
+**What this does not change.** One GPU job at a time under the lock (it serializes the card and keeps runs comparable; it is not a cost cap). The seed rules (LPC.PC.7), the per-action authorization of every use of the sealed seed (LPC.AUTH.6), the dirty-tree and commitment refusals, and the recording of wall-clock time and GPU hours per run (the tally is a report, no longer a limit, for production runs). The acceptance line of ROADMAP WU-0015.2 ("wall-clock under 12 h") stays a measured and reported figure; a run past it is reported, not refused.
+
+**Effect now.** Nothing in the plan is blocked by a cap: the official CPU run takes about 4.7 h, the GPU cross-check about 0.8 h, and the tally for the week is 0 GPU-hours of 60. The change matters for longer runs (a scaled-up ensemble), where the `timeout 12h` in the launch commands may be raised or left off.
+
+**Affects:** LPC.AUTH.3, WU-0015.2, WU-0015.2b, any scaled-up ensemble. **Status:** owner instruction; recorded pending the owner's ledger entry. Suggested entry (the owner's act): `python3 tools/ledger.py append --type authorization --actor "<you>" --role "human owner" --authority "LPC.AUTH.3; DEC-0034" --summary "Compute caps of LPC.AUTH.3 (12 h per run, 60 GPU-hours per week) lifted for production runs" --data '{"ruled_on": "2026-10-19", "quote": "all caps are hereby lifted for all production runs. caps were to limit churn and resource wastage during development", "source": "decisions.md DEC-0034"}'`.
+
+## DEC-0035: Owner rulings on the A13 ordering and on "another actor" for the regeneration (2026-10-20, owner statement relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim: "A13 is fine, it was my inconsistency due to the complexity around human recorded ledger entries. a tool to make this easier in the future should be considered." and "Another actor is fine to be me."
+
+**Reading, for the owner to correct.**
+1. **A13.** The first commit of the sealed outputs (e754601, 2026-10-20T08:41:12Z, the owner's commit) came before the release entry (ledger seq 20, 08:43:08Z). The mechanical check of A13 as written (outputs committed after the release entry) is not met, and the owner accepts the ordering: no defect is opened, the release entry stands as the release, and the outputs were not read by any agent before it. Cause given by the owner: the number of human-recorded ledger entries made in one sitting (entries 15 to 21 were entered on 2026-10-20, some after the act they record: seq 15, the CPU-run authorization, is marked `entered_after_run`).
+2. **Another actor.** For v3 section 9 item 4 and QA.9, the regeneration of the official run (WU-0016.2, run-2, ledger seq 21) may be run by the human owner, who also ran the official run. The independence the item asks for is then the second execution at the same commit from a fresh worktree (freeze-1, df8928f), with the comparison by `tools/compare_runs.py` (tier T0 expected), not a second person. The dated section 9 line of the findings document says that the owner ran both.
+3. **Future tool (idea, not planned, not for the sealed run).** A helper for human-recorded ledger entries: it would take the act (authorization, release, ruling), prefill the entry from the record it cites, check order against the commits and the run provenance, warn when an entry follows the act it records, and print the sequence number for the next step. The owner asked that it be considered in the future; nothing is built.
+
+**Affects:** WU-0015.3, WU-0015.4, WU-0016, the findings document section 9, the pre-promotion audit scope (A13 is not an open finding). **Status:** owner statements; recorded pending the owner's ledger entry.
+
+## DEC-0036: Owner approval of the handling of review findings R1 and R4 of WU-0020.8 (2026-10-20, owner statement relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim: "r1 is ok" and "r4 is ok", given in answer to the two questions put with fix round 1 of WU-0020.8.
+
+**Reading, for the owner to correct.**
+1. **R1 (Q-N).** The findings document shows both stored Q-N readings per system (logit part and zero-indicator part), traces both, and says that the stored overall word `verdicts.Q-N` is built from the logit part only. `lpcstudy/report.py` is not changed. The collapse is recorded here as a reporting observation of the frozen report code, not as a defect and not as a change request.
+2. **R4 (DEF-0027 count).** The findings document follows the official `RESULTS.md` and the DEF-0027 correction (negligible for 5 of 18 primary parts, not shown negligible for 13: not negligible 6, not certified 7; the projection is stated and not applied). `docs/study/proposal_and_methods_v3.md` section 8 is not edited. Its wording of the count differs from RESULTS.md; the difference is recorded here and in the constant's citation in `tools/findings/design_constants.json`.
+
+**Affects:** WU-0020.8, the findings document sections 4 and 10, the pre-promotion audit scope (the v3 section 8 wording is a known difference, not an open finding). **Status:** owner statements; recorded pending the owner's ledger entry.
+
+## DEC-0037: Owner authorizes the extension program (additional attractors, Dysts context) and the development ensemble (2026-10-20, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim: "for item 1, ideally we should have 2 more attractors with different properties for 10/28. higher dimensionality, or any qualitative departure from the 3 we picked is preferred. Item 2 is a strong goal, I agree. Item 3 is also a strong demonstration. Based on the research we did previously, integrate these items into the roadmap and plan so we can agressively start implmenting them. we want item 1 done by 10/22. The otehrs may be implemented concurrently. Concurrent to that, launch the ensemble study."
+
+**Reading, for the owner to correct.**
+1. **The items** (main session's list of 2026-10-20): (1) a check of the three studied systems against the Dysts database (parameters, step convention, published exponents), which the owner's wording extends to two additional attractors with different properties, due 2026-10-22; (2) the same CP / PLP / A4 comparison on further Dysts systems; (3) a descriptive comparison with the Dysts forecasting benchmark. All three are exploratory: development seeds only, labeled development, never beside the sealed result, no change to the freeze, the sealed verdict or main. A confirmatory claim on new systems would need a new sealed seed and freeze, which is the owner's decision and not part of this authorization.
+2. **First two additional attractors** (chosen by the main session from the ranked catalog of docs/agent/notes/2026-10-19-math-other-attractors.md; the owner may overrule): the hyperchaotic Rössler system (four dimensions, two positive exponents, Kaplan-Yorke dimension about 3: higher dimensionality) and Lorenz-63 at r = 166.1 (type-I intermittency: a bimodal local growth exponent, a qualitative departure). Rössler observed through z (observability spanning orders of magnitude, no new equations) is a cheap third configuration if time allows. Lorenz-96 with N = 8 is a stretch candidate and is not scheduled.
+3. **Constraint carried into the plan.** Code changes for new systems are additive on develop: the three frozen systems and the confirmatory path must give bitwise equal outputs (smoke preset against the freeze-1 reference); nothing is merged to main, and the promoted document is built from freeze-1.
+4. **Development ensemble.** Launched 2026-10-20: full preset on the GPU for DEV-1, DEV-3 and DEV-4 in turn, from a clean detached worktree at develop 3dec086 (lpcstudy/ identical to freeze-1), through tools/run_preset.sh under the GPU lock, concurrently with the CPU regeneration run-2 (host load does not change a run's bits at fixed thread counts). Development evidence only, for the labeled development appendix.
+
+**Affects:** ROADMAP.md (new phase), queue.md, the findings document appendix A, the research statement, the poster outline. **Status:** owner instruction; recorded pending the owner's ledger entry. Amendments to ROADMAP.md need the owner's ledger `amendment` entry (ROADMAP.md is a governed file).
+
+## DEC-0038: Owner confirms the per-system-only verdict branch and the two further review items of the extension code (2026-10-20, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim, in answer to three items put by the main session: "Verdict code. Still pending: option (a), the per-system-only branch in report.verdicts. Owner review needed. Add these two items to the list: data.lyapunov_record (the lyapunov_steps field) and tests/slow/test_start_states.py. Timing risk. The S1 re-specification adds roughly an hour and a re-review. The ensemble is still on the GPU, so the 10/22 target holds if the batch can start tonight. Proceed with all."
+
+**Reading, for the owner to correct.**
+1. **Option (a) is approved:** in `lpcstudy/report.py`, a run that contains any extension system skips `statistics.overall_verdict` and stores per-system verdict words with the overall word "per-system only"; the path for runs inside the three frozen systems is unchanged (checked bitwise, WU-0021 Log). It may merge to `develop` after the independent review. It never goes to `main`.
+2. **The two further items stay on the owner's review list** (verdict, seed and statistics code needs owner review, LPC.PC.11): the additive field `lyapunov_steps` in `data.lyapunov_record` (default 100000: the frozen systems are unchanged) and the edit of `tests/slow/test_start_states.py` (the control row generalized to dimension 4, plus the three new cases). The owner's instruction is to proceed with implementation, review and the runs meanwhile; the owner's own read of these hunks is not claimed as done.
+3. **The S1 re-specification** (RK4 step and orbit bound, review finding R1 of WU-0021.7) and its re-review proceed; the batched GPU run starts after the ensemble when the code review of the extension is approved.
+4. **Retraction.** The main session's earlier ruling that accepted a "2 to 5% per seed abort hazard" for S1 rested on a wrong mechanism (an integrator instability at the production step, not an escape to infinity: review R1) and is withdrawn.
+
+**Affects:** WU-0021, WU-0023, the extension runs. **Status:** owner instruction; recorded pending the owner's ledger entry.
+
+### DEC-0038 addendum A1 (2026-10-20, main session; correction found by the independent re-review of WU-0021.7, finding N4)
+
+The entry above says option (a) "is approved". The owner's words quoted there are the main session's own list of three items (including "Verdict code. Still pending: option (a)" and "Owner review needed") repeated back, followed by "Proceed with all." The words do not state an approval of the code change as such. The correct reading, which replaces item 1 and item 2 of the reading above: the owner authorized the main session to proceed with implementation, review, merging to `develop` and the development runs of the extension program, with option (a) in place; the owner's own review of these four items is **still pending** and is not claimed as done: the verdict-reporting branch in `lpcstudy/report.py` (`report.verdicts` and the added `extension_text`), the additive field `lyapunov_steps` in `data.lyapunov_record`, and `tests/slow/test_start_states.py`. The change never goes to `main` without that review. The owner may correct this reading.
+
+### DEC-0038 addendum A2 (2026-10-21, main session; finding R2 of the WU-0023 independent review)
+
+The owner-review list of DEC-0038 addendum A1 gains: the names in `EXTENSION_SYSTEMS` in `lpcstudy/report.py` (verdict-reporting code; the new systems S4 `hindmarsh_rose`, S5 `hyper_jha`, S6 `lorenz96_4` are added there). Status: the owner's review is pending; the change never goes to `main` without it. Separately, S6 (4-variable Lorenz-96, F = 20) needs an owner ruling because LPC.PC.1 listed Lorenz-96 as out of scope; it is not merged to `develop` until the owner rules (WU-0023 review R1).
+
+## DEC-0039: Owner rules S6 (4-variable Lorenz-96) in scope and allows concurrent development runs (2026-10-21, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim: "S6 i sin scope. concurrent runs are allowed."
+
+**Reading, for the owner to correct.**
+1. **S6** (`lorenz96_4`, 4-variable Lorenz-96, F = 20) is in scope as a development-only extension system under DEC-0037 (an explicit exception to the earlier Lorenz-96 line of LPC.PC.1, for development seeds, never confirmatory, never main). WU-0023 review finding R1 is resolved by this ruling; the S4 to S6 branch may merge to `develop`.
+2. **Concurrent runs** are allowed for DEVELOPMENT runs: up to two at once on the GPU (a second lock slot, `LPC_GPU_LOCK=/tmp/lpcstudy-gpu-2.lock`, through the unchanged wrapper), each logged with its out-dir and start time in the work log. The one-job lock stays exclusive for the sealed run, its cross-check and any production run (DEC-0034); a production or sealed run starts only when both development slots are idle. The 12 h and GPU-hour limits of LPC.AUTH.3 stay for development runs as before.
+
+**Affects:** WU-0023, LPC.PC.1 reading, the run wrapper use, the second extension batch. **Status:** owner instruction; recorded pending the owner's ledger entry.
+
+## DEC-0040: Owner rulings after the pre-promotion audit of the CONF-1 findings, and agreement with the theorem items (2026-10-21, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger entries are the owner's to append)
+
+**Decision.** The owner's words, verbatim, in answer to the audit report `docs/agent/notes/2026-10-21-audit-pre-promotion-conf1.md`: "Fix B1 and present for review. M1 point me to the review location. M2 accept. the failure was the complexity of making the ledger entry. please develop a tool that make the ledger entry a simple one command tool that I can run from the tools/ directory, then add these process instructions to the README doc. M3 because this is a small team development, it is not feasible to have more than one human actor. this may be waived for this case, and in the future, an agent session may launch. M4 propose a solution and present for review. Fix all minor items. agree with theorem items 1-3".
+
+**Reading, for the owner to correct.**
+1. **M2.** The owner accepts that the CPU run of 2026-10-19 was launched by the owner, and accepts ledger seq 15 (entered 2026-10-20, marked retroactive) as its record. The cause was the effort of making the entry; the remedy is the one-command tool (WU-0030). A ledger `ruling` entry should state this (use the tool once it is merged).
+2. **M3.** The requirement of v3 section 9 item 4 and LPC.PC.6 that the regeneration be by an actor other than the producer is **waived for CONF-1** because the team has one human actor (the owner ran both runs, DEC-0035). The waiver is for this case only. For future runs an agent session may launch the regeneration. A ledger `waiver` entry should record it. The promoted report must say that run-2 shows determinism (bitwise equal, same host, same environment, same actor), not an independent reproduction.
+3. **M1.** Pointer given: the owner review packet is `docs/agent/notes/2026-10-18-owner-review-packet.md`; the tiers and unit list are in `docs/agent/notes/2026-10-18-freeze-blockers.md` section B2 (recommended reading: option 2, the `lpcstudy/` pipeline first, then tools; tools not reviewed are waived by ledger `waiver`); the four extension code items of DEC-0038 and its addenda are listed separately. The owner's review itself is pending.
+4. **M4 and the minor items.** M4 is a proposal for review (`2026-10-21-def0022-proposal.md`); the fixes of the minor items and of B1 are in `2026-10-21-b1-minors-report.md` (units WU-0015 to WU-0018).
+5. **Theorem items 1 to 3.** (1) The branches wu/theory-verify (WU-0027) and wu/theory-dumps (WU-0028) are merged to develop; WU-0029 (dump schema /3) is added to the ROADMAP. (2) The errata of the C1.2 draft are appended to `docs/study/theorem_program_lpc_v1.md` (dated, 6 October text unchanged); the C1.3 decision is taken as option C (keep the ln 2/(2Λ̄) row with the envelope and raw-C fixes, add P1(d′) as a verification row), implemented as WU-0031 on development seeds with acceptance criteria fixed in the draft, owner review of the statistics code before any use. (3) The audit and check fixes of WU-0027 (checks that cannot fail, stronger hypotheses than named, uncounted censored skips) go into WU-0029 and WU-0031 and are counted, not silent.
+
+**Affects:** WU-0015 to WU-0018, WU-0027 to WU-0031, the promotion path, the audit. **Status:** owner instruction; recorded pending the owner's ledger entries.
+
+## DEC-0041: Owner accepts DEF-0022 (the H2a(ii) power finding) as a known limitation and asks for proposals to improve the quality of the interval results (2026-10-21, owner instruction relayed by claude-sonnet-5-5 (main session); the ledger `ruling` entry is the owner's to append)
+
+**Decision.** The owner's words, verbatim, in answer to `docs/agent/notes/2026-10-21-def0022-proposal.md`: "Accept, and propose new intervals to improve the quality of the results".
+
+**Reading, for the owner to correct.**
+1. **Accepted: option 1** of the proposal (accept as a known limitation, with the full-size evidence stated; text B for the promoted report; the same wording in section 10 of the findings document; no change to any verdict, band, level or number of the sealed run). If the owner meant option 2 (a per-part interval line in the report), say so.
+2. **"New intervals to improve the quality of the results"** is read as a request for **proposals** for the design of future or development work, not as a change to the sealed analysis. The pre-registered intervals, levels, bands and rules of v3 and the sealed CONF-1 verdicts are not changed: a change after the result was seen would be a post hoc criterion (PRIME.2, VV.3). Proposals go to the applied-mathematician (WU-0032), are labeled post hoc and exploratory, are evaluated on development seeds or on stored sealed intervals only as arithmetic about power, and would apply to a future pre-registered study or to the development extension, after the owner's ruling.
+3. After the owner's ledger entry: the defects status line of the DEF-0022 proposal (ii) is appended by the owner, the findings document is rebuilt with the ruled wording and checked.
+
+**Affects:** DEF-0022, WU-0017 (report limitations list), WU-0032. **Status:** owner instruction; recorded pending the owner's ledger entry.
+
+**Ledger (appended 2026-10-22, claude-sonnet-5-5, for DEC-0040):** the owner's entries are seq 30 (`ruling`, M2, quote "M2 accept. the failure was the complexity of making the ledger entry.", 2026-10-21T08:34:06Z) and seq 31 (`waiver`, M3, scope "CONF-1 only", quote "because this is a small team development, it is not feasible to have more than one human actor. this may be waived for this case, and in the future, an agent session may launch.", 2026-10-21T08:34:06Z). Seq 29 is the `amendment` entry of the same time.
+
+**Ledger (appended 2026-10-22, claude-sonnet-5-5, for DEC-0041):** the owner's entry is seq 32 (`ruling`, source "decisions.md DEC-0041", quote "Accept, and propose new intervals to improve the quality of the results", 2026-10-22T08:14:14Z).
+
+## DEC-0042: Owner entries of 2026-10-22 on the audit items M1, M3, m3 and the WU-0017 figure and gap findings (2026-10-22, recorded by claude-sonnet-5-5 from ledger seq 33 to 36)
+
+**Decision.** The owner's words, verbatim, as they stand in the ledger (all 2026-10-22):
+- Seq 33, `waiver`, source "audit M1", 08:15:21Z: "results were spot checked for agreement".
+- Seq 34, `ruling`, source "audit M3", 08:16:26Z: "agent-based cross-checking is ok for this project".
+- Seq 35, `note`, source "audit m3", 08:17:04Z: "plan amendment approved".
+- Seq 36, `ruling`, source "promotion-figure-map.md; WU-0017 NVVUQ check", 08:18:05Z: "different intervals/dataset size will be needed in subsequent runs".
+
+**Reading, for the owner to correct.**
+1. **M1 (seq 33).** The entry is a `waiver` of the owner's code review of the verdict, statistics, seed and provenance code (LPC.PC.11 second tier; WU-0004.5; freeze checklist item 3). Its quote speaks of spot-checking results for agreement, not of reading the code. So the promoted report's verification and validation status must read: **"owner code review waived (ledger seq 33); results spot-checked by the owner; code covered by independent agent reviews"**. It must not say that the owner reviewed the code. DEF-0001 is not marked resolved by this entry (see the defects status line of the same date).
+2. **M3 (seq 34, with the waiver of seq 31).** The owner accepts agent-based cross-checking for this project. This does not change the facts: run-2 was by the same actor on the same host in the same environment and shows determinism (bitwise equal compared leaves), not an independent reproduction. The report says so (DEC-0040 item 2).
+3. **m3 (seq 35).** "Plan amendment approved" is read as approval of the amendment of 2026-10-20 (A6: the source name `official_words` may be quoted inside the cross-check section of the findings document; WU-0020 log and `WU-0020-review.md`). If it meant another amendment, say so.
+4. **WU-0017 figures and gaps (seq 36).** The quote is read as: the owner accepts the gaps G1 to G3 (no numerical-error estimate or per-QoI V&V status for the secondary rows, and the unclear status wording of the secondaries) and the figure captions as sealed output, carrying the figure map in the report text, and notes that later runs will need different intervals and sample sizes (see DEC-0041 item 2: proposals, WU-0032). It is not read as a change to the sealed analysis. The unexplained 5% criterion line of `regret_vs_regimes.png` stays open and is not repeated as a criterion.
+
+**Affects:** WU-0017, WU-0018, WU-0020 (findings document section 10), DEF-0001, the promoted report's limitations and V&V status. **Status:** recorded from the owner's ledger entries; the reading is for the owner to correct.
+
+## DEC-0043: Owner chooses option (a) for the findings figures of the promoted copy (2026-10-22, owner instruction relayed by claude-sonnet-5-5 (main session))
+
+**Decision.** The owner's words, verbatim, in answer to the three options of section 9 of `docs/agent/notes/2026-10-22-promotion-proposal.md`: "option a".
+
+**Reading, for the owner to correct.** Option (a): the three findings figures F1 to F3 are re-rendered with a promoted status title for the promoted copy (WU-0034: `findings_build.py promote`, separate output folder, preliminary figures untouched, byte-reproduction and zero-tolerance pixel check outside the title band). The `RESULTS.md` figures are copied as they are (they carry no status text). The promoted report's provenance row keeps the stored label of the sealed file. Option (c) (omit the figures) is the fallback only if promotion has to precede WU-0034.
+
+**Affects:** WU-0033, WU-0034, WU-0018.2, WU-0018.3. **Status:** owner instruction; no ledger entry is required for this choice (a design choice for the report copy, no governed file changes); the owner may add a ledger `note` if wanted.
+
+## DEC-0044: Promotion of the CONF-1 run-1 result (2026-10-23, recorded by claude-sonnet-5-5 from ledger seq 37 to 40)
+
+**Decision.** The CONF-1 run-1 result (official CPU run, `ae4b0fe5bf488f6c147bce6c91a2398e87408f6a5d372ae66d89bdfc90b0cebe`; `RESULTS.md` `2a4c1d06859d07584b1633c6e7f1b5df205ffe445402509834383fb474649577`) is promoted. The owner's act is the ledger entry, not words recorded here: seq 40, type `promotion`, 2026-10-23T09:37:12+00:00, `promoted` true, `proposal_seq` 39, `reading_recorded` "WU-0017.3 dated line" (commit 03edc09). Seq 39 is the proposal (WU-0018.2; `promoted` false, rulings 30, 32, 34, 36, waivers 31, 33).
+
+**Audits.** `docs/agent/notes/2026-10-21-audit-pre-promotion-conf1.md` and `docs/agent/notes/2026-10-22-audit-promotion-conf1.md` (zero blockers; GO for the proposal; promotion deferred to the owner-side items, now done).
+
+**Ruled limitations carried by the promoted report.** Same host, environment and actor for run-1 and run-2: determinism, not independence (waiver seq 31, ruling seq 34, DEC-0035); owner code review waived, results spot-checked by the owner, DEF-0001 open (waiver seq 33); the risk and expiry of waivers 31 and 33 (note seq 37/38: expiry at the owner code review record or the end-of-project governance review, WU-0019.2); retroactive authorization of the official run accepted (seq 15, ruling seq 30); DEF-0022 power finding accepted as a known limitation, labeled development evidence (ruling seq 32); NVVUQ.22 gaps G1 to G3 and the four sealed figure captions with the figure map in the report text (ruling seq 36); Q-N two readings (DEC-0036, seq 24); DEF-0027 iterative error not estimated.
+
+**Duplicate entries.** Seq 37 (2026-10-22T09:56:05Z) and seq 38 (2026-10-23T09:31:31Z) are the same owner note (waivers 31 and 33: risk accepted and expiry); it was entered twice. The wording of seq 38 is the fuller one. The duplicate is harmless: the chain is intact and both name the same waivers. No entry is altered.
+
+**Files.** Promoted copies in `promoted/CONF-1/`, hashes in `promoted/CONF-1.sha256`; manifest line of 2026-10-23 names entry 40; originals under `runs/confirmatory/run-1/` unchanged. Main synced at d75b8be. Close-out: `docs/agent/notes/2026-10-23-promotion-closeout.md`.
+
+**Affects:** WU-0015 to WU-0018, results manifest, what may be stated publicly. **Status:** recorded from the ledger; the owner's act is seq 40.
+
+## DEC-0045: Development appendix A is a standalone document; recommended answers applied to the 10/28 materials (2026-10-23, main session, under the owner's instruction)
+
+**Decision.** The owner's words, verbatim: "fix all open questions with the recommended fixes. for the purposes of this study, no further bureaucracy is needed from me. advance as quicklly as possible to the definition of done".
+
+**Reading, for the owner to correct.**
+1. **Standalone appendix.** The review of WU-0025.1 (finding R2) showed that a rendering hosted by the DEV-2 development run cannot serve as the poster handout. The main session decided, under the instruction above, that appendix A is a **standalone document** built by `tools/findings_build.py appendix` (WU-0025.7), not a section of the sealed findings document. ROADMAP WU-0025.5 and its definition of done ("with the sealed inputs", "the sealed document is rebuilt with appendix A") are superseded in practice by this decision; ROADMAP.md is a governed file and is not edited (an `amendment` would be the owner's act if wanted). The sealed findings document and the promoted copy are unchanged.
+2. **Recommended answers applied** to the open questions of the research statement and poster drafts: promotion label "Confirmatory result, seed CONF-1, promoted by the owner on 2026-10-23"; appendix A includes S1 to S6 with S2 to S6 marked PROVISIONAL (stored gate V7 false); panel 12 goes on a handout or the back of the board, apart from F1 to F3; appendix A reprints no sealed value and points to section 5 of the promoted report; panel 12 says the extension's verdict-reporting code is development-only and not owner-reviewed; the student text says "a subsequent pre-registered study", not "v4".
+3. **Not waived.** The owner's pending review of the extension code (DEC-0038 A1, A2) is not waived by this instruction; it requires a ledger entry. The extension code stays development-only and never goes to main.
+
+**Affects:** WU-0025, the 10/28 materials. **Status:** owner instruction; no ledger entry required for these design choices.
