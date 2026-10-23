@@ -220,3 +220,13 @@ The rows below supersede the "planned" status of the WU-0015 to WU-0018 rows of 
 | WU-0018 | done: .1 audit 2026-10-22, .2 proposal seq 39, .3 promotion seq 40 |
 
 Decision DEC-0044; note `docs/agent/notes/2026-10-23-promotion-closeout.md`. Remaining and owner-held: WU-0019 (retention, governance review), DEF-0001 open, DEC-0043 (WU-0034 re-rendered figures in use), m8, open items listed in the note.
+
+## 2026-10-23 (records-h): phase H records
+
+| Unit | Status (2026-10-23) |
+| --- | --- |
+| WU-0021 | S1 to S3 implemented (`lpcstudy/systems.py`), reviewed (WU-0021.7, approve), run on DEV-3 at `974519a`; not closed: owner review of the verdict code pending (DEC-0038 A1/A2); extension code is development-only, never to main |
+| WU-0023 | S4 to S6 implemented, reviewed (R1/R2 answered by DEC-0039), run on DEV-3 at `392a069`; not closed for the same owner review |
+| WU-0026 | done: .1 manifest lines and GPU tally (`week=2026-W43 gpu_hours=6.8125 runs=9`), .2 gate and completeness table in the unit file |
+
+Frozen-pipeline regression reference `lpcstudy-wt/run/ext-ref-fc49d5f` (leafdiff 0 different). Results summary `docs/agent/notes/2026-10-23-extension-ensemble-summary.md`. Gate: ensemble all pass; extension S1 passes, S2 to S6 fail V7 (provisional).

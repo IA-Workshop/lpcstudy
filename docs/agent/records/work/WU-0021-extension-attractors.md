@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | planned |
+| Status | implemented, reviewed and run on DEV-3 (S1 to S3); not closed: owner review of the verdict code pending (DEC-0038); records closed 2026-10-23 from existing evidence |
 | Class | CSQ3 development (exploratory; DEV seeds only; never confirmatory) |
 | Agent(s) | claude-opus-5-5 (planner); researcher, applied-mathematician, developer, reviewer and main session to be named; under DEC-0037 and the owner's pending ledger entries (ROADMAP §8) |
 | Estimate | About 12 agent hours. Wall clock: GPU about 1 h for the pilot (.6) and 1 to 1.5 h for the full runs (.8); CPU smokes about 1.5 h at one thread. **Due 2026-10-22.** |
@@ -176,6 +176,13 @@
   - **A7 for S1 after the re-specification** (`tools/run_preset.sh smoke DEV-0 runs/a7d-rossler_hyper --device cpu --systems rossler_hyper`, commit 7e54adf, clean tree, 1 thread, niced): exit 0 in 43 s; `lambda_max` 0.11220508610149868, interval 0.297075, orbit max 166.35; gate V1, V2, V4, V5, V6 pass, **V7 fail at smoke size** (the earlier smoke at `max_dt` 0.01 had V7 pass; at smoke size V7 is a plumbing check judged at pilot size, DEC-0015; recorded, not required, not interpreted).
   - **R1 (final, after the S1 re-specification and the report text):** `runs/ext-new5` (commit 7e54adff454f, `dirty False`, exit 0, `LPC_THREADS=1`): leafdiff `leaves: A 14174, B 14174, common 14174, different 0, removed 0, added 0`; compare_runs `tier: T0`, `equal 13914, different 0, one-sided 0`, `RESULT: PASS (exit 0)`. R2 (additivity): `git diff --numstat freeze-1 -- lpcstudy/`: `1 1 data.py`, `130 0 report.py`, `111 0 systems.py` (the one deleted line is `n_steps=100_000`, exception (i)). A9 against the branch base: `git diff --name-only 2b8240e..HEAD` has no file under `seeds/`, `runs/confirmatory/`, `docs/study/`, `docs/agent/governance/` (the merge of develop adds notes under `docs/agent/notes/` only); no command in this Log contains the sealed-run flag.
 
+- **2026-10-23, main session records pass (claude-sonnet-5-5; records only, nothing rerun).**
+  - Implementation: S1 `rossler_hyper`, S2 `lorenz63_r166` and S3 `rossler_z` are in `lpcstudy/systems.py`, with `report.py` and the 1-line `data.py` exception, merged to develop as `974519a` (review: WU-0021.7 below, approved at the re-review).
+  - Frozen-pipeline regression reference: `lpcstudy-wt/run/ext-ref-fc49d5f` (develop fc49d5f, three systems, smoke) against the run `runs/ext-new5` at the extension code: leafdiff `different 0, removed 0, added 0` over 14174 leaves and compare_runs T0 PASS (see the R1 line of the Log above). The frozen systems' results are bitwise equal.
+  - Full-preset runs on DEV-3 (GPU, `--systems <S> --skip-robustness`, commit `974519a`, exit 0, `complete` true): S3 906 s, S2 2723 s, S1 2835 s. Gate: S1 passes V1 to V7; S2 and S3 fail V7 (provisional). Manifest lines and sha256 in `docs/agent/records/results-manifest.md` (2026-10-23, WU-0021.8). `git diff --quiet freeze-1 974519a -- lpcstudy/` returns 1: `data.py`, `report.py`, `systems.py` (additive).
+  - Results summary: `docs/agent/notes/2026-10-23-extension-ensemble-summary.md` (stored words, gates, intervals and limits; development, exploratory, single seed).
+  - Cross-reference: the 2026-10-23 close-out of the promotion (`docs/agent/notes/2026-10-23-promotion-closeout.md`) concerns CONF-1 only; extension code is not part of that promotion and is not edited there.
+
 ## Review
 
 - **Reviewer:** reviewer, claude-opus-5-5, fresh context, 2026-10-20 (WU-0021.7, round 1). Diff reviewed: `git diff 2b8240e..4967ed2` (lpcstudy/, tests/, this file). Read: this file, the specification note `2026-10-20-math-extension-specs.md` and its script directory, the researcher note `2026-10-20-researcher-dysts-extension.md`, DEC-0037, `.claude/CLAUDE.md`, `.claude/rules/test-discipline.md`.
@@ -328,6 +335,8 @@
 - Is the definition of done met? Give the evidence.
 - Defects recorded:
 - Notes for successors:
+
+- **2026-10-23, records pass.** Not defended as met in full: the definition of done requires the owner review below. Evidence of implementation and of the runs is in the Log, Review and the manifest. Pending: owner review of report.verdicts/extension_text, EXTENSION_SYSTEMS, data.lyapunov_record lyapunov_steps and tests/slow/test_start_states.py: pending (DEC-0038 A1/A2); extension code is development-only and never goes to main. The earlier owner note "no further bureaucracy" is not recorded in the ledger, so it is not treated as a waiver.
 
 ## Referral
 

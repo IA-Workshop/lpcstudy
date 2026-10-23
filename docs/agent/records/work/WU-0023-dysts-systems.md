@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | planned |
+| Status | S4 to S6 implemented, reviewed and run on DEV-3; not closed: owner review of the verdict code pending (DEC-0038); records closed 2026-10-23 from existing evidence |
 | Class | CSQ3 development (exploratory; DEV-3; never confirmatory) |
 | Agent(s) | claude-opus-5-5 (planner); researcher, applied-mathematician, developer, reviewer and main session to be named; under DEC-0037 |
 | Estimate | About 2 agent hours per system plus 2 h of overhead; GPU about 0.5 h per system at the pilot preset. **Target 2026-10-26** for a first set. |
@@ -160,10 +160,18 @@
   - R3 to R9 are notes. No smoke-gate finding indicates a code defect: V1 on S4 is FD truncation (shown), V4 on S5 is smoke size, the cached λ differences are reduction-level, and V7 is to be judged at full size.
   - Findings: 9 (1 blocker, 1 should fix, 7 notes).
 
+- **2026-10-23, main session records pass (claude-sonnet-5-5; records only).**
+  - Review outcome: the WU-0023 review (R1 blocker for S6 only: scope; R2 should-fix: the `report.py` change needs owner review) is answered by the ruling DEC-0039 (S6 in scope; concurrent development runs) and by the merge `392a069` to develop. S4 and S5 were approved as implemented.
+  - Full-preset runs on DEV-3 (GPU, `--systems <S> --skip-robustness`, commit `392a069`, exit 0, `complete` true): S5 `hyper_jha` 4042 s, S4 `hindmarsh_rose` 5169 s (concurrent with S5), S6 `lorenz96_4` 1304 s. Gate: V7 fails on all three (provisional). Manifest lines and sha256 in `docs/agent/records/results-manifest.md`. `git diff --quiet freeze-1 392a069 -- lpcstudy/` returns 1: `data.py` (1 line), `report.py` (+146), `systems.py` (+256), additive.
+  - Frozen-pipeline regression: R1 bitwise (leafdiff 0 different) in the reviewer's rerun and in `runs/ext2-r1` (see the Log); reference `lpcstudy-wt/run/ext-ref-fc49d5f`.
+  - Results summary: `docs/agent/notes/2026-10-23-extension-ensemble-summary.md`.
+
 ## Audit
 
 - Is the definition of done met? Give the evidence.
 - Defects recorded:
 - Notes for successors:
+
+- **2026-10-23, records pass.** Pending: owner review of report.verdicts/extension_text, EXTENSION_SYSTEMS, data.lyapunov_record lyapunov_steps and tests/slow/test_start_states.py: pending (DEC-0038 A1/A2); extension code is development-only and never goes to main.
 
 ## Referral
