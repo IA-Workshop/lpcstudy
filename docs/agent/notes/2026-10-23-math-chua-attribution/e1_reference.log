@@ -1,0 +1,15 @@
+ours start(0.7,0,0): lam [ 4.40850e-01 -1.65000e-03 -4.24771e+00] batch SE 0.00459
+   ensemble of 7 ok / 9 : mean 0.4347 SE 0.00176 min 0.42773 max 0.44085
+   spectrum mean [ 4.34700e-01 -1.82000e-03 -4.24694e+00] sum -3.81406 mean div -3.81402
+   over ok: pos_frac range 0.499 0.506 switches min 1591 max|x| over ok 2.2631
+   diverged: 2  seconds 108.1
+dysts start(0.7,0,0): lam [ 4.39120e-01 -1.09000e-03 -4.22101e+00] batch SE 0.00439
+   ensemble of 7 ok / 9 : mean 0.43455 SE 0.00178 min 0.42501 max 0.43912
+   spectrum mean [ 4.34550e-01 -1.62000e-03 -4.21724e+00] sum -3.78431 mean div -3.78439
+   over ok: pos_frac range 0.494 0.507 switches min 1564 max|x| over ok 2.2631
+   diverged: 2  seconds 107.5
+exact start(0.7,0,0): lam [ 4.3176e-01 -1.0600e-03 -4.2438e+00] batch SE 0.00471
+   ensemble of 7 ok / 9 : mean 0.43374 SE 0.00237 min 0.42457 max 0.4426
+   spectrum mean [ 4.33740e-01 -2.34000e-03 -4.22792e+00] sum -3.79652 mean div -3.79645
+   over ok: pos_frac range 0.491 0.505 switches min 1573 max|x| over ok 2.2631
+   diverged: 2  seconds 107.2

@@ -1,0 +1,2 @@
+[S5] hyper_jha: 2000000 steps x Delta 0.09082 = 181639 time units = 66667 LT; bound 80.0
+  max |x| 38.082; block maxima (100k steps each) quantiles 10/50/90% [35.15 36.22 37.12]; steps with |x| > 0.5 B: 0, > 0.75 B: 0; ratio B / max 2.10  [2 s]

@@ -1,0 +1,27 @@
+[S4] hindmarsh_rose dim 3 params {'a': 0.49, 'b': 1.0, 'c': 0.0322, 'd': 1.0, 's': 1.0, 'tx': 0.03, 'tz': 0.8} max_dt 0.005
+  long run: interval 0.1, 1000000 steps = 100000 time units
+  spectrum: +0.21635 (se 0.00144), +0.00002 (se 0.00017), -6.36303 (se 0.01105)
+  lambda_max 0.21635 +- 0.00144; LT 4.6220; d_KY 2.034; Delta = 1/(30 lambda) = 0.15407; substeps ceil(Delta/max_dt) = 31
+  max|s_i| per coordinate over the long orbit: [1.679 0.491 0.457]
+  code cache value lyapunov_guarded(interval 0.1, 100000, 5000) = 0.218553134417814, max|x| 1.794 [1 s]; independent routine at the same settings 0.21855 se 0.00549 (relative se 2.511%)
+  steps for a 1% relative se at this interval: about 630,325
+  [4 s]
+
+[S5] hyper_jha dim 4 params {'a': 10.0, 'b': 28.0, 'c': 2.667, 'd': 1.3} max_dt 0.005
+  long run: interval 0.1, 1000000 steps = 100000 time units
+  spectrum: +0.35600 (se 0.00140), +0.21168 (se 0.00134), -0.00000 (se 0.00010), -12.93467 (se 0.00126)
+  lambda_max 0.35600 +- 0.00140; LT 2.8090; d_KY 3.044; Delta = 1/(30 lambda) = 0.09363; substeps ceil(Delta/max_dt) = 19
+  max|s_i| per coordinate over the long orbit: [ 37.074  26.908  50.537 345.576]
+  code cache value lyapunov_guarded(interval 0.1, 100000, 5000) = 0.3583768671925949, max|x| 37.074 [1 s]; independent routine at the same settings 0.35838 se 0.00484 (relative se 1.352%)
+  steps for a 1% relative se at this interval: about 182,731
+  [5 s]
+
+[S6] lorenz96_4 dim 4 params {'F': 20.0} max_dt 0.005
+  long run: interval 0.1, 1000000 steps = 100000 time units
+  spectrum: +1.20184 (se 0.00349), +0.00000 (se 0.00009), -1.58820 (se 0.00275), -3.61363 (se 0.00272)
+  lambda_max 1.20184 +- 0.00349; LT 0.8321; d_KY 2.757; Delta = 1/(30 lambda) = 0.02774; substeps ceil(Delta/max_dt) = 6
+  max|s_i| per coordinate over the long orbit: [19.399 19.445 19.416 19.365]
+  code cache value lyapunov_guarded(interval 0.1, 100000, 5000) = 1.209780245520273, max|x| 28.724 [3 s]; independent routine at the same settings 1.20978 se 0.01214 (relative se 1.003%)
+  steps for a 1% relative se at this interval: about 100,675
+  [18 s]
+

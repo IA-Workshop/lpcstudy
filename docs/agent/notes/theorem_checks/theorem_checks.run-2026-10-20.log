@@ -1,0 +1,71 @@
+Installed 4 packages in 64ms
+/tmp/claude-1000/-home-brianm-projects-physics-chaos-lpcstudy/382a0870-b3b1-46ad-819f-0fa5d8e55c78/scratchpad/thchk/theorem_checks.py:489: RuntimeWarning: overflow encountered in exp
+  passage = first_passage(e0 * np.exp(log_gain), level)
+PASS  property      L1                      |F(s+xi) - F(s) - grad F . xi| <= (M2/2)|xi|^2 for F with |D^2F| <= M2
+       {"cases": 4000, "max_excess": -2.8791595685930937e-08}
+PASS  property      L1                      On the Lorenz-63 time-1-LT map the linearization remainder scales as |xi|^2
+       {"loglog_slope": 1.998043341794361}
+PASS  property      L2(a)-(c)               L J = I for L = J+ + Z (ZJ = 0); LL^T - (J^TJ)^-1 is PSD; tr(J+ J+^T) = sum sigma_j^-2
+       {"cases": 2000, "max_left_inverse_error": 3.943469570495295e-11, "min_eigenvalue_of_gap": 0.00032916942605107916, "max_relative_trace_error": 5.850875339774575e-14}
+PASS  property      L2(d)                   Cov(J+ eta) = rho^2 (J^TJ)^-1 for white noise of variance rho^2
+       {"draws": 400000, "max_relative_error": 0.002693699881794561}
+PASS  property      L3                      J = A Q^-1 implies (J^TJ)^-1 = Q (A^TA)^-1 Q^T (no inverse of Q needed)
+       {"cases": 2000, "max_relative_error": 3.674138912401666e-10}
+PASS  property      L3 (strengthened)       Whitened nu^2 = tr[(J^TJ)^-1 C^-1] is invariant under every invertible affine change of state coordinates (not only orthogonal ones)
+       {"cases": 2000, "max_relative_change": 4.125089109783677e-07}
+PASS  construction  L3 (literal form)       tr[W(J^TJ)^-1W^T] with W -> UW changes under a shear U (why the v1 erratum restricted it to orthogonal U)
+       {"before": 2.2175505769710835, "after": 4.1658629801164055}
+PASS  property      L4                      |a - s| <= 2 (R + |eta_t - eta_a|) / sigma_m whenever |a - s| <= sigma_m / L2
+       {"cases": 3000, "max_excess": -0.029990728069506277}
+PASS  symbolic      P1(a) / L5              V(w) = c (w - u)^2 + V(u), with V(u) = (E_C E_P - C^2)/c
+PASS  property      P1(a) / L5              With copied noise orthogonal to e_P and e_C - xi: c >= rho^2/k > 0, and clip(u) minimizes V on [0, 1]
+       {"cases": 5000, "min_of_c_minus_copied": 0.00037794527940482325, "max_gap_clip_vs_grid_min": 0.0}
+PASS  property      P1(b)                   u lies in [0, 1] iff C <= min(E_C, E_P)
+       {"cases": 5000, "mismatches": 0}
+PASS  symbolic      P1(c) proof step        2V(u) - E_C = E_C(E_P - E_C) + 2C(E_C - C), times c > 0
+PASS  property      P1(c) / L7(i)           C >= 0 implies min over [0,1] of V >= (1/2) min(E_C, E_P)
+       {"cases_with_C_nonneg": 9940, "min_slack": 4.7285054148200094e-09}
+PASS  construction  P1(c) tightness         Equality at E_C = E_P, C = 0 (independent, equal errors): min V = 1/2
+       {"min_V": 0.5}
+PASS  construction  P1(e) / L7(iv)          E_C = E_P = 1, C = -1 (e_C = -e_P) gives min V = 0
+       {"min_V": 0.0}
+PASS  symbolic      L7(iii)                 Uncorrelated proportional seeds: gain = ln(1 + r^2) / (2 Lambda), maximal (= ln 2 / (2 Lambda)) at r = 1
+PASS  property      P1(d) / L7(ii)          Exponential growth and C >= 0: horizon gain <= ln 2 / (2 Lambda)
+       {"cases": 2000, "max_excess": -0.017166076600382246}
+PASS  property      P1(d') new              Any growth shape, C >= 0 at the single step T_env(sqrt2 tol): gain over the better-forecaster envelope <= T_env(sqrt2 tol) - T_env(tol)
+       {"cases": 4000, "max_excess_steps": 0, "cases_where_ln2_over_2Lambda_screen_fails": 0}
+PASS  construction  P1(d) vs P1(d')         Two-phase growth (fast for 2 LT, then slow): the gain far exceeds ln2/(2 Lambda_bar) from the first LT, and equals the P1(d') bound
+       {"gain_steps": 86, "p1d_prime_bound_steps": 86, "ln2_over_2Lambda_bar_steps": 6.9314718055994575}
+PASS  symbolic      L6                      Proportional seed covariances: w* is the same at every horizon (q_H cancels)
+PASS  symbolic      L6 transient            With copied noise n = rho^2/k: dw*/dq_H = (delta^2 - kappa) n / (...)^2 > 0 when delta^2 > kappa, and w* -> (delta^2 - kappa)/(eps^2 + delta^2 - 2 kappa)
+PASS  construction  L6 (hypothesis)         Proportional covariances: w* range over amplifier directions is 0; random anisotropic seeds: it is not
+       {"max_range_proportional": 3.3306690738754696e-16, "median_range_anisotropic": 0.6377125447835861}
+PASS  symbolic      L8                      g_H = e^(Lambda H): T = ln(theta'/e0)/Lambda, so dT/d ln(theta) = 1/Lambda
+PASS  property      L8 bracket              (Lambda - e)H <= ln g_H <= (Lambda + e)H implies ln(theta'/e0)/(Lambda+e) <= T <= ln(theta'/e0)/(Lambda-e) (+1 step, discrete)
+       {"cases": 3000, "max_excess": -0.007403042107915425}
+PASS  property      L8'                     Gronwall: |error(t)| <= |xi| e^(L_K t) on a convex box containing both orbits; certified horizon ln(theta/|xi|)/L_K
+       {"L_K_box_bound": 49.97488952149194, "lambda_max": 0.905, "certified_horizon_LT": 0.05424999902001632, "linearized_horizon_LT": 2.9957322735539904, "max_excess_sampled": -0.0032367091700178235}
+PASS  property      L9                      (1/2H) mean ln g_i^2 <= (1/2H) ln mean g_i^2, equality iff all g_i equal
+       {"cases": 5000, "max_excess": -1.3853909238255519e-08, "gap_when_equal": 0.0}
+PASS  symbolic      L10(i) corrected        V_i(w) - V_i(u_i) = c_i (w - u_i)^2 with the UNCLIPPED u_i
+PASS  construction  L10(i) as in v1         V(w) - V(w*) = c (w - w*)^2 with CLIPPED w* fails: u = 1.4, w = 0 gives excess 1.80, the v1 form gives 1.00 (understated)
+       {"exact_excess": 1.7999999999999998, "v1_excess": 1.0}
+PASS  property      P3(a) / L10(ii)         The regime weight clip(sum c_i u_i / sum c_i) minimizes sum_i V_i(w) on [0, 1]
+       {"cases": 3000, "max_gap_vs_grid": 1.4210854715202004e-14}
+PASS  property      L10(iii)                |w_k - u_i| <= eps_w on the regime implies mean regret <= eps_w^2 max c_i
+       {"cases": 3000, "max_excess": -0.0022099017671821635}
+PASS  property      L10(iv)                 L-Lipschitz w* on a grid of K = n^p cells: mean regret <= c_max L^2 p K^(-2/p)
+       {"max_excess": -0.034961470497599484}
+PASS  property      P3(b)                   Every rule that is a function of the profile F has mean excess >= that of clip(E[c u | F] / E[c | F])
+       {"cases": 6000, "min_slack": 8.541670315498351e-09}
+PASS  property      P2(a) / L11(b)(i)       |eta| < Delta/2 never changes the retrieved analog
+       {"cases": 3000, "switches": 0}
+PASS  construction  P2(a) tightness         Collinear library: |eta| = Delta/2 + 1e-9 toward the runner-up switches the analog, so the constant 1/2 cannot be improved
+PASS  property      P2(b) / L11(b)(ii)      Pr(retrieval changes) <= Pr(|eta| >= Delta/2) <= 4 D rho^2 / Delta^2
+       {"states": 400, "draws_per_state": 1000, "max_excess_rate": -0.23249029018914052}
+PASS  property      P2(c) / L11(b)(iii)     N^2 <= (4/(rho^2 D)) E[(r1 + |eta|)^2 1{|eta| >= Delta/2}] (exact for the empirical law of the draws)
+       {"states": 400, "max_excess": 2.5703350984652367e-26}
+PASS  property      L11(a)                  PLP noise sensitivity |Gamma_H J+| <= g_H nu: a function of observability and amplification only
+       {"max_excess": -0.030637507549223814}
+
+37/37 checks passed (seed 20261020).

@@ -424,7 +424,7 @@ def lyapunov_record(spec: SystemSpec, cache: Path) -> tuple[float, float]:
     lam, largest = lyapunov_guarded(
         spec,
         interval,
-        n_steps=100_000,
+        n_steps=spec.lyapunov_steps,
         burn_in=5_000,
     )
     if entry is not None and struct.pack("<d", lam) != struct.pack(

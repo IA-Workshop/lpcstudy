@@ -1,0 +1,1 @@
+[S1] rossler_hyper: lyapunov_guarded(interval 0.1, n_steps 2000000, burn_in 5000) = 0.11220508610149857; max|x| 166.345; 200000 time units; independent 0.112205 +- 0.000528 (relative 0.47%); Delta = 0.297075; substeps 60  [14 s]

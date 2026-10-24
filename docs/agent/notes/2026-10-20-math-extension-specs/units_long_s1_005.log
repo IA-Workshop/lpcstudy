@@ -1,0 +1,18 @@
+[S1] Benettin steps 2000000
+[S1] rossler_hyper: lambda(code cache) 0.11220508610149857, Delta 0.297075, substeps 60, dt 0.004951
+  orbit maxima |s_i|: lyapunov orbit max|x| 166.345; statistics orbit (burn-in included) [146.077  97.783 316.772  71.498]; bound 460.0
+  observable: mean -24.83082, sigma_x 21.58322; state mean [-24.8308  -2.5457   2.5453  25.4679]
+  state std per coordinate [21.5833 20.1048 12.4662  8.4432]; covariance eigenvalues [ 49.172   146.33421 383.39627 517.83185]; condition 10.5; whitening scale sqrt(eig) [ 7.0123 12.0969 19.5805 22.7559]
+  observable quantiles 0.1/1/10/50/90/99/99.9%: [-111.769  -89.511  -55.003  -20.14    -1.775    8.677   14.248]; skewness -0.961; kurtosis 3.88
+  AMI first minimum 6 steps -> delay tau 5 (cap 5); window (D-1)tau = 30 steps = 1.00 LT
+  ACF 1/e envelope time 205 steps (6.83 LT; max_lag 1500); effective min(acf, 30) = 30; spacing 150 steps = 5.00 LT; block of 5 states = 25.0 LT
+  preset smoke: main trajectory 50831 steps (library segment 10271), estimator trajectory 25031, RK4 substeps (stats+main+est, burn-in included) 4.9 M, x dim 4
+  preset pilot: main trajectory 311831 steps (library segment 100271), estimator trajectory 200031, RK4 substeps (stats+main+est, burn-in included) 31.1 M, x dim 4
+  preset full: main trajectory 701831 steps (library segment 100271), estimator trajectory 500031, RK4 substeps (stats+main+est, burn-in included) 72.5 M, x dim 4
+  nu (D 7, tau 5) on 1333 thinned states: quantiles 1/5/25/50/75/95/99% = [ 1.201  1.261  1.446  1.923  2.073  7.453 16.498]; max 32; non-finite 0; ratio p99/p1 13.7
+  Lambda_tilde = 30 * slope of ln g_H over 1 LT: quantiles = [-0.218  0.401  0.824  1.081  1.795  2.554  3.407]; mean 1.296; fraction < 0.3: 0.035; fraction > 1.5: 0.361
+  Lambda_tilde histogram (bins of 0.25 from -1 to 4): [0, 3, 9, 11, 19, 55, 157, 380, 118, 100, 129, 117, 102, 56, 46, 11, 3, 8, 5, 4]
+  g_H at 1 LT: median 2.79, p5 0.788, p95 10.6
+  Levina-Bickel (k 20, pool 20000): 1/d_LB mean 0.3548 (se 0.0034), d = 2.818; floored 0; non-finite 0
+  [9 s]
+

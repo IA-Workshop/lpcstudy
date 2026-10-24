@@ -1,0 +1,895 @@
+{
+  "schema": "lpcstudy.findings-constants/1",
+  "note": "Every constant that may appear in the preliminary findings document without being read from a results file. Each entry cites its v3 section (proposal_and_methods_v3.md) or the decision that fixes it. Nothing here is computed.",
+  "constants": {
+    "primary_level": {
+      "text": "0.9833",
+      "v3": "§7 (level 1 − 0.05/3, Bonferroni over the three primaries)"
+    },
+    "standard_level": {
+      "text": "0.95",
+      "v3": "§7"
+    },
+    "standard_level_pct": {
+      "text": "95%",
+      "v3": "§7"
+    },
+    "unc_not_supported": {
+      "text": "about 7.3%",
+      "v3": "§7 (error of \"not supported\", three systems)"
+    },
+    "unc_h2c": {
+      "text": "about 14%",
+      "v3": "§7 (error of \"not supported\", H2c's two parts)"
+    },
+    "td_bound": {
+      "text": "3.4",
+      "v3": "§9 item 3; DEC-0031; DEC-0027"
+    },
+    "v1_bar": {
+      "text": "relative error < 10⁻⁴",
+      "v3": "§6 V1"
+    },
+    "v2_bar": {
+      "text": "ratio in [0.8, 1.2]",
+      "v3": "§6 V2"
+    },
+    "v3_bar": {
+      "text": "reported, no bar",
+      "v3": "§6 V3"
+    },
+    "v4_bar": {
+      "text": "median half-width ≤ 0.05",
+      "v3": "§6 V4"
+    },
+    "v5_bar": {
+      "text": "deviation < 0.01",
+      "v3": "§6 V5"
+    },
+    "v6_bar": {
+      "text": "change < 10⁻³ σ_x",
+      "v3": "§6 V6"
+    },
+    "v7_bar": {
+      "text": "median slope and median δ/(ρν) at every ρ in [0.9, 1.1]",
+      "v3": "§6 V7"
+    },
+    "lm_note": {
+      "text": "LM iteration error: not estimated",
+      "v3": "DEC-0024 A3; §8 (iterative error of PLP)"
+    },
+    "block_note": {
+      "text": "block-sensitive label: not computable for the sealed run",
+      "v3": "§8 (interval coverage); owner default D6"
+    },
+    "gain_label": {
+      "text": "reported, v1 statistic, v3 screen pending",
+      "v3": "§2 (hybrid's horizon gain); §8; DEC-0033 M3"
+    },
+    "caption_F1": {
+      "text": "Figure F1 (experiments E1, E2, E4 and E5; v3 identifiers H2a, H2b and H3c). One panel per primary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples) at level 98.33% (each panel states its level). The shaded region is the pass band of v3 §2. Marker shape and text give the stored verdict: filled circle pass, cross fail, open diamond inconclusive. A system that failed the validation gate is marked PROVISIONAL.",
+      "v3": "§2, §6, §7"
+    },
+    "caption_F2": {
+      "text": "Figure F2 (experiments E2 to E5; v3 identifiers H1a to H1d, H2c to H2e, H3b and Q-N). One panel per secondary part, one row per system. Each marker is the stored estimate and each bar its moving-block bootstrap percentile interval (blocks of 5 consecutive test states, 2000 resamples; H3b resamples construction states) at the level stated in each panel (95% unless the result stores another). The shaded region is the pass band of v3 §2. For Q-N no band is shaded: dashed lines mark the reading edges of v3 §7. Each panel states its level, and the three H2c panels are drawn one per system because the scales differ. Marker shape and text give the stored verdict or reading: filled circle pass, cross fail, open diamond inconclusive, square a Q-N reading (both readings, the logit part and the indicator part) or a quantity that is reported with no verdict. A system that failed the validation gate is marked PROVISIONAL.",
+      "v3": "§2, §6, §7"
+    },
+    "caption_F3": {
+      "text": "Figure F3 (cross-check, information only; v3 §9 item 3, DEC-0031; experiments E1, E2, E4 and E5). For each of the 18 primary parts, the away-arm z value comparing the official CPU run with the GPU run of the same seed, from the compare_runs text (interval procedure: the 98.33% moving-block bootstrap intervals of the two runs). The dashed line is the bound 3.4. A row would name a failed GPU validation gate and a PROVISIONAL official system if there were one; the footer states the GPU gate of each system. This figure changes no verdict.",
+      "v3": "§9 item 3; DEC-0031"
+    },
+    "coverage_limit": {
+      "text": "The block-5 percentile intervals undercover at these sample sizes: about 0.938 to 0.947 at 95% with independent states and 0.923 to 0.931 at lag-1 autocorrelation 0.3, which adds about 1 to 2 percentage points of false-verdict probability under dependence (v3 §8; DEF-0020). The pre-registered intervals and block length are kept.",
+      "v3": "§8 (interval coverage), quoted; DEF-0020"
+    },
+    "level_design_note": {
+      "text": "design value, not stored",
+      "v3": "§7 (levels); the results store no level for this part"
+    },
+    "lm_limitation": {
+      "text": "the iterative error of the fixed Levenberg–Marquardt budget of the PLP estimator (15 iterations) is not estimated for this run. On the development seed DEV-0, a study with 15, 30 and 60 iterations showed the iterative change below 10% of the sampling half-width for 5 of the 18 primary parts (class N) and did not show it below 10% for the other 13 (class X, not negligible, 6; class U, not certified, 7). The projection of its size against the half-width to the full preset, by the square root of the ratio of the numbers of states (test states for H2a and H3c, sweep states for H2b), is stated and not applied. This is development evidence, not a result of this run.",
+      "v3": "RESULTS.md (the iterative-error text of the uncertainty budget); the DEF-0027 correction of 2026-10-18 in docs/agent/records/defects.md (N 5, X 6, U 7 on DEV-0; Lorenz-63 X 4, Chua X 2, Rossler X 0); docs/study/lm_doubling_dev0_report_v3.md sections 0 and 3. v3 §8 words the same count differently (\"not negligible ... for 5 of the 18 primary parts\"); that wording is referred to the owner and v3 is not edited here."
+    },
+    "lm_report_pointer": {
+      "text": "docs/study/lm_doubling_dev0_report_v3.md",
+      "v3": "DEF-0027 correction of 2026-10-18 (docs/agent/records/defects.md); RESULTS.md (iterative-error text); v3 §8 (iterative error of PLP)"
+    },
+    "dec28_item4": {
+      "text": "What a TD pass does not mean: it does not reproduce verdicts or the gate outcome.",
+      "v3": "DEC-0028 item 4 (docs/agent/records/decisions.md); v3 §9 item 3"
+    },
+    "hw_ratio_note": {
+      "text": "The hw ratio column is the half-width of the cross-check (GPU) interval divided by the half-width of the official (CPU) interval (the column hw1/hw0 of the compare_runs text, whose REF is the official run and NEW the cross-check), so a value above 1 means the GPU interval is wider.",
+      "v3": "§9 item 3 (the TD table); tools/compare_runs.py, column hw1/hw0"
+    },
+    "precision_h2a": {
+      "text": "H2a's second part can be refuted but essentially cannot pass: that would need a partial correlation within about 0.01 of zero.",
+      "v3": "§7 (Precision); DEF-0022"
+    },
+    "a1_is_plp": {
+      "text": "A1 is PLP alone (w = 0)",
+      "v3": "§5 (the forecaster table: A1, PLP alone)"
+    },
+    "h3b_edge_note": {
+      "text": "The band of the H3b weight tree is [0, 0.2): closed at 0 and open at 0.2 (v3 §2). An interval whose lower bound is exactly 0 is therefore inside the band, and the verdict words in the table are the stored ones.",
+      "v3": "§2 H3b"
+    },
+    "def0022_proposed": {
+      "text": "the second part of H2a (the partial-correlation margin test) has low power at these sample sizes: it can be refuted but essentially cannot pass, which v3 §7 anticipated. The owner accepted this as a known limitation (DEC-0041, ledger seq 32). The margin that v3 §7 projects for it is not reproduced part by part at the full sample size (DEF-0022 status line; the full-size report of WU-0003): this is development evidence, not a result of this run (owner answer B7). In this run the stored interval of the Rossler interior part is wider than the margin band of v3 §2, so that part could not pass at any estimate. The verdict words of its parts are in section 5; an inconclusive word there means the interval was too wide to decide. The pre-registered rule is kept.",
+      "v3": "§7 (Precision); DEF-0022"
+    },
+    "same_host_limit": {
+      "text": "Run-2 (WU-0016) shows determinism, not an independent reproduction. The compared leaves are bitwise equal, and the same host, environment and actor produced both runs (DEC-0035). Results depend on the thread count and on the BLAS kernel of the host (DEF-0023, DEF-0024), which is why a second host may differ. The owner waived the independent-actor requirement for this case (ledger seq 31) and accepted agent-based cross-checking for this project (ledger seq 34).",
+      "v3": "§9 item 4; DEC-0040 item 2"
+    },
+    "vv_status_limit": {
+      "text": "Verification and validation status of the code: owner code review waived (ledger seq 33); results spot-checked by the owner; code covered by independent agent reviews. DEF-0001 stays open until the owner closes it.",
+      "v3": "NVVUQ.22; DEC-0042 item 1"
+    },
+    "nvvuq_gaps_limit": {
+      "text": "Reporting gaps of the official RESULTS.md (NVVUQ.22), accepted by the owner (ledger seq 36): there is no numerical-error estimate (G1) and no per-QoI verification and validation status (G2) for the nine secondary or reported rows, which have no budget table; and the status wording of the secondaries (pre-registered, exploratory on development seeds) does not say whether a secondary is confirmatory in this run (G3). The five primary budget parts carry all six items.",
+      "v3": "NVVUQ.22; DEC-0042 item 4"
+    },
+    "figure_map_limit": {
+      "text": "Figures of the official RESULTS.md (WU-0017.2, ledger seq 36): the four captions name no experiment or v3 identifier and none shows an interval. The figure map of docs/agent/notes/2026-10-21-promotion-figure-map.md gives them: separation_weight_vs_horizon, E4, H2a; kaplan_meier_by_rule, E4, rules behind H2c, H2d and H3c, no verdict; regret_vs_regimes, E5, H3c; knob_response_library, E1 and E2, H2b. The dotted line of regret_vs_regimes, which the caption calls a criterion, is a reference line drawn at 5.0 by the code (axhline(5.0), report.py at the frozen commit); it is not a pre-registered criterion for the plotted quantity (regret as a percent of the best-single MSE). The K rule of v3 §5 (1.05 times the minimum calibration excess MSE) is a different quantity.",
+      "v3": "§6 (E1 to E5); docs/agent/notes/2026-10-21-promotion-figure-map.md"
+    }
+  },
+  "identifiers": [
+    {
+      "key": "H1a",
+      "role": "secondary"
+    },
+    {
+      "key": "H1b",
+      "role": "secondary"
+    },
+    {
+      "key": "H1c",
+      "role": "secondary"
+    },
+    {
+      "key": "H1d",
+      "role": "secondary"
+    },
+    {
+      "key": "Q-N",
+      "role": "estimate"
+    },
+    {
+      "key": "H2a",
+      "role": "primary"
+    },
+    {
+      "key": "H2b",
+      "role": "primary"
+    },
+    {
+      "key": "H2c",
+      "role": "secondary"
+    },
+    {
+      "key": "H2d",
+      "role": "secondary"
+    },
+    {
+      "key": "H2e",
+      "role": "secondary"
+    },
+    {
+      "key": "gain_bound",
+      "role": "reported"
+    },
+    {
+      "key": "H3a",
+      "role": "secondary"
+    },
+    {
+      "key": "H3b",
+      "role": "secondary"
+    },
+    {
+      "key": "H3c",
+      "role": "primary"
+    }
+  ],
+  "primary_parts": [
+    {
+      "name": "H2a(i)",
+      "row": "H2a",
+      "experiment": "E4",
+      "estimate": "H2a/median_range",
+      "interval": "H2a/range_ci",
+      "verdict": "H2a/part_i_verdict",
+      "level": null,
+      "band": [
+        null,
+        0.1
+      ],
+      "band_text": "interval below 0.1 (strict)",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "name": "H2a(ii) zero",
+      "row": "H2a",
+      "experiment": "E4",
+      "estimate": "H2a/part_ii/zero/partial_corr",
+      "interval": "H2a/part_ii/zero/ci",
+      "verdict": "H2a/part_ii/zero/verdict",
+      "level": null,
+      "band": [
+        -0.1,
+        0.1
+      ],
+      "band_text": "interval inside (−0.1, 0.1) (strict)",
+      "v3": "§2 H2a (ii)"
+    },
+    {
+      "name": "H2a(ii) interior",
+      "row": "H2a",
+      "experiment": "E4",
+      "estimate": "H2a/part_ii/interior/partial_corr",
+      "interval": "H2a/part_ii/interior/ci",
+      "verdict": "H2a/part_ii/interior/verdict",
+      "level": null,
+      "band": [
+        -0.1,
+        0.1
+      ],
+      "band_text": "interval inside (−0.1, 0.1) (strict)",
+      "v3": "§2 H2a (ii)"
+    },
+    {
+      "name": "H2b(i)",
+      "row": "H2b",
+      "experiment": "E1",
+      "estimate": "H2b/noise/mean_state_spearman",
+      "interval": "H2b/noise/ci",
+      "verdict": "H2b/noise/verdict",
+      "level": null,
+      "band": [
+        0.0,
+        null
+      ],
+      "band_text": "lower bound > 0 (strict)",
+      "v3": "§2 H2b (i)"
+    },
+    {
+      "name": "H2b(ii)",
+      "row": "H2b",
+      "experiment": "E2",
+      "estimate": "H2b/library_change/mean_change",
+      "interval": "H2b/library_change/ci",
+      "verdict": "H2b/library_change/verdict",
+      "level": "H2b/library_change/level",
+      "band": [
+        0.0,
+        null
+      ],
+      "band_text": "lower bound > 0 (strict)",
+      "v3": "§2 H2b (ii)"
+    },
+    {
+      "name": "H3c",
+      "row": "H3c",
+      "experiment": "E5",
+      "estimate": "H3c/A5_over_A4_mse",
+      "interval": "H3c/ci",
+      "verdict": "H3c/verdict",
+      "level": "H3c/level",
+      "band": [
+        null,
+        1.05
+      ],
+      "band_text": "upper bound ≤ 1.05 (closed)",
+      "v3": "§2 H3c"
+    }
+  ],
+  "secondary_parts": [
+    {
+      "name": "H1a rho-1%",
+      "row": "H1a",
+      "experiment": "E2",
+      "estimate": "H1a/by_noise/0.01/ratio",
+      "interval": "H1a/by_noise/0.01/ratio_ci",
+      "verdict": "H1a/by_noise/0.01/verdict",
+      "level": "H1a/level",
+      "band": [
+        0.75,
+        1.25
+      ],
+      "band_text": "interval inside [0.75, 1.25] (closed)",
+      "v3": "§2 H1a"
+    },
+    {
+      "name": "H1a rho-2%",
+      "row": "H1a",
+      "experiment": "E2",
+      "estimate": "H1a/by_noise/0.02/ratio",
+      "interval": "H1a/by_noise/0.02/ratio_ci",
+      "verdict": "H1a/by_noise/0.02/verdict",
+      "level": "H1a/level",
+      "band": [
+        0.75,
+        1.25
+      ],
+      "band_text": "interval inside [0.75, 1.25] (closed)",
+      "v3": "§2 H1a"
+    },
+    {
+      "name": "H1b PLP",
+      "row": "H1b",
+      "experiment": "E3",
+      "estimate": "H1b/PLP/slope",
+      "interval": "H1b/PLP/ci",
+      "verdict": "H1b/verdict",
+      "level": null,
+      "band": [
+        0.8,
+        1.2
+      ],
+      "band_text": "interval inside [0.8, 1.2] (closed)",
+      "v3": "§2 H1b"
+    },
+    {
+      "name": "H1c PLP",
+      "row": "H1c",
+      "experiment": "E3",
+      "estimate": "H1c/PLP/median_ratio",
+      "interval": "H1c/PLP/ci",
+      "verdict": "H1c/PLP/verdict",
+      "level": null,
+      "band": [
+        0.8,
+        1.25
+      ],
+      "band_text": "interval inside [0.8, 1.25] (closed)",
+      "v3": "§2 H1c"
+    },
+    {
+      "name": "H1d analog seed",
+      "row": "H1d",
+      "experiment": "E3",
+      "estimate": "H1d/rows/analog_seed/spearman",
+      "interval": "H1d/rows/analog_seed/interval",
+      "verdict": "H1d/rows/analog_seed/verdict",
+      "level": "H1d/level",
+      "band": [
+        0.7,
+        null
+      ],
+      "band_text": "lower bound ≥ 0.7 (closed)",
+      "v3": "§2 H1d"
+    },
+    {
+      "name": "H1d estimation seed",
+      "row": "H1d",
+      "experiment": "E3",
+      "estimate": "H1d/rows/estimation_seed/spearman",
+      "interval": "H1d/rows/estimation_seed/interval",
+      "verdict": "H1d/rows/estimation_seed/verdict",
+      "level": "H1d/level",
+      "band": [
+        0.7,
+        null
+      ],
+      "band_text": "lower bound ≥ 0.7 (closed)",
+      "v3": "§2 H1d"
+    },
+    {
+      "name": "H1d growth",
+      "row": "H1d",
+      "experiment": "E3",
+      "estimate": "H1d/rows/growth/spearman",
+      "interval": "H1d/rows/growth/interval",
+      "verdict": "H1d/rows/growth/verdict",
+      "level": "H1d/level",
+      "band": [
+        0.7,
+        null
+      ],
+      "band_text": "lower bound ≥ 0.7 (closed)",
+      "v3": "§2 H1d"
+    },
+    {
+      "name": "H2c A4 - A2",
+      "row": "H2c",
+      "experiment": "E4",
+      "estimate": "H2c/A4_minus_A2/mean",
+      "interval": "H2c/A4_minus_A2/ci",
+      "verdict": "H2c/A4_minus_A2/verdict",
+      "level": null,
+      "band": [
+        null,
+        0.0
+      ],
+      "band_text": "upper bound < 0 (strict)",
+      "v3": "§2 H2c",
+      "own_axis": true
+    },
+    {
+      "name": "H2c A4 - A1",
+      "row": "H2c",
+      "experiment": "E4",
+      "estimate": "H2c/A4_minus_A1/mean",
+      "interval": "H2c/A4_minus_A1/ci",
+      "verdict": "H2c/A4_minus_A1/verdict",
+      "level": null,
+      "band": [
+        null,
+        0.0
+      ],
+      "band_text": "upper bound < 0 (strict)",
+      "v3": "§2 H2c",
+      "own_axis": true
+    },
+    {
+      "name": "H2c A4o - A2 (reported)",
+      "row": "H2c",
+      "experiment": "E4",
+      "estimate": "H2c/A4o_minus_A2/mean",
+      "interval": "H2c/A4o_minus_A2/ci",
+      "verdict": "H2c/A4o_minus_A2/role",
+      "level": "H2c/A4o_minus_A2/level",
+      "band": [
+        null,
+        null
+      ],
+      "band_text": "reported with its interval, no verdict (v3 §2 H2c)",
+      "own_axis": true,
+      "v3": "§2 H2c (A4o − A2 reported)"
+    },
+    {
+      "name": "H2d",
+      "row": "H2d",
+      "experiment": "E4",
+      "estimate": "H2d/in_distribution_excess",
+      "interval": "H2d/ci",
+      "verdict": "H2d/verdict",
+      "level": null,
+      "band": [
+        null,
+        0.1
+      ],
+      "band_text": "upper bound ≤ 0.10 (closed)",
+      "v3": "§2 H2d"
+    },
+    {
+      "name": "H2e rho-1%",
+      "row": "H2e",
+      "experiment": "E2",
+      "estimate": "H2e/by_noise/0.01/median_change",
+      "interval": "H2e/by_noise/0.01/ci",
+      "verdict": "H2e/by_noise/0.01/verdict",
+      "level": "H2e/by_noise/0.01/level",
+      "band": [
+        0.0,
+        null
+      ],
+      "band_text": "lower bound > 0 (strict)",
+      "v3": "§2 H2e"
+    },
+    {
+      "name": "H2e rho-2%",
+      "row": "H2e",
+      "experiment": "E2",
+      "estimate": "H2e/by_noise/0.02/median_change",
+      "interval": "H2e/by_noise/0.02/ci",
+      "verdict": "H2e/by_noise/0.02/verdict",
+      "level": "H2e/by_noise/0.02/level",
+      "band": [
+        0.0,
+        null
+      ],
+      "band_text": "lower bound > 0 (strict)",
+      "v3": "§2 H2e"
+    },
+    {
+      "name": "H3b weight tree",
+      "row": "H3b",
+      "experiment": "E5",
+      "estimate": "H3b/weight_lambda/importance",
+      "interval": "H3b/weight_lambda/ci",
+      "verdict": "H3b/weight_lambda/verdict",
+      "level": "H3b/weight_lambda/level",
+      "band": [
+        0.0,
+        0.2
+      ],
+      "band_text": "interval inside [0, 0.2) (closed at 0, open at 0.2)",
+      "v3": "§2 H3b"
+    },
+    {
+      "name": "H3b horizon tree D",
+      "row": "H3b",
+      "experiment": "E5",
+      "estimate": "H3b/D/value",
+      "interval": "H3b/D/ci",
+      "verdict": "H3b/D/verdict",
+      "level": "H3b/D/level",
+      "band": [
+        0.0,
+        null
+      ],
+      "band_text": "lower bound > 0 (strict)",
+      "v3": "§2 H3b"
+    }
+  ],
+  "qn_parts": [
+    {
+      "name": "Q-N oracle logit w*",
+      "row": "Q-N",
+      "experiment": "E3",
+      "estimate": "Q-N/oracle/logit_w_interior/delta_r2",
+      "interval": "Q-N/oracle/logit_w_interior/ci",
+      "verdict": "Q-N/oracle/logit_w_interior/reading",
+      "level": null,
+      "band": [
+        null,
+        null
+      ],
+      "band_text": "read by the table of v3 §7 (edges 0 and 0.05)",
+      "v3": "§7 (reading of Q-N)",
+      "lines": [
+        0.0,
+        0.05
+      ]
+    },
+    {
+      "name": "Q-N oracle zero indicator",
+      "row": "Q-N",
+      "experiment": "E3",
+      "estimate": "Q-N/oracle/w_zero_indicator/delta_r2",
+      "interval": "Q-N/oracle/w_zero_indicator/ci",
+      "verdict": "Q-N/oracle/w_zero_indicator/reading",
+      "level": null,
+      "band": [
+        null,
+        null
+      ],
+      "band_text": "read by the table of v3 §7 (edges 0 and 0.05)",
+      "v3": "§7 (reading of Q-N)",
+      "lines": [
+        0.0,
+        0.05
+      ]
+    }
+  ],
+  "gate_rows": [
+    {
+      "check": "V1",
+      "stats": [
+        [
+          "delay_jacobian_rel_err",
+          "validation/delay_jacobian_rel_err",
+          ".3g"
+        ],
+        [
+          "gain_rel_err",
+          "validation/gain_rel_err",
+          ".3g"
+        ]
+      ],
+      "pass": "validation/gate/V1",
+      "bar": "v1_bar"
+    },
+    {
+      "check": "V2",
+      "stats": [
+        [
+          "crlb_ratio_min",
+          "validation/crlb_ratio_min",
+          ".3f"
+        ],
+        [
+          "crlb_ratio_max",
+          "validation/crlb_ratio_max",
+          ".3f"
+        ]
+      ],
+      "pass": "validation/gate/V2",
+      "bar": "v2_bar"
+    },
+    {
+      "check": "V3",
+      "stats": [
+        [
+          "cp_median_vpt_lyapunov",
+          "validation/cp_median_vpt_lyapunov",
+          ".3g"
+        ]
+      ],
+      "pass": null,
+      "bar": "v3_bar"
+    },
+    {
+      "check": "V4",
+      "stats": [
+        [
+          "median_half_width at the design M",
+          "validation/convergence/200/median_half_width",
+          ".3g"
+        ]
+      ],
+      "pass": "validation/gate/V4",
+      "bar": "v4_bar"
+    },
+    {
+      "check": "V5",
+      "stats": [
+        [
+          "km_max_abs_dev",
+          "validation/km_max_abs_dev",
+          ".3g"
+        ]
+      ],
+      "pass": "validation/gate/V5",
+      "bar": "v5_bar"
+    },
+    {
+      "check": "V6",
+      "stats": [
+        [
+          "integrator_max_dev_sigma",
+          "validation/integrator_max_dev_sigma",
+          ".3g"
+        ]
+      ],
+      "pass": "validation/gate/V6",
+      "bar": "v6_bar"
+    },
+    {
+      "check": "V7",
+      "stats": [
+        [
+          "median_slope",
+          "V7/median_slope",
+          ".4f"
+        ],
+        [
+          "efficiency_median rho-0.5%",
+          "V7/efficiency_median_by_noise/0.005",
+          ".4f"
+        ],
+        [
+          "efficiency_median rho-1%",
+          "V7/efficiency_median_by_noise/0.01",
+          ".4f"
+        ],
+        [
+          "efficiency_median rho-2%",
+          "V7/efficiency_median_by_noise/0.02",
+          ".4f"
+        ],
+        [
+          "efficiency_median rho-5%",
+          "V7/efficiency_median_by_noise/0.05",
+          ".4f"
+        ]
+      ],
+      "pass": "validation/gate/V7",
+      "bar": "v7_bar"
+    }
+  ],
+  "wording": {
+    "supported": "Pass on all three systems in this preliminary, unpromoted run. The error of \"supported\" needs no further multiplicity correction (intersection–union).",
+    "not supported": "Fail on at least one system. The error of \"not supported\" is not controlled this way (§7), and this is not a statement about systems beyond the three studied.",
+    "inconclusive": "No system failed and at least one could not be decided at this precision. Inconclusive does not say the effect is absent.",
+    "reading:H2a": "Pre-registered reading of a failure (v3 §7): instability enters the weight through anisotropic seeds, and the size of the departure measures how far real attractors are from the separation assumption. v3 §7 pre-registered this reading and it is not tested here.",
+    "reading:H2c": "Pre-registered reading (v3 §7), to be applied by the reader from the reported A4o − A2 interval: if H2c fails but A4o beats A2, the theory is right and the deployable seed estimates limit it.",
+    "gate_failure": "GATE FAILURE: at least one system failed the validation gate (E0). Its results are PROVISIONAL, its verdicts are shown as computed, and the failure is referred to the owner (DEC-0027, DEC-0031). Nothing proceeds to promotion until the owner rules.",
+    "gate_ok": "Every system passed the validation gate, so no result carries the PROVISIONAL mark.",
+    "gpu_bound_ok": "No primary part exceeds the bound: failing parts {failing}, largest z (away) {max_away}, bound {bound}.",
+    "gpu_bound_exceeded": "At least one primary part exceeds the bound: failing parts {failing}, largest z (away) {max_away}, bound {bound}.",
+    "gpu_diff_count": "Verdict-type leaves that differ between the two runs: {differing}. The stored verdict words among them are in the tables above; the official words stand.",
+    "gpu_gate_ok": "The GPU validation gate passed on every system.",
+    "gpu_gate_failed": "The GPU validation gate did not pass on {systems}, or its result is not recorded there. This is reported only (DEC-0031).",
+    "gpu_result": "compare_runs result: {result}. {dec28}",
+    "gpu_info_only": "All of this is reported only and changes no verdict (DEC-0031).",
+    "secondary_intro": "Secondary rows (v3 §2; each is read at the level {level} with no multiplicity adjustment, v3 §7):"
+  },
+  "banned_phrases": [
+    "proves",
+    "confirms",
+    "significant",
+    "shows that",
+    "demonstrates",
+    "breakthrough"
+  ],
+  "required_phrases": [
+    "The error of \"not supported\" is not controlled this way",
+    "intersection–union",
+    "(preliminary, unpromoted)"
+  ],
+  "limitation_keywords": [
+    "deployable closed form",
+    "exact model",
+    "Deployable features",
+    "retrieval sensitivity",
+    "isotropic seeds",
+    "Same attractors",
+    "Interval coverage",
+    "Slow dependence",
+    "Small regimes",
+    "Iterative error",
+    "lambda_max for Chua",
+    "Doubled thinning",
+    "Bitwise agreement",
+    "gain-bound screen",
+    "DEF-0018",
+    "DEF-0020",
+    "DEF-0026",
+    "DEF-0027",
+    "DEC-0033 M2",
+    "DEC-0033 M3",
+    "one realization per system",
+    "not computable for the sealed run",
+    "false-verdict probability"
+  ],
+  "systems": [
+    "lorenz63",
+    "rossler",
+    "chua"
+  ],
+  "systems_v3": "§4 (the three systems of the study); v3 §7 (a system with no result is inconclusive)",
+  "free_slot_refused": [
+    "promoted",
+    "unpromoted",
+    "pre-registered",
+    "verified",
+    "unverified",
+    "provisional",
+    "confirmatory",
+    "development",
+    "preliminary",
+    "gate"
+  ],
+  "free_slot_stems": [
+    "prove",
+    "provin",
+    "confirm",
+    "signific",
+    "demonstrat",
+    "breakthrough",
+    "gate",
+    "gating",
+    "provision",
+    "promot",
+    "unpromot",
+    "verif",
+    "unverif",
+    "pre-regist",
+    "preregist",
+    "developm",
+    "preliminar"
+  ],
+  "result_counts": [
+    {
+      "leaf": "H1b/CP/n_floored",
+      "v3": "§8 (handling); RESULTS.md, Handling: result counts"
+    },
+    {
+      "leaf": "H2a/n_excluded_states",
+      "v3": "§2 H2a (i) (excluded states counted); RESULTS.md, Handling"
+    },
+    {
+      "leaf": "H1c/PLP/n_ineligible_states",
+      "v3": "§2 H1c; RESULTS.md, Handling"
+    },
+    {
+      "leaf": "H1c/CP/n_ineligible_states",
+      "v3": "§2 H1c; RESULTS.md, Handling"
+    },
+    {
+      "leaf": "H2b/noise/n_constant_states",
+      "v3": "§2 H2b (i); RESULTS.md, Handling"
+    },
+    {
+      "leaf": "gain_bound/n_screened_out/growth_nonpositive",
+      "v3": "§2 (hybrid's horizon gain), DEC-0033 M3; RESULTS.md, Handling"
+    },
+    {
+      "leaf": "gain_bound/n_screened_out/negative_covariance",
+      "v3": "§2 (hybrid's horizon gain), DEC-0033 M3; RESULTS.md, Handling"
+    },
+    {
+      "leaf": "gain_bound/n_screened_out/censored_single_forecaster",
+      "v3": "§2 (hybrid's horizon gain), DEC-0033 M3; RESULTS.md, Handling"
+    }
+  ],
+  "reported_quantities": [
+    {
+      "label": "H2a: test states excluded from part (i) (fewer than two leading horizons)",
+      "leaf": "H2a/n_excluded_states",
+      "fmt": "d",
+      "v3": "§2 H2a (i): excluded states are counted"
+    },
+    {
+      "label": "H2a: test states eligible for part (i)",
+      "leaf": "H2a/n_eligible_states",
+      "fmt": "d",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "label": "H2a: median range of w*, span of horizons {1, 2} LT",
+      "leaf": "H2a/range_by_span/1-2/median",
+      "fmt": ".4g",
+      "v3": "§2 H2a (i): medians and counts per span are reported"
+    },
+    {
+      "label": "H2a: states in the span {1, 2} LT",
+      "leaf": "H2a/range_by_span/1-2/n_states",
+      "fmt": "d",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "label": "H2a: median range of w*, span of horizons {1, 2, 4} LT",
+      "leaf": "H2a/range_by_span/1-2-4/median",
+      "fmt": ".4g",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "label": "H2a: states in the span {1, 2, 4} LT",
+      "leaf": "H2a/range_by_span/1-2-4/n_states",
+      "fmt": "d",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "label": "H2a: complete-case {1, 2, 4} LT range (a sensitivity), median and interval",
+      "leaf": "H2a/complete_case/median_range",
+      "ci": "H2a/complete_case/range_ci",
+      "fmt": ".4g",
+      "v3": "§2 H2a (i): the complete-case range is reported as a sensitivity"
+    },
+    {
+      "label": "H2a: states in the complete-case set",
+      "leaf": "H2a/complete_case/n_states",
+      "fmt": "d",
+      "v3": "§2 H2a (i)"
+    },
+    {
+      "label": "H2a: test states with w* = 0",
+      "leaf": "H2a/n_w_zero",
+      "fmt": "d",
+      "v3": "§2 H2a (ii): the counts of w* = 0 and w* = 1 are reported"
+    },
+    {
+      "label": "H2a: test states with w* = 1",
+      "leaf": "H2a/n_w_one",
+      "fmt": "d",
+      "v3": "§2 H2a (ii)"
+    },
+    {
+      "label": "H1a: floor f (r.m.s.) at rho 1%",
+      "leaf": "H1a/by_noise/0.01/floor_rms",
+      "fmt": ".4g",
+      "v3": "§2 H1a: the floor f is reported"
+    },
+    {
+      "label": "H1a: floor f (r.m.s.) at rho 2%",
+      "leaf": "H1a/by_noise/0.02/floor_rms",
+      "fmt": ".4g",
+      "v3": "§2 H1a"
+    },
+    {
+      "label": "H1c: CP median ratio and interval (reported; the tested part is PLP)",
+      "leaf": "H1c/CP/median_ratio",
+      "ci": "H1c/CP/ci",
+      "fmt": ".4g",
+      "v3": "§2 H1c (PLP only is tested); RESULTS.md"
+    },
+    {
+      "label": "H1d: N-hat Spearman correlation and interval (reported, not tested)",
+      "leaf": "H1d/rows/nhat/spearman",
+      "ci": "H1d/rows/nhat/interval",
+      "fmt": ".4g",
+      "v3": "§2 H1d, §8 (N-hat is reported, not tested)"
+    },
+    {
+      "label": "H3b: stability fraction (share of resamples with D > 0)",
+      "leaf": "H3b/stability",
+      "fmt": ".4g",
+      "v3": "§2 H3b (the stability index is reported)"
+    }
+  ]
+}

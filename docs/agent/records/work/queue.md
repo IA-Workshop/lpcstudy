@@ -168,3 +168,65 @@ Sub-task dependency index (from ROADMAP.md §2; "—" means none):
 - 2026-10-18, claude-sonnet-5-5 (developer): WU-0004c fix round 2 (review R8, R9) **done, rerun passed** (`1 passed in 473.63s`, 4695 leaves, 0 different, max abs and rel 0.0, tier T0); new `tests/unit/test_gpu_probe.py` (22 passed). **GPU hours of this unit for the LPC.AUTH.3 tally (main session to add by hand): 413 s + 442 s + 472 s = 1,327 s = 0.369 h in total (supersedes the 0.238 h line above, which covered two runs).** Not merged; the ROADMAP row edit is the owner's.
 - 2026-10-18, claude-sonnet-5-5 (developer): WU-0004e **implemented on branch `wu/0004e-citation-seeds`** (from develop e10f65e; not merged): C8 the docstring of `test_regression_ami_delay_lorenz_band` cites Deshmukh et al., arXiv:2003.06509 (Sec. IV.B, Fig. 5) per the researcher's note, docstring only (AST equal); C9 `seeds/development_seeds.json` DEV-1 to DEV-4 `status` unused -> used plus a `note` key (ids, values, schema and DEV-0 untouched; the loader reads only `id` and `value`, no test or hash pins the status). Radius: unit 8 files `406 passed`, integration `test_cli_seeds.py` `8 passed`. **C9 needs owner review before freeze** (seed registry). Note: `seeds/README.md` says "never edit or remove" an entry; only status text was changed, under the owner's ratification of 2026-10-18 (amendments section 36, B9). Pending: independent review.
 - 2026-10-18, claude-sonnet-5-5 (developer): WU-0004e **fix round 1** (review R1 to R4) on `wu/0004e-citation-seeds`: registry notes corrected (V6 context checks only for DEV-3/DEV-4; DEV-1/DEV-2 cite the offline-check note; no V4 claim), docstring attribution of 'shallow' to the researcher's reading, Log records that the first registry edit was a script that bypassed the `ask` rule (owner approval of the exact diff pending; not to be merged until then; this round's seed edits by the Edit tool) and the README conflict (owner item). Unit radius `406 passed`, integration `8 passed`.
+- 2026-10-19, claude-opus-5-5 (planner): WU-0020 **plan written** on branch `wu/prelim-findings-plan` (from develop 044dae2; not merged): preliminary findings document and data presentation for CONF-1 (internal to owner and student until promotion, QA.11). Unit file `WU-0020-preliminary-findings.md`; detail and owner decisions D1 to D10 in `docs/agent/notes/2026-10-19-preliminary-findings-plan.md`. Sub-tasks .1 to .6 (template, `tools/findings_build.py` with test, DEV-2 dry run, review, poster outline, merge) need no sealed output; .7 to .9 wait for the release (WU-0015.4). Depends on WU-0015.4 for .7; feeds WU-0017. No `lpcstudy/` change. Owner checkpoint: release, D1 to D10, reading (WU-0017.3). Status: planned.
+
+## Added 2026-10-20: extension program, phase H (DEC-0037; claude-opus-5-5, planner)
+
+Exploratory development work: DEV seeds only, labeled, never beside the sealed result, never merged to `main`; the freeze and the sealed track (WU-0016 to WU-0018) are untouched and keep priority. Plans in the unit files; schedule, drop order, risks and owner decisions O1 to O9 in `docs/agent/notes/2026-10-20-extension-schedule.md`; ROADMAP.md §8 (takes effect with the owner's ledger entries listed there).
+
+| Unit | Title | Depends on | Owner checkpoint | Status |
+| --- | --- | --- | --- | --- |
+| WU-0021 | Two additional attractors: S1 hyperchaotic Rössler, S2 Lorenz-63 at r = 166.1 (S3 Rössler observed through z optional); bitwise regression of the frozen pipeline | DEC-0037 ledger entries (merge and runs only) | scope ruling O1; O3, O8 | planned (.1, .2 running); **due 2026-10-22** |
+| WU-0022 | Dysts cross-check of Lorenz-63, Rössler, Chua; attribution of the Chua exponent difference | — | DEC-0010 wording proposal | planned |
+| WU-0023 | CP / PLP / A4 comparison on further Dysts systems (first set, pilots) | WU-0021.7 | O9 (cap) | planned; target 2026-10-26 |
+| WU-0024 | Descriptive comparison with the Dysts forecasting benchmark (no ranking) | WU-0026.2 for values | none | planned; target 2026-10-24 |
+| WU-0025 | Extension and ensemble in the 10/28 materials: `findings_build.py` appendix A, research statement, poster outline | WU-0026.2, WU-0021.9, WU-0023.5, WU-0024.3 (each if ready by 10-26 18:00) | O5, O7; poster wording | planned |
+| WU-0026 | Development ensemble records (full, GPU, DEV-1, DEV-3, DEV-4 at develop 3dec086) | runs end | none | in progress (runs launched 05:31) |
+
+Sub-task dependency index:
+
+| Unit | Sub-tasks and their dependencies |
+| --- | --- |
+| WU-0021 | .1 ← —; .2 ← .1; .3 ← —; .4 ← .2, .3; .5 ← .4; .6 ← .5; .7 ← .5; .8 ← .6, .7; .9 ← .8; .4b (S3, optional) ← .5 passed and .6 passed by 10-21 noon |
+| WU-0022 | .1 ← —; .2 ← .1 |
+| WU-0023 | .1 ← WU-0021.1; .2 ← .1, O9; .3 ← WU-0021.7, .2; .4 ← .3; .5 ← .4 |
+| WU-0024 | .1 ← —; .2 ← .1; .3 ← .2, WU-0026.2; .4 ← .3 |
+| WU-0025 | .1 ← —; .2 ← .1; .3 ← WU-0021.2, WU-0022.1; .4 ← .1; .5 ← .2, WU-0026.2 (and WU-0021.9, WU-0023.5, WU-0024.3 if ready); .6 ← .5 |
+| WU-0026 | .1 ← runs end; .2 ← .1 |
+
+- 2026-10-20, claude-opus-5-5 (planner): phase H **planned** on branch `wu/ext-plan` (from develop 22483b4; not merged). Unit files `WU-0021-extension-attractors.md` to `WU-0026-dev-ensemble.md`. Critical path WU-0021.2 → .4 → .5 → .6 → .7 → .8 → .9 (10-22), then WU-0023 (10-26), then WU-0025.5 → .6 (10-27). Acceptance criteria fixed in advance, including R1 (smoke DEV-0 of the three frozen systems, CPU, `LPC_THREADS=1`, bitwise equal to a reference made from code equal to `freeze-1`, outside `provenance/` and `seconds`). Can start now without the ledger entries: WU-0021.3, WU-0021.4 on a branch, WU-0022.1, WU-0024.1, WU-0025.1, WU-0026. Needs the owner's ledger entries before a merge or an extension pilot: scope ruling (LPC.PC.1 lists new systems as out of scope) and the ROADMAP §8 amendment.
+
+## Added 2026-10-21: status of phases F and G (claude-sonnet-5-5, developer; closes audit B1 for the records; append-only, the 2026-10-10 rows above stay as written)
+
+The rows below supersede the "planned" status of the WU-0015 to WU-0018 rows of the 2026-10-10 block. Unit files `WU-0015-confirmatory-run.md`, `WU-0016-regeneration.md`, `WU-0017-v3-report.md` and `WU-0018-promotion.md` were written on 2026-10-21 from existing evidence only (ledger seqs, manifest rows, hashes, run logs).
+
+| Unit | Title | Depends on | Owner checkpoint | Status (2026-10-21) |
+| --- | --- | --- | --- | --- |
+| WU-0015 | Confirmatory run (CONF-1, full preset) | WU-0004.7 | per-action authorization; manifest entry; release of outputs | .2, .2b, .3, .4 done as events (official CPU run 2026-10-19, GPU cross-check 2026-10-20, manifest entry e754601, release seq 20). .1: authorization entered retroactively (seq 15); pre-run checklist not recorded; owner ruling on seq 15 pending (audit M2) |
+| WU-0016 | Regeneration by another actor (by ruling, the owner: DEC-0035) and run comparison | WU-0015.3, WU-0003.6 | per-action authorization; manifest entry | .1 to .4 done as events (authorization seq 21, run-2 2026-10-20 by the owner per DEC-0035, T0 compare 20766 of 20766 equal, 0 different, manifest and outputs 15c9eef, release seq 22). Same actor and host: the promoted report must say so (audit M3) |
+| WU-0017 | v3 report and figures | WU-0015.4, WU-0016.4 | owner and student read the report | in progress. .1 not executed: two `--report-only` runs on a copy of the sealed `results.json` from the `freeze-1` worktree were refused by the GPU-lock hook (lock held by extension runs); command for the owner in the unit file; ten-number pre-sample on the stored files 10 of 10. .2 not started. .3 pending; owner and student read |
+| WU-0018 | Pre-promotion audit and promotion | WU-0017.2 | promotion transaction | planned. .1 pending: audit by 2026-10-21 reused, see audit note `docs/agent/notes/2026-10-21-audit-pre-promotion-conf1.md` (it audits the findings document, not the v3 report). .2 and .3 not started. Open before .3: audit M1 to M4 (owner rulings) |
+
+- 2026-10-21 (later), claude-sonnet-5-5: WU-0017.1 executed (hardened block, CPU, scratch copies, freeze-1 worktree): `RESULTS.md` sha256 `2a4c1d06...4577` on both runs, equal to the stored file; rewritten `results.json` `ae4b0fe5...cebe` equal to the stored one; ten-number sample 10 of 10; H2a(ii) 2 fail, 4 inconclusive. WU-0017.2: figures byte-identical; captions name no experiment or v3 identifier (gap, owner decision). WU-0017.3 pending; owner and student read. WU-0018.1 pending.
+- 2026-10-22, claude-sonnet-5-5: status after the promotion audit (`docs/agent/notes/2026-10-22-audit-promotion-conf1.md`: zero blockers, GO for the proposal). WU-0015 and WU-0016: done as events, records as of 2026-10-21 (M2 ruled seq 30; M3 waiver seq 31 and ruling seq 34). WU-0017: .1 and .2 done with the ruled exceptions of seq 36; .3 pending; owner and student read. WU-0018: .1 audit by 2026-10-22 (zero blockers); .2 proposal drafted in `docs/agent/notes/2026-10-22-promotion-proposal.md` (not a ledger entry); .3 not started, premature until WU-0017.3, the waiver note (seq 31 and 33) and the ledger sync are done.
+
+## Added 2026-10-23: close-out of the CONF-1 promotion (claude-sonnet-5-5, developer; append-only, earlier rows stay as written; ROADMAP.md not edited)
+
+| Unit | Status (2026-10-23) |
+| --- | --- |
+| WU-0015 | done as events; promoted result (ledger seq 40) |
+| WU-0016 | done; T0 20766 of 20766 equal; same actor and host by waiver seq 31 |
+| WU-0017 | .1, .2 done with the exceptions of seq 36; .3 done (commit 03edc09) |
+| WU-0018 | done: .1 audit 2026-10-22, .2 proposal seq 39, .3 promotion seq 40 |
+
+Decision DEC-0044; note `docs/agent/notes/2026-10-23-promotion-closeout.md`. Remaining and owner-held: WU-0019 (retention, governance review), DEF-0001 open, DEC-0043 (WU-0034 re-rendered figures in use), m8, open items listed in the note.
+
+## 2026-10-23 (records-h): phase H records
+
+| Unit | Status (2026-10-23) |
+| --- | --- |
+| WU-0021 | S1 to S3 implemented (`lpcstudy/systems.py`), reviewed (WU-0021.7, approve), run on DEV-3 at `974519a`; not closed: owner review of the verdict code pending (DEC-0038 A1/A2); extension code is development-only, never to main |
+| WU-0023 | S4 to S6 implemented, reviewed (R1/R2 answered by DEC-0039), run on DEV-3 at `392a069`; not closed for the same owner review |
+| WU-0026 | done: .1 manifest lines and GPU tally (`week=2026-W43 gpu_hours=6.8125 runs=9`), .2 gate and completeness table in the unit file |
+
+Frozen-pipeline regression reference `lpcstudy-wt/run/ext-ref-fc49d5f` (leafdiff 0 different). Results summary `docs/agent/notes/2026-10-23-extension-ensemble-summary.md`. Gate: ensemble all pass; extension S1 passes, S2 to S6 fail V7 (provisional).

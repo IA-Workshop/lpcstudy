@@ -1,0 +1,42 @@
+(i) uniform 2-flat, Gaussian noise
+   states 500, draws 400, rho 0.003; median r1/rho 2.96, median Delta/rho 1.31, switching states 473
+   (a) switches with ||eta|| < Delta/2: 0   (expected 0)
+   (b) P(switch) > P(||eta||>=Delta/2): 0;  CP99.9% lower bound of P(||eta||>=Delta/2) > Markov: 0  (expected 0, 0)
+   (c) N^2 > B on the same draws: 0   (expected 0)
+   tightness N/sqrt(B) over states with B>0: median 0.217, p90 0.319, max 0.380; states with B = 0: 0
+   fraction of draws that switch 0.2336; Markov bound mean 0.993 (vacuous (>=1) at 0.97 of states)
+(i) uniform 2-flat, Gaussian noise
+   states 500, draws 400, rho 0.01; median r1/rho 0.89, median Delta/rho 0.39, switching states 500
+   (a) switches with ||eta|| < Delta/2: 0   (expected 0)
+   (b) P(switch) > P(||eta||>=Delta/2): 0;  CP99.9% lower bound of P(||eta||>=Delta/2) > Markov: 0  (expected 0, 0)
+   (c) N^2 > B on the same draws: 0   (expected 0)
+   tightness N/sqrt(B) over states with B>0: median 0.240, p90 0.264, max 0.294; states with B = 0: 0
+   fraction of draws that switch 0.6034; Markov bound mean 1.000 (vacuous (>=1) at 1.00 of states)
+(i) uniform 2-flat, Gaussian noise
+   states 500, draws 400, rho 0.03; median r1/rho 0.30, median Delta/rho 0.13, switching states 500
+   (a) switches with ||eta|| < Delta/2: 0   (expected 0)
+   (b) P(switch) > P(||eta||>=Delta/2): 0;  CP99.9% lower bound of P(||eta||>=Delta/2) > Markov: 0  (expected 0, 0)
+   (c) N^2 > B on the same draws: 0   (expected 0)
+   tightness N/sqrt(B) over states with B>0: median 0.249, p90 0.264, max 0.285; states with B = 0: 0
+   fraction of draws that switch 0.9171; Markov bound mean 1.000 (vacuous (>=1) at 1.00 of states)
+(ii) curve d=1, Gaussian noise
+   states 500, draws 400, rho 0.01; median r1/rho 0.17, median Delta/rho 0.14, switching states 500
+   (a) switches with ||eta|| < Delta/2: 0   (expected 0)
+   (b) P(switch) > P(||eta||>=Delta/2): 0;  CP99.9% lower bound of P(||eta||>=Delta/2) > Markov: 0  (expected 0, 0)
+   (c) N^2 > B on the same draws: 0   (expected 0)
+   tightness N/sqrt(B) over states with B>0: median 0.182, p90 0.198, max 0.229; states with B = 0: 0
+   fraction of draws that switch 0.7343; Markov bound mean 1.000 (vacuous (>=1) at 1.00 of states)
+(iii) two-point adversarial library, Gaussian noise
+   states 200, draws 400, rho 0.01; median r1/rho 5.00, median Delta/rho 2.65, switching states 200
+   (a) switches with ||eta|| < Delta/2: 0   (expected 0)
+   (b) P(switch) > P(||eta||>=Delta/2): 0;  CP99.9% lower bound of P(||eta||>=Delta/2) > Markov: 0  (expected 0, 0)
+   (c) N^2 > B on the same draws: 0   (expected 0)
+   tightness N/sqrt(B) over states with B>0: median 0.243, p90 0.263, max 0.288; states with B = 0: 0
+   fraction of draws that switch 0.0926; Markov bound mean 1.000 (vacuous (>=1) at 1.00 of states)
+(iv) uniform 2-flat, Student-t(3) noise (unit variance)
+   states 500, draws 400, rho 0.01; median r1/rho 0.89, median Delta/rho 0.39, switching states 500
+   (a) switches with ||eta|| < Delta/2: 0   (expected 0)
+   (b) P(switch) > P(||eta||>=Delta/2): 0;  CP99.9% lower bound of P(||eta||>=Delta/2) > Markov: 0  (expected 0, 0)
+   (c) N^2 > B on the same draws: 0   (expected 0)
+   tightness N/sqrt(B) over states with B>0: median 0.242, p90 0.266, max 0.324; states with B = 0: 0
+   fraction of draws that switch 0.5279; Markov bound mean 1.000 (vacuous (>=1) at 1.00 of states)

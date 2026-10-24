@@ -148,8 +148,9 @@ prerun() {
   say "== WU-0015.1 pre-run checks =="
   [ "$(git describe --tags --exact-match 2>/dev/null)" = freeze-1 ] && ok "HEAD is exactly freeze-1" || bad "HEAD is not exactly freeze-1"
   [ -z "$(git status --porcelain)" ] && ok "working tree clean" || bad "working tree not clean"
-  [ -z "$(git status --porcelain --ignored | grep -v -E '^!! (\.venv|__pycache__|.*\.pyc|\.pytest_cache|runs/)' )" ] \
-    && ok "no unexpected ignored or untracked paths" || { bad "unexpected ignored/untracked paths:"; git status --porcelain --ignored | head; }
+  # Allowed ignored paths: the virtual environment, tool and bytecode caches (at any depth), and runs/.
+  [ -z "$(git status --porcelain --ignored | grep -v -E '^!! (\.venv/|\.pytest_cache/|\.ruff_cache/|runs/|(.*/)?__pycache__/|.*\.pyc$)' )" ] \
+    && ok "no unexpected ignored or untracked paths" || { bad "unexpected ignored/untracked paths (not on the allowed list):"; git status --porcelain --ignored | grep -v -E '^!! (\.venv/|\.pytest_cache/|\.ruff_cache/|runs/|(.*/)?__pycache__/|.*\.pyc$)' | head; }
   [ "$(grep -v -E '^\s*(#|$)' .git/info/exclude 2>/dev/null | tr -d ' \n')" = ".venv" ] && ok ".git/info/exclude holds only .venv" || bad ".git/info/exclude holds more than .venv"
   [ ! -e .git/info/attributes ] && ok "no .git/info/attributes" || bad ".git/info/attributes exists"
   [ -z "$(git config --show-origin --get-regexp '^(filter\.|core\.attributesfile|core\.fsmonitor)' 2>/dev/null)" ] \

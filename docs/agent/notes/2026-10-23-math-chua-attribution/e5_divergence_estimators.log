@@ -1,0 +1,6 @@
+lorenz63 pairs 10000 | Rosenstein slope by K: {5: 0.8208, 10: 1.3737, 20: 1.8917, 40: 1.9066, 100: 1.172} | ratio to Benettin: {5: 0.906, 10: 1.517, 20: 2.089, 40: 2.106, 100: 1.294}
+   mean max eig sym(J) 4.3639  mean max Re eig(J) 1.7305  mean div -13.6667  | Dysts max 0.89171 ratio Dysts max / Benettin 0.985
+rossler pairs 10000 | Rosenstein slope by K: {5: 0.1386, 10: 0.1213, 20: 0.0948, 40: 0.0951, 100: 0.0936} | ratio to Benettin: {5: 1.926, 10: 1.686, 20: 1.318, 40: 1.322, 100: 1.302}
+   mean max eig sym(J) 0.8249  mean max Re eig(J) 0.4032  mean div -5.3169  | Dysts max 0.150597 ratio Dysts max / Benettin 2.093
+chua pairs 10000 | Rosenstein slope by K: {5: 2.2195, 10: 2.7722, 20: 2.4783, 40: 1.1966, 100: 0.5995} | ratio to Benettin: {5: 5.148, 10: 6.43, 20: 5.748, 40: 2.775, 100: 1.391}
+   mean max eig sym(J) 15.0599  mean max Re eig(J) 1.0908  mean div -3.7997  | Dysts max 1.230116 ratio Dysts max / Benettin 2.853

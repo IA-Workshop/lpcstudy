@@ -1,0 +1,4 @@
+sigma 10.0 r 28.0: max |dV/dt identity residual| / scale = 1.93e-15
+  max_E V by sampling 1540.27 -> |x| <= sqrt = 39.25; attained near z 7.58, y 24.80
+sigma 10.0 r 166.1: max |dV/dt identity residual| / scale = 4.18e-15
+  max_E V by sampling 33078.61 -> |x| <= sqrt = 181.88; attained near z 35.15, y -114.95

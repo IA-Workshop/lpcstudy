@@ -170,9 +170,11 @@ def run(request, tmp_path_factory) -> dict:
     state, big, ok = _advance(step, state, big, ok, HORIZON)
     stress = starts(STRESS_ETA)
     _, stress_big, stress_ok = _advance(step, *_start_batch(stress), burn)
-    control = np.vstack([batch[:3], [[2.0 * bound, 0.0, 0.0]]])[
-        :, : orbit.shape[1]
-    ]
+    # The control row has one entry per state coordinate (a hard-coded 3
+    # failed for the 4-dimensional S1 of WU-0021; identical for dim 3).
+    control = np.vstack(
+        [batch[:3], [[2.0 * bound] + [0.0] * (orbit.shape[1] - 1)]]
+    )
     _, control_big, control_ok = _advance(step, *_start_batch(control), 10)
     out = {
         "name": name,

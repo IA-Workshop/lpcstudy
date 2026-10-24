@@ -1,0 +1,27 @@
+[S4] hindmarsh_rose: context built in 2 s; lambda 0.218553134417814, interval 0.152518, delay 5 (ami 25), acf 2, spacing 30, sigma_x 0.3048, orbit max|x| {'statistics': 1.9268175659274553, 'main': 1.6783772217103057, 'estimator': 1.679102518009375}, starts {'main': 175714, 'estimator': 93576}
+  V1 {'delay_jacobian_rel_err': 6.003271523344087e-07, 'gain_rel_err': np.float64(2.4299958963753673e-06)}  -> pass
+  V6 integrator_max_dev_sigma 4.240e-05 -> pass
+  V2 {'crlb_ratio_median': 0.9760501772068416, 'crlb_ratio_min': 0.885891569184356, 'crlb_ratio_max': 1.0940267519054259} -> pass
+  LM efficiency (15 damped iterations from the true window start) at rho 0.005: median delta/(rho nu) 0.962 (p10 0.855, p90 1.118); states with ratio < 0.9: 8, > 1.1: 5; non-finite Jacobians 0; draws with whitened error > 1: 0 of 2000; median rho*nu 0.005 -> V7-band ok
+  LM efficiency (15 damped iterations from the true window start) at rho 0.01: median delta/(rho nu) 0.958 (p10 0.849, p90 1.099); states with ratio < 0.9: 11, > 1.1: 4; non-finite Jacobians 0; draws with whitened error > 1: 0 of 2000; median rho*nu 0.011 -> V7-band ok
+  LM efficiency (15 damped iterations from the true window start) at rho 0.02: median delta/(rho nu) 0.954 (p10 0.771, p90 1.106); states with ratio < 0.9: 12, > 1.1: 6; non-finite Jacobians 0; draws with whitened error > 1: 0 of 2000; median rho*nu 0.022 -> V7-band ok
+  LM efficiency (15 damped iterations from the true window start) at rho 0.05: median delta/(rho nu) 0.941 (p10 0.684, p90 1.131); states with ratio < 0.9: 15, > 1.1: 5; non-finite Jacobians 0; draws with whitened error > 1: 1 of 2000; median rho*nu 0.054 -> V7-band ok
+  [43 s]
+[S5] hyper_jha: context built in 2 s; lambda 0.3583768671925949, interval 0.093012, delay 5 (ami 5), acf 9, spacing 45, sigma_x 9.6636, orbit max|x| {'statistics': 35.49249770056444, 'main': 32.7323856244223, 'estimator': 34.536303303667346}, starts {'main': 89752, 'estimator': 162458}
+  V1 {'delay_jacobian_rel_err': 8.817028021333682e-09, 'gain_rel_err': np.float64(7.39230435424008e-09)}  -> pass
+  V6 integrator_max_dev_sigma 5.136e-05 -> pass
+  V2 {'crlb_ratio_median': 0.9057568818629264, 'crlb_ratio_min': 0.8410402494172409, 'crlb_ratio_max': 1.0691095368931212} -> pass
+  LM efficiency (15 damped iterations from the true window start) at rho 0.005: median delta/(rho nu) 0.986 (p10 0.897, p90 1.066); states with ratio < 0.9: 5, > 1.1: 4; non-finite Jacobians 0; draws with whitened error > 1: 0 of 2000; median rho*nu 0.015 -> V7-band ok
+  LM efficiency (15 damped iterations from the true window start) at rho 0.01: median delta/(rho nu) 0.980 (p10 0.899, p90 1.109); states with ratio < 0.9: 5, > 1.1: 5; non-finite Jacobians 0; draws with whitened error > 1: 0 of 2000; median rho*nu 0.029 -> V7-band ok
+  LM efficiency (15 damped iterations from the true window start) at rho 0.02: median delta/(rho nu) 0.990 (p10 0.871, p90 1.067); states with ratio < 0.9: 7, > 1.1: 3; non-finite Jacobians 0; draws with whitened error > 1: 0 of 2000; median rho*nu 0.059 -> V7-band ok
+  LM efficiency (15 damped iterations from the true window start) at rho 0.05: median delta/(rho nu) 0.999 (p10 0.837, p90 1.124); states with ratio < 0.9: 10, > 1.1: 7; non-finite Jacobians 0; draws with whitened error > 1: 3 of 2000; median rho*nu 0.147 -> V7-band ok
+  [36 s]
+[S6] lorenz96_4: context built in 3 s; lambda 1.209780245520273, interval 0.027553, delay 5 (ami 10), acf 43, spacing 150, sigma_x 6.9873, orbit max|x| {'statistics': 30.314036544690737, 'main': 19.192332345174297, 'estimator': 18.90903837583787}, starts {'main': 86389, 'estimator': 165319}
+  V1 {'delay_jacobian_rel_err': 9.008875369283391e-10, 'gain_rel_err': np.float64(7.072682455494451e-10)}  -> pass
+  V6 integrator_max_dev_sigma 6.229e-06 -> pass
+  V2 {'crlb_ratio_median': 1.0257132404380915, 'crlb_ratio_min': 0.9582290596152209, 'crlb_ratio_max': 1.0514952066029108} -> pass
+  LM efficiency (15 damped iterations from the true window start) at rho 0.005: median delta/(rho nu) 0.980 (p10 0.895, p90 1.072); states with ratio < 0.9: 5, > 1.1: 3; non-finite Jacobians 0; draws with whitened error > 1: 0 of 2000; median rho*nu 0.012 -> V7-band ok
+  LM efficiency (15 damped iterations from the true window start) at rho 0.01: median delta/(rho nu) 0.981 (p10 0.879, p90 1.070); states with ratio < 0.9: 6, > 1.1: 2; non-finite Jacobians 0; draws with whitened error > 1: 0 of 2000; median rho*nu 0.024 -> V7-band ok
+  LM efficiency (15 damped iterations from the true window start) at rho 0.02: median delta/(rho nu) 0.984 (p10 0.890, p90 1.071); states with ratio < 0.9: 7, > 1.1: 2; non-finite Jacobians 0; draws with whitened error > 1: 0 of 2000; median rho*nu 0.048 -> V7-band ok
+  LM efficiency (15 damped iterations from the true window start) at rho 0.05: median delta/(rho nu) 0.995 (p10 0.892, p90 1.088); states with ratio < 0.9: 6, > 1.1: 4; non-finite Jacobians 0; draws with whitened error > 1: 0 of 2000; median rho*nu 0.119 -> V7-band ok
+  [138 s]

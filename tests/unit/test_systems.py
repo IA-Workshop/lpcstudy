@@ -190,14 +190,28 @@ def test_flow_step_respects_max_dt() -> None:
 
 
 def test_registry_holds_exactly_the_three_v3_systems() -> None:
-    """The registry is Lorenz-63, Rossler and Chua; Lorenz-96 is gone.
+    """The frozen registry entries are Lorenz-63, Rossler and Chua (Lorenz-96 is gone).
 
     Reference: decision log D3 and proposal and methods v3 section 4 (three
-    systems), written out in the test, not read from the code.
+    systems), written out in the test, not read from the code. The extension
+    systems of WU-0021 (DEC-0037) are additional registry entries and are
+    listed separately, so the registry is the frozen three plus the extension
+    three. This test changed by design in WU-0021: it asserted
+    ``set(SYSTEMS) == {"lorenz63", "rossler", "chua"}``.
 
-    Tolerance: none; the check is equality of a set of strings.
+    Tolerance: none; the check is equality of sets of strings.
     """
-    assert set(SYSTEMS) == {"lorenz63", "rossler", "chua"}
+    frozen = {"lorenz63", "rossler", "chua"}
+    extension = {
+        "rossler_hyper",
+        "lorenz63_r166",
+        "rossler_z",
+        "hindmarsh_rose",
+        "hyper_jha",
+        "lorenz96_4",
+    }
+    assert frozen <= set(SYSTEMS)
+    assert set(SYSTEMS) - frozen == extension
     assert not hasattr(systems, "lorenz96_field")
 
 
@@ -317,16 +331,30 @@ def test_guard_rejects_bad_input() -> None:
 
 
 def test_registry_bounds_are_the_ratified_ones() -> None:
-    """The registry bounds are Lorenz-63 40, Rossler 25 and Chua 3.
+    """The registry bounds are Lorenz-63 40, Rossler 25 and Chua 3 (frozen).
 
-    These are the ratified values (DEC-0017 Q1, DEC-0026 item 3).
+    These are the ratified values (DEC-0017 Q1, DEC-0026 item 3). The extension
+    systems of WU-0021 have their own bounds (specification note section 0:
+    S1 460, S2 185, S3 50). This test changed by design in WU-0021: it asserted
+    the dict of all registry bounds equal to the three frozen ones.
 
     Reference: the ratified numbers, typed here. Tolerance: none.
     """
-    assert {name: spec.orbit_bound for name, spec in SYSTEMS.items()} == {
+    bounds = {name: spec.orbit_bound for name, spec in SYSTEMS.items()}
+    assert {n: bounds[n] for n in ("lorenz63", "rossler", "chua")} == {
         "lorenz63": 40.0,
         "rossler": 25.0,
         "chua": 3.0,
+    }
+    assert {
+        n: bounds[n] for n in set(bounds) - {"lorenz63", "rossler", "chua"}
+    } == {
+        "rossler_hyper": 460.0,
+        "lorenz63_r166": 185.0,
+        "rossler_z": 50.0,
+        "hindmarsh_rose": 5.0,
+        "hyper_jha": 80.0,
+        "lorenz96_4": 60.0,
     }
 
 

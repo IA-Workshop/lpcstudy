@@ -1,0 +1,136 @@
+{
+ "seed": 20261021,
+ "results": [
+  {
+   "item": "A4.4 lemma",
+   "claim": "Clipping never hurts the comparison: V(clip v) - V(w*) <= c (v - u)^2",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 400000,
+    "max_excess": 0.0
+   }
+  },
+  {
+   "item": "N1",
+   "claim": "Stable retrieval (e_C constant over draws): c >= Var(e_P) > 0, with no copied-noise orthogonality assumption",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 5000,
+    "min_slack": 4.5639844332631685e-08
+   }
+  },
+  {
+   "item": "N2(a)",
+   "claim": "Stable retrieval: u = (m^2 + s^2 - mu m) / ((mu - m)^2 + s^2); unbiased PLP (m = 0) gives u = s^2 / (mu^2 + s^2), strictly inside (0, 1)",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "N2(b)",
+   "claim": "Stable retrieval: w* = 0 implies mu m > 0 and sigma_P <= |mu|/2",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 200000,
+    "cases_with_w_zero": 26660,
+    "violations": 0
+   }
+  },
+  {
+   "item": "N2(c)",
+   "claim": "Without switching C = mu m exactly; with switching event S, |C - mu m| <= sqrt(E[(e_C - mu)^2 1_S]) sqrt(E[e_P^2 1_S])",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 3000,
+    "max_excess": 1.6653345369377348e-16
+   }
+  },
+  {
+   "item": "N3(a)",
+   "claim": "K = 0: 1/(1 + lambda_max) <= w*(Gamma) <= 1/(1 + lambda_min), eigenvalues of Sigma_s^-1/2 Sigma_a Sigma_s^-T/2; both ends attained",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 40000,
+    "max_excess": -3.7709378430950125e-06,
+    "max_attainment_gap": 2.3551161021373446e-12
+   }
+  },
+  {
+   "item": "N3(b)",
+   "claim": "Rank-one analog seed Sigma_a = d d^T: lambda_max = d^T Sigma_s^-1 d, lambda_min = 0, so w* ranges over [1/(1 + d^T Sigma_s^-1 d), 1]",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 2000,
+    "max_error": 4.661160346586257e-12
+   }
+  },
+  {
+   "item": "N4(a)",
+   "claim": "min V / min(E_C, E_P) = (1 - rho^2) / (1 + r - 2 rho sqrt r), r = min/max; d/d rho = 2(sqrt r - rho)(1 - rho sqrt r)/(...)^2 >= 0 on [-1, sqrt r]",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "N4(b)",
+   "claim": "If min V / m^2 >= f0 from T(theta) on: 0 <= gain <= T(theta/sqrt f0) - T(theta)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 4000,
+    "max_excess_upper": -1,
+    "max_excess_lower": 0
+   }
+  },
+  {
+   "item": "N5",
+   "claim": "Implicit differentiation: dT/d ln theta' = 1 / Lambda_loc(T), where Lambda_loc = d ln E(H) / dH (checked on ln E = ln e0 + k1 H + k2 H^2)",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "N5 noise factor",
+   "claim": "d ln theta' / d ln theta = theta^2 / (theta^2 - rho^2) for theta' = sqrt(theta^2 - rho^2)",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  },
+  {
+   "item": "N6",
+   "claim": "No clipping: floor = E[c (u - u_bar(F))^2] = (1 - R_c^2) E[c (u - u_bar)^2]; Pythagoras: E[c u^2] = E[c u_bar(F)^2] + floor",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "cases": 2000,
+    "max_error": 2.7755575615628914e-16
+   }
+  },
+  {
+   "item": "N7",
+   "claim": "Exact half-space probabilities p_j = Phi_bar((r_j^2 - r_1^2)/(2 rho |X_j - X_1|)): max p_j <= Pr(switch) <= sum p_j (dimension-free)",
+   "method": "property",
+   "passed": true,
+   "detail": {
+    "states": 300,
+    "draws": 20000,
+    "max_excess_upper": -0.000157983066077007,
+    "max_excess_lower": -0.00015284633599076008,
+    "states_where_tighter_than_markov": 294.0
+   }
+  },
+  {
+   "item": "N8",
+   "claim": "Stable retrieval, unbiased PLP, common random numbers: dw*/drho = 2 q A (A + rho z) / (rho^3 (...)^2), positive iff the copied noise does not overturn the amplified mismatch A = Gamma_H d",
+   "method": "symbolic",
+   "passed": true,
+   "detail": {}
+  }
+ ]
+}
