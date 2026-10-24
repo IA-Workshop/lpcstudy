@@ -1,21 +1,62 @@
-# lpcstudy — v1 research code
+# lpcstudy: when should a forecaster trust the past, and when the physics?
 
-> **Development bundle (2026-10-10).** This is the v1 code as run for the pilot, plus governance (`docs/agent/governance/`), work records (`docs/agent/records/`), seeds (`seeds/`) and study documents (`docs/study/`). Start with `.claude/CLAUDE.md` (Claude Code reads it automatically). The study design is now v3. The hypothesis identifiers are the v3 ones (WU-0002.2).
+`lpcstudy` is the research code, records and results of a study that compares an **analog forecaster (CP)**, which looks up similar situations in a library of past data, with a **physics-based forecaster (PLP)**, which uses the known equations. It tests whether four local predictability conditions decide how the two should be blended, on three chaotic systems: Lorenz-63, Rössler, and Chua's circuit.
 
+## The result (CONF-1, promoted 2026-10-23)
 
-This is the working prototype for the pilot study **"State-dependent allocation between an analog (CP) and a physics-based (PLP) forecaster via local predictability conditions"**.
+The design was written down and frozen before the confirmatory run (tag `freeze-1`, `docs/study/proposal_and_methods_v3.md`). The run used a sealed random-number seed. The three primary hypotheses read:
 
-It runs proposal stages (i)–(v) end to end:
+| Hypothesis | Overall word | Lorenz-63 | Rössler | Chua |
+|---|---|---|---|---|
+| H2a | **not supported** | fail | fail | fail |
+| H2b | **supported** | pass | pass | pass |
+| H3c | **inconclusive** | inconclusive | pass | inconclusive |
 
-- (i) system generation;
-- (ii) mechanism validation;
-- (iii) allocation and horizon testing;
-- (iv) state abstraction and benchmarking;
-- (v) robustness.
+"Not supported" is not "disproved", and "inconclusive" does not mean "no effect". "Supported" means that on these three systems, with an exact physics model and one measured variable, the pre-registered prediction held in this run. It does not show the same for other models, real data, higher-dimensional systems or other seeds.
 
-It then evaluates every pre-registered hypothesis (v3 ids H1a–H3c, Q-N) and writes a results report.
+**Read the promoted report:** [`promoted/CONF-1/report.md`](promoted/CONF-1/report.md) (figures in `promoted/CONF-1/report.figures/`), and the code's own report [`promoted/CONF-1/RESULTS.md`](promoted/CONF-1/RESULTS.md). All numbers are in [`promoted/CONF-1/results.json`](promoted/CONF-1/results.json).
 
-The Methods document (`methods_experimental_procedures_v1.md`) is the specification. Every constant lives in `lpcstudy/config.py`.
+### Limitations, as ruled
+
+- Three low-dimensional systems, one observable, one sealed seed (one realization per system).
+- The second part of H2a has low power: it can be refuted but essentially cannot pass.
+- The regeneration of the run was by the same person on the same computer: it shows determinism (bitwise equal), not an independent reproduction. Results depend on thread count and the computer's linear-algebra library.
+- The owner's code review was waived; the owner spot-checked the results, and the code was covered by independent AI-agent reviews.
+- The secondary and reported rows carry no per-quantity numerical-error estimate or verification status.
+- The four built-in report figures name no experiment or hypothesis and show no interval.
+- A subsequent pre-registered study will need different intervals and sample sizes.
+
+## How the result was checked
+
+- A hash-chained, append-only ledger of every decision: `docs/agent/governance/ledger.jsonl` (`python3 tools/ledger.py verify`).
+- The official CPU run and a regeneration at the same commit gave bitwise-equal results (20766 of 20766 leaves equal); a GPU cross-check agreed statistically. Records: `docs/agent/records/results-manifest.md`.
+- Every number in the findings document is traced to a leaf of `results.json`: `docs/agent/notes/2026-10-20-prelim-findings-conf1.md` (the file keeps its pre-promotion name; `promoted/CONF-1/report.md` is the promoted copy) with its `.trace.csv` and `.sources.json`. Check with `python3 tools/findings_build.py check docs/agent/notes --stem 2026-10-20-prelim-findings-conf1`.
+- Two audits: `docs/agent/notes/2026-10-21-audit-pre-promotion-conf1.md` and `docs/agent/notes/2026-10-22-audit-promotion-conf1.md`.
+
+## Development context (not part of the result)
+
+After the pre-registered run, six further chaotic systems and a development ensemble on other seeds were run as an exploration. These are on **development seeds only, exploratory, never confirmatory**, with per-system readings only and no overall verdict; five of the six extension systems failed a validity check and are marked PROVISIONAL. They are described in `docs/agent/notes/2026-10-23-appendix-a-standalone.md` and `docs/agent/notes/2026-10-23-extension-ensemble-summary.md`, and never appear beside the result above. The extension code lives in `lpcstudy/systems.py` and `lpcstudy/report.py` as additive entries; the three studied systems are unchanged from the frozen pipeline.
+
+## Reproduce
+
+```bash
+pip install -r requirements.txt
+python -m lpcstudy --preset smoke --out results        # plumbing check (about 1 min)
+```
+
+The full-size official run took about 4.3 hours on a CPU. The sealed seed itself is not in this repository; only its hash commitment is in the ledger.
+
+## Where things are
+
+| Path | Contents |
+|---|---|
+| `lpcstudy/` | the study code |
+| `docs/study/` | the frozen design (v3), methods, pilot results |
+| `promoted/CONF-1/` | the promoted result |
+| `runs/confirmatory/` | the official run, the GPU cross-check and the regeneration (force-added outputs) |
+| `docs/agent/` | governance, decisions, defects, notes, audits |
+| `tools/` | ledger, findings builder, run wrappers |
+| `tests/` | unit, integration, slow and GPU tests |
 
 ## Install and run
 
