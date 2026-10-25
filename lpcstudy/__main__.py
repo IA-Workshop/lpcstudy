@@ -47,7 +47,8 @@ from .seeds import (
 )
 
 # Exit code of a refused request, and the seed ids that stand for the
-# development default and for the sealed confirmatory run.
+# development default and for the default sealed confirmatory run (WU-0038:
+# the confirmatory flag takes ``--seed-id CONF-n``; without it, CONF-1).
 REFUSAL_EXIT = 64
 DEFAULT_SEED_ID = "DEV-0"
 CONFIRMATORY_SEED_ID = "CONF-1"
@@ -80,8 +81,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--seed-id",
         default=None,
-        metavar="DEV-n",
-        help=f"Registered development seed (default {DEFAULT_SEED_ID}).",
+        metavar="DEV-n|CONF-n",
+        help=f"Registered development seed (default {DEFAULT_SEED_ID}); with "
+        "the confirmatory flag, the sealed id CONF-n whose ledger commitment "
+        f"the seed and salt must match (default {CONFIRMATORY_SEED_ID}).",
     )
     parser.add_argument(
         "--confirmatory",
@@ -340,10 +343,14 @@ def choose_seed(
     """Choose the seed id and master seed, or refuse the request.
 
     Refused: a raw ``--seed``, an unrecognized option (including an
-    abbreviation of a real one; the token is never echoed), the confirmatory
-    flag together with ``--seed-id``, a seed id that is not in the registry,
-    and a confirmatory request without the environment variables or with a
-    seed and salt that do not match the ledger commitment. Values are never
+    abbreviation of a real one; the token is never echoed), a development
+    seed id that is not in the registry, the confirmatory flag with a
+    ``--seed-id`` that is not ``CONF-n``, and a confirmatory request without
+    the environment variables or with a seed and salt that do not match the
+    latest ledger commitment for the id. With the confirmatory flag and no
+    ``--seed-id`` the id is ``CONF-1``: the id only names the commitment that
+    the seed from the environment must match, so a pair sealed under another
+    id is refused, never run under the wrong id (WU-0038). Values are never
     echoed.
 
     Parameters
@@ -390,11 +397,10 @@ def choose_seed(
         )
         raise SeedRefusal(what)
     if args.confirmatory:
-        if args.seed_id is not None:
-            raise SeedRefusal(
-                "the confirmatory flag and --seed-id are mutually exclusive"
-            )
-        return CONFIRMATORY_SEED_ID, confirmatory_seed(os.environ, ledger_path)
+        sealed_id = (
+            args.seed_id if args.seed_id is not None else CONFIRMATORY_SEED_ID
+        )
+        return sealed_id, confirmatory_seed(os.environ, ledger_path, sealed_id)
     seed_id = args.seed_id if args.seed_id is not None else DEFAULT_SEED_ID
     return seed_id, resolve_dev_seed(seed_id, load_registry(registry_path))
 
