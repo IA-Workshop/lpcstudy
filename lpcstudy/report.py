@@ -41,6 +41,7 @@ from .allocation import RULE_LABELS  # noqa: E402
 from .budget import (  # noqa: E402
     budget_lines,
     caption_figure,
+    level_text,
     figure_caption_lines,
     interval_label_lines,
     qoi_declaration_lines,
@@ -1628,6 +1629,193 @@ def _robustness_lines(results: dict) -> list[str]:
     return lines
 
 
+ABLATION_COEFFICIENTS: dict[str, str] = {
+    "a": "a",
+    "b": "b",
+    "a_prime": "a′",
+    "b_prime": "b′",
+}
+"""Report names of the A4 coefficients (keys of ``ablation.COEFFICIENTS``)."""
+ABLATION_TARGETS: dict[str, str] = {
+    "logit_w_interior": "logit w* (interior)",
+    "w_zero_indicator": "1{w* = 0}",
+    "log_horizon": "log horizon",
+}
+"""Report names of the three Q-N targets."""
+
+
+def _yes(flag: bool) -> str:
+    """Return "yes" or "NO" (a failed self-check stands out)."""
+    return "yes" if flag else "NO"
+
+
+CENSORED_LABEL_SHARE = 0.25
+"""Censored share above which a horizon row is "censoring-affected" (M-5)."""
+
+
+def _censoring_text(entry: dict) -> str:
+    """Return the censored count of a horizon entry, and the M-5 label.
+
+    Empty for an entry with no ``n_censored`` (the weight targets). Above 25%
+    censored test states the label "censoring-affected" is added (report only;
+    the reading is unchanged).
+    """
+    if "n_censored" not in entry:
+        return ""
+    label = (
+        ", censoring-affected"
+        if entry["n_censored"] > CENSORED_LABEL_SHARE * entry["n_test"]
+        else ""
+    )
+    return (
+        f" ({entry['n_censored']} censored, {entry['n_uncensored']} "
+        f"uncensored{label})"
+    )
+
+
+def _ratio_cell(row: dict) -> str:
+    """Return ``r [lo, hi] reading`` of an ablation ratio row."""
+    reason = f" ({row['reason']})" if row.get("reason") else ""
+    return (
+        f"{_fmt(row['mse_ratio'], 4)} {_interval(row['ci'], 4)} "
+        f"{row['reading']}{reason}"
+    )
+
+
+def _estimate_cell(row: dict, key: str) -> str:
+    """Return ``value [lo, hi] reading`` of a leave-one-out or Shapley row."""
+    reason = f" ({row['reason']})" if row.get("reason") else ""
+    return (
+        f"{_fmt(row[key], 3)} {_interval(row['ci'], 3)} "
+        f"{row['reading']}{reason}"
+    )
+
+
+def ablation_lines(results: dict, systems: list[str]) -> list[str]:
+    """Return the section "Ablations (estimates, no verdict)" (WU-0039b).
+
+    The section is empty when no system carries an ``ablation`` block (results
+    written before WU-0039b), so their report is unchanged. It has three
+    tables: the A4 coefficient variants (a), the leave-one-out and Shapley rows
+    of the profile conditions (b1, b2), and A5 without each condition (b3).
+    """
+    with_block = [s for s in systems if "ablation" in results["systems"][s]]
+    if not with_block:
+        return []
+    blocks = {s: results["systems"][s]["ablation"] for s in with_block}
+    first = blocks[with_block[0]]
+    lines = [
+        "",
+        "## Ablations (estimates, no verdict)",
+        "",
+        "Estimate rows of the follow-on pre-registration draft (sections 6 "
+        "and 7), at the core cell (ρ = "
+        f"{100 * first['cell']['noise']:g}%, n_lib = "
+        f"{first['cell']['library_size']}, H_ref = "
+        f"{first['cell']['reference_horizon']} steps). No row is passed or "
+        "failed. MSE ratios are read by the table of M-2 (WU-0041b: margin "
+        "1.05, closed; \"substantial\" needs a lower bound above 1.05); ΔR² "
+        "and Shapley shares by the Q-N table of v3 section 7.",
+        "",
+        "### A4 coefficients: r = MSE(variant) / MSE(A4), paired block "
+        f"bootstrap, level {level_text(first['A4_coefficients']['level'])}",
+        "",
+        "| System | Coefficient | Fitted | max abs Δw (zero) | "
+        "zero: r [CI] reading | refit: r [CI] reading | refit partner | "
+        "floored entries (zero, refit) |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for s in with_block:
+        a4 = blocks[s]["A4_coefficients"]
+        for key, label in ABLATION_COEFFICIENTS.items():
+            fit = a4["coefficients"][key]
+            zero = a4["variants"]["zero"][key]
+            refit = a4["variants"]["refit"][key]
+            partner = ABLATION_COEFFICIENTS[refit["partner"]]
+            lines.append(
+                f"| {s} | {label} | {_fmt(fit['value'], 4)} | "
+                f"{_fmt(fit['max_abs_weight_change'], 2)} | "
+                f"{_ratio_cell(zero)} | "
+                f"{_ratio_cell(refit)} | {partner} = "
+                f"{_fmt(refit['partner_value'], 4)} | "
+                f"{zero['n_floored']['entries']}, "
+                f"{refit['n_floored']['entries']} |"
+            )
+    reproduced = ", ".join(
+        f"{s} {_yes(blocks[s]['A4_coefficients']['full']['reproduces_A4'])}"
+        for s in with_block
+    )
+    lines += [
+        "",
+        "max abs Δw: the largest change of a test weight when the "
+        "coefficient is zeroed in the full A4. At most 1e-6, the coefficient "
+        "is fitted at the boundary and both of its rows read \"not "
+        "identifiable\" (M-2). A4 rescored with its fitted "
+        f"coefficients reproduces the stored A4 bitwise: {reproduced}.",
+    ]
+    profile = first["profile_conditions"]
+    for title, rows, key in (
+        ("(b1) leave-one-out ΔR²_X", "leave_one_out", "delta_r2"),
+        ("(b2) Shapley share φ_X", "shapley", "share"),
+    ):
+        lines += [
+            "",
+            f"### Profile conditions {title}: Q-N procedure, level "
+            f"{level_text(profile['level'])}",
+            "",
+            "| System | Profile | Target | R | O | I | N |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for s in with_block:
+            block = blocks[s]["profile_conditions"]
+            for kind in ("oracle", "deployable"):
+                for target, label in ABLATION_TARGETS.items():
+                    entry = block[kind][target][rows]
+                    cells = " | ".join(
+                        _estimate_cell(entry[x], key)
+                        for x in ("R", "O", "I", "N")
+                    )
+                    label += _censoring_text(block[kind][target])
+                    lines.append(f"| {s} | {kind} | {label} | {cells} |")
+    gap = max(
+        abs(t["shapley_sum"] - t["r2_full_minus_empty"])
+        for s in with_block
+        for kind in ("oracle", "deployable")
+        for t in blocks[s]["profile_conditions"][kind].values()
+    )
+    a5_level = level_text(first["A5_without_condition"]["level"])
+    lines += [
+        "",
+        "Shapley shares are over the 16 subsets, the empty one being the "
+        "training-mean predictor; they sum to R²(F) − R²(∅) within "
+        f"{_fmt(gap, 2)}. The drop-N leave-one-out row is Q-N. They describe "
+        "predictive information under fitted models, not causes.",
+        "",
+        "### A5 without X: r = MSE(A5 without X) / MSE(A5), paired block "
+        f"bootstrap, level {a5_level}",
+        "",
+        "| System | X | r [CI] reading | K |",
+        "|---|---|---|---|",
+    ]
+    for s in with_block:
+        a5 = blocks[s]["A5_without_condition"]
+        for x, row in a5["without"].items():
+            lines.append(
+                f"| {s} | {x} | {_ratio_cell(row)} | {row['chosen_K']} |"
+            )
+    reproduced = ", ".join(
+        f"{s} "
+        f"{_yes(blocks[s]['A5_without_condition']['full']['reproduces_A5'])}"
+        for s in with_block
+    )
+    lines += [
+        "",
+        "A5 refitted on all four coordinates reproduces A5 bitwise: "
+        f"{reproduced}.",
+    ]
+    return lines
+
+
 # Text of an extension run that is wrong or misleading for systems outside the
 # three v3 systems (WU-0021 review R5): (old, new) pairs, each of which must
 # occur in the generated report (a vanished pattern raises, never a silent
@@ -1789,6 +1977,7 @@ def write_markdown(results: dict, config: StudyConfig, path: Path) -> None:
     ]
     if "robustness" in results:
         lines += _robustness_lines(results)
+    lines += ablation_lines(results, systems)
     lines += [
         "",
         *figure_caption_lines(config),

@@ -96,6 +96,40 @@ def test_smoke_preset_writes_outputs_and_gate_flag(tmp_path: Path) -> None:
         results, (out_dir / "RESULTS.md").read_text().splitlines()
     )
     assert_wu0003_7a_leaves(results)
+    assert_ablation(results, (out_dir / "RESULTS.md").read_text().splitlines())
+
+
+def assert_ablation(results: dict, report_lines: list[str]) -> None:
+    """Check the ``ablation`` block of each system (WU-0039b, ROADMAP WU-0039).
+
+    On the real pipeline: the unchanged A4 proxies, rescored, reproduce the
+    stored A4 per-state MSE bitwise (``reproduces_A4``); the four-column A5
+    refit reproduces A5 (``reproduces_A5``); the drop-N leave-one-out row
+    equals the stored Q-N leaves bitwise for both profiles and all three
+    targets (float hex); the Shapley shares sum to
+    ``R^2(F) - R^2(empty)`` within 1e-12 (round-off of eight weighted
+    differences of O(1) values); and the report has the section heading.
+    """
+    for name, system in results["systems"].items():
+        block = system["ablation"]
+        a4 = block["A4_coefficients"]
+        assert a4["full"]["reproduces_A4"] is True, name
+        assert block["A5_without_condition"]["full"]["reproduces_A5"] is True
+        for kind in ("oracle", "deployable"):
+            for target, entry in block["profile_conditions"][kind].items():
+                qn = system["Q-N"][kind][target]
+                drop_n = entry["leave_one_out"]["N"]
+                for got, want in (
+                    (drop_n["delta_r2"], qn["delta_r2"]),
+                    (drop_n["r2_without"], qn["r2_three"]),
+                    (entry["r2_by_subset"]["ROIN"], qn["r2_four"]),
+                    *zip(drop_n["ci"], qn["ci"]),
+                ):
+                    assert got.hex() == want.hex(), (name, kind, target)
+                assert drop_n["n_failed_resamples"] == qn["n_failed_resamples"]
+                gap = entry["shapley_sum"] - entry["r2_full_minus_empty"]
+                assert abs(gap) <= 1e-12, (name, kind, target, gap)
+    assert "## Ablations (estimates, no verdict)" in report_lines
 
 
 def assert_wu0003_7a_leaves(results: dict) -> None:

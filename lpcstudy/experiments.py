@@ -30,6 +30,7 @@ import numpy as np
 
 from . import analysis as an
 from . import clip_sensitivity
+from .ablation import ablation_block
 from .allocation import deployable_profile, regime_regret
 from .config import StudyConfig
 from .data import SPLITS, SystemContext, make_rng
@@ -1039,6 +1040,19 @@ def run_system(study: Study, system: str) -> dict:
     res["gain_bound"] = an.gain_horizon_bound(core, cfg)
     res.update(an.h3_regimes(core, rules, scores, cfg))
     res["oracle_recovery"] = an.oracle_recovery(scores, cfg)
+    # WU-0039b: the ablation estimate rows (no verdict). They read the fitted
+    # rules and the test scores and draw only from their own bootstrap labels
+    # (and fresh Q-N generators), so no result above changes.
+    res["ablation"] = ablation_block(core, rules, scores, cfg)
+    LOG.info(
+        "%s ablation rows in %.1fs",
+        system,
+        sum(
+            part["seconds"]
+            for part in res["ablation"].values()
+            if isinstance(part, dict) and "seconds" in part
+        ),
+    )
     check_keys(res)
     # WU-0002.11e: how far each verdict would move if the clip level doubled.
     # It is reported next to the verdicts, changes none of them and draws no
