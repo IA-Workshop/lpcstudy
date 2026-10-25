@@ -4,7 +4,6 @@ This file is always loaded. Full rules: `DEVELOPMENT_WORKFLOW.md` §4.
 
 - **IMPORTANT: blast radius only.** Before any test run:
   - compute the affected set from the change set (`git diff --name-only main...HEAD` plus `git status --porcelain`) with `/test-impact`;
-  - write the set and the rule into the unit's `## Log`;
   - run only that set.
 
   Until `tools/test_impact.py` exists (WU-0011), derive the set by hand from §4.2. Whole-suite runs happen only at a gate (merge, phase end, freeze, promotion), by the main session, with `LPC_GATE=<gate>`. A hook blocks them otherwise.
@@ -19,8 +18,7 @@ This file is always loaded. Full rules: `DEVELOPMENT_WORKFLOW.md` §4.
 - **Device and threads.**
   - Settings default to `JAX_PLATFORMS=cpu`, `XLA_PYTHON_CLIENT_PREALLOCATE=false`, and `LPC_THREADS` and `OMP/MKL/OPENBLAS` threads = 4. Do not override them except for GPU work.
   - No `pytest -n`.
-- **One GPU job at a time** across all agents and worktrees. Use `tools/run_preset.sh` or, until it exists, `flock -n /tmp/lpcstudy-gpu.lock env JAX_PLATFORMS=cuda XLA_PYTHON_CLIENT_PREALLOCATE=false python -m lpcstudy --preset ...`. Exit 75 or "lock held" means busy: do other work. Never wait or poll in a loop.
+- **At most two development GPU jobs**, one per lock (`/tmp/lpcstudy-gpu.lock`, `/tmp/lpcstudy-gpu-2.lock`; DEC-0039); a sealed run takes the GPU alone. Use `tools/run_preset.sh` or, until it exists, `flock -n /tmp/lpcstudy-gpu.lock env JAX_PLATFORMS=cuda XLA_PYTHON_CLIENT_PREALLOCATE=false python -m lpcstudy --preset ...`. Exit 75 or "lock held" means busy: do other work. Never wait or poll in a loop.
 - **Heavy runs in the background.** Run `pilot`, `full`, `slow` and `gpu` in the background, and poll with `tail -n 5 <log>`. Never start one while `pgrep -fa "lpcstudy --preset"` shows a run.
 - **Quiet output.** Use `-q --tb=short -rfE`. Record only the summary line and the failures.
 - **Statistical tests:** fixed seeds, Monte Carlo error stated in the docstring, `slow` marker. Never change the seed, R, the level or the bound to pass.
-- **Checklist.** Answer the §4.9 checklist in one line per item in the `## Log` before every invocation.

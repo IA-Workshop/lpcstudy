@@ -36,6 +36,12 @@ Development work on development seeds is internal (LPC.PC.5), and broad verifica
    - new hypotheses, systems or rules not in the v3 design.
 
    An agent that finds such work necessary records it as a note (SIMPL.3) and refers it.
+
+   **Scoped exception: the follow-on extension study** (amendment of 2026-10-25, owner ruling "proceed as recommended"). The extension systems S1 to S6 of ROADMAP.md phase H (`rossler_hyper`, `lorenz63_r166`, `rossler_z`, `hindmarsh_rose`, `hyper_jha`, and `lorenz96_4`, the four-variable Lorenz-96 system) are in scope for one pre-registered confirmatory follow-on study under ROADMAP.md phase I, with its own pre-registration, freeze and sealed seeds. Inside that study:
+   - the v3 hypotheses, criteria, bands, levels and rules apply unchanged, per system, with no overall verdict;
+   - the two ablation studies of phase I (the four profile conditions R, O, I and N, and the four coefficients a, b, a′ and b′ of A4) enter as pre-specified estimate rows, which carry no verdict;
+   - the Lorenz-96 exclusion above applies to every Lorenz-96 configuration other than `lorenz96_4`; transfer experiments, a misspecified-model arm and Lean formalization stay out of scope;
+   - the sealed CONF-1 result and its documents are not changed.
 2. **LPC.PC.2 Roles** (PRIN.1, PRIME.1).
    - **The PI is the human owner** and performs every act PRIME.1 and GOV.50 reserve.
    - **The student is the study's primary author** and an actor on the project. The student reviews results and proposes interpretations. Promotion stays with the human owner.
