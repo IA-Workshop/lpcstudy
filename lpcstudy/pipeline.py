@@ -804,20 +804,16 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
     t_target = np.log(
         state_horizon_target(con_moments, noise, config.primary_threshold)
     )
-    regimes: dict[int, RegimeMap] = {}
-    for n_reg in config.regime_counts:
-        tree = fit_regime_tree(
-            con_profile, w_target, t_target, n_reg, config.seed
-        )
-        regimes[n_reg] = calibrate_regimes(
-            tree,
-            cal_profile,
-            cal_moments,
-            cal_evals,
-            config.primary_threshold,
-            a2,
-        )
-    chosen = _choose_regimes(regimes, cal_profile, cal_moments, config)
+    regimes, chosen = fit_regime_maps(
+        con_profile,
+        cal_profile,
+        w_target,
+        t_target,
+        cal_moments,
+        cal_evals,
+        a2,
+        config,
+    )
     return FittedRules(
         proxies=proxies,
         global_weights=a2,
@@ -831,6 +827,63 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
             constant_target_count(w_target, t_target),
         ),
     )
+
+
+def fit_regime_maps(
+    con_profile: np.ndarray,
+    cal_profile: np.ndarray,
+    w_target: np.ndarray,
+    t_target: np.ndarray,
+    cal_moments: EnsembleMoments,
+    cal_evals: EvaluationDraws,
+    fallback: np.ndarray,
+    config: StudyConfig,
+) -> tuple[dict[int, RegimeMap], int]:
+    """Fit and calibrate the A5 regime maps for every ``K``, and choose ``K``.
+
+    One tree per ``K`` of ``config.regime_counts`` is fitted on the
+    construction profiles (:func:`fit_regime_tree`), its leaf weights are set
+    on calibration (:func:`calibrate_regimes`) and ``K`` is chosen by the v3
+    rule (:func:`_choose_regimes`). :func:`fit_rules` calls it with the four
+    deployable coordinates; ablation (b3) of WU-0039b calls it with three.
+
+    Parameters
+    ----------
+    con_profile, cal_profile : np.ndarray
+        Deployable profiles of the construction and calibration splits,
+        shape ``(n, E, p)``.
+    w_target, t_target : np.ndarray
+        Tree targets per construction state: ``w*(H_ref)`` and the log
+        characteristic horizon.
+    cal_moments : EnsembleMoments
+        Calibration oracle moments.
+    cal_evals : EvaluationDraws
+        Calibration evaluation draws.
+    fallback : np.ndarray
+        Weights of an empty regime (A2), shape ``(nH,)``.
+    config : StudyConfig
+        Study configuration.
+
+    Returns
+    -------
+    tuple[dict[int, RegimeMap], int]
+        The calibrated maps by ``K`` and the chosen ``K``.
+    """
+    regimes: dict[int, RegimeMap] = {}
+    for n_reg in config.regime_counts:
+        tree = fit_regime_tree(
+            con_profile, w_target, t_target, n_reg, config.seed
+        )
+        regimes[n_reg] = calibrate_regimes(
+            tree,
+            cal_profile,
+            cal_moments,
+            cal_evals,
+            config.primary_threshold,
+            fallback,
+        )
+    chosen = _choose_regimes(regimes, cal_profile, cal_moments, config)
+    return regimes, chosen
 
 
 FIT_COUNTERS: tuple[str, ...] = (

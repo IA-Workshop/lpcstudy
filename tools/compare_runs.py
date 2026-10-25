@@ -1313,6 +1313,16 @@ def _build_tags() -> list[cp.Rule]:
             "writes P2C_KAPPA",
         )
     )
+    add(
+        _tags(
+            "fixture",
+            f"{S}/ablation/cell/noise "
+            f"{S}/ablation/{{A4_coefficients,profile_conditions,"
+            "A5_without_condition}/level",
+            CONSTANT + "ablation.py:ablation_block echoes config.core_noise; "
+            "the parts write A4_LEVEL, PROFILE_LEVEL and A5_LEVEL",
+        )
+    )
     # ---- cp chain ------------------------------------------------------------
     add(
         _tags(
@@ -1380,6 +1390,30 @@ def _build_tags() -> list[cp.Rule]:
         )
     )
     # ---- network chain -------------------------------------------------------
+    add(
+        _tags(
+            "network",
+            # The v3 systems are tagged in compare_pilot's table; this row
+            # covers every other system (the extension systems, WU-0021).
+            "estimators/re:\\('(?!(?:lorenz63|rossler|chua)')[a-z0-9_]+',"
+            "\\s\\d+,\\s\\d+,\\s[\\d.]+\\)/val_loss_by_width/*",
+            "networks.py:train_estimator: validation loss of the trained psi "
+            "per width (the extension systems' estimators; the v3 systems' "
+            "rows of compare_pilot give the same chain)",
+        )
+    )
+    add(
+        _tags(
+            "network",
+            f"{S}/ablation/A4_coefficients/{{coefficients,full,variants}}/** "
+            f"{S}/ablation/profile_conditions/{{deployable,oracle}}/** "
+            f"{S}/ablation/A5_without_condition/{{full,without}}/**",
+            "ablation.py:ablation_block (WU-0039b): A4 variants from "
+            "allocation.py:ProfileProxies (fitted on the estimated nu) scored "
+            "by pipeline.py:score_rules on the PLP errors; the Q-N targets "
+            "and the A5 refits read " + NETWORK_W,
+        )
+    )
     lm = (
         "estimation.py:lm_summary of the Levenberg-Marquardt refinement in "
         "StateEstimator.estimate_counted "

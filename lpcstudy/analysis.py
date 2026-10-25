@@ -1285,6 +1285,82 @@ def _qn_reading_reason(
     return reading, None
 
 
+def qn_targets(
+    x_train: np.ndarray,
+    x_test: np.ndarray,
+    w_train: np.ndarray,
+    w_test: np.ndarray,
+    log_t_train: np.ndarray,
+    log_t_test: np.ndarray,
+) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
+    """Check the Q-N inputs and return the three targets with their domains.
+
+    Shared by :func:`qn_profile_block` and the profile ablation of WU-0039b
+    (``lpcstudy.ablation``), so both fit and score the same targets.
+
+    Parameters
+    ----------
+    x_train, x_test : np.ndarray
+        Profiles, shape ``(n, 4)``.
+    w_train, w_test : np.ndarray
+        Oracle weights ``w*(H_ref)`` in ``[0, 1]``.
+    log_t_train, log_t_test : np.ndarray
+        Log state horizons.
+
+    Returns
+    -------
+    dict
+        ``logit_w_interior``, ``w_zero_indicator`` and ``log_horizon``, each
+        ``(train domain, train target, test domain, test target)``. Outside its
+        domain a target holds a placeholder that is never read.
+
+    Raises
+    ------
+    ValueError
+        If the profiles do not have four columns, the lengths disagree, or
+        ``w*`` leaves ``[0, 1]``.
+    """
+    if x_train.shape[1] != 4 or x_test.shape[1] != 4:
+        raise ValueError("profiles need four columns")
+    if not (
+        len(x_train) == len(w_train) == len(log_t_train)
+        and len(x_test) == len(w_test) == len(log_t_test)
+    ):
+        raise ValueError("profile, weight and horizon lengths disagree")
+    for weight in (w_train, w_test):
+        if (
+            not np.all(np.isfinite(weight))
+            or weight.min() < 0.0
+            or weight.max() > 1.0
+        ):
+            raise ValueError("w* must be finite and inside [0, 1]")
+
+    interior_train = (w_train > 0.0) & (w_train < 1.0)
+    interior_test = (w_test > 0.0) & (w_test < 1.0)
+    everywhere_train = np.ones(len(w_train), bool)
+    everywhere_test = np.ones(len(w_test), bool)
+    return {
+        "logit_w_interior": (
+            interior_train,
+            _masked_logit(w_train, interior_train),
+            interior_test,
+            _masked_logit(w_test, interior_test),
+        ),
+        "w_zero_indicator": (
+            everywhere_train,
+            (w_train == 0.0).astype(float),
+            everywhere_test,
+            (w_test == 0.0).astype(float),
+        ),
+        "log_horizon": (
+            everywhere_train,
+            log_t_train,
+            everywhere_test,
+            log_t_test,
+        ),
+    }
+
+
 def qn_profile_block(
     x_train: np.ndarray,
     x_test: np.ndarray,
@@ -1365,45 +1441,9 @@ def qn_profile_block(
         If the profiles do not have four columns, the lengths disagree, or
         ``w*`` leaves ``[0, 1]``.
     """
-    if x_train.shape[1] != 4 or x_test.shape[1] != 4:
-        raise ValueError("profiles need four columns")
-    if not (
-        len(x_train) == len(w_train) == len(log_t_train)
-        and len(x_test) == len(w_test) == len(log_t_test)
-    ):
-        raise ValueError("profile, weight and horizon lengths disagree")
-    for weight in (w_train, w_test):
-        if (
-            not np.all(np.isfinite(weight))
-            or weight.min() < 0.0
-            or weight.max() > 1.0
-        ):
-            raise ValueError("w* must be finite and inside [0, 1]")
-
-    interior_train = (w_train > 0.0) & (w_train < 1.0)
-    interior_test = (w_test > 0.0) & (w_test < 1.0)
-    everywhere_train = np.ones(len(w_train), bool)
-    everywhere_test = np.ones(len(w_test), bool)
-    targets = {
-        "logit_w_interior": (
-            interior_train,
-            _masked_logit(w_train, interior_train),
-            interior_test,
-            _masked_logit(w_test, interior_test),
-        ),
-        "w_zero_indicator": (
-            everywhere_train,
-            (w_train == 0.0).astype(float),
-            everywhere_test,
-            (w_test == 0.0).astype(float),
-        ),
-        "log_horizon": (
-            everywhere_train,
-            log_t_train,
-            everywhere_test,
-            log_t_test,
-        ),
-    }
+    targets = qn_targets(
+        x_train, x_test, w_train, w_test, log_t_train, log_t_test
+    )
     names = list(targets)
     pred3, pred4 = {}, {}
     for name, (rows_train, y_train, _, _) in targets.items():
@@ -1476,6 +1516,68 @@ def qn_profile_block(
     return out
 
 
+QN_PROFILES: tuple[str, str] = ("oracle", "deployable")
+"""The two Q-N profiles: the oracle one (primary) and the deployable one."""
+
+
+def qn_data(cell: Cell, rules: FittedRules, config: StudyConfig) -> dict:
+    """Return the training and test data of Q-N for both profiles.
+
+    Training is construction plus calibration, in that order; testing is the
+    test split. The targets are ``w*(H_ref)`` and the log characteristic
+    horizon of the oracle hybrid at ``primary_threshold``
+    (:func:`state_horizon_target`). The oracle profile is
+    :func:`_oracle_profile`; the deployable one is the first evaluation draw
+    of :func:`deployable_profile`. Shared by :func:`qn_noise_redundancy` and
+    the profile ablation of WU-0039b, so both see the same arrays. No random
+    number is drawn.
+
+    Parameters
+    ----------
+    cell : Cell
+        Core cell.
+    rules : FittedRules
+        Fitted rules (seed proxies for the deployable profile).
+    config : StudyConfig
+        Study configuration.
+
+    Returns
+    -------
+    dict
+        ``w_train``, ``w_test``, ``log_t_train``, ``log_t_test`` and, for each
+        kind of ``QN_PROFILES``, the pair ``(x_train, x_test)``.
+    """
+    col = config.reference_horizon - 1
+    lt = config.steps_per_lyapunov
+
+    def targets(split: str) -> tuple[np.ndarray, np.ndarray]:
+        m = cell.splits[split].moments
+        t = state_horizon_target(m, cell.noise, config.primary_threshold)
+        return oracle_weight(m)[:, col], np.log(t)
+
+    def profiles(kind: str, split: str) -> np.ndarray:
+        if kind == "oracle":
+            return _oracle_profile(cell, split, config)
+        ev = cell.splits[split].evals
+        return deployable_profile(ev, rules.proxies, cell.noise, lt)[:, 0, :]
+
+    train_splits = ("construction", "calibration")
+    pairs = [targets(s) for s in train_splits]
+    w_test, log_t_test = targets("test")
+    out: dict = {
+        "w_train": np.concatenate([w for w, _ in pairs]),
+        "w_test": w_test,
+        "log_t_train": np.concatenate([t for _, t in pairs]),
+        "log_t_test": log_t_test,
+    }
+    for kind in QN_PROFILES:
+        out[kind] = (
+            np.concatenate([profiles(kind, s) for s in train_splits]),
+            profiles(kind, "test"),
+        )
+    return out
+
+
 def qn_noise_redundancy(
     cell: Cell,
     rules: FittedRules,
@@ -1517,25 +1619,9 @@ def qn_noise_redundancy(
         reading table) and the blocks ``oracle`` and ``deployable`` of
         :func:`qn_profile_block`.
     """
-    col = config.reference_horizon - 1
-    lt = config.steps_per_lyapunov
-
-    def targets(split: str) -> tuple[np.ndarray, np.ndarray]:
-        m = cell.splits[split].moments
-        t = state_horizon_target(m, cell.noise, config.primary_threshold)
-        return oracle_weight(m)[:, col], np.log(t)
-
-    def profiles(kind: str, split: str) -> np.ndarray:
-        if kind == "oracle":
-            return _oracle_profile(cell, split, config)
-        ev = cell.splits[split].evals
-        return deployable_profile(ev, rules.proxies, cell.noise, lt)[:, 0, :]
-
-    train_splits = ("construction", "calibration")
-    pairs = [targets(s) for s in train_splits]
-    w_train = np.concatenate([w for w, _ in pairs])
-    log_t_train = np.concatenate([t for _, t in pairs])
-    w_test, log_t_test = targets("test")
+    data = qn_data(cell, rules, config)
+    w_train, w_test = data["w_train"], data["w_test"]
+    log_t_train, log_t_test = data["log_t_train"], data["log_t_test"]
     out: dict = {
         "role": "estimate",
         "primary": "oracle",
@@ -1543,9 +1629,8 @@ def qn_noise_redundancy(
         "n_w_one": int(np.sum(w_test == 1.0)),
         "n_test": int(len(w_test)),
     }
-    for kind in ("oracle", "deployable"):
-        x_train = np.concatenate([profiles(kind, s) for s in train_splits])
-        x_test = profiles(kind, "test")
+    for kind in QN_PROFILES:
+        x_train, x_test = data[kind]
         captured: dict | None = None if dump is None else {}
         out[kind] = qn_profile_block(
             x_train,
