@@ -1,0 +1,1542 @@
+# DEVELOPMENT (DEV-0): paths only, no values. WU-0039b. Shapes and the chain-before column as in extract_paths.py (functions float_shapes and shape_of reused).
+# columns: shape TAB chain tag of compare_pilot's table (empty: not tagged there)
+# source wu0039b/post2/smoke/results.json: sha256 d999e01a5b3d1c6ed337c98cc9ca510d7a76678018410909c2bc2e8f7dbe9835
+# source wu0039b/ext2/smoke/results.json: sha256 a9ee67d4525026a7994f0f5d8abb4c7f4eec7bf42013b0c977252419a7f203e0
+config/burn_in_lyapunov	
+config/core_noise	
+config/eval_horizons_lyapunov/[]	
+config/horizon_max_lyapunov	
+config/library_sweep_noises/[]	
+config/linear_regime_rms	
+config/misspec_levels/[]	
+config/noise_levels/[]	
+config/perturbation_scales/[]	
+config/primary_threshold	
+config/reference_horizon_lyapunov	
+config/theiler_lyapunov	
+config/thinning_factor	
+config/threshold_noise_factor	
+config/thresholds/[]	
+estimators/('chua', 7, 5, 0.01)/val_loss_by_width/32	network
+estimators/('chua', 7, 5, 0.02)/val_loss_by_width/32	network
+estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/32	network
+estimators/('lorenz63', 7, 5, 0.02)/val_loss_by_width/32	network
+estimators/('rossler', 7, 3, 0.01)/val_loss_by_width/32	network
+estimators/('rossler', 7, 3, 0.02)/val_loss_by_width/32	network
+estimators/('rossler_hyper', 7, 5, 0.01)/val_loss_by_width/32	
+estimators/('rossler_hyper', 7, 5, 0.02)/val_loss_by_width/32	
+systems/<sys>/H1a/band/[]	
+systems/<sys>/H1a/by_noise/0.01/ci_inverse_dim/[]	cp
+systems/<sys>/H1a/by_noise/0.01/fitted_inverse_dim	cp
+systems/<sys>/H1a/by_noise/0.01/floor_rms	cp
+systems/<sys>/H1a/by_noise/0.01/median_seed_by_n_lib/1000	cp
+systems/<sys>/H1a/by_noise/0.01/median_seed_by_n_lib/10000	cp
+systems/<sys>/H1a/by_noise/0.01/ratio	
+systems/<sys>/H1a/by_noise/0.01/ratio_ci/[]	
+systems/<sys>/H1a/inverse_dim_reference	cp
+systems/<sys>/H1a/level	
+systems/<sys>/H1b/CP/ci/[]	cp
+systems/<sys>/H1b/CP/slope	cp
+systems/<sys>/H1b/PLP/ci/[]	network
+systems/<sys>/H1b/PLP/slope	network
+systems/<sys>/H1b/threshold/[]	
+systems/<sys>/H1c/CP/ci/[]	cp
+systems/<sys>/H1c/CP/median_ratio	cp
+systems/<sys>/H1c/PLP/ci/[]	network
+systems/<sys>/H1c/PLP/median_ratio	network
+systems/<sys>/H1c/threshold/[]	
+systems/<sys>/H1c/thresholds/[]	
+systems/<sys>/H1d/estimation_seed_vs_cramer_rao	network
+systems/<sys>/H1d/level	
+systems/<sys>/H1d/rows/analog_seed/interval/[]	
+systems/<sys>/H1d/rows/analog_seed/spearman	network
+systems/<sys>/H1d/rows/estimation_seed/interval/[]	
+systems/<sys>/H1d/rows/estimation_seed/spearman	network
+systems/<sys>/H1d/rows/growth/interval/[]	
+systems/<sys>/H1d/rows/growth/spearman	network
+systems/<sys>/H1d/rows/nhat/interval/[]	
+systems/<sys>/H1d/rows/nhat/spearman	network
+systems/<sys>/H1d/threshold	
+systems/<sys>/H2a/complete_case/median_range	
+systems/<sys>/H2a/complete_case/range_ci/[]	
+systems/<sys>/H2a/median_range	network
+systems/<sys>/H2a/median_range_unrestricted	network
+systems/<sys>/H2a/part_ii/interior/ci/[]	
+systems/<sys>/H2a/part_ii/interior/partial_corr	
+systems/<sys>/H2a/part_ii/one/ci/[]	
+systems/<sys>/H2a/part_ii/one/partial_corr	
+systems/<sys>/H2a/part_ii/zero/ci/[]	
+systems/<sys>/H2a/part_ii/zero/partial_corr	
+systems/<sys>/H2a/range_by_span/1-2-4/median	
+systems/<sys>/H2a/range_by_span/1-2/median	
+systems/<sys>/H2a/range_ci/[]	
+systems/<sys>/H2a/short_horizon_range_median	network
+systems/<sys>/H2a/unconditional_spearman_w_lambda	network
+systems/<sys>/H2b/library_change/ci/[]	
+systems/<sys>/H2b/library_change/level	
+systems/<sys>/H2b/library_change/mean_change	
+systems/<sys>/H2b/library_change/rho	
+systems/<sys>/H2b/library_curves/0.01/1000/level	
+systems/<sys>/H2b/library_curves/0.01/1000/mean	
+systems/<sys>/H2b/library_curves/0.01/1000/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/1000/median	
+systems/<sys>/H2b/library_curves/0.01/1000/median_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/10000/level	
+systems/<sys>/H2b/library_curves/0.01/10000/mean	
+systems/<sys>/H2b/library_curves/0.01/10000/mean_ci/[]	
+systems/<sys>/H2b/library_curves/0.01/10000/median	
+systems/<sys>/H2b/library_curves/0.01/10000/median_ci/[]	
+systems/<sys>/H2b/noise/ci/[]	network
+systems/<sys>/H2b/noise/mean_state_spearman	network
+systems/<sys>/H2b/noise/median_w_by_noise/0.01	network
+systems/<sys>/H2b/noise/median_w_by_noise/0.02	network
+systems/<sys>/H2c/A4_minus_A0/ci/[]	
+systems/<sys>/H2c/A4_minus_A0/mean	
+systems/<sys>/H2c/A4_minus_A0/relative	
+systems/<sys>/H2c/A4_minus_A1/ci/[]	network
+systems/<sys>/H2c/A4_minus_A1/mean	network
+systems/<sys>/H2c/A4_minus_A1/relative	network
+systems/<sys>/H2c/A4_minus_A2/ci/[]	network
+systems/<sys>/H2c/A4_minus_A2/mean	network
+systems/<sys>/H2c/A4_minus_A2/relative	network
+systems/<sys>/H2c/A4o_minus_A2/ci/[]	
+systems/<sys>/H2c/A4o_minus_A2/level	
+systems/<sys>/H2c/A4o_minus_A2/mean	
+systems/<sys>/H2c/A4o_minus_A2/relative	
+systems/<sys>/H2c/calibration_mse/A0	
+systems/<sys>/H2c/calibration_mse/A1	
+systems/<sys>/H2d/ci/[]	network
+systems/<sys>/H2d/in_distribution_excess	network
+systems/<sys>/H2e/by_noise/0.01/level	
+systems/<sys>/H2e/by_noise/0.02/level	
+systems/<sys>/H2e/corr_curve/0.01/1000	
+systems/<sys>/H2e/corr_curve/0.01/10000	
+systems/<sys>/H3a/iqr_lt/[]	
+systems/<sys>/H3a/iqr_lt_mean	network
+systems/<sys>/H3a/logrank_p_holm/[]	network
+systems/<sys>/H3a/logrank_p_raw/[]	
+systems/<sys>/H3b/D/ci/[]	
+systems/<sys>/H3b/D/level	
+systems/<sys>/H3b/D/value	
+systems/<sys>/H3b/horizon_tree_importance/lambda_tilde	network
+systems/<sys>/H3b/horizon_tree_importance/log_eps_tilde	network
+systems/<sys>/H3b/horizon_tree_importance/log_noise_sens	network
+systems/<sys>/H3b/horizon_tree_importance/log_nu_tilde	network
+systems/<sys>/H3b/stability	
+systems/<sys>/H3b/weight_lambda/band/[]	
+systems/<sys>/H3b/weight_lambda/ci/[]	
+systems/<sys>/H3b/weight_lambda/importance	
+systems/<sys>/H3b/weight_lambda/level	
+systems/<sys>/H3b/weight_tree_importance/lambda_tilde	network
+systems/<sys>/H3b/weight_tree_importance/log_eps_tilde	network
+systems/<sys>/H3b/weight_tree_importance/log_noise_sens	network
+systems/<sys>/H3b/weight_tree_importance/log_nu_tilde	network
+systems/<sys>/H3c/A5_over_A4_mse	network
+systems/<sys>/H3c/ci/[]	
+systems/<sys>/H3c/level	
+systems/<sys>/H3c/threshold	
+systems/<sys>/Q-N/deployable/log_horizon/ci/[]	network
+systems/<sys>/Q-N/deployable/log_horizon/delta_r2	network
+systems/<sys>/Q-N/deployable/log_horizon/r2_four	network
+systems/<sys>/Q-N/deployable/log_horizon/r2_three	network
+systems/<sys>/Q-N/deployable/logit_w_interior/ci/[]	
+systems/<sys>/Q-N/deployable/logit_w_interior/delta_r2	
+systems/<sys>/Q-N/deployable/logit_w_interior/r2_four	
+systems/<sys>/Q-N/deployable/logit_w_interior/r2_three	
+systems/<sys>/Q-N/deployable/noise_sens_r2_from_three	network
+systems/<sys>/Q-N/deployable/w_zero_indicator/ci/[]	
+systems/<sys>/Q-N/deployable/w_zero_indicator/delta_r2	
+systems/<sys>/Q-N/deployable/w_zero_indicator/r2_four	
+systems/<sys>/Q-N/deployable/w_zero_indicator/r2_three	
+systems/<sys>/Q-N/oracle/log_horizon/ci/[]	network
+systems/<sys>/Q-N/oracle/log_horizon/delta_r2	network
+systems/<sys>/Q-N/oracle/log_horizon/r2_four	network
+systems/<sys>/Q-N/oracle/log_horizon/r2_three	network
+systems/<sys>/Q-N/oracle/logit_w_interior/ci/[]	
+systems/<sys>/Q-N/oracle/logit_w_interior/delta_r2	
+systems/<sys>/Q-N/oracle/logit_w_interior/r2_four	
+systems/<sys>/Q-N/oracle/logit_w_interior/r2_three	
+systems/<sys>/Q-N/oracle/noise_sens_r2_from_three	network
+systems/<sys>/Q-N/oracle/w_zero_indicator/ci/[]	
+systems/<sys>/Q-N/oracle/w_zero_indicator/delta_r2	
+systems/<sys>/Q-N/oracle/w_zero_indicator/r2_four	
+systems/<sys>/Q-N/oracle/w_zero_indicator/r2_three	
+systems/<sys>/V7/ci/[]	network
+systems/<sys>/V7/efficiency_ci_by_noise/0.01/[]	
+systems/<sys>/V7/efficiency_ci_by_noise/0.02/[]	
+systems/<sys>/V7/efficiency_median_by_noise/0.01	network
+systems/<sys>/V7/efficiency_median_by_noise/0.02	network
+systems/<sys>/V7/median_slope	network
+systems/<sys>/V7/threshold/[]	
+systems/<sys>/ablation/A4_coefficients/coefficients/a/max_abs_weight_change	
+systems/<sys>/ablation/A4_coefficients/coefficients/a/max_term_share	
+systems/<sys>/ablation/A4_coefficients/coefficients/a/value	
+systems/<sys>/ablation/A4_coefficients/coefficients/a_prime/max_abs_weight_change	
+systems/<sys>/ablation/A4_coefficients/coefficients/a_prime/max_term_share	
+systems/<sys>/ablation/A4_coefficients/coefficients/a_prime/value	
+systems/<sys>/ablation/A4_coefficients/coefficients/b/max_abs_weight_change	
+systems/<sys>/ablation/A4_coefficients/coefficients/b/max_term_share	
+systems/<sys>/ablation/A4_coefficients/coefficients/b/value	
+systems/<sys>/ablation/A4_coefficients/coefficients/b_prime/max_abs_weight_change	
+systems/<sys>/ablation/A4_coefficients/coefficients/b_prime/max_term_share	
+systems/<sys>/ablation/A4_coefficients/coefficients/b_prime/value	
+systems/<sys>/ablation/A4_coefficients/full/mean_weight	
+systems/<sys>/ablation/A4_coefficients/full/mse_href	
+systems/<sys>/ablation/A4_coefficients/level	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a/ci/[]	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a/coefficients/a	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a/coefficients/a_prime	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a/coefficients/b	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a/coefficients/b_prime	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a/mean_weight	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a/mse_href	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a/mse_ratio	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a/partner_value	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a_prime/ci/[]	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a_prime/coefficients/a	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a_prime/coefficients/a_prime	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a_prime/coefficients/b	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a_prime/coefficients/b_prime	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a_prime/mean_weight	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a_prime/mse_href	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a_prime/mse_ratio	
+systems/<sys>/ablation/A4_coefficients/variants/refit/a_prime/partner_value	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b/ci/[]	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b/coefficients/a	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b/coefficients/a_prime	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b/coefficients/b	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b/coefficients/b_prime	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b/mean_weight	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b/mse_href	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b/mse_ratio	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b/partner_value	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b_prime/ci/[]	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b_prime/coefficients/a	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b_prime/coefficients/a_prime	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b_prime/coefficients/b	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b_prime/coefficients/b_prime	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b_prime/mean_weight	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b_prime/mse_href	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b_prime/mse_ratio	
+systems/<sys>/ablation/A4_coefficients/variants/refit/b_prime/partner_value	
+systems/<sys>/ablation/A4_coefficients/variants/zero/a/ci/[]	
+systems/<sys>/ablation/A4_coefficients/variants/zero/a/mean_weight	
+systems/<sys>/ablation/A4_coefficients/variants/zero/a/mse_href	
+systems/<sys>/ablation/A4_coefficients/variants/zero/a/mse_ratio	
+systems/<sys>/ablation/A4_coefficients/variants/zero/a_prime/ci/[]	
+systems/<sys>/ablation/A4_coefficients/variants/zero/a_prime/mean_weight	
+systems/<sys>/ablation/A4_coefficients/variants/zero/a_prime/mse_href	
+systems/<sys>/ablation/A4_coefficients/variants/zero/a_prime/mse_ratio	
+systems/<sys>/ablation/A4_coefficients/variants/zero/b/ci/[]	
+systems/<sys>/ablation/A4_coefficients/variants/zero/b/mean_weight	
+systems/<sys>/ablation/A4_coefficients/variants/zero/b/mse_href	
+systems/<sys>/ablation/A4_coefficients/variants/zero/b/mse_ratio	
+systems/<sys>/ablation/A4_coefficients/variants/zero/b_prime/ci/[]	
+systems/<sys>/ablation/A4_coefficients/variants/zero/b_prime/mean_weight	
+systems/<sys>/ablation/A4_coefficients/variants/zero/b_prime/mse_href	
+systems/<sys>/ablation/A4_coefficients/variants/zero/b_prime/mse_ratio	
+systems/<sys>/ablation/A5_without_condition/level	
+systems/<sys>/ablation/A5_without_condition/without/I/ci/[]	
+systems/<sys>/ablation/A5_without_condition/without/I/mse_href	
+systems/<sys>/ablation/A5_without_condition/without/I/mse_ratio	
+systems/<sys>/ablation/A5_without_condition/without/N/ci/[]	
+systems/<sys>/ablation/A5_without_condition/without/N/mse_href	
+systems/<sys>/ablation/A5_without_condition/without/N/mse_ratio	
+systems/<sys>/ablation/A5_without_condition/without/O/ci/[]	
+systems/<sys>/ablation/A5_without_condition/without/O/mse_href	
+systems/<sys>/ablation/A5_without_condition/without/O/mse_ratio	
+systems/<sys>/ablation/A5_without_condition/without/R/ci/[]	
+systems/<sys>/ablation/A5_without_condition/without/R/mse_href	
+systems/<sys>/ablation/A5_without_condition/without/R/mse_ratio	
+systems/<sys>/ablation/cell/noise	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/I/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/I/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/N/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/N/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/O/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/O/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/R/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/leave_one_out/R/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/I	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/IN	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/N	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/O	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/OI	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/OIN	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/ON	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/R	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RI	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RIN	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RN	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RO	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/ROI	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/ROIN	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RON	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/none	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/r2_full_minus_empty	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/shapley/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/shapley/I/share	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/shapley/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/shapley/N/share	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/shapley/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/shapley/O/share	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/shapley/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/shapley/R/share	
+systems/<sys>/ablation/profile_conditions/deployable/log_horizon/shapley_sum	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/I/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/I/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/N/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/N/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/O/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/O/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/R/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/R/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/I	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/IN	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/N	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/O	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/OI	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/OIN	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/ON	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/R	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/RI	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/RIN	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/RN	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/RO	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/ROI	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/ROIN	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/RON	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/none	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/r2_full_minus_empty	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/shapley/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/shapley/I/share	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/shapley/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/shapley/N/share	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/shapley/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/shapley/O/share	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/shapley/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/shapley/R/share	
+systems/<sys>/ablation/profile_conditions/deployable/logit_w_interior/shapley_sum	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/I/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/I/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/N/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/N/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/O/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/O/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/delta_r2	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/r2_without	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/I	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/IN	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/N	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/O	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/OI	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/OIN	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/ON	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/R	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RI	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RIN	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RN	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RO	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/ROI	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/ROIN	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RON	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/none	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/r2_full_minus_empty	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/shapley/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/shapley/I/share	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/shapley/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/shapley/N/share	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/shapley/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/shapley/O/share	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/shapley/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/shapley/R/share	
+systems/<sys>/ablation/profile_conditions/deployable/w_zero_indicator/shapley_sum	
+systems/<sys>/ablation/profile_conditions/level	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/I/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/I/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/N/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/N/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/O/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/O/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/R/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/leave_one_out/R/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/I	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/IN	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/N	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/O	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/OI	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/OIN	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/ON	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/R	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/RI	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/RIN	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/RN	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/RO	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/ROI	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/ROIN	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/RON	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/none	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/r2_full_minus_empty	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/shapley/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/shapley/I/share	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/shapley/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/shapley/N/share	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/shapley/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/shapley/O/share	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/shapley/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/shapley/R/share	
+systems/<sys>/ablation/profile_conditions/oracle/log_horizon/shapley_sum	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/I/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/I/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/N/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/N/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/O/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/O/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/R/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/R/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/I	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/IN	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/N	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/O	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/OI	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/OIN	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/ON	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/R	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/RI	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/RIN	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/RN	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/RO	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/ROI	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/ROIN	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/RON	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/none	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/r2_full_minus_empty	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/shapley/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/shapley/I/share	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/shapley/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/shapley/N/share	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/shapley/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/shapley/O/share	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/shapley/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/shapley/R/share	
+systems/<sys>/ablation/profile_conditions/oracle/logit_w_interior/shapley_sum	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/I/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/I/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/N/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/N/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/O/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/O/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/R/delta_r2	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/R/r2_without	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/I	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/IN	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/N	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/O	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/OI	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/OIN	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/ON	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/R	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/RI	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/RIN	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/RN	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/RO	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/ROI	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/ROIN	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/RON	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/none	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/r2_full_minus_empty	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/shapley/I/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/shapley/I/share	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/shapley/N/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/shapley/N/share	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/shapley/O/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/shapley/O/share	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/shapley/R/ci/[]	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/shapley/R/share	
+systems/<sys>/ablation/profile_conditions/oracle/w_zero_indicator/shapley_sum	
+systems/<sys>/clip_sensitivity/by_hypothesis/H1b/parts/PLP/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H1b/parts/PLP/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/interior/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/interior/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/one/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/one/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/zero/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2a/parts/zero/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2b/parts/library_change/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2b/parts/library_change/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2b/parts/noise/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2b/parts/noise/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A0/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A0/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A1/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A1/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A2/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A2/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2d/parts/A4_over_A3/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H2d/parts/A4_over_A3/ratio	
+systems/<sys>/clip_sensitivity/by_hypothesis/H3c/parts/A5_over_A4/delta	
+systems/<sys>/clip_sensitivity/by_hypothesis/H3c/parts/A5_over_A4/ratio	
+systems/<sys>/clip_sensitivity/clip_level	
+systems/<sys>/clip_sensitivity/perturbed_level	
+systems/<sys>/clip_sensitivity/share_test/A0	
+systems/<sys>/clip_sensitivity/share_test/A1	
+systems/<sys>/clip_sensitivity/share_test/A2	
+systems/<sys>/clip_sensitivity/share_test/A3	
+systems/<sys>/clip_sensitivity/share_test/A4	
+systems/<sys>/clip_sensitivity/share_test/A5	
+systems/<sys>/clip_sensitivity/weight_shift/A2	
+systems/<sys>/clip_sensitivity/weight_shift/A5_max	
+systems/<sys>/context/interval	dynamics
+systems/<sys>/context/lambda_max	dynamics
+systems/<sys>/context/lyapunov_orbit_max_abs	dynamics
+systems/<sys>/context/obs_scale	dynamics
+systems/<sys>/context/start_state/estimator/[]	dynamics
+systems/<sys>/context/start_state/main/[]	dynamics
+systems/<sys>/context/trajectory_max_abs/estimator	dynamics
+systems/<sys>/context/trajectory_max_abs/main	dynamics
+systems/<sys>/context/trajectory_max_abs/statistics	dynamics
+systems/<sys>/fitted/analog_proxy/floor	network
+systems/<sys>/fitted/analog_proxy/slope	network
+systems/<sys>/fitted/estimation_proxy/floor	network
+systems/<sys>/fitted/estimation_proxy/slope	network
+systems/<sys>/fitted/nu_cap	network
+systems/<sys>/fitted/regime_horizons_km_lyapunov/2/[]	
+systems/<sys>/fitted/regime_horizons_km_lyapunov/3/[]	
+systems/<sys>/fitted/regime_horizons_km_lyapunov/4/[]	
+systems/<sys>/fitted/regime_weights_href/2/[]	
+systems/<sys>/fitted/regime_weights_href/3/[]	
+systems/<sys>/fitted/regime_weights_href/4/[]	
+systems/<sys>/gain_bound/fraction_within_bound	network
+systems/<sys>/gain_bound/max_gain_lyapunov	network
+systems/<sys>/gain_bound/median_gain_lyapunov	network
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/fraction_above_chi2	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/fraction_late_progress	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/fraction_no_decrease	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/median_iterations	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/median_residual	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/check/p95_residual	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/fraction_late_progress	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/median_iterations	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/median_residual	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/noise	
+systems/<sys>/handling/cells/V3-cp-horizon/lm/p95_residual	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/fraction_above_chi2	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/fraction_late_progress	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/fraction_no_decrease	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/median_iterations	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/median_residual	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/check/p95_residual	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/V4-convergence/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/V4-convergence/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/V4-convergence/lm/fraction_late_progress	
+systems/<sys>/handling/cells/V4-convergence/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/V4-convergence/lm/median_iterations	
+systems/<sys>/handling/cells/V4-convergence/lm/median_residual	
+systems/<sys>/handling/cells/V4-convergence/lm/noise	
+systems/<sys>/handling/cells/V4-convergence/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=10000|core/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/check/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/eval/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/p95_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/fraction_above_chi2	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/fraction_late_progress	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/fraction_no_decrease	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/median_iterations	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/median_residual	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/noise	
+systems/<sys>/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/p95_residual	
+systems/<sys>/km_curves/A*/[]	network
+systems/<sys>/km_curves/A0/[]	cp
+systems/<sys>/km_curves/A1/[]	network
+systems/<sys>/km_curves/A2/[]	network
+systems/<sys>/km_curves/A3/[]	network
+systems/<sys>/km_curves/A4/[]	network
+systems/<sys>/km_curves/A4o/[]	network
+systems/<sys>/km_curves/A5/[]	
+systems/<sys>/oracle_recovery/A4_vs_A4o	network
+systems/<sys>/oracle_recovery/A4_vs_Astar	network
+systems/<sys>/oracle_recovery/A5_vs_Astar	
+systems/<sys>/oracle_recovery/mse_at_href/A*	network
+systems/<sys>/oracle_recovery/mse_at_href/A0	cp
+systems/<sys>/oracle_recovery/mse_at_href/A1	network
+systems/<sys>/oracle_recovery/mse_at_href/A2	network
+systems/<sys>/oracle_recovery/mse_at_href/A3	network
+systems/<sys>/oracle_recovery/mse_at_href/A4	network
+systems/<sys>/oracle_recovery/mse_at_href/A4o	network
+systems/<sys>/oracle_recovery/mse_at_href/A5	
+systems/<sys>/regime_curve/regret_ratio_by_K/2	network
+systems/<sys>/regime_curve/regret_ratio_by_K/3	network
+systems/<sys>/regime_curve/regret_ratio_by_K/4	network
+systems/<sys>/scores/A*/agreement_href	network
+systems/<sys>/scores/A*/km_median_lyapunov	network
+systems/<sys>/scores/A*/mse/0.25LT	network
+systems/<sys>/scores/A*/mse/0.5LT	network
+systems/<sys>/scores/A*/mse/1LT	network
+systems/<sys>/scores/A*/mse/2LT	network
+systems/<sys>/scores/A*/mse/4LT	network
+systems/<sys>/scores/A*/mse_href	network
+systems/<sys>/scores/A*/regret/0.25LT	
+systems/<sys>/scores/A*/regret/0.5LT	
+systems/<sys>/scores/A*/regret/1LT	
+systems/<sys>/scores/A*/regret/2LT	
+systems/<sys>/scores/A*/regret/4LT	
+systems/<sys>/scores/A*/rmst_lyapunov	network
+systems/<sys>/scores/A0/agreement_href	network
+systems/<sys>/scores/A0/km_median_lyapunov	cp
+systems/<sys>/scores/A0/mse/0.25LT	cp
+systems/<sys>/scores/A0/mse/0.5LT	cp
+systems/<sys>/scores/A0/mse/1LT	cp
+systems/<sys>/scores/A0/mse/2LT	cp
+systems/<sys>/scores/A0/mse/4LT	cp
+systems/<sys>/scores/A0/mse_href	cp
+systems/<sys>/scores/A0/regret/0.25LT	network
+systems/<sys>/scores/A0/regret/0.5LT	network
+systems/<sys>/scores/A0/regret/1LT	network
+systems/<sys>/scores/A0/regret/2LT	network
+systems/<sys>/scores/A0/regret/4LT	network
+systems/<sys>/scores/A0/rmst_lyapunov	cp
+systems/<sys>/scores/A1/agreement_href	network
+systems/<sys>/scores/A1/km_median_lyapunov	network
+systems/<sys>/scores/A1/mse/0.25LT	network
+systems/<sys>/scores/A1/mse/0.5LT	network
+systems/<sys>/scores/A1/mse/1LT	network
+systems/<sys>/scores/A1/mse/2LT	network
+systems/<sys>/scores/A1/mse/4LT	network
+systems/<sys>/scores/A1/mse_href	network
+systems/<sys>/scores/A1/regret/0.25LT	network
+systems/<sys>/scores/A1/regret/0.5LT	network
+systems/<sys>/scores/A1/regret/1LT	network
+systems/<sys>/scores/A1/regret/2LT	network
+systems/<sys>/scores/A1/regret/4LT	network
+systems/<sys>/scores/A1/rmst_lyapunov	network
+systems/<sys>/scores/A2/agreement_href	network
+systems/<sys>/scores/A2/km_median_lyapunov	network
+systems/<sys>/scores/A2/mse/0.25LT	network
+systems/<sys>/scores/A2/mse/0.5LT	network
+systems/<sys>/scores/A2/mse/1LT	network
+systems/<sys>/scores/A2/mse/2LT	network
+systems/<sys>/scores/A2/mse/4LT	network
+systems/<sys>/scores/A2/mse_href	network
+systems/<sys>/scores/A2/regret/0.25LT	network
+systems/<sys>/scores/A2/regret/0.5LT	network
+systems/<sys>/scores/A2/regret/1LT	network
+systems/<sys>/scores/A2/regret/2LT	network
+systems/<sys>/scores/A2/regret/4LT	network
+systems/<sys>/scores/A2/rmst_lyapunov	network
+systems/<sys>/scores/A3/agreement_href	network
+systems/<sys>/scores/A3/km_median_lyapunov	network
+systems/<sys>/scores/A3/mse/0.25LT	network
+systems/<sys>/scores/A3/mse/0.5LT	network
+systems/<sys>/scores/A3/mse/1LT	network
+systems/<sys>/scores/A3/mse/2LT	network
+systems/<sys>/scores/A3/mse/4LT	network
+systems/<sys>/scores/A3/mse_href	network
+systems/<sys>/scores/A3/regret/0.25LT	network
+systems/<sys>/scores/A3/regret/0.5LT	network
+systems/<sys>/scores/A3/regret/1LT	network
+systems/<sys>/scores/A3/regret/2LT	network
+systems/<sys>/scores/A3/regret/4LT	network
+systems/<sys>/scores/A3/rmst_lyapunov	network
+systems/<sys>/scores/A4/agreement_href	network
+systems/<sys>/scores/A4/km_median_lyapunov	network
+systems/<sys>/scores/A4/mse/0.25LT	network
+systems/<sys>/scores/A4/mse/0.5LT	network
+systems/<sys>/scores/A4/mse/1LT	network
+systems/<sys>/scores/A4/mse/2LT	network
+systems/<sys>/scores/A4/mse/4LT	network
+systems/<sys>/scores/A4/mse_href	network
+systems/<sys>/scores/A4/regret/0.25LT	network
+systems/<sys>/scores/A4/regret/0.5LT	network
+systems/<sys>/scores/A4/regret/1LT	network
+systems/<sys>/scores/A4/regret/2LT	network
+systems/<sys>/scores/A4/regret/4LT	network
+systems/<sys>/scores/A4/rmst_lyapunov	network
+systems/<sys>/scores/A4o/agreement_href	network
+systems/<sys>/scores/A4o/km_median_lyapunov	network
+systems/<sys>/scores/A4o/mse/0.25LT	network
+systems/<sys>/scores/A4o/mse/0.5LT	network
+systems/<sys>/scores/A4o/mse/1LT	network
+systems/<sys>/scores/A4o/mse/2LT	network
+systems/<sys>/scores/A4o/mse/4LT	network
+systems/<sys>/scores/A4o/mse_href	network
+systems/<sys>/scores/A4o/regret/0.25LT	network
+systems/<sys>/scores/A4o/regret/0.5LT	network
+systems/<sys>/scores/A4o/regret/1LT	network
+systems/<sys>/scores/A4o/regret/2LT	network
+systems/<sys>/scores/A4o/regret/4LT	network
+systems/<sys>/scores/A4o/rmst_lyapunov	network
+systems/<sys>/scores/A5/agreement_href	
+systems/<sys>/scores/A5/km_median_lyapunov	
+systems/<sys>/scores/A5/mse/0.25LT	
+systems/<sys>/scores/A5/mse/0.5LT	
+systems/<sys>/scores/A5/mse/1LT	
+systems/<sys>/scores/A5/mse/2LT	
+systems/<sys>/scores/A5/mse/4LT	
+systems/<sys>/scores/A5/mse_href	
+systems/<sys>/scores/A5/regret/0.25LT	
+systems/<sys>/scores/A5/regret/0.5LT	
+systems/<sys>/scores/A5/regret/1LT	
+systems/<sys>/scores/A5/regret/2LT	
+systems/<sys>/scores/A5/regret/4LT	
+systems/<sys>/scores/A5/rmst_lyapunov	
+systems/<sys>/validation/convergence/10/mean_abs_dev_from_max	network
+systems/<sys>/validation/convergence/10/median_half_width	network
+systems/<sys>/validation/convergence/30/mean_abs_dev_from_max	network
+systems/<sys>/validation/convergence/30/median_half_width	network
+systems/<sys>/validation/cp_median_vpt_lyapunov	cp
+systems/<sys>/validation/crlb_ratio_max	fixture
+systems/<sys>/validation/crlb_ratio_median	fixture
+systems/<sys>/validation/crlb_ratio_min	fixture
+systems/<sys>/validation/delay_jacobian_rel_err	fixture
+systems/<sys>/validation/estimators/('chua', 7, 5, 0.01)/val_loss_by_width/32	network
+systems/<sys>/validation/estimators/('lorenz63', 7, 5, 0.01)/val_loss_by_width/32	network
+systems/<sys>/validation/estimators/('rossler', 7, 3, 0.01)/val_loss_by_width/32	network
+systems/<sys>/validation/gain_rel_err	fixture
+systems/<sys>/validation/integrator_max_dev_sigma	fixture
+systems/<sys>/validation/km_max_abs_dev	fixture
+systems/<sys>/verification/P2c/cell/noise	
+systems/<sys>/verification/P2c/fraction_switching_draws	
+systems/<sys>/verification/P2c/fraction_violations	
+systems/<sys>/verification/P2c/noise_second_moment/se	
+systems/<sys>/verification/P2c/noise_second_moment/value	
+systems/<sys>/verification/P2c/population/sum_ratio_inf	
+systems/<sys>/verification/P2c/population/z_B	
+systems/<sys>/verification/P2c/tightness/N_over_sqrt_B/max	
+systems/<sys>/verification/P2c/tightness/N_over_sqrt_B/median	
+systems/<sys>/verification/P2c/tightness/N_over_sqrt_B/p90	
+systems/<sys>/verification/P2c/tightness/median_A_over_Bsw	
+systems/<sys>/verification/P2c/tightness/median_Bsw_over_B	
+systems/<sys>/verification/P2c/tightness/median_N2_over_A	
+systems/<sys>/verification/P2c/tolerances/kappa	
+systems/<sys>/verification/P2c/tolerances/tau_N_max	
+systems/<sys>/weight_profile/median/[]	network
+systems/<sys>/weight_profile/q25/[]	network
+systems/<sys>/weight_profile/q75/[]	network
+systems/rossler_hyper/H1a/band/[]	
+systems/rossler_hyper/H1a/by_noise/0.01/ci_inverse_dim/[]	cp
+systems/rossler_hyper/H1a/by_noise/0.01/fitted_inverse_dim	cp
+systems/rossler_hyper/H1a/by_noise/0.01/floor_rms	cp
+systems/rossler_hyper/H1a/by_noise/0.01/median_seed_by_n_lib/1000	cp
+systems/rossler_hyper/H1a/by_noise/0.01/median_seed_by_n_lib/10000	cp
+systems/rossler_hyper/H1a/by_noise/0.01/ratio	
+systems/rossler_hyper/H1a/by_noise/0.01/ratio_ci/[]	
+systems/rossler_hyper/H1a/inverse_dim_reference	cp
+systems/rossler_hyper/H1a/level	
+systems/rossler_hyper/H1b/CP/ci/[]	cp
+systems/rossler_hyper/H1b/CP/slope	cp
+systems/rossler_hyper/H1b/PLP/ci/[]	network
+systems/rossler_hyper/H1b/PLP/slope	network
+systems/rossler_hyper/H1b/threshold/[]	
+systems/rossler_hyper/H1c/CP/ci/[]	cp
+systems/rossler_hyper/H1c/CP/median_ratio	cp
+systems/rossler_hyper/H1c/PLP/ci/[]	network
+systems/rossler_hyper/H1c/PLP/median_ratio	network
+systems/rossler_hyper/H1c/threshold/[]	
+systems/rossler_hyper/H1c/thresholds/[]	
+systems/rossler_hyper/H1d/estimation_seed_vs_cramer_rao	network
+systems/rossler_hyper/H1d/level	
+systems/rossler_hyper/H1d/rows/analog_seed/interval/[]	
+systems/rossler_hyper/H1d/rows/analog_seed/spearman	network
+systems/rossler_hyper/H1d/rows/estimation_seed/interval/[]	
+systems/rossler_hyper/H1d/rows/estimation_seed/spearman	network
+systems/rossler_hyper/H1d/rows/growth/interval/[]	
+systems/rossler_hyper/H1d/rows/growth/spearman	network
+systems/rossler_hyper/H1d/rows/nhat/interval/[]	
+systems/rossler_hyper/H1d/rows/nhat/spearman	network
+systems/rossler_hyper/H1d/threshold	
+systems/rossler_hyper/H2a/complete_case/median_range	
+systems/rossler_hyper/H2a/complete_case/range_ci/[]	
+systems/rossler_hyper/H2a/median_range	network
+systems/rossler_hyper/H2a/median_range_unrestricted	network
+systems/rossler_hyper/H2a/part_ii/interior/ci/[]	
+systems/rossler_hyper/H2a/part_ii/interior/partial_corr	
+systems/rossler_hyper/H2a/part_ii/one/ci/[]	
+systems/rossler_hyper/H2a/part_ii/one/partial_corr	
+systems/rossler_hyper/H2a/part_ii/zero/ci/[]	
+systems/rossler_hyper/H2a/part_ii/zero/partial_corr	
+systems/rossler_hyper/H2a/range_by_span/1-2-4/median	
+systems/rossler_hyper/H2a/range_by_span/1-2/median	
+systems/rossler_hyper/H2a/range_ci/[]	
+systems/rossler_hyper/H2a/short_horizon_range_median	network
+systems/rossler_hyper/H2a/unconditional_spearman_w_lambda	network
+systems/rossler_hyper/H2b/library_change/ci/[]	
+systems/rossler_hyper/H2b/library_change/level	
+systems/rossler_hyper/H2b/library_change/mean_change	
+systems/rossler_hyper/H2b/library_change/rho	
+systems/rossler_hyper/H2b/library_curves/0.01/1000/level	
+systems/rossler_hyper/H2b/library_curves/0.01/1000/mean	
+systems/rossler_hyper/H2b/library_curves/0.01/1000/mean_ci/[]	
+systems/rossler_hyper/H2b/library_curves/0.01/1000/median	
+systems/rossler_hyper/H2b/library_curves/0.01/1000/median_ci/[]	
+systems/rossler_hyper/H2b/library_curves/0.01/10000/level	
+systems/rossler_hyper/H2b/library_curves/0.01/10000/mean	
+systems/rossler_hyper/H2b/library_curves/0.01/10000/mean_ci/[]	
+systems/rossler_hyper/H2b/library_curves/0.01/10000/median	
+systems/rossler_hyper/H2b/library_curves/0.01/10000/median_ci/[]	
+systems/rossler_hyper/H2b/noise/ci/[]	network
+systems/rossler_hyper/H2b/noise/mean_state_spearman	network
+systems/rossler_hyper/H2b/noise/median_w_by_noise/0.01	network
+systems/rossler_hyper/H2b/noise/median_w_by_noise/0.02	network
+systems/rossler_hyper/H2c/A4_minus_A0/ci/[]	
+systems/rossler_hyper/H2c/A4_minus_A0/mean	
+systems/rossler_hyper/H2c/A4_minus_A0/relative	
+systems/rossler_hyper/H2c/A4_minus_A2/ci/[]	network
+systems/rossler_hyper/H2c/A4_minus_A2/mean	network
+systems/rossler_hyper/H2c/A4_minus_A2/relative	network
+systems/rossler_hyper/H2c/A4o_minus_A2/ci/[]	
+systems/rossler_hyper/H2c/A4o_minus_A2/level	
+systems/rossler_hyper/H2c/A4o_minus_A2/mean	
+systems/rossler_hyper/H2c/A4o_minus_A2/relative	
+systems/rossler_hyper/H2c/calibration_mse/A0	
+systems/rossler_hyper/H2c/calibration_mse/A1	
+systems/rossler_hyper/H2d/ci/[]	network
+systems/rossler_hyper/H2d/in_distribution_excess	network
+systems/rossler_hyper/H2e/by_noise/0.01/level	
+systems/rossler_hyper/H2e/by_noise/0.02/level	
+systems/rossler_hyper/H2e/corr_curve/0.01/1000	
+systems/rossler_hyper/H2e/corr_curve/0.01/10000	
+systems/rossler_hyper/H3a/iqr_lt/[]	
+systems/rossler_hyper/H3a/iqr_lt_mean	network
+systems/rossler_hyper/H3a/logrank_p_holm/[]	network
+systems/rossler_hyper/H3a/logrank_p_raw/[]	
+systems/rossler_hyper/H3b/D/ci/[]	
+systems/rossler_hyper/H3b/D/level	
+systems/rossler_hyper/H3b/D/value	
+systems/rossler_hyper/H3b/horizon_tree_importance/lambda_tilde	network
+systems/rossler_hyper/H3b/horizon_tree_importance/log_eps_tilde	network
+systems/rossler_hyper/H3b/horizon_tree_importance/log_noise_sens	network
+systems/rossler_hyper/H3b/horizon_tree_importance/log_nu_tilde	network
+systems/rossler_hyper/H3b/stability	
+systems/rossler_hyper/H3b/weight_lambda/band/[]	
+systems/rossler_hyper/H3b/weight_lambda/ci/[]	
+systems/rossler_hyper/H3b/weight_lambda/importance	
+systems/rossler_hyper/H3b/weight_lambda/level	
+systems/rossler_hyper/H3b/weight_tree_importance/lambda_tilde	network
+systems/rossler_hyper/H3b/weight_tree_importance/log_eps_tilde	network
+systems/rossler_hyper/H3b/weight_tree_importance/log_noise_sens	network
+systems/rossler_hyper/H3b/weight_tree_importance/log_nu_tilde	network
+systems/rossler_hyper/H3c/A5_over_A4_mse	network
+systems/rossler_hyper/H3c/ci/[]	
+systems/rossler_hyper/H3c/level	
+systems/rossler_hyper/H3c/threshold	
+systems/rossler_hyper/Q-N/deployable/log_horizon/ci/[]	network
+systems/rossler_hyper/Q-N/deployable/log_horizon/delta_r2	network
+systems/rossler_hyper/Q-N/deployable/log_horizon/r2_four	network
+systems/rossler_hyper/Q-N/deployable/log_horizon/r2_three	network
+systems/rossler_hyper/Q-N/deployable/logit_w_interior/ci/[]	
+systems/rossler_hyper/Q-N/deployable/logit_w_interior/delta_r2	
+systems/rossler_hyper/Q-N/deployable/logit_w_interior/r2_four	
+systems/rossler_hyper/Q-N/deployable/logit_w_interior/r2_three	
+systems/rossler_hyper/Q-N/deployable/noise_sens_r2_from_three	network
+systems/rossler_hyper/Q-N/deployable/w_zero_indicator/ci/[]	
+systems/rossler_hyper/Q-N/deployable/w_zero_indicator/delta_r2	
+systems/rossler_hyper/Q-N/deployable/w_zero_indicator/r2_four	
+systems/rossler_hyper/Q-N/deployable/w_zero_indicator/r2_three	
+systems/rossler_hyper/Q-N/oracle/log_horizon/ci/[]	network
+systems/rossler_hyper/Q-N/oracle/log_horizon/delta_r2	network
+systems/rossler_hyper/Q-N/oracle/log_horizon/r2_four	network
+systems/rossler_hyper/Q-N/oracle/log_horizon/r2_three	network
+systems/rossler_hyper/Q-N/oracle/logit_w_interior/ci/[]	
+systems/rossler_hyper/Q-N/oracle/logit_w_interior/delta_r2	
+systems/rossler_hyper/Q-N/oracle/logit_w_interior/r2_four	
+systems/rossler_hyper/Q-N/oracle/logit_w_interior/r2_three	
+systems/rossler_hyper/Q-N/oracle/noise_sens_r2_from_three	network
+systems/rossler_hyper/Q-N/oracle/w_zero_indicator/ci/[]	
+systems/rossler_hyper/Q-N/oracle/w_zero_indicator/delta_r2	
+systems/rossler_hyper/Q-N/oracle/w_zero_indicator/r2_four	
+systems/rossler_hyper/Q-N/oracle/w_zero_indicator/r2_three	
+systems/rossler_hyper/V7/ci/[]	network
+systems/rossler_hyper/V7/efficiency_ci_by_noise/0.01/[]	
+systems/rossler_hyper/V7/efficiency_ci_by_noise/0.02/[]	
+systems/rossler_hyper/V7/efficiency_median_by_noise/0.01	network
+systems/rossler_hyper/V7/efficiency_median_by_noise/0.02	network
+systems/rossler_hyper/V7/median_slope	network
+systems/rossler_hyper/V7/threshold/[]	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/a/max_abs_weight_change	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/a/max_term_share	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/a/value	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/a_prime/max_abs_weight_change	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/a_prime/max_term_share	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/a_prime/value	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/b/max_abs_weight_change	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/b/max_term_share	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/b/value	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/b_prime/max_abs_weight_change	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/b_prime/max_term_share	
+systems/rossler_hyper/ablation/A4_coefficients/coefficients/b_prime/value	
+systems/rossler_hyper/ablation/A4_coefficients/full/mean_weight	
+systems/rossler_hyper/ablation/A4_coefficients/full/mse_href	
+systems/rossler_hyper/ablation/A4_coefficients/level	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a/ci/[]	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a/coefficients/a	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a/coefficients/a_prime	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a/coefficients/b	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a/coefficients/b_prime	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a/mean_weight	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a/mse_href	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a/mse_ratio	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a/partner_value	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a_prime/ci/[]	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a_prime/coefficients/a	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a_prime/coefficients/a_prime	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a_prime/coefficients/b	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a_prime/coefficients/b_prime	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a_prime/mean_weight	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a_prime/mse_href	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a_prime/mse_ratio	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/a_prime/partner_value	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b/ci/[]	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b/coefficients/a	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b/coefficients/a_prime	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b/coefficients/b	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b/coefficients/b_prime	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b/mean_weight	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b/mse_href	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b/mse_ratio	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b/partner_value	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b_prime/ci/[]	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b_prime/coefficients/a	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b_prime/coefficients/a_prime	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b_prime/coefficients/b	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b_prime/coefficients/b_prime	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b_prime/mean_weight	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b_prime/mse_href	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b_prime/mse_ratio	
+systems/rossler_hyper/ablation/A4_coefficients/variants/refit/b_prime/partner_value	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/a/ci/[]	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/a/mean_weight	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/a/mse_href	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/a/mse_ratio	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/a_prime/ci/[]	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/a_prime/mean_weight	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/a_prime/mse_href	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/a_prime/mse_ratio	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/b/ci/[]	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/b/mean_weight	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/b/mse_href	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/b/mse_ratio	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/b_prime/ci/[]	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/b_prime/mean_weight	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/b_prime/mse_href	
+systems/rossler_hyper/ablation/A4_coefficients/variants/zero/b_prime/mse_ratio	
+systems/rossler_hyper/ablation/A5_without_condition/level	
+systems/rossler_hyper/ablation/A5_without_condition/without/I/ci/[]	
+systems/rossler_hyper/ablation/A5_without_condition/without/I/mse_href	
+systems/rossler_hyper/ablation/A5_without_condition/without/I/mse_ratio	
+systems/rossler_hyper/ablation/A5_without_condition/without/N/ci/[]	
+systems/rossler_hyper/ablation/A5_without_condition/without/N/mse_href	
+systems/rossler_hyper/ablation/A5_without_condition/without/N/mse_ratio	
+systems/rossler_hyper/ablation/A5_without_condition/without/O/ci/[]	
+systems/rossler_hyper/ablation/A5_without_condition/without/O/mse_href	
+systems/rossler_hyper/ablation/A5_without_condition/without/O/mse_ratio	
+systems/rossler_hyper/ablation/A5_without_condition/without/R/ci/[]	
+systems/rossler_hyper/ablation/A5_without_condition/without/R/mse_href	
+systems/rossler_hyper/ablation/A5_without_condition/without/R/mse_ratio	
+systems/rossler_hyper/ablation/cell/noise	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/I/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/I/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/N/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/N/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/O/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/O/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/R/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/leave_one_out/R/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/I	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/IN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/N	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/O	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/OI	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/OIN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/ON	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/R	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RI	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RIN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RO	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/ROI	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/ROIN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RON	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/none	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/r2_full_minus_empty	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/shapley/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/shapley/I/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/shapley/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/shapley/N/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/shapley/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/shapley/O/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/shapley/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/shapley/R/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/log_horizon/shapley_sum	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/I/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/I/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/N/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/N/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/O/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/O/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/R/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/R/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/I	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/IN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/N	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/O	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/OI	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/OIN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/ON	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/R	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/RI	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/RIN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/RN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/RO	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/ROI	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/ROIN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/RON	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_by_subset/none	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/r2_full_minus_empty	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/shapley/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/shapley/I/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/shapley/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/shapley/N/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/shapley/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/shapley/O/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/shapley/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/shapley/R/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/logit_w_interior/shapley_sum	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/I/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/I/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/N/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/N/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/O/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/O/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/I	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/IN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/N	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/O	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/OI	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/OIN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/ON	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/R	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RI	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RIN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RO	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/ROI	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/ROIN	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RON	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/none	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/r2_full_minus_empty	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/shapley/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/shapley/I/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/shapley/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/shapley/N/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/shapley/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/shapley/O/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/shapley/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/shapley/R/share	
+systems/rossler_hyper/ablation/profile_conditions/deployable/w_zero_indicator/shapley_sum	
+systems/rossler_hyper/ablation/profile_conditions/level	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/I/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/I/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/N/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/N/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/O/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/O/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/R/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/leave_one_out/R/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/I	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/IN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/N	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/O	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/OI	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/OIN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/ON	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/R	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/RI	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/RIN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/RN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/RO	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/ROI	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/ROIN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/RON	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_by_subset/none	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/r2_full_minus_empty	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/shapley/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/shapley/I/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/shapley/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/shapley/N/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/shapley/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/shapley/O/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/shapley/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/shapley/R/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/log_horizon/shapley_sum	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/I/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/I/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/N/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/N/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/O/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/O/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/R/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/leave_one_out/R/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/I	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/IN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/N	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/O	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/OI	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/OIN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/ON	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/R	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/RI	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/RIN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/RN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/RO	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/ROI	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/ROIN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/RON	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_by_subset/none	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/r2_full_minus_empty	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/shapley/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/shapley/I/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/shapley/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/shapley/N/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/shapley/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/shapley/O/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/shapley/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/shapley/R/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/logit_w_interior/shapley_sum	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/I/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/I/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/N/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/N/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/O/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/O/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/R/delta_r2	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/leave_one_out/R/r2_without	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/I	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/IN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/N	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/O	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/OI	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/OIN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/ON	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/R	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/RI	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/RIN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/RN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/RO	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/ROI	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/ROIN	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/RON	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_by_subset/none	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/r2_full_minus_empty	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/shapley/I/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/shapley/I/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/shapley/N/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/shapley/N/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/shapley/O/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/shapley/O/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/shapley/R/ci/[]	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/shapley/R/share	
+systems/rossler_hyper/ablation/profile_conditions/oracle/w_zero_indicator/shapley_sum	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H1b/parts/PLP/delta	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H1b/parts/PLP/ratio	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2a/parts/interior/delta	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2a/parts/interior/ratio	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2a/parts/one/delta	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2a/parts/one/ratio	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2a/parts/zero/delta	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2a/parts/zero/ratio	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2b/parts/library_change/delta	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2b/parts/library_change/ratio	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2b/parts/noise/delta	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2b/parts/noise/ratio	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A0/delta	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A0/ratio	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A2/delta	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2c/parts/A4_minus_A2/ratio	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2d/parts/A4_over_A3/delta	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H2d/parts/A4_over_A3/ratio	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H3c/parts/A5_over_A4/delta	
+systems/rossler_hyper/clip_sensitivity/by_hypothesis/H3c/parts/A5_over_A4/ratio	
+systems/rossler_hyper/clip_sensitivity/clip_level	
+systems/rossler_hyper/clip_sensitivity/perturbed_level	
+systems/rossler_hyper/clip_sensitivity/share_test/A0	
+systems/rossler_hyper/clip_sensitivity/share_test/A1	
+systems/rossler_hyper/clip_sensitivity/share_test/A2	
+systems/rossler_hyper/clip_sensitivity/share_test/A3	
+systems/rossler_hyper/clip_sensitivity/share_test/A4	
+systems/rossler_hyper/clip_sensitivity/share_test/A5	
+systems/rossler_hyper/clip_sensitivity/weight_shift/A2	
+systems/rossler_hyper/clip_sensitivity/weight_shift/A5_max	
+systems/rossler_hyper/context/interval	dynamics
+systems/rossler_hyper/context/lambda_max	dynamics
+systems/rossler_hyper/context/lyapunov_orbit_max_abs	dynamics
+systems/rossler_hyper/context/obs_scale	dynamics
+systems/rossler_hyper/context/start_state/estimator/[]	dynamics
+systems/rossler_hyper/context/start_state/main/[]	dynamics
+systems/rossler_hyper/context/trajectory_max_abs/estimator	dynamics
+systems/rossler_hyper/context/trajectory_max_abs/main	dynamics
+systems/rossler_hyper/context/trajectory_max_abs/statistics	dynamics
+systems/rossler_hyper/fitted/analog_proxy/floor	network
+systems/rossler_hyper/fitted/analog_proxy/slope	network
+systems/rossler_hyper/fitted/estimation_proxy/floor	network
+systems/rossler_hyper/fitted/estimation_proxy/slope	network
+systems/rossler_hyper/fitted/nu_cap	network
+systems/rossler_hyper/fitted/regime_horizons_km_lyapunov/2/[]	
+systems/rossler_hyper/fitted/regime_horizons_km_lyapunov/3/[]	
+systems/rossler_hyper/fitted/regime_horizons_km_lyapunov/4/[]	
+systems/rossler_hyper/fitted/regime_weights_href/2/[]	
+systems/rossler_hyper/fitted/regime_weights_href/3/[]	
+systems/rossler_hyper/fitted/regime_weights_href/4/[]	
+systems/rossler_hyper/gain_bound/fraction_within_bound	network
+systems/rossler_hyper/gain_bound/max_gain_lyapunov	network
+systems/rossler_hyper/gain_bound/median_gain_lyapunov	network
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/by_kind/check/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/by_kind/check/fraction_late_progress	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/by_kind/check/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/by_kind/check/median_iterations	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/by_kind/check/median_residual	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/by_kind/check/noise	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/by_kind/check/p95_residual	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/by_kind/eval/noise	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/by_kind/oracle/noise	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/fraction_late_progress	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/median_iterations	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/median_residual	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/noise	
+systems/rossler_hyper/handling/cells/V3-cp-horizon/lm/p95_residual	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/by_kind/check/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/by_kind/check/fraction_late_progress	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/by_kind/check/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/by_kind/check/median_iterations	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/by_kind/check/median_residual	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/by_kind/check/noise	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/by_kind/check/p95_residual	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/by_kind/eval/noise	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/by_kind/oracle/noise	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/fraction_late_progress	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/median_iterations	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/median_residual	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/noise	
+systems/rossler_hyper/handling/cells/V4-convergence/lm/p95_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/check/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_late_progress	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_iterations	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/median_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/eval/p95_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_late_progress	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_iterations	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/median_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/by_kind/oracle/p95_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/fraction_late_progress	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/median_iterations	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/median_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=10000|core/lm/p95_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/check/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/eval/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/median_iterations	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/median_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/by_kind/oracle/p95_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/fraction_late_progress	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/median_iterations	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/median_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.01|n_lib=1000|sweep/lm/p95_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/check/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/eval/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/fraction_late_progress	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/median_iterations	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/median_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/by_kind/oracle/p95_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/fraction_above_chi2	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/fraction_late_progress	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/fraction_no_decrease	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/median_iterations	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/median_residual	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/noise	
+systems/rossler_hyper/handling/cells/base|rho=0.02|n_lib=10000|sweep/lm/p95_residual	
+systems/rossler_hyper/km_curves/A*/[]	network
+systems/rossler_hyper/km_curves/A0/[]	cp
+systems/rossler_hyper/km_curves/A1/[]	network
+systems/rossler_hyper/km_curves/A2/[]	network
+systems/rossler_hyper/km_curves/A3/[]	network
+systems/rossler_hyper/km_curves/A4/[]	network
+systems/rossler_hyper/km_curves/A4o/[]	network
+systems/rossler_hyper/km_curves/A5/[]	
+systems/rossler_hyper/oracle_recovery/A4_vs_A4o	network
+systems/rossler_hyper/oracle_recovery/A4_vs_Astar	network
+systems/rossler_hyper/oracle_recovery/A5_vs_Astar	
+systems/rossler_hyper/oracle_recovery/mse_at_href/A*	network
+systems/rossler_hyper/oracle_recovery/mse_at_href/A0	cp
+systems/rossler_hyper/oracle_recovery/mse_at_href/A1	network
+systems/rossler_hyper/oracle_recovery/mse_at_href/A2	network
+systems/rossler_hyper/oracle_recovery/mse_at_href/A3	network
+systems/rossler_hyper/oracle_recovery/mse_at_href/A4	network
+systems/rossler_hyper/oracle_recovery/mse_at_href/A4o	network
+systems/rossler_hyper/oracle_recovery/mse_at_href/A5	
+systems/rossler_hyper/regime_curve/regret_ratio_by_K/2	network
+systems/rossler_hyper/regime_curve/regret_ratio_by_K/3	network
+systems/rossler_hyper/regime_curve/regret_ratio_by_K/4	network
+systems/rossler_hyper/scores/A*/agreement_href	network
+systems/rossler_hyper/scores/A*/km_median_lyapunov	network
+systems/rossler_hyper/scores/A*/mse/0.25LT	network
+systems/rossler_hyper/scores/A*/mse/0.5LT	network
+systems/rossler_hyper/scores/A*/mse/1LT	network
+systems/rossler_hyper/scores/A*/mse/2LT	network
+systems/rossler_hyper/scores/A*/mse/4LT	network
+systems/rossler_hyper/scores/A*/mse_href	network
+systems/rossler_hyper/scores/A*/regret/0.25LT	
+systems/rossler_hyper/scores/A*/regret/0.5LT	
+systems/rossler_hyper/scores/A*/regret/1LT	
+systems/rossler_hyper/scores/A*/regret/2LT	
+systems/rossler_hyper/scores/A*/regret/4LT	
+systems/rossler_hyper/scores/A*/rmst_lyapunov	network
+systems/rossler_hyper/scores/A0/agreement_href	network
+systems/rossler_hyper/scores/A0/km_median_lyapunov	cp
+systems/rossler_hyper/scores/A0/mse/0.25LT	cp
+systems/rossler_hyper/scores/A0/mse/0.5LT	cp
+systems/rossler_hyper/scores/A0/mse/1LT	cp
+systems/rossler_hyper/scores/A0/mse/2LT	cp
+systems/rossler_hyper/scores/A0/mse/4LT	cp
+systems/rossler_hyper/scores/A0/mse_href	cp
+systems/rossler_hyper/scores/A0/regret/0.25LT	network
+systems/rossler_hyper/scores/A0/regret/0.5LT	network
+systems/rossler_hyper/scores/A0/regret/1LT	network
+systems/rossler_hyper/scores/A0/regret/2LT	network
+systems/rossler_hyper/scores/A0/regret/4LT	network
+systems/rossler_hyper/scores/A0/rmst_lyapunov	cp
+systems/rossler_hyper/scores/A1/agreement_href	network
+systems/rossler_hyper/scores/A1/km_median_lyapunov	network
+systems/rossler_hyper/scores/A1/mse/0.25LT	network
+systems/rossler_hyper/scores/A1/mse/0.5LT	network
+systems/rossler_hyper/scores/A1/mse/1LT	network
+systems/rossler_hyper/scores/A1/mse/2LT	network
+systems/rossler_hyper/scores/A1/mse/4LT	network
+systems/rossler_hyper/scores/A1/mse_href	network
+systems/rossler_hyper/scores/A1/regret/0.25LT	network
+systems/rossler_hyper/scores/A1/regret/0.5LT	network
+systems/rossler_hyper/scores/A1/regret/1LT	network
+systems/rossler_hyper/scores/A1/regret/2LT	network
+systems/rossler_hyper/scores/A1/regret/4LT	network
+systems/rossler_hyper/scores/A1/rmst_lyapunov	network
+systems/rossler_hyper/scores/A2/agreement_href	network
+systems/rossler_hyper/scores/A2/km_median_lyapunov	network
+systems/rossler_hyper/scores/A2/mse/0.25LT	network
+systems/rossler_hyper/scores/A2/mse/0.5LT	network
+systems/rossler_hyper/scores/A2/mse/1LT	network
+systems/rossler_hyper/scores/A2/mse/2LT	network
+systems/rossler_hyper/scores/A2/mse/4LT	network
+systems/rossler_hyper/scores/A2/mse_href	network
+systems/rossler_hyper/scores/A2/regret/0.25LT	network
+systems/rossler_hyper/scores/A2/regret/0.5LT	network
+systems/rossler_hyper/scores/A2/regret/1LT	network
+systems/rossler_hyper/scores/A2/regret/2LT	network
+systems/rossler_hyper/scores/A2/regret/4LT	network
+systems/rossler_hyper/scores/A2/rmst_lyapunov	network
+systems/rossler_hyper/scores/A3/agreement_href	network
+systems/rossler_hyper/scores/A3/km_median_lyapunov	network
+systems/rossler_hyper/scores/A3/mse/0.25LT	network
+systems/rossler_hyper/scores/A3/mse/0.5LT	network
+systems/rossler_hyper/scores/A3/mse/1LT	network
+systems/rossler_hyper/scores/A3/mse/2LT	network
+systems/rossler_hyper/scores/A3/mse/4LT	network
+systems/rossler_hyper/scores/A3/mse_href	network
+systems/rossler_hyper/scores/A3/regret/0.25LT	network
+systems/rossler_hyper/scores/A3/regret/0.5LT	network
+systems/rossler_hyper/scores/A3/regret/1LT	network
+systems/rossler_hyper/scores/A3/regret/2LT	network
+systems/rossler_hyper/scores/A3/regret/4LT	network
+systems/rossler_hyper/scores/A3/rmst_lyapunov	network
+systems/rossler_hyper/scores/A4/agreement_href	network
+systems/rossler_hyper/scores/A4/km_median_lyapunov	network
+systems/rossler_hyper/scores/A4/mse/0.25LT	network
+systems/rossler_hyper/scores/A4/mse/0.5LT	network
+systems/rossler_hyper/scores/A4/mse/1LT	network
+systems/rossler_hyper/scores/A4/mse/2LT	network
+systems/rossler_hyper/scores/A4/mse/4LT	network
+systems/rossler_hyper/scores/A4/mse_href	network
+systems/rossler_hyper/scores/A4/regret/0.25LT	network
+systems/rossler_hyper/scores/A4/regret/0.5LT	network
+systems/rossler_hyper/scores/A4/regret/1LT	network
+systems/rossler_hyper/scores/A4/regret/2LT	network
+systems/rossler_hyper/scores/A4/regret/4LT	network
+systems/rossler_hyper/scores/A4/rmst_lyapunov	network
+systems/rossler_hyper/scores/A4o/agreement_href	network
+systems/rossler_hyper/scores/A4o/km_median_lyapunov	network
+systems/rossler_hyper/scores/A4o/mse/0.25LT	network
+systems/rossler_hyper/scores/A4o/mse/0.5LT	network
+systems/rossler_hyper/scores/A4o/mse/1LT	network
+systems/rossler_hyper/scores/A4o/mse/2LT	network
+systems/rossler_hyper/scores/A4o/mse/4LT	network
+systems/rossler_hyper/scores/A4o/mse_href	network
+systems/rossler_hyper/scores/A4o/regret/0.25LT	network
+systems/rossler_hyper/scores/A4o/regret/0.5LT	network
+systems/rossler_hyper/scores/A4o/regret/1LT	network
+systems/rossler_hyper/scores/A4o/regret/2LT	network
+systems/rossler_hyper/scores/A4o/regret/4LT	network
+systems/rossler_hyper/scores/A4o/rmst_lyapunov	network
+systems/rossler_hyper/scores/A5/agreement_href	
+systems/rossler_hyper/scores/A5/km_median_lyapunov	
+systems/rossler_hyper/scores/A5/mse/0.25LT	
+systems/rossler_hyper/scores/A5/mse/0.5LT	
+systems/rossler_hyper/scores/A5/mse/1LT	
+systems/rossler_hyper/scores/A5/mse/2LT	
+systems/rossler_hyper/scores/A5/mse/4LT	
+systems/rossler_hyper/scores/A5/mse_href	
+systems/rossler_hyper/scores/A5/regret/0.25LT	
+systems/rossler_hyper/scores/A5/regret/0.5LT	
+systems/rossler_hyper/scores/A5/regret/1LT	
+systems/rossler_hyper/scores/A5/regret/2LT	
+systems/rossler_hyper/scores/A5/regret/4LT	
+systems/rossler_hyper/scores/A5/rmst_lyapunov	
+systems/rossler_hyper/validation/convergence/10/mean_abs_dev_from_max	network
+systems/rossler_hyper/validation/convergence/10/median_half_width	network
+systems/rossler_hyper/validation/convergence/30/mean_abs_dev_from_max	network
+systems/rossler_hyper/validation/convergence/30/median_half_width	network
+systems/rossler_hyper/validation/cp_median_vpt_lyapunov	cp
+systems/rossler_hyper/validation/crlb_ratio_max	fixture
+systems/rossler_hyper/validation/crlb_ratio_median	fixture
+systems/rossler_hyper/validation/crlb_ratio_min	fixture
+systems/rossler_hyper/validation/delay_jacobian_rel_err	fixture
+systems/rossler_hyper/validation/estimators/('rossler_hyper', 7, 5, 0.01)/val_loss_by_width/32	network
+systems/rossler_hyper/validation/gain_rel_err	fixture
+systems/rossler_hyper/validation/integrator_max_dev_sigma	fixture
+systems/rossler_hyper/validation/km_max_abs_dev	fixture
+systems/rossler_hyper/verification/P2c/cell/noise	
+systems/rossler_hyper/verification/P2c/fraction_switching_draws	
+systems/rossler_hyper/verification/P2c/fraction_violations	
+systems/rossler_hyper/verification/P2c/noise_second_moment/se	
+systems/rossler_hyper/verification/P2c/noise_second_moment/value	
+systems/rossler_hyper/verification/P2c/population/sum_ratio_inf	
+systems/rossler_hyper/verification/P2c/population/z_B	
+systems/rossler_hyper/verification/P2c/tightness/N_over_sqrt_B/max	
+systems/rossler_hyper/verification/P2c/tightness/N_over_sqrt_B/median	
+systems/rossler_hyper/verification/P2c/tightness/N_over_sqrt_B/p90	
+systems/rossler_hyper/verification/P2c/tightness/median_A_over_Bsw	
+systems/rossler_hyper/verification/P2c/tightness/median_Bsw_over_B	
+systems/rossler_hyper/verification/P2c/tightness/median_N2_over_A	
+systems/rossler_hyper/verification/P2c/tolerances/kappa	
+systems/rossler_hyper/verification/P2c/tolerances/tau_N_max	
+systems/rossler_hyper/weight_profile/median/[]	network
+systems/rossler_hyper/weight_profile/q25/[]	network
+systems/rossler_hyper/weight_profile/q75/[]	network
