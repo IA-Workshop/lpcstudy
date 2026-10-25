@@ -16,7 +16,7 @@ Run `/start-session`. If governance is not adopted, or the ledger chain is broke
 - **Web access is reserved to the `researcher` agent.** A hook blocks it everywhere else. Use `/verify-citation` or dispatch `researcher`.
 - **Never rewrite history.** No amend, rebase, force or reset --hard: make a new commit. Records and the ledger are append-only (PRIME.5).
 - **Blast radius only.** Never run the full test suite outside a gate, and never rerun a test without a code change. Use `/test-impact` first (`.claude/rules/test-discipline.md`).
-- **One GPU job at a time,** under the lock. Everything else runs on CPU (the default in settings).
+- **GPU slots.** Development runs use at most two GPU slots, each under its own lock (`LPC_GPU_LOCK=/tmp/lpcstudy-gpu.lock` or `/tmp/lpcstudy-gpu-2.lock`; DEC-0039). A sealed run takes the GPU alone. Everything else runs on CPU (the default in settings).
 - **Never loosen a test, tolerance or criterion to pass** (PRIME.2). Never clip, replace or skip silently: count it and report it (PRIME.4).
 
 ## Commands
@@ -28,23 +28,17 @@ python -m lpcstudy --preset smoke --out runs/dev       # plumbing check (~1 min)
 python3 tools/ledger.py verify && python3 tools/ledger.py status
 ```
 
-- `--seed-id DEV-n` arrives with WU-0001. Until then, runs use DEV-0, the pilot seed.
+- Runs take `--seed-id DEV-n` from `seeds/development_seeds.json`.
 - On the GPU workstation, use `jax[cuda12]==0.11.2`.
 - The owner sets up `.venv` once with `pip install -r requirements.txt`. Further installs prompt.
 
 ## How work flows
 
-- **Plan, cycle and status.** `ROADMAP.md` is the plan (phases A–G, sub-tasks WU-nnnn.k). `DEVELOPMENT_WORKFLOW.md` is the development cycle and the test discipline. `queue.md` is the live status.
-- **Units of work.** Work is done in units, each a file under `docs/agent/records/work/`, with the queue in `queue.md`. Run `/work-unit WU-nnnn`.
-- **The sequence.**
-  1. `planner` writes the plan, with acceptance criteria fixed in advance.
-  2. `applied-mathematician` checks the mathematics and tolerances.
-  3. `developer` implements and tests.
-  4. `/independent-review` runs `reviewer` in a fresh context. Findings R1…Rn go back to the same developer, with at most two fix rounds, then `/refer`.
-  5. The unit closes with evidence.
-- **Audits.** `/audit <scope>`, run by the owner, invokes `critical-elite-auditor`.
-- **Blocked or out of authority?** Run `/refer`, then continue with another unit.
-- **Commits.** Commit often. Messages name the unit and end with `Agent: <model id>`.
+- **Plan and status.** `ROADMAP.md` is the plan. CONF-1 (phases A–G) is promoted (ledger seq 40). The current work is phase I, the follow-on extension study and ablations: it has no deadline and runs until done.
+- **Minimal formality** (ledger seq 42). Do the work directly with one agent per task, fix accuracy problems found, and move on. Review rounds, audits, unit-file logs, decision and incident records and manifest bookkeeping are not required unless the owner asks. Acceptance criteria are still fixed before results are seen.
+- **What stays.** The sealed seed and its script are the owner's; the ledger chain; verdict words and labels exactly as stored; development numbers never beside a sealed result; merges to `main` only with the owner's authorization.
+- **Ledger.** The main session appends entries that record statements the owner approved in chat, quoting the approving words (ledger seq 41).
+- **Commits.** Commit often on unit branches and `develop`. Messages name the unit and end with `Agent: <model id>`.
 
 ## Code conventions
 

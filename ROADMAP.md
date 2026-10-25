@@ -381,3 +381,43 @@ Append, do not edit: a dated block listing WU-0009 to WU-0019 with the dependenc
 | WU-0030 | One-command ledger entry tool `tools/enter.sh` and README process | developer | — | CSQ2 | PRIME.5, M2 of the audit | `tests/unit` for the tool | S |
 | WU-0031 | Gain screen option C: envelope and raw-C fixes and P1(d′) verification row (acceptance criteria in `2026-10-21-draft-gain-screen-decision.md` section 4). Reported-only quantity; no verdict depends on it. | developer | WU-0027 | CSQ3 | DEC-0033 M3, DEC-0040 | per plan | M |
 | WU-0015 to WU-0018 | Records and the report-only check (B1 of the audit) | main session | — | CSQ2 | promotion | none | S |
+
+## 9. Phase I. Follow-on study: confirmatory extension systems and two ablations
+
+**Amended 2026-10-25 (owner ruling "proceed as recommended"; LPC.PC.1 scoped exception of the same date).** Proposed by the main session (claude-opus-5-5). Sections 1 to 8 are unchanged, and CONF-1 is not re-run. This is a follow-on study with no deadline: it runs until done, gated by evidence, not by dates. It does not touch the 10/28 materials.
+
+**Decisions taken (owner, 2026-10-25).**
+
+1. Scope: S1 to S6 enter one pre-registered confirmatory follow-on study (LPC.PC.1 exception).
+2. Admission: a system enters the freeze only if V1 to V7 pass at their v3 §6 criteria on DEV-1, DEV-3 and DEV-4 at the code that is frozen. A system that fails V7 gets at most two estimator-side fixes, for the new systems only, then is reported as not admitted, with its reason. No band, criterion or level changes.
+3. Code review: the owner's review of the extension verdict-reporting code and the system specifications is waived for confirmatory use, on the condition that the researcher checks the S1 to S6 parameter table against Dysts and the literature.
+4. Device: the GPU (RTX 4090) is the official device. Regeneration is a second GPU run on the same host, expected bitwise. A CPU run happens only on a trigger named in the pre-registration, and it informs only; it never replaces or rescues a GPU verdict.
+5. Ablations: both, as pre-specified estimate rows; the A4 coefficient ablation first.
+6. Seeds: three sealed seeds (CONF-2, CONF-3, CONF-4). Verdicts are per seed. A per-system word is promoted only if all three seeds give it; otherwise it is reported as "seed-dependent". No pooling.
+7. The extension code that reached `main` in fe0193b is accepted there.
+
+**Phases.**
+
+| Phase | Units | Gate to the next phase |
+| --- | --- | --- |
+| P0 | WU-0035: settings, hook, CLAUDE.md, this section, ledger rulings | owner approval (given) |
+| P1 | WU-0036 coefficient ablation stage 1 (offline, existing dumps); WU-0037 V7 diagnosis for S2 to S6; WU-0038 `CONF-n` seed ids; WU-0041 pre-registration draft; WU-0044 parameter-table check (researcher) | WU-0036 approximation check passes; WU-0037 diagnosis written |
+| P2 | WU-0039: one code change with the V7 fixes (new systems only), the A4 coefficient variants and the profile ablations | the frozen-pipeline regression and the synthetic references pass |
+| P3 | WU-0040: development runs of every extension system and the three frozen systems on DEV-1, DEV-3 and DEV-4 at the P2 commit | runs complete; failing systems loop back to P2 within their fix budget |
+| P4 | WU-0041: admitted set and final pre-registration | owner approval |
+| P5 | WU-0042: freeze gate, merge to `main`, tag `freeze-x`; the owner seals CONF-2 to CONF-4; one owner command runs the GPU official and GPU regeneration runs | runs complete |
+| P6 | WU-0043: comparison, `--report-only` twice, promotion report, one auditor pass | owner promotion |
+
+**Acceptance criteria (fixed now; a tolerance the applied-mathematician sets before a run may be tightened, never loosened).**
+
+| Unit | Criteria |
+| --- | --- |
+| WU-0036 | For the unchanged A4, the exact quadratic V(w) on the oracle moments, averaged over the evaluation draws, agrees with the stored `state_mse/A4` at H_ref within a tolerance the applied-mathematician states before computing it; if it does not, stage 1 reports no number. Each variant's weight equals the hand formula within 1e-12 relative. Development label on every number. |
+| WU-0037 | For each of S2 to S6, the mechanisms named in the 2026-10-20 specification notes (wrong-basin estimate, nonlinear regime at large ρ) are each tested or marked untested, with the evidence; proposed fixes act on the estimator for that system only. |
+| WU-0038 | The confirmatory flag accepts `CONF-n` and checks the latest `commitment` entry for that id; the CONF-1 path is unchanged (its existing tests pass unedited); tests use ledger fixtures under `tmp_path` only; no real seed appears in any test or output. |
+| WU-0039 | Frozen-system smoke on DEV-0 differs from the pre-change smoke only by added leaves (leafdiff: 0 changed, 0 removed). A4 variants: zero-term weights equal the hand formula within 1e-12; a refit on synthetic data generated without the term recovers the other coefficients within the stated tolerance; the full variant reproduces the stored A4 bitwise. Profile ablation: the drop-N row reproduces the stored Q-N leaves bitwise; on a synthetic target that depends on known conditions, the irrelevant conditions stay within the WU-0006.3 null rate; Shapley shares sum to R²(full) − R²(empty) within 1e-12. New randomness only through new `make_rng` labels. |
+| WU-0040 | One manifest line per run (commit, seed id, device, wall clock, SHA-256 of `results.json`); gate table per system and seed. |
+| WU-0041 | Before any seal, the pre-registration states: the admitted systems; the v3 rows applied per system; the ablation estimate rows with their reading table and written predictions; the seed-combination rule; the CPU trigger; the S1 start-state refusal handling; the known limitations. |
+| WU-0042 | Freeze gate green (all tiers, `LPC_GATE=freeze-x`); tag on `main`; commitments for CONF-2 to CONF-4 in the ledger; seed values in no output. |
+| WU-0043 | Regeneration bitwise equal (tier T0) on every compared leaf; `--report-only` byte-identical twice; every reported number traced to `results.json`; auditor pass with zero blockers. |
+| WU-0044 | Every S1 to S6 equation and parameter matches a cited source (Dysts entry or the original paper), with a quote; a mismatch is reported, never silently fixed. |

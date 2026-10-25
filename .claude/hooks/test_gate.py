@@ -5,7 +5,8 @@ for the confirmatory path (LPC.PC.7). It blocks, with exit code 2 and a reason:
 
 1. any command that uses the confirmatory path or the seal script;
 2. a ``pilot`` or ``full`` preset run that does not hold the GPU lock (``flock``)
-   and is not started through ``tools/run_preset.sh``;
+   and is not started through ``tools/run_preset.sh`` (``--report-only`` runs are
+   exempt: they recompute nothing);
 3. a whole-suite pytest run (no test path, or the bare ``tests`` directory)
    unless the command sets ``LPC_GATE=<gate>``, which only the main session
    uses at a gate of §4.3.
@@ -29,6 +30,29 @@ def block(reason: str) -> None:
     """Print the reason for Claude and block the tool call."""
     print(reason, file=sys.stderr)
     sys.exit(2)
+
+
+def heavy_run_unlocked(segment: str) -> bool:
+    """Say whether one command segment starts a pilot or full run without the lock.
+
+    A ``--report-only`` run recomputes nothing (it rewrites the report from a
+    stored ``results.json``), so it needs no GPU lock even with ``--preset full``.
+
+    Parameters
+    ----------
+    segment : str
+        One simple command of the shell command line.
+
+    Returns
+    -------
+    bool
+        True when the segment must be blocked.
+    """
+    if not re.search(r"--preset\s+(pilot|full)\b", segment):
+        return False
+    if "--report-only" in segment:
+        return False
+    return not ("flock" in segment or "run_preset.sh" in segment)
 
 
 def pytest_targets(tokens: list[str]) -> list[list[str]]:
@@ -76,8 +100,7 @@ def main() -> None:
     command = payload.get("tool_input", {}).get("command", "") or ""
     if re.search(r"--confirmatory|seal_confirmatory_seed", command):
         block("The confirmatory path and the seal script are owner-only (LPC.PC.7, LPC.AUTH.6).")
-    if re.search(r"--preset\s+(pilot|full)\b", command) and not (
-            "flock" in command or "run_preset.sh" in command):
+    if any(heavy_run_unlocked(segment) for segment in re.split(r"[;&|]+", command)):
         block("pilot/full runs must hold the GPU lock: use tools/run_preset.sh, or until it "
               "exists `flock -n ${LPC_GPU_LOCK:-/tmp/lpcstudy-gpu.lock} env JAX_PLATFORMS=cuda "
               "python -m lpcstudy --preset ...` in the background (DEVELOPMENT_WORKFLOW.md §4.5).")
