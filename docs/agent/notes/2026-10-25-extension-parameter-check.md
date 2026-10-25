@@ -179,3 +179,50 @@ Summary S6: 8 match, 4 mismatch (all Dysts stored Lyapunov fields), 1 unconfirme
 ## 8. Retrieval list (the hook recorded these in the main checkout's network-log.jsonl, lines 416-445)
 
 Dysts `flows.py` (1), Dysts JSON (2 fetches, two halves), arxiv chao-dyn/9909029, arxiv 2605.10685 (pdf, html twice), Springer chapter (redirect), doi 10.1016/j.chaos.2005.08.013 (redirect), ScienceDirect S0960077905006223 (403), doi 10.1016/0375-9601(79)90150-6 (redirect), Wikipedia Lorenz_96_model, Rössler_attractor, Lorenz_system, Hyperchaos, ECMWF Lorenz 1996 PDF, math.la.asu.edu Pomeau_Manneville_1.pdf, arxiv 1412.2242, eaps4.mit.edu (host not found), journals.ametsoc.org (403), scholarpedia (certificate expired); 8 web searches.
+
+
+## 9. Follow-up of 2026-10-25 (coordinator request after commit bfefa93): S5, S4, S6
+
+Appended text; sections 0 to 8 unchanged. (Written to a separate file because this agent has no append or edit tool; append with `cat`.) Agent: researcher (claude-sonnet-5-5). Status words as in section 0.
+
+### 9.1 S5: arXiv:2605.10685 read directly (not through a summariser)
+
+Source: https://arxiv.org/pdf/2605.10685 (v3, 4.2 MB PDF, page images read directly; the PDF page numbers below are the printed page numbers). Title: "GESR: A Genetic Programming-Based Symbolic Regression Method with Gene Editing".
+
+| Item | Verbatim reading | Page | Status |
+|---|---|---|---|
+| Table 10, row HyperJha | Governing equations: `x' = a(y - x) + w`, `y' = -xz + bx - y`, `z' = xy - cz`, `w' = -xz + dw`. Parameters: `a : 10, b : 28, c : 2.667, d : 1.3` | p.48 | match to Dysts and to the code (term by term, values) |
+| Table 10, row HyperLorenz | `x' = a(y - x) + w`, `y' = -xz + cx - y`, `z' = -bz + xy`, `w' = dw - xz`; `a : 10, b : 2.667, c : 28, d : 1.1` | p.48 | same as its Eq. (8) |
+| Section J.1 item 3, Eq. (9) | "3. Hyper-Jha System (Four-Dimensional Hyperchaos) [46] The Hyper-Jha system is another Lorenz-type four-dimensional hyperchaotic system described by: x' = a(y - x) + w, y' = cx - y - xz, z' = xy - bz, w' = -dy" (no parameter values). Following text: "Unlike the Hyper-Lorenz system, Hyper-Jha introduces a linear decay term -dy in the auxiliary state equation" | p.51 | confirmed: Eq. (9) differs from Table 10 in y' (`cx` for `bx`), z' (`bz` for `cz`) and w' (`-dy` for `-xz + dw`); with b and c swapped, Eq. (9) is Eq. (8) with w' = -dy |
+| Eq. (8) (Hyper-Lorenz) | `x' = a(y - x) + w`, `y' = cx - y - xz`, `z' = xy - bz`, `w' = dw - xz`; `a = 10, b = 2.667, c = 28, d = 1.1` | p.50 | consistent with Table 10 for Hyper-Lorenz |
+| Reference [46] | "Jha, R.: Hyperchaos generated from a modified lorenz system. Chaos, Solitons & Fractals 13(9), 1965-1971 (2002)" | p.20 | confirmed text; the paper itself not retrieved |
+| Reference [45] | "Rössler, O.E.: An equation for hyperchaos. Physics Letters A 71(2-3), 155-157 (1979)" | p.19 | confirmed text |
+
+Reading. Eq. (9) is a different system from Table 10's HyperJha, not a transcription slip of one term: three of four right-hand sides differ, and the paper's own prose ("a linear decay term -dy") describes Eq. (9), not Table 10. The paper does not say which of the two its experiments used; Table 10 carries the parameter values, which Eq. (9) lacks, and Table 10's values and names equal Dysts' (`a 10, b 28, c 2.667, d 1.3`), so Table 10 is most probably the benchmark data (Dysts-derived) and Eq. (9) the prose description. That is an inference, not a statement in the paper. Neither is shown to be Jha's 2002 system. The paper's Table 10 therefore does not independently fix the field (it copies Dysts), and Eq. (9) is a conflicting description whose origin I could not determine.
+
+Independent or primary source for the HyperJha field: **none found.**
+- Jha 2002 (Chaos, Solitons & Fractals 13(9) 1965-1971): two further searches (exact title; title plus equation forms) returned no abstract page or reprint; no ScienceDirect access.
+- Meier 2003 chapter (doi 10.1007/978-3-540-24699-2_13): Springer authorisation redirect; the author's site http://www.3d-meier.de/ failed with a certificate error (host not in the certificate).
+- A citing paper that reprints the equations: arXiv:1504.00811 (Kuznetsov and Sedova, read directly, p.1) gives a different four-variable modified Lorenz system (`x' = a(y - x) + eyz`, `y' = cx - dxz + y + u`, `z' = xy - bz`, `u' = -ky`, cited to Chen et al.), not Jha's. Search summaries volunteered "w' = -dy" for Jha; that is the same arXiv:2605.10685 prose, not a new source.
+Status S5: **unresolved.** Dysts = code; the only secondary text offers two incompatible forms; no primary text read.
+
+### 9.2 S4: Marhl and Perc 2005
+
+Second route tried: two further web searches (author and journal; DOI and title; one for the Dysts parameter values 0.0322, tx, tz in the earlier extended search) returned no page for the paper (none carries doi 10.1016/j.chaos.2005.08.013) and no citing paper that reprints the Dysts form (the ones returned give the standard form with r, e.g. a = 1, b = 3, c = 1, d = 5, s = 4). ScienceDirect abstract page: HTTP 403 (section 0). Status S4: **provenance limited (spec = Dysts).**
+
+### 9.3 S6: F = 20 at N = 4
+
+One further search for "N = 4" with "F = 20" returned no source with a Lorenz-96 spectrum or equation at F = 20, N = 4. arXiv:2509.21802 (ChaosNexus) was fetched; its text layer was unreadable and the summariser found no Dysts system list, so nothing was confirmed. Lorenz's own paper uses F = 15 and 18 at K = 4 (section 6). Status S6: no source besides Dysts for F = 20 at N = 4; the equation and cyclic form are confirmed (Lorenz Eq. 1). **provenance limited (spec = Dysts)** for the parameter F = 20 only.
+
+### 9.4 One line per system
+
+- S1 rossler_hyper: resolved (equations and parameters confirmed by Dysts plus Ramasubramanian and Sriram and Wikipedia).
+- S2 lorenz63_r166: resolved (Manneville and Pomeau 1980).
+- S3 rossler_z: resolved (Dysts plus Wikipedia).
+- S4 hindmarsh_rose: provenance limited (spec = Dysts).
+- S5 hyper_jha: unresolved (Dysts = code; secondary source has two incompatible forms, Table 10 equal to Dysts and Eq. (9) different; no primary text).
+- S6 lorenz96_4: resolved for the equation (Lorenz 1996 Eq. 1); provenance limited (spec = Dysts) for F = 20.
+
+### 9.5 Retrievals of this follow-up (logged by the hook in the main checkout)
+
+Direct reads of the saved PDF of arXiv 2605.10685 (pp.19-21, 40-43, 46-53, 58-60 of the PDF), https://arxiv.org/pdf/1504.00811, https://arxiv.org/pdf/2509.21802, http://www.3d-meier.de/ (certificate error); 5 web searches.
