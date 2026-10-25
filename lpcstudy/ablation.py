@@ -380,8 +380,9 @@ def refit_variant(
     Returns
     -------
     tuple[ProfileProxies, dict]
-        The variant, and a record of the refit coefficient (``value``,
-        ``max_term_share`` of the partner, ``nfev``, ``status``).
+        The variant, and a record: ``partner`` (the refitted coefficient),
+        ``partner_value``, ``nfev``, ``status`` and ``coefficients`` (the
+        variant's four coefficients, the removed one 0).
     """
     proxy_name, field = COEFFICIENTS[name]
     f_key, g_key, seed_key = PROXY_COLUMNS[proxy_name]
@@ -393,10 +394,20 @@ def refit_variant(
         else SeedProxy(slope=float(value), floor=0.0, nfev=nfev, status=status)
     )
     variant = replace(proxies, **{proxy_name: refit})
+    partner = next(
+        k
+        for k, (p, f) in COEFFICIENTS.items()
+        if p == proxy_name and f != field
+    )
     return variant, {
+        "partner": partner,
         "partner_value": float(value),
         "nfev": nfev,
         "status": status,
+        "coefficients": {
+            k: float(getattr(getattr(variant, p), f))
+            for k, (p, f) in COEFFICIENTS.items()
+        },
     }
 
 
@@ -462,17 +473,6 @@ def a4_coefficient_block(
     for name in COEFFICIENTS:
         variants[f"zero/{name}"] = zero_variant(proxies, name)
         variant, record = refit_variant(proxies, design, name)
-        proxy_name, field = COEFFICIENTS[name]
-        partner = next(
-            k
-            for k, (p, f) in COEFFICIENTS.items()
-            if p == proxy_name and f != field
-        )
-        record["partner"] = partner
-        record["coefficients"] = {
-            k: float(getattr(getattr(variant, p), f))
-            for k, (p, f) in COEFFICIENTS.items()
-        }
         variants[f"refit/{name}"] = variant
         extra[f"refit/{name}"] = record
 

@@ -255,7 +255,12 @@ def test_zero_variant_weight_equals_the_hand_formula(world, name: str) -> None:
     divides positive terms, a few ulps (about 1e-15) in all.
     """
     proxies = world.rules.proxies
-    test = world.core.splits["test"].evals
+    # Raise nu_hat above the construction cap on the first ten states, so the
+    # cap is exercised (the hand formula caps nu itself).
+    evals = world.core.splits["test"].evals
+    est_nu = evals.est_nu.copy()
+    est_nu[:10] = 2.0 * proxies.nu_cap
+    test = replace(evals, est_nu=est_nu)
     coef = {
         "a": proxies.analog.slope,
         "b": proxies.analog.floor,
@@ -270,7 +275,7 @@ def test_zero_variant_weight_equals_the_hand_formula(world, name: str) -> None:
     eps2 = coef["a"] * test.distance**2 * nu**2 + coef["b"] * rho2 * nu**2
     hand = delta2 / (eps2 + delta2)
     got, floored = ablation.a4_weight(
-        ablation.zero_variant(proxies, name), world.core.splits["test"], NOISE
+        ablation.zero_variant(proxies, name), SimpleNamespace(evals=test), NOISE
     )
     assert floored == {"entries": 0, "states": 0}
     np.testing.assert_allclose(got, hand, rtol=1e-12, atol=0.0)

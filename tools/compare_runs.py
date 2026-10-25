@@ -1407,7 +1407,7 @@ def _build_tags() -> list[cp.Rule]:
             "network",
             f"{S}/ablation/A4_coefficients/{{coefficients,full,variants}}/** "
             f"{S}/ablation/profile_conditions/{{deployable,oracle}}/** "
-            f"{S}/ablation/A5_without_condition/{{full,without}}/**",
+            f"{S}/ablation/A5_without_condition/without/**",
             "ablation.py:ablation_block (WU-0039b): A4 variants from "
             "allocation.py:ProfileProxies (fitted on the estimated nu) scored "
             "by pipeline.py:score_rules on the PLP errors; the Q-N targets "
