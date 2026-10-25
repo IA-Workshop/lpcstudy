@@ -92,7 +92,9 @@ def test_frozen_specs_equal_the_freeze_1_literals() -> None:
     Reference: the literals below, copied from ``git show freeze-1:
     lpcstudy/systems.py`` (the ratified registry, DEC-0017 Q1 and DEC-0026
     item 3), plus ``lyapunov_steps = 100_000``, the literal that
-    ``data.lyapunov_record`` used before the field existed.
+    ``data.lyapunov_record`` used before the field existed, and
+    ``estimator_starts = ("network",)``, the single network start of the
+    frozen estimator (WU-0039).
 
     Tolerance: none; exact equality of floats, tuples and dicts, and identity
     of the field functions.
@@ -106,6 +108,7 @@ def test_frozen_specs_equal_the_freeze_1_literals() -> None:
             max_dt=0.01,
             orbit_bound=40.0,
             lyapunov_steps=100_000,
+            estimator_starts=("network",),
             field_fn=systems.lorenz63_field,
         ),
         "rossler": dict(
@@ -116,6 +119,7 @@ def test_frozen_specs_equal_the_freeze_1_literals() -> None:
             max_dt=0.04,
             orbit_bound=25.0,
             lyapunov_steps=100_000,
+            estimator_starts=("network",),
             field_fn=systems.rossler_field,
         ),
         "chua": dict(
@@ -126,6 +130,7 @@ def test_frozen_specs_equal_the_freeze_1_literals() -> None:
             max_dt=0.005,
             orbit_bound=3.0,
             lyapunov_steps=100_000,
+            estimator_starts=("network",),
             field_fn=systems.chua_field,
         ),
     }
@@ -174,7 +179,9 @@ def test_extension_specs_equal_the_specification_values() -> None:
     """The extension specs equal specification note section 0, field by field.
 
     Reference: the table of section 0, typed here (not read from the code).
-    Tolerance: none; exact equality.
+    ``estimator_starts`` is fix F1 of the V7 diagnosis (note 2026-10-25,
+    section 6) on S2, S4, S5 and S6 only, typed here (WU-0039). Tolerance:
+    none; exact equality.
     """
     expected = {
         "rossler_hyper": dict(
@@ -185,6 +192,7 @@ def test_extension_specs_equal_the_specification_values() -> None:
             max_dt=0.005,
             orbit_bound=460.0,
             lyapunov_steps=2_000_000,
+            estimator_starts=("network",),
         ),
         "lorenz63_r166": dict(
             params={"sigma": 10.0, "rho": 166.1, "beta": 8.0 / 3.0},
@@ -194,6 +202,7 @@ def test_extension_specs_equal_the_specification_values() -> None:
             max_dt=0.002,
             orbit_bound=185.0,
             lyapunov_steps=4_000_000,
+            estimator_starts=("network", "pair"),
         ),
         "rossler_z": dict(
             params={"a": 0.2, "b": 0.2, "c": 5.7},
@@ -203,6 +212,7 @@ def test_extension_specs_equal_the_specification_values() -> None:
             max_dt=0.04,
             orbit_bound=50.0,
             lyapunov_steps=1_000_000,
+            estimator_starts=("network",),
         ),
         # Specification note 2, section 0 (S4 to S6).
         "hindmarsh_rose": dict(
@@ -221,6 +231,7 @@ def test_extension_specs_equal_the_specification_values() -> None:
             max_dt=0.0025,
             orbit_bound=5.0,
             lyapunov_steps=2_000_000,
+            estimator_starts=("network", "pair"),
         ),
         "hyper_jha": dict(
             params={"a": 10.0, "b": 28.0, "c": 2.667, "d": 1.3},
@@ -230,6 +241,7 @@ def test_extension_specs_equal_the_specification_values() -> None:
             max_dt=0.0025,
             orbit_bound=80.0,
             lyapunov_steps=2_000_000,
+            estimator_starts=("network", "pair"),
         ),
         "lorenz96_4": dict(
             params={"F": 20.0},
@@ -239,6 +251,7 @@ def test_extension_specs_equal_the_specification_values() -> None:
             max_dt=0.005,
             orbit_bound=60.0,
             lyapunov_steps=1_000_000,
+            estimator_starts=("network", "pair"),
         ),
     }
     for name, fields in expected.items():
