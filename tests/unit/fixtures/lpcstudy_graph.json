@@ -4,6 +4,7 @@
   "graph": {
     "__init__": [],
     "__main__": ["config", "dump", "experiments", "pipeline", "provenance", "report", "seeds"],
+    "ablation": ["allocation", "analysis", "config", "data", "oracle", "pipeline", "statistics"],
     "allocation": ["data", "ensemble", "networks", "oracle", "provenance", "statistics"],
     "analysis": ["allocation", "config", "data", "dump", "identifiers", "oracle", "pipeline", "statistics"],
     "budget": ["config", "identifiers"],
@@ -15,7 +16,7 @@
     "embedding": [],
     "ensemble": ["data", "dynamics", "embedding", "estimation"],
     "estimation": ["data", "dynamics", "networks"],
-    "experiments": ["allocation", "analysis", "clip_sensitivity", "config", "data", "dump", "dynamics", "embedding", "ensemble", "identifiers", "oracle", "pipeline", "provenance", "validation"],
+    "experiments": ["ablation", "allocation", "analysis", "clip_sensitivity", "config", "data", "dump", "dynamics", "embedding", "ensemble", "identifiers", "oracle", "pipeline", "provenance", "validation"],
     "identifiers": [],
     "networks": ["provenance"],
     "oracle": ["data", "dynamics", "ensemble", "systems"],
