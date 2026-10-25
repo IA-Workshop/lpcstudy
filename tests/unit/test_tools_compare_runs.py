@@ -2579,6 +2579,11 @@ def concrete(shape: str) -> tuple[str, ...]:
 
 
 ALL_SHAPES = {name: read_shapes(name) for name in FIXTURE_FILES}
+WU0039B_FIXTURE = "wu0039b_smoke_float_paths.txt"
+"""Float-leaf shapes of the WU-0039b smokes (DEV-0): the frozen-system smoke
+(lorenz63, rossler, chua) and the extension smoke (rossler_hyper), which carry
+the ``ablation`` block and the extension estimators' ``val_loss_by_width``."""
+WU0039B_SHAPES = read_shapes(WU0039B_FIXTURE)
 
 
 def test_the_schema_fixtures_hold_paths_and_old_chains_only() -> None:
@@ -2640,6 +2645,70 @@ def test_no_float_leaf_of_the_pilot_schema_is_untagged(name: str) -> None:
         shape for shape in ALL_SHAPES[name] if not cr.chain_of(concrete(shape))
     ]
     assert untagged == []
+
+
+def test_no_float_leaf_of_the_wu0039b_smokes_is_untagged() -> None:
+    """C4 for the leaves WU-0039b adds: the untagged set is EMPTY.
+
+    Reference: the shapes of every float leaf of two DEV-0 smoke runs at the
+    WU-0039b commit (``WU0039B_FIXTURE``, paths only): the frozen-system smoke,
+    which carries the ``ablation`` block of each v3 system, and the extension
+    smoke (``--systems rossler_hyper``), whose ``estimators`` keys were
+    untagged before (``val_loss_by_width``). An untagged float leaf is NOT
+    COMPUTABLE (exit 2), so the comparison of two such runs needs this set
+    empty (M-7 of WU-0041b). The fixture must hold both kinds of leaf. No
+    shape matches two overrides or shadows a ``compare_pilot`` tag. Exact.
+    """
+    shapes = WU0039B_SHAPES
+    assert any("/ablation/A4_coefficients/" in s for s in shapes)
+    assert any("/ablation/profile_conditions/" in s for s in shapes)
+    assert any("/ablation/A5_without_condition/" in s for s in shapes)
+    assert any(s.startswith("systems/rossler_hyper/ablation/") for s in shapes)
+    assert any(
+        s.startswith("estimators/('rossler_hyper'")
+        and "/val_loss_by_width/" in s
+        for s in shapes
+    )
+    untagged = [s for s in shapes if not cr.chain_of(concrete(s))]
+    assert untagged == []
+    for shape in shapes:
+        path = concrete(shape)
+        found = cr.TAGS.matches(path)
+        assert len(found) <= 1, (shape, [t.pattern for t in found])
+        try:
+            table_chain = cr.cp.TABLE.classify(path).chain
+        except cr.cp.ToolError:
+            table_chain = ""
+        assert not (table_chain and found), (shape, found[0].pattern)
+
+
+def test_ablation_leaves_take_the_network_chain_and_levels_are_fixture() -> (
+    None
+):
+    """The chain of the new leaves follows the producing code.
+
+    Reference: ``lpcstudy/ablation.py`` by hand. Every ablation number reads
+    the PLP errors, ``w*`` or the proxies fitted on the estimated ``nu``
+    (network); the levels and the echoed core noise are constants (fixture).
+    The extension estimators' validation loss is network, as the v3 rows of
+    ``compare_pilot``. Exact strings.
+    """
+    for shape in WU0039B_SHAPES:
+        if "/ablation/" not in shape:
+            continue
+        want = (
+            "fixture"
+            if shape.endswith(("/level", "/cell/noise"))
+            else "network"
+        )
+        assert cr.chain_of(concrete(shape)) == want, shape
+    leaf = (
+        "estimators",
+        "('rossler_hyper', 7, 5, 0.01)",
+        "val_loss_by_width",
+        "32",
+    )
+    assert cr.chain_source(leaf)[:2] == ("network", "override")
 
 
 # the one documented change of an existing chain (review R2): a tightening,
@@ -2753,7 +2822,7 @@ def test_every_override_matches_a_fixture_leaf_with_wildcards() -> None:
     no literal list index and no literal system name.
     """
     used = set()
-    for shapes in ALL_SHAPES.values():
+    for shapes in (*ALL_SHAPES.values(), WU0039B_SHAPES):
         for shape in shapes:
             used.update(t.pattern for t in cr.TAGS.matches(concrete(shape)))
     assert (
