@@ -20,6 +20,13 @@ unbiased estimator can reach) to first order in the noise level ``rho``
 (validation V2); stage 1 only provides the basin of attraction. The
 deployable observability proxy is ``nu`` evaluated at the refined estimate.
 
+Stage 2 runs from the network start alone, except on a system whose
+``SystemSpec.estimator_starts`` names more starts (WU-0039, fixes F1 and F2
+of the V7 diagnosis note 2026-10-25). The refinement then runs from each
+start and keeps the estimate with the strictly lowest final cost; ties go to
+the network start. The choice is made in Python before tracing, so the
+single-start systems compile the unchanged function.
+
 ``dynamics.py`` supplies the delay map and ``nu``; ``ensemble.py`` calls
 ``StateEstimator`` to build PLP forecasts; ``lm_summary`` condenses the LM
 diagnostics for the reports.
@@ -35,10 +42,12 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from scipy import stats
+from scipy.spatial import cKDTree
 
 from .data import SystemContext
 from .dynamics import delay_map_forward, make_observability
 from .networks import TrainedNetwork
+from .systems import SINGLE_START, check_starts
 
 LATE_WINDOW: int = 3
 """Last LM iterations that ``late_progress`` looks at (D1, DEC-0025)."""
@@ -48,6 +57,19 @@ LATE_DECREASE: float = 1e-6
 
 GOF_QUANTILE: float = 0.999
 """Level of the chi-square quantile ``gof_threshold`` (D3, DEC-0025)."""
+
+CONTINUATION_STEPS: int = 5
+"""LM iterations of each stage of the ``continuation`` start (F2, WU-0039).
+
+The value is the one the V7 diagnosis tested (note 2026-10-25, section 3)."""
+
+START_DECREASE: float = 1e-6
+"""Relative cost decrease that makes a switch of start *material* (WU-0039).
+
+A non-network start is selected whenever its final cost is strictly lower,
+which happens often by round-off between two fits of the same minimum. Only
+a decrease above this fraction of the network cost counts as a change of
+basin (``lm_start_switched_material``; note 2026-10-25, section 6 item 4)."""
 
 
 def gof_threshold(dof: int) -> float:
@@ -125,6 +147,23 @@ class LMDiagnostics:
         moving at the iteration budget. Report-only. Without noise the cost
         sits at the round-off floor, where null-step accepts lower it by large
         relative amounts, so the flag means nothing there.
+    start_selected : np.ndarray or None
+        Integer ``(n,)``: the index into ``StateEstimator.starts`` of the
+        selected start (0 is the network). ``None`` for a single start.
+    start_material : np.ndarray or None
+        Bool ``(n,)``: a non-network start was selected and its final cost is
+        lower than the network run's by more than ``START_DECREASE``
+        relative (or the network run's cost is infinite). ``None`` for a
+        single start.
+
+    Notes
+    -----
+    With several starts (WU-0039), ``residual``, ``accepted`` and
+    ``late_progress`` are those of the selected run (for the continuation
+    start, of its final full-window refinement). ``nonfinite_cost`` and
+    ``nonfinite_jacobian`` are the union over every run and stage made for
+    the estimate, so a handling event in a run that was not selected is
+    still counted.
     """
 
     residual: np.ndarray
@@ -132,6 +171,8 @@ class LMDiagnostics:
     nonfinite_cost: np.ndarray
     nonfinite_jacobian: np.ndarray
     late_progress: np.ndarray
+    start_selected: np.ndarray | None = None
+    start_material: np.ndarray | None = None
 
 
 class Refinement(NamedTuple):
@@ -157,6 +198,19 @@ class StateEstimator:
         Flow map of the model used for refinement and for ``nu``.
     refine_steps : int
         Levenberg-Marquardt iterations (0 disables refinement).
+    starts : tuple[str, ...]
+        Starts of the refinement (``systems.ESTIMATOR_STARTS``; WU-0039). The
+        default ``("network",)`` builds the single-start function of the
+        frozen pipeline, unchanged. With more starts the refinement runs
+        ``refine_steps`` iterations from each and keeps the strictly lowest
+        final cost (ties go to the earlier start, so to the network): see
+        :meth:`pair_index` and :meth:`continuation`. Several starts need
+        ``refine_steps >= 1``.
+    start_counts : dict[str, int]
+        Running tally of the start selections over every call of
+        :meth:`estimate_counted` (several starts only; see
+        :meth:`start_record`). Not an init argument, so
+        ``dataclasses.replace`` starts a fresh tally.
 
     Notes
     -----
@@ -182,7 +236,28 @@ class StateEstimator:
     network: TrainedNetwork
     model_step: Callable
     refine_steps: int = 6
+    starts: tuple[str, ...] = SINGLE_START
     _fn: Callable | None = field(default=None, repr=False)
+    start_counts: dict[str, int] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    _tree: cKDTree | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Check ``starts`` (``systems.check_starts``) and the iterations.
+
+        Raises
+        ------
+        ValueError
+            If ``starts`` is invalid, or names several starts with
+            ``refine_steps < 1`` (a selection by final cost needs a fit).
+        """
+        check_starts(self.starts)
+        if self.starts != SINGLE_START and self.refine_steps < 1:
+            raise ValueError(
+                f"several starts {self.starts} need refine_steps >= 1, got "
+                f"{self.refine_steps}"
+            )
 
     @property
     def width(self) -> int:
@@ -309,8 +384,285 @@ class StateEstimator:
             refine=refine, trace=trace, cost=cost, generate=generate
         )
 
+    def continuation(self) -> Callable:
+        """Build the window-continuation start of F2 (one estimate).
+
+        From a start ``u0`` it runs LM on the ``j`` oldest delay coordinates
+        only, for ``j = m + 1, ..., D - 1`` in turn (``m`` state components),
+        ``CONTINUATION_STEPS`` iterations per stage with the damping restarted
+        at ``1e-3``. The newer coordinates are masked out of the residual and
+        the Jacobian. The step arithmetic is that of :meth:`refinement` with
+        the 0/1 mask applied, as in the V7 diagnosis (note 2026-10-25,
+        section 3, ``cont``). With ``D <= m + 1`` there is no stage and the
+        start is ``u0`` itself.
+
+        Returns
+        -------
+        Callable
+            ``settle(u0, target) -> (u, nonfinite_cost, nonfinite_jacobian)``.
+            The flags say that some masked cost was not finite (mapped to
+            ``inf``, the step rejected) or that some Jacobian entry, masked
+            or not, was not finite (set to 0), in any stage.
+        """
+        ctx = self.ctx
+        root = jnp.asarray(ctx.unwhiten)
+        mean = jnp.asarray(ctx.state_mean)
+        fwd = delay_map_forward(
+            self.model_step,
+            ctx.spec.observed_index,
+            ctx.obs_mean,
+            ctx.obs_scale,
+            ctx.delay,
+            ctx.embed_dim,
+        )
+        big_d = ctx.embed_dim
+        dim = int(root.shape[1])
+        # X_t[k] observes the window start advanced by (D - 1 - k) tau, so the
+        # oldest coordinate is the last one (delay_map_forward).
+        masks = [
+            jnp.asarray(np.r_[np.zeros(big_d - j), np.ones(j)])
+            for j in range(dim + 1, big_d)
+        ]
+
+        def generate(u: jnp.ndarray) -> jnp.ndarray:
+            return fwd(mean + root @ u)
+
+        jac = jax.jacfwd(generate)
+
+        def cost(u, target, mask):
+            resid = (target - generate(u)) * mask
+            value = jnp.sum(resid**2)
+            return jnp.where(jnp.isfinite(value), value, jnp.inf)
+
+        def stage(u0, target, mask):
+            def body(carry, _):
+                u, c_u, damping, bad_cost, bad_jac = carry
+                a_mat = jac(u)
+                finite = jnp.isfinite(a_mat)
+                a_mat = jnp.where(finite, a_mat, 0.0) * mask[:, None]
+                normal = a_mat.T @ a_mat
+                rhs = a_mat.T @ ((target - generate(u)) * mask)
+                scale = jnp.trace(normal) / dim + 1e-12
+                delta = jnp.linalg.solve(
+                    normal + damping * scale * jnp.eye(dim), rhs
+                )
+                cand = u + delta
+                c_cand = cost(cand, target, mask)
+                accept = c_cand < c_u
+                return (
+                    jnp.where(accept, cand, u),
+                    jnp.where(accept, c_cand, c_u),
+                    jnp.where(accept, damping / 3.0, damping * 4.0),
+                    bad_cost | jnp.isinf(c_cand),
+                    bad_jac | ~jnp.all(finite),
+                ), None
+
+            c0 = cost(u0, target, mask)
+            carry, _ = jax.lax.scan(
+                body,
+                (u0, c0, 1e-3, jnp.isinf(c0), jnp.bool_(False)),
+                None,
+                length=CONTINUATION_STEPS,
+            )
+            return carry[0], carry[3], carry[4]
+
+        def settle(u0: jnp.ndarray, target: jnp.ndarray):
+            u, bad_cost, bad_jac = u0, jnp.bool_(False), jnp.bool_(False)
+            for mask in masks:
+                u, stage_cost, stage_jac = stage(u, target, mask)
+                bad_cost = bad_cost | stage_cost
+                bad_jac = bad_jac | stage_jac
+            return u, bad_cost, bad_jac
+
+        return settle
+
+    def pair_index(self, inputs: np.ndarray) -> np.ndarray:
+        """Return the nearest estimator training pair of each input (F1).
+
+        The search is over ``ctx.estimator_inputs``, the noise-free
+        normalized delay vectors the network was trained on, by Euclidean
+        distance (``scipy.spatial.cKDTree``, built once per estimator). It is
+        exact, deterministic and host-side, and it draws no random number.
+        The ``pair`` start of row ``i`` is ``ctx.estimator_targets[index[i]]``,
+        a whitened window-start state on the attractor. It uses PLP's own
+        training data only, never the analog library.
+
+        Parameters
+        ----------
+        inputs : np.ndarray
+            Noisy normalized delay vectors ``(n, D)``, finite.
+
+        Returns
+        -------
+        np.ndarray
+            Integer row indices ``(n,)``.
+
+        Raises
+        ------
+        ValueError
+            If ``inputs`` is not ``(n, D)`` or has a non-finite entry.
+        """
+        inputs = np.asarray(inputs, dtype=np.float64)
+        if inputs.ndim != 2 or inputs.shape[1] != self.ctx.embed_dim:
+            raise ValueError(
+                f"inputs must be (n, {self.ctx.embed_dim}), got {inputs.shape}"
+            )
+        if not np.isfinite(inputs).all():
+            raise ValueError("an input of the pair search is not finite")
+        if self._tree is None:
+            self._tree = cKDTree(
+                np.asarray(self.ctx.estimator_inputs, dtype=np.float64)
+            )
+        _, index = self._tree.query(inputs, k=1)
+        return np.asarray(index, dtype=np.int64)
+
+    def start_record(self) -> dict:
+        """Return the tally of the start selections (several starts only).
+
+        Returns
+        -------
+        dict
+            ``starts`` (the names), ``estimates`` (estimates made),
+            ``selected`` (per start name, the estimates that kept it),
+            ``lm_start_switched`` (estimates that kept a non-network start)
+            and ``lm_start_switched_material`` (those whose cost was lower by
+            more than ``START_DECREASE`` relative; see ``LMDiagnostics``).
+            Every count is 0 before the first call.
+        """
+        counts = self.start_counts
+        selected = {
+            name: int(counts.get(f"selected/{name}", 0)) for name in self.starts
+        }
+        return {
+            "starts": list(self.starts),
+            "estimates": int(counts.get("estimates", 0)),
+            "selected": selected,
+            "lm_start_switched": int(counts.get("lm_start_switched", 0)),
+            "lm_start_switched_material": int(
+                counts.get("lm_start_switched_material", 0)
+            ),
+        }
+
+    def _tally(self, lm: LMDiagnostics) -> None:
+        """Add the start selections of one call to ``start_counts``."""
+        picked = np.asarray(lm.start_selected).ravel()
+        material = np.asarray(lm.start_material).ravel()
+        counts = self.start_counts
+        counts["estimates"] = counts.get("estimates", 0) + int(picked.size)
+        for i, name in enumerate(self.starts):
+            key = f"selected/{name}"
+            counts[key] = counts.get(key, 0) + int(np.sum(picked == i))
+        counts["lm_start_switched"] = counts.get(
+            "lm_start_switched", 0
+        ) + int(np.sum(picked != 0))
+        counts["lm_start_switched_material"] = counts.get(
+            "lm_start_switched_material", 0
+        ) + int(np.sum(material))
+
+    def _build_multi(self) -> Callable:
+        """Compile the batched estimator with several starts (WU-0039).
+
+        Every start is refined with the unchanged loop of :meth:`refinement`
+        (``refine_steps`` iterations): ``network`` from the network's
+        estimate, ``pair`` from the nearest training pair (:meth:`pair_index`)
+        and ``continuation`` from the network's estimate after
+        :meth:`continuation`. The estimate with the strictly lowest final
+        cost is kept (``jnp.argmin``: ties go to the first start, the
+        network); see ``LMDiagnostics`` for the diagnostics.
+        """
+        ctx = self.ctx
+        root = jnp.asarray(ctx.unwhiten)
+        mean = jnp.asarray(ctx.state_mean)
+        span = ctx.history
+        step = self.model_step
+        nu_fn = make_observability(
+            step,
+            ctx.spec.observed_index,
+            ctx.obs_scale,
+            ctx.whiten,
+            ctx.delay,
+            ctx.embed_dim,
+        )
+        names = self.starts
+        parts = self.refinement()
+        settle = self.continuation() if "continuation" in names else None
+
+        def advance(s_old: jnp.ndarray) -> jnp.ndarray:
+            return jax.lax.fori_loop(0, span, lambda _, s: step(s), s_old)
+
+        def single(x: jnp.ndarray, u_net: jnp.ndarray, u_pair: jnp.ndarray):
+            finals, diags = [], []
+            for name in names:
+                if name == "network":
+                    u, diag = parts.refine(u_net, x)
+                elif name == "pair":
+                    u, diag = parts.refine(u_pair, x)
+                else:
+                    u_cont, stage_cost, stage_jac = settle(u_net, x)
+                    u, diag = parts.refine(u_cont, x)
+                    diag = (
+                        diag[0],
+                        diag[1],
+                        diag[2] | stage_cost,
+                        diag[3] | stage_jac,
+                        diag[4],
+                    )
+                finals.append(u)
+                diags.append(diag)
+            costs = jnp.stack([d[0] for d in diags])
+            pick = jnp.argmin(costs)
+            residual = costs[pick]
+            c_net = costs[0]
+            material = (pick > 0) & (
+                (c_net - residual > START_DECREASE * c_net) | jnp.isinf(c_net)
+            )
+            diag = (
+                residual,
+                jnp.stack([d[1] for d in diags])[pick],
+                jnp.any(jnp.stack([d[2] for d in diags])),
+                jnp.any(jnp.stack([d[3] for d in diags])),
+                jnp.stack([d[4] for d in diags])[pick],
+            )
+            s_old = mean + root @ jnp.stack(finals)[pick]
+            return advance(s_old), s_old, diag, pick, material
+
+        batched = jax.jit(jax.vmap(single))
+
+        def run(
+            inputs: np.ndarray,
+        ) -> tuple[np.ndarray, np.ndarray, LMDiagnostics]:
+            x = jnp.asarray(inputs)
+            u_net = jnp.asarray(self.network.predict(x))
+            u_pair = (
+                jnp.asarray(ctx.estimator_targets[self.pair_index(inputs)])
+                if "pair" in names
+                else u_net
+            )
+            s_t, s_old, diag, pick, material = batched(x, u_net, u_pair)
+            nu = nu_fn(s_old)
+            residual, accepted, bad_cost, bad_jac, late = (
+                np.asarray(d) for d in diag
+            )
+            return (
+                np.asarray(s_t),
+                np.asarray(nu),
+                LMDiagnostics(
+                    residual=residual,
+                    accepted=accepted,
+                    nonfinite_cost=bad_cost,
+                    nonfinite_jacobian=bad_jac,
+                    late_progress=late,
+                    start_selected=np.asarray(pick),
+                    start_material=np.asarray(material),
+                ),
+            )
+
+        return run
+
     def _build(self) -> Callable:
         """Compile the batched estimator: inputs to states, ``nu``, LM info."""
+        if self.starts != SINGLE_START:
+            return self._build_multi()
         ctx = self.ctx
         root = jnp.asarray(ctx.unwhiten)
         mean = jnp.asarray(ctx.state_mean)
@@ -404,10 +756,14 @@ class StateEstimator:
         lm : LMDiagnostics
             Residual, accepted iterations, S3/S4 flags and ``late_progress``
             of the Levenberg-Marquardt refinement, per estimate (NVVUQ.10).
+            With several starts it also carries the selected start, and the
+            call adds the selections to ``start_counts``.
         """
         if self._fn is None:
             self._fn = self._build()
         states, nu, lm = self._fn(inputs)
+        if lm.start_selected is not None:
+            self._tally(lm)
         finite_nu = np.isfinite(nu)
         finite_state = np.isfinite(states)
         nu = np.where(finite_nu, nu, 1e6)

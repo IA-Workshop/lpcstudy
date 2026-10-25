@@ -302,6 +302,7 @@ class Study:
             network=network,
             model_step=model_step,
             refine_steps=self.config.estimator_refine_steps,
+            starts=ctx.spec.estimator_starts,
         )
         self._setups[key] = ForecastSetup(
             ctx=ctx,
@@ -474,13 +475,15 @@ class Study:
             ``schema``, ``cells``, ``oracles``, ``fitting``,
             ``result_counts`` and ``totals`` (every counter of
             ``ALL_COUNTERS`` as an int, the sum over cells, their evaluation
-            sub-blocks, the oracles and the fit).
+            sub-blocks, the oracles and the fit). A system with several
+            estimator starts also has ``lm_starts`` (``start_blocks``); the
+            single-start systems have no such key.
         """
         cells = dict(self._records.get((system, "main"), {}))
         oracles = self._oracle_blocks(system, main=True)
         fitting = self._fit_records.get(system) or empty_fit_block()
         totals = sum_totals([*cells.values(), *oracles.values(), fitting])
-        return {
+        block = {
             "schema": HANDLING_SCHEMA,
             "cells": cells,
             "oracles": oracles,
@@ -488,6 +491,54 @@ class Study:
             "result_counts": dict(result_counts),
             "totals": totals,
         }
+        starts = self.start_blocks(system, main=True)
+        if starts:
+            block["lm_starts"] = starts
+        return block
+
+    def start_blocks(self, system: str, main: bool) -> dict[str, dict]:
+        """Return the start-selection tallies of a system's estimators.
+
+        One entry per forecast setup whose estimator has several starts
+        (WU-0039, F1 and F2), keyed by the setup key ``(system, D, delay,
+        rho, misspec, n_analogs)`` as text, with the value of
+        ``StateEstimator.start_record``. It pools every estimate the setup
+        made in the run (all cells and kinds at that noise level). The
+        counts are report-only: no verdict reads them, and they are not in
+        ``totals`` (PRIME.4: reported, never silent).
+
+        Parameters
+        ----------
+        system : str
+            System name.
+        main : bool
+            ``True`` for the setups of the main analysis (the main embedding
+            dimension, no misspecification, one analog); ``False`` for the
+            robustness variants (every other setup). The robustness variants
+            never call a main setup's estimator, so each tally is complete
+            when its block is written.
+
+        Returns
+        -------
+        dict[str, dict]
+            Empty for a single-start system.
+        """
+        out: dict[str, dict] = {}
+        for key, setup in self._setups.items():
+            estimator = setup.estimator
+            if key[0] != system or len(estimator.starts) < 2:
+                continue
+            _, dim, _, _, misspec, n_analogs = key
+            base = (
+                dim == self.config.embedding_dim
+                and misspec == 0.0
+                and n_analogs == 1
+            )
+            if base != main:
+                continue
+            out[str(key)] = estimator.start_record()
+            LOG.info("lm starts %s %s: %s", system, key, out[str(key)])
+        return out
 
     def robustness_handling(
         self, system: str, result_counts: dict[str, int]
@@ -501,16 +552,21 @@ class Study:
         dict
             ``cells`` (variant cells, each with its ``evaluation`` and
             ``fitting``), ``oracles`` (variant embedding dimensions),
-            ``result_counts`` and ``totals``.
+            ``result_counts`` and ``totals``; ``lm_starts`` for a system with
+            several estimator starts (``start_blocks``).
         """
         cells = dict(self._records.get((system, "robustness"), {}))
         oracles = self._oracle_blocks(system, main=False)
-        return {
+        block = {
             "cells": cells,
             "oracles": oracles,
             "result_counts": dict(result_counts),
             "totals": sum_totals([*cells.values(), *oracles.values()]),
         }
+        starts = self.start_blocks(system, main=False)
+        if starts:
+            block["lm_starts"] = starts
+        return block
 
     # ------------------------------------------------------------------ cells
     def run_cell(
