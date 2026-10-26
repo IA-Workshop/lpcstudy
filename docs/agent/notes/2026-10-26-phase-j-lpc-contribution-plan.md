@@ -249,3 +249,13 @@ The applied-mathematician's answers to M-1 to M-8 (`docs/agent/notes/2026-10-26-
 - the effective-size guard for L_A ratio rows.
 
 §1.3 and §4.B are corrected: anisotropic amplification is a main effect of I, so the direct test of the student's reading is A's drop-I given {R, O}, not B. The DEV-1 exploration run started at bfab03d was stopped after 458 s (exit 143) because its dump lacked the per-draw errors. It is rerun after WU-0046b.
+
+## 9. Amendments from WU-0048a (2026-10-26)
+
+The DEV-2 prototype (`docs/agent/notes/2026-10-26-phase-j-quick-look.md`) showed three things. The Q-N learner overfits the κ-weighted allocation fit, and out of fold the full profile often fails to beat A2. A few states carry the loss. The 1.05 margin, set for MSE ratios, reads excess-loss ratios too sensitively. Adopted for WU-0048:
+- model complexity is chosen by inner blocked cross-validation on the training split, over a grid fixed in advance, with the same rule for every model;
+- the Kish effective n is reported on every row, and a row with n_eff < 50 reads "undetermined";
+- allocation rows are read on MSE(simpler)/MSE(richer) by `ablation.ratio_reading`, and the excess-loss ratio and G are reported as estimates without a reading;
+- the separation formula is a reference column in A and rung 2 of D;
+- B uses the logit scale only;
+- horizons are labelled by steps and LT, so the first is 8 steps (0.27 LT).
