@@ -78,7 +78,9 @@ PAIRINGS = {
     ("bootstrap", "Q-N"): {
         ("analysis.py", "qn_noise_redundancy"),
         ("ablation.py", "profile_ablation"),
-    },  # WU-0039b: the profile ablation draws Q-N's resamples (drop-N is Q-N)
+        ("contribution.py", "qn_cross_check"),
+    },  # WU-0039b: the profile ablation draws Q-N's resamples (drop-N is Q-N);
+    # WU-0048 test (g) recomputes those rows from the dump with the same draws
 }
 """Literal label tuples that two or more ``make_rng`` sites share on purpose.
 
@@ -132,6 +134,7 @@ SEED_CONSUMERS = frozenset(
         "_h3b_trees",
         "fit_regime_tree",
         "qn_regressor",
+        "make_estimator",  # WU-0048: the phase J learner, like qn_regressor
         "qn_profile_block",
         "profile_ablation_block",
         "with_seed",
@@ -153,9 +156,14 @@ PASS_THROUGH = frozenset(
         ("analysis.py", "h2a_part_ii"),
         ("analysis.py", "qn_profile_block"),
         ("ablation.py", "profile_ablation_block"),
+        ("contribution.py", "analyze_system"),
     }
 )
 """Functions whose ``seed``/``boot_seed`` parameter is forwarded.
+
+``contribution.analyze_system`` (WU-0048) forwards the master seed to its
+``Learner`` (which only calls ``sklearn_seed``) and to
+``bootstrap_generator`` (which only calls ``make_rng``).
 
 The parameter is a Generator (or the master seed of ``qn_regressor``); callers
 pass a ``make_rng(...)`` generator (checked below)."""
