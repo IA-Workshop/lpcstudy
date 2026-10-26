@@ -1,0 +1,15 @@
+lorenz63 0.267 LT  kish 11 (train 10)  top1% 0.65  A2 0.396-0.823  G in 0.99  oof qn 0.04  shrunk full 0.03  RO 0.09
+lorenz63 0.5 LT  kish 27 (train 22)  top1% 0.52  A2 0.244-0.345  G in 1.00  oof qn 0.85  shrunk full 0.86  RO 0.86
+lorenz63 1 LT  kish 51 (train 41)  top1% 0.34  A2 0.178-0.238  G in 0.99  oof qn 0.51  shrunk full 0.27  RO 0.19
+lorenz63 2 LT  kish 136 (train 109)  top1% 0.18  A2 0.155-0.166  G in 0.95  oof qn -0.29  shrunk full 0.02  RO -0.00
+lorenz63 4 LT  kish 414 (train 332)  top1% 0.06  A2 0.277-0.292  G in 0.80  oof qn -0.28  shrunk full -0.01  RO -0.01
+rossler 0.267 LT  kish 128 (train 105)  top1% 0.21  A2 0.021-0.029  G in 0.38  oof qn 0.33  shrunk full 0.18  RO 0.15
+rossler 0.5 LT  kish 108 (train 88)  top1% 0.24  A2 0.018-0.028  G in 0.50  oof qn 0.42  shrunk full 0.26  RO 0.22
+rossler 1 LT  kish 127 (train 102)  top1% 0.21  A2 0.027-0.046  G in 0.71  oof qn 0.53  shrunk full 0.32  RO 0.28
+rossler 2 LT  kish 121 (train 98)  top1% 0.21  A2 0.085-0.106  G in 0.87  oof qn 0.22  shrunk full 0.28  RO 0.28
+rossler 4 LT  kish 405 (train 324)  top1% 0.07  A2 0.353-0.367  G in 0.82  oof qn -0.22  shrunk full 0.08  RO 0.04
+chua 0.267 LT  kish 7 (train 6)  top1% 0.81  A2 0.003-0.005  G in 0.67  oof qn 0.13  shrunk full 0.20  RO 0.20
+chua 0.5 LT  kish 16 (train 13)  top1% 0.64  A2 0.008-0.026  G in 0.88  oof qn -0.69  shrunk full 0.20  RO 0.11
+chua 1 LT  kish 48 (train 39)  top1% 0.38  A2 0.043-0.076  G in 0.93  oof qn -0.24  shrunk full 0.03  RO 0.05
+chua 2 LT  kish 217 (train 174)  top1% 0.11  A2 0.204-0.234  G in 0.93  oof qn 0.08  shrunk full 0.14  RO 0.13
+chua 4 LT  kish 467 (train 374)  top1% 0.05  A2 0.345-0.367  G in 0.82  oof qn -0.11  shrunk full 0.04  RO 0.06
