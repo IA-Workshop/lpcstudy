@@ -28,9 +28,16 @@ Bitwise neutrality
     it on, ``results.json`` is bitwise the same except one provenance leaf,
     ``provenance.states_dump``.
 
+    The ``split/`` group of schema /3 adds only pure functions of stored
+    arrays, evaluated after the run's own use of them: the clean delay vectors
+    (``delay_vectors`` of the stored trajectory), the oracle and deployable
+    profiles, and the characteristic horizons.
+
 Schema version
     ``/2`` adds the ``h1c/`` and ``h1a/`` groups (WU-0003.7c); every key of
-    ``/1`` keeps its name and meaning.
+    ``/1`` keeps its name and meaning. ``/3`` adds the ``split/`` group and
+    six ``meta/`` keys (WU-0046, phase J); every key of ``/2`` keeps its name
+    and meaning.
 
 File format
     A NumPy ``.npz`` archive (uncompressed, ``allow_pickle`` never needed).
@@ -45,6 +52,14 @@ File format
     ``n_oracle_draws``, ``n_eval_draws``, ``steps_per_lyapunov``,
     ``reference_horizon`` (int64 scalars); ``draw_counters`` (str, ``(8,)``):
     the column names of every ``*_handled`` array.
+
+    Schema /3 adds: ``horizons_full`` (int64 ``(H_max,)``: ``1..H_max``, the
+    columns of the full-grid moments of ``split/``); ``allocator_grid`` (int64
+    ``(nG,)``: the horizons of the A3 network outputs, ``ErrorPredictor.grid``);
+    ``allocator_draws`` (int64: ``K``, the oracle draws per construction state
+    that A3 trains on); ``core_noise`` (float64: ``rho`` of the core cell);
+    ``horizon_threshold`` (float64: the ``theta`` of ``split/<s>/T``, the
+    primary threshold); ``n_test_sweep`` (int64: ``nS``).
 
 ``core/``
     The test split of the core cell; state ``i`` is the ``i``-th test state in
@@ -189,6 +204,48 @@ File format
       state), ``<target>/y`` (``(n,)``: the target, with the placeholder
       ``0.0`` outside the domain, which is never read) and
       ``<target>/domain`` (bool ``(n,)``).
+
+``split/<construction|calibration|test>/``
+    Schema /3 (WU-0046, phase J): the core cell, every split, ``n_s`` its
+    states in time order. Row ``i`` of every array of a split is the same
+    state.
+
+    * ``state_index`` (int64 ``(n_s,)``): the time index ``t`` (steps) of the
+      state on the evaluation trajectory (``ctx.split_indices``). The
+      test-sweep states of the ``sweep/`` and ``h1a/`` groups are the first
+      ``nS`` rows of ``split/test/``.
+    * ``delay_clean`` (``(n_s, D)``): the noise-free delay vector
+      ``X_t = (x_t, x_{t-tau}, ..., x_{t-(D-1) tau})`` (``delay_vectors`` of
+      the run's normalized observable ``(x - mean) / sigma_x``: units of
+      ``sigma_x``, the units of every error and of ``rho``).
+    * ``delay_eval`` (``(n_s, E, D)``): the noisy delay vectors
+      ``X_t + rho z`` that CP, PLP and A3 received on each evaluation draw
+      (``EvaluationDraws.inputs``; same units).
+    * ``E_C``, ``E_P``, ``C`` (``(n_s, H_max)``): the oracle moments over all
+      ``M`` draws on the full grid ``meta/horizons_full``, as in ``core/``.
+      The core cell computes every split on ``1..H_max``, so nothing is
+      recomputed; for the construction split these are the moments that A2
+      and the A5 targets were fitted on.
+    * ``eps_s``, ``delta``, ``N``, ``Lambda_bar`` (``(n_s,)``): as in
+      ``core/``.
+    * ``profile_oracle`` (``(n_s, 4)``): the oracle profile as Q-N builds it,
+      ``(ln(eps_s/rho), ln(delta/rho), Lambda_bar x steps_per_lyapunov,
+      ln(N + 0.01))`` (``analysis._oracle_profile``).
+    * ``profile_deployable`` (``(n_s, E, 4)``): the deployable profile of every
+      evaluation draw (``deployable_profile``; ``core/profile`` for the test
+      split).
+    * ``T`` (int64 ``(n_s,)``, steps) and ``T_censored`` (bool ``(n_s,)``):
+      the characteristic horizon of the oracle hybrid at
+      ``meta/horizon_threshold`` (``state_horizon_target``); ``T = H_max`` and
+      ``T_censored`` true where the error never exceeds the threshold.
+    * ``a3_weight`` (``(n, E, k)``, test split only): the A3 weight of every
+      evaluation draw at the evaluation horizons ``core/horizons``.
+    * ``a3_train/inputs`` (``(n_c, K, D)``), ``a3_train/cp_err`` and
+      ``a3_train/plp_err`` (``(n_c, K, nG)``), construction split only: the
+      noisy delay vectors and the per-draw CP and PLP errors at
+      ``meta/allocator_grid`` that A3 was trained on (``EnsembleMoments.kept``,
+      the first ``K`` oracle draws of each state). A3 trains on these per-draw
+      errors, not on moments.
 """
 
 from __future__ import annotations
@@ -198,13 +255,14 @@ from pathlib import Path
 
 import numpy as np
 
-from .allocation import deployable_profile
+from .allocation import deployable_profile, state_horizon_target
 from .config import StudyConfig
 from .data import SPLITS
+from .embedding import delay_vectors
 from .ensemble import DRAW_COUNTERS, ENTRY_COUNTERS
-from .oracle import oracle_weight
+from .oracle import characteristic_horizon, hybrid_mse, oracle_weight
 
-SCHEMA = "lpcstudy.states/2"
+SCHEMA = "lpcstudy.states/3"
 """Schema version key (``meta/schema``).
 
 A change of any key or shape in the module docstring changes the version."""
@@ -460,6 +518,12 @@ class StateDump:
         put("meta/reference_horizon", ref)
         put("meta/draw_counters", np.array(DRAW_COUNTERS))
         put("meta/clip_entry_names", np.array(ENTRY_COUNTERS))
+        put("meta/horizons_full", np.asarray(core.horizons))
+        put("meta/allocator_grid", rules.predictor.grid)
+        put("meta/allocator_draws", cfg.allocator_draws)
+        put("meta/core_noise", float(core.noise))
+        put("meta/horizon_threshold", float(cfg.primary_threshold))
+        put("meta/n_test_sweep", cfg.n_test_sweep)
         put("core/horizons", np.array(cfg.eval_horizons))
         put("core/ref_index", cfg.eval_horizons.index(ref))
         for stem, name in HALF_NAMES:
@@ -546,6 +610,8 @@ class StateDump:
                         f"lm/{split}/{kind}_{name}",
                         getattr(source, f"lm_{name}"),
                     )
+        for name, value in split_arrays(core, rules, weights, cfg).items():
+            put(name, value)
 
         done: set[tuple[float, int]] = set()
         for cell in (*noise_cells.values(), *library_cells.values()):
@@ -600,6 +666,94 @@ class StateDump:
         path.parent.mkdir(parents=True, exist_ok=True)
         np.savez(path, **arrays)
         return path.stat().st_size
+
+
+def split_arrays(
+    core, rules, weights: dict[str, np.ndarray], cfg: StudyConfig
+) -> dict[str, np.ndarray]:
+    """Return the ``split/`` group of schema /3 (WU-0046).
+
+    Every array is a copy of what the run computed, or a pure function of
+    such arrays; no random number is drawn and nothing is written back.
+
+    Parameters
+    ----------
+    core : Cell
+        The core cell (all three splits on ``1..H_max``, with evaluation
+        draws).
+    rules : FittedRules
+        The rules fitted on it (seed proxies for the deployable profile).
+    weights : dict[str, np.ndarray]
+        Rule weights of the test split ``(n, E, H_max)``.
+    cfg : StudyConfig
+        Configuration.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        The arrays, keyed ``split/<split>/<name>`` as in the module docstring
+        (not yet passed through ``clean``).
+
+    Raises
+    ------
+    ValueError
+        If the core horizons are not ``1..H_max``, if the construction split
+        kept no per-draw arrays for A3, or if the horizon of
+        ``characteristic_horizon`` differs from ``state_horizon_target`` (a
+        defect of the dump, not a tolerance).
+    """
+    # analysis imports this module, so its oracle profile is imported here.
+    from .analysis import _oracle_profile
+
+    horizons = np.asarray(core.horizons)
+    if not np.array_equal(horizons, np.arange(1, cfg.horizon_max + 1)):
+        raise ValueError("the core horizons are not 1..H_max")
+    ctx = core.ctx
+    lt = cfg.steps_per_lyapunov
+    theta = cfg.primary_threshold
+    out: dict[str, np.ndarray] = {}
+    for split in SPLITS:
+        part = core.splits[split]
+        m, ev, oracles = part.moments, part.evals, core.oracles[split]
+        group = f"split/{split}"
+        times = np.asarray(ctx.split_indices[split])
+        out[f"{group}/state_index"] = times
+        out[f"{group}/delay_clean"] = delay_vectors(
+            ctx.eval_clean, times, ctx.delay, ctx.embed_dim
+        )
+        out[f"{group}/delay_eval"] = ev.inputs
+        out[f"{group}/E_C"] = m.sq_cp
+        out[f"{group}/E_P"] = m.sq_plp
+        out[f"{group}/C"] = m.cross
+        out[f"{group}/eps_s"] = m.analog_seed
+        out[f"{group}/delta"] = m.est_seed
+        out[f"{group}/N"] = m.noise_sens
+        out[f"{group}/Lambda_bar"] = oracles.growth
+        out[f"{group}/profile_oracle"] = _oracle_profile(core, split, cfg)
+        out[f"{group}/profile_deployable"] = deployable_profile(
+            ev, rules.proxies, core.noise, lt
+        )
+        target = state_horizon_target(m, core.noise, theta)
+        first, event = characteristic_horizon(
+            hybrid_mse(m, oracle_weight(m)), m.horizons, core.noise, theta
+        )
+        if not np.array_equal(first, target):
+            raise ValueError(
+                f"split {split}: characteristic_horizon differs from "
+                "state_horizon_target, a defect of the dump"
+            )
+        out[f"{group}/T"] = target
+        out[f"{group}/T_censored"] = ~event
+    cols = np.array(cfg.eval_horizons) - 1
+    out["split/test/a3_weight"] = weights["A3"][:, :, cols]
+    kept = core.splits["construction"].moments.kept
+    if not all(k in kept for k in ("inputs", "cp_err", "plp_err")):
+        raise ValueError(
+            "the construction split kept no per-draw arrays for A3"
+        )
+    for name in ("inputs", "cp_err", "plp_err"):
+        out[f"split/construction/a3_train/{name}"] = kept[name]
+    return out
 
 
 def v4_arrays(cfg: StudyConfig) -> tuple[np.ndarray, np.ndarray]:

@@ -21,7 +21,7 @@ seed-id helpers. ``tools/rehearsal_diagnostics.py`` is its sibling. Usage::
 
 ``RUN`` is the pilot-size rehearsal (R1): a ``results.json`` or the directory
 that holds it. The per-state dump of each system, ``<dir>/states/<system>.npz``
-(schema ``lpcstudy.states/1`` or ``/2``, see the module docstring of
+(schema ``lpcstudy.states/1``, ``/2`` or ``/3``, see the module docstring of
 ``lpcstudy/dump.py``; ``--states`` overrides the folder), is used for the
 evaluation-draw factor. ``--observed`` is a full-size run (R5); its half-widths
 are compared with the projection made from ``RUN``. Every recorded seed id must

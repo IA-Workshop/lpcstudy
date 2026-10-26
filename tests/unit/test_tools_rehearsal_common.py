@@ -139,7 +139,9 @@ def test_both_tools_use_one_definition_of_each_shared_name() -> None:
         == (rd.EXIT_MISMATCH, rd.EXIT_INCOMPLETE)
     )
     assert (
-        rr.SCHEMAS == rd.SCHEMAS == ("lpcstudy.states/1", "lpcstudy.states/2")
+        rr.SCHEMAS
+        == rd.SCHEMAS
+        == ("lpcstudy.states/1", "lpcstudy.states/2", "lpcstudy.states/3")
     )
     assert (
         rr.PRIMARY_LEVEL == rd.PRIMARY_LEVEL == 1.0 - 0.05 / 3.0

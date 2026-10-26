@@ -11,7 +11,7 @@
     "clip_sensitivity": ["allocation", "analysis", "config", "data", "ensemble", "oracle", "statistics"],
     "config": [],
     "data": ["config", "embedding", "provenance", "systems"],
-    "dump": ["allocation", "config", "data", "ensemble", "oracle"],
+    "dump": ["allocation", "analysis", "config", "data", "embedding", "ensemble", "oracle"],
     "dynamics": [],
     "embedding": [],
     "ensemble": ["data", "dynamics", "embedding", "estimation"],
