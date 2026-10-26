@@ -42,6 +42,12 @@ Development work on development seeds is internal (LPC.PC.5), and broad verifica
    - the two ablation studies of phase I (the four profile conditions R, O, I and N, and the four coefficients a, b, a′ and b′ of A4) enter as pre-specified estimate rows, which carry no verdict;
    - the Lorenz-96 exclusion above applies to every Lorenz-96 configuration other than `lorenz96_4`; transfer experiments, a misspecified-model arm and Lean formalization stay out of scope;
    - the sealed CONF-1 result and its documents are not changed.
+
+   **Scoped exception: the LPC contribution study** (amendment of 2026-10-26, owner rulings "Proceed" and "I approve, proceed"). The analyses of ROADMAP.md phase J (`docs/agent/notes/2026-10-26-phase-j-lpc-contribution-plan.md`) are in scope on Lorenz-63, Rössler and Chua: the contribution of each profile condition R, O, I and N, their pairwise interactions, one profile informing both allocation and horizon, the incremental value over simpler and empirical predictors with oracle against deployable profiles, and explanatory analyses of H2a, H2e and H3c. Inside that study:
+   - it is development work on registered development seeds, with estimates and readings and no verdict, until a later pre-registered confirmatory round, which the owner intends to promote when confirmed and which needs its own pre-registration, freeze and sealed seeds;
+   - new allocation or horizon models fitted for these analyses are analysis instruments, not new rules of the v3 design;
+   - the extension systems, transfer experiments, a misspecified-model arm and Lean formalization stay out of scope;
+   - the sealed CONF-1 result and its documents are not changed, and no development number is set beside it.
 2. **LPC.PC.2 Roles** (PRIN.1, PRIME.1).
    - **The PI is the human owner** and performs every act PRIME.1 and GOV.50 reserve.
    - **The student is the study's primary author** and an actor on the project. The student reviews results and proposes interpretations. Promotion stays with the human owner.

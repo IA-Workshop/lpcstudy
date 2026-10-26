@@ -424,7 +424,7 @@ Append, do not edit: a dated block listing WU-0009 to WU-0019 with the dependenc
 
 ## 10. Phase J. LPC contribution study (development priority)
 
-**Amended 2026-10-26 (owner ruling "Proceed", ledger seq 47; the LPC.PC.1 scoped exception for phase J is proposed and awaits the owner).** Plan: `docs/agent/notes/2026-10-26-phase-j-lpc-contribution-plan.md` (WU-0045 to WU-0052), adopted with all its provisions DV-1 to DV-5 and DS-1 to DS-7. Sections 1 to 9 are unchanged.
+**Amended 2026-10-26 (owner ruling "Proceed", ledger seq 47; LPC.PC.1 scoped exception of the same date, owner "I approve, proceed", ledger seq 48).** Plan: `docs/agent/notes/2026-10-26-phase-j-lpc-contribution-plan.md` (WU-0045 to WU-0052), adopted with all its provisions DV-1 to DV-5 and DS-1 to DS-7. Sections 1 to 9 are unchanged.
 
 **Decisions taken (owner, 2026-10-26).**
 
