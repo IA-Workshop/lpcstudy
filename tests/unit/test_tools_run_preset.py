@@ -148,7 +148,7 @@ def test_wrapper_is_executable() -> None:
 
 
 REFUSALS = [
-    pytest.param(["smoke", "DEV-9", "runs/d"], id="unregistered-id"),
+    pytest.param(["smoke", "DEV-99", "runs/d"], id="unregistered-id"),
     pytest.param(
         ["smoke", "20261005", "runs/d"], id="raw-integer-registered-value"
     ),
@@ -789,7 +789,7 @@ def test_background_run_has_the_checks_of_the_front_end(fake: FakeRoot) -> None:
     command (``timeout ... 12h``), run under the recorder with the process id in
     the meta file equal to the printed one.
     """
-    refused = fake.run("run_preset.sh", "pilot", "DEV-9", "runs/dev/DEV-9")
+    refused = fake.run("run_preset.sh", "pilot", "DEV-99", "runs/dev/DEV-99")
     assert refused.returncode == 64
     assert fake.calls() == []
     done, pid = start_pilot(fake)

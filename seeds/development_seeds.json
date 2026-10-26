@@ -37,6 +37,41 @@
       "status": "used",
       "use": "Spare for debugging and for seed-sensitivity checks.",
       "note": "Used 2026-10-17 for V6 context checks only (pilot and full presets, CPU; no V4, no outcome run); docs/agent/notes/2026-10-17-v6-v4-offline-check.md. Status updated per owner ratification of 2026-10-18 (WU-0004e)."
+    },
+    {
+      "id": "DEV-5",
+      "value": 3524469134264475218,
+      "status": "fresh",
+      "use": "Phase J held-out replication set (WU-0051): run only after the analysis commit and the replication rule are frozen.",
+      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4)."
+    },
+    {
+      "id": "DEV-6",
+      "value": 4201349150595825683,
+      "status": "fresh",
+      "use": "Phase J held-out replication set (WU-0051): run only after the analysis commit and the replication rule are frozen.",
+      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4)."
+    },
+    {
+      "id": "DEV-7",
+      "value": 593445681833105917,
+      "status": "fresh",
+      "use": "Phase J held-out replication set (WU-0051): run only after the analysis commit and the replication rule are frozen.",
+      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4)."
+    },
+    {
+      "id": "DEV-8",
+      "value": 769281679037469920,
+      "status": "fresh",
+      "use": "Phase J held-out replication set (WU-0051): run only after the analysis commit and the replication rule are frozen.",
+      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4)."
+    },
+    {
+      "id": "DEV-9",
+      "value": 4350691002390398880,
+      "status": "fresh",
+      "use": "Phase J held-out replication set (WU-0051): run only after the analysis commit and the replication rule are frozen.",
+      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4)."
     }
   ]
 }
