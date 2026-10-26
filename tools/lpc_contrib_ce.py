@@ -86,14 +86,22 @@ def b_link(abd_system: dict) -> dict:
 
 
 def g_reproduction(joint: dict, abd_system: dict) -> dict:
-    """Largest |MSE(g) here - MSE(A/ROIN) of the A/D record| per profile."""
+    """Largest |value here - value of the A/D record| per profile.
+
+    ``MSE`` of the refit ``A/ROIN`` and ``L_w`` of the refit ``W/ROIN``
+    (the same jobs and seed as WU-0048, so 0 is expected).
+    """
     out = {}
     for kind, by_h in joint["checks"]["g_mse"].items():
-        diffs = [
+        out[kind] = max(
             abs(v - abd_system["allocation"][h][kind]["subsets"]["ROIN"]["mse"])
             for h, v in by_h.items()
-        ]
-        out[kind] = max(diffs)
+        )
+    for kind, by_h in joint["checks"]["gw_L_w"].items():
+        out[f"{kind}_L_w"] = max(
+            abs(v - abd_system["allocation"][h][kind]["subsets"]["ROIN"]["L_w"])
+            for h, v in by_h.items()
+        )
     return out
 
 
@@ -378,8 +386,8 @@ def _checks(res: dict) -> list[str]:
         "| A2 rebuilt on 1..H_max equals the dumped A2 (bitwise); A4 "
         f"horizon-free | {chk['a2_full_grid_equals_dump']}, "
         f"{chk['a4_horizon_free']} |",
-        "| g refit reproduces WU-0048 A/ROIN MSE (max abs, oracle / "
-        "deployable) | "
+        "| refit reproduces WU-0048 (max abs: A/ROIN MSE oracle, deployable;"
+        " W/ROIN L_w oracle, deployable) | "
         + " / ".join(
             fmt(v, 2) for v in chk.get("g_reproduces_abd_max_abs", {}).values()
         )
@@ -391,9 +399,8 @@ def _checks(res: dict) -> list[str]:
         "| A2 on 1..H_max: pooled curvature floor / columns at 0 or 1 | "
         f"{chk['a2_full_grid_counts']['pooled_curvature_floor']} / "
         f"{chk['a2_full_grid_counts']['columns_at_0_or_1']} |",
-        "| weights clipped to [0, 1] (g oracle test / train OOF, g "
-        "deployable test / train OOF) | "
-        + ", ".join(str(v) for v in chk["n_pred_clipped"].values())
+        "| weights clipped to [0, 1] | "
+        + ", ".join(f"{k} {v}" for k, v in chk["n_pred_clipped"].items())
         + " |",
         "",
     ]
@@ -446,53 +453,72 @@ def _c1(res: dict) -> list[str]:
 
 def _c2(res: dict) -> list[str]:
     c2 = res["C2"]
-    fwd = c2["forward"]
     out = [
-        "### C2. Shared information (oracle profile)",
+        "### C2. Shared information (oracle and deployable profiles)",
         "",
         "Skill retained = [L(constant) - L(bottleneck)] / [L(constant) - "
         "L(F)]; reading: keeps most (CI > 0.5), loses most (CI < 0.5), else "
-        "not determined. Forward: horizon from g(F) (five clipped weights); "
-        "reverse: weight from h(F) (three quantiles). Training inputs "
-        "cross-fitted.",
+        "not determined. Forward: horizon from g (five clipped weights; g_w: "
+        "the L_w fits); reverse: weight from h (three quantiles), scored by "
+        "L_A (MSE; deployable: realized per draw, R2 guard) and by L_w "
+        "(weight units, unit-weight fits). Training inputs cross-fitted.",
         "",
-        "| direction | horizon | L(constant) | L(F) | L(bottleneck) | "
-        "full skill [CI] | retained [CI] | reading |",
+        "| profile | direction | horizon | full skill [CI] | retained L_A / "
+        "pinball [CI] | reading | retained L_w [CI] | reading L_w |",
         "|---|---|---|---|---|---|---|---|",
-        f"| forward (pinball) | all five | {fmt(fwd['pinball']['constant'])} "
-        f"| {fmt(fwd['pinball']['F'])} | {fmt(fwd['pinball']['g(F)'])} | "
-        f"{rd(fwd['full_skill'])} | {rd(fwd['retained'])} | "
-        f"{fwd['retained']['reading']} |",
     ]
-    for h, r in fwd["single_horizon"].items():
+    for kind in ("oracle", "deployable"):
+        fwd = c2[kind]["forward"]
         out.append(
-            f"| forward, one weight | {r['horizon']} | | | {fmt(r['pinball'])}"
-            f" | | {rd(r['retained'])} | {r['retained']['reading']} |"
+            f"| {kind} | forward (g; g_w) | all five | {rd(fwd['full_skill'])} | "
+            f"{rd(fwd['retained'])} | {fwd['retained']['reading']} | "
+            f"{rd(fwd['retained_w'])} | {fwd['retained_w']['reading']} |"
         )
-    for h, r in c2["reverse"].items():
+        for r in fwd["single_horizon"].values():
+            out.append(
+                f"| {kind} | forward, one weight | {r['horizon']} | | "
+                f"{rd(r['retained'])} | {r['retained']['reading']} | | |"
+            )
+        for r in c2[kind]["reverse"].values():
+            out.append(
+                f"| {kind} | reverse | {r['horizon']} | {rd(r['full_skill'])} | "
+                f"{rd(r['retained'])} | {r['retained']['reading']} | "
+                f"{rd(r['retained_w'])} | {r['retained_w']['reading']} |"
+            )
+    out += [
+        "",
+        "| profile | forward C-index F / g / g_w | reverse MSE(h)/MSE(F) per "
+        "horizon | math-spec prediction (both lose most) | largest "
+        "single-weight retention at H |",
+        "|---|---|---|---|---|",
+    ]
+    for kind in ("oracle", "deployable"):
+        fwd, rev = c2[kind]["forward"], c2[kind]["reverse"]
+        ci_text = " / ".join(fmt(fwd["c_index"][k]) for k in ("F", "g", "g_w"))
+        ratios = "; ".join(
+            f"{r['horizon']} {rd(r['mse_ratio_bottleneck_over_F'])} "
+            f"{reading(r['mse_ratio_bottleneck_over_F'])}"
+            for r in rev.values()
+        )
+        pc = c2[kind]["prediction_check"]
         out.append(
-            f"| reverse (MSE) | {r['horizon']} | {fmt(r['mse']['constant'])} | "
-            f"{fmt(r['mse']['F'])} | {fmt(r['mse']['h(F)'])} | "
-            f"{rd(r['full_skill'])} | {rd(r['retained'])} | "
-            f"{r['retained']['reading']} |"
+            f"| {kind} | {ci_text} | {ratios} | **{pc['reading']}** | "
+            f"{pc['forward_single_largest_at']} |"
         )
     out += [
         "",
-        f"Forward C-index: F {fmt(fwd['c_index']['F'])}, g(F) "
-        f"{fmt(fwd['c_index']['g(F)'])}. Reverse MSE(h(F))/MSE(F): "
-        + "; ".join(
-            f"{r['horizon']} {rd(r['mse_ratio_bottleneck_over_F'])} "
-            f"{reading(r['mse_ratio_bottleneck_over_F'])}"
-            for r in c2["reverse"].values()
-        )
-        + ".",
+        "Oracle against deployable: retained (deployable) minus retained "
+        "(oracle), paired 95% interval.",
         "",
-        f"Math-spec prediction (both bottlenecks lose most): "
-        f"**{c2['prediction_check']['reading']}**; largest single-weight "
-        f"forward retention at H = "
-        f"{c2['prediction_check']['forward_single_largest_at']}.",
-        "",
+        "| row | oracle | deployable | difference [CI] | reading |",
+        "|---|---|---|---|---|",
     ]
+    for key, r in c2["oracle_vs_deployable"].items():
+        out.append(
+            f"| {key} | {fmt(r['oracle'])} | {fmt(r['deployable'])} | "
+            f"{fmt(r['difference'])} {ci(r)} | {r['reading']} |"
+        )
+    out.append("")
     if "shapley_rank" in c2:
         out += [
             "| horizon | Spearman(phi allocation, phi horizon) (4 items, "
@@ -775,22 +801,40 @@ def crossseed(records: list[dict]) -> str:
             "C1 F pinball / C, oracle",
             lambda s: f"{fmt(s['C1']['horizon']['oracle']['ROIN']['pinball'])} / {fmt(s['C1']['horizon']['oracle']['ROIN']['c_index'])}",
         )
-        row(
-            system,
-            "C2 forward retained [CI]",
-            lambda s: f"{rd(s['C2']['forward']['retained'])} {s['C2']['forward']['retained']['reading']}",
-        )
-        for h in ("8", "30", "120"):
+        for kind in ("oracle", "deployable"):
+            k = kind[:3]
             row(
                 system,
-                f"C2 reverse retained, H={h}",
-                lambda s, h=h: f"{rd(s['C2']['reverse'][h]['retained'])} {s['C2']['reverse'][h]['retained']['reading']}",
+                f"C2 {k} forward retained",
+                lambda s, k=kind: f"{rd(s['C2'][k]['forward']['retained'])} {s['C2'][k]['forward']['retained']['reading']}",
             )
-        row(
-            system,
-            "C2 prediction (both lose most)",
-            lambda s: s["C2"]["prediction_check"]["reading"],
-        )
+            row(
+                system,
+                f"C2 {k} forward retained L_w (g_w)",
+                lambda s, k=kind: f"{rd(s['C2'][k]['forward']['retained_w'])} {s['C2'][k]['forward']['retained_w']['reading']}",
+            )
+            for h in ("8", "30", "120"):
+                row(
+                    system,
+                    f"C2 {k} reverse retained L_A, H={h}",
+                    lambda s, h=h, k=kind: f"{rd(s['C2'][k]['reverse'][h]['retained'])} {s['C2'][k]['reverse'][h]['retained']['reading']}",
+                )
+                row(
+                    system,
+                    f"C2 {k} reverse retained L_w, H={h}",
+                    lambda s, h=h, k=kind: f"{rd(s['C2'][k]['reverse'][h]['retained_w'])} {s['C2'][k]['reverse'][h]['retained_w']['reading']}",
+                )
+            row(
+                system,
+                f"C2 {k} prediction (both lose most)",
+                lambda s, k=kind: s["C2"][k]["prediction_check"]["reading"],
+            )
+        for key in ("forward", "forward_w", "reverse/30", "reverse_w/30"):
+            row(
+                system,
+                f"C2 dep - ora retained, {key}",
+                lambda s, key=key: f"{fmt(s['C2']['oracle_vs_deployable'][key]['difference'])} {ci(s['C2']['oracle_vs_deployable'][key])} {s['C2']['oracle_vs_deployable'][key]['reading']}",
+            )
         row(
             system,
             "C2 Spearman(phi), 1 LT",

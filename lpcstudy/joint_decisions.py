@@ -10,29 +10,39 @@ offline on the state dump of schema /3.
 C1, separate performance (:func:`c1_rows`)
     A table read from the A/D record of ``tools/lpc_contrib.py`` (no refit).
 
-C2, shared information, oracle profile (:func:`analyze_joint`), as replaced
-by the mathematics specification
+C2, shared information, on the oracle and the deployable profile
+(:func:`analyze_joint`, :func:`c2_profile`), as replaced by the mathematics
+specification
     *Forward bottleneck*: the horizon quantile models (the WU-0048 target
     ``Y = ln min(T_c, H_max)`` of the oracle hybrid) fitted on the five
-    allocation outputs ``g(F)`` (clipped weights at the five evaluation
-    horizons) instead of ``F``; also on each single horizon's output (median
-    only). *Reverse bottleneck*: the allocation model at each horizon (u with
-    weight ``kappa / mean kappa``, M-2) fitted on the three horizon quantile
-    outputs ``h(F)`` instead of ``F``. The bottleneck inputs of the training
-    states are cross-fitted (five contiguous time blocks, each block
-    predicted by the model fitted, with its own inner cross-validation, on
-    the other four), so no training state sees its own target through them;
-    the test inputs come from the models fitted on every training state.
+    allocation outputs ``g`` (clipped weights at the five evaluation
+    horizons, per draw on the deployable profile) instead of the profile;
+    also on each single horizon's output (median only). *Reverse
+    bottleneck*: the allocation model at each horizon (u with weight ``kappa
+    / mean kappa``, M-2) fitted on the three horizon quantile outputs ``h``
+    instead of the profile. The bottleneck inputs of the training states are
+    cross-fitted (five contiguous time blocks, each block predicted by the
+    model fitted, with its own inner cross-validation, on the other four),
+    so no training state sees its own target through them; the test inputs
+    come from the models fitted on every training state.
+
+    Scoring: oracle allocation rows in moment form; deployable rows by the
+    realized per-draw score (M-8), guarded by addendum R2 (``Kish`` of the
+    full model's substituted excess). ``L_w`` companions (M-2 rule 2): the
+    reverse rows refitted with unit weights and scored by ``L_w``; the
+    forward rows fed with the ``L_w`` allocation outputs ``g_w``.
 
     Skill retained: ``[L(constant) - L(bottleneck)] / [L(constant) - L(F)]``
-    (pinball at 0.5 for the horizon, the moment-form MSE for allocation),
-    with the paired 95% interval of the shared index sets. Reading (fixed in
-    advance): "keeps most" if the interval lies above 0.5, "loses most" if
-    below; "not determined" if it spans 0.5, if the full model's skill
-    ``L(constant) - L(F)`` has a 95% lower bound ``<= 0`` ("full-profile skill
-    not established"), if a failed-resample count makes a bound infinite, or
-    (allocation) if ``min(Kish(kappa), Kish(excess of F)) < 50``. The MSE
-    ratio ``MSE(bottleneck) / MSE(F)`` is also read by the 1.05 table.
+    (pinball at 0.5 for the horizon, the MSE for ``L_A`` rows, ``L_w`` for
+    its companions), with the paired 95% interval of the shared index sets.
+    Reading (fixed in advance): "keeps most" if the interval lies above 0.5,
+    "loses most" if below; "not determined" if it spans 0.5, if the full
+    model's skill ``L(constant) - L(F)`` has a 95% lower bound ``<= 0``
+    ("full-profile skill not established"), if a failed-resample count makes
+    a bound infinite, or (``L_A`` rows) if ``min(Kish(kappa), Kish(excess of
+    F)) < 50``. The MSE ratio ``MSE(bottleneck) / MSE(F)`` is also read by
+    the 1.05 table. Oracle against deployable (:func:`retention_comparison`):
+    the difference of the retained shares with its paired interval.
 
     The rank correlation of the Shapley shares of the two decisions (oracle
     profile; allocation ``L_A`` per horizon against the horizon pinball) is
@@ -95,7 +105,7 @@ from . import contribution as cb
 from .ablation import CONDITIONS, subset_key
 from .mechanisms import spearman
 from .oracle import realized_horizon
-from .statistics import kaplan_meier
+from .statistics import kaplan_meier, percentile_interval
 
 RETAIN_LEVEL: float = 0.5
 """The retained skill share that separates "keeps most" from "loses most"."""
@@ -307,17 +317,20 @@ def _alloc_job(
     target: cb.Allocation,
     x_train: np.ndarray,
     x_test: np.ndarray,
+    unit: bool = False,
 ) -> cb.FitJob:
-    """The WU-0048 ``A/<set>`` job: u, weight ``kappa / mean kappa``."""
+    """The WU-0048 ``A/<set>`` job (u, weight ``kappa / mean kappa``, loss
+    ``kappa_excess``) or, with ``unit``, its ``W/<set>`` companion (u, unit
+    weights, loss ``unit_excess``: the ``L_w`` fit of M-2 rule 2)."""
     return cb.FitJob(
         "regression",
         x_train,
         target.u,
-        target.kappa / target.kappa.mean(),
+        None if unit else target.kappa / target.kappa.mean(),
         np.ones(len(target.u), bool),
         data.train["state_index"],
         x_test,
-        "kappa_excess",
+        "unit_excess" if unit else "kappa_excess",
         {"kappa": target.kappa, "u": target.u, "w_star": target.w_star},
     )
 
@@ -605,87 +618,73 @@ def analyze_joint(
         data.theta,
     )
 
-    # Stage 1: g(F), h(F) oracle (cross-fitted); g(F-hat) cross-fitted; h_A2.
+    # Stage 1, per profile: g (L_A fit) and g_w (L_w fit) at each horizon,
+    # h (three quantiles), each cross-fitted on the training states; h_A2.
+    inputs = {"oracle": (oracle_tr, oracle_te), "deployable": (dep_tr, dep_te)}
     jobs: dict = {}
     folds: dict = {}
-    for c in range(len(cols)):
-        tr, _ = targets[c]
-        _with_cross_fit(
-            jobs,
-            ("g", "oracle", c),
-            _alloc_job(data, tr, oracle_tr, oracle_te),
-            n_folds,
-            folds,
-        )
-        _with_cross_fit(
-            jobs,
-            ("g", "deployable", c),
-            _alloc_job(data, tr, dep_tr, dep_te),
-            n_folds,
-            folds,
-        )
+    for kind, (x_tr, x_te) in inputs.items():
+        for c in range(len(cols)):
+            tr, _ = targets[c]
+            for name, unit in (("g", False), ("gw", True)):
+                _with_cross_fit(
+                    jobs,
+                    (name, kind, c),
+                    _alloc_job(data, tr, x_tr, x_te, unit=unit),
+                    n_folds,
+                    folds,
+                )
+        for tau in cb.TAUS:
+            _with_cross_fit(
+                jobs,
+                ("h", kind, tau),
+                _quantile_job(data, tr_cross.y, tau, x_tr, x_te),
+                n_folds,
+                folds,
+            )
     for tau in cb.TAUS:
-        _with_cross_fit(
-            jobs,
-            ("h", "oracle", tau),
-            _quantile_job(data, tr_cross.y, tau, oracle_tr, oracle_te),
-            n_folds,
-            folds,
-        )
         jobs[("hA2", tau)] = _quantile_job(
             data, a2_train.y[:, 0], tau, dep_tr, dep_te
         )
     res1 = _run(jobs, learner, mapper)
 
-    g_oracle_te = np.concatenate(
-        [
-            np.clip(res1[("g", "oracle", c, "full")].pred, 0, 1)
-            for c in range(len(cols))
-        ],
-        axis=1,
-    )[:, None, :]
-    g_oracle_tr = np.concatenate(
-        [
-            np.clip(_oof(res1, ("g", "oracle", c), folds, n_tr), 0, 1)
-            for c in range(len(cols))
-        ],
-        axis=1,
-    )[:, None, :]
-    h_te, h_te_crossed, h_te_capped = quantile_triplet(
-        [res1[("h", "oracle", tau, "full")].pred for tau in cb.TAUS], cap
-    )
-    h_tr, h_tr_crossed, h_tr_capped = quantile_triplet(
-        [_oof(res1, ("h", "oracle", tau), folds, n_tr) for tau in cb.TAUS], cap
-    )
-    g_dep_te_raw = np.stack(
-        [res1[("g", "deployable", c, "full")].pred for c in range(len(cols))],
-        axis=-1,
-    )
-    g_dep_tr_raw = np.stack(
-        [
-            _oof(res1, ("g", "deployable", c), folds, n_tr)
-            for c in range(len(cols))
-        ],
-        axis=-1,
-    )
-
     def outside(x: np.ndarray) -> int:
         return int(np.sum((x < 0.0) | (x > 1.0)))
 
-    g_oracle_raw = [
-        res1[("g", "oracle", c, "full")].pred for c in range(len(cols))
-    ]
-    clipped = {
-        "g_oracle_test": sum(outside(p) for p in g_oracle_raw),
-        "g_oracle_train_oof": sum(
-            outside(_oof(res1, ("g", "oracle", c), folds, n_tr))
-            for c in range(len(cols))
-        ),
-        "g_deployable_test": outside(g_dep_te_raw),
-        "g_deployable_train_oof": outside(g_dep_tr_raw),
-    }
-    g_dep_te = np.clip(g_dep_te_raw, 0.0, 1.0)
-    g_dep_tr = np.clip(g_dep_tr_raw, 0.0, 1.0)
+    weights: dict[tuple[str, str, str], np.ndarray] = {}
+    clipped: dict[str, int] = {}
+    quantiles: dict[tuple[str, str], np.ndarray] = {}
+    quantile_counts: dict[str, int] = {}
+    for kind in inputs:
+        for name in ("g", "gw"):
+            test_raw = np.stack(
+                [res1[(name, kind, c, "full")].pred for c in range(len(cols))],
+                axis=-1,
+            )
+            train_raw = np.stack(
+                [
+                    _oof(res1, (name, kind, c), folds, n_tr)
+                    for c in range(len(cols))
+                ],
+                axis=-1,
+            )
+            clipped[f"{name}_{kind}_test"] = outside(test_raw)
+            clipped[f"{name}_{kind}_train_oof"] = outside(train_raw)
+            weights[(name, kind, "test")] = np.clip(test_raw, 0.0, 1.0)
+            weights[(name, kind, "train")] = np.clip(train_raw, 0.0, 1.0)
+        for split, preds in (
+            ("test", [res1[("h", kind, tau, "full")].pred for tau in cb.TAUS]),
+            (
+                "train",
+                [_oof(res1, ("h", kind, tau), folds, n_tr) for tau in cb.TAUS],
+            ),
+        ):
+            q, crossed, capped = quantile_triplet(preds, cap)
+            quantiles[(kind, split)] = q
+            quantile_counts[f"h_{kind}_{split}_crossed"] = crossed
+            quantile_counts[f"h_{kind}_{split}_capped"] = capped
+    g_dep_te = weights[("g", "deployable", "test")]
+    g_dep_tr = weights[("g", "deployable", "train")]
     g_full_tr = full_grid_weight(g_dep_tr, data.horizons, data.h_max)
     g_train = policy_crossing(
         data.train["E_C"],
@@ -696,113 +695,63 @@ def analyze_joint(
         data.theta,
     )
 
-    # Stage 2: the bottlenecks and h(F-hat) of the full system.
+    # Stage 2: the bottlenecks of both profiles and h(F-hat) of the full system.
     jobs2: dict = {}
+    for kind in inputs:
+        g_tr, g_te = weights[("g", kind, "train")], weights[("g", kind, "test")]
+        gw_tr, gw_te = (
+            weights[("gw", kind, "train")],
+            weights[("gw", kind, "test")],
+        )
+        h_tr, h_te = quantiles[(kind, "train")], quantiles[(kind, "test")]
+        for tau in cb.TAUS:
+            jobs2[("fwd", kind, tau)] = _quantile_job(
+                data, tr_cross.y, tau, g_tr, g_te
+            )
+            jobs2[("fwdw", kind, tau)] = _quantile_job(
+                data, tr_cross.y, tau, gw_tr, gw_te
+            )
+        for c in range(len(cols)):
+            jobs2[("fwd1", kind, c)] = _quantile_job(
+                data,
+                tr_cross.y,
+                0.5,
+                g_tr[..., c : c + 1],
+                g_te[..., c : c + 1],
+            )
+            jobs2[("rev", kind, c)] = _alloc_job(
+                data, targets[c][0], h_tr, h_te
+            )
+            jobs2[("revw", kind, c)] = _alloc_job(
+                data, targets[c][0], h_tr, h_te, unit=True
+            )
     for tau in cb.TAUS:
-        jobs2[("fwd", tau)] = _quantile_job(
-            data, tr_cross.y, tau, g_oracle_tr, g_oracle_te
-        )
         jobs2[("hg", tau)] = _quantile_job(data, g_train.y, tau, dep_tr, dep_te)
-    for c in range(len(cols)):
-        jobs2[("fwd1", c)] = _quantile_job(
-            data,
-            tr_cross.y,
-            0.5,
-            g_oracle_tr[..., c : c + 1],
-            g_oracle_te[..., c : c + 1],
-        )
-        jobs2[("rev", c)] = _alloc_job(data, targets[c][0], h_tr, h_te)
     res2 = _run(jobs2, learner, mapper)
 
-    # ---- C2 forward
-    const_q = np.quantile(tr_cross.y, cb.TAUS)
-    pin_const = cb.pinball(te_cross.y, np.full((n_te, 1), const_q[1]), 0.5)
-    pin_full = cb.pinball(te_cross.y, h_te[..., 1], 0.5)
-    fwd, fwd_crossed, fwd_capped = quantile_triplet(
-        [res2[("fwd", tau)].pred for tau in cb.TAUS], cap
+    # ---- C2, both profiles, then oracle against deployable
+    c2: dict = {"counts": quantile_counts}
+    parts: dict[str, dict] = {}
+    for kind in inputs:
+        c2[kind], parts[kind] = c2_profile(
+            data,
+            kind,
+            targets,
+            tr_cross,
+            te_cross,
+            res1,
+            res2,
+            quantiles[(kind, "test")],
+            index,
+            cap,
+        )
+    c2["oracle_vs_deployable"] = retention_comparison(
+        parts["oracle"],
+        parts["deployable"],
+        c2["oracle"],
+        c2["deployable"],
+        index,
     )
-    pin_fwd = cb.pinball(te_cross.y, fwd[..., 1], 0.5)
-    time = np.minimum(te_cross.T_c, data.h_max)
-    forward = {
-        "target": "Y = ln min(T_c, H_max), oracle hybrid (the WU-0048 horizon target)",
-        "inputs": "g(F): clipped allocation outputs at the five evaluation horizons",
-        "pinball": {
-            "constant": float(pin_const.mean()),
-            "F": float(pin_full.mean()),
-            "g(F)": float(pin_fwd.mean()),
-        },
-        "c_index": {
-            "F": cb.harrell_c(time, te_cross.event, h_te[..., 1])[0],
-            "g(F)": cb.harrell_c(time, te_cross.event, fwd[..., 1])[0],
-        },
-        "pinball_ratio_bottleneck_over_F": cb.ratio_row(
-            pin_fwd, pin_full, index, cb.SHAPLEY_LEVEL
-        ),
-        **retained_rows(pin_const, pin_fwd, pin_full, index),
-        "single_horizon": {},
-        "n_crossed": fwd_crossed,
-        "n_capped": fwd_capped,
-        "settings": {f"{tau:g}": res2[("fwd", tau)].setting for tau in cb.TAUS},
-    }
-    for c, h in enumerate(data.horizons):
-        raw = res2[("fwd1", c)].pred
-        pin = cb.pinball(te_cross.y, np.minimum(raw, cap), 0.5)
-        rows = retained_rows(pin_const, pin, pin_full, index)
-        forward["single_horizon"][str(int(h))] = {
-            "horizon": data.horizon_label(int(h)),
-            "pinball": float(pin.mean()),
-            "retained": rows["retained"],
-            "n_capped": int(np.sum(raw > cap)),
-        }
-
-    # ---- C2 reverse
-    reverse = {}
-    for c, h in enumerate(data.horizons):
-        tr, te = targets[c]
-        moments = tuple(
-            data.test[k][:, int(h) - 1] for k in ("E_C", "E_P", "C")
-        )
-        const = cb.score_allocation(
-            np.full((n_te, 1), cb.kappa_baseline(tr.kappa, tr.u)),
-            te,
-            moments,
-            None,
-        )
-        full = cb.score_allocation(
-            res1[("g", "oracle", c, "full")].pred, te, moments, None
-        )
-        bott = cb.score_allocation(res2[("rev", c)].pred, te, moments, None)
-        n_eff = cb.guard_sizes(te.kappa, full.excess)
-        rows = retained_rows(const.mse, bott.mse, full.mse, index, n_eff)
-        reverse[str(int(h))] = {
-            "horizon": data.horizon_label(int(h)),
-            "inputs": "h(F): the three horizon quantile outputs (log steps)",
-            "mse": {
-                "constant": float(const.mse.mean()),
-                "F": float(full.mse.mean()),
-                "h(F)": float(bott.mse.mean()),
-            },
-            "n_eff": list(n_eff),
-            "mse_ratio_bottleneck_over_F": cb.ratio_row(
-                bott.mse, full.mse, index, cb.SHAPLEY_LEVEL, n_eff=n_eff
-            ),
-            **rows,
-            "n_pred_clipped": bott.n_clipped,
-            "setting": res2[("rev", c)].setting,
-        }
-
-    c2 = {
-        "profile": "oracle",
-        "forward": forward,
-        "reverse": reverse,
-        "counts": {
-            "h_test_crossed": h_te_crossed,
-            "h_test_capped": h_te_capped,
-            "h_train_oof_crossed": h_tr_crossed,
-            "h_train_oof_capped": h_tr_capped,
-        },
-        "prediction_check": c2_prediction(forward, reverse),
-    }
 
     # ---- C3
     t = data.test
@@ -1017,6 +966,20 @@ def analyze_joint(
             }
             for kind in ("oracle", "deployable")
         },
+        "gw_L_w": {
+            kind: {
+                str(int(h)): float(
+                    cb.score_allocation(
+                        res1[("gw", kind, c, "full")].pred,
+                        targets[c][1],
+                        tuple(t[k][:, int(h) - 1] for k in ("E_C", "E_P", "C")),
+                        None,
+                    ).excess_w.mean()
+                )
+                for c, h in enumerate(data.horizons)
+            }
+            for kind in ("oracle", "deployable")
+        },
         "n_pred_clipped": clipped,
         "settings": {
             f"g/{kind}/{int(h)}": res1[("g", kind, c, "full")].setting
@@ -1045,6 +1008,227 @@ def analyze_joint(
         "C2": c2,
         "C3": c3,
     }
+
+
+def c2_profile(
+    data: cb.SystemData,
+    kind: str,
+    targets: dict,
+    tr_cross: cb.Crossing,
+    te_cross: cb.Crossing,
+    res1: dict,
+    res2: dict,
+    h_test: np.ndarray,
+    index: np.ndarray,
+    cap: float,
+) -> tuple[dict, dict]:
+    """C2 on one profile: forward and reverse bottlenecks, ``L_A`` and ``L_w``.
+
+    Oracle allocation rows are scored in moment form; deployable ones by the
+    realized per-draw score (M-8), with the guard of addendum R2 (``Kish`` of
+    the full model's substituted excess). ``L_w`` rows (weight units, every
+    state once) use the unit-weight fits and carry no effective-size guard.
+    The forward ``L_w`` companion feeds the horizon model with the ``L_w``
+    allocation outputs ``g_w``.
+
+    Returns
+    -------
+    tuple
+        The record, and the per-state losses ``(constant, bottleneck, F)`` of
+        every retained-skill row (for :func:`retention_comparison`), with the
+        row's guard sizes.
+    """
+    n_te = len(te_cross.y)
+    r = 1 if kind == "oracle" else data.n_draws
+    t = data.test
+    parts: dict = {}
+    const_q = np.quantile(tr_cross.y, cb.TAUS)
+    pin_const = cb.pinball(te_cross.y, np.full((n_te, 1), const_q[1]), 0.5)
+    pin_full = cb.pinball(te_cross.y, h_test[..., 1], 0.5)
+    time = np.minimum(te_cross.T_c, data.h_max)
+    forward: dict = {
+        "target": "Y = ln min(T_c, H_max), oracle hybrid (the WU-0048 "
+        "horizon target)",
+        "inputs": "g: clipped allocation outputs at the five evaluation "
+        "horizons (g_w: the L_w fits)",
+        "pinball": {
+            "constant": float(pin_const.mean()),
+            "F": float(pin_full.mean()),
+        },
+        "c_index": {"F": cb.harrell_c(time, te_cross.event, h_test[..., 1])[0]},
+        "single_horizon": {},
+    }
+    for name, label in (("fwd", "g"), ("fwdw", "g_w")):
+        q, crossed, capped = quantile_triplet(
+            [res2[(name, kind, tau)].pred for tau in cb.TAUS], cap
+        )
+        pin = cb.pinball(te_cross.y, q[..., 1], 0.5)
+        rows = retained_rows(pin_const, pin, pin_full, index)
+        forward["pinball"][label] = float(pin.mean())
+        forward["c_index"][label] = cb.harrell_c(
+            time, te_cross.event, q[..., 1]
+        )[0]
+        key = "" if name == "fwd" else "_w"
+        forward[f"retained{key}"] = rows["retained"]
+        forward["full_skill"] = rows["full_skill"]
+        forward[f"pinball_ratio_bottleneck_over_F{key}"] = cb.ratio_row(
+            pin, pin_full, index, cb.SHAPLEY_LEVEL
+        )
+        forward[f"n_crossed{key}"], forward[f"n_capped{key}"] = crossed, capped
+        parts[f"forward{key}"] = ((pin_const, pin, pin_full), ())
+    for c, h in enumerate(data.horizons):
+        raw = res2[("fwd1", kind, c)].pred
+        pin = cb.pinball(te_cross.y, np.minimum(raw, cap), 0.5)
+        forward["single_horizon"][str(int(h))] = {
+            "horizon": data.horizon_label(int(h)),
+            "pinball": float(pin.mean()),
+            "retained": retained_rows(pin_const, pin, pin_full, index)[
+                "retained"
+            ],
+            "n_capped": int(np.sum(raw > cap)),
+        }
+
+    reverse: dict = {}
+    for c, h in enumerate(data.horizons):
+        tr, te = targets[c]
+        moments = tuple(t[k][:, int(h) - 1] for k in ("E_C", "E_P", "C"))
+        errors = None
+        if kind == "deployable":
+            errors = (t["cp_err"][:, :, c], t["plp_err"][:, :, c])
+
+        def score(pred: np.ndarray) -> cb.AllocScore:
+            return cb.score_allocation(pred, te, moments, errors)
+
+        const = score(np.full((n_te, r), cb.kappa_baseline(tr.kappa, tr.u)))
+        full = score(res1[("g", kind, c, "full")].pred)
+        bott = score(res2[("rev", kind, c)].pred)
+        const_w = score(np.full((n_te, r), float(tr.u.mean())))
+        full_w = score(res1[("gw", kind, c, "full")].pred)
+        bott_w = score(res2[("revw", kind, c)].pred)
+        reference = full.excess if errors is None else full.subst - te.v_star
+        n_eff = cb.guard_sizes(te.kappa, reference)
+        rows = retained_rows(const.mse, bott.mse, full.mse, index, n_eff)
+        rows_w = retained_rows(
+            const_w.excess_w, bott_w.excess_w, full_w.excess_w, index
+        )
+        hkey = str(int(h))
+        parts[f"reverse/{hkey}"] = ((const.mse, bott.mse, full.mse), n_eff)
+        parts[f"reverse_w/{hkey}"] = (
+            (const_w.excess_w, bott_w.excess_w, full_w.excess_w),
+            (),
+        )
+        reverse[hkey] = {
+            "horizon": data.horizon_label(int(h)),
+            "inputs": "h: the three horizon quantile outputs (log steps)",
+            "scoring": "moment form" if errors is None else "realized per draw",
+            "mse": {
+                "constant": float(const.mse.mean()),
+                "F": float(full.mse.mean()),
+                "h": float(bott.mse.mean()),
+            },
+            "L_w": {
+                "constant": float(const_w.excess_w.mean()),
+                "F": float(full_w.excess_w.mean()),
+                "h": float(bott_w.excess_w.mean()),
+            },
+            "n_eff": list(n_eff),
+            "mse_ratio_bottleneck_over_F": cb.ratio_row(
+                bott.mse, full.mse, index, cb.SHAPLEY_LEVEL, n_eff=n_eff
+            ),
+            **rows,
+            "retained_w": rows_w["retained"],
+            "full_skill_w": rows_w["full_skill"],
+            "n_pred_clipped": bott.n_clipped,
+            "n_pred_clipped_w": bott_w.n_clipped,
+            "setting": res2[("rev", kind, c)].setting,
+            "setting_w": res2[("revw", kind, c)].setting,
+        }
+    record = {
+        "profile": kind,
+        "forward": forward,
+        "reverse": reverse,
+        "prediction_check": c2_prediction(forward, reverse),
+    }
+    return record, parts
+
+
+def retention_comparison(
+    oracle_parts: dict,
+    deployable_parts: dict,
+    oracle_record: dict,
+    deployable_record: dict,
+    index: np.ndarray,
+) -> dict:
+    """Retained skill, deployable minus oracle, for every C2 row.
+
+    The difference of the two ratios of means, with the paired 95% interval
+    of the shared index sets (a resample where either ratio fails is failed,
+    M-7). Reading (fixed in advance): "not determined" if either profile's
+    row reads not determined for its full-profile skill or its effective
+    size; otherwise "deployable retains less" if the interval lies below 0,
+    "deployable retains more" if above, and "no difference detected".
+    """
+
+    def values(triple: tuple) -> tuple[float, np.ndarray]:
+        const, bott, full = triple
+        point = float(
+            cb._ratio(
+                np.array(np.mean(const - bott)), np.array(np.mean(const - full))
+            )
+        )
+        boot = cb._ratio(
+            cb.resampled_mean(const - bott, index),
+            cb.resampled_mean(const - full, index),
+        )
+        return point, boot
+
+    def reading_of(record: dict, key: str) -> str:
+        if key.startswith("forward"):
+            return record["forward"]["retained" + key[len("forward") :]][
+                "reading"
+            ]
+        part, hkey = key.split("/")
+        row = "retained_w" if part.endswith("_w") else "retained"
+        return record["reverse"][hkey][row]["reading"]
+
+    out = {}
+    for key, (triple_o, _) in oracle_parts.items():
+        triple_d, _ = deployable_parts[key]
+        p_o, v_o = values(triple_o)
+        p_d, v_d = values(triple_d)
+        lower, upper, n_failed = percentile_interval(
+            v_d - v_o, cb.SHAPLEY_LEVEL
+        )
+        row = {
+            "oracle": p_o,
+            "deployable": p_d,
+            "difference": p_d - p_o,
+            "ci": [
+                float(lower) if np.isfinite(lower) else None,
+                float(upper) if np.isfinite(upper) else None,
+            ],
+            "n_failed_resamples": n_failed,
+        }
+        readings = (
+            reading_of(oracle_record, key),
+            reading_of(deployable_record, key),
+        )
+        blocked = [
+            x
+            for x in readings
+            if x.startswith("not determined (full-profile")
+            or x.startswith("not determined (n_eff")
+        ]
+        if blocked:
+            row["reading"] = "not determined (" + blocked[0][16:-1] + ")"
+        elif row["ci"][1] is not None and row["ci"][1] < 0:
+            row["reading"] = "deployable retains less"
+        elif row["ci"][0] is not None and row["ci"][0] > 0:
+            row["reading"] = "deployable retains more"
+        else:
+            row["reading"] = "no difference detected"
+        out[key] = row
+    return out
 
 
 def c2_prediction(forward: dict, reverse: dict) -> dict:
