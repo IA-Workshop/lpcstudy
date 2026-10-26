@@ -31,8 +31,10 @@
    `tools/run_preset.sh phasej DEV-n runs/dev/phj-DEV-n --device gpu --skip-robustness --states-dump`
 2. One manifest line per run (commit, seed, device, wall, sha256 of `results.json`), with the validation gate per system.
 3. Analysis, once per seed, on CPU, in the same worktree. First check `git diff --quiet phasej-freeze -- lpcstudy tools`, which must pass. Then:
-   `tools/lpc_contrib.py <run>/phasej --out <run>/contrib-freeze` and `tools/lpc_contrib_ce.py <run>/phasej --abd <run>/contrib-freeze --out <run>/contrib-freeze`
+   `tools/lpc_contrib.py <run>/phasej --replication --jobs 4 --out <run>/contrib-freeze`, then `tools/lpc_contrib_ce.py <run>/phasej --replication --jobs 4 --abd <run>/contrib-freeze --out <run>/contrib-freeze`
 4. Replication, once: `tools/lpc_replicate.py <run DEV-5..9>/contrib-freeze --out runs/dev/replication-phasej-freeze`, in rule mode (no `--exploratory`).
 5. No analysis code changes between step 1 and step 4. If a tool refuses or fails, the failure is reported as it is. Any fix is a new commit, recorded as a departure, and its results are labeled as made after the freeze.
 
 A validation-gate failure on a held-out seed is reported, and that system's rows for that seed are marked provisional. The seed is not redrawn.
+
+Correction (2026-10-26, before any held-out run): step 3 originally omitted `--replication` (both tools refuse DEV-5 to DEV-9 without it) and `--jobs 4`. The commands above are corrected. The tag `phasej-freeze` is unchanged: no code changed.
