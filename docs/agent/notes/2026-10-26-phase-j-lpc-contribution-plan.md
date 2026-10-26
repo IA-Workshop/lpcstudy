@@ -237,3 +237,15 @@ Parallel start, today: WU-0045 (math), WU-0046 (dump code) and WU-0048a (quick l
 - The extension systems S1 to S6 in phase J (DV-1, DS-7).
 - New forecasters, new systems, or new LPC definitions. The four conditions are used as v3 §5 defines them.
 - A confirmatory version of phase J (possible later, as an owner decision; DV-3).
+
+## 8. Amendments from WU-0045 (2026-10-26)
+
+The applied-mathematician's answers to M-1 to M-8 (`docs/agent/notes/2026-10-26-phase-j-math-spec.md`) are adopted. They tighten the criteria and loosen none, and where they differ from §3 to §5 above, they govern. In short:
+- one fit per horizon, with H_ref as the headline (M-1);
+- u fitted with weight κ/mean(κ) (M-2);
+- logit u and log-odds classifiers for the w\* = 0 and w\* = 1 parts, and the interpolated crossing time T_c for the horizon (M-3, M-4);
+- the replication rule "at least 4 of 5 seeds and none contradicting" (M-6);
+- realized per-draw scores for deployable rows (M-8). This adds WU-0046 criterion (vi) and replaces WU-0048 test (f) with (f1) and (f2);
+- the effective-size guard for L_A ratio rows.
+
+§1.3 and §4.B are corrected: anisotropic amplification is a main effect of I, so the direct test of the student's reading is A's drop-I given {R, O}, not B. The DEV-1 exploration run started at bfab03d was stopped after 458 s (exit 143) because its dump lacked the per-draw errors. It is rerun after WU-0046b.
