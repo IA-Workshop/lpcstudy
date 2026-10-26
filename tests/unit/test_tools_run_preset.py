@@ -1,7 +1,7 @@
 """Tests of ``tools/run_preset.sh``, the shell script that starts a study run.
 
-Study runs (the "presets": ``smoke``, ``pilot`` and ``full``) are started
-through this wrapper. It accepts only registered development seeds, refuses
+Study runs (the "presets": ``smoke``, ``pilot``, ``full`` and ``phasej``) are
+started through this wrapper. It accepts only registered development seeds, refuses
 anything that names the sealed run, takes the GPU lock for GPU work, tallies GPU
 hours, can run a long job in the background, and writes a ``run.meta.json`` file
 that says who ran what and when (WU-0012.2, LPC.AUTH.3, LPC.PC.7). A mistake
@@ -119,14 +119,18 @@ def meta_path(fake: FakeRoot, preset: str, name: str = "DEV-1") -> Path:
 
 
 def start_pilot(
-    fake: FakeRoot, *extra: str, name: str = "DEV-1", **env: str
+    fake: FakeRoot,
+    *extra: str,
+    name: str = "DEV-1",
+    preset: str = "pilot",
+    **env: str,
 ) -> tuple[subprocess.CompletedProcess[str], int]:
-    """Start a pilot run through the wrapper; return the result and the
-    background process id.
+    """Start a background run (a pilot by default) through the wrapper; return
+    the result and the background process id.
     """
     done = fake.run(
         "run_preset.sh",
-        "pilot",
+        preset,
         name,
         f"runs/dev/{name}",
         *extra,
@@ -183,6 +187,17 @@ REFUSALS = [
     pytest.param(["smoke", "DEV-1", "runs"], id="outdir-is-runs"),
     pytest.param(["smoke", "DEV-1", "runs/../elsewhere"], id="outdir-dotdot"),
     pytest.param(["huge", "DEV-1", "runs/d"], id="unknown-preset"),
+    pytest.param(["PHASEJ", "DEV-1", "runs/d"], id="unknown-preset-case"),
+    pytest.param(["phasej", "DEV-99", "runs/d"], id="phasej-unregistered-id"),
+    pytest.param(["phasej", "20261005", "runs/d"], id="phasej-raw-integer"),
+    pytest.param(
+        ["phasej", "DEV-1", "runs/d", "--confirmatory"],
+        id="phasej-confirmatory-flag",
+    ),
+    pytest.param(["phasej", "DEV-1", "OUTSIDE"], id="phasej-outdir-outside"),
+    pytest.param(
+        ["phasej", "DEV-1", "runs/d", "--foo"], id="phasej-unknown-argument"
+    ),
     pytest.param(["smoke", "DEV-1", "runs/d", "--foo"], id="unknown-argument"),
     pytest.param(["smoke", "DEV-1", "runs/d", "extra"], id="extra-positional"),
     pytest.param(
@@ -278,13 +293,14 @@ def test_missing_registry_is_refused(fake: FakeRoot) -> None:
     [
         ["pilot", "DEV-1", "runs/dev/DEV-1"],
         ["full", "DEV-1", "runs/dev/DEV-1"],
+        ["phasej", "DEV-1", "runs/dev/DEV-1"],
         ["smoke", "DEV-1", "runs/dev/DEV-1", "--device", "gpu"],
         ["pilot", "DEV-1", "runs/dev/DEV-1", "--device", "cpu"],
     ],
 )
 def test_lock_held_exits_75_at_once(fake: FakeRoot, args: list[str]) -> None:
-    """With the lock held, pilot, full, a GPU smoke and a CPU pilot exit 75 in
-    under 3 s (g).
+    """With the lock held, pilot, full, phasej, a GPU smoke and a CPU pilot exit
+    75 in under 3 s (g).
 
     The fake never runs (no call at all: the lock comes before the tally and the
     probe), no meta file is written, and the message is one line. Bound: about
@@ -633,6 +649,71 @@ def test_pilot_background_environment_and_tally(
     assert json.loads(meta_path(fake, "pilot").read_text())["device"] == (
         "gpu" if hours == "12" else "cpu"
     )
+
+
+@pytest.mark.parametrize("preset", ["full", "phasej"])
+def test_phasej_starts_like_full_in_the_background_on_the_gpu(
+    fake: FakeRoot, preset: str
+) -> None:
+    """``phasej`` is accepted and handled exactly as ``full`` (WU-0051a).
+
+    Both default to the GPU (``JAX_PLATFORMS=cuda``), start in the background,
+    call the tally once with ``check --hours 12`` (the hours of ``full``), pass
+    ``--preset <name>`` to the study command unchanged, and write
+    ``<out>/<name>/run.meta.json`` with device ``gpu``. Reference: the WU-0051a
+    plan (phasej is treated like full) and the expected argv written out here.
+    """
+    done, pid = start_pilot(fake, preset=preset)
+    assert wait_until(lambda: not alive(pid))
+    out = fake.root / "runs" / "dev" / "DEV-1"
+    (call,) = cli_calls(fake)
+    assert call["argv"] == [
+        "-m",
+        "lpcstudy",
+        "--preset",
+        preset,
+        "--out",
+        str(out),
+        "--seed-id",
+        "DEV-1",
+    ]
+    assert call["env"]["JAX_PLATFORMS"] == "cuda"
+    assert any("12h" in c for c in fake.timeout_calls())
+    assert fake.tally_calls() == [["check", "--hours", "12"]]
+    meta = json.loads(meta_path(fake, preset).read_text())
+    assert (meta["preset"], meta["device"], meta["exit_code"]) == (
+        preset,
+        "gpu",
+        0,
+    )
+    assert f"console={out / preset / 'console.log'}" in done.stdout
+    assert lock_is_free(fake)
+
+
+def test_existing_phasej_meta_is_never_overwritten(fake: FakeRoot) -> None:
+    """An existing ``phasej/run.meta.json`` gives 64 and is left byte for byte,
+    as for ``full``.
+    """
+    path = meta_path(fake, "phasej")
+    path.parent.mkdir(parents=True)
+    path.write_text('{"keep": "me"}')
+    done = fake.run("run_preset.sh", "phasej", "DEV-1", "runs/dev/DEV-1")
+    assert done.returncode == 64
+    assert len(done.stderr.strip().splitlines()) == 1
+    assert path.read_text() == '{"keep": "me"}'
+    assert fake.calls() == [] and fake.tally_calls() == []
+
+
+def test_unknown_preset_message_lists_phasej(fake: FakeRoot) -> None:
+    """The refusals of an unknown preset and of too few arguments name the four
+    accepted presets.
+    """
+    done = fake.run("run_preset.sh", "huge", "DEV-1", "runs/d")
+    assert done.returncode == 64
+    assert "(smoke, pilot, full or phasej)" in done.stderr
+    usage = fake.run("run_preset.sh")
+    assert usage.returncode == 64
+    assert "<smoke|pilot|full|phasej>" in usage.stderr
 
 
 @pytest.mark.parametrize("fake_exit", [0, 3])

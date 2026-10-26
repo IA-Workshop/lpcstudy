@@ -11,7 +11,8 @@
 #                            [--systems S...] [--skip-robustness] [--estimator-refine-steps N]
 #                            [--states-dump]
 #
-#   preset   smoke | pilot | full
+#   preset   smoke | pilot | full | phasej (full with n_test 4000, for the phase J replication
+#            runs: WU-0051a, ledger entry 49; it is treated exactly as full)
 #   seed-id  a DEV-n id listed in seeds/development_seeds.json (never a raw integer)
 #   out-dir  must lie under <repo>/runs/, so that the weekly GPU tally sees every run
 #
@@ -32,14 +33,16 @@
 # accepts) and with --report-only (which this wrapper never passes). The meta file records it in
 # "command". Nothing else changes with it.
 #
-# Device: cpu for smoke, gpu for pilot and full (JAX_PLATFORMS cpu or cuda); thread variables
-# are set from LPC_THREADS (1..99, default 4), as are PJRT_NPROC and NPROC (the XLA CPU thread
-# pools); XLA_PYTHON_CLIENT_PREALLOCATE=false. XLA_FLAGS is never set or altered.
-# Lock: pilot, full and any gpu run take `flock -n` on ${LPC_GPU_LOCK:-/tmp/lpcstudy-gpu.lock} at
-# once (exit 75 if held, never wait). A smoke run on CPU takes no lock (section 4.5).
-# Tally: pilot, full and any gpu run call `python3 -I tools/gpu_hours.py check --hours H` while
-# holding the lock (H = 12 for gpu, 0 for cpu); exit 64 or 65 is passed on, any other failure
-# or a missing tool gives 65 (fail closed: if the check cannot be made, the run is refused).
+# Device: cpu for smoke, gpu for pilot, full and phasej (JAX_PLATFORMS cpu or cuda); thread
+# variables are set from LPC_THREADS (1..99, default 4), as are PJRT_NPROC and NPROC (the XLA CPU
+# thread pools); XLA_PYTHON_CLIENT_PREALLOCATE=false. XLA_FLAGS is never set or altered.
+# Lock: pilot, full, phasej and any gpu run take `flock -n` on
+# ${LPC_GPU_LOCK:-/tmp/lpcstudy-gpu.lock} at once (exit 75 if held, never wait). A smoke run on
+# CPU takes no lock (section 4.5).
+# Tally: pilot, full, phasej and any gpu run call `python3 -I tools/gpu_hours.py check --hours H`
+# while holding the lock (H = 12 for gpu, 0 for cpu); exit 64 or 65 is passed on, any other
+# failure or a missing tool gives 65 (fail closed: if the check cannot be made, the run is
+# refused).
 # Seed: the study command is probed with `--help`. If it has --seed-id the flag is passed. If
 # not, only DEV-0 runs (the command's default 20261005 is the registry's DEV-0), with a note;
 # any other id is refused (needs --seed-id, WU-0001.1).
@@ -47,8 +50,8 @@
 # temporary file, then a replace) at the start (end_utc, wall_seconds, exit_code null) and
 # again at the end.
 # Run: `timeout --kill-after=300 12h <python> -m lpcstudy --preset P --out OUT [...]`. Smoke runs
-# in the foreground and returns the study command's exit code. Pilot and full always start in
-# the background (a subshell that ignores SIGHUP like nohup, console.log) and print
+# in the foreground and returns the study command's exit code. Pilot, full and phasej always
+# start in the background (a subshell that ignores SIGHUP like nohup, console.log) and print
 # "started pid=... console=... run_log=... meta=...".
 # Exit codes: 64 refusal, 65 weekly GPU hours (or tally failure), 75 lock busy, else the study
 # command's.
@@ -151,7 +154,7 @@ for arg in "$@"; do
     [[ "$lower" != *confirmatory* ]] || refuse "an argument names the confirmatory path, which is owner-only (LPC.PC.7)"
 done
 
-[ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-robustness] [--estimator-refine-steps N] [--states-dump]"
+[ "$#" -ge 3 ] || refuse "usage: run_preset.sh <smoke|pilot|full|phasej> <DEV-n> <out-dir> [--device cpu|gpu] [--systems S...] [--skip-robustness] [--estimator-refine-steps N] [--states-dump]"
 preset="$1"
 seed="$2"
 out_arg="$3"
@@ -204,8 +207,8 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$preset" in
-    smoke | pilot | full) ;;
-    *) refuse "unknown preset ${preset@Q} (smoke, pilot or full)" ;;
+    smoke | pilot | full | phasej) ;;
+    *) refuse "unknown preset ${preset@Q} (smoke, pilot, full or phasej)" ;;
 esac
 
 [[ ! "$seed" =~ ^[0-9]+$ ]] || refuse "raw integer seed; use a DEV-n id, LPC.PC.7"

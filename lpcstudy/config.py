@@ -6,9 +6,12 @@ them all in one frozen (unchangeable) object, ``StudyConfig``, means that no
 other module hides a number of its own, so a result can always be traced back
 to the settings that produced it.
 
-There are three presets:
+There are four presets:
 
 * ``full`` is the design written in the Methods document, verbatim;
+* ``phasej`` is ``full`` with four times the test states (``n_test`` 4000),
+  for the held-out replication runs of phase J (WU-0051a, ledger entry 49);
+  every other setting, the test sweep included, is that of ``full``;
 * ``pilot`` shrinks the sample sizes (not the design) so that the whole study
   runs on a 2-core CPU;
 * ``smoke`` is tiny and exists only for tests and quick plumbing checks.
@@ -39,7 +42,7 @@ class StudyConfig:
     Attributes
     ----------
     name : str
-        Preset name (``full``, ``pilot`` or ``smoke``).
+        Preset name (``full``, ``phasej``, ``pilot`` or ``smoke``).
     core_systems : tuple[str, ...]
         Systems run through the primary experiments (stages ii-iv).
     steps_per_lyapunov : int
@@ -295,4 +298,18 @@ SMOKE = replace(
     robustness_systems=(),
 )
 
-PRESETS: dict[str, StudyConfig] = {"full": FULL, "pilot": PILOT, "smoke": SMOKE}
+PHASEJ = replace(FULL, name="phasej", n_test=4000)
+"""``full`` with 4000 test states (WU-0051a, ledger entry 49).
+
+Only ``n_test`` (and the name) differ from ``FULL``. The test split is the
+last split of the trajectory (``data.SPLITS``), so the construction and
+calibration states, and the first 1000 test states (the test sweep), sit at the
+same time indices as in ``full``.
+"""
+
+PRESETS: dict[str, StudyConfig] = {
+    "full": FULL,
+    "phasej": PHASEJ,
+    "pilot": PILOT,
+    "smoke": SMOKE,
+}
