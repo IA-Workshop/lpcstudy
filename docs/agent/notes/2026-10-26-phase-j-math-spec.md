@@ -389,3 +389,66 @@ The interval level is per family (M-3, M-7), and the dependence assumption is bl
   2. (f2) adds the decomposition. It reports mean(T1 + T2) as the dependence-bias estimate, with a paired moving-block bootstrap interval over test states (block 5), beside WU-0036's z.
      - The WU-0036 z, on the half-draw SE, is kept as a secondary column. A row with \|z\| > 4 whose T1 + T2 interval contains 0 reads "realized-noise outlier, no detectable dependence bias".
      - (f2) remains reported, not gating.
+
+## Addendum (WU-0045c, 2026-10-26): M-6 tool semantics (before the freeze)
+
+These rulings are on the semantics of `tools/lpc_replicate.py` (WU-0051b) and of `lpcstudy.mechanisms`. They are made before any held-out seed (DEV-5 to DEV-9) has been read, and no number is used. They govern the tool and the E readings from the freeze on.
+
+### S1. Non-detections can never be replicated
+
+**Confirmed.**
+
+- **Why.** A non-detection ("no interaction gain detected", "no difference detected", "no detectable dependence bias", and every "not determined") is the absence of a bound claim. Low power produces it on every seed with probability near 1. Counting it toward "at least 4 of 5" would turn imprecision into a replicated null.
+- **What a replicable null needs.** An equivalence claim: an interval inside a margin fixed in advance. The vocabulary has three:
+  - the ratio rows' "negligible" (ratio ≤ 1.05), which covers A, the B loss ratio, D and the horizon ratios;
+  - E-H2a "not consistent" (−0.1 < Spearman < 0.1 at every usable H; S2);
+  - C2 "loses most" (retained < the retain level).
+- **No new margins.** None is added for C2's oracle-against-deployable difference or for (f2). Their nulls stay non-replicable, and J7 says so in one line.
+- **Claim-set change:** none.
+
+### S2. E-H2a: "consistent" and "not consistent" should contradict
+
+- **The fault.** The two words are not mutually exclusive in truth. A true Spearman in (0, 0.1) satisfies both, so a seed split between them is not evidence of seed dependence. The fault is in the reading, not in the tool. "Consistent" only asked the interval to exclude 0, while "not consistent" uses the margin 0.1. An association smaller than the margin the null reading calls negligible should not count as supporting the mechanism.
+- **Corrected reading** (`mechanisms.h2a_reading`). A horizon *supports* the mechanism iff two conditions hold:
+  - its Spearman(m, I) interval lies beyond the margin on one side: lower > NEAR_ZERO, or upper < −NEAR_ZERO;
+  - the drift condition holds as now.
+
+  The "not consistent" rule is unchanged, and so is the "not determined" rule (otherwise). This tightens "consistent"; nothing is loosened. The exploration readings must be regenerated before the freeze.
+- **Corrected claim sets:**
+  - **consistent:** at each supporting H, either `Spearman(m, I)@H > 0.1` (interval) or `Spearman(m, I)@H < -0.1` (interval), whichever side established it, plus `drift high - low I@H > 0` (point);
+  - **not consistent:** at each usable H, `Spearman(m, I)@H > -0.1` and `Spearman(m, I)@H < 0.1` (interval). Unchanged.
+- **Effect.** The two now contradict whenever a supporting H of one seed is a usable H of the other. The claims are keyed by H, so `satisfiable` already handles horizons that differ between seeds. The drift claim is a point claim (S3), so it never establishes a contradiction.
+
+### S3. Point-threshold claims (E-H3c, and E-H2a's drift) never establish a contradiction
+
+- **The fault.** M-6's contradiction is a statement about the *true* quantity: two seeds' intervals cannot both cover it. A point estimate on one side of a threshold makes no claim about the true value. So two seeds whose point estimates fall on either side of a threshold show sampling variation, not seed dependence. Calling that "contradicted" mislabels noise, which is exactly what the plan's DS-6 and M-6 set out to avoid.
+- **The rule.** Claims with `basis == "point"` do two things only:
+  - they count toward the minimum by word: a row is replicated if the same word appears on at least 4 of 5 seeds;
+  - they are ignored by `contradict` and by the claim-level fallback.
+
+  A row whose claim-bearing words are all point-based therefore reads:
+  - **"replicated (point readings)"**, if the same word is on at least 4 of 5 seeds;
+  - **"not replicated"**, otherwise.
+
+  It never reads "contradicted". The label "(point readings)" must appear in `replication.md` and `replication.json`, so these rows are never mistaken for interval-based replications. Error rates for point readings are not controlled, as for any explanatory reading (plan §4.E).
+- **E-H3c.** This applies to all three parts:
+  - the Lorenz-63 tail share and percentile;
+  - the Rössler BC;
+  - the width ordering.
+
+  The gaps between the thresholds (0.05 to 0.10 for the share, 1/2 to 2/3 for the percentile) already act as a "not determined" buffer. No interval is added before the freeze.
+- **E-H2a.** Mixed rows check contradiction on the interval claims only (S2). The drift claims count only through the word.
+- **Claim-set change:** none to the sets themselves. `contradict(first, second)` and the fallback filter out claims with `basis == "point"`, and the row classifier gains the "(point readings)" outcome.
+
+### S4. The main session's two bookkeeping decisions
+
+- **C1 rows excluded from the family counts and shown for display: agreed, with one guard.** They are duplicates only if their ratio, interval and word equal those of the matching D vs-full row on every seed. The tool must assert this and refuse otherwise. Without the check, "duplicate" is an assumption.
+- **The claim-level fallback for contradicted rows: agreed, with two guards.**
+  - The row's headline stays "contradicted".
+  - A fallback claim is listed beneath it as "replicated claim within a contradicted row". It still needs to be implied by at least 4 seeds and contradicted by none.
+
+  Example: four seeds read "small" and one reads "lowers". The row is contradicted on `ratio > 1`, but `ratio <= 1.05` is a legitimate replicated claim, and it must not lift the row's label.
+
+### Note on r for C2
+
+C2's upper-quartile r of 2.2 gives p = 0.21 and a P(at least 4 of 5) of 8·10⁻³ per null row. This is above M-6's robustness bound r ≤ 2. M-6 already rules that the rule is not changed: J7 states the expected count for the C2 rows. Nothing more is needed.
