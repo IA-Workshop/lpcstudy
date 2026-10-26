@@ -30,6 +30,9 @@ WU-0049 (experiments C and E) adds, on the same dump:
 * ``tools/lpc_contrib_ce.py`` on the smoke run (after ``lpc_contrib.py``):
   labeled tables, and figures that ``--figures-from`` regenerates byte for
   byte.
+
+WU-0051b adds ``tools/lpc_replicate.py --exploratory`` on three copies of the
+smoke records (both tools write into one folder, once per module).
 """
 
 from __future__ import annotations
@@ -266,42 +269,51 @@ def test_policy_crossing_on_the_dumped_curves(smoke) -> None:
         assert cross.n_exact_theta == int(cross.exact.sum())
 
 
-def test_ce_tool_writes_labeled_tables_and_reproducible_figures(
-    smoke, tmp_path
-) -> None:
-    """``lpc_contrib.py`` then ``lpc_contrib_ce.py`` on the smoke run.
+def call_tool(*argv: str) -> subprocess.CompletedProcess:
+    """A tool in a fresh isolated interpreter on the CPU."""
+    return subprocess.run(
+        [sys.executable, "-I", *argv],
+        capture_output=True,
+        env={**os.environ, "JAX_PLATFORMS": "cpu"},
+        timeout=TIMEOUT_SECONDS,
+    )
 
-    Exit 0; the DEVELOPMENT label before every table; the refit allocation
-    reproduces the A/D record's MSE exactly (the same job and seed); the
-    figures regenerate byte for byte from ``ce.json`` (``--figures-from``).
-    """
-    run = smoke["run"]
-    env = {**os.environ, "JAX_PLATFORMS": "cpu"}
+
+@pytest.fixture(scope="module")
+def smoke_records(smoke, tmp_path_factory) -> Path:
+    """``lpc_contrib.py`` then ``lpc_contrib_ce.py`` into one folder, once."""
     tools = REPO_ROOT / "tools"
-
-    def call(*argv: str) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            [sys.executable, "-I", *argv],
-            capture_output=True,
-            env=env,
-            timeout=TIMEOUT_SECONDS,
-        )
-
-    abd = tmp_path / "abd"
-    done = call(str(tools / "lpc_contrib.py"), str(run), "--out", str(abd))
+    out = tmp_path_factory.mktemp("records") / "DEV-0"
+    run = smoke["run"]
+    done = call_tool(str(tools / "lpc_contrib.py"), str(run), "--out", str(out))
     assert done.returncode == 0, done.stderr.decode()[-2000:]
-    out = tmp_path / "ce"
-    done = call(
+    done = call_tool(
         str(tools / "lpc_contrib_ce.py"),
         str(run),
         "--out",
         str(out),
         "--abd",
-        str(abd / "contrib.json"),
+        str(out / "contrib.json"),
         "--jobs",
         "4",
     )
     assert done.returncode == 0, done.stderr.decode()[-2000:]
+    return out
+
+
+def test_ce_tool_writes_labeled_tables_and_reproducible_figures(
+    smoke_records, tmp_path
+) -> None:
+    """``lpc_contrib.py`` then ``lpc_contrib_ce.py`` on the smoke run.
+
+    Exit 0 (in the fixture); the DEVELOPMENT label before every table; the
+    refit allocation reproduces the A/D record's MSE exactly (the same job
+    and seed); the figures regenerate byte for byte from ``ce.json``
+    (``--figures-from``).
+    """
+    tools = REPO_ROOT / "tools"
+    call = call_tool
+    out = smoke_records
     record = json.loads((out / "ce.json").read_text())
     label = "DEVELOPMENT (DEV-0): exploratory, not a hypothesis test"
     assert record["label"] == label
@@ -340,3 +352,59 @@ def test_ce_tool_writes_labeled_tables_and_reproducible_figures(
         assert (out / "figures" / name).read_bytes() == (
             tmp_path / "again" / "figures" / name
         ).read_bytes()
+
+
+# ----------------------------------------------------------------- WU-0051b
+def test_replication_tool_on_three_copies_of_the_smoke_records(
+    smoke_records, tmp_path
+) -> None:
+    """``lpc_replicate.py --exploratory`` on three copies of one seed.
+
+    Reference: with identical copies no pair of seeds can contradict, so a
+    row is replicated iff its word carries a claim, and not replicated (with
+    no fallback claim) iff it carries none. The row set equals the tool's
+    own extraction of one copy, every reading leaf of both records being
+    covered (else the tool refuses). Without ``--exploratory`` N = 3 is
+    refused (exit 64, nothing written). Tolerance: none (words, counts).
+    """
+    tools = REPO_ROOT / "tools"
+    copies = []
+    for k in range(3):
+        d = tmp_path / f"copy{k}"
+        d.mkdir()
+        for name in ("contrib.json", "ce.json"):
+            (d / name).write_bytes((smoke_records / name).read_bytes())
+        copies.append(str(d))
+    tool = str(tools / "lpc_replicate.py")
+    refused = call_tool(tool, *copies, "--out", str(tmp_path / "rule"))
+    assert refused.returncode == 64, refused.stderr.decode()[-2000:]
+    assert not (tmp_path / "rule").exists()
+    out = tmp_path / "out"
+    done = call_tool(tool, *copies, "--out", str(out), "--exploratory")
+    assert done.returncode == 0, done.stderr.decode()[-2000:]
+    record = json.loads((out / "replication.json").read_text())
+    assert record["mode"] == "exploratory"
+    assert record["n_seeds"] == 3 and record["minimum"] == 3
+    assert record["n_repeated_seeds"] == 2
+    assert record["seeds"] == ["DEV-0"] * 3
+    assert "not the M-6 rule" in record["label"]
+    rows = record["rows"]
+    assert len(rows) > 100
+    families = {row["family"] for row in rows}
+    assert {"A drop-one", "B pair", "D vs full", "C1", "C2 retained",
+            "C3 ratio", "E-H2a", "E-H2e"} <= families
+    for row in rows:
+        words = set(row["readings"])
+        assert len(words) == 1 and None not in words, row
+        assert row["contradicting_pairs"] == [], row
+        if row["claims"][0]:
+            assert row["class"] == "replicated", row
+            assert row["replicated_reading"] == row["readings"][0]
+        else:
+            assert row["class"] == "not replicated", row
+            assert row["replicated_claims"] == [], row
+    blocks = (out / "replication.md").read_text().split("\n\n")
+    tables = [i for i, b in enumerate(blocks) if b.lstrip().startswith("|")]
+    assert tables
+    for i in tables:
+        assert record["label"] in blocks[i - 1], blocks[i][:80]
