@@ -1,6 +1,6 @@
 # Phase J experiments C and E: DEV-4
 
-**DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.** Run `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/phj-f701a47/runs/dev/phj-DEV-4/full`; analysis commit `5889351ff1eda1dec755a186de48101522c7a94a` (dirty: False); A/D record `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/phj-f701a47/runs/dev/phj-DEV-4/contrib-ea0bd77/contrib.json`. Estimates with 95% intervals from the shared moving-block index sets (models fixed; training variance not included). Readings are descriptive; no causal claim; nothing here is set beside CONF-1.
+**DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.** Run `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/phj-f701a47/runs/dev/phj-DEV-4/full`; analysis commit `33cb71e06322baa281454f26e4b74f804a725026` (dirty: False); A/D record `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/phj-f701a47/runs/dev/phj-DEV-4/contrib-33cb71e/contrib.json`. Estimates with 95% intervals from the shared moving-block index sets (models fixed; training variance not included). Readings are descriptive; no causal claim; nothing here is set beside CONF-1.
 
 ## lorenz63
 
@@ -172,7 +172,7 @@ DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 | H=60 (2.00 LT) | 669 | -0.25 / 0.16 / -0.04 | 0.06 / 0.089 / 0.065 | 0.12 / 0.19 / 0.19 | 0.0794 [-0.000604, 0.147] | no interaction gain detected / no interaction gain detected | undetermined (n_eff < 50) |
 | H=120 (4.00 LT) | 156 | -1.2 / -1.8 / -2.5 | 0.28 / 0.4 / 0.42 | 0.29 / 0.31 / 0.27 | -0.164 [-0.315, -0.0191] | no interaction gain detected / no interaction gain detected | negligible |
 
-**Reading: consistent** (horizons_used: ['60', '120'], horizons_supporting: ['120'], horizons_null: []).
+**Reading: not determined** (horizons_used: ['60', '120'], horizons_supporting: [], horizons_null: []).
 
 ### E-H2e. Library size and error correlation (sweep states)
 
