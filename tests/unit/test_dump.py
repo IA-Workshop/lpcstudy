@@ -1055,3 +1055,227 @@ def test_split_group_refuses_a_construction_split_without_a3_arrays() -> None:
     world[1].splits["construction"].moments.kept = {}
     with pytest.raises(ValueError, match="kept no per-draw arrays"):
         _collect_world(world)
+
+
+def test_split_per_draw_errors_weights_and_halves_are_copies_of_their_sources() -> (
+    None
+):
+    """The WU-0046b keys of ``split/`` are copies of the run's arrays.
+
+    Reference: the arrays put into the hand-built world, sliced here at the
+    evaluation columns ``h - 1``: the CP and PLP errors of the test and
+    calibration evaluation draws (``(n_s, E, k)``) and of the test split on
+    the full grid (``(n, E, H_max)``); the A2, A3 and A4 weights of the test
+    draws (``(n, E, k)``); the full-grid half-draw moments of the core record
+    (``(n, H_max)``), whose evaluation columns are ``core/E_C_A`` and the
+    others. Only the documented splits carry them.
+
+    Tolerance: exact (copies and slices).
+    """
+    arrays, world = _collect_world()
+    _, core, _, weights, *_, core_halves, _ = world
+    h_max, k = CFG.horizon_max, len(HORIZONS)
+    for split, n_s in (("test", N), ("calibration", N_CAL)):
+        ev = core.splits[split].evals
+        for name, source in (("cp_err", ev.cp_err), ("plp_err", ev.plp_err)):
+            value = arrays[f"split/{split}/{name}"]
+            assert value.dtype == np.float64, (split, name)
+            assert value.shape == (n_s, E, k), (split, name)
+            assert np.array_equal(value, source[:, :, COLS]), (split, name)
+            assert not np.shares_memory(value, source), (split, name)
+    ev = core.splits["test"].evals
+    for name, source in (
+        ("cp_err_full", ev.cp_err),
+        ("plp_err_full", ev.plp_err),
+    ):
+        value = arrays[f"split/test/{name}"]
+        assert value.dtype == np.float64 and value.shape == (N, E, h_max)
+        assert np.array_equal(value, source), name
+        assert not np.shares_memory(value, source), name
+        short = arrays[f"split/test/{name.removesuffix('_full')}"]
+        assert np.array_equal(value[:, :, COLS], short), name
+    for rule in ("A2", "A3", "A4"):
+        value = arrays[f"split/test/{rule.lower()}_weight"]
+        assert value.dtype == np.float64 and value.shape == (N, E, k), rule
+        assert np.array_equal(value, weights[rule][:, :, COLS]), rule
+    for stem, name in (("sq_cp", "E_C"), ("sq_plp", "E_P"), ("cross", "C")):
+        for tag in ("A", "B"):
+            value = arrays[f"split/test/{name}_{tag}"]
+            source = core_halves[f"{stem}_{tag}"]
+            assert value.dtype == np.float64 and value.shape == (N, h_max)
+            assert np.array_equal(value, source), (name, tag)
+            assert not np.shares_memory(value, source), (name, tag)
+            assert np.array_equal(
+                value[:, COLS], arrays[f"core/{name}_{tag}"]
+            ), (name, tag)
+    added = ("cp_err", "plp_err", "_weight", "_A", "_B")
+    for key in arrays:
+        if key.startswith("split/construction/") and "a3_train" not in key:
+            assert not key.endswith(added), key
+        if key.startswith("split/calibration/"):
+            assert not key.endswith(("_full", "_weight", "_A", "_B")), key
+
+
+def _dyadic_world():
+    """Return ``_world()`` with dyadic per-draw errors and rule weights.
+
+    The errors are ``i / 8`` with integer ``|i| <= 64`` and the weights
+    ``j / 8`` with ``0 <= j <= 8``, so every blend, square and mean over the
+    two draws is exact in float64. A0 is 1 and A1 is 0 on every draw (as
+    ``rule_weights`` builds them); A2 is one weight per horizon for all
+    states and draws; A4 is one weight per (state, draw) for all horizons;
+    A3, A5, A4o and A* vary freely. The scores at ``H_ref`` follow the
+    weights, so ``collect`` accepts the world.
+    """
+    world = list(_world())
+    core, weights, scores = world[1], world[3], world[4]
+    rng = np.random.default_rng(70046)
+    n_hor = len(core.horizons)
+    for split in ("test", "calibration"):
+        ev = core.splits[split].evals
+        shape = ev.cp_err.shape
+        ev.cp_err = rng.integers(-64, 65, shape) / 8.0
+        ev.plp_err = rng.integers(-64, 65, shape) / 8.0
+    shape = (N, E, n_hor)
+    weights.update(
+        {rule: rng.integers(0, 9, shape) / 8.0 for rule in RULES},
+        A0=np.ones(shape),
+        A1=np.zeros(shape),
+        A2=np.broadcast_to(rng.integers(0, 9, n_hor) / 8.0, shape).copy(),
+        A4=np.broadcast_to(
+            (rng.integers(0, 9, (N, E)) / 8.0)[:, :, None], shape
+        ).copy(),
+    )
+    ev = core.splits["test"].evals
+    for rule, w in weights.items():
+        col = REF - 1
+        err = w[:, :, col] * ev.cp_err[:, :, col] + (1 - w[:, :, col]) * (
+            ev.plp_err[:, :, col]
+        )
+        scores[rule] = SimpleNamespace(state_mse_ref=(err**2).mean(axis=1))
+    return tuple(world)
+
+
+def test_state_mse_is_recomputed_from_the_dumped_per_draw_errors_and_weights() -> (
+    None
+):
+    """Criterion (vi) of WU-0046b, on manufactured arrays.
+
+    ``core/state_mse/<rule>`` is recomputed from the dumped per-draw errors
+    ``split/test/cp_err`` and ``plp_err`` and the dumped weights: A0 (weight
+    1), A1 (weight 0), A2, A3 and A4 (``split/test/<rule>_weight``) at every
+    evaluation horizon, and A5 at ``H_ref`` (``core/weight_href/A5``, column
+    ``core/ref_index``).
+
+    Reference (manufactured, independent of the code): dyadic errors and
+    weights (``_dyadic_world``), and the state MSE
+    ``(1/E) sum_j (w e_C + (1 - w) e_P)^2`` evaluated in exact rational
+    arithmetic (``fractions.Fraction``) from the world's own arrays. The
+    dumped ``state_mse`` must equal it exactly (every float operation on these
+    values is exact). The recomputation from the dumped arrays, in float64,
+    must match the dumped ``state_mse`` to ``1e-12`` relative: the criterion
+    of the plan. Its round-off is at most a few ulps (a blend, a square and a
+    mean of ``E = 2`` terms, about ``4 x 2**-53 = 4e-16`` relative), far
+    below the criterion.
+    """
+    from fractions import Fraction
+
+    world = _dyadic_world()
+    arrays, _ = _collect_world(world)
+    core, weights = world[1], world[3]
+    ev = core.splits["test"].evals
+
+    def exact(rule: str, col: int) -> list[float]:
+        w, c, p = weights[rule], ev.cp_err, ev.plp_err
+        out = []
+        for i in range(N):
+            total = sum(
+                (
+                    Fraction(w[i, j, col]) * Fraction(c[i, j, col])
+                    + (1 - Fraction(w[i, j, col])) * Fraction(p[i, j, col])
+                )
+                ** 2
+                for j in range(E)
+            )
+            out.append(float(total / E))
+        return out
+
+    ref_index = int(arrays["core/ref_index"])
+    assert HORIZONS[ref_index] == REF
+    for rule in ("A0", "A1", "A2", "A3", "A4", "A5"):
+        for c, col in enumerate(COLS.tolist()):
+            assert arrays[f"core/state_mse/{rule}"][:, c].tolist() == exact(
+                rule, col
+            ), (rule, col)
+
+    e_c, e_p = arrays["split/test/cp_err"], arrays["split/test/plp_err"]
+    dumped_weights = {
+        "A0": np.ones_like(e_c),
+        "A1": np.zeros_like(e_c),
+        **{
+            r: arrays[f"split/test/{r.lower()}_weight"]
+            for r in ("A2", "A3", "A4")
+        },
+    }
+    for rule, w in dumped_weights.items():
+        recomputed = ((w * e_c + (1 - w) * e_p) ** 2).mean(axis=1)
+        np.testing.assert_allclose(
+            recomputed, arrays[f"core/state_mse/{rule}"], rtol=1e-12, atol=0.0
+        )
+    w5 = arrays["core/weight_href/A5"]
+    recomputed = (
+        (w5 * e_c[:, :, ref_index] + (1 - w5) * e_p[:, :, ref_index]) ** 2
+    ).mean(axis=1)
+    np.testing.assert_allclose(
+        recomputed,
+        arrays["core/state_mse/A5"][:, ref_index],
+        rtol=1e-12,
+        atol=0.0,
+    )
+
+
+def test_split_group_refuses_half_moments_off_the_full_grid() -> None:
+    """Half-draw moments recorded on another grid raise ``ValueError``.
+
+    Reference: the contract (the full-grid half moments are copied only if
+    their columns are ``1..H_max``; nothing is relabelled, PRIME.4), decided
+    by hand: the core record is replaced by one whose horizons are shifted by
+    one step.
+
+    Tolerance: exact.
+    """
+    world = _world()
+    dump, core, core_halves = world[0], world[1], world[7]
+    dump.record_halves(
+        "lorenz63", 0.01, 10_000, True, core.horizons + 1, core_halves
+    )
+    with pytest.raises(ValueError, match="not on 1..H_max"):
+        _collect_world(world)
+
+
+def test_split_verify_noise_is_a_copy_of_the_test_evaluation_draws() -> None:
+    """``split/test/verify_noise`` is a copy of the test draws' verification
+    noise on the full grid, and only the test split carries it.
+
+    Reference: random values put into the hand-built world here (its default
+    verification noise is zero, which would not show a wrong source).
+
+    Tolerance: exact (a copy).
+    """
+    world = _world()
+    core = world[1]
+    rng = np.random.default_rng(70047)
+    for split in ("construction", "calibration", "test"):
+        ev = core.splits[split].evals
+        ev.verify_noise = 0.01 * rng.standard_normal(ev.verify_noise.shape)
+    arrays, _ = _collect_world(world)
+    source = core.splits["test"].evals.verify_noise
+    value = arrays["split/test/verify_noise"]
+    assert value.dtype == np.float64
+    assert value.shape == (N, E, CFG.horizon_max)
+    assert np.array_equal(value, source)
+    assert not np.shares_memory(value, source)
+    assert not any(
+        k.endswith("verify_noise") and k != "split/test/verify_noise"
+        for k in arrays
+    )

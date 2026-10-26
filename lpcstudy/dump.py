@@ -31,13 +31,19 @@ Bitwise neutrality
     The ``split/`` group of schema /3 adds only pure functions of stored
     arrays, evaluated after the run's own use of them: the clean delay vectors
     (``delay_vectors`` of the stored trajectory), the oracle and deployable
-    profiles, and the characteristic horizons.
+    profiles, and the characteristic horizons. Its per-draw evaluation errors,
+    verification noise, rule weights and full-grid half-draw moments
+    (WU-0046b) are copies of arrays the run already holds.
 
 Schema version
     ``/2`` adds the ``h1c/`` and ``h1a/`` groups (WU-0003.7c); every key of
     ``/1`` keeps its name and meaning. ``/3`` adds the ``split/`` group and
     six ``meta/`` keys (WU-0046, phase J); every key of ``/2`` keeps its name
-    and meaning.
+    and meaning. WU-0046b added keys to ``split/test/`` and
+    ``split/calibration/`` before any ``/3`` dump was used for results, so the
+    version string stayed ``/3``: the per-draw evaluation errors and
+    verification noise, the A2 and A4 weights, and the full-grid half-draw
+    moments.
 
 File format
     A NumPy ``.npz`` archive (uncompressed, ``allow_pickle`` never needed).
@@ -246,6 +252,31 @@ File format
       ``meta/allocator_grid`` that A3 was trained on (``EnsembleMoments.kept``,
       the first ``K`` oracle draws of each state). A3 trains on these per-draw
       errors, not on moments.
+    * ``cp_err`` and ``plp_err`` (``(n_s, E, k)``, test and calibration
+      splits; WU-0046b): the CP and PLP error of every evaluation draw against
+      the noise-free truth, at ``core/horizons`` (``EvaluationDraws.cp_err``
+      and ``plp_err``, after the run's clipping; units of ``sigma_x``). These
+      are the errors that ``score_rules`` blends.
+    * ``cp_err_full`` and ``plp_err_full`` (``(n, E, H_max)``, test split
+      only): the same errors on the full grid ``meta/horizons_full``. The
+      columns ``core/horizons - 1`` are ``cp_err`` and ``plp_err``.
+    * ``verify_noise`` (``(n, E, H_max)``, test split only): the verification
+      noise ``rho z`` on the observed truth of every evaluation draw
+      (``EvaluationDraws.verify_noise``). ``score_rules`` takes a rule's
+      realized horizon (``oracle.realized_horizon``, threshold
+      ``meta/horizon_threshold``) from ``blend - verify_noise``, the blend's
+      error against the noisy truth.
+    * ``a2_weight`` and ``a4_weight`` (``(n, E, k)``, test split only): the A2
+      and A4 weight of every evaluation draw at ``core/horizons``, like
+      ``a3_weight``. A0 is the weight 1 and A1 the weight 0 on every draw, so
+      ``core/state_mse/<rule>`` of A0 to A4 is
+      ``mean_j (w e_C + (1 - w) e_P)^2`` over the draws ``j`` of these
+      arrays, at every evaluation horizon, and that of A5 at ``H_ref`` uses
+      ``core/weight_href/A5`` and the ``core/ref_index`` column.
+    * ``E_C_A``, ``E_P_A``, ``C_A``, ``E_C_B``, ``E_P_B``, ``C_B``
+      (``(n, H_max)``, test split only): the half-draw moments of
+      ``core/E_C_A`` and the others on the full grid ``meta/horizons_full``;
+      the sizes of the halves are ``core/half_n_draws``.
 """
 
 from __future__ import annotations
@@ -610,7 +641,9 @@ class StateDump:
                         f"lm/{split}/{kind}_{name}",
                         getattr(source, f"lm_{name}"),
                     )
-        for name, value in split_arrays(core, rules, weights, cfg).items():
+        for name, value in split_arrays(
+            core, rules, weights, cfg, halves
+        ).items():
             put(name, value)
 
         done: set[tuple[float, int]] = set()
@@ -669,7 +702,11 @@ class StateDump:
 
 
 def split_arrays(
-    core, rules, weights: dict[str, np.ndarray], cfg: StudyConfig
+    core,
+    rules,
+    weights: dict[str, np.ndarray],
+    cfg: StudyConfig,
+    halves: dict[str, np.ndarray],
 ) -> dict[str, np.ndarray]:
     """Return the ``split/`` group of schema /3 (WU-0046).
 
@@ -687,6 +724,9 @@ def split_arrays(
         Rule weights of the test split ``(n, E, H_max)``.
     cfg : StudyConfig
         Configuration.
+    halves : dict[str, np.ndarray]
+        The half-draw moments of the core cell's test split, as
+        ``record_halves`` stored them.
 
     Returns
     -------
@@ -697,8 +737,9 @@ def split_arrays(
     Raises
     ------
     ValueError
-        If the core horizons are not ``1..H_max``, if the construction split
-        kept no per-draw arrays for A3, or if the horizon of
+        If the core horizons or the horizons of ``halves`` are not
+        ``1..H_max``, if the construction split kept no per-draw arrays for
+        A3, or if the horizon of
         ``characteristic_horizon`` differs from ``state_horizon_target`` (a
         defect of the dump, not a tolerance).
     """
@@ -745,7 +786,21 @@ def split_arrays(
         out[f"{group}/T"] = target
         out[f"{group}/T_censored"] = ~event
     cols = np.array(cfg.eval_horizons) - 1
-    out["split/test/a3_weight"] = weights["A3"][:, :, cols]
+    for split in ("test", "calibration"):
+        ev = core.splits[split].evals
+        out[f"split/{split}/cp_err"] = ev.cp_err[:, :, cols]
+        out[f"split/{split}/plp_err"] = ev.plp_err[:, :, cols]
+    test = core.splits["test"].evals
+    out["split/test/cp_err_full"] = test.cp_err
+    out["split/test/plp_err_full"] = test.plp_err
+    out["split/test/verify_noise"] = test.verify_noise
+    for rule in ("A2", "A3", "A4"):
+        out[f"split/test/{rule.lower()}_weight"] = weights[rule][:, :, cols]
+    if not np.array_equal(np.asarray(halves["horizons"]), horizons):
+        raise ValueError("the half-draw moments are not on 1..H_max")
+    for stem, name in HALF_NAMES:
+        for tag in ("A", "B"):
+            out[f"split/test/{name}_{tag}"] = halves[f"{stem}_{tag}"]
     kept = core.splits["construction"].moments.kept
     if not all(k in kept for k in ("inputs", "cp_err", "plp_err")):
         raise ValueError(
