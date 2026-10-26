@@ -10,7 +10,11 @@ process: once without and once with ``--states-dump``. Each run is a preset, so
 the file is run only when the preset slot is free. The numbering b1 to b7
 follows the plan (B2 row .7b). Check b1 (dump off against the .7a tip: 0
 changed, 0 removed, 0 added) needs a run of that older commit and is done by
-hand with ``tools/leafdiff.py``; it is in the unit Log.
+hand with ``tools/leafdiff.py``; it is in the unit Log. Both sides of such a
+hand leafdiff need the same environment, ``PJRT_NPROC`` and ``NPROC``
+included: ``tools/run_tests.sh`` sets them to 4, a plain shell leaves them
+unset, and the XLA thread pools change the A3 training and the leaves that
+depend on it (WU-0046b).
 
 * b2: the ``results.json`` files of the two runs are bitwise equal (floats
   compared by their IEEE bytes), except that the dump run's ``provenance`` block
@@ -613,3 +617,80 @@ def test_schema3_state_mse_is_recomputed_from_the_per_draw_errors_and_weights(
     np.testing.assert_allclose(
         recomputed, a["core/state_mse/A5"][:, ref_index], rtol=1e-12, atol=0.0
     )
+
+
+def test_schema3_realized_horizons_are_recomputed_from_the_dumped_draws(
+    runs,
+) -> None:
+    """The dumped full-grid draws reproduce the run's realized horizons.
+
+    For A0 (weight 1), A1 (weight 0), A2 and A4 the blend
+    ``w e_C + (1 - w) e_P`` of ``split/test/cp_err_full`` and
+    ``plp_err_full``, minus ``split/test/verify_noise``, is the error against
+    the noisy truth; ``oracle.realized_horizon`` at ``meta/horizon_threshold``
+    gives the first passage of every (state, draw). The run stores only
+    aggregates of these: per rule, the Kaplan-Meier median and restricted mean
+    (``scores/<rule>/km_median_lyapunov``, ``rmst_lyapunov``, in Lyapunov
+    times) and the survival curve (``km_curves/<rule>``). Those three are
+    recomputed here with the production ``statistics.kaplan_meier`` and must
+    be equal exactly. This is a dump-fidelity check, like b3: the reference
+    is the production statistic applied to the dumped arrays.
+
+    Full-grid weights: the dump has A2 and A4 at the five evaluation horizons
+    only. A4 does not depend on the horizon (checked on the five columns), so
+    its first column is broadcast. A2 on ``1..H_max`` is the pooled minimizer
+    ``clip(sum(E_P - C) / max(sum(E_C + E_P - 2 C), 1e-300), 0, 1)`` over the
+    dumped construction moments, written here; it must equal the dumped
+    ``a2_weight`` bitwise at the five columns.
+
+    Tolerance: exact (the same float64 operations on the same arrays; the
+    JSON floats round-trip exactly).
+    """
+    from lpcstudy.config import SMOKE
+    from lpcstudy.oracle import realized_horizon
+    from lpcstudy.statistics import kaplan_meier
+
+    a = runs["arrays"]
+    res = runs["results"]["on"]["systems"][SYSTEM]
+    n, e, h_max = SMOKE.n_test, SMOKE.n_eval_draws, SMOKE.horizon_max
+    noise = a["split/test/verify_noise"]
+    assert noise.shape == (n, e, h_max) and noise.dtype == np.float64
+    e_c, e_p = a["split/test/cp_err_full"], a["split/test/plp_err_full"]
+    horizons = a["meta/horizons_full"]
+    theta = float(a["meta/horizon_threshold"])
+    lt = int(a["meta/steps_per_lyapunov"])
+    cols = a["core/horizons"] - 1
+
+    con = "split/construction"
+    a2 = np.clip(
+        np.sum(a[f"{con}/E_P"] - a[f"{con}/C"], axis=0)
+        / np.maximum(
+            np.sum(
+                a[f"{con}/E_C"] + a[f"{con}/E_P"] - 2.0 * a[f"{con}/C"],
+                axis=0,
+            ),
+            1e-300,
+        ),
+        0.0,
+        1.0,
+    )
+    a2_dumped = a["split/test/a2_weight"]
+    assert np.array_equal(
+        np.broadcast_to(a2[cols], a2_dumped.shape), a2_dumped
+    )
+    a4_dumped = a["split/test/a4_weight"]
+    assert np.all(a4_dumped == a4_dumped[:, :, :1])
+    weights = {
+        "A0": np.ones_like(e_c),
+        "A1": np.zeros_like(e_c),
+        "A2": np.broadcast_to(a2, e_c.shape),
+        "A4": np.broadcast_to(a4_dumped[:, :, :1], e_c.shape),
+    }
+    for rule, w in weights.items():
+        blend = w * e_c + (1 - w) * e_p
+        durations, events = realized_horizon(blend - noise, horizons, theta)
+        curve = kaplan_meier(durations, events, len(horizons))
+        stored = res["scores"][rule]
+        assert curve.median() / lt == stored["km_median_lyapunov"], rule
+        assert curve.restricted_mean() / lt == stored["rmst_lyapunov"], rule
+        assert curve.survival.tolist() == res["km_curves"][rule], rule

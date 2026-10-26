@@ -32,8 +32,8 @@ Bitwise neutrality
     arrays, evaluated after the run's own use of them: the clean delay vectors
     (``delay_vectors`` of the stored trajectory), the oracle and deployable
     profiles, and the characteristic horizons. Its per-draw evaluation errors,
-    rule weights and full-grid half-draw moments (WU-0046b) are copies of
-    arrays the run already holds.
+    verification noise, rule weights and full-grid half-draw moments
+    (WU-0046b) are copies of arrays the run already holds.
 
 Schema version
     ``/2`` adds the ``h1c/`` and ``h1a/`` groups (WU-0003.7c); every key of
@@ -41,8 +41,9 @@ Schema version
     six ``meta/`` keys (WU-0046, phase J); every key of ``/2`` keeps its name
     and meaning. WU-0046b added keys to ``split/test/`` and
     ``split/calibration/`` before any ``/3`` dump was used for results, so the
-    version string stayed ``/3``: the per-draw evaluation errors, the A2 and
-    A4 weights, and the full-grid half-draw moments.
+    version string stayed ``/3``: the per-draw evaluation errors and
+    verification noise, the A2 and A4 weights, and the full-grid half-draw
+    moments.
 
 File format
     A NumPy ``.npz`` archive (uncompressed, ``allow_pickle`` never needed).
@@ -259,6 +260,12 @@ File format
     * ``cp_err_full`` and ``plp_err_full`` (``(n, E, H_max)``, test split
       only): the same errors on the full grid ``meta/horizons_full``. The
       columns ``core/horizons - 1`` are ``cp_err`` and ``plp_err``.
+    * ``verify_noise`` (``(n, E, H_max)``, test split only): the verification
+      noise ``rho z`` on the observed truth of every evaluation draw
+      (``EvaluationDraws.verify_noise``). ``score_rules`` takes a rule's
+      realized horizon (``oracle.realized_horizon``, threshold
+      ``meta/horizon_threshold``) from ``blend - verify_noise``, the blend's
+      error against the noisy truth.
     * ``a2_weight`` and ``a4_weight`` (``(n, E, k)``, test split only): the A2
       and A4 weight of every evaluation draw at ``core/horizons``, like
       ``a3_weight``. A0 is the weight 1 and A1 the weight 0 on every draw, so
@@ -786,6 +793,7 @@ def split_arrays(
     test = core.splits["test"].evals
     out["split/test/cp_err_full"] = test.cp_err
     out["split/test/plp_err_full"] = test.plp_err
+    out["split/test/verify_noise"] = test.verify_noise
     for rule in ("A2", "A3", "A4"):
         out[f"split/test/{rule.lower()}_weight"] = weights[rule][:, :, cols]
     if not np.array_equal(np.asarray(halves["horizons"]), horizons):

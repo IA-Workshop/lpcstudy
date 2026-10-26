@@ -1251,3 +1251,31 @@ def test_split_group_refuses_half_moments_off_the_full_grid() -> None:
     )
     with pytest.raises(ValueError, match="not on 1..H_max"):
         _collect_world(world)
+
+
+def test_split_verify_noise_is_a_copy_of_the_test_evaluation_draws() -> None:
+    """``split/test/verify_noise`` is a copy of the test draws' verification
+    noise on the full grid, and only the test split carries it.
+
+    Reference: random values put into the hand-built world here (its default
+    verification noise is zero, which would not show a wrong source).
+
+    Tolerance: exact (a copy).
+    """
+    world = _world()
+    core = world[1]
+    rng = np.random.default_rng(70047)
+    for split in ("construction", "calibration", "test"):
+        ev = core.splits[split].evals
+        ev.verify_noise = 0.01 * rng.standard_normal(ev.verify_noise.shape)
+    arrays, _ = _collect_world(world)
+    source = core.splits["test"].evals.verify_noise
+    value = arrays["split/test/verify_noise"]
+    assert value.dtype == np.float64
+    assert value.shape == (N, E, CFG.horizon_max)
+    assert np.array_equal(value, source)
+    assert not np.shares_memory(value, source)
+    assert not any(
+        k.endswith("verify_noise") and k != "split/test/verify_noise"
+        for k in arrays
+    )
