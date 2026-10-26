@@ -364,8 +364,11 @@ def test_replication_tool_on_three_copies_of_the_smoke_records(
     row is replicated iff its word carries a claim, and not replicated (with
     no fallback claim) iff it carries none. The row set equals the tool's
     own extraction of one copy, every reading leaf of both records being
-    covered (else the tool refuses). Without ``--exploratory`` N = 3 is
-    refused (exit 64, nothing written). Tolerance: none (words, counts).
+    covered (else the tool refuses). A row of point claims only reads
+    "replicated (point readings)" instead (S3). The C1 rows are checked
+    equal to D vs full and left out of the family counts (S4). Without
+    ``--exploratory`` N = 3 is refused (exit 64, nothing written).
+    Tolerance: none (words, counts).
     """
     tools = REPO_ROOT / "tools"
     copies = []
@@ -398,11 +401,20 @@ def test_replication_tool_on_three_copies_of_the_smoke_records(
         assert len(words) == 1 and None not in words, row
         assert row["contradicting_pairs"] == [], row
         if row["claims"][0]:
-            assert row["class"] == "replicated", row
+            expected = (
+                "replicated (point readings)"
+                if row["point_readings"]
+                else "replicated"
+            )
+            assert row["class"] == expected, row
             assert row["replicated_reading"] == row["readings"][0]
         else:
             assert row["class"] == "not replicated", row
             assert row["replicated_claims"] == [], row
+    # C1 duplicates D vs full: checked on every copy, not counted (S4).
+    assert all(n > 0 for n in record["c1_rows_checked"])
+    assert "C1" not in record["summary"]
+    assert any(row["family"] == "C1" for row in rows)
     blocks = (out / "replication.md").read_text().split("\n\n")
     tables = [i for i, b in enumerate(blocks) if b.lstrip().startswith("|")]
     assert tables

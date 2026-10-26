@@ -24,11 +24,14 @@ E-H2a, directional amplification (:func:`h2a_block`)
     Reading (fixed in advance). Over the horizons beyond ``H_0`` with at
     least 50 kept states: "consistent" (with the student's reading that the
     instability enters ``w*(H)`` through uneven growth) if at one of them
-    the interval of Spearman(m, I) excludes 0 and the median ``|drift|`` of
-    the high-``I`` tercile exceeds that of the low tercile; "not consistent"
-    if at every one of them the interval lies inside ``(-0.1, 0.1)``;
-    otherwise "not determined", and "not determined (fewer than 50 kept
-    states)" if no such horizon exists.
+    the interval of Spearman(m, I) lies beyond the margin ``NEAR_ZERO`` on
+    one side (lower bound > 0.1 or upper bound < -0.1; math spec addendum
+    WU-0045c S2) and the median ``|drift|`` of the high-``I`` tercile
+    exceeds that of the low tercile; "not consistent" if at every one of
+    them the interval lies inside ``(-0.1, 0.1)``; otherwise "not
+    determined", and "not determined (fewer than 50 kept states)" if no such
+    horizon exists. With the same margin on both sides, the two determined
+    words make contradictory claims on the true Spearman.
 
 E-H2e, library size and correlation (:func:`h2e_block`)
     On the sweep states (the first ``n_test_sweep`` test states), per noise
@@ -432,15 +435,15 @@ def h2a_reading(rows: dict, ref: int) -> dict:
     for h, r in usable:
         lower, upper = r["spearman_m_I"]["ci"]
         low_drift, _, high_drift = r["median_abs_drift_by_tercile"]
-        excludes = (lower is not None and lower > 0) or (
-            upper is not None and upper < 0
+        beyond = (lower is not None and lower > NEAR_ZERO) or (
+            upper is not None and upper < -NEAR_ZERO
         )
         larger = (
             low_drift is not None
             and high_drift is not None
             and high_drift > low_drift
         )
-        if excludes and larger:
+        if beyond and larger:
             support.append(h)
         if (
             lower is not None

@@ -1,35 +1,61 @@
 #!/usr/bin/env python3
-"""Phase J replication rule M-6, applied mechanically (WU-0051b).
+"""Phase J replication rule M-6, applied mechanically (WU-0051b, WU-0051c).
 
 DEVELOPMENT: phase J replication (held-out development seeds), not a
 hypothesis test. The tool reads, for each of N seeds, the A/B/D record
 ``contrib.json`` (``tools/lpc_contrib.py``) and the C/E record ``ce.json``
 (``tools/lpc_contrib_ce.py``) of one analysis commit, lines up every reading
 row across the seeds, and classifies each row by the rule of the math spec
-(``docs/agent/notes/2026-10-26-phase-j-math-spec.md``, M-6):
+(``docs/agent/notes/2026-10-26-phase-j-math-spec.md``, M-6, with the
+addendum of WU-0045c, S1 to S4):
 
-* **contradicted**: some pair of seeds has jointly unsatisfiable bound
+* **contradicted**: some pair of seeds has jointly unsatisfiable interval
   claims (the plan's "seed-dependent");
 * **replicated**: otherwise, if one claim-bearing reading occurs on at least
   4 of the 5 seeds;
+* **replicated (point readings)**: the same, for a row whose claim-bearing
+  readings carry point claims only (S3); such a row is never contradicted;
 * **not replicated**: otherwise (typically imprecision).
 
-For a row that is not replicated, the claim-level fallback reports every
-atomic bound claim (for example ``ratio > 1``) that at least 4 seeds' claims
-imply and no seed's claims contradict, as a "replicated claim".
+Claim-level fallback (M-6, S4): every atomic interval claim (for example
+``ratio > 1``) that at least 4 seeds' claims imply and no seed's claims
+contradict. It is listed as "replicated claim" for a row that is not
+replicated, and as "replicated claim within a contradicted row" beneath a
+contradicted one, whose headline stays "contradicted".
 
 Claims
     Every reading word maps to a conjunction of claims ``quantity op value``
-    on the true value of the row's quantity (:func:`claims_of`), derived from
-    the rule that produced the word. Two readings contradict iff the union of
-    their claims is unsatisfiable (:func:`satisfiable`). A word with no claim
-    ("undetermined", "not determined (...)", "not identifiable", and the
-    non-detections "no interaction gain detected", "no difference detected",
-    "no detectable dependence bias", "realized-noise outlier, no detectable
-    dependence bias") never contradicts and never counts toward the minimum.
-    :data:`VOCABULARY` lists every word with its claim template; a word that
-    is not in it, or a ``reading`` leaf that no row covers, is refused, so a
-    change of the analysis cannot drop a row silently.
+    on the true value of the row's quantity, derived from the rule that
+    produced the word. Each claim has a basis: ``interval`` (a bound of the
+    row's interval), ``test`` (a Holm-adjusted one-sided test) or ``point``
+    (a point estimate against a threshold: E-H3c, all parts, and E-H2a's
+    drift). Two readings contradict iff the union of their non-point claims
+    is unsatisfiable (:func:`contradict`). Point claims count only through
+    the word and never enter :func:`contradict` or the fallback (S3).
+
+    Non-detections can never be replicated (S1). A word with no claim
+    ("undetermined", "not identifiable", every "not determined (...)", and
+    the non-detections "no interaction gain detected", "no difference
+    detected", "no detectable dependence bias", "realized-noise outlier, no
+    detectable dependence bias") never contradicts and never counts toward
+    the minimum. A replicable null needs an equivalence claim, an interval
+    inside a margin fixed in advance; the vocabulary has three:
+
+    * the ratio rows' "negligible" (ratio <= 1.05): A, the B loss ratio, D,
+      the horizon ratios;
+    * E-H2a "not consistent" (-0.1 < Spearman(m, I) < 0.1 at every usable H);
+    * C2 "loses most" (retained < 0.5).
+
+    :data:`VOCABULARY` lists every word with its claims; a word that is not
+    in it, or a ``reading`` leaf that no row covers, is refused, so a change
+    of the analysis cannot drop a row silently.
+
+C1 rows
+    C1 copies D's vs-full ladder rows (``joint_decisions.c1_rows``). On every
+    seed the tool checks that each C1 row's word and ratio (allocation; C1
+    stores no interval) or word and pinball loss (horizon) equal those of
+    its source in ``contrib.json``, and refuses otherwise (S4). C1 rows are
+    shown for display and left out of the family counts.
 
 Usage::
 
@@ -42,7 +68,8 @@ Refusals (exit 64, nothing written): an argument containing "confirmatory"
 or "CONF-" (any case); a record whose text contains either; a seed id that is
 not ``DEV-n``; records of different analysis commits (contrib and ce, every
 seed) or of different presets; a C/E record of another seed or run, or
-without its A/D record; an unknown reading word or an uncovered reading leaf.
+without its A/D record; an unknown reading word or an uncovered reading leaf;
+a C1 row that differs from its D source.
 Without ``--exploratory`` also: N other than 5, a seed set other than the
 held-out DEV-5 to DEV-9, a record with uncommitted analysis code. With
 ``--exploratory`` any N >= 2 runs, the minimum is ``ceil(4 N / 5)``, repeated
@@ -132,9 +159,18 @@ def satisfiable(claims) -> bool:
     return True
 
 
+def interval_claims(claims) -> tuple[Claim, ...]:
+    """The claims that can establish a contradiction (S3: not ``point``)."""
+    return tuple(c for c in claims if c.basis != "point")
+
+
 def contradict(first, second) -> bool:
-    """Two claim sets contradict iff their union is unsatisfiable."""
-    return not satisfiable((*first, *second))
+    """Two claim sets contradict iff their non-point union is unsatisfiable.
+
+    Point claims (a point estimate against a threshold) make no claim about
+    the true value, so they never establish a contradiction (S3).
+    """
+    return not satisfiable(interval_claims((*first, *second)))
 
 
 def implies(claims, claim: Claim) -> bool:
@@ -219,9 +255,9 @@ VOCABULARY: dict[str, dict[str, str]] = {
         BIAS_DETECTED: "bias > 0 or bias < 0, the side of the interval",
     },
     "E-H2a": {
-        "consistent": "at every supporting H: Spearman(m, I)@H > 0 or < 0 "
-        "(the side of its interval), and drift(high I) - drift(low I)@H > 0 "
-        "(point)",
+        "consistent": f"at every supporting H: Spearman(m, I)@H > "
+        f"{NEAR_ZERO:g} or < -{NEAR_ZERO:g} (the side of its interval), and "
+        "drift(high I) - drift(low I)@H > 0 (point)",
         "not consistent": f"at every usable H: -{NEAR_ZERO:g} < Spearman(m, "
         f"I)@H < {NEAR_ZERO:g}",
         "not determined (...)": "none",
@@ -277,13 +313,13 @@ def table_claims(table: dict, word: str, path: str) -> tuple[Claim, ...]:
     raise Refusal(f"unknown reading {word!r} at {path}")
 
 
-def _side(ci: list, quantity: str, basis: str = "interval") -> tuple:
-    """The claim an interval that excludes 0 makes (``()`` if it does not)."""
+def _side(ci: list, quantity: str, margin: float = 0.0) -> tuple:
+    """The claim of an interval beyond ``+-margin`` (``()`` if it is not)."""
     lower, upper = ci
-    if lower is not None and lower > 0:
-        return (_c(quantity, ">", 0, basis),)
-    if upper is not None and upper < 0:
-        return (_c(quantity, "<", 0, basis),)
+    if lower is not None and lower > margin:
+        return (_c(quantity, ">", margin),)
+    if upper is not None and upper < -margin:
+        return (_c(quantity, "<", -margin),)
     return ()
 
 
@@ -300,16 +336,23 @@ def bias_claims(row: dict, path: str) -> tuple[Claim, ...]:
 
 
 def h2a_claims(block: dict, path: str) -> tuple[Claim, ...]:
-    """E-H2a (``mechanisms.h2a_reading``)."""
+    """E-H2a (``mechanisms.h2a_reading``, addendum S2).
+
+    "consistent": at each supporting H, Spearman(m, I) > 0.1 or < -0.1
+    (interval, the side that established it) and the drift difference > 0
+    (point). "not consistent": -0.1 < Spearman < 0.1 at every usable H.
+    """
     rec = block["reading"]
     word = rec["reading"]
     if word == "consistent":
         out = []
         for h in rec["horizons_supporting"]:
             row = block["by_horizon"][h]
-            side = _side(row["spearman_m_I"]["ci"], f"Spearman(m, I)@{h}")
+            side = _side(
+                row["spearman_m_I"]["ci"], f"Spearman(m, I)@{h}", NEAR_ZERO
+            )
             if not side:
-                raise Refusal(f"{path}: supporting H={h} spans 0")
+                raise Refusal(f"{path}: supporting H={h} within the margin")
             out += [*side, _c(f"drift high - low I@{h}", ">", 0, "point")]
         return tuple(out)
     if word == "not consistent":
@@ -751,15 +794,47 @@ def atomic(claims) -> list[Claim]:
     return list(seen.values())
 
 
+POINT_CLASS = "replicated (point readings)"
+"""S3: a row whose claim-bearing readings carry point claims only."""
+WITHIN = "replicated claim within a contradicted row"
+"""S4: the label of a fallback claim beneath a contradicted row."""
+
+
+def fallback(present: list, minimum: int) -> list[str]:
+    """Atomic interval claims implied on ``minimum`` seeds, contradicted by
+    none.
+
+    Point claims are ignored (S3). A claim implied by a stronger passing
+    claim on the same quantity is dropped.
+    """
+    own = [interval_claims(r.claims) for _, r in present]
+    passing = []
+    for claim in atomic(c for claims in own for c in claims):
+        holds = sum(1 for claims in own if implies(claims, claim))
+        clash = any(contradict(claims, (claim,)) for claims in own)
+        if holds >= minimum and not clash:
+            passing.append(claim)
+    return [
+        c.text()
+        for c in passing
+        if not any(
+            o is not c and implies((o,), c) and not implies((c,), o)
+            for o in passing
+        )
+    ]
+
+
 def classify(readings: list[Reading | None], minimum: int) -> dict:
     """The M-6 class of one row from its seeds' readings (``None``: absent).
 
-    Contradicted if any pair of present readings has unsatisfiable claims;
-    else replicated if one claim-bearing word occurs at least ``minimum``
-    times; else not replicated. Rows that are not replicated get the
-    claim-level fallback: each atomic claim of any seed that at least
-    ``minimum`` seeds imply and no seed contradicts (claims implied by a
-    stronger replicated claim on the same quantity are dropped).
+    Contradicted if any pair of present readings has unsatisfiable interval
+    claims; else replicated if one claim-bearing word occurs at least
+    ``minimum`` times; else not replicated. A row whose claim-bearing
+    readings carry point claims only reads "replicated (point readings)" or
+    "not replicated", never "contradicted" (S3). The claim-level fallback is
+    listed for a row that is not replicated ("replicated claims") and
+    beneath a contradicted row ("replicated claims within a contradicted
+    row"), whose class stays "contradicted" (S4).
     """
     present = [(i, r) for i, r in enumerate(readings) if r is not None]
     pairs = [
@@ -770,37 +845,84 @@ def classify(readings: list[Reading | None], minimum: int) -> dict:
     ]
     bearing = Counter(r.word for _, r in present if r.claims)
     word, count = (bearing.most_common(1) or [(None, 0)])[0]
+    point_only = bool(bearing) and not any(
+        interval_claims(r.claims) for _, r in present
+    )
     out = {
         "class": "not replicated",
         "replicated_reading": None,
+        "point_readings": point_only,
         "modal_claim_word": word,
         "modal_count": count,
         "n_claim_free": sum(1 for _, r in present if not r.claims),
         "n_absent": len(readings) - len(present),
         "contradicting_pairs": pairs,
         "replicated_claims": [],
+        "replicated_claims_within_contradicted_row": [],
     }
-    if pairs:
-        out["class"] = "contradicted"
-    elif count >= minimum:
-        out["class"] = "replicated"
+    if count >= minimum and not pairs:
+        out["class"] = POINT_CLASS if point_only else "replicated"
         out["replicated_reading"] = word
         return out
-    passing = []
-    for claim in atomic(c for _, r in present for c in r.claims):
-        holds = sum(1 for _, r in present if implies(r.claims, claim))
-        clash = any(contradict(r.claims, (claim,)) for _, r in present)
-        if holds >= minimum and not clash:
-            passing.append(claim)
-    out["replicated_claims"] = [
-        c.text()
-        for c in passing
-        if not any(
-            o is not c and implies((o,), c) and not implies((c,), o)
-            for o in passing
+    if point_only:
+        return out
+    if pairs:
+        out["class"] = "contradicted"
+        out["replicated_claims_within_contradicted_row"] = fallback(
+            present, minimum
         )
-    ]
+    else:
+        out["replicated_claims"] = fallback(present, minimum)
     return out
+
+
+def check_c1(contrib: dict, ce: dict, where: str) -> int:
+    """S4: every C1 row equals its source in ``contrib.json``; the count.
+
+    Allocation: word, ratio and MSE of the rung equal the D vs-full row
+    (C1 stores no interval, so there is none to differ). Horizon: word and
+    pinball loss of the rung, and the Lyapunov-rank C. Refuses otherwise.
+    """
+    checked = 0
+    for system, res in ce["systems"].items():
+        c1 = res.get("C1")
+        if c1 is None:
+            continue
+        src = contrib["systems"][system]
+        for hkey, kinds in c1["allocation"].items():
+            for kind, b in kinds.items():
+                lad = src["allocation"][hkey][kind]["ladder"]
+                for rung, word in b["reading_vs_F"].items():
+                    row = lad["vs_full"][rung]["mse_ratio"]
+                    same = (
+                        word == row.get("reading")
+                        and b["ratio_vs_F"][rung] == row.get("ratio")
+                        and b["mse"].get(rung) == lad["mse"].get(rung)
+                    )
+                    if not same:
+                        raise Refusal(
+                            f"{where}: C1 {system} H={hkey} {kind} {rung} "
+                            "differs from D vs full"
+                        )
+                    checked += 1
+        for kind, rungs in c1["horizon"].items():
+            hb = src["horizon"][kind]
+            for rung, r in rungs.items():
+                if rung == "lyapunov_rank_c":
+                    same = r == hb["lyapunov_rank"]["c_index"]
+                else:
+                    vs = hb["ladder"]["vs_full"].get(rung)
+                    word = vs["pinball_ratio"].get("reading") if vs else None
+                    same = r["reading_vs_F"] == word and (
+                        r["pinball"] == hb["rows"][rung]["pinball_0.5"]
+                    )
+                if not same:
+                    raise Refusal(
+                        f"{where}: C1 {system} horizon {kind} {rung} differs "
+                        "from D"
+                    )
+                checked += 1
+    return checked
 
 
 # ----------------------------------------------------------------- checks
@@ -888,6 +1010,9 @@ def load(directory: Path) -> dict:
 def replicate(records: list[dict], exploratory: bool) -> dict:
     """The replication record: metadata, every row classified, a summary."""
     meta = check_records(records, exploratory)
+    meta["c1_rows_checked"] = [
+        check_c1(r["contrib"], r["ce"], str(r["dir"])) for r in records
+    ]
     per_seed = [seed_rows(r["contrib"], r["ce"]) for r in records]
     keys = sorted(set().union(*per_seed))
     rows = []
@@ -906,20 +1031,30 @@ def replicate(records: list[dict], exploratory: bool) -> dict:
         )
     summary: dict[str, Counter] = defaultdict(Counter)
     for row in rows:
-        summary[row["family"]][row["class"]] += 1
-        summary[row["family"]]["rows"] += 1
+        if row["family"] == C1_FAMILY:
+            continue  # duplicates of D vs full, checked (S4)
+        counts = summary[row["family"]]
+        counts[row["class"]] += 1
+        counts["rows"] += 1
         if row["replicated_claims"]:
-            summary[row["family"]]["with replicated claim"] += 1
+            counts["with replicated claim"] += 1
+        if row["replicated_claims_within_contradicted_row"]:
+            counts[WITHIN] += 1
         if row["n_absent"]:
-            summary[row["family"]]["absent on some seed"] += 1
+            counts["absent on some seed"] += 1
     return {
         **meta,
         "rule": (
             "replicated: one claim-bearing reading on at least "
             f"{meta['minimum']} of {meta['n_seeds']} seeds and no pair of "
-            "seeds with jointly unsatisfiable claims; contradicted: some "
-            "such pair; else not replicated. Fallback: atomic claims implied "
-            f"on at least {meta['minimum']} seeds and contradicted by none."
+            "seeds with jointly unsatisfiable interval claims; "
+            "contradicted: some such pair; replicated (point readings): "
+            "the same count on a row whose claims are all point claims, "
+            "which never contradict; else not replicated. Fallback: atomic "
+            f"interval claims implied on at least {meta['minimum']} seeds "
+            "and contradicted by none, listed as 'replicated claim', or as "
+            f"'{WITHIN}' beneath a contradicted row. C1 rows are checked "
+            "equal to D vs full and left out of the family counts."
         ),
         "constants": {
             "ratio_margin": RATIO_MARGIN,
@@ -937,7 +1072,8 @@ def replicate(records: list[dict], exploratory: bool) -> dict:
 
 
 # ---------------------------------------------------------------- markdown
-CLASSES = ("replicated", "contradicted", "not replicated")
+CLASSES = ("replicated", POINT_CLASS, "contradicted", "not replicated")
+C1_FAMILY = "C1"
 
 
 def markdown(record: dict) -> str:
@@ -962,16 +1098,20 @@ def markdown(record: dict) -> str:
         "",
         "## Summary by family",
         "",
-        "| family | rows | replicated | contradicted | not replicated | "
-        "with replicated claim | absent on some seed |",
-        "|---|---|---|---|---|---|---|",
+        f"C1 rows are display only: on every seed they equal their D "
+        f"vs-full source ({', '.join(map(str, record['c1_rows_checked']))} "
+        "checked per seed) and are not counted here.",
+        "",
+        "| family | rows | " + " | ".join(CLASSES) + " | with replicated "
+        f"claim | {WITHIN} | absent on some seed |",
+        "|---|---|" + "---|" * (len(CLASSES) + 3),
     ]
     for family, c in record["summary"].items():
         lines.append(
             f"| {family} | {c.get('rows', 0)} | "
             + " | ".join(
                 str(c.get(k, 0))
-                for k in (*CLASSES, "with replicated claim",
+                for k in (*CLASSES, "with replicated claim", WITHIN,
                           "absent on some seed")
             )
             + " |"
@@ -981,7 +1121,8 @@ def markdown(record: dict) -> str:
         "## Claims of every reading word",
         "",
         "A word with claims `none` never contradicts and never counts toward "
-        "the minimum.",
+        "the minimum. Point claims (marked point) count through the word "
+        "only and never establish a contradiction or a fallback claim.",
         "",
         "| row type | word | claims |",
         "|---|---|---|",
@@ -1001,7 +1142,8 @@ def markdown(record: dict) -> str:
     for family, rows in sorted(by_family.items()):
         lines += [
             "",
-            f"## {family}",
+            f"## {family}"
+            + (" (display only, not counted)" if family == C1_FAMILY else ""),
             "",
             head,
             rule,
@@ -1012,10 +1154,16 @@ def markdown(record: dict) -> str:
             )
             if row["class"] == "contradicted":
                 first = row["contradicting_pairs"][0]
+                within = "; ".join(
+                    row["replicated_claims_within_contradicted_row"]
+                )
                 what = (
                     f"{seeds[first[0]]} {first[1]} vs {seeds[first[2]]} "
-                    f"{first[3]}" + (f"; claims: {what}" if what else "")
+                    f"{first[3]}"
+                    + (f"; {WITHIN}: {within}" if within else "")
                 )
+            elif row["replicated_claims"]:
+                what = "replicated claim: " + what
             lines.append(
                 f"| {row['system']} | {row['decision']} | {row['profile']} | "
                 f"{row['horizon']} | {row['item']} | "
