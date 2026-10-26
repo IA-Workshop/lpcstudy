@@ -335,3 +335,57 @@ All of these tighten or add; none loosens.
 | Model form: three systems, ρ = 1% core cell, scalar observable | epistemic | not estimated | — | no |
 
 The interval level is per family (M-3, M-7), and the dependence assumption is block stationarity with blocks of 5. Seed: DEV-2 for every number here. For the horizon QoIs (pinball loss, C, coverage), the same rows apply, with the oracle Monte Carlo error of T_c "not estimated" unless J1 dumps the full-grid halves.
+
+## Addendum (WU-0045b, 2026-10-26): rulings on three WU-0048 points
+
+**DEVELOPMENT (DEV-1): exploratory, not a hypothesis test.** The inputs are the phase J DEV-1 full run (run commit f701a47, schema /3) and the WU-0048 analysis code at 108d7d5. The diagnostics are `2026-10-26-phase-j-math-spec/rulings_0045b.py`, with output in `rulings_0045b.out.md` (CPU, one thread). This addendum supersedes the text above where they differ.
+
+### R1. Test (c), the additive null: the criterion I gave was mis-specified
+
+- **The fault.** I wrote that under an additive truth the fixed-model gain Δ = L(M_add) − L(M_XY) is ≤ 0 in expectation, because the pair model can only overfit. I then asked, as part of the null criterion, for every upper bound of Δ to be ≥ 0. These two statements contradict each other. The overfitting penalty is a real, non-zero quantity. With 1000 test states and the models held fixed, the interval can exclude 0 from above. That is what happened for R × O: Δ = −0.0110 [−0.0212, −0.0016].
+- **The upper-bound condition controls no error rate.** It fails more often the larger the pair model's overfit, and that is not a defect of the statistic.
+- **Corrected criterion (c), null.** For each of the 6 pairs, the Holm-adjusted p is > 0.05. Equivalently, no pair is detected, and no claim "gain > 0" is made.
+  - **Error rate.** The null hypothesis is the one-sided, composite E[Δ] ≤ 0. Holm on the one-sided bootstrap p-values keeps the family-wise false-detection rate ≤ 0.05, approximately, since bootstrap p-values are approximate. It is conservative when E[Δ] < 0.
+  - **For the test.** This is one fixed-seed check, so its probability of a spurious failure is ≤ 0.05. The observed smallest Holm p is 0.144.
+  - **The planted part is unchanged.**
+- **A significantly negative Δ is not a defect, and needs no fix.**
+  - **No stricter inner CV.** The inner cross-validation chose each model's setting by its own decision loss, as designed. A stricter grid for the pair model only would be a different rule for one model.
+  - **No training variance in the interval.** The intervals hold the models fixed by design (plan §3.4). Training variance enters through replication.
+  - **The cost is power, not error.** A true interaction is detected only if its gain exceeds the pair model's overfitting penalty. The J5 report should state this.
+- **Reading of a B row with upper bound < 0** (MSE-ratio upper bound < 1): "no interaction gain; the pair model fits worse". It is not a claim of a negative interaction. For M-6, it does not contradict "no interaction".
+
+### R2. The n_eff guard for deployable rows: use the substituted excess
+
+- **The fault.** For realized scores, x_i = S_i − V_i(w\*_i) = E[x_i] + η_i, where η_i is draw noise with mean zero that is independent across states. So (Σx)²/Σx² estimates n·mean²/(mean² + var(η)), a signal-to-noise ratio, not concentration. On DEV-1 its value was 0.6 to 75 for A4 and 27 for the learned rules at Rössler 0.27 LT, where Kish(κ) is 269.
+- **What the guard is for.** It targets the concentration of the estimand's per-state contributions E[x_i]. Draw noise is resampled by the bootstrap, and its heavy tail lies on the large-κ states that Kish(κ) already covers.
+- **Ruling.** For deployable rows, n_eff = min(Kish(κ), Kish(x̃)), where x̃_i = (1/E) Σ_j V_i(g_ij) − V_i(w\*_i) ≥ 0 is the substituted (moment-form) excess of the row's reference rule. This is the oracle-row definition applied to the deployable weights. x̃_i estimates E[x_i] up to the dependence bias, which (f2) reports.
+  - The same quantity replaces `n_eff_constant_excess` in the deployable blocks.
+  - The reading is still made on the realized MSE ratio (M-8). Only the guard changes.
+- **Rejected alternatives.**
+  - **\|x\|** measures noise magnitude. On DEV-1 its Kish size exceeds the substituted one by up to 2× (Rössler 0.27 LT: 306 against 143), and it falls below it elsewhere (Chua 1 LT: 13.7 against 26.4).
+  - **Kish(κ) alone** ignores the rule. A rule's excess can concentrate where κ does not: Chua 0.27 LT A4 gives 5.1 against Kish(κ) 19.4.
+- **Effect on DEV-1.** At Rössler 0.27 LT, Kish(x̃) is 52 to 57 for the learned RON and ROIN rules and 143 for A4. Those rows become readable. Chua 0.27 LT stays undetermined (4.0 to 5.1), correctly, because one state there has κ 269 times the median.
+
+### R3. (f2) on DEV-1, Chua 0.27 LT, RON at z = 6.4: noise in one state, not a dependence bias
+
+- **Exact decomposition.** With w = w̄ + d over a state's draws, Δ = e_C − e_P, a = e_P Δ − (C − E_P) and b = Δ² − κ, the paired D_i − D_i(A1) = T0 + T1 + T2:
+  - T0 = mean_j(2w̄a + w̄²b), the realized noise at the draw-mean weight, approximately mean zero;
+  - T1 = mean_j 2d(a + w̄b), the 2 Cov(d, h) term;
+  - T2 = mean_j d²b, the Cov(d², Δ²) term.
+
+  This is an algebraic identity, checked per state to 1e-9.
+- **Size of each term for RON,** in units of the rule's mean V:
+  - total +0.080: T0 +0.064, T1 +0.016, T2 +0.0006;
+  - one state (index 4) carries +0.052 of the total. Its RON weight does not vary across draws (draw-SD 0), so it has no dependence term at all: its contribution is pure realized-draw noise on a state with κ 269 times the median;
+  - five states carry 81% of the total.
+- **Why z is 6.4.** The half-draw SE has one degree of freedom per state, and Kish(κ) is 19. It therefore underestimates the SE when one state dominates. This is the WU-0036 §2.5 caveat, here larger.
+- **The dependence part, T1 + T2 = +0.017 of V, is consistent with the derivation.**
+  - T2 is negligible.
+  - T1 is positive, meaning that RON shifts weight towards CP on draws where that hurts. The derivation leaves this sign open. My M-8 statement that the bias is negative held only "for a rule that uses this well": a rule whose draw-level weight changes track the draw's own loss gradient. The learned rules are trained on state-level targets u_i with per-draw inputs, so nothing makes them track the draw's own errors.
+  - **Correction to M-8 and the summary table:** delete "the substitution overstates the estimation gap" as a general claim. The sign of the dependence bias is not determined a priori, and (f2) measures it.
+  - A4 shows the same sign (T1 +0.015).
+- **What changes.**
+  1. M-8's decision is reinforced. Deployable rows already use realized scores, so no reading depends on the substitution.
+  2. (f2) adds the decomposition. It reports mean(T1 + T2) as the dependence-bias estimate, with a paired moving-block bootstrap interval over test states (block 5), beside WU-0036's z.
+     - The WU-0036 z, on the half-draw SE, is kept as a secondary column. A row with \|z\| > 4 whose T1 + T2 interval contains 0 reads "realized-noise outlier, no detectable dependence bias".
+     - (f2) remains reported, not gating.
