@@ -164,13 +164,24 @@ def _h2a_row(ci, low, high, kept=200) -> dict:
 
 
 def test_h2a_reading_rule() -> None:
-    """Consistent / not consistent / not determined, as fixed in advance."""
+    """Consistent / not consistent / not determined (addendum S2).
+
+    A horizon supports only if its interval lies beyond the margin 0.1 on
+    one side (strict), with the drift condition. Manufactured intervals on
+    both sides of +0.1 and of -0.1.
+    """
     rows = {
         "30": _h2a_row([None, None], 0, 0),
-        "60": _h2a_row([0.1, 0.3], 0.1, 0.2),
+        "60": _h2a_row([0.12, 0.3], 0.1, 0.2),
     }
     assert me.h2a_reading(rows, 30)["reading"] == "consistent"
-    rows["60"] = _h2a_row([0.1, 0.3], 0.3, 0.2)  # drift not larger in high-I
+    rows["60"] = _h2a_row([-0.3, -0.12], 0.1, 0.2)
+    assert me.h2a_reading(rows, 30)["reading"] == "consistent"
+    for inside in ([0.05, 0.3], [0.1, 0.3], [-0.3, -0.05], [-0.3, -0.1]):
+        # excludes 0 but not beyond the margin: no longer supports
+        rows["60"] = _h2a_row(inside, 0.1, 0.2)
+        assert me.h2a_reading(rows, 30)["reading"] == "not determined", inside
+    rows["60"] = _h2a_row([0.12, 0.3], 0.3, 0.2)  # drift not larger in high-I
     assert me.h2a_reading(rows, 30)["reading"] == "not determined"
     rows["60"] = _h2a_row([-0.05, 0.08], 0.1, 0.2)
     rows["120"] = _h2a_row([-0.09, 0.02], 0.1, 0.2)

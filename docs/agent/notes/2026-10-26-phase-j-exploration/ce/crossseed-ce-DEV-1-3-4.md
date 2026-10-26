@@ -38,7 +38,7 @@
 | lorenz63 | C3 false trust realized: g(F-hat) + h(F-hat) | 0.0963 [0.0835, 0.109] | 0.0902 [0.078, 0.101] | 0.106 [0.0915, 0.121] |
 | lorenz63 | C3 trusted LT: g(F-hat) + h(F-hat) | 1.15 [1.13, 1.17] | 1.09 [1.06, 1.11] | 1.04 [1.01, 1.07] |
 | lorenz63 | C3 MSE g / A2 at 1 LT | 0.688 [0.487, 0.884] undetermined (n_eff < 50) | 0.719 [0.531, 0.928] undetermined (n_eff < 50) | 0.901 [0.7, 1.14] undetermined (n_eff < 50) |
-| lorenz63 | E-H2a reading | not determined | not determined | consistent |
+| lorenz63 | E-H2a reading | not determined | not determined | not determined |
 | lorenz63 | E-H2a Spearman(m, I) at 2 LT | -0.0236 [-0.0978, 0.0538] | 0.000719 [-0.0692, 0.0738] | 0.0794 [-0.000604, 0.147] |
 | lorenz63 | E-H2e reading rho 0.01 | not determined (depends on the zero-variance convention) | not determined (depends on the zero-variance convention) | not determined (depends on the zero-variance convention) |
 | lorenz63 | E-H2e Spearman all, rho 0.01 | 0.0733 [0.00877, 0.136] | 0.0911 [0.0309, 0.153] | 0.161 [0.1, 0.211] |

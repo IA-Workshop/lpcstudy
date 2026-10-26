@@ -72,3 +72,15 @@ With r_omit in place of r_tot, every rate falls: the A, B and D medians give P4 
   - Four are (f2) dependence-bias rows: two of these read "detectable" on all three seeds, with opposite signs.
 
   This is a plumbing check, not the rule.
+
+## Update (WU-0051c, after the addendum S1 to S4)
+
+**DEVELOPMENT (DEV-1, DEV-3, DEV-4): exploratory, not a hypothesis test.**
+
+- **Rerun.** Both tools were rerun at 33cb71e, the commit that implements S1 to S4. Every A/B/D and C2 leaf is identical to 2b2891c, so r above is unchanged.
+- **The one changed leaf.** E-H2a on Lorenz-63, DEV-4, went from "consistent" to "not determined". Its only supporting horizon, 4 LT, has the interval [−0.315, −0.019], which lies outside 0 but not beyond the margin −0.1 (S2).
+- **The exploratory dry run** (`runs/dev/replication-explore-33cb71e/`, at least 3 of 3) counts 3261 rows, with the 228 C1 rows shown for display only (240 C1 values checked equal to D per seed):
+  - 992 replicated;
+  - 3 replicated (point readings): the three E-H3c rows;
+  - 9 contradicted, with no replicated claim within them;
+  - 2257 not replicated, 247 of them with a replicated claim.

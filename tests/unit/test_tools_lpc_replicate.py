@@ -11,7 +11,10 @@
   satisfies both.
 * The 4-of-5 count with undetermined and absent seeds; claim-free words never
   count and never contradict.
-* The claim-level fallback.
+* The claim-level fallback, and its listing beneath a contradicted row (S4).
+* Point claims never contradict; a row of point readings reads "replicated
+  (point readings)" or "not replicated" (S3). E-H2a's claims at the margin
+  0.1 (S2). The C1 rows are checked against their D source (S4).
 * The refusals (exit 64, nothing written) and the rule-mode run on five
   synthetic held-out records.
 
@@ -201,11 +204,11 @@ def h2e_part(word: str, median: list, spearman: list) -> dict:
 
 
 def test_e_h2e_and_e_h2a_tables() -> None:
-    """E-H2e words clash; E-H2a's consistent and not consistent do not.
+    """E-H2e words clash; so do E-H2a's, at a horizon both seeds use (S2).
 
-    E-H2a "consistent" claims a non-zero Spearman(m, I) at a supporting
-    horizon, "not consistent" claims |Spearman| < 0.1 at every usable one:
-    both hold for a Spearman in (0, 0.1), so they cannot contradict.
+    E-H2a "consistent" claims Spearman(m, I) > 0.1 (or < -0.1) at a
+    supporting horizon, "not consistent" claims |Spearman| < 0.1 at every
+    usable one: they clash iff a supporting H of one is usable in the other.
     """
     parts = {
         "consistent": h2e_part("consistent", [0.1, 0.3], [-0.3, -0.1]),
@@ -218,11 +221,11 @@ def test_e_h2e_and_e_h2a_tables() -> None:
         [("consistent", "nc spearman"), ("consistent", "nc median")]
     )
 
-    def h2a(word: str, ci60: list, supporting: list) -> dict:
+    def h2a(word: str, ci60: list, supporting: list, used=("60", "120")):
         return {
             "reading": {
                 "reading": word,
-                "horizons_used": ["60", "120"],
+                "horizons_used": list(used),
                 "horizons_supporting": supporting,
             },
             "by_horizon": {
@@ -232,13 +235,28 @@ def test_e_h2e_and_e_h2a_tables() -> None:
         }
 
     blocks = {
-        "consistent +": h2a("consistent", [0.02, 0.3], ["60"]),
-        "consistent -": h2a("consistent", [-0.3, -0.02], ["60"]),
+        "consistent +": h2a("consistent", [0.12, 0.3], ["60"]),
+        "consistent -": h2a("consistent", [-0.3, -0.12], ["60"]),
         "not consistent": h2a("not consistent", [-0.05, 0.08], []),
+        "nc at 120 only": h2a("not consistent", [0, 0], [], used=("120",)),
         "nd": h2a("not determined (fewer than 50 kept states)", [0, 0], []),
     }
     claims = {k: tool.h2a_claims(b, "p") for k, b in blocks.items()}
-    assert tool_table(claims) == unordered([("consistent +", "consistent -")])
+    assert tool_table(claims) == unordered(
+        [
+            ("consistent +", "consistent -"),
+            ("consistent +", "not consistent"),
+            ("consistent -", "not consistent"),
+        ]
+    )
+    assert claims["consistent +"] == (
+        tool.Claim("Spearman(m, I)@60", ">", 0.1),
+        tool.Claim("drift high - low I@60", ">", 0.0, "point"),
+    )
+    # A supporting horizon inside the margin cannot come from S2's rule.
+    for inside in ([0.05, 0.3], [0.1, 0.3], [-0.3, -0.1]):
+        with pytest.raises(tool.Refusal):
+            tool.h2a_claims(h2a("consistent", inside, ["60"]), "p")
 
 
 def h3c(word: str, lorenz: str, rossler: str, share: float, pct: float,
@@ -254,7 +272,7 @@ def h3c(word: str, lorenz: str, rossler: str, share: float, pct: float,
 
 
 def test_e_h3c_and_c2_prediction_tables() -> None:
-    """E-H3c consistent clashes with either not-consistent part; the C2
+    """E-H3c's claims are all point claims and never clash (S3); the C2
     prediction clashes only where the two seeds read the same component."""
     low = {"R": 0.4, "O": 0.4, "I": 0.4, "N": 0.4}
     high = {"R": 0.7, "O": 0.7, "I": 0.4, "N": 0.4}
@@ -269,9 +287,11 @@ def test_e_h3c_and_c2_prediction_tables() -> None:
                   "consistent", 0.2, 0.8, low),
     }
     claims = {k: tool.h3c_claims(r) for k, r in recs.items()}
-    assert tool_table(claims) == unordered(
-        [("consistent", "nc lorenz"), ("consistent", "nc rossler")]
-    )
+    assert all(c.basis == "point" for cs in claims.values() for c in cs)
+    assert tool_table(claims) == set()
+    # Without S3 the point thresholds would clash: the sets themselves are
+    # unchanged, only contradict ignores them.
+    assert not tool.satisfiable(claims["consistent"] + claims["nc lorenz"])
 
     def c2(word: str, forward: str, reverse: dict) -> dict:
         return {
@@ -349,10 +369,17 @@ def test_claim_level_fallback() -> None:
     assert out["replicated_claims"] == ["ratio > 1"]
     out = classify(["small", "small", "negligible", "negligible", "lowers"])
     assert out["class"] == "contradicted"
-    assert out["replicated_claims"] == ["ratio <= 1.05"]
+    assert out["replicated_claims"] == []
+    assert out["replicated_claims_within_contradicted_row"] == ["ratio <= 1.05"]
     out = classify(["substantial", "substantial", NEEDED, NEEDED, "small"])
     assert out["class"] == "contradicted"
-    assert out["replicated_claims"] == ["ratio > 1"]
+    assert out["replicated_claims_within_contradicted_row"] == ["ratio > 1"]
+    # S4's example: four "small", one "lowers". The headline stays
+    # contradicted; ratio <= 1.05 is listed beneath it.
+    out = classify(["small"] * 4 + ["lowers"])
+    assert out["class"] == "contradicted"
+    assert out["replicated_reading"] is None
+    assert out["replicated_claims_within_contradicted_row"] == ["ratio <= 1.05"]
     # Two passing claims on one quantity: the stronger one is reported.
     out = classify(["lowers", "lowers", NO_GAIN, NO_GAIN, "negligible"])
     assert out["class"] == "not replicated"
@@ -511,3 +538,138 @@ def test_cli_refuses_forbidden_words_in_arguments(tmp_path: Path) -> None:
         )
         assert done.returncode == 64, done.stderr
         assert not (tmp_path / bad).exists()
+
+
+# ----------------------------------------------------- point readings (S3)
+def point_reading(word: str, rec: dict) -> object:
+    return tool.Reading(word, tool.h3c_claims(rec), "p")
+
+
+def test_point_readings_never_contradict_and_carry_their_label() -> None:
+    """E-H3c rows: replicated (point readings) or not replicated, by word.
+
+    Hand cases: 4 "not consistent" and 1 "consistent" (point thresholds on
+    opposite sides) read "replicated (point readings)"; a 3/2 split reads
+    "not replicated", not "contradicted"; no fallback claim from points.
+    """
+    low = {"R": 0.4, "O": 0.4, "I": 0.4, "N": 0.4}
+    yes = h3c("consistent", "consistent", "consistent", 0.2, 0.8, low)
+    no = h3c("not consistent", "not consistent", "consistent", 0.02, 0.8,
+             low)
+    out = tool.classify(
+        [point_reading("not consistent", no)] * 4
+        + [point_reading("consistent", yes)],
+        4,
+    )
+    assert out["class"] == "replicated (point readings)"
+    assert out["point_readings"] and out["contradicting_pairs"] == []
+    assert out["replicated_reading"] == "not consistent"
+    out = tool.classify(
+        [point_reading("not consistent", no)] * 3
+        + [point_reading("consistent", yes)] * 2,
+        4,
+    )
+    assert out["class"] == "not replicated"
+    assert out["replicated_claims"] == []
+    assert out["replicated_claims_within_contradicted_row"] == []
+
+
+def test_mixed_e_h2a_rows_contradict_on_interval_claims_only() -> None:
+    """E-H2a: the drift (point) claims never decide; the Spearman ones do."""
+    c = tool.Claim
+    consistent = (
+        c("Spearman(m, I)@60", ">", 0.1),
+        c("drift high - low I@60", ">", 0.0, "point"),
+    )
+    other_drift = (
+        c("Spearman(m, I)@120", "<", -0.1),
+        c("drift high - low I@60", "<", 0.0, "point"),  # opposite point
+    )
+    null = (c("Spearman(m, I)@60", ">", -0.1), c("Spearman(m, I)@60", "<", 0.1))
+    assert not tool.contradict(consistent, other_drift)
+    assert tool.contradict(consistent, null)
+    rows = [tool.Reading("consistent", consistent, "p")] * 4 + [
+        tool.Reading("not consistent", null, "p")
+    ]
+    out = tool.classify(rows, 4)
+    assert out["class"] == "contradicted" and not out["point_readings"]
+    out = tool.classify([tool.Reading("consistent", consistent, "p")] * 5, 4)
+    assert out["class"] == "replicated"
+
+
+# ------------------------------------------------------------- C1 (S4)
+def c1_records(word: str = "small", ratio: float = 1.02) -> tuple:
+    contrib = {
+        "systems": {
+            "lorenz63": {
+                "allocation": {
+                    "30": {
+                        "oracle": {
+                            "ladder": {
+                                "vs_full": {
+                                    "RO": {
+                                        "mse_ratio": {
+                                            "reading": "small",
+                                            "ratio": 1.02,
+                                            "ci": [1.01, 1.04],
+                                        }
+                                    }
+                                },
+                                "mse": {"RO": 0.5},
+                            }
+                        }
+                    }
+                },
+                "horizon": {
+                    "oracle": {
+                        "ladder": {
+                            "vs_full": {
+                                "RO": {"pinball_ratio": {"reading": NEEDED}}
+                            }
+                        },
+                        "rows": {"RO": {"pinball_0.5": 0.2},
+                                 "ROIN": {"pinball_0.5": 0.1}},
+                        "lyapunov_rank": {"c_index": 0.6},
+                    }
+                },
+            }
+        }
+    }
+    ce = {
+        "systems": {
+            "lorenz63": {
+                "C1": {
+                    "allocation": {
+                        "30": {
+                            "oracle": {
+                                "reading_vs_F": {"RO": word},
+                                "ratio_vs_F": {"RO": ratio},
+                                "mse": {"RO": 0.5},
+                            }
+                        }
+                    },
+                    "horizon": {
+                        "oracle": {
+                            "RO": {"pinball": 0.2, "reading_vs_F": NEEDED},
+                            "ROIN": {"pinball": 0.1, "reading_vs_F": None},
+                            "lyapunov_rank_c": 0.6,
+                        }
+                    },
+                }
+            }
+        }
+    }
+    return contrib, ce
+
+
+def test_c1_rows_must_equal_their_d_source() -> None:
+    """Equal word and ratio: 4 rows checked; a changed word or ratio refuses."""
+    assert tool.check_c1(*c1_records(), "seed") == 4
+    with pytest.raises(tool.Refusal):
+        tool.check_c1(*c1_records(word="negligible"), "seed")
+    with pytest.raises(tool.Refusal):
+        tool.check_c1(*c1_records(ratio=1.03), "seed")
+    contrib, ce = c1_records()
+    ce["systems"]["lorenz63"]["C1"]["horizon"]["oracle"]["RO"]["pinball"] = 0.3
+    with pytest.raises(tool.Refusal):
+        tool.check_c1(contrib, ce, "seed")
