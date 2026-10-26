@@ -1,6 +1,6 @@
 # Phase J experiments C and E: DEV-4
 
-**DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.** Run `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/phj-f701a47/runs/dev/phj-DEV-4/full`; analysis commit `199e43a32db3ace33c88a0e8f2ad8ce2b405cc4d` (dirty: False); A/D record `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/phj-f701a47/runs/dev/phj-DEV-4/contrib-ea0bd77/contrib.json`. Estimates with 95% intervals from the shared moving-block index sets (models fixed; training variance not included). Readings are descriptive; no causal claim; nothing here is set beside CONF-1.
+**DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.** Run `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/phj-f701a47/runs/dev/phj-DEV-4/full`; analysis commit `5889351ff1eda1dec755a186de48101522c7a94a` (dirty: False); A/D record `/home/brianm/projects/physics/chaos/lpcstudy-wt/run/phj-f701a47/runs/dev/phj-DEV-4/contrib-ea0bd77/contrib.json`. Estimates with 95% intervals from the shared moving-block index sets (models fixed; training variance not included). Readings are descriptive; no causal claim; nothing here is set beside CONF-1.
 
 ## lorenz63
 
@@ -9,10 +9,10 @@ DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 | check | result |
 |---|---|
 | A2 rebuilt on 1..H_max equals the dumped A2 (bitwise); A4 horizon-free | True, True |
-| g refit reproduces WU-0048 A/ROIN MSE (max abs, oracle / deployable) | 0 / 0 |
+| refit reproduces WU-0048 (max abs: A/ROIN MSE oracle, deployable; W/ROIN L_w oracle, deployable) | 0 / 0 / 0 / 0 |
 | T_c counts T = 1 / e_(T-1) = theta (A2 train, g train, A2 test, g test, A4 calibration) | 21/0, 100/0, 6/0, 36/0, 152/0 |
 | A2 on 1..H_max: pooled curvature floor / columns at 0 or 1 | 0 / 0 |
-| weights clipped to [0, 1] (g oracle test / train OOF, g deployable test / train OOF) | 744, 2403, 562, 2837 |
+| weights clipped to [0, 1] | g_oracle_test 744, g_oracle_train_oof 2403, gw_oracle_test 630, gw_oracle_train_oof 1902, g_deployable_test 562, g_deployable_train_oof 2837, gw_deployable_test 356, gw_deployable_train_oof 904 |
 
 ### C1. Separate performance (from the A/D record, no refit)
 
@@ -54,29 +54,62 @@ DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 | deployable | X+F | 0.129 | 0.736 | 0.135 | lowers |
 | deployable | Lyapunov rank | | 0.628 | | |
 
-### C2. Shared information (oracle profile)
+### C2. Shared information (oracle and deployable profiles)
 
-Skill retained = [L(constant) - L(bottleneck)] / [L(constant) - L(F)]; reading: keeps most (CI > 0.5), loses most (CI < 0.5), else not determined. Forward: horizon from g(F) (five clipped weights); reverse: weight from h(F) (three quantiles). Training inputs cross-fitted.
+Skill retained = [L(constant) - L(bottleneck)] / [L(constant) - L(F)]; reading: keeps most (CI > 0.5), loses most (CI < 0.5), else not determined. Forward: horizon from g (five clipped weights; g_w: the L_w fits); reverse: weight from h (three quantiles), scored by L_A (MSE; deployable: realized per draw, R2 guard) and by L_w (weight units, unit-weight fits). Training inputs cross-fitted.
 
 DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 
-| direction | horizon | L(constant) | L(F) | L(bottleneck) | full skill [CI] | retained [CI] | reading |
+| profile | direction | horizon | full skill [CI] | retained L_A / pinball [CI] | reading | retained L_w [CI] | reading L_w |
 |---|---|---|---|---|---|---|---|
-| forward (pinball) | all five | 0.195 | 0.148 | 0.19 | 0.0467 [0.0369, 0.0575] | 0.0951 [0.0464, 0.149] | loses most |
-| forward, one weight | H=8 (0.27 LT) | | | 0.195 | | -0.00577 [-0.0298, 0.0186] | loses most |
-| forward, one weight | H=15 (0.50 LT) | | | 0.195 | | -0.0056 [-0.0365, 0.0249] | loses most |
-| forward, one weight | H=30 (1.00 LT) | | | 0.195 | | -0.0138 [-0.0421, 0.0133] | loses most |
-| forward, one weight | H=60 (2.00 LT) | | | 0.194 | | 0.00834 [-0.0117, 0.0282] | loses most |
-| forward, one weight | H=120 (4.00 LT) | | | 0.191 | | 0.0759 [0.023, 0.135] | loses most |
-| reverse (MSE) | H=8 (0.27 LT) | 0.0147 | 0.00604 | 0.0166 | 0.00864 [0.00633, 0.0113] | -0.225 [-0.775, 0.204] | not determined (n_eff < 50) |
-| reverse (MSE) | H=15 (0.50 LT) | 0.0284 | 0.0114 | 0.0318 | 0.017 [0.012, 0.0226] | -0.195 [-0.929, 0.317] | not determined (n_eff < 50) |
-| reverse (MSE) | H=30 (1.00 LT) | 0.0454 | 0.0371 | 0.0611 | 0.00837 [-0.0038, 0.0194] | -1.87 [-, -] | not determined (full-profile skill not established) |
-| reverse (MSE) | H=60 (2.00 LT) | 0.158 | 0.156 | 0.164 | 0.0023 [-0.0115, 0.0163] | -2.79 [-, -] | not determined (full-profile skill not established) |
-| reverse (MSE) | H=120 (4.00 LT) | 0.89 | 0.875 | 0.891 | 0.0151 [0.000592, 0.0289] | -0.0436 [-3.69, 1.08] | not determined (interval spans 0.5) |
+| oracle | forward (g; g_w) | all five | 0.0467 [0.0369, 0.0575] | 0.0951 [0.0464, 0.149] | loses most | 0.301 [0.182, 0.426] | loses most |
+| oracle | forward, one weight | H=8 (0.27 LT) | | -0.00577 [-0.0298, 0.0186] | loses most | | |
+| oracle | forward, one weight | H=15 (0.50 LT) | | -0.0056 [-0.0365, 0.0249] | loses most | | |
+| oracle | forward, one weight | H=30 (1.00 LT) | | -0.0138 [-0.0421, 0.0133] | loses most | | |
+| oracle | forward, one weight | H=60 (2.00 LT) | | 0.00834 [-0.0117, 0.0282] | loses most | | |
+| oracle | forward, one weight | H=120 (4.00 LT) | | 0.0759 [0.023, 0.135] | loses most | | |
+| oracle | reverse | H=8 (0.27 LT) | 0.00864 [0.00633, 0.0113] | -0.225 [-0.775, 0.204] | not determined (n_eff < 50) | 0.208 [0.127, 0.284] | loses most |
+| oracle | reverse | H=15 (0.50 LT) | 0.017 [0.012, 0.0226] | -0.195 [-0.929, 0.317] | not determined (n_eff < 50) | 0.234 [0.165, 0.302] | loses most |
+| oracle | reverse | H=30 (1.00 LT) | 0.00837 [-0.0038, 0.0194] | -1.87 [-, -] | not determined (full-profile skill not established) | 0.21 [0.127, 0.291] | loses most |
+| oracle | reverse | H=60 (2.00 LT) | 0.0023 [-0.0115, 0.0163] | -2.79 [-, -] | not determined (full-profile skill not established) | 0.243 [0.139, 0.359] | loses most |
+| oracle | reverse | H=120 (4.00 LT) | 0.0151 [0.000592, 0.0289] | -0.0436 [-3.69, 1.08] | not determined (interval spans 0.5) | 0.134 [-0.0223, 0.317] | loses most |
+| deployable | forward (g; g_w) | all five | 0.0502 [0.041, 0.0595] | 0.201 [0.135, 0.267] | loses most | 0.304 [0.224, 0.39] | loses most |
+| deployable | forward, one weight | H=8 (0.27 LT) | | 0.0556 [0.0225, 0.0888] | loses most | | |
+| deployable | forward, one weight | H=15 (0.50 LT) | | 0.0233 [0.00107, 0.048] | loses most | | |
+| deployable | forward, one weight | H=30 (1.00 LT) | | 0.0478 [0.0137, 0.082] | loses most | | |
+| deployable | forward, one weight | H=60 (2.00 LT) | | 0.0229 [-0.0168, 0.0638] | loses most | | |
+| deployable | forward, one weight | H=120 (4.00 LT) | | 0.118 [0.0759, 0.164] | loses most | | |
+| deployable | reverse | H=8 (0.27 LT) | 0.0052 [0.00229, 0.00868] | -0.428 [-1.2, 0.568] | not determined (n_eff < 50) | 0.0824 [-0.0745, 0.227] | loses most |
+| deployable | reverse | H=15 (0.50 LT) | 0.00704 [0.000691, 0.0128] | -0.844 [-18.7, 0.87] | not determined (n_eff < 50) | 0.115 [0.0411, 0.189] | loses most |
+| deployable | reverse | H=30 (1.00 LT) | 0.005 [-0.00715, 0.0168] | -1.22 [-, -] | not determined (full-profile skill not established) | 0.128 [-0.0107, 0.256] | loses most |
+| deployable | reverse | H=60 (2.00 LT) | 0.00471 [-0.00244, 0.0119] | 0.491 [-, -] | not determined (full-profile skill not established) | 0.18 [-0.0292, 0.384] | loses most |
+| deployable | reverse | H=120 (4.00 LT) | 0.0044 [-0.00458, 0.0133] | 1.84 [-, -] | not determined (full-profile skill not established) | 0.444 [0.08, 0.866] | not determined (interval spans 0.5) |
 
-Forward C-index: F 0.692, g(F) 0.582. Reverse MSE(h(F))/MSE(F): H=8 (0.27 LT) 2.75 [1.83, 12.1] undetermined (n_eff < 50); H=15 (0.50 LT) 2.79 [1.77, 5.06] undetermined (n_eff < 50); H=30 (1.00 LT) 1.65 [1.16, 2.54] undetermined (n_eff < 50); H=60 (2.00 LT) 1.06 [0.986, 1.14] undetermined (n_eff < 50); H=120 (4.00 LT) 1.02 [1, 1.04] small.
+DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 
-Math-spec prediction (both bottlenecks lose most): **consistent**; largest single-weight forward retention at H = 120.
+| profile | forward C-index F / g / g_w | reverse MSE(h)/MSE(F) per horizon | math-spec prediction (both lose most) | largest single-weight retention at H |
+|---|---|---|---|---|
+| oracle | 0.692 / 0.582 / 0.616 | H=8 (0.27 LT) 2.75 [1.83, 12.1] undetermined (n_eff < 50); H=15 (0.50 LT) 2.79 [1.77, 5.06] undetermined (n_eff < 50); H=30 (1.00 LT) 1.65 [1.16, 2.54] undetermined (n_eff < 50); H=60 (2.00 LT) 1.06 [0.986, 1.14] undetermined (n_eff < 50); H=120 (4.00 LT) 1.02 [1, 1.04] small | **consistent** | 120 |
+| deployable | 0.701 / 0.622 / 0.612 | H=8 (0.27 LT) 1.81 [1.15, 3.09] undetermined (n_eff < 50); H=15 (0.50 LT) 1.57 [1.07, 2.34] undetermined (n_eff < 50); H=30 (1.00 LT) 1.24 [1.08, 1.47] undetermined (n_eff < 50); H=60 (2.00 LT) 1.02 [0.974, 1.07] undetermined; H=120 (4.00 LT) 0.996 [0.987, 1] negligible | **consistent** | 120 |
+
+Oracle against deployable: retained (deployable) minus retained (oracle), paired 95% interval.
+
+DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
+
+| row | oracle | deployable | difference [CI] | reading |
+|---|---|---|---|---|
+| forward | 0.0951 | 0.201 | 0.106 [0.0478, 0.163] | deployable retains more |
+| forward_w | 0.301 | 0.304 | 0.00317 [-0.135, 0.146] | no difference detected |
+| reverse/8 | -0.225 | -0.428 | -0.203 [-0.845, 0.653] | not determined (n_eff < 50) |
+| reverse_w/8 | 0.208 | 0.0824 | -0.126 [-0.286, 0.0203] | no difference detected |
+| reverse/15 | -0.195 | -0.844 | -0.649 [-17.9, 1] | not determined (n_eff < 50) |
+| reverse_w/15 | 0.234 | 0.115 | -0.119 [-0.209, -0.0236] | deployable retains less |
+| reverse/30 | -1.87 | -1.22 | 0.654 [-, -] | not determined (full-profile skill not established) |
+| reverse_w/30 | 0.21 | 0.128 | -0.0823 [-0.214, 0.0416] | no difference detected |
+| reverse/60 | -2.79 | 0.491 | 3.28 [-, -] | not determined (full-profile skill not established) |
+| reverse_w/60 | 0.243 | 0.18 | -0.063 [-0.278, 0.138] | no difference detected |
+| reverse/120 | -0.0436 | 1.84 | 1.88 [-, -] | not determined (full-profile skill not established) |
+| reverse_w/120 | 0.134 | 0.444 | 0.309 [-0.014, 0.714] | no difference detected |
 
 DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 
@@ -195,10 +228,10 @@ DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 | check | result |
 |---|---|
 | A2 rebuilt on 1..H_max equals the dumped A2 (bitwise); A4 horizon-free | True, True |
-| g refit reproduces WU-0048 A/ROIN MSE (max abs, oracle / deployable) | 0 / 0 |
+| refit reproduces WU-0048 (max abs: A/ROIN MSE oracle, deployable; W/ROIN L_w oracle, deployable) | 0 / 0 / 0 / 0 |
 | T_c counts T = 1 / e_(T-1) = theta (A2 train, g train, A2 test, g test, A4 calibration) | 0/0, 0/0, 0/0, 0/0, 0/0 |
 | A2 on 1..H_max: pooled curvature floor / columns at 0 or 1 | 0 / 0 |
-| weights clipped to [0, 1] (g oracle test / train OOF, g deployable test / train OOF) | 845, 2777, 2626, 7754 |
+| weights clipped to [0, 1] | g_oracle_test 845, g_oracle_train_oof 2777, gw_oracle_test 537, gw_oracle_train_oof 1465, g_deployable_test 2626, g_deployable_train_oof 7754, gw_deployable_test 264, gw_deployable_train_oof 857 |
 
 ### C1. Separate performance (from the A/D record, no refit)
 
@@ -240,29 +273,62 @@ DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 | deployable | X+F | 0.0926 | 0.766 | 0.141 | lowers |
 | deployable | Lyapunov rank | | 0.633 | | |
 
-### C2. Shared information (oracle profile)
+### C2. Shared information (oracle and deployable profiles)
 
-Skill retained = [L(constant) - L(bottleneck)] / [L(constant) - L(F)]; reading: keeps most (CI > 0.5), loses most (CI < 0.5), else not determined. Forward: horizon from g(F) (five clipped weights); reverse: weight from h(F) (three quantiles). Training inputs cross-fitted.
+Skill retained = [L(constant) - L(bottleneck)] / [L(constant) - L(F)]; reading: keeps most (CI > 0.5), loses most (CI < 0.5), else not determined. Forward: horizon from g (five clipped weights; g_w: the L_w fits); reverse: weight from h (three quantiles), scored by L_A (MSE; deployable: realized per draw, R2 guard) and by L_w (weight units, unit-weight fits). Training inputs cross-fitted.
 
 DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 
-| direction | horizon | L(constant) | L(F) | L(bottleneck) | full skill [CI] | retained [CI] | reading |
+| profile | direction | horizon | full skill [CI] | retained L_A / pinball [CI] | reading | retained L_w [CI] | reading L_w |
 |---|---|---|---|---|---|---|---|
-| forward (pinball) | all five | 0.162 | 0.122 | 0.139 | 0.0407 [0.0339, 0.0472] | 0.581 [0.49, 0.675] | not determined (interval spans 0.5) |
-| forward, one weight | H=8 (0.27 LT) | | | 0.16 | | 0.0525 [-0.00982, 0.113] | loses most |
-| forward, one weight | H=15 (0.50 LT) | | | 0.161 | | 0.0329 [-0.0156, 0.0853] | loses most |
-| forward, one weight | H=30 (1.00 LT) | | | 0.161 | | 0.027 [-0.0212, 0.0821] | loses most |
-| forward, one weight | H=60 (2.00 LT) | | | 0.161 | | 0.042 [-0.038, 0.122] | loses most |
-| forward, one weight | H=120 (4.00 LT) | | | 0.141 | | 0.531 [0.437, 0.626] | not determined (interval spans 0.5) |
-| reverse (MSE) | H=8 (0.27 LT) | 0.000131 | 0.000121 | 0.00013 | 1.01e-05 [8.22e-06, 1.21e-05] | 0.154 [0.118, 0.197] | loses most |
-| reverse (MSE) | H=15 (0.50 LT) | 0.000227 | 0.000206 | 0.000221 | 2.06e-05 [1.59e-05, 2.67e-05] | 0.265 [0.172, 0.356] | loses most |
-| reverse (MSE) | H=30 (1.00 LT) | 0.000836 | 0.000723 | 0.000825 | 0.000114 [8.64e-05, 0.000144] | 0.0971 [0.0498, 0.155] | loses most |
-| reverse (MSE) | H=60 (2.00 LT) | 0.0136 | 0.0124 | 0.0135 | 0.00119 [0.000721, 0.0017] | 0.0762 [-0.364, 0.322] | loses most |
-| reverse (MSE) | H=120 (4.00 LT) | 0.116 | 0.113 | 0.115 | 0.00236 [0.00104, 0.00371] | 0.424 [0.11, 0.814] | not determined (interval spans 0.5) |
+| oracle | forward (g; g_w) | all five | 0.0407 [0.0339, 0.0472] | 0.581 [0.49, 0.675] | not determined (interval spans 0.5) | 0.682 [0.583, 0.784] | keeps most |
+| oracle | forward, one weight | H=8 (0.27 LT) | | 0.0525 [-0.00982, 0.113] | loses most | | |
+| oracle | forward, one weight | H=15 (0.50 LT) | | 0.0329 [-0.0156, 0.0853] | loses most | | |
+| oracle | forward, one weight | H=30 (1.00 LT) | | 0.027 [-0.0212, 0.0821] | loses most | | |
+| oracle | forward, one weight | H=60 (2.00 LT) | | 0.042 [-0.038, 0.122] | loses most | | |
+| oracle | forward, one weight | H=120 (4.00 LT) | | 0.531 [0.437, 0.626] | not determined (interval spans 0.5) | | |
+| oracle | reverse | H=8 (0.27 LT) | 1.01e-05 [8.22e-06, 1.21e-05] | 0.154 [0.118, 0.197] | loses most | 0.307 [0.223, 0.399] | loses most |
+| oracle | reverse | H=15 (0.50 LT) | 2.06e-05 [1.59e-05, 2.67e-05] | 0.265 [0.172, 0.356] | loses most | 0.399 [0.309, 0.502] | not determined (interval spans 0.5) |
+| oracle | reverse | H=30 (1.00 LT) | 0.000114 [8.64e-05, 0.000144] | 0.0971 [0.0498, 0.155] | loses most | 0.312 [0.232, 0.393] | loses most |
+| oracle | reverse | H=60 (2.00 LT) | 0.00119 [0.000721, 0.0017] | 0.0762 [-0.364, 0.322] | loses most | 0.31 [0.211, 0.416] | loses most |
+| oracle | reverse | H=120 (4.00 LT) | 0.00236 [0.00104, 0.00371] | 0.424 [0.11, 0.814] | not determined (interval spans 0.5) | 0.449 [0.223, 0.909] | not determined (interval spans 0.5) |
+| deployable | forward (g; g_w) | all five | 0.0447 [0.0381, 0.0512] | 0.552 [0.472, 0.638] | not determined (interval spans 0.5) | 0.645 [0.556, 0.723] | keeps most |
+| deployable | forward, one weight | H=8 (0.27 LT) | | 0.0572 [0.016, 0.0992] | loses most | | |
+| deployable | forward, one weight | H=15 (0.50 LT) | | 0.0238 [-0.0127, 0.0624] | loses most | | |
+| deployable | forward, one weight | H=30 (1.00 LT) | | 0.0785 [0.0357, 0.126] | loses most | | |
+| deployable | forward, one weight | H=60 (2.00 LT) | | 0.149 [0.102, 0.203] | loses most | | |
+| deployable | forward, one weight | H=120 (4.00 LT) | | 0.541 [0.459, 0.627] | not determined (interval spans 0.5) | | |
+| deployable | reverse | H=8 (0.27 LT) | 3.76e-07 [-1.68e-06, 2.25e-06] | -0.603 [-, -] | not determined (full-profile skill not established) | 0.0746 [0.0175, 0.138] | loses most |
+| deployable | reverse | H=15 (0.50 LT) | 3.73e-06 [1.59e-07, 7.45e-06] | 0.0722 [-0.883, 3.65] | not determined (interval spans 0.5) | 0.119 [0.0476, 0.203] | loses most |
+| deployable | reverse | H=30 (1.00 LT) | 2.51e-05 [3.79e-06, 4.75e-05] | -0.0722 [-0.973, 0.9] | not determined (interval spans 0.5) | 0.0761 [0.00618, 0.138] | loses most |
+| deployable | reverse | H=60 (2.00 LT) | -8.5e-06 [-0.000288, 0.000247] | - [-, -] | not determined (full-profile skill not established) | 0.184 [0.0202, 0.332] | loses most |
+| deployable | reverse | H=120 (4.00 LT) | 0.00119 [8.5e-05, 0.00239] | 1.1 [0.403, 9.24] | not determined (interval spans 0.5) | 0.812 [0.438, 1.57] | not determined (interval spans 0.5) |
 
-Forward C-index: F 0.683, g(F) 0.63. Reverse MSE(h(F))/MSE(F): H=8 (0.27 LT) 1.07 [1.06, 1.09] substantial; H=15 (0.50 LT) 1.07 [1.05, 1.1] substantial; H=30 (1.00 LT) 1.14 [1.11, 1.18] substantial; H=60 (2.00 LT) 1.09 [1.06, 1.12] substantial; H=120 (4.00 LT) 1.01 [1, 1.02] small.
+DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 
-Math-spec prediction (both bottlenecks lose most): **not determined**; largest single-weight forward retention at H = 120.
+| profile | forward C-index F / g / g_w | reverse MSE(h)/MSE(F) per horizon | math-spec prediction (both lose most) | largest single-weight retention at H |
+|---|---|---|---|---|
+| oracle | 0.683 / 0.63 / 0.639 | H=8 (0.27 LT) 1.07 [1.06, 1.09] substantial; H=15 (0.50 LT) 1.07 [1.05, 1.1] substantial; H=30 (1.00 LT) 1.14 [1.11, 1.18] substantial; H=60 (2.00 LT) 1.09 [1.06, 1.12] substantial; H=120 (4.00 LT) 1.01 [1, 1.02] small | **not determined** | 120 |
+| deployable | 0.693 / 0.615 / 0.648 | H=8 (0.27 LT) 1 [0.99, 1.02] negligible; H=15 (0.50 LT) 1.01 [0.999, 1.03] negligible; H=30 (1.00 LT) 1.03 [1, 1.06] needed, size not determined; H=60 (2.00 LT) 0.995 [0.973, 1.02] negligible; H=120 (4.00 LT) 0.999 [0.991, 1.01] negligible | **not determined** | 120 |
+
+Oracle against deployable: retained (deployable) minus retained (oracle), paired 95% interval.
+
+DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
+
+| row | oracle | deployable | difference [CI] | reading |
+|---|---|---|---|---|
+| forward | 0.581 | 0.552 | -0.0293 [-0.111, 0.0504] | no difference detected |
+| forward_w | 0.682 | 0.645 | -0.037 [-0.16, 0.0673] | no difference detected |
+| reverse/8 | 0.154 | -0.603 | -0.757 [-, -] | not determined (full-profile skill not established) |
+| reverse_w/8 | 0.307 | 0.0746 | -0.233 [-0.327, -0.144] | deployable retains less |
+| reverse/15 | 0.265 | 0.0722 | -0.193 [-1.11, 3.37] | no difference detected |
+| reverse_w/15 | 0.399 | 0.119 | -0.281 [-0.388, -0.174] | deployable retains less |
+| reverse/30 | 0.0971 | -0.0722 | -0.169 [-1.05, 0.825] | no difference detected |
+| reverse_w/30 | 0.312 | 0.0761 | -0.236 [-0.316, -0.161] | deployable retains less |
+| reverse/60 | 0.0762 | - | - [-, -] | not determined (full-profile skill not established) |
+| reverse_w/60 | 0.31 | 0.184 | -0.127 [-0.301, 0.0311] | no difference detected |
+| reverse/120 | 0.424 | 1.1 | 0.676 [-0.0488, 9.26] | no difference detected |
+| reverse_w/120 | 0.449 | 0.812 | 0.364 [-0.101, 1.02] | no difference detected |
 
 DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 
@@ -381,10 +447,10 @@ DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 | check | result |
 |---|---|
 | A2 rebuilt on 1..H_max equals the dumped A2 (bitwise); A4 horizon-free | True, True |
-| g refit reproduces WU-0048 A/ROIN MSE (max abs, oracle / deployable) | 0 / 0 |
+| refit reproduces WU-0048 (max abs: A/ROIN MSE oracle, deployable; W/ROIN L_w oracle, deployable) | 0 / 0 / 0 / 0 |
 | T_c counts T = 1 / e_(T-1) = theta (A2 train, g train, A2 test, g test, A4 calibration) | 0/0, 0/0, 1/0, 4/0, 0/0 |
 | A2 on 1..H_max: pooled curvature floor / columns at 0 or 1 | 0 / 0 |
-| weights clipped to [0, 1] (g oracle test / train OOF, g deployable test / train OOF) | 628, 2193, 2398, 6830 |
+| weights clipped to [0, 1] | g_oracle_test 628, g_oracle_train_oof 2193, gw_oracle_test 538, gw_oracle_train_oof 1688, g_deployable_test 2398, g_deployable_train_oof 6830, gw_deployable_test 545, gw_deployable_train_oof 1300 |
 
 ### C1. Separate performance (from the A/D record, no refit)
 
@@ -426,29 +492,62 @@ DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 | deployable | X+F | 0.137 | 0.76 | 0.162 | lowers |
 | deployable | Lyapunov rank | | 0.657 | | |
 
-### C2. Shared information (oracle profile)
+### C2. Shared information (oracle and deployable profiles)
 
-Skill retained = [L(constant) - L(bottleneck)] / [L(constant) - L(F)]; reading: keeps most (CI > 0.5), loses most (CI < 0.5), else not determined. Forward: horizon from g(F) (five clipped weights); reverse: weight from h(F) (three quantiles). Training inputs cross-fitted.
+Skill retained = [L(constant) - L(bottleneck)] / [L(constant) - L(F)]; reading: keeps most (CI > 0.5), loses most (CI < 0.5), else not determined. Forward: horizon from g (five clipped weights; g_w: the L_w fits); reverse: weight from h (three quantiles), scored by L_A (MSE; deployable: realized per draw, R2 guard) and by L_w (weight units, unit-weight fits). Training inputs cross-fitted.
 
 DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 
-| direction | horizon | L(constant) | L(F) | L(bottleneck) | full skill [CI] | retained [CI] | reading |
+| profile | direction | horizon | full skill [CI] | retained L_A / pinball [CI] | reading | retained L_w [CI] | reading L_w |
 |---|---|---|---|---|---|---|---|
-| forward (pinball) | all five | 0.219 | 0.159 | 0.196 | 0.0598 [0.0509, 0.0687] | 0.372 [0.286, 0.462] | loses most |
-| forward, one weight | H=8 (0.27 LT) | | | 0.218 | | 0.00336 [-0.0234, 0.0287] | loses most |
-| forward, one weight | H=15 (0.50 LT) | | | 0.218 | | 0.0124 [-0.0174, 0.0416] | loses most |
-| forward, one weight | H=30 (1.00 LT) | | | 0.218 | | 0.00277 [-0.0272, 0.0319] | loses most |
-| forward, one weight | H=60 (2.00 LT) | | | 0.214 | | 0.0785 [0.0282, 0.137] | loses most |
-| forward, one weight | H=120 (4.00 LT) | | | 0.216 | | 0.0417 [0.00523, 0.0778] | loses most |
-| reverse (MSE) | H=8 (0.27 LT) | 0.00071 | 0.000647 | 0.000694 | 6.3e-05 [2.02e-05, 0.00013] | 0.261 [-0.212, 0.425] | not determined (n_eff < 50) |
-| reverse (MSE) | H=15 (0.50 LT) | 0.00227 | 0.00213 | 0.0022 | 0.000137 [-1.23e-05, 0.000299] | 0.511 [-, -] | not determined (full-profile skill not established) |
-| reverse (MSE) | H=30 (1.00 LT) | 0.014 | 0.0126 | 0.0141 | 0.00145 [-0.000285, 0.00344] | -0.0726 [-, -] | not determined (full-profile skill not established) |
-| reverse (MSE) | H=60 (2.00 LT) | 0.169 | 0.159 | 0.169 | 0.00953 [0.000543, 0.0184] | 0.0296 [-5.4, 1.03] | not determined (interval spans 0.5) |
-| reverse (MSE) | H=120 (4.00 LT) | 0.618 | 0.598 | 0.617 | 0.0199 [0.0107, 0.0275] | 0.0818 [-0.141, 0.34] | loses most |
+| oracle | forward (g; g_w) | all five | 0.0598 [0.0509, 0.0687] | 0.372 [0.286, 0.462] | loses most | 0.496 [0.409, 0.581] | not determined (interval spans 0.5) |
+| oracle | forward, one weight | H=8 (0.27 LT) | | 0.00336 [-0.0234, 0.0287] | loses most | | |
+| oracle | forward, one weight | H=15 (0.50 LT) | | 0.0124 [-0.0174, 0.0416] | loses most | | |
+| oracle | forward, one weight | H=30 (1.00 LT) | | 0.00277 [-0.0272, 0.0319] | loses most | | |
+| oracle | forward, one weight | H=60 (2.00 LT) | | 0.0785 [0.0282, 0.137] | loses most | | |
+| oracle | forward, one weight | H=120 (4.00 LT) | | 0.0417 [0.00523, 0.0778] | loses most | | |
+| oracle | reverse | H=8 (0.27 LT) | 6.3e-05 [2.02e-05, 0.00013] | 0.261 [-0.212, 0.425] | not determined (n_eff < 50) | 0.157 [0.0677, 0.245] | loses most |
+| oracle | reverse | H=15 (0.50 LT) | 0.000137 [-1.23e-05, 0.000299] | 0.511 [-, -] | not determined (full-profile skill not established) | 0.168 [0.0809, 0.255] | loses most |
+| oracle | reverse | H=30 (1.00 LT) | 0.00145 [-0.000285, 0.00344] | -0.0726 [-, -] | not determined (full-profile skill not established) | 0.208 [0.0976, 0.31] | loses most |
+| oracle | reverse | H=60 (2.00 LT) | 0.00953 [0.000543, 0.0184] | 0.0296 [-5.4, 1.03] | not determined (interval spans 0.5) | 0.28 [0.133, 0.426] | loses most |
+| oracle | reverse | H=120 (4.00 LT) | 0.0199 [0.0107, 0.0275] | 0.0818 [-0.141, 0.34] | loses most | 0.34 [0.14, 0.598] | not determined (interval spans 0.5) |
+| deployable | forward (g; g_w) | all five | 0.0623 [0.0542, 0.0702] | 0.49 [0.416, 0.567] | not determined (interval spans 0.5) | 0.407 [0.319, 0.482] | loses most |
+| deployable | forward, one weight | H=8 (0.27 LT) | | 0.073 [0.0419, 0.104] | loses most | | |
+| deployable | forward, one weight | H=15 (0.50 LT) | | 0.0163 [0.000118, 0.0325] | loses most | | |
+| deployable | forward, one weight | H=30 (1.00 LT) | | 0.0247 [-0.0103, 0.0574] | loses most | | |
+| deployable | forward, one weight | H=60 (2.00 LT) | | 0.0721 [0.0266, 0.118] | loses most | | |
+| deployable | forward, one weight | H=120 (4.00 LT) | | 0.123 [0.0564, 0.189] | loses most | | |
+| deployable | reverse | H=8 (0.27 LT) | -1.34e-05 [-2.9e-05, -2.74e-07] | - [-, -] | not determined (full-profile skill not established) | 0.214 [0.0342, 0.364] | loses most |
+| deployable | reverse | H=15 (0.50 LT) | 8.47e-05 [-9.53e-05, 0.000299] | -0.178 [-, -] | not determined (full-profile skill not established) | 0.22 [0.0737, 0.332] | loses most |
+| deployable | reverse | H=30 (1.00 LT) | 0.00128 [0.000226, 0.00265] | 0.278 [-0.302, 1.01] | not determined (n_eff < 50) | 0.214 [-0.0114, 0.377] | loses most |
+| deployable | reverse | H=60 (2.00 LT) | 0.0108 [0.00441, 0.0174] | 0.345 [0.121, 0.726] | not determined (interval spans 0.5) | 0.419 [0.205, 0.607] | not determined (interval spans 0.5) |
+| deployable | reverse | H=120 (4.00 LT) | 0.00222 [-0.00603, 0.0104] | 1.23 [-, -] | not determined (full-profile skill not established) | 0.395 [-0.395, 1.03] | not determined (interval spans 0.5) |
 
-Forward C-index: F 0.721, g(F) 0.635. Reverse MSE(h(F))/MSE(F): H=8 (0.27 LT) 1.07 [1.04, 1.11] undetermined (n_eff < 50); H=15 (0.50 LT) 1.03 [0.982, 1.09] undetermined (n_eff < 50); H=30 (1.00 LT) 1.12 [0.986, 1.29] undetermined (n_eff < 50); H=60 (2.00 LT) 1.06 [1.01, 1.11] needed, size not determined; H=120 (4.00 LT) 1.03 [1.01, 1.04] small.
+DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 
-Math-spec prediction (both bottlenecks lose most): **consistent**; largest single-weight forward retention at H = 60.
+| profile | forward C-index F / g / g_w | reverse MSE(h)/MSE(F) per horizon | math-spec prediction (both lose most) | largest single-weight retention at H |
+|---|---|---|---|---|
+| oracle | 0.721 / 0.635 / 0.661 | H=8 (0.27 LT) 1.07 [1.04, 1.11] undetermined (n_eff < 50); H=15 (0.50 LT) 1.03 [0.982, 1.09] undetermined (n_eff < 50); H=30 (1.00 LT) 1.12 [0.986, 1.29] undetermined (n_eff < 50); H=60 (2.00 LT) 1.06 [1.01, 1.11] needed, size not determined; H=120 (4.00 LT) 1.03 [1.01, 1.04] small | **consistent** | 60 |
+| deployable | 0.727 / 0.648 / 0.646 | H=8 (0.27 LT) 0.976 [0.947, 1] undetermined (n_eff < 50); H=15 (0.50 LT) 1.05 [0.969, 1.13] undetermined (n_eff < 50); H=30 (1.00 LT) 1.07 [1, 1.16] undetermined (n_eff < 50); H=60 (2.00 LT) 1.04 [1.01, 1.09] needed, size not determined; H=120 (4.00 LT) 0.999 [0.988, 1.01] negligible | **not determined** | 120 |
+
+Oracle against deployable: retained (deployable) minus retained (oracle), paired 95% interval.
+
+DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
+
+| row | oracle | deployable | difference [CI] | reading |
+|---|---|---|---|---|
+| forward | 0.372 | 0.49 | 0.118 [0.0093, 0.221] | deployable retains more |
+| forward_w | 0.496 | 0.407 | -0.0895 [-0.19, 0.00404] | no difference detected |
+| reverse/8 | 0.261 | - | - [-, -] | not determined (n_eff < 50) |
+| reverse_w/8 | 0.157 | 0.214 | 0.0569 [-0.132, 0.216] | no difference detected |
+| reverse/15 | 0.511 | -0.178 | -0.69 [-, -] | not determined (full-profile skill not established) |
+| reverse_w/15 | 0.168 | 0.22 | 0.0517 [-0.111, 0.183] | no difference detected |
+| reverse/30 | -0.0726 | 0.278 | 0.351 [-, -] | not determined (full-profile skill not established) |
+| reverse_w/30 | 0.208 | 0.214 | 0.0056 [-0.193, 0.166] | no difference detected |
+| reverse/60 | 0.0296 | 0.345 | 0.315 [-0.581, 5.64] | no difference detected |
+| reverse_w/60 | 0.28 | 0.419 | 0.139 [-0.0831, 0.332] | no difference detected |
+| reverse/120 | 0.0818 | 1.23 | 1.15 [-, -] | not determined (full-profile skill not established) |
+| reverse_w/120 | 0.34 | 0.395 | 0.0552 [-0.735, 0.684] | no difference detected |
 
 DEVELOPMENT (DEV-4): exploratory, not a hypothesis test.
 
