@@ -84,7 +84,7 @@ So the two decisions share part of their information, not all of it. The math sp
   - On Lorenz-63 the top 1% of states carry 59 to 68% of the A5–A4 difference. Those states are low-instability states (median I percentile about 0.2), not high-instability ones.
   - The explanation stated in advance is therefore "not consistent" on all three seeds. Lorenz-63's uncertainty comes from a few heavy states, but not the ones expected.
 - **E-H2e.** The candidate mechanism (correlation rises most where recurrence improves most) is not supported where it can be read. On Rössler the association has the opposite sign. Elsewhere it is mostly not determined, because many states have zero error correlation at the smallest library.
-- **E-H2a.** Mostly not determined. There is one "consistent" reading, on Lorenz-63 at DEV-4, at 4 LT only.
+- **E-H2a.** Not determined on every system and seed, except Rössler DEV-3, which reads "not consistent". Lorenz-63 DEV-4 first read "consistent" at 4 LT only. Under ruling S2, "consistent" requires the Spearman interval to lie beyond ±0.1, and that interval, [−0.315, −0.019], does not, so it now reads "not determined" (records at 33cb71e).
 
 ## 2. Predictions written before the data, against these seeds
 
