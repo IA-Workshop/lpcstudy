@@ -26,7 +26,9 @@ The two decisions
     by the moment form; deployable-profile rows by the realized per-draw score
     ``S_i = mean_j (g_ij e_C + (1 - g_ij) e_P)^2`` (M-8,
     :func:`realized_score`), with the V-substituted value and its dependence
-    bias (test (f2)) beside it.
+    bias beside it (test (f2), reported, not gating: ``mean (t1 + t2)`` of
+    :func:`dependence_terms` with an interval, WU-0036's ``z`` secondary;
+    addendum R3).
 
     *Horizon*: the oracle hybrid's crossing time ``T_c`` at ``theta``
     (log-linear interpolation, ``ceil(T_c) = T``, M-4), predicted on ``Y = ln
@@ -55,10 +57,12 @@ Uncertainty and readings
     gain share ``G`` are estimates without a reading. A ratio reads
     "undetermined (n_eff < 50)" when the Kish effective size of ``kappa`` on
     the test states, or the effective size of the reference rule's per-state
-    excess, is below 50. Families (Holm on bootstrap p-values, intervals at
+    excess in moment form (substituted for deployable rows, addendum R2), is
+    below 50. Families (Holm on bootstrap p-values, intervals at
     ``1 - 0.05/m``): A's four drop-one rows, B's six pairs, D's rungs against
-    the full profile. Shapley shares and the reference columns are 95%
-    estimates. The theory gap is an upper bound (M-2 rule 3).
+    the full profile. A B pair whose upper bound is below 0 reads "no
+    interaction gain; the pair model fits worse" (addendum R1). Shapley
+    shares and the reference columns are 95% estimates. The theory gap is an upper bound (M-2 rule 3).
 
 Randomness: the bootstrap indices come from ``make_rng(seed, system,
 "bootstrap", "phase-J-contrib")``; the scikit-learn seed is
@@ -120,6 +124,8 @@ SHAPLEY_LEVEL: float = 0.95
 """Level of the Shapley rows and the reference columns (estimates)."""
 PAIRS: tuple[tuple[int, int], ...] = tuple(combinations(range(4), 2))
 """The six condition pairs of B."""
+NO_GAIN: str = "no interaction gain; the pair model fits worse"
+"""Reading of a B row whose upper bound is below 0 (math spec addendum R1)."""
 PRIMARY_PAIRS: tuple[str, str] = ("RI", "OI")
 """The pairs named primary in advance (plan section 3.4)."""
 FULL: tuple[int, ...] = SUBSETS[-1]
@@ -565,57 +571,121 @@ def separation_weight(profile: np.ndarray) -> np.ndarray:
     return expit(2.0 * (profile[..., 1] - profile[..., 0]))
 
 
-def dependence_bias(
+def dependence_terms(
     weight: np.ndarray,
-    realized: np.ndarray,
-    full: tuple[np.ndarray, np.ndarray, np.ndarray],
-    halves: tuple[tuple, tuple],
-    half_sizes: tuple[int, int],
-    a1_realized: np.ndarray,
-) -> dict:
-    """Test (f2): the dependence bias of the V substitution (WU-0036 form).
+    e_c: np.ndarray,
+    e_p: np.ndarray,
+    moments: tuple[np.ndarray, np.ndarray, np.ndarray],
+) -> dict[str, np.ndarray]:
+    """Exact per-state decomposition of the paired (f2) difference (R3).
 
-    ``D_i = S_i - Q_i`` with ``Q_i = mean_j V_i(w_ij)``; its standard error
-    from the half-draw moments (the oracle Monte Carlo error of ``Q_i``) and
-    from the spread of the single-draw squared errors (the realized part).
-    Paired: the same with A1 (``w = 0``) subtracted from ``S`` and ``Q``.
+    With ``w = wbar + d`` over a state's draws, ``Delta = e_C - e_P``, ``a =
+    e_P Delta - (C - E_P)`` and ``b = Delta^2 - kappa``, the paired difference
+    ``(S_i - S_i(A1)) - (Q_i - Q_i(A1))`` equals ``t0 + t1 + t2`` with
+    ``t0 = mean_j (2 wbar a + wbar^2 b)`` (realized noise at the draw-mean
+    weight), ``t1 = mean_j 2 d (a + wbar b)`` (the ``2 Cov(d, h)`` part) and
+    ``t2 = mean_j d^2 b`` (the ``Cov(d^2, Delta^2)`` part); math spec
+    addendum R3, ``rulings_0045b.py``. Inputs ``(n, E)``; moments ``(n,)``.
 
     Returns
     -------
     dict
-        ``direct`` and ``paired``: ``mean_d``, ``se``, ``z``, ``rel`` (mean
-        ``D`` over mean ``Q``) and ``within_margin`` (``|rel| <= 0.05``).
+        ``t0``, ``t1``, ``t2`` and ``total`` (the paired difference computed
+        directly), each ``(n,)``.
     """
+    e_cc, e_pp, cross = (m[:, None] for m in moments)
+    delta = e_c - e_p
+    a = e_p * delta - (cross - e_pp)
+    b = delta**2 - (e_cc + e_pp - 2.0 * cross)
+    wbar = weight.mean(axis=1, keepdims=True)
+    d = weight - wbar
+    realized = realized_score(weight, e_c, e_p) - np.mean(e_p**2, axis=1)
+    substituted = (
+        np.mean(quad_mse(weight, e_cc, e_pp, cross), axis=1) - e_pp[:, 0]
+    )
+    return {
+        "t0": np.mean(2.0 * wbar * a + wbar**2 * b, axis=1),
+        "t1": np.mean(2.0 * d * (a + wbar * b), axis=1),
+        "t2": np.mean(d**2 * b, axis=1),
+        "total": realized - substituted,
+    }
+
+
+Z_OUTLIER: float = 4.0
+"""WU-0036's rule: a half-draw ``|z|`` above this is examined (R3)."""
+
+
+def dependence_bias(
+    weight: np.ndarray,
+    errors: tuple[np.ndarray, np.ndarray],
+    full: tuple[np.ndarray, np.ndarray, np.ndarray],
+    halves: tuple[tuple, tuple],
+    half_sizes: tuple[int, int],
+    index: np.ndarray,
+) -> dict:
+    """Test (f2), reported and not gating (math spec M-8 and addendum R3).
+
+    The estimate is ``mean_i (t1 + t2)`` (:func:`dependence_terms`), the
+    dependence part of the paired difference between the realized and the
+    V-substituted score, with a paired moving-block interval over the test
+    states (95%, the shared index sets). Its sign is not determined a priori.
+    Secondary columns: WU-0036's ``D_i = S_i - Q_i``, direct and paired with
+    A1, with its half-draw standard error and ``z``. A row with ``|z| > 4``
+    whose ``t1 + t2`` interval contains 0 reads "realized-noise outlier, no
+    detectable dependence bias".
+
+    Returns
+    -------
+    dict
+        ``dependence`` (``estimate``, ``rel`` to the rule's mean V, ``ci``,
+        ``t0_rel``), ``reading``, and ``direct`` and ``paired`` (``mean_d``,
+        ``se``, ``z``, ``rel``).
+    """
+    e_c, e_p = errors
+    realized = realized_score(weight, e_c, e_p)
+    a1_realized = np.mean(e_p**2, axis=1)
     m_a, m_b = half_sizes
     inv = 1.0 / m_a + 1.0 / m_b
     n_draws = weight.shape[1]
     zero = np.zeros_like(weight)
-    out = {}
+    scale = float(np.mean(quad_mse(weight, *(m[:, None] for m in full))))
+    out: dict = {}
     for name, paired in (("direct", False), ("paired", True)):
 
         def q(mom: tuple) -> np.ndarray:
-            e_c, e_p, cross = (m[:, None] for m in mom)
-            value = quad_mse(weight, e_c, e_p, cross)
-            return value - quad_mse(zero, e_c, e_p, cross) if paired else value
+            e_cc, e_pp, cross = (m[:, None] for m in mom)
+            value = quad_mse(weight, e_cc, e_pp, cross)
+            return (
+                value - quad_mse(zero, e_cc, e_pp, cross) if paired else value
+            )
 
         q_a, q_b = q(halves[0]), q(halves[1])
         var = ((q_a - q_b) ** 2 / inv).sum(axis=1) / n_draws**2 + (
             q_a.mean(axis=1) - q_b.mean(axis=1)
         ) ** 2 / inv / (m_a + m_b)
         se = float(np.sqrt(var.sum()) / len(weight))
-        q_full = q(full).mean(axis=1)
         s = realized - a1_realized if paired else realized
-        d = s - q_full
-        scale = float(np.mean(quad_mse(weight, *(m[:, None] for m in full))))
-        mean_d = float(d.mean())
-        rel = mean_d / scale if scale > 0 else float("nan")
+        mean_d = float(np.mean(s - q(full).mean(axis=1)))
         out[name] = {
             "mean_d": mean_d,
             "se": se,
             "z": mean_d / se if se > 0 else float("nan"),
-            "rel": rel,
-            "within_margin": bool(abs(rel) <= 0.05),
+            "rel": mean_d / scale if scale > 0 else float("nan"),
         }
+    terms = dependence_terms(weight, e_c, e_p, full)
+    part = estimate_row(terms["t1"] + terms["t2"], index)
+    lower, upper = part["ci"]
+    covers = lower is None or upper is None or lower <= 0.0 <= upper
+    part["rel"] = part["estimate"] / scale if scale > 0 else float("nan")
+    part["t0_rel"] = float(terms["t0"].mean() / scale) if scale > 0 else None
+    out["dependence"] = part
+    z = out["paired"]["z"]
+    if np.isfinite(z) and abs(z) > Z_OUTLIER and covers:
+        out["reading"] = "realized-noise outlier, no detectable dependence bias"
+    elif covers:
+        out["reading"] = "no detectable dependence bias"
+    else:
+        out["reading"] = "dependence bias detectable (interval excludes 0)"
     return out
 
 
@@ -864,6 +934,20 @@ def guarded_reading(
     ):
         return "undetermined", f"n_eff < {MIN_EFFECTIVE}"
     return reading, reason
+
+
+def guard_sizes(
+    kappa: np.ndarray, reference_excess: np.ndarray
+) -> tuple[float, float]:
+    """The two effective sizes of the guard: ``Kish(kappa)`` and ``Kish(x)``.
+
+    ``x`` is the reference rule's per-state excess in moment form: ``V(g) -
+    V(w*)`` for an oracle row, and the substituted ``mean_j V(g_ij) -
+    V(w*)`` for a deployable row (math spec addendum R2; the realized excess
+    would measure draw noise, not concentration). A ratio reads
+    "undetermined" if the smaller is below 50.
+    """
+    return (kish_size(kappa), kish_size(reference_excess))
 
 
 def ratio_row(
@@ -1460,6 +1544,12 @@ def pair_rows(
     its bootstrap p-value, Holm over the six pairs, and the loss ratio
     ``L(add) / L(pair)`` read by the 1.05 table at the same level (math spec
     M-3). ``ceiling`` is ``L(add) - L(full)`` (if ``full`` is given).
+
+    Each pair's ``reading`` (addendum R1): "interaction gain detected" (Holm
+    p <= 0.05); NO_GAIN if the upper bound of ``Delta`` is below 0 (the pair
+    model's overfitting exceeds any gain; not a negative interaction, and the
+    loss ratio's "lowers" is replaced by the same words); otherwise "no
+    interaction gain detected".
     """
     level = 1.0 - 0.05 / len(PAIRS)
     rows = {}
@@ -1474,6 +1564,16 @@ def pair_rows(
         row["primary"] = name in PRIMARY_PAIRS
         rows[name] = row
     add_holm(rows)
+    for row in rows.values():
+        upper = row["ci"][1]
+        if row["detected"]:
+            row["reading"] = "interaction gain detected"
+        elif upper is not None and upper < 0.0:
+            row["reading"] = NO_GAIN
+            if row["loss_ratio"].get("reading") == "lowers":
+                row["loss_ratio"]["reading"] = NO_GAIN
+        else:
+            row["reading"] = "no interaction gain detected"
     out = {"pairs": rows, "level": level}
     if "full" in losses:
         out["ceiling"] = difference_row(
@@ -1540,7 +1640,7 @@ def allocation_block(
     full_key = subset_key(FULL)
 
     def n_eff_of(reference: str) -> tuple[float, float]:
-        return (n_eff_kappa, kish_size(scores[reference].excess))
+        return guard_sizes(test.kappa, scores[reference].subst - test.v_star)
 
     subset_rows = {}
     for s in SUBSETS:
@@ -1603,7 +1703,6 @@ def allocation_block(
     ladder = _allocation_ladder(ctx, kind, scores, n_eff_of, column)
     dependence = {}
     if kind == "deployable":
-        a1 = realized_score(np.zeros_like(errors[0]), *errors)
         halves = tuple(
             tuple(
                 t[f"{m}_{tag}"][:, data.horizons[column] - 1]
@@ -1613,7 +1712,7 @@ def allocation_block(
         )
         for name, sc in scores.items():
             dependence[name] = dependence_bias(
-                sc.weight, sc.mse, moments, halves, data.half_sizes, a1
+                sc.weight, errors, moments, halves, data.half_sizes, index
             )
     oracle_mc = (
         test.kappa
@@ -1630,7 +1729,7 @@ def allocation_block(
         "scoring": "moment form" if kind == "oracle" else "realized per draw",
         "n_states": n,
         "n_eff_kappa": n_eff_kappa,
-        "n_eff_constant_excess": kish_size(scores["none"].excess),
+        "n_eff_constant_excess": kish_size(scores["none"].subst - test.v_star),
         "constant_weight": {"kappa": constant, "unit": unit_constant},
         "share_u_below_0": float(np.mean(test.u <= 0.0)),
         "share_u_above_1": float(np.mean(test.u >= 1.0)),

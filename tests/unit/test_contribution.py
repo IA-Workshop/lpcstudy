@@ -449,3 +449,115 @@ def test_pair_constraints_cover_every_pair_once() -> None:
         groups = cst[CONDITIONS[j] + CONDITIONS[k]]
         assert groups[0] == [j, k]
         assert sorted(sum(groups, [])) == [0, 1, 2, 3]
+
+
+# ------------------------------------------------------- rulings R1 to R3
+def test_r3_dependence_terms_sum_to_the_paired_difference() -> None:
+    """R3: ``T0 + T1 + T2`` equals the paired difference per state, to 1e-9.
+
+    Reference: ``(S - S_A1) - (Q - Q_A1)`` written out draw by draw (the
+    realized blend squared, minus ``e_P^2``, minus the quadratic ``V`` at
+    each draw's weight, plus ``E_P``). Tolerance: 1e-9 relative to the
+    state's largest term (the identity is algebraic; round-off is a few ulps
+    of terms of that size). Weights that vary over draws, and one state with
+    a constant weight (``d = 0``, so ``T1 = T2 = 0`` exactly).
+    """
+    rng = np.random.default_rng(48013)
+    n, draws = 40, 4
+    e_c_m, e_p_m, cross = _moments(rng, n)
+    e_c = rng.standard_normal((n, draws)) * 0.3
+    e_p = rng.standard_normal((n, draws)) * 0.5
+    w = rng.uniform(0, 1, (n, draws))
+    w[0] = 0.4
+    terms = cb.dependence_terms(w, e_c, e_p, (e_c_m, e_p_m, cross))
+    for i in range(n):
+        s = (
+            sum(
+                (w[i, j] * e_c[i, j] + (1 - w[i, j]) * e_p[i, j]) ** 2
+                - e_p[i, j] ** 2
+                for j in range(draws)
+            )
+            / draws
+        )
+        q = (
+            sum(
+                w[i, j] ** 2 * e_c_m[i]
+                + (1 - w[i, j]) ** 2 * e_p_m[i]
+                + 2 * w[i, j] * (1 - w[i, j]) * cross[i]
+                - e_p_m[i]
+                for j in range(draws)
+            )
+            / draws
+        )
+        parts = terms["t0"][i] + terms["t1"][i] + terms["t2"][i]
+        scale = max(
+            abs(terms["t0"][i]),
+            abs(terms["t1"][i]),
+            abs(terms["t2"][i]),
+            abs(s - q),
+            1e-300,
+        )
+        assert abs(parts - (s - q)) <= 1e-9 * scale, i
+        assert abs(terms["total"][i] - (s - q)) <= 1e-9 * scale, i
+    assert terms["t1"][0] == 0.0 and terms["t2"][0] == 0.0
+
+
+def test_r3_constant_weight_rule_has_no_dependence_part() -> None:
+    """A rule whose weight does not vary over draws has ``T1 + T2 = 0``, so
+    its (f2) interval is ``[0, 0]`` and it reads "no detectable dependence
+    bias" whatever its ``z`` (a constant rule is the A2 case)."""
+    rng = np.random.default_rng(48014)
+    n, draws = 60, 4
+    mom = _moments(rng, n)
+    errors = (rng.standard_normal((n, draws)), rng.standard_normal((n, draws)))
+    weight = np.full((n, draws), 0.3)
+    index = cb.resample_indices(n, 50, 5, np.random.default_rng(48015))
+    out = cb.dependence_bias(weight, errors, mom, (mom, mom), (10, 10), index)
+    assert out["dependence"]["estimate"] == 0.0
+    assert out["dependence"]["ci"] == [0.0, 0.0]
+    assert out["reading"] in (
+        "no detectable dependence bias",
+        "realized-noise outlier, no detectable dependence bias",
+    )
+
+
+def test_r2_guard_uses_the_moment_form_excess_not_the_realized_one() -> None:
+    """R2: the guard's second size is Kish of the substituted excess.
+
+    A realized excess with mean near 0 and large draw noise has a tiny Kish
+    size (signal to noise); its moment-form counterpart, positive and spread
+    evenly, has Kish near n. Reference: Kish computed by hand.
+    """
+    n = 400
+    kappa = np.ones(n)
+    substituted = np.full(n, 0.01)
+    sizes = cb.guard_sizes(kappa, substituted)
+    assert sizes == (pytest.approx(n), pytest.approx(n))
+    rng = np.random.default_rng(48016)
+    realized = substituted + rng.standard_normal(n)
+    assert cb.kish_size(realized) < 5 < min(sizes)
+
+
+def test_r1_pair_that_fits_worse_reads_no_gain() -> None:
+    """R1: a pair whose ``Delta`` upper bound is below 0 reads "no interaction
+    gain; the pair model fits worse" (also its loss ratio); a clear gain is
+    "interaction gain detected"; otherwise "no interaction gain detected".
+
+    Reference: hand-built per-state losses (the pair losses are the additive
+    ones scaled by 1.3, by 0.5, or equal plus noise).
+    """
+    rng = np.random.default_rng(48017)
+    n = 300
+    add = rng.uniform(1.0, 2.0, n)
+    losses = {"add": add}
+    for j, k in cb.PAIRS:
+        name = CONDITIONS[j] + CONDITIONS[k]
+        losses[name] = add * (1.0 + 0.02 * rng.standard_normal(n))
+    losses["RO"] = 1.3 * add
+    losses["RI"] = 0.5 * add
+    index = cb.resample_indices(n, 200, 5, np.random.default_rng(48018))
+    rows = cb.pair_rows(losses, index)["pairs"]
+    assert rows["RO"]["reading"] == cb.NO_GAIN
+    assert rows["RO"]["loss_ratio"]["reading"] == cb.NO_GAIN
+    assert rows["RI"]["reading"] == "interaction gain detected"
+    assert rows["ON"]["reading"] in ("no interaction gain detected", cb.NO_GAIN)

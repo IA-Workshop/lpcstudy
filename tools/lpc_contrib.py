@@ -244,8 +244,30 @@ def _checks_table(res: dict) -> list[str]:
         f"{chk['crossing_time']['train']['n_exact_theta']}, "
         f"{chk['crossing_time']['test']['n_first_step']}/"
         f"{chk['crossing_time']['test']['n_exact_theta']} |",
+        f"| (f2) dependence bias, deployable rows (reported, not gating) | "
+        f"{_f2_summary(res)} |",
         "",
     ]
+
+
+def _f2_summary(res: dict) -> str:
+    """Count the (f2) readings; name the rows that are not "no detectable"."""
+    rows, flagged = 0, []
+    for hkey, blocks in res["allocation"].items():
+        for rule, d in (
+            blocks.get("deployable", {}).get("dependence_bias", {}).items()
+        ):
+            rows += 1
+            if d["reading"] != "no detectable dependence bias":
+                part = d["dependence"]
+                flagged.append(
+                    f"H={hkey} {rule}: {d['reading']}, t1+t2 / V "
+                    f"{fmt(part['rel'])}, z {fmt(d['paired']['z'])}"
+                )
+    shown = "; ".join(flagged[:12]) + (" ..." if len(flagged) > 12 else "")
+    return f"{rows} rows; {len(flagged)} flagged" + (
+        f": {shown}" if flagged else ""
+    )
 
 
 def _allocation_tables(res: dict, label: str) -> list[str]:
@@ -319,7 +341,7 @@ def _allocation_tables(res: dict, label: str) -> list[str]:
         "states, models fixed; level 1 - 0.05/6; Holm over the six pairs. "
         "R x I and O x I are primary.",
         "",
-        "| horizon | profile | pair | Delta [CI] | Holm p | detected | "
+        "| horizon | profile | pair | Delta [CI] | Holm p | reading | "
         "loss ratio reading |",
         "|---|---|---|---|---|---|---|",
     ]
@@ -336,7 +358,7 @@ def _allocation_tables(res: dict, label: str) -> list[str]:
                 out.append(
                     f"| {horizon} | {kind} | {name}{star} | "
                     f"{fmt(row['difference'])} {ci(row)} | "
-                    f"{fmt(row['p_holm'])} | {row['detected']} | "
+                    f"{fmt(row['p_holm'])} | {row['reading']} | "
                     f"{reading(row['loss_ratio'])} |"
                 )
     out += [

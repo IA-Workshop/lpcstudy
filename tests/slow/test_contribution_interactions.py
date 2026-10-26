@@ -3,9 +3,19 @@
 The B procedure of lpcstudy.contribution (pair_jobs, run_job with
 the production learner, state_loss, pair_rows) is run on a synthetic
 regression target with four inputs, once additive and once with a planted
-R x I term. Criterion (math spec, WU-0048 (c)): under the additive truth
-every pair has Holm p > 0.05 and an upper bound of Delta >= 0; with the
-planted term that pair is detected (Holm p <= 0.05) and no other pair is.
+R x I term. Criterion (math spec, WU-0048 (c), as restated by addendum
+R1 of WU-0045b): under the additive truth every pair has Holm-adjusted p >
+0.05 (one-sided: no pair detected); with the planted term that pair is
+detected (Holm p <= 0.05) and no other pair is.
+
+The null criterion was restated by its owner, the applied-mathematician,
+because the original was self-contradictory: it also asked for every upper
+bound of Delta to be >= 0, while stating that under an additive truth the
+fixed-model gain is <= 0 in expectation (the pair model can only overfit).
+With 1000 fixed-model test states the overfitting penalty can be resolved,
+and for R x O it was (Delta -0.0110 [-0.0212, -0.0016]); that clause controls
+no error rate. Such a row reads "no interaction gain; the pair model fits
+worse", which this test also checks.
 Sizes and seeds are fixed below. Slow because every one of the 14 models is
 selected by five-fold CV over three settings (about 200 fits). Each test is a
 single fixed-seed check, not a rate: no Monte Carlo error applies.
@@ -65,16 +75,20 @@ def _pair_experiment(planted: float) -> dict:
 
 
 def test_c_additive_target_has_no_detected_pair() -> None:
-    """(c), null: every pair has Holm p > 0.05 and ``Delta`` upper bound >= 0.
+    """(c), null: every pair has Holm-adjusted p > 0.05 (addendum R1).
 
-    Reference: the data are additive by construction. Tolerance: the Holm
-    rule at 5% (math spec, WU-0048 (c)); the fixed-model gain under an
-    additive truth is <= 0 in expectation, so the test is conservative.
+    Reference: the data are additive by construction. Tolerance: Holm at 5%
+    on one-sided bootstrap p-values (family-wise false detection <= 0.05,
+    approximately; conservative when E[Delta] < 0), so this fixed-seed check
+    fails spuriously with probability <= 0.05. A row whose upper bound is
+    below 0 must read "no interaction gain; the pair model fits worse".
     """
     rows = _pair_experiment(0.0)["pairs"]
     for name, row in rows.items():
         assert row["p_holm"] > 0.05, (name, row)
-        assert row["ci"][1] >= 0.0, (name, row)
+        assert not row["detected"], (name, row)
+        if row["ci"][1] < 0.0:
+            assert row["reading"] == cb.NO_GAIN, (name, row)
 
 
 def test_c_planted_r_by_i_term_is_detected_and_no_other_pair() -> None:
