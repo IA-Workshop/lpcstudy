@@ -18,6 +18,18 @@ the CPU, in a fresh process (the pattern of ``test_states_dump.py``). Then:
 * The tool ``tools/lpc_contrib.py`` on the smoke run writes ``contrib.json``
   and ``contrib.md`` with the DEVELOPMENT label before every table (its
   refusals are unit-tested in ``tests/unit/test_tools_lpc_contrib.py``).
+
+WU-0049 (experiments C and E) adds, on the same dump:
+
+* the realized horizon of a blend (``joint_decisions.realized_policy_horizon``)
+  reproduces the run's stored Kaplan-Meier aggregates exactly for the A0,
+  A1, A2 and A4 weights;
+* the characteristic crossing time of a policy on the dumped curves:
+  ``T - 1 <= T_c <= T`` and ``ceil(T_c)`` equals
+  ``oracle.characteristic_horizon`` except where ``e_{T-1} = theta`` (counted);
+* ``tools/lpc_contrib_ce.py`` on the smoke run (after ``lpc_contrib.py``):
+  labeled tables, and figures that ``--figures-from`` regenerates byte for
+  byte.
 """
 
 from __future__ import annotations
@@ -150,3 +162,173 @@ def test_tool_writes_labeled_tables_on_the_smoke_run(smoke, tmp_path) -> None:
             "| profile"
         ):
             assert label in blocks[i - 1] or label in blocks[i - 2], block[:80]
+
+
+# ----------------------------------------------------------------- WU-0049
+def _policy_weights(a: dict) -> dict[str, np.ndarray]:
+    """A0, A1, A2 (rebuilt on 1..H_max) and A4 on the full grid."""
+    from lpcstudy import joint_decisions as jd
+
+    e_c = a["split/test/cp_err_full"]
+    con = "split/construction"
+    a2 = jd.pooled_weight(a[f"{con}/E_C"], a[f"{con}/E_P"], a[f"{con}/C"])
+    a4 = a["split/test/a4_weight"]
+    assert np.all(a4 == a4[:, :, :1])
+    return {
+        "A0": np.ones_like(e_c),
+        "A1": np.zeros_like(e_c),
+        "A2": np.broadcast_to(a2, e_c.shape),
+        "A4": np.broadcast_to(a4[:, :, :1], e_c.shape),
+    }
+
+
+def test_realized_policy_horizon_reproduces_the_stored_km_aggregates(
+    smoke,
+) -> None:
+    """The realized horizon of a blend, given A0 to A4 weights, gives the
+    run's Kaplan-Meier median, restricted mean and curve exactly.
+
+    Reference: ``scores/<rule>/km_median_lyapunov``, ``rmst_lyapunov`` and
+    ``km_curves/<rule>`` of ``results.json`` (``pipeline.score_rules``, the
+    run's own code path). The rebuilt A2 equals the dumped A2 bitwise at the
+    evaluation horizons. Tolerance: exact (the same float64 operations on
+    the same arrays; the JSON floats round-trip exactly).
+    """
+    from lpcstudy import joint_decisions as jd
+    from lpcstudy.statistics import kaplan_meier
+
+    a = smoke["arrays"]
+    res = smoke["results"]["systems"][SYSTEM]
+    theta = float(a["meta/horizon_threshold"])
+    lt = int(a["meta/steps_per_lyapunov"])
+    h_max = a["split/test/cp_err_full"].shape[-1]
+    weights = _policy_weights(a)
+    cols = a["core/horizons"] - 1
+    a2 = weights["A2"][:, :, cols]
+    assert np.array_equal(a2, a["split/test/a2_weight"])
+    for rule, w in weights.items():
+        durations, events = jd.realized_policy_horizon(
+            w,
+            a["split/test/cp_err_full"],
+            a["split/test/plp_err_full"],
+            a["split/test/verify_noise"],
+            theta,
+        )
+        curve = kaplan_meier(durations, events, h_max)
+        stored = res["scores"][rule]
+        assert curve.median() / lt == stored["km_median_lyapunov"], rule
+        assert curve.restricted_mean() / lt == stored["rmst_lyapunov"], rule
+        assert curve.survival.tolist() == res["km_curves"][rule], rule
+
+
+def test_policy_crossing_on_the_dumped_curves(smoke) -> None:
+    """``T - 1 <= T_c <= T``; ``ceil(T_c)`` is ``characteristic_horizon``.
+
+    Policies A0, A1, A2 and A4 on the test moments ``(n, H_max)``.
+    Reference: ``oracle.characteristic_horizon`` of ``oracle.hybrid_mse``
+    with the same weights (the production code). ``T_c = T - 1`` occurs only
+    where ``e_{T-1} = theta`` exactly, which is counted and is the only
+    place where the ceiling may differ. Tolerance: exact.
+    """
+    from lpcstudy import joint_decisions as jd
+    from lpcstudy.ensemble import EnsembleMoments
+    from lpcstudy.oracle import characteristic_horizon, hybrid_mse
+
+    a = smoke["arrays"]
+    noise = float(a["meta/core_noise"])
+    theta = float(a["meta/horizon_threshold"])
+    horizons = a["meta/horizons_full"]
+    e_c, e_p, c = (a[f"split/test/{k}"] for k in ("E_C", "E_P", "C"))
+    moments = EnsembleMoments(
+        horizons=horizons,
+        mean_cp=np.zeros_like(e_c),
+        mean_plp=np.zeros_like(e_c),
+        sq_cp=e_c,
+        sq_plp=e_p,
+        cross=c,
+        analog_seed=np.ones(len(e_c)),
+        est_seed=np.ones(len(e_c)),
+        noise_sens=np.ones(len(e_c)),
+    )
+    for rule, w in _policy_weights(a).items():
+        cross = jd.policy_crossing(e_c, e_p, c, w, noise, theta)
+        for j in range(w.shape[1]):
+            first, event = characteristic_horizon(
+                hybrid_mse(moments, w[:, j, :]), horizons, noise, theta
+            )
+            np.testing.assert_array_equal(cross.T[:, j], first, err_msg=rule)
+            np.testing.assert_array_equal(cross.event[:, j], event)
+            fin = np.isfinite(cross.T_c[:, j])
+            t_c, t = cross.T_c[fin, j], first[fin]
+            assert np.all((t - 1 <= t_c) & (t_c <= t)), rule
+            differs = np.ceil(t_c) != t
+            np.testing.assert_array_equal(differs, cross.exact[fin, j])
+        assert cross.n_exact_theta == int(cross.exact.sum())
+
+
+def test_ce_tool_writes_labeled_tables_and_reproducible_figures(
+    smoke, tmp_path
+) -> None:
+    """``lpc_contrib.py`` then ``lpc_contrib_ce.py`` on the smoke run.
+
+    Exit 0; the DEVELOPMENT label before every table; the refit allocation
+    reproduces the A/D record's MSE exactly (the same job and seed); the
+    figures regenerate byte for byte from ``ce.json`` (``--figures-from``).
+    """
+    run = smoke["run"]
+    env = {**os.environ, "JAX_PLATFORMS": "cpu"}
+    tools = REPO_ROOT / "tools"
+
+    def call(*argv: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, "-I", *argv],
+            capture_output=True,
+            env=env,
+            timeout=TIMEOUT_SECONDS,
+        )
+
+    abd = tmp_path / "abd"
+    done = call(str(tools / "lpc_contrib.py"), str(run), "--out", str(abd))
+    assert done.returncode == 0, done.stderr.decode()[-2000:]
+    out = tmp_path / "ce"
+    done = call(
+        str(tools / "lpc_contrib_ce.py"),
+        str(run),
+        "--out",
+        str(out),
+        "--abd",
+        str(abd / "contrib.json"),
+        "--jobs",
+        "4",
+    )
+    assert done.returncode == 0, done.stderr.decode()[-2000:]
+    record = json.loads((out / "ce.json").read_text())
+    label = "DEVELOPMENT (DEV-0): exploratory, not a hypothesis test"
+    assert record["label"] == label
+    system = record["systems"][SYSTEM]
+    assert system["checks"]["g_reproduces_abd_max_abs"] == {
+        "oracle": 0.0,
+        "deployable": 0.0,
+    }
+    for key in ("C1", "C2", "C3", "E_H2a", "E_H2e", "E_H3c"):
+        assert key in system, key
+    text = (out / "ce.md").read_text()
+    blocks = text.split("\n\n")
+    tables = [i for i, b in enumerate(blocks) if b.lstrip().startswith("|")]
+    assert tables
+    for i in tables:
+        assert label in blocks[i - 1], blocks[i][:80]
+    digests = json.loads((out / "figures.sha256.json").read_text())
+    again = call(
+        str(tools / "lpc_contrib_ce.py"),
+        "--figures-from",
+        str(out / "ce.json"),
+        "--out",
+        str(tmp_path / "again"),
+    )
+    assert again.returncode == 0, again.stderr.decode()[-2000:]
+    assert json.loads(again.stdout) == digests
+    for name in digests:
+        assert (out / "figures" / name).read_bytes() == (
+            tmp_path / "again" / "figures" / name
+        ).read_bytes()

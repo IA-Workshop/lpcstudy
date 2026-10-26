@@ -218,7 +218,8 @@ class FitJob:
     x_train, x_test : np.ndarray
         Inputs ``(n_tr, r, p)`` and ``(n_te, r', p)``.
     y_train : np.ndarray
-        Target per training state ``(n_tr,)``.
+        Target per training state ``(n_tr,)``, or per row ``(n_tr, r)``
+        (a target that differs between a state's draws, WU-0049 C3).
     weight : np.ndarray or None
         Sample weight per training state (already normalized), or None.
     domain : np.ndarray
@@ -285,7 +286,11 @@ def _flatten(x: np.ndarray) -> np.ndarray:
 def _fit(job: FitJob, setting: Setting, learner: Learner, rows: np.ndarray):
     """Fit on the training states ``rows``; None if the target is one class."""
     r = job.x_train.shape[1]
-    y = np.repeat(job.y_train[rows], r)
+    y = (
+        job.y_train[rows].reshape(-1)
+        if job.y_train.ndim == 2
+        else np.repeat(job.y_train[rows], r)
+    )
     if job.task == "classifier" and np.unique(y).size < 2:
         return None
     weight = None
@@ -328,13 +333,15 @@ def state_loss(
     * ``squared``: ``(g - y)^2``;
     * ``log_loss``: ``ln(1 + e^g) - y g`` for raw log-odds ``g``;
     * ``pinball``: ``max(tau (y - g), (tau - 1)(y - g))``.
+
+    ``aux["y"]`` is per state ``(n,)`` or per row ``(n, r)``.
     """
     if kind in ("kappa_excess", "unit_excess"):
         g = np.clip(pred, 0.0, 1.0)
         kappa = aux["kappa"][:, None] if kind == "kappa_excess" else 1.0
         u, ws = aux["u"][:, None], aux["w_star"][:, None]
         return np.mean(kappa * ((g - u) ** 2 - (ws - u) ** 2), axis=1)
-    y = aux["y"][:, None]
+    y = aux["y"] if aux["y"].ndim == 2 else aux["y"][:, None]
     if kind == "squared":
         return np.mean((pred - y) ** 2, axis=1)
     if kind == "log_loss":
@@ -692,7 +699,7 @@ def dependence_bias(
 # --------------------------------------------------------------- horizon math
 @dataclass
 class Crossing:
-    """The oracle hybrid's horizon per state.
+    """The horizon per state (or per entry of a policy, WU-0049).
 
     ``T`` (int, steps, ``H_max`` if censored), ``event``, ``T_c`` (the
     interpolated crossing time; ``inf`` if censored), ``y = ln min(T_c,
@@ -723,24 +730,44 @@ def crossing_time(
     e_{T-1}) / (ln e_T - ln e_{T-1})`` (math spec M-4).
     """
     target = allocation_targets(e_c, e_p, cross)
-    rms = np.sqrt(target.v_star + noise**2)
-    exceed = rms > theta
+    return rms_crossing(np.sqrt(target.v_star + noise**2), theta)
+
+
+def rms_crossing(rms: np.ndarray, theta: float) -> Crossing:
+    """The crossing time of r.m.s. curves ``(..., H_max)`` on ``1..H_max``.
+
+    ``T`` is the first step with ``e_H > theta`` (``H_max`` and ``event``
+    false if none), as in ``oracle.characteristic_horizon``; ``T_c = T - 1 +
+    (ln theta - ln e_{T-1}) / (ln e_T - ln e_{T-1})`` for ``T > 1`` and 1 for
+    ``T = 1`` (counted); ``inf`` if censored. ``e_{T-1} = theta`` exactly
+    gives ``T_c = T - 1`` (counted in ``n_exact_theta``). Every array of the
+    result has the leading shape of ``rms``.
+    """
+    shape = rms.shape[:-1]
+    flat = rms.reshape(-1, rms.shape[-1])
+    exceed = flat > theta
     event = exceed.any(axis=1)
-    h_max = rms.shape[1]
+    h_max = flat.shape[1]
     first = np.where(event, exceed.argmax(axis=1) + 1, h_max)
     t_c = np.full(len(first), np.inf)
     first_step = event & (first == 1)
     t_c[first_step] = 1.0
     inner = event & (first > 1)
     rows = np.flatnonzero(inner)
-    after = np.log(rms[rows, first[rows] - 1])
-    before = np.log(rms[rows, first[rows] - 2])
+    after = np.log(flat[rows, first[rows] - 1])
+    before = np.log(flat[rows, first[rows] - 2])
     t_c[rows] = first[rows] - 1 + (np.log(theta) - before) / (after - before)
     exact = np.zeros(len(first), bool)
-    exact[rows] = rms[rows, first[rows] - 2] == theta
+    exact[rows] = flat[rows, first[rows] - 2] == theta
     y = np.log(np.minimum(t_c, h_max))
     return Crossing(
-        first, event, t_c, y, int(first_step.sum()), int(exact.sum()), exact
+        first.reshape(shape),
+        event.reshape(shape),
+        t_c.reshape(shape),
+        y.reshape(shape),
+        int(first_step.sum()),
+        int(exact.sum()),
+        exact.reshape(shape),
     )
 
 
@@ -758,9 +785,11 @@ def coverage(
 
     Exact for every entry with ``q < cap``; at the cap the indicator is 1 for
     an event and unknown for a censored state, so the all-entry bracket sets
-    the unknowns to 0 and to 1.
+    the unknowns to 0 and to 1. ``y`` and ``event`` are per state ``(n,)``
+    or per entry ``(n, r)``.
     """
-    yy, ev = y[:, None], np.broadcast_to(event[:, None], q.shape)
+    yy = y if y.ndim == 2 else y[:, None]
+    ev = np.broadcast_to(event if event.ndim == 2 else event[:, None], q.shape)
     below = q < cap
     hit = yy <= q
     unknown = ~below & ~ev
