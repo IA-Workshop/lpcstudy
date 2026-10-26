@@ -4,7 +4,7 @@ Implements DEVELOPMENT_WORKFLOW.md §4.3 and §4.5 and backs up the deny rules
 for the confirmatory path (LPC.PC.7). It blocks, with exit code 2 and a reason:
 
 1. any command that uses the confirmatory path or the seal script;
-2. a ``pilot`` or ``full`` preset run that does not hold the GPU lock (``flock``)
+2. a ``pilot``, ``full`` or ``phasej`` preset run that does not hold the GPU lock (``flock``)
    and is not started through ``tools/run_preset.sh`` (``--report-only`` runs are
    exempt: they recompute nothing);
 3. a whole-suite pytest run (no test path, or the bare ``tests`` directory)
@@ -33,7 +33,7 @@ def block(reason: str) -> None:
 
 
 def heavy_run_unlocked(segment: str) -> bool:
-    """Say whether one command segment starts a pilot or full run without the lock.
+    """Say whether one command segment starts a pilot, full or phasej run without the lock.
 
     A ``--report-only`` run recomputes nothing (it rewrites the report from a
     stored ``results.json``), so it needs no GPU lock even with ``--preset full``.
@@ -48,7 +48,7 @@ def heavy_run_unlocked(segment: str) -> bool:
     bool
         True when the segment must be blocked.
     """
-    if not re.search(r"--preset\s+(pilot|full)\b", segment):
+    if not re.search(r"--preset\s+(pilot|full|phasej)\b", segment):
         return False
     if "--report-only" in segment:
         return False
