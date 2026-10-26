@@ -246,3 +246,8 @@ Phase I P3 to P6 (WU-0040 to WU-0043) are paused behind phase J (DV-1). Plan and
 | WU-0050 | Exploration report | WU-0047, WU-0049 | planned |
 | WU-0051 | Freeze analysis and replication rule; replication runs DEV-5 to DEV-9 | WU-0050 | planned |
 | WU-0052 | Replication analysis and phase J report | WU-0051 | planned |
+
+- 2026-10-26 (later), claude-opus-5-5 (main session): phase J status.
+  - Done: WU-0045 (with addenda R1–R3 and S1–S4), WU-0046 and WU-0046b (dump /3), WU-0047 (DEV-5 to DEV-9 registered; exploration runs DEV-1, DEV-3, DEV-4), WU-0048a, WU-0048, WU-0049, WU-0049b, WU-0050 (exploration report), WU-0051a (`phasej` preset; hook amendment seq 50 on develop, active once on main), WU-0051b and WU-0051c (replication tool, r measurement).
+  - WU-0051: analysis frozen at tag `phasej-freeze` (0929a9a, `docs/agent/notes/2026-10-26-phase-j-freeze.md`); DEV-5 to DEV-9 running at `phasej` from `lpcstudy-wt/run/phj-freeze`.
+  - Next: WU-0052, the replication analysis (run once) and the phase J report.
