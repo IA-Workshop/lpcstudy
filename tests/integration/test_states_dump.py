@@ -540,3 +540,76 @@ def test_schema3_oracle_profile_horizon_and_alignment_on_the_smoke_dump(
         SMOKE.n_eval_draws,
         len(SMOKE.eval_horizons),
     )
+
+
+def test_schema3_state_mse_is_recomputed_from_the_per_draw_errors_and_weights(
+    runs,
+) -> None:
+    """Criterion (vi) of WU-0046b on the smoke dump (M-8, test (f1)).
+
+    ``core/state_mse/<rule>`` is recomputed from the dumped per-draw errors
+    against the noise-free truth (``split/test/cp_err``, ``plp_err``) and the
+    dumped weights: A0 (weight 1) and A1 (weight 0), A2, A3 and A4
+    (``split/test/<rule>_weight``) at every evaluation horizon, and A5 at
+    ``H_ref`` (``core/weight_href/A5``). The formula
+    ``(1/E) sum_j (w e_C + (1 - w) e_P)^2`` is written here. This is a
+    dump-fidelity check: the stored values come from the same run, and the
+    ``H_ref`` column of each is the score the verdicts use (checked bitwise by
+    ``collect``, and against the results leaf by b3).
+
+    Also checked, exactly: the shapes; the full-grid errors at the evaluation
+    columns are the short arrays; the weights agree with the ``/2`` keys
+    ``core/weight_href/<rule>`` at ``H_ref``, A2 is one number per horizon and
+    A4 one per (state, draw); the full-grid half-draw moments at the
+    evaluation columns are ``core/E_C_A`` and the others.
+
+    Tolerance: ``1e-12`` relative, the criterion of the plan. The round-off of
+    the recomputation is a few ulps (a blend, a square and a mean of ``E``
+    terms: about ``(E + 3) 2**-53``, under ``1e-15`` at smoke), far below it.
+    """
+    from lpcstudy.config import SMOKE
+
+    a = runs["arrays"]
+    n, n_cal, e = SMOKE.n_test, SMOKE.n_calibration, SMOKE.n_eval_draws
+    k, h_max = len(SMOKE.eval_horizons), SMOKE.horizon_max
+    cols = a["core/horizons"] - 1
+    ref_index = int(a["core/ref_index"])
+    for split, n_s in (("test", n), ("calibration", n_cal)):
+        for name in ("cp_err", "plp_err"):
+            assert a[f"split/{split}/{name}"].shape == (n_s, e, k), split
+            assert a[f"split/{split}/{name}"].dtype == np.float64, split
+    for name in ("cp_err", "plp_err"):
+        full = a[f"split/test/{name}_full"]
+        assert full.shape == (n, e, h_max) and full.dtype == np.float64
+        assert np.array_equal(full[:, :, cols], a[f"split/test/{name}"])
+    weights = {
+        rule: a[f"split/test/{rule.lower()}_weight"]
+        for rule in ("A2", "A3", "A4")
+    }
+    for rule, w in weights.items():
+        assert w.shape == (n, e, k) and w.dtype == np.float64, rule
+        assert np.array_equal(
+            w[:, :, ref_index], a[f"core/weight_href/{rule}"]
+        ), rule
+    assert np.all(weights["A2"] == weights["A2"][:1, :1, :])
+    assert np.all(weights["A4"] == weights["A4"][:, :, :1])
+    for name in ("E_C", "E_P", "C"):
+        for tag in ("A", "B"):
+            full = a[f"split/test/{name}_{tag}"]
+            assert full.shape == (n, h_max), (name, tag)
+            assert np.array_equal(full[:, cols], a[f"core/{name}_{tag}"])
+
+    e_c, e_p = a["split/test/cp_err"], a["split/test/plp_err"]
+    weights |= {"A0": np.ones_like(e_c), "A1": np.zeros_like(e_c)}
+    for rule, w in weights.items():
+        recomputed = ((w * e_c + (1.0 - w) * e_p) ** 2).mean(axis=1)
+        np.testing.assert_allclose(
+            recomputed, a[f"core/state_mse/{rule}"], rtol=1e-12, atol=0.0
+        )
+    w5 = a["core/weight_href/A5"]
+    recomputed = (
+        (w5 * e_c[:, :, ref_index] + (1.0 - w5) * e_p[:, :, ref_index]) ** 2
+    ).mean(axis=1)
+    np.testing.assert_allclose(
+        recomputed, a["core/state_mse/A5"][:, ref_index], rtol=1e-12, atol=0.0
+    )
