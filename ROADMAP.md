@@ -421,3 +421,27 @@ Append, do not edit: a dated block listing WU-0009 to WU-0019 with the dependenc
 | WU-0042 | Freeze gate green (all tiers, `LPC_GATE=freeze-x`); tag on `main`; commitments for CONF-2 to CONF-4 in the ledger; seed values in no output. |
 | WU-0043 | Regeneration bitwise equal (tier T0) on every compared leaf; `--report-only` byte-identical twice; every reported number traced to `results.json`; auditor pass with zero blockers. |
 | WU-0044 | Every S1 to S6 equation and parameter matches a cited source (Dysts entry or the original paper), with a quote; a mismatch is reported, never silently fixed. |
+
+## 10. Phase J. LPC contribution study (development priority)
+
+**Amended 2026-10-26 (owner ruling "Proceed", ledger seq 47; the LPC.PC.1 scoped exception for phase J is proposed and awaits the owner).** Plan: `docs/agent/notes/2026-10-26-phase-j-lpc-contribution-plan.md` (WU-0045 to WU-0052), adopted with all its provisions DV-1 to DV-5 and DS-1 to DS-7. Sections 1 to 9 are unchanged.
+
+**Decisions taken (owner, 2026-10-26).**
+
+1. Priority: phase J goes first. Phase I P3 to P6 are paused; phase I runs use the GPU only when phase J does not need it (DV-1).
+2. The December empirical-baseline comparison is deferred; experiment D carries the empirical benchmarks (DV-2).
+3. Phase J is development work on development seeds, estimates with readings and no verdict, with the intention of promoting it after a pre-registered confirmatory round (DV-3). That round needs its own pre-registration, freeze and sealed seeds, and is planned after WU-0052.
+4. Five new development seeds DEV-5 to DEV-9 form the held-out replication set (DV-4).
+5. The opt-in state dump gains schema /3, flag-gated and bitwise neutral for `results.json` (DV-5).
+
+**Phases.**
+
+| Phase | Units | Gate to the next phase |
+| --- | --- | --- |
+| J0 to J1 | WU-0045 analysis specification (applied-mathematician); WU-0046 dump schema /3; WU-0048a quick look on the DEV-2 dumps | WU-0046 acceptance criteria pass |
+| J2 | WU-0047: register DEV-5 to DEV-9; exploration runs DEV-1, DEV-3, DEV-4 (full preset, GPU, three core systems, `--states-dump`) | runs complete; gate per system and seed |
+| J3 to J5 | WU-0048 experiments A, B, D; WU-0049 experiments C, E; WU-0050 exploration report | the plan's tests pass; every number traced |
+| J6 | WU-0051: freeze the analysis commit and the replication rule; replication runs DEV-5 to DEV-9 | script unchanged since the freeze commit |
+| J7 | WU-0052: replication analysis, run once; phase J report | owner and student read; owner decides the confirmatory round |
+
+Acceptance criteria: as in the plan's section 5 (fixed now; tightened, never loosened).

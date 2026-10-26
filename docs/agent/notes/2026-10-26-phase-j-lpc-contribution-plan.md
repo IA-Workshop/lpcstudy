@@ -1,6 +1,6 @@
 # Phase J: LPC contribution study, plan
 
-**DEVELOPMENT plan, proposed, not adopted.** WU-0045. Main session (claude-opus-5-5), 2026-10-26. Source: the student's follow-up proposal and notes, relayed by the owner on 2026-10-26 as "now the development priority". This plan implements that proposal. Section 1 lists every place where it departs from the proposal or from the current plan (ROADMAP §9, phase I).
+**DEVELOPMENT plan, adopted 2026-10-26 (owner: "Proceed", ledger seq 47; DV-1 to DV-5 and DS-1 to DS-7 agreed; DV-3 "with the intention of promoting it when confirmed").** WU-0045. Main session (claude-opus-5-5), 2026-10-26. Source: the student's follow-up proposal and notes, relayed by the owner on 2026-10-26 as "now the development priority". This plan implements that proposal. Section 1 lists every place where it departs from the proposal or from the current plan (ROADMAP §9, phase I).
 
 Every number this phase produces is a development number (DEV seeds). It never appears beside the sealed CONF-1 result, and it never changes CONF-1.
 

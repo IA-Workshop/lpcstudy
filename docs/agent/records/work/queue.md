@@ -230,3 +230,19 @@ Decision DEC-0044; note `docs/agent/notes/2026-10-23-promotion-closeout.md`. Rem
 | WU-0026 | done: .1 manifest lines and GPU tally (`week=2026-W43 gpu_hours=6.8125 runs=9`), .2 gate and completeness table in the unit file |
 
 Frozen-pipeline regression reference `lpcstudy-wt/run/ext-ref-fc49d5f` (leafdiff 0 different). Results summary `docs/agent/notes/2026-10-23-extension-ensemble-summary.md`. Gate: ensemble all pass; extension S1 passes, S2 to S6 fail V7 (provisional).
+
+## Added 2026-10-26: phase J, LPC contribution study (claude-opus-5-5, main session; ROADMAP.md §10; ledger seq 47)
+
+Phase I P3 to P6 (WU-0040 to WU-0043) are paused behind phase J (DV-1). Plan and acceptance criteria: `docs/agent/notes/2026-10-26-phase-j-lpc-contribution-plan.md` §5.
+
+| Unit | Title | Depends on | Status (2026-10-26) |
+| --- | --- | --- | --- |
+| WU-0045 | Analysis specification M-1 to M-8 (applied-mathematician) | — | in progress |
+| WU-0046 | Dump schema /3 (developer) | — | in progress |
+| WU-0047 | Register DEV-5 to DEV-9; exploration runs DEV-1, DEV-3, DEV-4 (GPU) | WU-0046 | planned |
+| WU-0048a | Quick look on the DEV-2 dumps (prototype, old code) | — | in progress |
+| WU-0048 | Analysis library: experiments A, B, D | WU-0045, WU-0046 | planned |
+| WU-0049 | Experiments C, E | WU-0048 | planned |
+| WU-0050 | Exploration report | WU-0047, WU-0049 | planned |
+| WU-0051 | Freeze analysis and replication rule; replication runs DEV-5 to DEV-9 | WU-0050 | planned |
+| WU-0052 | Replication analysis and phase J report | WU-0051 | planned |
