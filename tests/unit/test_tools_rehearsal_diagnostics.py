@@ -1833,11 +1833,11 @@ def test_a_wrong_schema_is_not_computable(tmp_path, capsys) -> None:
     as 1).
     """
     d, res, _ = build_world(rng_for("world"))
-    d["meta/schema"] = np.array("lpcstudy.states/3")
+    d["meta/schema"] = np.array("lpcstudy.states/4")
     assert rd.main([str(write_run(tmp_path, d, res))]) == 2
     assert (
-        "schema 'lpcstudy.states/3' is not one of ('lpcstudy.states/1', "
-        "'lpcstudy.states/2')" in capsys.readouterr().out
+        "schema 'lpcstudy.states/4' is not one of ('lpcstudy.states/1', "
+        "'lpcstudy.states/2', 'lpcstudy.states/3')" in capsys.readouterr().out
     )
     d["meta/schema"] = np.array(
         "lpcstudy.states/2"

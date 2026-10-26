@@ -37,6 +37,13 @@ from lpcstudy.oracle import StateOracles
 from unit_helpers import moments_from_triples
 
 N, E, M, N_CAL, N_SWEEP = 4, 2, 6, 3, 3
+N_CON, D, TAU, K_KEPT = 5, 3, 2, 2
+GRID = np.array([1, 8, 30, 120])  # the hand-built A3 grid (nG = 4)
+TIMES = {  # time indices of the splits, each >= (D - 1) TAU
+    "construction": np.arange(10, 10 + N_CON),
+    "calibration": np.array([20, 23, 26]),
+    "test": np.array([40, 41, 45, 50]),
+}
 CFG = dataclasses.replace(
     SMOKE,
     horizon_max_lyapunov=4.0,
@@ -122,7 +129,7 @@ def _draws(
         est_nu=1.0 + rng.random((n, E)),
         growth_proxy=growth,
         gain_proxy=np.ones((n, E, n_hor)),
-        inputs=np.zeros((n, E, 1)),
+        inputs=rng.standard_normal((n, E, D)),
         noise_sens=rng.random((n, E)),
         handled=rng.integers(0, 3, (n, 8)).astype(np.int64),
         lm_residual=rng.random((n, E)),
@@ -188,28 +195,51 @@ def _world():
         local_dim=2.0 + rng.random(N),
         handled=rng.integers(0, 2, (N, 3)).astype(np.int64),
     )
-    lm = lambda n, k: SimpleNamespace(
-        lm_residual=rng.random((n, k)),
-        lm_accepted=rng.integers(0, 15, (n, k)),
-        lm_late=rng.integers(0, 2, (n, k)).astype(bool),
-        handled=rng.integers(0, 3, (n, 8)).astype(np.int64),
-        clip_entries={
-            "error_clips_cp": int(rng.integers(0, 9)),
-            "error_clips_plp": 3,
-            "error_clips_nonfinite": int(rng.integers(0, 4)),
-        },
-    )
+    entries = lambda: {
+        "error_clips_cp": int(rng.integers(0, 9)),
+        "error_clips_plp": 3,
+        "error_clips_nonfinite": int(rng.integers(0, 4)),
+    }
+    # construction and calibration (schema /3 reads their moments and
+    # oracles): full-grid moments, and for construction the A3 kept arrays
+    con_m = _moments(rng, N_CON, n_hor, np.arange(1, n_hor + 1))
+    con_m.clip_entries = entries()
+    con_m.kept = {
+        "inputs": rng.standard_normal((N_CON, K_KEPT, D)),
+        "cp_err": rng.standard_normal((N_CON, K_KEPT, len(GRID))),
+        "plp_err": rng.standard_normal((N_CON, K_KEPT, len(GRID))),
+    }
+    con_ev = _draws(rng, N_CON, rng.random((N_CON, E)) * 0.04, n_hor)
+    con_ev.clip_entries = entries()
+    cal_m = _moments(rng, N_CAL, n_hor, np.arange(1, n_hor + 1))
+    cal_m.clip_entries = entries()
+    split_oracles = {
+        name: StateOracles(
+            nu=rng.random(n),
+            gains=1.0 + rng.random((n, 30)),
+            growth=rng.random(n),
+            local_dim=2.0 + rng.random(n),
+            handled=rng.integers(0, 2, (n, 3)).astype(np.int64),
+        )
+        for name, n in (("construction", N_CON), ("calibration", N_CAL))
+    }
     core = SimpleNamespace(
         system="lorenz63",
         noise=0.01,
         library_size=10_000,
         horizons=np.arange(1, n_hor + 1),
         splits={
-            "construction": SimpleNamespace(moments=lm(5, M), evals=lm(5, E)),
-            "calibration": SimpleNamespace(moments=lm(N_CAL, M), evals=cal),
+            "construction": SimpleNamespace(moments=con_m, evals=con_ev),
+            "calibration": SimpleNamespace(moments=cal_m, evals=cal),
             "test": SimpleNamespace(moments=m, evals=ev),
         },
-        oracles={"test": oracles},
+        oracles={**split_oracles, "test": oracles},
+        ctx=SimpleNamespace(
+            split_indices=TIMES,
+            eval_clean=rng.standard_normal(60),
+            delay=TAU,
+            embed_dim=D,
+        ),
     )
     # the clip entry totals of the real computations (dicts), distinct per part
     m.clip_entries = {
@@ -235,6 +265,7 @@ def _world():
         ),
         regimes={2: _stump_map(), 3: _stump_map(split=0.1)},
         chosen_regimes=2,
+        predictor=SimpleNamespace(grid=GRID),
     )
     weights = {rule: rng.random((N, E, n_hor)) for rule in RULES}
     scores = {
@@ -366,7 +397,7 @@ def test_collect_dumps_every_core_array_as_the_hand_formula_says() -> None:
         CFG,
     )
     m, ev = core.splits["test"].moments, core.splits["test"].evals
-    assert str(arrays["meta/schema"]) == SCHEMA == "lpcstudy.states/2"
+    assert str(arrays["meta/schema"]) == SCHEMA == "lpcstudy.states/3"
     assert (
         arrays["core/horizons"].tolist() == HORIZONS.tolist()
         and int(arrays["core/ref_index"]) == 2
@@ -466,7 +497,7 @@ def test_collect_dumps_every_core_array_as_the_hand_formula_says() -> None:
         assert not np.shares_memory(arrays[key], value), key
     assert arrays["lm/test/oracle_late"].dtype == bool
     assert arrays["lm/test/oracle_accepted"].dtype == np.int64
-    assert arrays["lm/construction/oracle_residual"].shape == (5, M)
+    assert arrays["lm/construction/oracle_residual"].shape == (N_CON, M)
     for key, value in arrays.items():
         assert value.dtype.kind in "fibU" and (
             value.dtype.kind != "f" or value.dtype.itemsize == 8
@@ -698,7 +729,7 @@ def test_the_a5_leaf_arrays_digest_to_the_fitted_leaf() -> None:
         _world()
     )
     rules.predictor = SimpleNamespace(
-        network=SimpleNamespace(weights_digest=lambda: "0" * 64)
+        network=SimpleNamespace(weights_digest=lambda: "0" * 64), grid=GRID
     )
     for rule in rules.regimes.values():
         rule.weights = np.zeros((2, CFG.reference_horizon))
@@ -805,3 +836,222 @@ def test_record_extra_refuses_keys_outside_h1a_h1c_and_a_key_recorded_twice() ->
     assert dump._extra["lorenz63"]["h1c/thresholds"].tolist() == [0.1, 0.2]
     # another system: its own record
     dump.record_extra("rossler", {"h1c/thresholds": np.zeros(1)})
+
+
+# ------------------------------------------------------------ schema /3 (WU-0046)
+SPLIT_SIZES = {"construction": N_CON, "calibration": N_CAL, "test": N}
+
+
+def _collect_world(world=None) -> tuple[dict[str, np.ndarray], tuple]:
+    """Return the arrays of ``collect`` on ``_world()`` and the world."""
+    world = _world() if world is None else world
+    dump, core, rules, weights, scores, noise_cells, library_cells, _, _ = world
+    arrays = dump.collect(
+        "lorenz63",
+        core,
+        rules,
+        weights,
+        scores,
+        noise_cells,
+        library_cells,
+        CFG,
+    )
+    return arrays, world
+
+
+def test_split_group_has_every_array_with_its_shape_dtype_and_source() -> None:
+    """``split/<s>/`` holds the documented arrays, as copies of their sources.
+
+    Reference: the arrays put into the hand-built world, and the shapes and
+    dtypes of the schema in ``lpcstudy/dump.py`` (typed here). The moments are
+    the full-grid ``sq_cp``, ``sq_plp``, ``cross`` of every split (``(n_s,
+    H_max)``); ``state_index`` is the time index of each state; ``delay_eval``
+    the evaluation inputs; ``a3_weight`` the A3 weight at the evaluation
+    columns ``h - 1``; ``a3_train/`` the construction ``kept`` arrays. The
+    deployable profile of the test split equals ``core/profile`` (the /2 key).
+    The six ``meta/`` keys of /3 are the configuration values.
+
+    Tolerance: exact (copies and slices).
+    """
+    arrays, world = _collect_world()
+    _, core, rules, weights, *_ = world
+    h_max = CFG.horizon_max
+    assert arrays["meta/horizons_full"].tolist() == list(range(1, h_max + 1))
+    assert arrays["meta/allocator_grid"].tolist() == GRID.tolist()
+    assert int(arrays["meta/allocator_draws"]) == CFG.allocator_draws
+    assert float(arrays["meta/core_noise"]) == 0.01
+    assert float(arrays["meta/horizon_threshold"]) == CFG.primary_threshold
+    assert int(arrays["meta/n_test_sweep"]) == N_SWEEP
+    for key in (
+        "meta/horizons_full",
+        "meta/allocator_grid",
+        "meta/allocator_draws",
+        "meta/n_test_sweep",
+    ):
+        assert arrays[key].dtype == np.int64, key
+    for key in ("meta/core_noise", "meta/horizon_threshold"):
+        assert arrays[key].dtype == np.float64 and arrays[key].shape == ()
+    float_shapes = {
+        "delay_clean": lambda n: (n, D),
+        "delay_eval": lambda n: (n, E, D),
+        "E_C": lambda n: (n, h_max),
+        "E_P": lambda n: (n, h_max),
+        "C": lambda n: (n, h_max),
+        "eps_s": lambda n: (n,),
+        "delta": lambda n: (n,),
+        "N": lambda n: (n,),
+        "Lambda_bar": lambda n: (n,),
+        "profile_oracle": lambda n: (n, 4),
+        "profile_deployable": lambda n: (n, E, 4),
+    }
+    for split, n_s in SPLIT_SIZES.items():
+        group = f"split/{split}"
+        part, oracles = core.splits[split], core.oracles[split]
+        for name, shape in float_shapes.items():
+            value = arrays[f"{group}/{name}"]
+            assert value.dtype == np.float64, (split, name)
+            assert value.shape == shape(n_s), (split, name)
+        for name, dtype in (
+            ("state_index", np.int64),
+            ("T", np.int64),
+            ("T_censored", np.bool_),
+        ):
+            value = arrays[f"{group}/{name}"]
+            assert value.dtype == dtype and value.shape == (n_s,), (split, name)
+        assert arrays[f"{group}/state_index"].tolist() == TIMES[split].tolist()
+        for name, source in (
+            ("E_C", part.moments.sq_cp),
+            ("E_P", part.moments.sq_plp),
+            ("C", part.moments.cross),
+            ("eps_s", part.moments.analog_seed),
+            ("delta", part.moments.est_seed),
+            ("N", part.moments.noise_sens),
+            ("Lambda_bar", oracles.growth),
+            ("delay_eval", part.evals.inputs),
+        ):
+            assert np.array_equal(arrays[f"{group}/{name}"], source), (
+                split,
+                name,
+            )
+            assert not np.shares_memory(arrays[f"{group}/{name}"], source)
+    assert np.array_equal(
+        arrays["split/test/profile_deployable"], arrays["core/profile"]
+    )
+    a3 = arrays["split/test/a3_weight"]
+    assert a3.dtype == np.float64 and a3.shape == (N, E, len(HORIZONS))
+    assert np.array_equal(a3, weights["A3"][:, :, COLS])
+    kept = core.splits["construction"].moments.kept
+    for name, shape in (
+        ("inputs", (N_CON, K_KEPT, D)),
+        ("cp_err", (N_CON, K_KEPT, len(GRID))),
+        ("plp_err", (N_CON, K_KEPT, len(GRID))),
+    ):
+        value = arrays[f"split/construction/a3_train/{name}"]
+        assert value.dtype == np.float64 and value.shape == shape, name
+        assert np.array_equal(value, kept[name]), name
+        assert not np.shares_memory(value, kept[name]), name
+    # only the test split carries a3_weight; only construction a3_train
+    assert not any(
+        k.startswith(("split/construction/a3_weight", "split/calibration/a3"))
+        or k.startswith(("split/test/a3_train", "split/calibration/a3_train"))
+        for k in arrays
+    )
+
+
+def test_split_delay_clean_is_the_hand_stacked_delay_vector() -> None:
+    """``delay_clean`` row ``i`` is ``(x_t, x_{t-tau}, ..., x_{t-(D-1) tau})``.
+
+    Reference: the stored normalized series ``ctx.eval_clean`` indexed by hand
+    at ``t_i - j tau`` for ``j = 0..D-1`` (independent of ``delay_vectors``).
+
+    Tolerance: exact (a gather).
+    """
+    arrays, world = _collect_world()
+    series = world[1].ctx.eval_clean
+    for split, times in TIMES.items():
+        hand = np.array(
+            [[series[t - j * TAU] for j in range(D)] for t in times.tolist()]
+        )
+        assert np.array_equal(arrays[f"split/{split}/delay_clean"], hand), split
+
+
+def test_split_oracle_profile_is_the_formula_of_its_own_dumped_columns() -> (
+    None
+):
+    """``profile_oracle`` is ``(ln eps_s/rho, ln delta/rho, Lambda_bar x 30,
+    ln(N + 0.01))`` of the dumped columns, per split.
+
+    Reference: the formula of the plan (section 3.1, "exactly as Q-N builds
+    it") written here from the dumped ``eps_s``, ``delta``, ``Lambda_bar``,
+    ``N``, ``meta/core_noise`` and ``meta/steps_per_lyapunov``, not from
+    ``analysis._oracle_profile``.
+
+    Tolerance: exact (the same four elementwise IEEE operations on the same
+    float64 values; ``0.01`` is the double of ``NOISE_SENS_FLOOR = 1e-2``).
+    """
+    arrays, _ = _collect_world()
+    rho = float(arrays["meta/core_noise"])
+    lt = int(arrays["meta/steps_per_lyapunov"])
+    for split in SPLIT_SIZES:
+        g = f"split/{split}"
+        hand = np.column_stack(
+            [
+                np.log(arrays[f"{g}/eps_s"] / rho),
+                np.log(arrays[f"{g}/delta"] / rho),
+                arrays[f"{g}/Lambda_bar"] * lt,
+                np.log(arrays[f"{g}/N"] + 0.01),
+            ]
+        )
+        assert np.array_equal(arrays[f"{g}/profile_oracle"], hand), split
+
+
+def test_split_horizon_and_censoring_on_manufactured_moments() -> None:
+    """``T`` and ``T_censored`` follow the manufactured calibration moments.
+
+    Reference (manufactured): ``E_C = E_P = a_i h / 120`` and ``C = 0``, so
+    ``w* = 1/2`` and the oracle hybrid's error is ``a_i h / 240``. With
+    ``rho = 0.01`` and ``theta = 0.2`` the first horizon with
+    ``sqrt(a_i h / 240 + rho^2) > theta`` is the smallest integer
+    ``h > 240 (theta^2 - rho^2) / a_i``: 9.576 for ``a = 1`` (``T = 10``),
+    19.152 for ``a = 0.5`` (``T = 20``); ``a = 0.01`` never exceeds it within
+    120 steps (``T = 120``, censored). A loop over horizons written here
+    gives the same three numbers. No bound is within 0.15 of an integer, so
+    round-off cannot move a crossing.
+
+    Tolerance: exact (integers and flags).
+    """
+    world = _world()
+    core = world[1]
+    cal = core.splits["calibration"].moments
+    h = np.arange(1, 121, dtype=float)
+    amp = np.array([1.0, 0.01, 0.5])
+    cal.sq_cp = amp[:, None] * h[None, :] / 120.0
+    cal.sq_plp = cal.sq_cp.copy()
+    cal.cross = np.zeros_like(cal.sq_cp)
+    arrays, _ = _collect_world(world)
+    rho, theta = 0.01, CFG.primary_threshold
+    loop = []
+    for a in amp:
+        crossing = [
+            k for k in range(1, 121) if np.sqrt(a * k / 240 + rho**2) > theta
+        ]
+        loop.append((crossing[0], False) if crossing else (120, True))
+    assert loop == [(10, False), (120, True), (20, False)]
+    assert arrays["split/calibration/T"].tolist() == [t for t, _ in loop]
+    assert arrays["split/calibration/T_censored"].tolist() == [
+        c for _, c in loop
+    ]
+
+
+def test_split_group_refuses_a_construction_split_without_a3_arrays() -> None:
+    """A construction split with no ``kept`` arrays raises ``ValueError``.
+
+    Reference: the contract (the dump never writes a partial ``split/`` group,
+    PRIME.4), decided by hand.
+
+    Tolerance: exact.
+    """
+    world = _world()
+    world[1].splits["construction"].moments.kept = {}
+    with pytest.raises(ValueError, match="kept no per-draw arrays"):
+        _collect_world(world)

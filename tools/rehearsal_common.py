@@ -42,7 +42,7 @@ import numpy as np
 
 EXIT_MISMATCH = 1
 EXIT_INCOMPLETE = 2
-SCHEMAS = ("lpcstudy.states/1", "lpcstudy.states/2")
+SCHEMAS = ("lpcstudy.states/1", "lpcstudy.states/2", "lpcstudy.states/3")
 PRIMARY_LEVEL = 1.0 - 0.05 / 3.0
 
 

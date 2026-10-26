@@ -52,7 +52,7 @@ What it computes (plan amendment 2, B1 item 7 as amended; mathematics check
 * **C4.** Levenberg-Marquardt (LM) fit readings against the bands of note M6. A
   value outside its band is a FINDING and never a failure.
 
-A missing array, a schema other than ``lpcstudy.states/1`` or ``/2``, a
+A missing array, a schema other than ``lpcstudy.states/1``, ``/2`` or ``/3``, a
 non-finite half-width, a series that cannot be formed, or an unexpected
 exception (an "INTERNAL ERROR" line that names the place) prints ``not
 computable: <what>: <why>``. Nothing is skipped or replaced, and the rest of the
