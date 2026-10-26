@@ -259,3 +259,10 @@ The DEV-2 prototype (`docs/agent/notes/2026-10-26-phase-j-quick-look.md`) showed
 - the separation formula is a reference column in A and rung 2 of D;
 - B uses the logit scale only;
 - horizons are labelled by steps and LT, so the first is 8 steps (0.27 LT).
+
+## 10. Amendment: a larger test split for the replication runs (2026-10-26, ledger seq 49)
+
+The exploration seeds left most short-horizon allocation rows on Lorenz-63 and Chua "undetermined": n_eff was 6 to 63 out of 1000 test states, because a few states carry the loss. The owner ruled "Proceed as recommended":
+- DEV-5 to DEV-9 run at a new additive preset, `phasej`, which is `full` with n_test = 4000 (WU-0051a). The v3 presets are unchanged.
+- Before the freeze (WU-0051), one dress-rehearsal run of an exploration seed at `phasej` checks that the analysis runs at that size. Its readings are exploratory, like those of the other exploration seeds.
+- The replication rule compares readings among the five held-out seeds only.
