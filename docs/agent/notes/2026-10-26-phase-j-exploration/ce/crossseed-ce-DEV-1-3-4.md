@@ -6,11 +6,28 @@
 |---|---|---|---|---|
 | lorenz63 | C1 G(F) oracle, 1 LT | 0.75 | 0.608 | 0.334 |
 | lorenz63 | C1 F pinball / C, oracle | 0.146 / 0.678 | 0.149 / 0.675 | 0.148 / 0.692 |
-| lorenz63 | C2 forward retained [CI] | 0.129 [0.0587, 0.192] loses most | 0.179 [0.107, 0.258] loses most | 0.0951 [0.0464, 0.149] loses most |
-| lorenz63 | C2 reverse retained, H=8 | 0.598 [0.364, 0.746] not determined (n_eff < 50) | 0.514 [0.076, 0.779] not determined (n_eff < 50) | -0.225 [-0.775, 0.204] not determined (n_eff < 50) |
-| lorenz63 | C2 reverse retained, H=30 | 0.606 [0.386, 0.77] not determined (n_eff < 50) | 0.815 [0.481, 2.06] not determined (n_eff < 50) | -1.87 [-, -] not determined (full-profile skill not established) |
-| lorenz63 | C2 reverse retained, H=120 | - [-, -] not determined (full-profile skill not established) | 0.323 [-, -] not determined (full-profile skill not established) | -0.0436 [-3.69, 1.08] not determined (interval spans 0.5) |
-| lorenz63 | C2 prediction (both lose most) | consistent | consistent | consistent |
+| lorenz63 | C2 ora forward retained | 0.129 [0.0587, 0.192] loses most | 0.179 [0.107, 0.258] loses most | 0.0951 [0.0464, 0.149] loses most |
+| lorenz63 | C2 ora forward retained L_w (g_w) | 0.275 [0.162, 0.381] loses most | 0.429 [0.321, 0.529] not determined (interval spans 0.5) | 0.301 [0.182, 0.426] loses most |
+| lorenz63 | C2 ora reverse retained L_A, H=8 | 0.598 [0.364, 0.746] not determined (n_eff < 50) | 0.514 [0.076, 0.779] not determined (n_eff < 50) | -0.225 [-0.775, 0.204] not determined (n_eff < 50) |
+| lorenz63 | C2 ora reverse retained L_w, H=8 | 0.135 [0.0912, 0.176] loses most | 0.179 [0.109, 0.25] loses most | 0.208 [0.127, 0.284] loses most |
+| lorenz63 | C2 ora reverse retained L_A, H=30 | 0.606 [0.386, 0.77] not determined (n_eff < 50) | 0.815 [0.481, 2.06] not determined (n_eff < 50) | -1.87 [-, -] not determined (full-profile skill not established) |
+| lorenz63 | C2 ora reverse retained L_w, H=30 | 0.172 [0.126, 0.216] loses most | 0.148 [0.0744, 0.219] loses most | 0.21 [0.127, 0.291] loses most |
+| lorenz63 | C2 ora reverse retained L_A, H=120 | - [-, -] not determined (full-profile skill not established) | 0.323 [-, -] not determined (full-profile skill not established) | -0.0436 [-3.69, 1.08] not determined (interval spans 0.5) |
+| lorenz63 | C2 ora reverse retained L_w, H=120 | 0.298 [0.0624, 0.928] not determined (interval spans 0.5) | 0.144 [0.00454, 0.295] loses most | 0.134 [-0.0223, 0.317] loses most |
+| lorenz63 | C2 ora prediction (both lose most) | consistent | consistent | consistent |
+| lorenz63 | C2 dep forward retained | 0.126 [0.068, 0.186] loses most | 0.212 [0.152, 0.277] loses most | 0.201 [0.135, 0.267] loses most |
+| lorenz63 | C2 dep forward retained L_w (g_w) | 0.0974 [-0.0847, 0.244] loses most | 0.4 [0.309, 0.499] loses most | 0.304 [0.224, 0.39] loses most |
+| lorenz63 | C2 dep reverse retained L_A, H=8 | 0.124 [-1.2, 1.84] not determined (n_eff < 50) | -0.107 [-1.66, 0.939] not determined (n_eff < 50) | -0.428 [-1.2, 0.568] not determined (n_eff < 50) |
+| lorenz63 | C2 dep reverse retained L_w, H=8 | 0.241 [0.142, 0.371] loses most | 0.243 [0.139, 0.35] loses most | 0.0824 [-0.0745, 0.227] loses most |
+| lorenz63 | C2 dep reverse retained L_A, H=30 | 0.785 [0.423, 1.21] not determined (n_eff < 50) | 0.36 [-0.696, 0.744] not determined (n_eff < 50) | -1.22 [-, -] not determined (full-profile skill not established) |
+| lorenz63 | C2 dep reverse retained L_w, H=30 | 0.308 [0.16, 0.475] loses most | 0.367 [0.22, 0.511] not determined (interval spans 0.5) | 0.128 [-0.0107, 0.256] loses most |
+| lorenz63 | C2 dep reverse retained L_A, H=120 | 0.0631 [-, -] not determined (full-profile skill not established) | 0.532 [-, -] not determined (full-profile skill not established) | 1.84 [-, -] not determined (full-profile skill not established) |
+| lorenz63 | C2 dep reverse retained L_w, H=120 | 0.541 [0.0745, 1.9] not determined (interval spans 0.5) | 0.383 [0.127, 0.691] not determined (interval spans 0.5) | 0.444 [0.08, 0.866] not determined (interval spans 0.5) |
+| lorenz63 | C2 dep prediction (both lose most) | consistent | consistent | consistent |
+| lorenz63 | C2 dep - ora retained, forward | -0.00232 [-0.0692, 0.0683] no difference detected | 0.0329 [-0.039, 0.101] no difference detected | 0.106 [0.0478, 0.163] deployable retains more |
+| lorenz63 | C2 dep - ora retained, forward_w | -0.177 [-0.364, -0.0192] deployable retains less | -0.0286 [-0.135, 0.085] no difference detected | 0.00317 [-0.135, 0.146] no difference detected |
+| lorenz63 | C2 dep - ora retained, reverse/30 | 0.179 [-0.176, 0.712] not determined (n_eff < 50) | -0.455 [-2.49, 0.118] not determined (n_eff < 50) | 0.654 [-, -] not determined (full-profile skill not established) |
+| lorenz63 | C2 dep - ora retained, reverse_w/30 | 0.137 [-0.00228, 0.295] no difference detected | 0.219 [0.078, 0.371] deployable retains more | -0.0823 [-0.214, 0.0416] no difference detected |
 | lorenz63 | C2 Spearman(phi), 1 LT | 0.6 | 0.6 | 0.8 |
 | lorenz63 | C3 false trust realized: A2 + constant | 0.0805 [0.068, 0.0932] | 0.0658 [0.0525, 0.0778] | 0.0612 [0.0495, 0.0732] |
 | lorenz63 | C3 trusted LT: A2 + constant | 0.621 [0.621, 0.621] | 0.538 [0.538, 0.538] | 0.39 [0.39, 0.39] |
@@ -31,11 +48,28 @@
 | lorenz63 | E-H3c top-1% share abs(d) | 0.683 | 0.597 | 0.585 |
 | rossler | C1 G(F) oracle, 1 LT | 0.66 | 0.627 | 0.688 |
 | rossler | C1 F pinball / C, oracle | 0.117 / 0.692 | 0.121 / 0.686 | 0.122 / 0.683 |
-| rossler | C2 forward retained [CI] | 0.475 [0.379, 0.581] not determined (interval spans 0.5) | 0.483 [0.368, 0.586] not determined (interval spans 0.5) | 0.581 [0.49, 0.675] not determined (interval spans 0.5) |
-| rossler | C2 reverse retained, H=8 | 0.311 [0.15, 0.439] loses most | 0.0572 [0.00163, 0.119] loses most | 0.154 [0.118, 0.197] loses most |
-| rossler | C2 reverse retained, H=30 | 0.124 [0.0611, 0.187] loses most | 0.124 [0.0456, 0.198] loses most | 0.0971 [0.0498, 0.155] loses most |
-| rossler | C2 reverse retained, H=120 | 0.704 [0.297, 1.54] not determined (interval spans 0.5) | -0.183 [-118, 2.49] not determined (interval spans 0.5) | 0.424 [0.11, 0.814] not determined (interval spans 0.5) |
-| rossler | C2 prediction (both lose most) | not determined | not determined | not determined |
+| rossler | C2 ora forward retained | 0.475 [0.379, 0.581] not determined (interval spans 0.5) | 0.483 [0.368, 0.586] not determined (interval spans 0.5) | 0.581 [0.49, 0.675] not determined (interval spans 0.5) |
+| rossler | C2 ora forward retained L_w (g_w) | 0.45 [0.337, 0.562] not determined (interval spans 0.5) | 0.652 [0.547, 0.76] keeps most | 0.682 [0.583, 0.784] keeps most |
+| rossler | C2 ora reverse retained L_A, H=8 | 0.311 [0.15, 0.439] loses most | 0.0572 [0.00163, 0.119] loses most | 0.154 [0.118, 0.197] loses most |
+| rossler | C2 ora reverse retained L_w, H=8 | 0.268 [0.177, 0.356] loses most | 0.132 [0.0613, 0.208] loses most | 0.307 [0.223, 0.399] loses most |
+| rossler | C2 ora reverse retained L_A, H=30 | 0.124 [0.0611, 0.187] loses most | 0.124 [0.0456, 0.198] loses most | 0.0971 [0.0498, 0.155] loses most |
+| rossler | C2 ora reverse retained L_w, H=30 | 0.353 [0.243, 0.452] loses most | 0.215 [0.161, 0.274] loses most | 0.312 [0.232, 0.393] loses most |
+| rossler | C2 ora reverse retained L_A, H=120 | 0.704 [0.297, 1.54] not determined (interval spans 0.5) | -0.183 [-118, 2.49] not determined (interval spans 0.5) | 0.424 [0.11, 0.814] not determined (interval spans 0.5) |
+| rossler | C2 ora reverse retained L_w, H=120 | 0.385 [0.148, 0.697] not determined (interval spans 0.5) | -0.0475 [-0.403, 0.187] loses most | 0.449 [0.223, 0.909] not determined (interval spans 0.5) |
+| rossler | C2 ora prediction (both lose most) | not determined | not determined | not determined |
+| rossler | C2 dep forward retained | 0.442 [0.355, 0.52] not determined (interval spans 0.5) | 0.685 [0.602, 0.76] keeps most | 0.552 [0.472, 0.638] not determined (interval spans 0.5) |
+| rossler | C2 dep forward retained L_w (g_w) | 0.477 [0.386, 0.568] not determined (interval spans 0.5) | 0.63 [0.552, 0.704] keeps most | 0.645 [0.556, 0.723] keeps most |
+| rossler | C2 dep reverse retained L_A, H=8 | - [-, -] not determined (full-profile skill not established) | - [-, -] not determined (full-profile skill not established) | -0.603 [-, -] not determined (full-profile skill not established) |
+| rossler | C2 dep reverse retained L_w, H=8 | 0.073 [0.011, 0.14] loses most | 0.0132 [-0.0608, 0.0793] loses most | 0.0746 [0.0175, 0.138] loses most |
+| rossler | C2 dep reverse retained L_A, H=30 | 0.0816 [-14.7, 9.4] not determined (interval spans 0.5) | -0.135 [-, -] not determined (full-profile skill not established) | -0.0722 [-0.973, 0.9] not determined (interval spans 0.5) |
+| rossler | C2 dep reverse retained L_w, H=30 | 0.145 [0.0724, 0.22] loses most | 0.127 [0.0296, 0.219] loses most | 0.0761 [0.00618, 0.138] loses most |
+| rossler | C2 dep reverse retained L_A, H=120 | 2.04 [-, -] not determined (full-profile skill not established) | 0.25 [-, -] not determined (full-profile skill not established) | 1.1 [0.403, 9.24] not determined (interval spans 0.5) |
+| rossler | C2 dep reverse retained L_w, H=120 | 0.661 [0.101, 1.32] not determined (interval spans 0.5) | 0.154 [-1.21, 0.701] not determined (interval spans 0.5) | 0.812 [0.438, 1.57] not determined (interval spans 0.5) |
+| rossler | C2 dep prediction (both lose most) | not determined | not consistent | not determined |
+| rossler | C2 dep - ora retained, forward | -0.0334 [-0.14, 0.0644] no difference detected | 0.203 [0.0976, 0.31] deployable retains more | -0.0293 [-0.111, 0.0504] no difference detected |
+| rossler | C2 dep - ora retained, forward_w | 0.0267 [-0.0937, 0.142] no difference detected | -0.0228 [-0.132, 0.0807] no difference detected | -0.037 [-0.16, 0.0673] no difference detected |
+| rossler | C2 dep - ora retained, reverse/30 | -0.0426 [-14.8, 9.24] no difference detected | -0.259 [-, -] not determined (full-profile skill not established) | -0.169 [-1.05, 0.825] no difference detected |
+| rossler | C2 dep - ora retained, reverse_w/30 | -0.208 [-0.314, -0.0896] deployable retains less | -0.0882 [-0.19, 0.00296] no difference detected | -0.236 [-0.316, -0.161] deployable retains less |
 | rossler | C2 Spearman(phi), 1 LT | -1 | -1 | -0.8 |
 | rossler | C3 false trust realized: A2 + constant | 0.0897 [0.0783, 0.101] | 0.105 [0.0925, 0.118] | 0.0983 [0.0867, 0.11] |
 | rossler | C3 trusted LT: A2 + constant | 1.89 [1.89, 1.89] | 1.89 [1.89, 1.89] | 1.87 [1.87, 1.87] |
@@ -56,11 +90,28 @@
 | rossler | E-H3c top-1% share abs(d) | 0.213 | 0.166 | 0.2 |
 | chua | C1 G(F) oracle, 1 LT | 0.203 | 0.0773 | 0.247 |
 | chua | C1 F pinball / C, oracle | 0.15 / 0.725 | 0.166 / 0.712 | 0.159 / 0.721 |
-| chua | C2 forward retained [CI] | 0.485 [0.405, 0.573] not determined (interval spans 0.5) | 0.404 [0.315, 0.489] loses most | 0.372 [0.286, 0.462] loses most |
-| chua | C2 reverse retained, H=8 | 0.482 [0.141, 1.07] not determined (n_eff < 50) | -1.59 [-19, 0.569] not determined (n_eff < 50) | 0.261 [-0.212, 0.425] not determined (n_eff < 50) |
-| chua | C2 reverse retained, H=30 | 0.475 [-, -] not determined (full-profile skill not established) | 0.44 [-, -] not determined (full-profile skill not established) | -0.0726 [-, -] not determined (full-profile skill not established) |
-| chua | C2 reverse retained, H=120 | 0.307 [-0.293, 0.723] not determined (interval spans 0.5) | 0.063 [-0.419, 0.417] loses most | 0.0818 [-0.141, 0.34] loses most |
-| chua | C2 prediction (both lose most) | not determined | consistent | consistent |
+| chua | C2 ora forward retained | 0.485 [0.405, 0.573] not determined (interval spans 0.5) | 0.404 [0.315, 0.489] loses most | 0.372 [0.286, 0.462] loses most |
+| chua | C2 ora forward retained L_w (g_w) | 0.496 [0.404, 0.58] not determined (interval spans 0.5) | 0.57 [0.483, 0.658] not determined (interval spans 0.5) | 0.496 [0.409, 0.581] not determined (interval spans 0.5) |
+| chua | C2 ora reverse retained L_A, H=8 | 0.482 [0.141, 1.07] not determined (n_eff < 50) | -1.59 [-19, 0.569] not determined (n_eff < 50) | 0.261 [-0.212, 0.425] not determined (n_eff < 50) |
+| chua | C2 ora reverse retained L_w, H=8 | 0.183 [0.042, 0.3] loses most | 0.154 [0.0741, 0.233] loses most | 0.157 [0.0677, 0.245] loses most |
+| chua | C2 ora reverse retained L_A, H=30 | 0.475 [-, -] not determined (full-profile skill not established) | 0.44 [-, -] not determined (full-profile skill not established) | -0.0726 [-, -] not determined (full-profile skill not established) |
+| chua | C2 ora reverse retained L_w, H=30 | 0.279 [0.17, 0.378] loses most | 0.294 [0.187, 0.419] loses most | 0.208 [0.0976, 0.31] loses most |
+| chua | C2 ora reverse retained L_A, H=120 | 0.307 [-0.293, 0.723] not determined (interval spans 0.5) | 0.063 [-0.419, 0.417] loses most | 0.0818 [-0.141, 0.34] loses most |
+| chua | C2 ora reverse retained L_w, H=120 | 0.531 [0.272, 0.826] not determined (interval spans 0.5) | 0.18 [-0.108, 0.455] loses most | 0.34 [0.14, 0.598] not determined (interval spans 0.5) |
+| chua | C2 ora prediction (both lose most) | not determined | consistent | consistent |
+| chua | C2 dep forward retained | 0.48 [0.4, 0.554] not determined (interval spans 0.5) | 0.529 [0.449, 0.605] not determined (interval spans 0.5) | 0.49 [0.416, 0.567] not determined (interval spans 0.5) |
+| chua | C2 dep forward retained L_w (g_w) | 0.477 [0.406, 0.548] not determined (interval spans 0.5) | 0.646 [0.575, 0.715] keeps most | 0.407 [0.319, 0.482] loses most |
+| chua | C2 dep reverse retained L_A, H=8 | 1.28 [-, -] not determined (full-profile skill not established) | - [-, -] not determined (full-profile skill not established) | - [-, -] not determined (full-profile skill not established) |
+| chua | C2 dep reverse retained L_w, H=8 | 0.231 [-0.00519, 0.501] not determined (interval spans 0.5) | 0.0844 [0.0303, 0.144] loses most | 0.214 [0.0342, 0.364] loses most |
+| chua | C2 dep reverse retained L_A, H=30 | - [-, -] not determined (full-profile skill not established) | 0.681 [-, -] not determined (full-profile skill not established) | 0.278 [-0.302, 1.01] not determined (n_eff < 50) |
+| chua | C2 dep reverse retained L_w, H=30 | 0.436 [0.254, 0.593] not determined (interval spans 0.5) | 0.441 [0.251, 0.618] not determined (interval spans 0.5) | 0.214 [-0.0114, 0.377] loses most |
+| chua | C2 dep reverse retained L_A, H=120 | 0.32 [-, -] not determined (full-profile skill not established) | 0.711 [0.0903, 1.99] not determined (interval spans 0.5) | 1.23 [-, -] not determined (full-profile skill not established) |
+| chua | C2 dep reverse retained L_w, H=120 | 0.418 [-0.24, 1.13] not determined (interval spans 0.5) | 0.65 [0.329, 1.26] not determined (interval spans 0.5) | 0.395 [-0.395, 1.03] not determined (interval spans 0.5) |
+| chua | C2 dep prediction (both lose most) | not determined | not determined | not determined |
+| chua | C2 dep - ora retained, forward | -0.00478 [-0.0957, 0.0849] no difference detected | 0.125 [0.0315, 0.215] deployable retains more | 0.118 [0.0093, 0.221] deployable retains more |
+| chua | C2 dep - ora retained, forward_w | -0.0195 [-0.102, 0.0754] no difference detected | 0.0768 [-0.019, 0.175] no difference detected | -0.0895 [-0.19, 0.00404] no difference detected |
+| chua | C2 dep - ora retained, reverse/30 | - [-, -] not determined (full-profile skill not established) | 0.241 [-, -] not determined (full-profile skill not established) | 0.351 [-, -] not determined (full-profile skill not established) |
+| chua | C2 dep - ora retained, reverse_w/30 | 0.157 [-0.0118, 0.315] no difference detected | 0.147 [-0.0341, 0.314] no difference detected | 0.0056 [-0.193, 0.166] no difference detected |
 | chua | C2 Spearman(phi), 1 LT | -0.2 | 0 | -0.8 |
 | chua | C3 false trust realized: A2 + constant | 0.0685 [0.0573, 0.08] | 0.0793 [0.0665, 0.091] | 0.0665 [0.056, 0.0775] |
 | chua | C3 trusted LT: A2 + constant | 0.967 [0.967, 0.967] | 0.995 [0.995, 0.995] | 1.01 [1.01, 1.01] |

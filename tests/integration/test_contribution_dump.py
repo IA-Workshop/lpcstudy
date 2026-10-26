@@ -309,9 +309,17 @@ def test_ce_tool_writes_labeled_tables_and_reproducible_figures(
     assert system["checks"]["g_reproduces_abd_max_abs"] == {
         "oracle": 0.0,
         "deployable": 0.0,
+        "oracle_L_w": 0.0,
+        "deployable_L_w": 0.0,
     }
     for key in ("C1", "C2", "C3", "E_H2a", "E_H2e", "E_H3c"):
         assert key in system, key
+    c2 = system["C2"]
+    for kind in ("oracle", "deployable"):
+        assert "retained_w" in c2[kind]["forward"]
+        for row in c2[kind]["reverse"].values():
+            assert "retained" in row and "retained_w" in row
+    assert set(c2["oracle_vs_deployable"]) >= {"forward", "forward_w"}
     text = (out / "ce.md").read_text()
     blocks = text.split("\n\n")
     tables = [i for i, b in enumerate(blocks) if b.lstrip().startswith("|")]

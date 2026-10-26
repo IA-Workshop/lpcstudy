@@ -441,3 +441,79 @@ def test_coverage_accepts_a_target_per_entry() -> None:
     ]
     assert rec["n_below_cap"] == len(hits)
     assert rec["coverage_below_cap"] == np.mean(hits)
+
+
+# ------------------------------------------- WU-0049b: deployable and L_w
+def _c2_record(forward: str, reverse: str) -> dict:
+    return {
+        "forward": {"retained": {"reading": forward}},
+        "reverse": {"8": {"retained": {"reading": reverse}}},
+    }
+
+
+def test_retention_comparison_is_the_paired_difference() -> None:
+    """Deployable minus oracle retained skill, exact on manufactured losses.
+
+    Oracle ``(4, 3, 2)`` per state retains ``1/2``, deployable ``(4, 3.5,
+    2)`` retains ``1/4``: the difference is ``-1/4`` exactly on every
+    resample, so the interval is degenerate and reads "retains less";
+    identical triples give 0 and "no difference detected"; a row whose
+    reading is blocked on either profile reads not determined with that
+    reason. Reference: the hand values. Tolerance: exact (binary fractions).
+    """
+    n = 120
+    index = cb.resample_indices(n, 40, 5, np.random.default_rng(4931))
+    const, full = np.full(n, 4.0), np.full(n, 2.0)
+    oracle = {
+        "forward": ((const, np.full(n, 3.0), full), ()),
+        "reverse/8": ((const, np.full(n, 3.0), full), ()),
+    }
+    deploy = {
+        "forward": ((const, np.full(n, 3.5), full), ()),
+        "reverse/8": ((const, np.full(n, 3.0), full), ()),
+    }
+    rec = _c2_record("keeps most", "loses most")
+    out = jd.retention_comparison(oracle, deploy, rec, rec, index)
+    fwd = out["forward"]
+    assert (fwd["oracle"], fwd["deployable"], fwd["difference"]) == (
+        0.5,
+        0.25,
+        -0.25,
+    )
+    assert fwd["ci"] == [-0.25, -0.25]
+    assert fwd["reading"] == "deployable retains less"
+    assert out["reverse/8"]["difference"] == 0.0
+    assert out["reverse/8"]["reading"] == "no difference detected"
+    blocked = _c2_record("keeps most", "not determined (n_eff < 50)")
+    out = jd.retention_comparison(oracle, deploy, rec, blocked, index)
+    assert out["reverse/8"]["reading"] == "not determined (n_eff < 50)"
+    assert out["forward"]["reading"] == "deployable retains less"
+
+
+def test_unit_allocation_job_is_the_l_w_fit() -> None:
+    """``unit=True`` gives M-2 rule 2's fit: u, no sample weight, ``L_w`` loss.
+
+    Reference: the definition of the WU-0048 ``W/<set>`` job. Exact.
+    """
+    from types import SimpleNamespace
+
+    rng = np.random.default_rng(4932)
+    e_c, e_p, cross = _moments_like(rng, 30)
+    target = cb.allocation_targets(e_c, e_p, cross)
+    data = SimpleNamespace(train={"state_index": np.arange(30)})
+    x = rng.standard_normal((30, 1, 4))
+    job_w = jd._alloc_job(data, target, x, x[:5], unit=True)
+    job_a = jd._alloc_job(data, target, x, x[:5])
+    assert job_w.weight is None and job_w.loss == "unit_excess"
+    assert job_a.loss == "kappa_excess"
+    np.testing.assert_array_equal(
+        job_a.weight, target.kappa / target.kappa.mean()
+    )
+    np.testing.assert_array_equal(job_w.y_train, target.u)
+
+
+def _moments_like(rng: np.random.Generator, n: int) -> tuple[np.ndarray, ...]:
+    """Moments of correlated draws (a valid Gram matrix per state)."""
+    e_c = rng.standard_normal((n, 50)) * rng.uniform(0.1, 1, (n, 1))
+    e_p = 0.3 * e_c + rng.standard_normal((n, 50)) * 0.5
+    return (e_c**2).mean(1), (e_p**2).mean(1), (e_c * e_p).mean(1)
