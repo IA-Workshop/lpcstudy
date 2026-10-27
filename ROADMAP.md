@@ -445,3 +445,18 @@ Append, do not edit: a dated block listing WU-0009 to WU-0019 with the dependenc
 | J7 | WU-0052: replication analysis, run once; phase J report | owner and student read; owner decides the confirmatory round |
 
 Acceptance criteria: as in the plan's section 5 (fixed now; tightened, never loosened).
+
+### 10.1 Phase J confirmatory round
+
+**Amended 2026-10-27 (owner ruling "Proceed with all as recommended").** Plan: `docs/agent/notes/2026-10-27-phase-j-confirmatory-plan.md` (WU-0053 to WU-0058), adopted with DC-1 to DC-8 as recommended there:
+
+1. **DC-1, claims.** Tiers 1 and 2 of plan §3 are pre-registered. Tier 3 enters only if the student asks for it before the pre-registration is approved.
+2. **DC-2, seeds.** Five sealed seeds, CONF-5 to CONF-9. A claim is confirmed on a system when it holds on at least 4 of 5 seeds with no contradiction (M-6, pre-registered rows only). No pooling.
+3. **DC-3, O6.** A sealed run may write the state dump (`--states-dump` with the confirmatory flag).
+4. **DC-4, device.** The official device is the GPU, with a pinned `lyapunov.json` whose hash is in the pre-registration. Regeneration is a second GPU run, expected bitwise. A CPU run informs only.
+5. **DC-5, gate failures.** A validation-gate failure removes that system's rows for that seed ("absent"). It does not stop the round. There is no redraw and no retuning.
+6. **DC-6, freeze.** Merge to `main` after a green freeze gate (owner), tag `freeze-j`. The lock-hook amendment (seq 50) goes in the same merge.
+7. **DC-7, docstring.** The DEF-0030 docstring is fixed in the WU-0054 code change.
+8. **DC-8, phase I.** Phase I stays paused.
+
+Units and acceptance criteria: plan §4 (fixed now; tightened, never loosened). Owner-only acts: approving the pre-registration, the merge to `main`, sealing CONF-5 to CONF-9, the sealed runs, and promotion.
