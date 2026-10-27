@@ -437,3 +437,293 @@ def test_rehearsal_on_two_seeds_runs(tmp_path: Path) -> None:
     code, record, _ = run(tmp_path, dirs, "--rehearsal")
     assert code == 0
     assert {r["verdict"] for r in record["rows"]} == {"not confirmable"}
+
+
+# ---------------------------------------- source rows J-I1, J-C2 (seq 53)
+# Reference: the reading tables of claims.json (ledger seq 53), copied below
+# by hand. J-I1: substantial -> delta_r2 > 0; distinct but small -> 0 <
+# delta_r2 < 0.05; reduces -> delta_r2 < 0.05; undetermined -> none. J-C2:
+# above target (ci[0] > 0.10) -> false_trust > 0.10; below target (ci[1] <
+# 0.10) -> false_trust < 0.10; not determined -> none.
+I1_PATH = (
+    "systems/{s}/ablation/profile_conditions/deployable/logit_w_interior/"
+    "leave_one_out/I"
+)
+C2_PATH = "systems/rossler/C3/policies/g(F-hat) + h(F-hat)/false_trust_realized"
+READING_TABLES = {
+    "J-I1": {
+        "words": {
+            "substantial": ["delta_r2 > 0"],
+            "distinct but small": ["delta_r2 > 0", "delta_r2 < 0.05"],
+            "reduces": ["delta_r2 < 0.05"],
+            "undetermined": [],
+        }
+    },
+    "J-C2": {
+        "words": {
+            "above target": ["false_trust > 0.10"],
+            "below target": ["false_trust < 0.10"],
+            "not determined": [],
+        }
+    },
+}
+
+
+def test_source_claims_imply_and_contradict_by_hand() -> None:
+    """The threshold claims of the two reading tables, pair by pair.
+
+    By hand: "reduces" (delta_r2 < 0.05) is compatible with "substantial"
+    (delta_r2 > 0) and does not imply delta_r2 > 0, so J-I1 is never
+    contradicted; "distinct but small" implies delta_r2 > 0. "above target"
+    and "below target" are disjoint; "not determined" claims nothing.
+    """
+    table = {"reading_tables": READING_TABLES}
+    i1 = tool.word_claims(table, "J-I1")
+    c2 = tool.word_claims(table, "J-C2")
+    target = tool.parse_text("delta_r2 > 0")
+    assert rep.implies(i1["substantial"], target)
+    assert rep.implies(i1["distinct but small"], target)
+    assert not rep.implies(i1["reduces"], target)
+    assert not rep.implies(i1["undetermined"], target)
+    for a in i1:
+        for b in i1:
+            assert not rep.contradict(i1[a], i1[b]), (a, b)
+    above = tool.parse_text("false_trust > 0.10")
+    assert rep.implies(c2["above target"], above)
+    assert not rep.implies(c2["below target"], above)
+    assert rep.contradict(c2["above target"], c2["below target"])
+    assert not rep.contradict(c2["above target"], c2["not determined"])
+    assert not rep.contradict(c2["below target"], c2["not determined"])
+
+
+@pytest.mark.parametrize(
+    ("ci", "word"),
+    [
+        ([0.11, 0.2], "above target"),
+        ([0.05, 0.09], "below target"),
+        ([0.09, 0.12], "not determined"),
+        ([0.10, 0.2], "not determined"),  # strict: ci[0] > 0.10
+        ([0.0, 0.10], "not determined"),  # strict: ci[1] < 0.10
+        ([None, 0.2], "not determined"),
+        ([None, 0.05], "below target"),
+    ],
+)
+def test_j_c2_word_from_the_interval(ci: list, word: str) -> None:
+    """Above if ci[0] > 0.10, below if ci[1] < 0.10, else not determined
+    (``None``: a non-finite bound, never beyond the target)."""
+    words = tool.word_claims({"reading_tables": READING_TABLES}, "J-C2")
+    assert tool.read_ci_threshold({"ci": ci}, words) == word
+
+
+def source_table() -> dict:
+    out = table(systems=("lorenz63",))
+    out["claims"] += [
+        {
+            "id": "J-I1",
+            "tier": 3,
+            "statement": "synthetic",
+            "claim": "delta_r2 > 0",
+            "rows": [
+                {
+                    "source": "pipeline results.json",
+                    "system": "lorenz63",
+                    "profile": "deployable",
+                    "path": I1_PATH.format(s="lorenz63"),
+                    "item": "drop I: Delta R^2",
+                }
+            ],
+        },
+        {
+            "id": "J-C2",
+            "tier": 3,
+            "statement": "synthetic",
+            "claim": "false_trust > 0.10",
+            "rows": [
+                {
+                    "source": "ce.json",
+                    "system": "rossler",
+                    "profile": "deployable",
+                    "path": C2_PATH,
+                    "item": "C3 false trust",
+                }
+            ],
+        },
+    ]
+    out["reading_tables"] = json.loads(json.dumps(READING_TABLES))
+    return out
+
+
+def source_seeds(
+    root: Path, i1_words: list, c2_cis: list, gates: list | None = None
+) -> list[str]:
+    """Five sealed seeds with a J-I1 word (results.json) and a J-C2
+    interval (ce.json); lorenz63's gate per seed from ``gates``."""
+    dirs = seed_set(root, [S] * 5, gates)
+    for d, word, ci in zip(dirs, i1_words, c2_cis):
+        folder = Path(d)
+        results_path = folder.parent / "phasej" / "results.json"
+        results = json.loads(results_path.read_text())
+        loo = {"leave_one_out": {"I": {"reading": word, "ci": [0.0, 0.1]}}}
+        results["systems"]["lorenz63"]["ablation"] = {
+            "profile_conditions": {"deployable": {"logit_w_interior": loo}}
+        }
+        results_path.write_text(json.dumps(results))
+        ce = json.loads((folder / "ce.json").read_text())
+        ce["systems"]["rossler"] = {
+            "C2": {},
+            "C3": {
+                "policies": {
+                    "g(F-hat) + h(F-hat)": {
+                        "mse": {},
+                        "false_trust_realized": {"estimate": 0.1, "ci": ci},
+                    }
+                },
+                "horizon_models": {},
+            },
+            "E_H2a": {"reading": {"reading": "not determined (synthetic)"}},
+            "E_H2e": {"levels": {}},
+        }
+        (folder / "ce.json").write_text(json.dumps(ce))
+    return dirs
+
+
+def by_claim(record: dict, claim_id: str) -> tuple[str, dict]:
+    (row,) = [r for r in record["rows"] if r["claim_id"] == claim_id]
+    (v,) = [v for v in record["verdicts"] if v["claim_id"] == claim_id]
+    assert v["verdict"] == row["verdict"]
+    return row["verdict"], row
+
+
+ABOVE, BELOW, ND = [0.12, 0.14], [0.05, 0.08], [0.09, 0.12]
+
+
+@pytest.mark.parametrize(
+    ("i1_words", "c2_cis", "gates", "i1", "c2"),
+    [
+        pytest.param(["substantial"] * 5, [ABOVE] * 5, None,
+                     "confirmed", "confirmed", id="all-imply"),
+        pytest.param(["substantial"] * 4 + ["reduces"], [ABOVE] * 4 + [BELOW],
+                     None, "confirmed", "contradicted",
+                     id="reduces-never-contradicts-below-does"),
+        pytest.param(["substantial"] * 3 + ["reduces"] * 2,
+                     [ABOVE] * 3 + [ND] * 2, None,
+                     "not confirmed", "not confirmed", id="3-of-5"),
+        pytest.param(["distinct but small"] * 4 + ["undetermined"],
+                     [ABOVE] * 5, [True] * 4 + [False],
+                     "confirmed", "confirmed", id="absent-lorenz63-seed"),
+        pytest.param(["substantial"] * 5, [ABOVE] * 5,
+                     [True] * 3 + [False] * 2,
+                     "not confirmable", "confirmed", id="two-absent"),
+    ],
+)
+def test_source_rows_follow_the_rule(
+    tmp_path: Path, i1_words, c2_cis, gates, i1, c2
+) -> None:
+    """Hand-computed verdicts of the J-I1 and J-C2 rows under the rule; the
+    lorenz63 gate does not touch the rossler row."""
+    dirs = source_seeds(tmp_path, i1_words, c2_cis, gates)
+    code, record, out = run(tmp_path, dirs, claims=source_table())
+    assert code == 0
+    assert by_claim(record, "J-I1")[0] == i1
+    verdict, row = by_claim(record, "J-C2")
+    assert verdict == c2
+    assert row["source"] == "ce.json" and row["path"] == C2_PATH
+    assert "J-C2" in (out / "confirm.md").read_text()
+
+
+def test_source_row_with_a_missing_path_is_an_error(tmp_path: Path) -> None:
+    """A present seed without the J-I1 leaf: exit 64, nothing written."""
+    dirs = source_seeds(tmp_path, ["substantial"] * 5, [ABOVE] * 5)
+    results_path = Path(dirs[3]).parent / "phasej" / "results.json"
+    results = json.loads(results_path.read_text())
+    del results["systems"]["lorenz63"]["ablation"]
+    results_path.write_text(json.dumps(results))
+    code, _, out = run(tmp_path, dirs, claims=source_table())
+    assert code == 64 and not out.exists()
+
+
+def test_source_table_refusals(tmp_path: Path) -> None:
+    """An unknown word, a table quantity unlike the claim's, a claim with no
+    reader: exit 64, nothing written."""
+    dirs = source_seeds(
+        tmp_path / "a", ["substantial"] * 4 + ["large"], [ABOVE] * 5
+    )
+    code, _, out = run(tmp_path, dirs, claims=source_table())
+    assert code == 64 and not out.exists()
+    good = source_seeds(tmp_path / "b", ["substantial"] * 5, [ABOVE] * 5)
+    bad = source_table()
+    bad["reading_tables"]["J-C2"]["words"]["above target"] = ["x > 0.10"]
+    assert run(tmp_path, good, claims=bad)[0] == 64
+    bad = source_table()
+    bad["claims"][1]["id"] = "J-Z9"
+    bad["reading_tables"]["J-Z9"] = bad["reading_tables"]["J-I1"]
+    assert run(tmp_path, good, claims=bad)[0] == 64
+    assert not out.exists()
+
+
+# ------------------------------------------- secondary v3 description (7a)
+def test_v3_description_lists_words_per_seed_and_counts(
+    tmp_path: Path,
+) -> None:
+    """A synthetic ``verdicts`` block: the word per seed and system, "gate
+    failed" where lorenz63's gate failed, "(missing)" counted, the counts
+    per word; no seed-level verdict, no combined word; the section 7a label
+    (sealed) or the rehearsal label.
+
+    Reference: the hand-written block and expected rows below.
+    """
+    dirs = seed_set(tmp_path, [S] * 5, [True, True, False, True, True])
+    words = [
+        ("pass", "fail"),
+        ("pass", "pass"),
+        ("pass", "pass"),
+        ("inconclusive", "pass"),
+        ("pass", None),
+    ]
+    for d, (lorenz, rossler) in zip(dirs, words):
+        path = Path(d).parent / "phasej" / "results.json"
+        results = json.loads(path.read_text())
+        by_system = {"lorenz63": lorenz}
+        if rossler is not None:
+            by_system["rossler"] = rossler
+        results["verdicts"] = {
+            "H1a": {
+                "by_system": by_system,
+                "verdict": "supported",
+                "missing_systems": [],
+            }
+        }
+        path.write_text(json.dumps(results))
+    code, _, out = run(tmp_path, dirs)
+    assert code == 0
+    v3 = json.loads((out / "v3.json").read_text())
+    assert v3["label"] == tool.V3_LABEL == (
+        "SECONDARY DESCRIPTION: v3 words of the sealed runs under the phase J "
+        "configuration; not the v3 test; does not change, confirm or replace "
+        "CONF-1"
+    )
+    assert v3["rows"] == [
+        {
+            "row": "H1a",
+            "system": "lorenz63",
+            "words": ["pass", "pass", "gate failed", "inconclusive", "pass"],
+            "count": {"pass": 3, "gate failed": 1, "inconclusive": 1},
+        },
+        {
+            "row": "H1a",
+            "system": "rossler",
+            "words": ["fail", "pass", "pass", "pass", "(missing)"],
+            "count": {"fail": 1, "pass": 3, "(missing)": 1},
+        },
+    ]
+    assert v3["n_missing"] == 1
+    text = (out / "v3.md").read_text()
+    assert "supported" not in text  # the seed-level verdict is not listed
+    blocks = text.split("\n\n")
+    tables = [i for i, b in enumerate(blocks) if b.lstrip().startswith("|")]
+    assert tables and all(v3["label"] in blocks[i - 1] for i in tables)
+    rehearsal = seed_set(tmp_path / "dev", [S] * 2, sealed=False)
+    code, _, out = run(tmp_path / "dev", rehearsal, "--rehearsal")
+    assert code == 0
+    v3 = json.loads((out / "v3.json").read_text())
+    assert v3["label"] == tool.REHEARSAL_LABEL and v3["rows"] == []
