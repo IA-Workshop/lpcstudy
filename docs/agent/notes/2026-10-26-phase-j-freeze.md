@@ -38,3 +38,7 @@
 A validation-gate failure on a held-out seed is reported, and that system's rows for that seed are marked provisional. The seed is not redrawn.
 
 Correction (2026-10-26, before any held-out run): step 3 originally omitted `--replication` (both tools refuse DEV-5 to DEV-9 without it) and `--jobs 4`. The commands above are corrected. The tag `phasej-freeze` is unchanged: no code changed.
+
+Departure (2026-10-26, during step 3): the step 3 command gave `--abd` the directory `<run>/contrib-freeze`, while `lpc_contrib_ce.py` reads the file `contrib.json`. On DEV-5 to DEV-8, `lpc_contrib_ce.py` stopped with `IsADirectoryError` (exit 1) at argument loading. That is before it reads a dump or computes anything, and no `ce.json` was written. `lpc_contrib.py` exited 0 on all four seeds, and its outputs stand. I stopped the chain before step 4, so the replication tool has not run. Corrected command, with no code change and `phasej-freeze` unchanged:
+`tools/lpc_contrib_ce.py <run>/phasej --replication --jobs 4 --abd <run>/contrib-freeze/contrib.json --out <run>/contrib-freeze`
+`lpc_contrib_ce.py` runs once per seed with this command, and then step 4 runs once. No C or E output had been seen when the correction was made.
