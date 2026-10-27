@@ -17,7 +17,7 @@
 | Item | Closes with |
 |---|---|
 | P-1 Analysis and evaluator code (`tools/lpc_contrib.py`, `tools/lpc_contrib_ce.py`, `tools/lpc_confirm.py`) and the sealed-dump change | WU-0054 merged; acceptance criteria met |
-| P-2 Rehearsal on development seeds through the whole chain, including a bitwise GPU regeneration with the pinned cache | WU-0055 |
+| P-2 Rehearsal on development seeds through the whole chain, including a GPU regeneration with the pinned cache | **closed:** WU-0055 (`docs/agent/notes/2026-10-27-phase-j-rehearsal.md`). The chain ran end to end. DEV-6 regenerated bitwise; DEV-5 did not (DEF-0033: 420 leaves, 16 non-claimed Chua readings, 0 of the 48 claim rows). The owner dropped the bitwise expectation (ledger seq 54, §5) |
 | P-3 Freeze commit and tag `freeze-j` on `main`, with the sha256 of this file and its two companions | WU-0056; owner |
 | P-4 O-J1: who runs the regeneration (§5) | **closed:** the owner waived the other-actor requirement (ledger seq 52) |
 | P-5 Tier 3 | **closed:** J-I1 and J-C2 included; J-C1 and J-E1 out (ledger seq 53) |
@@ -118,10 +118,12 @@ The rule's power for an effect near its reading boundary is limited. M-6 put it 
 
 - **Regeneration.**
   - Each seed is run a second time on the same host and device from the same commit and inputs, into `runs/confirmatory/phasej-CONF-n-regen`.
-  - It is compared at tier T0, bitwise on every compared leaf (`tools/compare_runs.py`), and the dump arrays are compared bitwise too.
-  - A difference is reported. No verdict depends on the regeneration.
+  - **It is not expected to be bitwise** (ledger seq 54). On the GPU, the state estimator's ν̂ can differ between runs on a few entries even with the pinned time unit. That moves both seed-proxy fits by about 1e-9 and can flip a reading that sits at its threshold (DEF-0033; on the DEV-5 rehearsal, 420 leaves and 16 non-claimed Chua readings, none of the 48 claim rows).
+  - **Leaves.** It is compared with the official run at tier T0 (`tools/compare_runs.py`), and the dump arrays bitwise. Every differing leaf and array is reported, with its size.
+  - **Claim rows.** The regeneration is analyzed as in §7 step 1, into `<regen run>/contrib-j`, and `tools/lpc_confirm.py` is run once on the five regeneration analyses, into `runs/confirmatory/phasej-confirm-regen`. For each of the 48 rows, the per-seed `readings` and `absent` lists and the `verdict` are compared with the official `confirm.json`. Every row where any of them differs is reported by name.
+  - **No verdict depends on the regeneration.** The verdicts are those of the official runs. A row whose reading differs between the two runs is reported as unstable at its threshold beside its verdict, which is not changed.
   - **Actor.** v3 §9 item 4 asks for another actor. The owner waived that requirement for this round (ledger seq 52, "Not feasible; waive as with CONF-1"), as seq 31 did for CONF-1, so the owner may run both the official and the regeneration runs.
-- **CPU.** A CPU run happens only if a regeneration is not bitwise. It informs only: GPU and CPU build different orbits (diagnosis note, finding 4).
+- **CPU.** No CPU run. GPU and CPU build different orbits (diagnosis note, finding 4), so a CPU run could not explain a difference between two GPU runs.
 - **Refusals.** A refused or crashed run is reported and not redrawn. If a run stops after some systems, the systems it did not reach are absent for that seed.
 
 ## 6. Validation gate
@@ -165,8 +167,9 @@ Every sealed run computes v3's hypothesis words for Lorenz-63, Rössler and Chua
 2. **Five realizations.** Each seed is one realization per system. Seeds are not pooled, and no between-seed variance is estimated.
 3. **Allocation below 2 LT on Lorenz-63 and Chua is mostly unreadable** (the n_eff guard). No claim is made there.
 4. **Chua gate risk** (§6). Two of the nine development GPU runs failed V1 on Chua, and both are diagnosed as artifacts of the check.
-5. **Determinism, not independent reproduction.** The regeneration uses the same host and device, and the same actor (waiver, seq 52).
+5. **Repetition, not independent reproduction.** The regeneration uses the same host and device, and the same actor (waiver, seq 52). It is not expected to be bitwise (item 7).
 6. **The pinned time unit** is the value of 8 of 9 development GPU runs. The ninth differed by one ulp in Chua's λ_max.
+7. **GPU runs are not bitwise reproducible** (DEF-0033). A rerun of the same seed can move the deployable profile by about 1e-9. On the DEV-5 rehearsal that flipped 16 non-claimed Chua deployable readings. A claim row whose reading sits at its threshold on a sealed seed could read differently on a rerun; the regeneration comparison (§5) reports any such row.
 7. **The analysis instruments** (HGB allocation fits, quantile boosting, the reading table) are analysis instruments, not rules of the v3 design (LPC.PC.1 exception).
 8. **The phase J code was not reviewed by the owner.** Agents built and tested it.
 
