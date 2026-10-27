@@ -33,10 +33,16 @@ WU-0049 (experiments C and E) adds, on the same dump:
 
 WU-0051b adds ``tools/lpc_replicate.py --exploratory`` on three copies of the
 smoke records (both tools write into one folder, once per module).
+
+WU-0054 adds both tools with ``--sealed`` on a copy of the smoke run made to
+look sealed (synthetic seed, throwaway ledger): the records equal the
+development records apart from labels, ids, paths and wall-clock times.
 """
 
 from __future__ import annotations
 
+import hashlib
+import importlib
 import json
 import os
 import subprocess
@@ -420,3 +426,112 @@ def test_replication_tool_on_three_copies_of_the_smoke_records(
     assert tables
     for i in tables:
         assert record["label"] in blocks[i - 1], blocks[i][:80]
+
+
+# ------------------------------------------------------------------ WU-0054
+SALT = "0f" * 16
+PINNED = (
+    REPO_ROOT / "docs" / "study" / "preregistration_phase_j" / "lyapunov.json"
+)
+
+
+def _without_seconds(value):
+    """A copy without the wall-clock ``seconds`` leaves."""
+    if isinstance(value, dict):
+        return {k: _without_seconds(v) for k, v in value.items()
+                if k != "seconds"}
+    if isinstance(value, list):
+        return [_without_seconds(v) for v in value]
+    return value
+
+
+def test_sealed_mode_on_a_relabelled_smoke_copy_equals_development_mode(
+    smoke, smoke_records, tmp_path, monkeypatch
+) -> None:
+    """``--sealed`` (WU-0054 (b)) on a copy of the smoke run made to look
+    sealed: id CONF-1, kind confirmatory, no seed value in ``results.json``,
+    the pinned cache, the dump's ``meta/seed_id`` CONF-1. The synthetic
+    "sealed" seed is the DEV-0 value, committed in a throwaway ledger.
+
+    Reference: the development records of the same run (``smoke_records``).
+    Both tools must give the same records except the label (the sealed one),
+    the seed id, the run and A/D paths, the wall-clock ``seconds`` and the
+    added ``sealed`` block; no DEVELOPMENT word and no seed value may appear
+    in any written text. Tolerance: none (the same code, the same seed and
+    inputs, so equal JSON).
+    """
+    sys.path.insert(0, str(REPO_ROOT / "tools"))
+    contrib_tool = importlib.import_module("lpc_contrib")
+    ce_tool = importlib.import_module("lpc_contrib_ce")
+    seed = int(smoke["results"]["config"]["seed"])
+    run = tmp_path / "sealed" / "smoke"
+    (run / "states").mkdir(parents=True)
+    (run / "cache").mkdir()
+    (run / "cache" / "lyapunov.json").write_bytes(PINNED.read_bytes())
+    results = json.loads((smoke["run"] / "results.json").read_text())
+    results["provenance"].update(seed_id="CONF-1", seed_kind="confirmatory")
+    results["provenance"]["config"]["seed"] = None
+    results["config"]["seed"] = None
+    (run / "results.json").write_text(json.dumps(results))
+    arrays = dict(smoke["arrays"])
+    arrays["meta/seed_id"] = np.array("CONF-1")
+    np.savez(run / "states" / f"{SYSTEM}.npz", **arrays)
+    digest = hashlib.sha256(f"{seed}:{SALT}".encode()).hexdigest()
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(
+        json.dumps(
+            {
+                "seq": 1,
+                "prev_sha256": "0" * 64,
+                "utc": "2026-01-01T00:00:00+00:00",
+                "type": "commitment",
+                "actor": "test",
+                "role": "test",
+                "authority": "",
+                "summary": "synthetic",
+                "files": {},
+                "data": {"seed_id": "CONF-1", "sha256": digest},
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(contrib_tool, "LEDGER_PATH", ledger)
+    monkeypatch.setenv("LPC_CONF_SEED", str(seed))
+    monkeypatch.setenv("LPC_CONF_SALT", SALT)
+    monkeypatch.setenv("JAX_PLATFORMS", "cpu")
+    out = tmp_path / "records"
+    assert contrib_tool.main([str(run), "--out", str(out), "--sealed"]) == 0
+    assert ce_tool.main(
+        [str(run), "--out", str(out), "--abd", str(out / "contrib.json"),
+         "--sealed", "--jobs", "4"]
+    ) == 0
+    dev_label = "DEVELOPMENT (DEV-0): exploratory, not a hypothesis test"
+    label = contrib_tool.SEALED_LABEL.format(seed_id="CONF-1")
+    for name in ("contrib.json", "ce.json"):
+        sealed = json.loads((out / name).read_text())
+        assert sealed.pop("sealed") == {
+            "pinned_lyapunov_sha256": contrib_tool.PINNED_LYAPUNOV_SHA256,
+            "development_words_left": 0,
+        }
+        text = (
+            (smoke_records / name)
+            .read_text()
+            .replace(dev_label, label)
+            .replace('"DEV-0"', '"CONF-1"')
+            .replace(json.dumps(str(smoke["run"])), json.dumps(str(run)))
+            .replace(
+                json.dumps(str(smoke_records / "contrib.json")),
+                json.dumps(str(out / "contrib.json")),
+            )
+        )
+        expected = _without_seconds(json.loads(text))
+        assert _without_seconds(sealed) == expected, name
+    for name in ("contrib.json", "contrib.md", "ce.json", "ce.md"):
+        written = (out / name).read_text()
+        assert "DEVELOPMENT" not in written and str(seed) not in written, name
+    blocks = (out / "ce.md").read_text().split("\n\n")
+    tables = [i for i, b in enumerate(blocks) if b.lstrip().startswith("|")]
+    assert tables
+    for i in tables:
+        assert label in blocks[i - 1], blocks[i][:80]

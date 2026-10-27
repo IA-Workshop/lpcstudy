@@ -11,7 +11,7 @@ writes ``contrib.json`` and ``contrib.md`` to the output directory.
 Usage::
 
     python tools/lpc_contrib.py <run-dir> --out <dir> [--jobs 4]
-        [--systems lorenz63 ...] [--replication]
+        [--systems lorenz63 ...] [--replication | --sealed]
 
 Refusals (exit 64, nothing written): an argument containing "confirmatory"
 (any case); a run whose ``provenance.seed_kind`` is not ``development`` or
@@ -19,6 +19,24 @@ whose seed id is not ``DEV-n``; a held-out replication seed (DEV-5 to DEV-9)
 without ``--replication`` (phase J, DV-4: those are analyzed once, by the
 frozen script); a ``run.meta.json`` whose ``exit_code`` is not 0; a dump of
 another seed; a dump without schema /3.
+
+Sealed runs (``--sealed``, phase J confirmatory round, WU-0054)
+    With ``--sealed`` the tool accepts only a completed sealed run:
+    ``provenance.seed_kind`` "confirmatory", seed id ``CONF-n``, and a
+    ``cache/lyapunov.json`` whose sha256 is :data:`PINNED_LYAPUNOV_SHA256`
+    (the pre-registered cache, DC-4). Development runs are refused, and so
+    is ``--replication`` beside it. A sealed ``results.json`` holds no seed
+    value (``config.seed`` is null), while the analysis needs the master seed
+    (the bootstrap stream, the learner's seed and test (g), as on a
+    development run). The tool therefore reads it as the command line does:
+    ``LPC_CONF_SEED`` and ``LPC_CONF_SALT``, verified against the ledger
+    commitment for the run's id (``seeds.confirmatory_seed``); the value is
+    never written. Every label of the record and its tables reads
+    :data:`SEALED_LABEL` instead of the DEVELOPMENT label, and the record
+    gains a ``sealed`` block (the pinned hash and the count of DEVELOPMENT
+    words left, expected 0). Without ``--sealed`` nothing changes.
+    **Needs owner review before freeze (LPC.PC.11):** this path reads the
+    sealed seed.
 
 The model fits run in ``--jobs`` worker processes with one thread each
 (``OMP``, ``MKL`` and ``OPENBLAS`` threads = 1), so ``--jobs 4`` uses four
@@ -28,6 +46,7 @@ cores, the project's limit.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import multiprocessing
 import os
@@ -44,11 +63,24 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from lpcstudy import contribution as cb  # noqa: E402
+from lpcstudy import seeds  # noqa: E402
 from lpcstudy.ablation import CONDITIONS  # noqa: E402
 
 HELD_OUT = {f"DEV-{k}" for k in range(5, 10)}
 """The replication seeds of phase J (plan DV-4), held out until the freeze."""
 THREAD_VARS = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")
+PINNED_LYAPUNOV_SHA256 = (
+    "852ce1f67cdcc55275f388c72817348b1b83e2146b4751c8c8aedc7a85453417"
+)
+"""sha256 of ``docs/study/preregistration_phase_j/lyapunov.json`` (WU-0053),
+the Lyapunov cache every sealed phase J run starts from (DC-4)."""
+SEALED_LABEL = (
+    "PHASE J CONFIRMATORY ({seed_id}): pre-registered analysis, UNPROMOTED"
+)
+"""The label of every record and table of a sealed run (``--sealed``)."""
+LEDGER_PATH = seeds.LEDGER_PATH
+"""The ledger holding the sealed commitments; Python-only, as in
+``lpcstudy.__main__`` (no flag or variable redirects it)."""
 
 
 class Refusal(Exception):
@@ -56,8 +88,24 @@ class Refusal(Exception):
 
 
 # ------------------------------------------------------------------ reading
-def check_run(run: Path, replication: bool) -> dict:
-    """Read and check ``results.json`` (and ``run.meta.json`` if present)."""
+def check_pinned_cache(run: Path) -> None:
+    """Refuse unless ``<run>/cache/lyapunov.json`` is the pinned cache."""
+    path = run / "cache" / "lyapunov.json"
+    if not path.exists():
+        raise Refusal(f"{path} is missing (the pinned cache, DC-4)")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if digest != PINNED_LYAPUNOV_SHA256:
+        raise Refusal(
+            f"{path} has sha256 {digest}, not the pinned "
+            f"{PINNED_LYAPUNOV_SHA256}"
+        )
+
+
+def check_run(run: Path, replication: bool, sealed: bool = False) -> dict:
+    """Read and check ``results.json`` (and ``run.meta.json`` if present).
+
+    With ``sealed`` only a sealed run with the pinned cache passes.
+    """
     meta_path = run / "run.meta.json"
     if meta_path.exists():
         meta = json.loads(meta_path.read_text())
@@ -66,7 +114,16 @@ def check_run(run: Path, replication: bool) -> dict:
     results = json.loads((run / "results.json").read_text())
     prov = results.get("provenance", {})
     seed_id = str(prov.get("seed_id", ""))
-    if prov.get("seed_kind") != "development" or not re.fullmatch(
+    if sealed:
+        if prov.get("seed_kind") != "confirmatory" or not re.fullmatch(
+            r"CONF-\d+", seed_id
+        ):
+            raise Refusal(
+                f"not a sealed run: seed_kind={prov.get('seed_kind')!r}, "
+                f"seed_id={seed_id!r}"
+            )
+        check_pinned_cache(run)
+    elif prov.get("seed_kind") != "development" or not re.fullmatch(
         r"DEV-\d+", seed_id
     ):
         raise Refusal(
@@ -78,6 +135,55 @@ def check_run(run: Path, replication: bool) -> dict:
     if prov.get("complete") is False:
         raise Refusal("the run is not complete")
     return results
+
+
+def master_seed(results: dict, sealed: bool) -> int:
+    """The run's master seed: ``config.seed``, or for a sealed run the
+    verified ``LPC_CONF_SEED`` (never written anywhere)."""
+    config = results["config"]
+    if not sealed:
+        return int(config["seed"])
+    if config.get("seed") is not None:
+        raise Refusal("a sealed run's results.json holds a seed value")
+    try:
+        return seeds.confirmatory_seed(
+            os.environ, LEDGER_PATH, str(results["provenance"]["seed_id"])
+        )
+    except seeds.SeedRefusal as err:
+        raise Refusal(str(err)) from None
+
+
+def relabel(value, old: str, new: str):
+    """A copy of ``value`` with every string equal to ``old`` made ``new``."""
+    if isinstance(value, dict):
+        return {k: relabel(v, old, new) for k, v in value.items()}
+    if isinstance(value, list):
+        return [relabel(v, old, new) for v in value]
+    return new if isinstance(value, str) and value == old else value
+
+
+def seal_record(record: dict, seed_id: str) -> dict:
+    """The sealed form of a record: labels and the ``sealed`` block.
+
+    Every DEVELOPMENT label becomes :data:`SEALED_LABEL`; the words
+    "DEVELOPMENT" still in the record are counted and reported (expected 0).
+    """
+    out = relabel(
+        record,
+        cb.LABEL.format(seed_id=seed_id),
+        SEALED_LABEL.format(seed_id=seed_id),
+    )
+    left = json.dumps(to_json(out)).count("DEVELOPMENT")
+    if left:
+        print(
+            f"warning: {left} DEVELOPMENT word(s) left in the sealed record",
+            file=sys.stderr,
+        )
+    out["sealed"] = {
+        "pinned_lyapunov_sha256": PINNED_LYAPUNOV_SHA256,
+        "development_words_left": left,
+    }
+    return out
 
 
 def load_dump(path: Path, seed_id: str) -> dict[str, np.ndarray]:
@@ -493,10 +599,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--systems", nargs="*")
     parser.add_argument("--replication", action="store_true")
+    parser.add_argument("--sealed", action="store_true")
     args = parser.parse_args(argv)
     try:
-        results = check_run(args.run, args.replication)
+        if args.sealed and args.replication:
+            raise Refusal("--sealed and --replication exclude each other")
+        results = check_run(args.run, args.replication, args.sealed)
         seed_id = results["provenance"]["seed_id"]
+        seed = master_seed(results, args.sealed)
         config = results["config"]
         systems = args.systems or list(results["systems"])
         dumps = {
@@ -530,7 +640,7 @@ def main(argv: list[str] | None = None) -> int:
             start = time.time()
             res = cb.analyze_system(
                 data,
-                int(config["seed"]),
+                seed,
                 n_resamples=int(config["bootstrap_resamples"]),
                 block=int(config["bootstrap_block"]),
                 mapper=mapper,
@@ -539,11 +649,13 @@ def main(argv: list[str] | None = None) -> int:
                 "profile_conditions"
             ]["oracle"]
             res["checks"]["g_wu0039b"] = cross_check(
-                data, int(config["seed"]), config, leaves
+                data, seed, config, leaves
             )
             res["seconds"] = time.time() - start
             record["systems"][system] = res
             print(f"{system}: {res['seconds']:.0f} s", file=sys.stderr)
+    if args.sealed:
+        record = seal_record(record, seed_id)
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "contrib.json").write_text(
         json.dumps(to_json(record), indent=1, allow_nan=False) + "\n"

@@ -11,6 +11,7 @@ smoke dump is in ``tests/integration/test_contribution_dump.py``.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -150,3 +151,182 @@ def test_json_copy_has_no_non_finite_numbers() -> None:
         "e": [1, 2],
         "f": [0.5, None],
     }
+
+
+# ------------------------------------------------- WU-0054: --sealed mode
+# Reference: the plan (WU-0054 (b)) and the pre-registration's pinned cache
+# (docs/study/preregistration_phase_j/lyapunov.json, sha256 written below by
+# hand). Synthetic seed and salt with a throwaway ledger only (the pattern of
+# tests/unit/test___main__.py); no sealed seed is read. The end-to-end sealed
+# run on a relabelled smoke copy is in
+# tests/integration/test_contribution_dump.py. Tolerance: none (exact).
+PINNED = REPO / "docs" / "study" / "preregistration_phase_j" / "lyapunov.json"
+PINNED_SHA = "852ce1f67cdcc55275f388c72817348b1b83e2146b4751c8c8aedc7a85453417"
+FAKE_SEED = 123456789012345
+FAKE_SALT = "0f" * 16
+
+
+def sealed_run(
+    path: Path, seed_id: str = "CONF-5", cache: bytes | None = None
+) -> Path:
+    """A sealed run folder: no seed value, the pinned cache (or ``cache``)."""
+    run = fake_run(path, seed_id, "confirmatory")
+    results = json.loads((run / "results.json").read_text())
+    results["config"]["seed"] = None
+    (run / "results.json").write_text(json.dumps(results))
+    (run / "cache").mkdir()
+    (run / "cache" / "lyapunov.json").write_bytes(
+        PINNED.read_bytes() if cache is None else cache
+    )
+    return run
+
+
+def ledger_with(path: Path, seed: int, seed_id: str) -> Path:
+    """A one-entry ledger holding the commitment of ``seed`` for
+    ``seed_id``."""
+    digest = hashlib.sha256(f"{seed}:{FAKE_SALT}".encode()).hexdigest()
+    record = {
+        "seq": 1,
+        "prev_sha256": "0" * 64,
+        "utc": "2026-01-01T00:00:00+00:00",
+        "type": "commitment",
+        "actor": "test",
+        "role": "test",
+        "authority": "",
+        "summary": "synthetic",
+        "files": {},
+        "data": {"seed_id": seed_id, "sha256": digest},
+    }
+    path.write_text(json.dumps(record, sort_keys=True) + "\n")
+    return path
+
+
+def test_pinned_hash_is_the_pre_registered_file() -> None:
+    """The constant is the hash of the pinned file (hand-copied above)."""
+    assert lpc_contrib.PINNED_LYAPUNOV_SHA256 == PINNED_SHA
+    assert hashlib.sha256(PINNED.read_bytes()).hexdigest() == PINNED_SHA
+
+
+def test_sealed_mode_accepts_a_sealed_run_and_refuses_the_rest(
+    tmp_path: Path,
+) -> None:
+    """``check_run(sealed=True)``: a sealed run with the pinned cache passes;
+    a development run, a sealed run with another cache or none, and a
+    sealed id of the wrong form are refused. Without ``sealed`` a sealed run
+    is still refused (development behavior unchanged)."""
+    run = sealed_run(tmp_path / "ok")
+    checked = lpc_contrib.check_run(run, False, sealed=True)
+    assert checked["provenance"]["seed_id"] == "CONF-5"
+    with pytest.raises(lpc_contrib.Refusal):
+        lpc_contrib.check_run(run, False)
+    dev = fake_run(tmp_path / "dev", "DEV-1")
+    (dev / "cache").mkdir()
+    (dev / "cache" / "lyapunov.json").write_bytes(PINNED.read_bytes())
+    with pytest.raises(lpc_contrib.Refusal, match="not a sealed run"):
+        lpc_contrib.check_run(dev, False, sealed=True)
+    other = sealed_run(tmp_path / "other", cache=PINNED.read_bytes() + b"\n")
+    with pytest.raises(lpc_contrib.Refusal, match="pinned"):
+        lpc_contrib.check_run(other, False, sealed=True)
+    none = sealed_run(tmp_path / "none")
+    (none / "cache" / "lyapunov.json").unlink()
+    with pytest.raises(lpc_contrib.Refusal, match="lyapunov.json"):
+        lpc_contrib.check_run(none, False, sealed=True)
+    bad_id = sealed_run(tmp_path / "bad", seed_id="CONF-x")
+    with pytest.raises(lpc_contrib.Refusal, match="not a sealed run"):
+        lpc_contrib.check_run(bad_id, False, sealed=True)
+
+
+def test_master_seed_of_a_sealed_run_comes_from_the_verified_variables(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Development: ``config.seed``. Sealed: the synthetic seed, verified
+    against the throwaway ledger's commitment for the run's id; refused
+    without the variables, with a commitment for another id only, or when
+    the sealed ``results.json`` holds a seed value."""
+    monkeypatch.delenv("LPC_CONF_SEED", raising=False)
+    monkeypatch.delenv("LPC_CONF_SALT", raising=False)
+    dev_run = fake_run(tmp_path / "dev", "DEV-1")
+    dev = json.loads((dev_run / "results.json").read_text())
+    assert lpc_contrib.master_seed(dev, sealed=False) == 1
+    sealed = json.loads(
+        (sealed_run(tmp_path / "s") / "results.json").read_text()
+    )
+    monkeypatch.setattr(
+        lpc_contrib,
+        "LEDGER_PATH",
+        ledger_with(tmp_path / "l.jsonl", FAKE_SEED, "CONF-5"),
+    )
+    with pytest.raises(lpc_contrib.Refusal, match="LPC_CONF_SEED"):
+        lpc_contrib.master_seed(sealed, sealed=True)
+    monkeypatch.setenv("LPC_CONF_SEED", str(FAKE_SEED))
+    monkeypatch.setenv("LPC_CONF_SALT", FAKE_SALT)
+    assert lpc_contrib.master_seed(sealed, sealed=True) == FAKE_SEED
+    monkeypatch.setattr(
+        lpc_contrib,
+        "LEDGER_PATH",
+        ledger_with(tmp_path / "m.jsonl", FAKE_SEED, "CONF-6"),
+    )
+    with pytest.raises(lpc_contrib.Refusal) as err:
+        lpc_contrib.master_seed(sealed, sealed=True)
+    assert str(FAKE_SEED) not in str(err.value)
+    leaked = {**sealed, "config": {**sealed["config"], "seed": 7}}
+    with pytest.raises(lpc_contrib.Refusal, match="seed value"):
+        lpc_contrib.master_seed(leaked, sealed=True)
+
+
+def test_relabel_replaces_every_development_label() -> None:
+    """Every string equal to the old label, at any depth, becomes the new
+    one; other strings are kept; the input is not modified."""
+    old = "DEVELOPMENT (CONF-5): exploratory, not a hypothesis test"
+    new = lpc_contrib.SEALED_LABEL.format(seed_id="CONF-5")
+    record = {
+        "label": old,
+        "systems": {"a": {"label": old, "x": [old, "y"]}},
+        "n": 1,
+    }
+    out = lpc_contrib.relabel(record, old, new)
+    assert out == {
+        "label": new,
+        "systems": {"a": {"label": new, "x": [new, "y"]}},
+        "n": 1,
+    }
+    assert record["label"] == old
+    assert new == (
+        "PHASE J CONFIRMATORY (CONF-5): pre-registered analysis, UNPROMOTED"
+    )
+
+
+def test_sealed_flag_refusals_write_nothing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``--sealed`` on a development run, with ``--replication``, or without
+    the seed variables: 64, nothing written. With the synthetic seed and
+    ledger the seed check passes and the run stops at its missing dump
+    (still 64, nothing written)."""
+    monkeypatch.delenv("LPC_CONF_SEED", raising=False)
+    monkeypatch.delenv("LPC_CONF_SALT", raising=False)
+    out = tmp_path / "out"
+    dev = fake_run(tmp_path / "dev", "DEV-1")
+    run = sealed_run(tmp_path / "run")
+    for argv in (
+        [str(dev), "--sealed"],
+        [str(run), "--sealed", "--replication"],
+        [str(run), "--sealed"],
+    ):
+        assert lpc_contrib.main([*argv, "--out", str(out)]) == 64
+        assert not out.exists()
+    err = capsys.readouterr().err
+    assert "LPC_CONF_SEED" in err and str(FAKE_SEED) not in err
+    monkeypatch.setattr(
+        lpc_contrib,
+        "LEDGER_PATH",
+        ledger_with(tmp_path / "l.jsonl", FAKE_SEED, "CONF-5"),
+    )
+    monkeypatch.setenv("LPC_CONF_SEED", str(FAKE_SEED))
+    monkeypatch.setenv("LPC_CONF_SALT", FAKE_SALT)
+    assert lpc_contrib.main([str(run), "--sealed", "--out", str(out)]) == 64
+    err = capsys.readouterr().err
+    assert "lorenz63.npz" in err and str(FAKE_SEED) not in err
+    assert not out.exists()
