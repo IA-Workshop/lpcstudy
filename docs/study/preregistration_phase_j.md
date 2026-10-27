@@ -11,6 +11,7 @@
 **Machine-readable parts** (their sha256 are recorded at approval):
 - `docs/study/preregistration_phase_j/claims.json`: the claims, rows and rule;
 - `docs/study/preregistration_phase_j/lyapunov.json`: the pinned time unit, sha256 `852ce1f67cdcc55275f388c72817348b1b83e2146b4751c8c8aedc7a85453417`.
+- `docs/study/preregistration_phase_j/run_sealed.sh`: the owner's launcher for the ten runs of §5.
 
 ## 0. PENDING (all closed before any seal)
 
@@ -115,6 +116,12 @@ The rule's power for an effect near its reading boundary is limited. M-6 put it 
     python -m lpcstudy --preset phasej --confirmatory --seed-id CONF-n \
     --skip-robustness --states-dump --out $OUT
   ```
+
+  The launcher `run_sealed.sh` runs exactly this command for the five official runs, then the five regeneration runs, one at a time.
+  - It checks each seed and salt against its ledger commitment before starting anything.
+  - It takes the GPU lock once and holds it for the whole session, in place of a `flock -n` per run.
+  - It sets the development runs' thread settings (`LPC_THREADS=4`, as `tools/run_preset.sh` does).
+  - It never overwrites a run directory.
 
 - **Regeneration.**
   - Each seed is run a second time on the same host and device from the same commit and inputs, into `runs/confirmatory/phasej-CONF-n-regen`.
