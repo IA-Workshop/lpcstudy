@@ -1,0 +1,410 @@
+{
+ "schema": "lpcstudy.phase-j-claims/1",
+ "rule": "Per row: confirmed if the claim is implied by the reading on at least 4 seeds among those present and no two present seeds have jointly unsatisfiable interval claims; contradicted if some such pair exists; not confirmable if fewer than 4 seeds are present (gate failures make a system's rows absent for that seed, DC-5); otherwise not confirmed. Per claim and system: confirmed if every row of that system is confirmed; contradicted if any is contradicted; not confirmable if any is not confirmable and none is contradicted; otherwise not confirmed.",
+ "minimum": 4,
+ "n_seeds": 5,
+ "seed_ids": [
+  "CONF-5",
+  "CONF-6",
+  "CONF-7",
+  "CONF-8",
+  "CONF-9"
+ ],
+ "claims": [
+  {
+   "id": "J-H1",
+   "tier": 1,
+   "statement": "Dropping instability (I) raises the horizon loss by more than 5%",
+   "claim": "ratio > 1.05",
+   "rows": [
+    {
+     "family": "A drop-one",
+     "system": "chua",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "drop I: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "chua",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "drop I: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "lorenz63",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "drop I: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "lorenz63",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "drop I: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "rossler",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "drop I: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "rossler",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "drop I: pinball ratio"
+    }
+   ]
+  },
+  {
+   "id": "J-H2",
+   "tier": 1,
+   "statement": "Dropping separation (O) raises the horizon loss",
+   "claim": "ratio > 1",
+   "rows": [
+    {
+     "family": "A drop-one",
+     "system": "chua",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "drop O: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "chua",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "drop O: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "lorenz63",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "drop O: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "lorenz63",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "drop O: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "rossler",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "drop O: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "rossler",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "drop O: pinball ratio"
+    }
+   ]
+  },
+  {
+   "id": "J-H3",
+   "tier": 1,
+   "statement": "Dropping noise (N) changes the horizon loss by at most 5%",
+   "claim": "ratio <= 1.05",
+   "rows": [
+    {
+     "family": "A drop-one",
+     "system": "chua",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "drop N: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "chua",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "drop N: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "lorenz63",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "drop N: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "lorenz63",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "drop N: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "rossler",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "drop N: pinball ratio"
+    },
+    {
+     "family": "A drop-one",
+     "system": "rossler",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "drop N: pinball ratio"
+    }
+   ]
+  },
+  {
+   "id": "J-H4",
+   "tier": 1,
+   "statement": "O and I interact in the horizon",
+   "claim": "delta > 0",
+   "rows": [
+    {
+     "family": "B pair",
+     "system": "chua",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "log T OI: Delta"
+    },
+    {
+     "family": "B pair",
+     "system": "chua",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "log T OI: Delta"
+    },
+    {
+     "family": "B pair",
+     "system": "lorenz63",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "log T OI: Delta"
+    },
+    {
+     "family": "B pair",
+     "system": "lorenz63",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "log T OI: Delta"
+    },
+    {
+     "family": "B pair",
+     "system": "rossler",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "log T OI: Delta"
+    },
+    {
+     "family": "B pair",
+     "system": "rossler",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "log T OI: Delta"
+    }
+   ]
+  },
+  {
+   "id": "J-H5",
+   "tier": 1,
+   "statement": "The four-condition profile predicts the horizon better than the Lyapunov rank by more than 5%",
+   "claim": "ratio > 1.05",
+   "rows": [
+    {
+     "family": "D vs full",
+     "system": "chua",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "lyapunov: pinball ratio vs F"
+    },
+    {
+     "family": "D vs full",
+     "system": "chua",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "lyapunov: pinball ratio vs F"
+    },
+    {
+     "family": "D vs full",
+     "system": "lorenz63",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "lyapunov: pinball ratio vs F"
+    },
+    {
+     "family": "D vs full",
+     "system": "lorenz63",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "lyapunov: pinball ratio vs F"
+    },
+    {
+     "family": "D vs full",
+     "system": "rossler",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "lyapunov: pinball ratio vs F"
+    },
+    {
+     "family": "D vs full",
+     "system": "rossler",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "lyapunov: pinball ratio vs F"
+    }
+   ]
+  },
+  {
+   "id": "J-H6",
+   "tier": 1,
+   "statement": "Adding the raw delay vector to the profile lowers the horizon loss",
+   "claim": "ratio < 1",
+   "rows": [
+    {
+     "family": "D vs full",
+     "system": "chua",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "X+F: pinball ratio vs F"
+    },
+    {
+     "family": "D vs full",
+     "system": "chua",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "X+F: pinball ratio vs F"
+    },
+    {
+     "family": "D vs full",
+     "system": "lorenz63",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "X+F: pinball ratio vs F"
+    },
+    {
+     "family": "D vs full",
+     "system": "lorenz63",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "X+F: pinball ratio vs F"
+    },
+    {
+     "family": "D vs full",
+     "system": "rossler",
+     "profile": "deployable",
+     "horizon": "T_c",
+     "item": "X+F: pinball ratio vs F"
+    },
+    {
+     "family": "D vs full",
+     "system": "rossler",
+     "profile": "oracle",
+     "horizon": "T_c",
+     "item": "X+F: pinball ratio vs F"
+    }
+   ]
+  },
+  {
+   "id": "J-A1",
+   "tier": 2,
+   "statement": "Rossler, oracle, 1 LT: dropping R raises the allocation MSE by more than 5%",
+   "claim": "ratio > 1.05",
+   "rows": [
+    {
+     "family": "A drop-one",
+     "system": "rossler",
+     "profile": "oracle",
+     "horizon": "H=30 (1.00 LT)",
+     "item": "drop R: MSE ratio"
+    }
+   ]
+  },
+  {
+   "id": "J-A2",
+   "tier": 2,
+   "statement": "Rossler, deployable, 1 LT: the profile improves the allocation MSE over a fitted constant by at most 5%",
+   "claim": "ratio <= 1.05",
+   "rows": [
+    {
+     "family": "D vs full",
+     "system": "rossler",
+     "profile": "deployable",
+     "horizon": "H=30 (1.00 LT)",
+     "item": "none: mse ratio vs F"
+    }
+   ]
+  },
+  {
+   "id": "J-A3",
+   "tier": 2,
+   "statement": "4 LT: a fitted constant weight has a lower MSE than the separation formula",
+   "claim": "ratio < 1",
+   "rows": [
+    {
+     "family": "A vs separation",
+     "system": "chua",
+     "profile": "deployable",
+     "horizon": "H=120 (4.00 LT)",
+     "item": "none: MSE(F)/MSE(sep)"
+    },
+    {
+     "family": "A vs separation",
+     "system": "chua",
+     "profile": "oracle",
+     "horizon": "H=120 (4.00 LT)",
+     "item": "none: MSE(F)/MSE(sep)"
+    },
+    {
+     "family": "A vs separation",
+     "system": "lorenz63",
+     "profile": "deployable",
+     "horizon": "H=120 (4.00 LT)",
+     "item": "none: MSE(F)/MSE(sep)"
+    },
+    {
+     "family": "A vs separation",
+     "system": "lorenz63",
+     "profile": "oracle",
+     "horizon": "H=120 (4.00 LT)",
+     "item": "none: MSE(F)/MSE(sep)"
+    },
+    {
+     "family": "A vs separation",
+     "system": "rossler",
+     "profile": "deployable",
+     "horizon": "H=120 (4.00 LT)",
+     "item": "none: MSE(F)/MSE(sep)"
+    },
+    {
+     "family": "A vs separation",
+     "system": "rossler",
+     "profile": "oracle",
+     "horizon": "H=120 (4.00 LT)",
+     "item": "none: MSE(F)/MSE(sep)"
+    }
+   ]
+  },
+  {
+   "id": "J-A4",
+   "tier": 2,
+   "statement": "Lorenz-63, deployable, 1 LT: the raw delay vector alone has a lower allocation MSE than the profile",
+   "claim": "ratio < 1",
+   "rows": [
+    {
+     "family": "D vs full",
+     "system": "lorenz63",
+     "profile": "deployable",
+     "horizon": "H=30 (1.00 LT)",
+     "item": "X: mse ratio vs F"
+    }
+   ]
+  }
+ ]
+}
