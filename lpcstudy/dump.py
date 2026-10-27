@@ -8,9 +8,9 @@ need the numbers behind them, state by state, plus the per-estimate
 Levenberg-Marquardt data (the iterative search that estimates each starting
 state) of the reproducibility tiers. This module collects those arrays and
 writes them to one file per core system. It is used only with the command-line
-flag ``--states-dump``. The flag is refused together with the confirmatory
-flag, before the seed is chosen, until the owner decides whether a
-confirmatory run may carry it (O6).
+flag ``--states-dump``. A sealed (confirmatory) run may carry it: the owner
+decided O6 (ledger seq 51, phase J decision DC-3). The ``meta/`` group holds
+the seed id, never the seed value.
 
 ``pipeline.Study.run_cell``, ``experiments`` and ``analysis`` hand arrays to
 ``StateDump``; ``__main__`` writes the file; ``tools/rehearsal_diagnostics.py``

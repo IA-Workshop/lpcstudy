@@ -125,9 +125,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also write the per-state arrays of each core system to "
         "<out>/<preset>/states/<system>.npz (WU-0003.7b; the schema is in "
-        "the docstring of lpcstudy/dump.py). Not accepted with the "
-        "confirmatory flag or --report-only. Results are bitwise the same "
-        "except one provenance leaf.",
+        "the docstring of lpcstudy/dump.py). Accepted with the confirmatory "
+        "flag (owner ruling O6, DC-3); not accepted with --report-only. "
+        "Results are bitwise the same except one provenance leaf.",
     )
     return parser
 
@@ -136,13 +136,14 @@ def choose_states_dump(args: argparse.Namespace) -> bool:
     """Say whether the state dump was requested, or refuse a bad request.
 
     The state dump writes the per-state arrays of each core system to disk.
-    It is refused together with the confirmatory flag: whether a sealed run
-    may carry a dump is an open owner decision (O6), and until then the
-    sealed run writes none. It is also refused with ``--report-only``, which
-    recomputes nothing the dump could hold (a silently ignored flag would let
-    a caller believe a dump exists). This runs before the seed is chosen, so a
-    refused request has not read the sealed seed. Needs owner review before
-    freeze (LPC.PC.11): it sits beside the seed guard.
+    A sealed run may write it: the owner decided O6 (ledger seq 51, phase J
+    decision DC-3), so the flag is accepted together with the confirmatory
+    flag. The dump holds the seed id, never the seed value (``dump`` module,
+    ``meta/``). The flag is refused with ``--report-only``, which recomputes
+    nothing the dump could hold (a silently ignored flag would let a caller
+    believe a dump exists). This runs before the seed is chosen, so a refused
+    request has not read the sealed seed. Needs owner review before freeze
+    (LPC.PC.11): it sits beside the seed guard.
 
     Parameters
     ----------
@@ -157,17 +158,10 @@ def choose_states_dump(args: argparse.Namespace) -> bool:
     Raises
     ------
     SeedRefusal
-        If the flag is given with the confirmatory flag or with
-        ``--report-only``.
+        If the flag is given with ``--report-only``.
     """
     if not args.states_dump:
         return False
-    if args.confirmatory:
-        raise SeedRefusal(
-            "--states-dump is not accepted with the confirmatory flag (the "
-            "sealed "
-            "run writes no state dump until the owner decides)"
-        )
     if args.report_only:
         raise SeedRefusal(
             "--states-dump is not accepted with --report-only (nothing is "
