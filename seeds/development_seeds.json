@@ -41,37 +41,37 @@
     {
       "id": "DEV-5",
       "value": 3524469134264475218,
-      "status": "fresh",
+      "status": "used",
       "use": "Phase J held-out replication set (WU-0051): run only after the analysis commit and the replication rule are frozen.",
-      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4)."
+      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4). Used 2026-10-26 in the phase J held-out runs at the phasej preset (GPU, tag phasej-freeze) and their frozen analysis (WU-0051, WU-0052; results manifest)."
     },
     {
       "id": "DEV-6",
       "value": 4201349150595825683,
-      "status": "fresh",
+      "status": "used",
       "use": "Phase J held-out replication set (WU-0051): run only after the analysis commit and the replication rule are frozen.",
-      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4)."
+      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4). Used 2026-10-26 in the phase J held-out runs at the phasej preset (GPU, tag phasej-freeze) and their frozen analysis (WU-0051, WU-0052; results manifest)."
     },
     {
       "id": "DEV-7",
       "value": 593445681833105917,
-      "status": "fresh",
+      "status": "used",
       "use": "Phase J held-out replication set (WU-0051): run only after the analysis commit and the replication rule are frozen.",
-      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4)."
+      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4). Used 2026-10-26 in the phase J held-out runs at the phasej preset (GPU, tag phasej-freeze) and their frozen analysis (WU-0051, WU-0052; results manifest)."
     },
     {
       "id": "DEV-8",
       "value": 769281679037469920,
-      "status": "fresh",
+      "status": "used",
       "use": "Phase J held-out replication set (WU-0051): run only after the analysis commit and the replication rule are frozen.",
-      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4)."
+      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4). Used 2026-10-26 in the phase J held-out runs at the phasej preset (GPU, tag phasej-freeze) and their frozen analysis (WU-0051, WU-0052; results manifest)."
     },
     {
       "id": "DEV-9",
       "value": 4350691002390398880,
-      "status": "fresh",
+      "status": "used",
       "use": "Phase J held-out replication set (WU-0051): run only after the analysis commit and the replication rule are frozen.",
-      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4)."
+      "note": "Drawn 2026-10-26 by Claude (claude-opus-5-5, main session) with Python secrets.randbits(62); owner ruling ledger seq 47 (DV-4). Used 2026-10-26 in the phase J held-out runs at the phasej preset (GPU, tag phasej-freeze) and their frozen analysis (WU-0051, WU-0052; results manifest)."
     }
   ]
 }
