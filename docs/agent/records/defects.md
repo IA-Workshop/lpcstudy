@@ -303,3 +303,25 @@ Status lines of 2026-10-18 (freeze records, WU-0004.9; they belong to the defect
 - **Resolution:** known documentation defect, not fixed (owner, 2026-10-27, "Proceed with 2 and 3 as recommended"). `lpcstudy/` stays byte-identical to `freeze-1`, so `git diff --quiet freeze-1 -- lpcstudy/` keeps returning 0. Fix it if the pipeline is ever reopened.
 - 2026-10-27: opened and resolved as accepted (claude-opus-5-5, main session).
 - DEF-0030, correction (2026-10-27, claude-opus-5-5, main session; the entry above is not edited): the resolution's reason is wrong. `lpcstudy/` is no longer byte-identical to `freeze-1`. `git diff --stat freeze-1 main -- lpcstudy/` shows 3 files (the extension code), and on develop 16 files (the extension and phase J). Leaving the docstring unchanged therefore preserves no equality. The decision goes back to the owner, with the corrected recommendation: fix the docstring in the code change a confirmatory phase J round needs anyway. Until the owner decides, the status is open (documentation only, not blocking).
+
+**DEF-0031: V1 fails on Chua for about 5% of seeds because its central difference straddles a diode breakpoint** (found by the main session's diagnosis of the phase J held-out runs, `docs/agent/notes/2026-10-27-chua-v1-diagnosis.md`)
+- **Blocking:** no for development. In a sealed run a V1 failure is a gate failure, so the rule for handling one must be fixed before any seal.
+- **Description.**
+  - V1 compares the automatic delay-map Jacobian with a central difference at h = 1e-6 × scale on 10 test states.
+  - On Chua, about 0.5% of states (62 of 12,000, DEV-5, DEV-6 and DEV-9, CPU) lie within h of a breakpoint crossing of the numerical flow map. There the central difference averages two slopes, while one one-sided difference agrees with the automatic Jacobian to rounding error.
+  - Per seed this is a failure probability of about 5%.
+  - It explains the V1 failures of DEV-7 (7.05e-4) and DEV-8 (7.76e-4). Both are reproduced bitwise and show this signature.
+  - The Jacobian is correct.
+  - This sits beside DEF-0026 (V6, about 4.6% per seed on Chua).
+- **Resolution:** pending the owner. V1's bar and recipe are unchanged; any change is the owner's alone. The phase J confirmatory plan (DC-5) proposes how a gate failure on a sealed seed is handled.
+- 2026-10-27: opened (claude-opus-5-5, main session).
+
+**DEF-0032: on the GPU, Chua's Lyapunov exponent can differ by one unit in the last place between runs, which changes the whole orbit** (same note, finding 3)
+- **Blocking:** no for development. It bears on any plan that expects bitwise GPU regeneration (phase I decision 4; the phase J confirmatory DC-4).
+- **Description.**
+  - λ_max does not depend on the seed. It was 0.4408520035546001 in the DEV-7 `phasej` run and 0.4408520035546002 in eight other phase J GPU runs.
+  - The step interval follows from λ_max and changed in its last digit, so the chaotic orbit and every Chua test state of that run differ from a rerun.
+  - A GPU rebuild with the run's cached `lyapunov.json` reproduces it bitwise; one without the cache does not.
+  - Rate seen: 1 in 9 runs on Chua. Lorenz-63 and Rössler had the same λ_max in all 9 runs.
+- **Resolution:** pending the owner. Candidate measure, no code change: pre-populate each sealed run's cache with one pinned `lyapunov.json`, with its hash in the pre-registration. Not yet tested as a measure.
+- 2026-10-27: opened (claude-opus-5-5, main session).
