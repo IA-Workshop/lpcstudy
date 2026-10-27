@@ -1,6 +1,6 @@
 {
  "schema": "lpcstudy.phase-j-claims/1",
- "rule": "Per row: confirmed if the claim is implied by the reading on at least 4 seeds among those present and no two present seeds have jointly unsatisfiable interval claims; contradicted if some such pair exists; not confirmable if fewer than 4 seeds are present (gate failures make a system's rows absent for that seed, DC-5); otherwise not confirmed. Per claim and system: confirmed if every row of that system is confirmed; contradicted if any is contradicted; not confirmable if any is not confirmable and none is contradicted; otherwise not confirmed.",
+ "rule": "Per row: confirmed if the claim is implied by the reading on at least 4 seeds among those present and no two present seeds have jointly unsatisfiable interval claims; contradicted if some such pair exists; not confirmable if fewer than 4 seeds are present (gate failures make a system's rows absent for that seed, DC-5); otherwise not confirmed. Per claim and system: confirmed if every row of that system is confirmed; contradicted if any is contradicted; not confirmable if any is not confirmable and none is contradicted; otherwise not confirmed. Rows of J-I1 and J-C2 are read by reading_tables; their claims enter the same rule.",
  "minimum": 4,
  "n_seeds": 5,
  "seed_ids": [
@@ -405,6 +405,75 @@
      "item": "X: mse ratio vs F"
     }
    ]
+  },
+  {
+   "id": "J-I1",
+   "tier": 3,
+   "statement": "Instability adds information about the logit weight given R, O and N (deployable profile)",
+   "claim": "delta_r2 > 0",
+   "rows": [
+    {
+     "source": "pipeline results.json",
+     "system": "lorenz63",
+     "profile": "deployable",
+     "path": "systems/lorenz63/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/I",
+     "item": "drop I: Delta R^2 on logit w* (Q-N procedure)"
+    },
+    {
+     "source": "pipeline results.json",
+     "system": "chua",
+     "profile": "deployable",
+     "path": "systems/chua/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/I",
+     "item": "drop I: Delta R^2 on logit w* (Q-N procedure)"
+    }
+   ]
+  },
+  {
+   "id": "J-C2",
+   "tier": 3,
+   "statement": "Rossler: the full deployable system's realized false-trust rate is above the 10% target",
+   "claim": "false_trust > 0.10",
+   "rows": [
+    {
+     "source": "ce.json",
+     "system": "rossler",
+     "profile": "deployable",
+     "path": "systems/rossler/C3/policies/g(F-hat) + h(F-hat)/false_trust_realized",
+     "item": "C3 full deployable system: realized false-trust rate"
+    }
+   ]
   }
- ]
+ ],
+ "reading_tables": {
+  "J-I1": {
+   "from": "the stored 95% interval of delta_r2 (lower, upper) and the frozen Q-N reading (lpcstudy.analysis.qn_reading)",
+   "words": {
+    "substantial": [
+     "delta_r2 > 0"
+    ],
+    "distinct but small": [
+     "delta_r2 > 0",
+     "delta_r2 < 0.05"
+    ],
+    "reduces": [
+     "delta_r2 < 0.05"
+    ],
+    "undetermined": []
+   },
+   "note": "The Q-N 'substantial' (lower > 0, upper >= 0.05) does not bound the size from below, so the claim is delta_r2 > 0. 'reduces' claims only delta_r2 < 0.05, which is compatible with delta_r2 > 0: this claim can be not confirmed but never contradicted."
+  },
+  "J-C2": {
+   "from": "the stored 95% interval (ci) of false_trust_realized",
+   "words": {
+    "above target": [
+     "false_trust > 0.10"
+    ],
+    "below target": [
+     "false_trust < 0.10"
+    ],
+    "not determined": []
+   },
+   "rule": "above target if ci[0] > 0.10; below target if ci[1] < 0.10; otherwise not determined"
+  }
+ }
 }

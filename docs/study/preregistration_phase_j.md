@@ -20,7 +20,7 @@
 | P-2 Rehearsal on development seeds through the whole chain, including a bitwise GPU regeneration with the pinned cache | WU-0055 |
 | P-3 Freeze commit and tag `freeze-j` on `main`, with the sha256 of this file and its two companions | WU-0056; owner |
 | P-4 O-J1: who runs the regeneration (§5) | **closed:** the owner waived the other-actor requirement (ledger seq 52) |
-| P-5 Tier 3: included only if the student asks before approval (§3) | owner and student |
+| P-5 Tier 3 | **closed:** J-I1 and J-C2 included; J-C1 and J-E1 out (ledger seq 53) |
 
 ## 1. Question and scope
 
@@ -31,11 +31,11 @@
 - **Analysis.** The phase J analysis as frozen at `phasej-freeze` (0929a9a). Only the changes of WU-0054 are added: sealed-run mode, the evaluator and a docstring.
 - **Out of scope:**
   - the extension systems;
-  - any v3 hypothesis;
+  - any v3 hypothesis test (the v3 words are described only, §7a);
   - pooling across seeds;
   - any comparison with CONF-1.
 
-**The v3 verdicts these runs compute are not part of this study.** The pipeline computes v3's hypothesis words for every run. For CONF-5 to CONF-9 they are neither reported nor used. CONF-1 stays the v3 result, and nothing here changes it.
+**The v3 words these runs compute are a secondary description, not a test** (§7a; ledger seq 53, LPC.PC.1 as amended). CONF-1 stays the v3 result, and nothing here changes, confirms or replaces it.
 
 ## 2. What was seen before this was written
 
@@ -62,13 +62,20 @@ The full definition, including the exact row identifiers, is `claims.json`. Each
 | J-A3 | 2 | 4 LT: a fitted constant weight has a lower MSE than the separation formula | 3 systems × 2 profiles | ratio < 1 |
 | J-A4 | 2 | Lorenz-63, deployable profile, 1 LT: the raw delay vector alone has a lower allocation MSE than the profile | 1 | ratio < 1 |
 
-That is 45 rows in 10 claims.
+| J-I1 | 3 | Instability adds information about the logit weight given R, O and N (the student's H2a question) | Lorenz-63 and Chua, deployable profile: 2 rows | ΔR² > 0 |
+| J-C2 | 3 | Rössler: the full deployable system's realized false-trust rate is above the 10% target | 1 | false trust > 0.10 |
 
-**Tier 3 is not included** unless the student asks before approval (P-5). It would cover:
-- C2 forward one weight;
-- C3 Rössler false trust;
-- E-H3c;
-- drop-I on the logit weight.
+That is 48 rows in 12 claims. Tier 3 entered by ledger seq 53. J-C1 (C2 forward one weight) and J-E1 (E-H3c) are not included.
+
+**How the two Tier 3 rows are read.** `claims.json` → `reading_tables` gives the rules.
+- **J-I1.**
+  - Its rows come from each run's own Q-N ablation (`results.json`), with their stored 95% interval and the frozen Q-N reading.
+  - Q-N's "substantial" means the interval lies above 0 and reaches 0.05. It does not bound the size from below, so the claim is stated as ΔR² > 0. That is a refinement of the plan's wording ("substantial"), made before any sealed seed exists.
+  - A seed reading "reduces" claims only ΔR² < 0.05, which is compatible with the claim. So J-I1 can be not confirmed but never contradicted.
+- **J-C2.**
+  - Its row comes from `ce.json`, using the realized false-trust rate's 95% interval.
+  - "Above target" if the lower bound exceeds 0.10, "below target" if the upper bound is under 0.10, otherwise not determined.
+- **Held-out seeds.** J-I1's lower bounds were 0.010 to 0.055 on all five seeds and both systems. J-C2's lower bounds were 12.6% to 13.4% on all five.
 
 ## 4. Seeds and the rule
 
@@ -88,7 +95,7 @@ That is 45 rows in 10 claims.
 
 **Error rates.** These use the r measurement of the development seeds (`docs/agent/notes/2026-10-26-phase-j-r-measurement.md`):
 - if a row's claim were false at its boundary, the chance that it still reads confirmed is at most about 1.5·10⁻³ per row;
-- for 45 rows, that is about 0.07 expected false confirmations.
+- for the 45 Tier 1 and 2 rows, that is about 0.07 expected false confirmations. r was not measured for the three Tier 3 rows, so they add an unquantified, small risk.
 
 The rule's power for an effect near its reading boundary is limited. M-6 put it at 0.74 for a borderline effect. Most rows sit far from their boundary on the development seeds; for example, drop-I ratios are 1.20 to 1.29 against 1.05.
 
@@ -137,6 +144,19 @@ All of the analysis takes place after the owner releases the sealed outputs to a
 
 A tool that refuses or fails is reported as it stands. Any fix is a new commit and is labeled post-freeze.
 
+## 7a. Secondary description: the v3 words of the sealed runs
+
+Every sealed run computes v3's hypothesis words for Lorenz-63, Rössler and Chua. They are reported as a description (LPC.PC.1 as amended, ledger seq 53):
+- **What is listed.** For each v3 row and system, the word on each of CONF-5 to CONF-9 is listed, read from `results.json` → `verdicts`. Beside it goes the count of seeds that give each word, and CONF-1's promoted word, shown for reference only.
+- **What is not computed.** No combined word, no "confirmed" and no pooled statistic.
+- **Departures from v3, stated with the table:**
+  1. n_test is 4000, not v3's 1000, so the intervals are narrower than v3 sized them;
+  2. the device is the GPU, where v3 §9 makes the CPU official;
+  3. the robustness sweep is skipped (it is reported-only in v3);
+  4. the time unit is pinned (§5).
+- **What it may not be used for.** It is not the v3 test. It cannot change, confirm or replace CONF-1. A disagreement with CONF-1 is reported as information about how v3's words vary across seeds and configurations, not as a revision.
+- **Gate.** A system that fails the gate on a seed is listed as "gate failed" for that seed.
+
 ## 8. Known limitations, stated before the run
 
 1. **The claims were chosen on development seeds** whose results were seen (§2). The sealed seeds are fresh.
@@ -157,7 +177,7 @@ A tool that refuses or fails is reported as it stands. Any fix is a new commit a
 - any pooling across seeds;
 - that a condition causes predictability;
 - that "not confirmed" means no effect;
-- anything about the v3 hypotheses from these runs;
+- that the v3 words of these runs test, confirm or revise any v3 hypothesis or the CONF-1 result (§7a);
 - any comparison with CONF-1's numbers, or any change to the CONF-1 result.
 
 Development numbers (DEV seeds) stay labeled development.

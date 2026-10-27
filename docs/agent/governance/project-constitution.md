@@ -47,7 +47,11 @@ Development work on development seeds is internal (LPC.PC.5), and broad verifica
    - it is development work on registered development seeds, with estimates and readings and no verdict, until a later pre-registered confirmatory round, which the owner intends to promote when confirmed and which needs its own pre-registration, freeze and sealed seeds;
    - new allocation or horizon models fitted for these analyses are analysis instruments, not new rules of the v3 design;
    - the extension systems, transfer experiments, a misspecified-model arm and Lean formalization stay out of scope;
-   - the sealed CONF-1 result and its documents are not changed, and no development number is set beside it.
+   - the sealed CONF-1 result and its documents are not changed, and no development number is set beside it;
+   - (amendment of 2026-10-27, owner ruling "proceed with B as recommended") the v3 hypothesis words that the sealed runs of its confirmatory round (CONF-5 to CONF-9) compute on Lorenz-63, Rössler and Chua may be reported as a pre-registered secondary description:
+     - per seed, with an agreement count across the five seeds;
+     - with the run's departures from v3 stated (n_test 4000, GPU device, robustness sweep skipped, pinned time unit);
+     - never as the v3 test, never combined into a verdict, and never changing, confirming or replacing the CONF-1 result.
 2. **LPC.PC.2 Roles** (PRIN.1, PRIME.1).
    - **The PI is the human owner** and performs every act PRIME.1 and GOV.50 reserve.
    - **The student is the study's primary author** and an actor on the project. The student reviews results and proposes interpretations. Promotion stays with the human owner.
