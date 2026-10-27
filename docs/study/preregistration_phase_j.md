@@ -16,7 +16,7 @@
 
 | Item | Closes with |
 |---|---|
-| P-1 Analysis and evaluator code (`tools/lpc_contrib.py`, `tools/lpc_contrib_ce.py`, `tools/lpc_confirm.py`) and the sealed-dump change | WU-0054 merged; acceptance criteria met |
+| P-1 Analysis and evaluator code (`tools/lpc_contrib.py`, `tools/lpc_contrib_ce.py`, `tools/lpc_confirm.py`) and the sealed-dump change | **closed:** WU-0054 merged into develop (54975c7); its acceptance criteria met (rehearsal on DEV-5 to DEV-9: 45 of 45 Tier 1 and 2 verdicts equal the replication class; v3 description 42 rows, 0 missing) |
 | P-2 Rehearsal on development seeds through the whole chain, including a GPU regeneration with the pinned cache | **closed:** WU-0055 (`docs/agent/notes/2026-10-27-phase-j-rehearsal.md`). The chain ran end to end. DEV-6 regenerated bitwise; DEV-5 did not (DEF-0033: 420 leaves, 16 non-claimed Chua readings, 0 of the 48 claim rows). The owner dropped the bitwise expectation (ledger seq 54, §5) |
 | P-3 Freeze commit and tag `freeze-j` on `main`, with the sha256 of this file and its two companions | WU-0056; owner |
 | P-4 O-J1: who runs the regeneration (§5) | **closed:** the owner waived the other-actor requirement (ledger seq 52) |
