@@ -335,3 +335,4 @@ Status lines of 2026-10-18 (freeze records, WU-0004.9; they belong to the defect
   - DEV-6 reran bitwise. The rate is not known.
 - **Resolution:** pending the owner (regeneration rule of the phase J confirmatory round). Candidates: accept a non-bitwise GPU regeneration and report the readings that differ; test XLA's deterministic-ops mode first; or use the CPU as the official device, as for CONF-1.
 - 2026-10-27: opened (claude-opus-5-5, main session).
+- 2026-10-27: resolution (owner, "choose recommendation A", ledger seq 54). Accepted for the phase J confirmatory round: the GPU stays the official device, the bitwise regeneration expectation is dropped, and the regeneration comparison reports every differing leaf and every claim row whose reading differs (pre-registration §5, §8 item 7). The cause is not fixed; status accepted (claude-opus-5-5, main session).

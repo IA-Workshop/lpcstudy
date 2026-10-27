@@ -75,7 +75,7 @@ Each claim is a set of rows of the frozen analysis, with the reading it needs. "
 | WU-0055 | **Dress rehearsal** of the whole chain on two development seeds through the confirmatory code path, with the analysis tools and `lpc_confirm.py` in rehearsal mode | Exit 0 everywhere; labels say DEVELOPMENT; one manifest line per run |
 | WU-0056 | **Freeze**: gate on every tier (`LPC_GATE=freeze-j`), merge to `main` (owner), tag `freeze-j` | Gate green; tag on `main`; the analysis and evaluator hashes recorded |
 | WU-0057 | **Owner acts**: seal CONF-5 to CONF-9 (ledger commitments), then one command per seed for the official GPU run and the regeneration | Commitments in the ledger; seed values in no output |
-| WU-0058 | **Analysis and verdicts**: tools once per seed, `lpc_confirm.py` once; comparison of the regeneration; report; auditor pass; owner promotion | Regeneration bitwise (T0); every reported number traced to a record; auditor finds zero blockers |
+| WU-0058 | **Analysis and verdicts**: tools once per seed, `lpc_confirm.py` once; comparison of the regeneration; report; auditor pass; owner promotion | Regeneration compared at T0, every differing leaf reported, and every claim row whose per-seed reading or verdict differs between official and regeneration runs reported (seq 54; was "Regeneration bitwise (T0)"); every reported number traced to a record; auditor finds zero blockers |
 
 Compute: about 33 min of GPU time per run. Five official runs plus five regeneration runs make about 5.5 h. The analysis takes about 29 min of CPU per seed.
 
@@ -93,3 +93,10 @@ The plan therefore proposes:
 V1's bar and recipe are not changed. That is the owner's alone (PRIME.2). If the owner wants V1 to stop failing on correct Jacobians, it would be a separate ruling, made before the seal: for example, accept a state when either one-sided difference agrees. It is not proposed here.
 
 WU-0055 adds one acceptance criterion: with the pinned cache, a second GPU run of each rehearsal seed is bitwise equal to the first (tier T0).
+
+**Ruling on DC-4 after the rehearsal** (owner, 2026-10-27, ledger seq 54, "choose recommendation A"):
+- **The criterion was not met.** DEV-6 regenerated bitwise; DEV-5 did not (DEF-0033, `docs/agent/notes/2026-10-27-phase-j-rehearsal.md`).
+- **The ruling.** The official device stays the GPU with the pinned cache, and the bitwise expectation is dropped.
+- **What replaces it.** The regeneration is compared at T0 and every differing leaf is reported. It is also analyzed, and every claim row whose per-seed reading or verdict differs from the official runs is reported by name.
+- **Verdicts.** Verdicts come from the official runs only. There is no CPU fallback run.
+- **The pre-registration.** §5 and §8 item 7 carry the ruling.

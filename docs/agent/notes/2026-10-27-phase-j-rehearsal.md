@@ -60,3 +60,7 @@ Paths are relative to `lpcstudy-wt/run/phj-reh-54975c7`.
   - DC-4 promised a bitwise regeneration, and the rehearsal shows it cannot be promised on the GPU, even with the pin.
   - The pre-registration (§5) already says "No verdict depends on the regeneration", so the verdict rule is unaffected.
   - The expectation, and what a non-bitwise regeneration means, need the owner's ruling before approval (P-2).
+
+## Ruling
+
+The owner chose option A ("choose recommendation A", ledger seq 54): keep the GPU and drop the bitwise expectation. The regeneration's differing leaves and any claim row whose reading differs are reported (pre-registration §5). WU-0055 is closed on that basis.
