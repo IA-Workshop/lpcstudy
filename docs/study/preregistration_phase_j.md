@@ -21,6 +21,8 @@
 | P-3 Freeze commit and tag `freeze-j` on `main`, with the sha256 of this file and its two companions | WU-0056; owner |
 | P-4 O-J1: who runs the regeneration (§5) | **closed:** the owner waived the other-actor requirement (ledger seq 52) |
 | P-5 Tier 3 | **closed:** J-I1 and J-C2 included; J-C1 and J-E1 out (ledger seq 53) |
+| P-6 O-J2: who runs the sealed analysis (§7). The analysis tools draw their bootstrap and learner randomness from the run's master seed, which a sealed `results.json` does not store. As built (WU-0054), `--sealed` reads `LPC_CONF_SEED` and `LPC_CONF_SALT`, checks them against the ledger commitment as the CLI does, and never writes the value. The sealed analysis is then an owner act. The alternative, a fixed analysis seed in this pre-registration, would break the tools' check that they reproduce the run's own rows | owner |
+| P-7 Owner review of the seed-handling code in `--sealed` (LPC.PC.11), or a waiver as for CONF-1 (seq 33) | owner |
 
 ## 1. Question and scope
 
@@ -135,7 +137,7 @@ The rule's power for an effect near its reading boundary is limited. M-6 put it 
 
 ## 7. Analysis, once
 
-All of the analysis takes place after the owner releases the sealed outputs to agents with a ledger entry.
+All of the analysis takes place after the owner releases the sealed outputs to agents with a ledger entry. If P-6 stands as built, the owner runs steps 1 and 2 in the sealed environment, because the tools need the sealed seed. Agents then read only the records and write the report.
 1. For each seed, at `freeze-j`, on the CPU:
    - `tools/lpc_contrib.py <run>/phasej --sealed --jobs 4 --out <run>/contrib-j`
    - then `tools/lpc_contrib_ce.py <run>/phasej --sealed --jobs 4 --abd <run>/contrib-j/contrib.json --out <run>/contrib-j`
