@@ -325,3 +325,13 @@ Status lines of 2026-10-18 (freeze records, WU-0004.9; they belong to the defect
   - Rate seen: 1 in 9 runs on Chua. Lorenz-63 and Rössler had the same λ_max in all 9 runs.
 - **Resolution:** pending the owner. Candidate measure, no code change: pre-populate each sealed run's cache with one pinned `lyapunov.json`, with its hash in the pre-registration. Not yet tested as a measure.
 - 2026-10-27: opened (claude-opus-5-5, main session).
+
+**DEF-0033: on the GPU, the state estimator's ν̂ can differ between runs on a few entries, which moves both seed-proxy fits and the deployable profile by about 1e-9** (WU-0055 rehearsal, `docs/agent/notes/2026-10-27-phase-j-rehearsal.md`)
+- **Blocking:** no for development. It blocks the WU-0055 criterion (a bitwise GPU regeneration with the pinned cache) and so DC-4 as written.
+- **Description.**
+  - A GPU rerun of DEV-5 at `phasej` with the pinned `lyapunov.json` built the same orbits, oracle seeds, growth proxy and noise sensitivity, bitwise.
+  - On 9 of 16,000 Lorenz-63 test entries, ν̂ at the estimated state differed. The proxy coefficients of all three systems changed by about 1e-9 relative, and on Chua and Rössler `least_squares` stopped at a different nfev and status.
+  - Downstream, results.json differs on 420 of 20,846 leaves (up to 1.6% relative on a Chua Shapley interval bound), and 16 Chua deployable readings flip. None is a pre-registered row.
+  - DEV-6 reran bitwise. The rate is not known.
+- **Resolution:** pending the owner (regeneration rule of the phase J confirmatory round). Candidates: accept a non-bitwise GPU regeneration and report the readings that differ; test XLA's deterministic-ops mode first; or use the CPU as the official device, as for CONF-1.
+- 2026-10-27: opened (claude-opus-5-5, main session).

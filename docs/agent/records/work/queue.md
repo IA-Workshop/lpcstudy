@@ -256,3 +256,8 @@ Phase I P3 to P6 (WU-0040 to WU-0043) are paused behind phase J (DV-1). Plan and
   - WU-0051 done: DEV-5 to DEV-9 at `phasej`, all exit 0; Chua fails V1 on DEV-7 and DEV-8 (provisional, not redrawn).
   - WU-0052 done: frozen analysis once per seed, replication rule once (1421 replicated, 3 point, 56 contradicted, 1805 not replicated of 3285). One departure, an `--abd` path in the freeze note's command, recorded there. Report `docs/agent/notes/2026-10-26-phase-j-report.md`. DEV-5 to DEV-9 marked used.
   - Owner decisions: confirmatory round (which claims); optional Chua V1 diagnosis; `pooled_floor_count` docstring. The lock-hook fix (seq 50) goes to main with the next merge (owner, 2026-10-26).
+
+- 2026-10-27, claude-opus-5-5 (main session): phase J confirmatory round (plan `docs/agent/notes/2026-10-27-phase-j-confirmatory-plan.md`, ROADMAP §10.1).
+  - Done: Chua V1 diagnosis (DEF-0031, DEF-0032); WU-0053 pre-registration draft `docs/study/preregistration_phase_j.md` (P-1 to P-3, P-6, P-7 pending); WU-0054 merged (54975c7).
+  - WU-0055 rehearsal: chain runs end to end (all exit 0, evaluator 48 rows), but the bitwise GPU regeneration criterion fails on DEV-5 (DEF-0033; DEV-6 bitwise). Note `docs/agent/notes/2026-10-27-phase-j-rehearsal.md`. Needs the owner's regeneration ruling.
+  - Freeze gate `freeze-j` on develop: unit 2234 passed, integration 31 passed; slow and gpu tiers next.
