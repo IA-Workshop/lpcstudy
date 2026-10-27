@@ -6,6 +6,7 @@
 - **Analysis.** Both analysis tools ran once per seed, then `tools/lpc_replicate.py` ran once in rule mode (M-6 with S1 to S4: at least 4 of 5 seeds and no contradiction). All at `phasej-freeze`, clean tree, on CPU.
 - **Departure.** The C/E command in the freeze note passed a directory to `--abd`. The C/E tool stopped at argument loading on DEV-5 to DEV-8 before it computed anything. The corrected command then ran once per seed. No code changed. Details are in the freeze note.
 - **Chua is provisional on DEV-7 and DEV-8.** Chua failed validation check V1 (delay-map Jacobian against finite differences) on those two seeds. With 5 seeds, any "4 of 5" Chua replication includes at least one of them. So every Chua replication below is provisional. Of the 392 replicated Chua rows, 327 also read the same on all three clean seeds (DEV-5, DEV-6, DEV-9). Every Chua reading this report names is among those 327.
+  - **Lifted by the owner on 2026-10-27** (ledger seq 55, §10). The text below is left as written.
 - **No pooling.** Each seed is read on its own. The replication rule counts readings and computes no new statistic across seeds.
 - **Kept apart from CONF-1.** Nothing here is placed beside the sealed CONF-1 result.
 
@@ -160,3 +161,18 @@ Every replicated weight interaction is small except Rössler's R × O.
 - Whether to run a confirmatory round, and on which claims. The horizon claims (I, O, O × I, and X+F lowering the loss) are the strongest candidates.
 - Chua V1 on DEV-7 and DEV-8: an optional diagnosis, exploratory, that changes no reading.
 - The `allocation.pooled_floor_count` docstring finding, still open.
+
+## 10. Addendum: the provisional label on Chua lifted (2026-10-27)
+
+- **Ruling.** The owner lifted the provisional label on Chua for DEV-7 and DEV-8 (ledger seq 55, "Lift the provisional labels").
+- **Basis.** The V1 diagnosis (`docs/agent/notes/2026-10-27-chua-v1-diagnosis.md`, DEF-0031):
+  - Both failures are finite-difference artifacts at a diode breakpoint. The central difference straddles a kink of the numerical flow map, one one-sided difference agrees with the automatic Jacobian to rounding error, and the error collapses at a smaller step.
+  - The Jacobian is correct.
+- **Effect.** All 392 replicated Chua rows stand without qualification. That includes the 65 that do not also read the same on all three of DEV-5, DEV-6 and DEV-9.
+  - No reading, count or verdict changes. Only the label does.
+  - §1's "Chua (provisional)" now reads as Chua.
+- **Made after the freeze.** The freeze note's rule (provisional on a gate failure) was fixed before the runs. Lifting it is a ruling made after the results and the diagnosis were seen, and it is stated as such.
+- **Not changed.**
+  - V1's bar and recipe.
+  - The confirmatory rule: a gate failure on a sealed seed makes that system's rows absent for that seed (DC-5, pre-registration §6).
+
