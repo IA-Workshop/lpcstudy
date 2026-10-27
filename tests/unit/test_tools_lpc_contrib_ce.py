@@ -15,6 +15,7 @@ The end-to-end run on a smoke dump is in
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -69,6 +70,85 @@ def test_refusals_exit_64_and_write_nothing(tmp_path: Path) -> None:
     done = call(str(held), "--out", str(tmp_path / "out"))
     assert done.returncode == 64 and b"held-out" in done.stderr
     assert not (tmp_path / "out").exists()
+
+
+def test_sealed_flag_refusals_write_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WU-0054: ``--sealed`` with ``--replication``, without ``--abd``, or
+    with an A/D record not written with ``--sealed``: exit 64, nothing
+    written. The last case passes the seed check with a synthetic seed and
+    a throwaway ledger (in-process; no sealed seed is read).
+
+    Reference: the plan (WU-0054 (b)) and the hand-written label.
+    Tolerance: none (exit codes).
+    """
+    monkeypatch.delenv("LPC_CONF_SEED", raising=False)
+    monkeypatch.delenv("LPC_CONF_SALT", raising=False)
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "results.json").write_text(
+        json.dumps(
+            {
+                "provenance": {
+                    "seed_id": "CONF-5",
+                    "seed_kind": "confirmatory",
+                    "complete": True,
+                },
+                "config": {"seed": None},
+                "systems": {"lorenz63": {}},
+            }
+        )
+    )
+    (run / "cache").mkdir()
+    pinned = REPO / "docs" / "study" / "preregistration_phase_j"
+    (run / "cache" / "lyapunov.json").write_bytes(
+        (pinned / "lyapunov.json").read_bytes()
+    )
+    abd = tmp_path / "contrib.json"
+    abd.write_text(
+        json.dumps(
+            {
+                "label": "DEVELOPMENT (CONF-5): exploratory, not a "
+                "hypothesis test",
+                "run": {"seed_id": "CONF-5", "dir": str(run)},
+            }
+        )
+    )
+    out = tmp_path / "out"
+    for argv in (
+        ["--sealed", "--replication", "--abd", str(abd)],
+        ["--sealed"],
+    ):
+        assert tool.main([str(run), "--out", str(out), *argv]) == 64
+        assert not out.exists()
+    seed, salt = 123456789012345, "0f" * 16
+    digest = hashlib.sha256(f"{seed}:{salt}".encode()).hexdigest()
+    ledger = tmp_path / "l.jsonl"
+    ledger.write_text(
+        json.dumps(
+            {
+                "seq": 1,
+                "prev_sha256": "0" * 64,
+                "utc": "2026-01-01T00:00:00+00:00",
+                "type": "commitment",
+                "actor": "test",
+                "role": "test",
+                "authority": "",
+                "summary": "synthetic",
+                "files": {},
+                "data": {"seed_id": "CONF-5", "sha256": digest},
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(tool.base, "LEDGER_PATH", ledger)
+    monkeypatch.setenv("LPC_CONF_SEED", str(seed))
+    monkeypatch.setenv("LPC_CONF_SALT", salt)
+    assert tool.main([str(run), "--out", str(out), "--sealed", "--abd",
+                      str(abd)]) == 64
+    assert not out.exists()
 
 
 def test_abd_record_of_another_seed_or_run_is_refused(tmp_path: Path) -> None:

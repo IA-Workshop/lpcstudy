@@ -428,8 +428,12 @@ def pooled_floor_count(
     This applies to A2 (:func:`global_weight`, all states) and to the regime
     weights (:func:`regime_weight`, the given members). The denominator is
     ``sum_i c_i`` per horizon, the same expression those functions use.
-    Under P1(a) every ``c_i >= rho^2 / k > 0``, so a nonzero count is a
-    warning sign.
+    The pooled weight divides by that sum, so a sum below the floor would
+    leave the weight undefined at that horizon. No per-state lower bound on
+    ``c_i`` is claimed: a bound such as ``c_i >= rho^2 / k`` needs the
+    expectation to include the library noise, a hypothesis not established
+    here, and the smallest per-state curvature in the DEV-2 prototype data
+    is ``0.012 rho^2`` (DEF-0030). A nonzero count is a warning sign.
 
     Parameters
     ----------

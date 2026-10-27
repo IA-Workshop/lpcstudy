@@ -13,7 +13,7 @@ writes ``ce.json``, ``ce.md`` and ``figures/*.png`` to the output directory.
 Usage::
 
     python tools/lpc_contrib_ce.py <run-dir> --out <dir> --abd <contrib.json>
-        [--jobs 4] [--systems lorenz63 ...] [--replication]
+        [--jobs 4] [--systems lorenz63 ...] [--replication | --sealed]
     python tools/lpc_contrib_ce.py --figures-from <ce.json> --out <dir>
     python tools/lpc_contrib_ce.py --crossseed <ce.json> ... --out <file.md>
 
@@ -23,6 +23,13 @@ byte. Refusals (exit 64, nothing written) are those of
 ``tools/lpc_contrib.py`` (confirmatory, non-development run, held-out seed
 without ``--replication``, failed run, foreign dump), plus an A/D record of
 another seed or run.
+
+``--sealed`` (WU-0054) is the sealed-run mode of ``tools/lpc_contrib.py``:
+the same checks (sealed run, pinned cache, the master seed from the verified
+``LPC_CONF_SEED``, never written), the sealed label on the record, tables
+and figures, and the ``sealed`` block. It also needs ``--abd``, an A/D record
+written with ``--sealed`` (its label is the sealed one). **Needs owner review
+before freeze (LPC.PC.11):** this path reads the sealed seed.
 """
 
 from __future__ import annotations
@@ -105,11 +112,15 @@ def g_reproduction(joint: dict, abd_system: dict) -> dict:
     return out
 
 
-def analyze(args, results: dict, datas: dict, dumps: dict, abd) -> dict:
-    """Every block of every system; the seed-level E-H3c reading."""
+def analyze(
+    args, results: dict, datas: dict, dumps: dict, abd, seed: int
+) -> dict:
+    """Every block of every system; the seed-level E-H3c reading.
+
+    ``seed`` is the run's master seed (``lpc_contrib.master_seed``).
+    """
     seed_id = results["provenance"]["seed_id"]
     config = results["config"]
-    seed = int(config["seed"])
     n_resamples = int(config["bootstrap_resamples"])
     block = int(config["bootstrap_block"])
     record = {
@@ -914,6 +925,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--systems", nargs="*")
     parser.add_argument("--replication", action="store_true")
+    parser.add_argument("--sealed", action="store_true")
     parser.add_argument("--figures-from", type=Path)
     parser.add_argument("--crossseed", type=Path, nargs="+")
     args = parser.parse_args(argv)
@@ -929,8 +941,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.run is None:
         parser.error("a run directory is required")
     try:
-        results = base.check_run(args.run, args.replication)
+        if args.sealed and args.replication:
+            raise Refusal("--sealed and --replication exclude each other")
+        if args.sealed and args.abd is None:
+            raise Refusal("--sealed needs --abd (the sealed A/D record)")
+        results = base.check_run(args.run, args.replication, args.sealed)
         seed_id = results["provenance"]["seed_id"]
+        seed = base.master_seed(results, args.sealed)
+        if args.sealed:  # before the dumps are read
+            sealed_abd = json.loads(args.abd.read_text())
+            if sealed_abd.get("label") != base.SEALED_LABEL.format(
+                seed_id=seed_id
+            ):
+                raise Refusal("the A/D record was not written with --sealed")
         systems = args.systems or list(results["systems"])
         dumps = {
             s: base.load_dump(args.run / "states" / f"{s}.npz", seed_id)
@@ -944,7 +967,9 @@ def main(argv: list[str] | None = None) -> int:
     except (Refusal, ValueError, FileNotFoundError) as err:
         print(f"lpc_contrib_ce: refused: {err}", file=sys.stderr)
         return 64
-    record = analyze(args, results, datas, dumps, abd)
+    record = analyze(args, results, datas, dumps, abd, seed)
+    if args.sealed:
+        record = base.seal_record(record, seed_id)
     args.out.mkdir(parents=True, exist_ok=True)
     text = json.dumps(base.to_json(record), indent=1, allow_nan=False) + "\n"
     (args.out / "ce.json").write_text(text)
