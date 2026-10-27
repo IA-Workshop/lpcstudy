@@ -19,7 +19,7 @@
 | P-1 Analysis and evaluator code (`tools/lpc_contrib.py`, `tools/lpc_contrib_ce.py`, `tools/lpc_confirm.py`) and the sealed-dump change | WU-0054 merged; acceptance criteria met |
 | P-2 Rehearsal on development seeds through the whole chain, including a bitwise GPU regeneration with the pinned cache | WU-0055 |
 | P-3 Freeze commit and tag `freeze-j` on `main`, with the sha256 of this file and its two companions | WU-0056; owner |
-| P-4 O-J1: who runs the regeneration (§5) | owner |
+| P-4 O-J1: who runs the regeneration (§5) | **closed:** the owner waived the other-actor requirement (ledger seq 52) |
 | P-5 Tier 3: included only if the student asks before approval (§3) | owner and student |
 
 ## 1. Question and scope
@@ -111,7 +111,7 @@ The rule's power for an effect near its reading boundary is limited. M-6 put it 
   - Each seed is run a second time on the same host and device from the same commit and inputs, into `runs/confirmatory/phasej-CONF-n-regen`.
   - It is compared at tier T0, bitwise on every compared leaf (`tools/compare_runs.py`), and the dump arrays are compared bitwise too.
   - A difference is reported. No verdict depends on the regeneration.
-  - **O-J1 (owner):** v3 §9 item 4 asks for another actor. Either another actor runs it, or the owner records a waiver, as seq 31 did for CONF-1.
+  - **Actor.** v3 §9 item 4 asks for another actor. The owner waived that requirement for this round (ledger seq 52, "Not feasible; waive as with CONF-1"), as seq 31 did for CONF-1, so the owner may run both the official and the regeneration runs.
 - **CPU.** A CPU run happens only if a regeneration is not bitwise. It informs only: GPU and CPU build different orbits (diagnosis note, finding 4).
 - **Refusals.** A refused or crashed run is reported and not redrawn. If a run stops after some systems, the systems it did not reach are absent for that seed.
 
@@ -143,7 +143,7 @@ A tool that refuses or fails is reported as it stands. Any fix is a new commit a
 2. **Five realizations.** Each seed is one realization per system. Seeds are not pooled, and no between-seed variance is estimated.
 3. **Allocation below 2 LT on Lorenz-63 and Chua is mostly unreadable** (the n_eff guard). No claim is made there.
 4. **Chua gate risk** (§6). Two of the nine development GPU runs failed V1 on Chua, and both are diagnosed as artifacts of the check.
-5. **Determinism, not independent reproduction.** The regeneration uses the same host and device, and possibly the same actor (O-J1).
+5. **Determinism, not independent reproduction.** The regeneration uses the same host and device, and the same actor (waiver, seq 52).
 6. **The pinned time unit** is the value of 8 of 9 development GPU runs. The ninth differed by one ulp in Chua's λ_max.
 7. **The analysis instruments** (HGB allocation fits, quantile boosting, the reading table) are analysis instruments, not rules of the v3 design (LPC.PC.1 exception).
 8. **The phase J code was not reviewed by the owner.** Agents built and tested it.
