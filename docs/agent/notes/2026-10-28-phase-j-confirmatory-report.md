@@ -71,8 +71,8 @@ Reports: `runs/confirmatory/phasej-CONF-n-regen-compare.txt` (one per seed) and 
 
 ## 4. Defects found in this round
 
-- **DEF-0034** (command form; workaround recorded in ledger seq 66). Resolution pending the owner.
-- **DEF-0035** (GPU network training not reproducible on CONF-9). It does not affect any verdict, reading or v3 word. It widens §8 item 7, which named only the state estimator's ν̂. Resolution pending the owner.
+- **DEF-0034** (command form; workaround recorded in ledger seq 66). Accepted by the owner (ledger seq 67): a departure in the form of the command only.
+- **DEF-0035** (GPU network training not reproducible on CONF-9). It does not affect any verdict, reading or v3 word. It widens §8 item 7, which named only the state estimator's ν̂. Accepted by the owner as a limitation of the round (ledger seq 68); the cause is not fixed.
 
 ## 5. Secondary description: v3 words of the sealed runs (§7a)
 
@@ -199,4 +199,4 @@ f9e3f1427234db3eef483648bfe9a83501843f6d7305acb7652178653990f46d  phasej-regen-c
 ## 9. What remains (WU-0058)
 
 - Auditor pass on this report (plan criterion: zero blockers).
-- Owner: rulings on DEF-0034 and DEF-0035, and promotion of the round (copy of the records into `promoted/`, as for CONF-1).
+- Owner: promotion of the round (copy of the records into `promoted/`, as for CONF-1). DEF-0034 and DEF-0035 are ruled (ledger seq 67, 68).
