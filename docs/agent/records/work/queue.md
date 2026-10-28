@@ -272,3 +272,4 @@ Phase I P3 to P6 (WU-0040 to WU-0043) are paused behind phase J (DV-1). Plan and
   - Regeneration (§5): 0 of 48 claim rows differ; v3 words identical. Leaves: CONF-7 bitwise; CONF-5, 6, 8 the DEF-0033 pattern; CONF-9 network weights differ (DEF-0035, opened).
   - Remaining for WU-0058: auditor pass; owner rulings on DEF-0034 and DEF-0035; promotion.
 - 2026-10-28 (later), claude-opus-5-5 (main session): owner rulings seq 67 (DEF-0034 accepted, command form only) and seq 68 (DEF-0035 accepted as a limitation). WU-0058 remaining: audit of the report (owner runs `/audit`), then promotion.
+- 2026-10-28 (later), claude-opus-5-5 (main session): audit of the phase J confirmatory report (owner's command): zero blockers, 1 major, 9 minor (`docs/agent/records/audits/2026-10-28-phase-j-confirmatory.md`). M1 fixed (every differing leaf now listed, `docs/agent/records/phase-j-regen/`); minors addressed in the report. Next: promotion (owner).

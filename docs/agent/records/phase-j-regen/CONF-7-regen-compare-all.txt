@@ -1,0 +1,51 @@
+DEVELOPMENT: comparison of two runs, not a hypothesis test
+NOTE: tolerance and verdict-comparison code, rules ratified by the owner (DEC-0030 OF-5 and OF-7, DEC-0032 B9); CSQ2 use in WU-0016
+REF: phasej-CONF-7/phasej/results.json
+NEW: phasej-CONF-7-regen/phasej/results.json
+tier: T0
+  evidence chua/state_mean_digest: equal
+  evidence chua/lambda_max: equal
+  evidence chua/interval: equal
+  evidence chua/start_state/main: equal
+  evidence chua/start_state/estimator: equal
+  evidence chua/main_digest: equal
+  evidence chua/estimator_digest: equal
+  evidence chua/cov_digest: equal
+  evidence chua/whiten_digest: equal
+  evidence chua/unwhiten_digest: equal
+  evidence chua/allocator_digest: equal
+  evidence chua/validation_weights: equal
+  evidence lorenz63/state_mean_digest: equal
+  evidence lorenz63/lambda_max: equal
+  evidence lorenz63/interval: equal
+  evidence lorenz63/start_state/main: equal
+  evidence lorenz63/start_state/estimator: equal
+  evidence lorenz63/main_digest: equal
+  evidence lorenz63/estimator_digest: equal
+  evidence lorenz63/cov_digest: equal
+  evidence lorenz63/whiten_digest: equal
+  evidence lorenz63/unwhiten_digest: equal
+  evidence lorenz63/allocator_digest: equal
+  evidence lorenz63/validation_weights: equal
+  evidence rossler/state_mean_digest: equal
+  evidence rossler/lambda_max: equal
+  evidence rossler/interval: equal
+  evidence rossler/start_state/main: equal
+  evidence rossler/start_state/estimator: equal
+  evidence rossler/main_digest: equal
+  evidence rossler/estimator_digest: equal
+  evidence rossler/cov_digest: equal
+  evidence rossler/whiten_digest: equal
+  evidence rossler/unwhiten_digest: equal
+  evidence rossler/allocator_digest: equal
+  evidence rossler/validation_weights: equal
+  evidence (top level)/estimators/*/weights_digest: equal
+leaves: REF 20806, NEW 20806, union 20806, common 20806, equal 20806, different 0, one-sided 0
+excluded (ref): provenance 152 leaves, timing 28 leaves
+excluded (new): provenance 152 leaves, timing 28 leaves
+chain tags of the float leaves (config included; untagged leaves are NOT COMPUTABLE, exit 2): REF: compare_pilot table 7899, tightened 3, override 3817, untagged 0; NEW: compare_pilot table 7899, tightened 3, override 3817, untagged 0
+differences by rule (every FAIL, FINDING and DEF is listed; a pass group lists its first 20, all with --all):
+10x rule (ROADMAP; classes per note M2):
+  class (a): 0 leaves, max rel 0 -> declared bitwise on the same device type
+  class (b) to (g): 0 leaves, max rel 0 -> declared bitwise on the same device type
+RESULT: PASS (exit 0)

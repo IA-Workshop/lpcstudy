@@ -5,9 +5,9 @@
 ## 1. What was run
 
 - **Runs (pre-registration §5).** The owner ran `run_sealed.sh` (ledger seq 59) in the worktree `lpcstudy-wt/run/conf-j`, detached at `freeze-j` and clean. Ten GPU runs, one at a time under the GPU lock: the five official runs `runs/confirmatory/phasej-CONF-n`, then the five regenerations `phasej-CONF-n-regen`. All ten exited 0. Each run's `lyapunov.json` cache still had the pinned hash (852ce1f6…7453417) at the end. Log: `runs/confirmatory/phasej-runs.log`.
-- **Gate (§6).** V1 to V7 passed for all three systems on all five seeds, so no rows are absent.
+- **Gate (§6).** The validation gate (V1, V2 and V4 to V7; V3 is reported only) passed for all three systems on all five seeds, so no rows are absent.
 - **Analysis (§7).** The owner ran `run_sealed_analysis.sh` (develop 48dd3e6, ledger seq 66) on the CPU at `freeze-j`. For each of the ten runs it ran `tools/lpc_contrib.py --sealed`, then `tools/lpc_contrib_ce.py --sealed --abd`. Then it ran `tools/lpc_confirm.py` once on the five official analyses (`runs/confirmatory/phasej-confirm`) and once on the five regeneration analyses (`phasej-confirm-regen`). All 20 analysis steps and both `lpc_confirm` runs exited 0 (`runs/confirmatory/phasej-analysis.log`). `confirm.json` records analysis commit c19ad486…, dirty False.
-- **Departure, in the form of the command only (DEF-0034, ledger seq 66).** The two analysis tools refuse any argument containing the word "confirmatory". So they ran with `runs/confirmatory` as the working directory and paths relative to it, rather than with the literal paths of §7. The code, inputs and order are those of §7. On development run DEV-6 (Rössler), the working directory did not change the result.
+- **Departure, in the form of the command only (DEF-0034, ledger seq 66).** The two analysis tools refuse any argument containing the word "confirmatory". So they ran with `runs/confirmatory` as the working directory and paths relative to it, rather than with the literal paths of §7. The code, inputs and order are those of §7. On development run DEV-6 (Rössler), the working directory did not change the result (`docs/agent/records/phase-j-regen/def0034-cwd-check.md`).
 
 ## 2. Verdicts
 
@@ -45,7 +45,7 @@ The per-seed reading of every row is in `runs/confirmatory/phasej-confirm/confir
 | CONF-8 | 0.778 | [0.642, 0.905] | lowers |
 | CONF-9 | 0.836 | [0.724, 0.975] | lowers |
 
-Three seeds imply the claim and four are needed. On CONF-7 the interval lies below 1, but the pre-registered guard (effective sample size under 50) makes the reading undetermined. The guard is part of the reading table and was applied as frozen. Under §9, "not confirmed" does not mean that X fails to lower the MSE.
+Three seeds imply the claim and four are needed. On CONF-7 the interval lies below 1, but the pre-registered guard (effective sample size under 50) makes the reading undetermined. The guard is part of the reading table and was applied as frozen. `contrib.json` stores only the reason string "n_eff < 50", not the guarded size. That size is the Kish effective size of the full deployable rule's substituted excess (`contribution.py`), not `n_eff_kappa`, which is 187.6 and 203.2 on these two seeds. Under §9, "not confirmed" does not mean that X fails to lower the MSE.
 
 ## 3. Regeneration comparison (§5)
 
@@ -55,7 +55,7 @@ No verdict depends on the regeneration. The verdicts above are those of the offi
 
 **Leaves (`tools/compare_runs.py`, official as reference).**
 
-| seed | tier | results.json leaves differing | largest class (a) change (relative) | integer leaves differing | dump arrays differing (of 355 per system: L63 / Rö / Chua) |
+| seed | tier | results.json leaves differing | largest class (a) metric (see below) | integer leaves differing | dump arrays differing (of 355 per system: L63 / Rö / Chua) |
 |---|---|---|---|---|---|
 | CONF-5 | T0 | 489 of 20,798 | 3.9e-3, Chua deployable Shapley O interval bound | 3: analog-proxy nfev (Chua 9 → 10, Rössler 20 → 15), status (Rössler 3 → 2) | 8 / 8 / 10 |
 | CONF-6 | T0 | 97 of 20,806 | 0.219, Chua deployable w=0 leave-one-out R interval bound | 2: Chua Q-N predictions outside [0, 1] (79 → 71, 71 → 70) | 7 / 7 / 9 |
@@ -63,16 +63,22 @@ No verdict depends on the regeneration. The verdicts above are those of the offi
 | CONF-8 | T0 | 440 of 20,838 | 0.129, Chua Q-N deployable logit interval bound | 4: analog-proxy nfev (Chua 20 → 21, Rössler 26 → 15), status (Lorenz-63 A4 refit 1 → 2, Rössler estimation proxy 4 → 3) | 8 / 8 / 12 |
 | CONF-9 | T3 | 3800 of 20,822 | 6.3e-4, Chua H2d interval bound | 6: `gain_bound/n_screened_out/negative_covariance`, twice each (Chua 935 → 936, Lorenz-63 946 → 955, Rössler 1274 → 1275) | 183 / 183 / 183 |
 
+- **The metric** in the fourth column is `compare_runs`' class (a) measure, the change divided by the larger absolute endpoint of the reference interval. It is not the relative change of the named bound: on CONF-5, for example, the named upper bound moved from 0.000310 to 0.000396 (28%) for a metric of 0.0039.
 - **CONF-5, CONF-6, CONF-8: the DEF-0033 pattern.** The differing arrays are those downstream of the seed-proxy fit: the deployable profile, A4's weights and MSE, and the Q-N test inputs. The orbits, the oracle quantities and the trained networks are equal. The largest relative changes are on small ΔR² interval bounds in Chua's deployable analyses: on CONF-6, the w = 0 leave-one-out R upper bound moved from 0.0255 to 0.0310 (0.219 relative); on CONF-8, the Q-N logit lower bound moved from −0.0191 to −0.0216 (0.129). No claim row's reading changed.
-- **CONF-9: a new, wider mechanism (DEF-0035).** The state-estimator network trained to different weights: the weight digests differ in all three systems, so the tier is T3. The orbits, the analog errors and the oracle seeds are still equal (`core/E_C`, `core/nu`, `core/eps_s`, `core/oracle_state`). Everything that depends on the trained estimator differs, by at most 6.3e-4 relative on a quantity of interest. No claim row and no v3 word changed.
+- **CONF-9: a new, wider mechanism (DEF-0035).** The state-estimator network trained to different weights: the weight digests differ in all three systems, so the tier is T3. The orbits, the analog errors and the oracle seeds are still equal (`core/E_C`, `core/nu`, `core/eps_s`, `core/oracle_state`). Everything that depends on the trained estimator differs, by a class (a) metric of at most 6.3e-4. No claim row and no v3 word changed.
 - **CONF-7** is bitwise.
 
-Reports: `runs/confirmatory/phasej-CONF-n-regen-compare.txt` (one per seed) and `runs/confirmatory/phasej-regen-compare.txt` (every differing dump array, then the row comparison), written by `docs/agent/notes/2026-10-28-phase-j-confirmatory-report.regen_cmp.py`.
+Reports (§5 asks for every differing leaf and array):
+- **Every differing leaf:** `docs/agent/records/phase-j-regen/CONF-n-regen-compare-all.txt`, written by `tools/compare_runs.py --all` at `freeze-j`.
+- **Group summaries:** `runs/confirmatory/phasej-CONF-n-regen-compare.txt`, from the same tool with `--show 0`.
+- **Every differing dump array, then the row comparison:** `docs/agent/records/phase-j-regen/regen-arrays-and-rows.txt`, a copy of `runs/confirmatory/phasej-regen-compare.txt`, written by `docs/agent/notes/2026-10-28-phase-j-confirmatory-report.regen_cmp.py`.
+
+The header line "DEVELOPMENT: comparison of two runs, not a hypothesis test" in these reports is the tool's fixed label. The runs compared are the sealed runs.
 
 ## 4. Defects found in this round
 
 - **DEF-0034** (command form; workaround recorded in ledger seq 66). Accepted by the owner (ledger seq 67): a departure in the form of the command only.
-- **DEF-0035** (GPU network training not reproducible on CONF-9). It does not affect any verdict, reading or v3 word. It widens §8 item 7, which named only the state estimator's ν̂. Accepted by the owner as a limitation of the round (ledger seq 68); the cause is not fixed.
+- **DEF-0035** (GPU network training not reproducible on CONF-9). It does not affect any verdict, reading or v3 word. It widens §8 item 7 (the first of the two items numbered 7 in the frozen text, "GPU runs are not bitwise reproducible"), which named only the state estimator's ν̂. Accepted by the owner as a limitation of the round (ledger seq 68); the cause is not fixed.
 
 ## 5. Secondary description: v3 words of the sealed runs (§7a)
 
@@ -131,7 +137,7 @@ The words come from `runs/confirmatory/phasej-confirm/v3.json`. The CONF-1 colum
 | H3c | rossler | pass | pass | pass | pass | pass | pass 5 | pass |
 | H3c | chua | inconclusive | pass | pass | pass | pass | inconclusive 1, pass 4 | inconclusive |
 
-No combined word, no "confirmed" and no pooled statistic is computed. Under departure 1, a word that is "inconclusive" on CONF-1 and "pass" or "fail" here is expected from the narrower intervals alone.
+No combined word, no "confirmed" and no pooled statistic is computed. Under departure 1, a word that is "inconclusive" on CONF-1 and "pass" or "fail" here can arise from the narrower intervals. The seeds and the device also differ, so no single cause is assigned.
 
 ## 6. Limitations (pre-registration §8, attached)
 
@@ -141,7 +147,7 @@ No combined word, no "confirmed" and no pooled statistic is computed. Under depa
 4. Chua gate risk: no gate failure occurred in this round.
 5. Repetition, not independent reproduction: the regeneration used the same host, device and actor (waiver, seq 52).
 6. The time unit was pinned to the value of 8 of 9 development GPU runs.
-7. GPU runs are not bitwise reproducible (DEF-0033). **This round adds DEF-0035:** on CONF-9 the network training itself differed between the two runs. Neither changed a claim row.
+7. GPU runs are not bitwise reproducible (DEF-0033; the first of the two items numbered 7 in the frozen §8). **This round adds DEF-0035:** on CONF-9 the network training itself differed between the two runs. Neither changed a claim row.
 8. The analysis instruments (HGB allocation fits, quantile boosting, the reading table) are analysis instruments, not rules of the v3 design.
 9. The phase J code was not reviewed by the owner; agents built and tested it.
 10. The analysis command took a different form from §7's literal text (DEF-0034, §1).
@@ -194,9 +200,20 @@ d481196146147d6afa960dd9e2b29bc5ba2ed9dd38ea205d62f8502f7a5dbf15  phasej-CONF-6-
 680c7356fdeef7d97e3b24d48c07372e6ffb49c8b62f4df5d50976a75ebd0919  phasej-CONF-8-regen-compare.txt
 7213d4f72c87e6baad579c37997066c919da95c54286cd649703494b2f705d16  phasej-CONF-9-regen-compare.txt
 f9e3f1427234db3eef483648bfe9a83501843f6d7305acb7652178653990f46d  phasej-regen-compare.txt
+ed6d69d08aef9e74d2a328da54f94ca0f0bf27ac0ba941aad45ad2b39975fe96  docs/agent/records/phase-j-regen/CONF-5-regen-compare-all.txt
+280dbd8b09eb8686492f599d9554220611c261e8c3faf1395a15f619ac30f3a0  docs/agent/records/phase-j-regen/CONF-6-regen-compare-all.txt
+ecb66f0d1a1d58494ad98a2e6133206fe97e67bc38ac8c36ff9363ab33794f3d  docs/agent/records/phase-j-regen/CONF-7-regen-compare-all.txt
+fd1bbc3177615b358d10b679b0dca73caca13f4a87700e57509f0215de6f60e0  docs/agent/records/phase-j-regen/CONF-8-regen-compare-all.txt
+e462dc9b284cd66b756ae1c38fbf12d400ffb33d44dac9644bca2666e34c08a0  docs/agent/records/phase-j-regen/CONF-9-regen-compare-all.txt
 ```
+
+The last five paths are relative to the develop worktree.
+
+**Provenance notes (audit m9).**
+- Tag `freeze-j` (07:56:59Z) is later than the seed commitments (07:54:52Z), because its tree contains the ledger commit that holds them. Its code and documents equal 63ba689, except `run_sealed.sh` (45f64a8, committed before the commitments).
+- The frozen pre-registration's header still reads "DRAFT". It is the file approved by hash in ledger seq 58.
 
 ## 9. What remains (WU-0058)
 
-- Auditor pass on this report (plan criterion: zero blockers).
+- Auditor pass: done, zero blockers (`docs/agent/records/audits/2026-10-28-phase-j-confirmatory.md`). Its major finding (M1, every differing leaf) and minors m1 to m9 are addressed above; m7 was fixed in the script.
 - Owner: promotion of the round (copy of the records into `promoted/`, as for CONF-1). DEF-0034 and DEF-0035 are ruled (ledger seq 67, 68).

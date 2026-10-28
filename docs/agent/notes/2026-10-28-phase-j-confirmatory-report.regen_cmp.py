@@ -25,7 +25,7 @@ for n in range(5, 10):
                 differ.append((k, f"{ne} of {x.size}", None))
         heads = Counter(k.split("/")[0] for k, *_ in differ)
         print(f"CONF-{n} {system}: {len(keys)} arrays, {len(differ)} differ; by group {dict(heads)}")
-        for k, what, _ in differ[:400]:
+        for k, what, _ in differ:
             print(f"    {k}: {what}")
 
 off = json.loads((B / "phasej-confirm/confirm.json").read_text())

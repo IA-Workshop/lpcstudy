@@ -1,0 +1,160 @@
+DEVELOPMENT: comparison of two runs, not a hypothesis test
+NOTE: tolerance and verdict-comparison code, rules ratified by the owner (DEC-0030 OF-5 and OF-7, DEC-0032 B9); CSQ2 use in WU-0016
+REF: phasej-CONF-6/phasej/results.json
+NEW: phasej-CONF-6-regen/phasej/results.json
+tier: T0
+  evidence chua/state_mean_digest: equal
+  evidence chua/lambda_max: equal
+  evidence chua/interval: equal
+  evidence chua/start_state/main: equal
+  evidence chua/start_state/estimator: equal
+  evidence chua/main_digest: equal
+  evidence chua/estimator_digest: equal
+  evidence chua/cov_digest: equal
+  evidence chua/whiten_digest: equal
+  evidence chua/unwhiten_digest: equal
+  evidence chua/allocator_digest: equal
+  evidence chua/validation_weights: equal
+  evidence lorenz63/state_mean_digest: equal
+  evidence lorenz63/lambda_max: equal
+  evidence lorenz63/interval: equal
+  evidence lorenz63/start_state/main: equal
+  evidence lorenz63/start_state/estimator: equal
+  evidence lorenz63/main_digest: equal
+  evidence lorenz63/estimator_digest: equal
+  evidence lorenz63/cov_digest: equal
+  evidence lorenz63/whiten_digest: equal
+  evidence lorenz63/unwhiten_digest: equal
+  evidence lorenz63/allocator_digest: equal
+  evidence lorenz63/validation_weights: equal
+  evidence rossler/state_mean_digest: equal
+  evidence rossler/lambda_max: equal
+  evidence rossler/interval: equal
+  evidence rossler/start_state/main: equal
+  evidence rossler/start_state/estimator: equal
+  evidence rossler/main_digest: equal
+  evidence rossler/estimator_digest: equal
+  evidence rossler/cov_digest: equal
+  evidence rossler/whiten_digest: equal
+  evidence rossler/unwhiten_digest: equal
+  evidence rossler/allocator_digest: equal
+  evidence rossler/validation_weights: equal
+  evidence (top level)/estimators/*/weights_digest: equal
+leaves: REF 20806, NEW 20806, union 20806, common 20806, equal 20709, different 97, one-sided 0
+excluded (ref): provenance 152 leaves, timing 28 leaves
+excluded (new): provenance 152 leaves, timing 28 leaves
+chain tags of the float leaves (config included; untagged leaves are NOT COMPUTABLE, exit 2): REF: compare_pilot table 7899, tightened 3, override 3817, untagged 0; NEW: compare_pilot table 7899, tightened 3, override 3817, untagged 0
+  override systems/*/H1d/rows/estimation_seed/interval/[]: chain network, 2 differing leaves; reason: analysis.py:h1d_proxies: the proxies come from allocation.py:ProfileProxies.fit on the estimated nu and the model growth at the estimated state (ensemble.py:evaluation_draws est_nu, growth_proxy)
+  override systems/*/Q-N/deployable/w_zero_indicator/ci/[]: chain network, 2 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/deployable/w_zero_indicator/delta_r2: chain network, 1 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/deployable/w_zero_indicator/r2_four: chain network, 1 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/Q-N/deployable/w_zero_indicator/r2_three: chain network, 1 differing leaves; reason: analysis.py:qn_profile_block: the targets are w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator), also for the oracle profile
+  override systems/*/ablation/A4_coefficients/coefficients/**: chain network, 1 differing leaves; reason: ablation.py:ablation_block (WU-0039b): A4 variants from allocation.py:ProfileProxies (fitted on the estimated nu) scored by pipeline.py:score_rules on the PLP errors; the Q-N targets and the A5 refits read w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/ablation/A4_coefficients/variants/**: chain network, 14 differing leaves; reason: ablation.py:ablation_block (WU-0039b): A4 variants from allocation.py:ProfileProxies (fitted on the estimated nu) scored by pipeline.py:score_rules on the PLP errors; the Q-N targets and the A5 refits read w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+  override systems/*/ablation/profile_conditions/deployable/**: chain network, 58 differing leaves; reason: ablation.py:ablation_block (WU-0039b): A4 variants from allocation.py:ProfileProxies (fitted on the estimated nu) scored by pipeline.py:score_rules on the PLP errors; the Q-N targets and the A5 refits read w* = oracle.py:oracle_weight reads the PLP moments sq_plp and cross (ensemble.py:ensemble_moments: the PLP forecast runs StateEstimator.estimate_counted from the trained psi, networks.py:train_estimator)
+differences by rule (every FAIL, FINDING and DEF is listed; a pass group lists its first 20, all with --all):
+  [measured] T0 non-CPU: measured (10x rule) (class a): 51 leaves, max metric 0.219 at systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/ci/[1]
+      systems/chua/H1d/rows/estimation_seed/interval/[0]: 0.947 -> 0.947 rel 5.22e-08 (same device type)
+      systems/chua/H1d/rows/estimation_seed/interval/[1]: 0.969 -> 0.969 rel 3.87e-07 (same device type)
+      systems/chua/H1d/rows/estimation_seed/spearman: 0.959 -> 0.959 rel 9.48e-08 (same device type)
+      systems/chua/H2c/A4_minus_A1/ci/[1]: -6.93e-05 -> -6.93e-05 rel 1.54e-17 (same device type)
+      systems/chua/H2c/A4_minus_A2/ci/[0]: -0.000785 -> -0.000785 rel 1.38e-16 (same device type)
+      systems/chua/H2c/A4_minus_A2/mean: -0.000197 -> -0.000197 rel 1.04e-16 (same device type)
+      systems/chua/Q-N/deployable/w_zero_indicator/ci/[0]: 0.0378 -> 0.0442 rel 0.0815 (same device type)
+      systems/chua/Q-N/deployable/w_zero_indicator/ci/[1]: 0.0787 -> 0.0838 rel 0.0654 (same device type)
+      systems/chua/Q-N/deployable/w_zero_indicator/delta_r2: 0.0589 -> 0.0645 rel 0.0704 (same device type)
+      systems/chua/ablation/A4_coefficients/variants/zero/b/ci/[1]: 1 -> 1 rel 2.22e-16 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/leave_one_out/I/ci/[0]: 0.214 -> 0.214 rel 0.00208 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/leave_one_out/I/ci/[1]: 0.266 -> 0.266 rel 0.000506 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/leave_one_out/I/delta_r2: 0.24 -> 0.239 rel 0.0011 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/I/ci/[0]: 0.265 -> 0.265 rel 0.000245 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/I/ci/[1]: 0.312 -> 0.312 rel 0.000565 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/N/ci/[0]: -0.00765 -> -0.00783 rel 0.0184 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/N/ci/[1]: 0.00991 -> 0.00974 rel 0.0166 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/O/ci/[0]: 0.0948 -> 0.0949 rel 0.000476 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/O/ci/[1]: 0.129 -> 0.129 rel 0.00102 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/R/ci/[0]: -0.0123 -> -0.0122 rel 0.0084 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/R/ci/[1]: 0.00547 -> 0.00547 rel 0.000446 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/I/ci/[0]: 0.0115 -> 0.00889 rel 0.0619 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/I/ci/[1]: 0.0421 -> 0.039 rel 0.0756 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/I/delta_r2: 0.0266 -> 0.0236 rel 0.0719 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/N/ci/[0]: 0.0378 -> 0.0442 rel 0.0815 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/N/ci/[1]: 0.0787 -> 0.0838 rel 0.0654 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/N/delta_r2: 0.0589 -> 0.0645 rel 0.0704 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/O/ci/[0]: 0.004 -> 0.00847 rel 0.147 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/O/ci/[1]: 0.0305 -> 0.0336 rel 0.104 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/O/delta_r2: 0.017 -> 0.0205 rel 0.115 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/ci/[0]: 0.00144 -> 0.00579 rel 0.171 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/ci/[1]: 0.0255 -> 0.031 rel 0.219 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/delta_r2: 0.0138 -> 0.0185 rel 0.185 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/I/ci/[0]: -0.00643 -> -0.008 rel 0.0947 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/I/ci/[1]: 0.0166 -> 0.0153 rel 0.0755 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/N/ci/[0]: 0.0438 -> 0.0463 rel 0.0309 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/N/ci/[1]: 0.0818 -> 0.0836 rel 0.0215 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/O/ci/[0]: -0.0116 -> -0.0107 rel 0.0736 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/O/ci/[1]: 0.00826 -> 0.00917 rel 0.0786 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/R/ci/[0]: 0.00649 -> 0.00854 rel 0.0669 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/R/ci/[1]: 0.0307 -> 0.0328 rel 0.0695 (same device type)
+      systems/lorenz63/H2c/A4_minus_A2/ci/[0]: 0.00475 -> 0.00475 rel 7.24e-17 (same device type)
+      systems/lorenz63/H2d/ci/[0]: 0.263 -> 0.263 rel 3.36e-16 (same device type)
+      systems/lorenz63/ablation/A4_coefficients/variants/refit/a_prime/ci/[0]: 1 -> 1 rel 2e-13 (same device type)
+      systems/lorenz63/ablation/A4_coefficients/variants/refit/a_prime/ci/[1]: 1.06 -> 1.06 rel 1.46e-13 (same device type)
+      systems/rossler/H2c/A4_minus_A1/ci/[0]: -9.7e-06 -> -9.7e-06 rel 1.5e-16 (same device type)
+      systems/rossler/H2c/A4_minus_A1/ci/[1]: 3.39e-05 -> 3.39e-05 rel 2e-16 (same device type)
+      systems/rossler/H2c/A4_minus_A1/mean: 1.23e-05 -> 1.23e-05 rel 5e-17 (same device type)
+      systems/rossler/H2c/A4_minus_A2/ci/[0]: 7.63e-06 -> 7.63e-06 rel 7.92e-17 (same device type)
+      systems/rossler/H2c/A4_minus_A2/ci/[1]: 4.28e-05 -> 4.28e-05 rel 1.58e-16 (same device type)
+      systems/rossler/ablation/A4_coefficients/variants/refit/a_prime/ci/[0]: 0.982 -> 0.982 rel 1.08e-16 (same device type)
+  [measured] T0 non-CPU: measured (10x rule) (class f): 2 leaves, max metric 0.0781 at systems/chua/Q-N/deployable/w_zero_indicator/r2_three
+      systems/chua/Q-N/deployable/w_zero_indicator/r2_four: 0.085 -> 0.0885 rel 0.0412 (same device type)
+      systems/chua/Q-N/deployable/w_zero_indicator/r2_three: 0.0261 -> 0.024 rel 0.0781 (same device type)
+  [measured] T0 non-CPU: measured (10x rule) (class g): 42 leaves, max metric 15.5 at systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RO
+      systems/chua/H2c/A4_minus_A2/relative: -0.01 -> -0.01 rel 3.46e-16 (same device type)
+      systems/chua/ablation/A4_coefficients/coefficients/a/max_abs_weight_change: 1 -> 1 rel 1.11e-16 (same device type)
+      systems/chua/ablation/A4_coefficients/variants/refit/a_prime/ci_mc_se/[0]: 0.000943 -> 0.000943 rel 5.88e-14 (same device type)
+      systems/chua/ablation/A4_coefficients/variants/zero/a_prime/mean_weight: 0.00279 -> 0.00279 rel 1.55e-16 (same device type)
+      systems/chua/ablation/A4_coefficients/variants/zero/b_prime/mean_weight: 0.162 -> 0.162 rel 1.71e-16 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/leave_one_out/I/r2_without: 0.159 -> 0.16 rel 0.00183 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/O: 0.158 -> 0.158 rel 0.00409 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/ON: 0.154 -> 0.152 rel 0.0118 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RO: 0.145 -> 0.145 rel 0.000148 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/r2_by_subset/RON: 0.159 -> 0.16 rel 0.00183 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/I/share: 0.289 -> 0.289 rel 8.05e-05 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/N/share: 0.001 -> 0.000817 rel 0.183 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/O/share: 0.113 -> 0.113 rel 0.000316 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley/R/share: -0.00344 -> -0.00332 rel 0.036 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/log_horizon/shapley_sum: 0.399 -> 0.399 rel 1.39e-16 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/I/r2_without: 0.0584 -> 0.0649 rel 0.112 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/N/r2_without: 0.0261 -> 0.024 rel 0.0781 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/r2_without: 0.0712 -> 0.07 rel 0.017 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/O: -0.026 -> -0.0261 rel 0.00577 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/OI: -0.0309 -> -0.0346 rel 0.118 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/OIN: 0.0712 -> 0.07 rel 0.017 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/ON: 0.0492 -> 0.049 rel 0.00417 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RO: 7.34e-05 -> 0.00121 rel 15.5 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/ROI: 0.0261 -> 0.024 rel 0.0781 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/ROIN: 0.085 -> 0.0885 rel 0.0412 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RON: 0.0584 -> 0.0649 rel 0.112 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_full_minus_empty: 0.0854 -> 0.0889 rel 0.041 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/I/share: 0.00494 -> 0.00354 rel 0.283 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/N/share: 0.0634 -> 0.0655 rel 0.032 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/O/share: -0.00181 -> -0.000927 rel 0.488 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley/R/share: 0.0188 -> 0.0208 rel 0.105 (same device type)
+      systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/shapley_sum: 0.0854 -> 0.0889 rel 0.041 (same device type)
+      systems/chua/scores/A4/regret/0.5LT: 0.000731 -> 0.000731 rel 1.48e-16 (same device type)
+      systems/lorenz63/ablation/A4_coefficients/variants/refit/a_prime/ci_mc_se/[0]: 0.000988 -> 0.000988 rel 6.66e-11 (same device type)
+      systems/lorenz63/ablation/A4_coefficients/variants/refit/a_prime/ci_mc_se/[1]: 0.0014 -> 0.0014 rel 2.23e-11 (same device type)
+      systems/lorenz63/ablation/A4_coefficients/variants/refit/a_prime/mean_weight: 0.133 -> 0.133 rel 5.86e-15 (same device type)
+      systems/lorenz63/ablation/A4_coefficients/variants/refit/a_prime/mse_href: 0.0747 -> 0.0747 rel 1.53e-13 (same device type)
+      systems/lorenz63/ablation/A4_coefficients/variants/refit/a_prime/mse_ratio: 1.03 -> 1.03 rel 1.53e-13 (same device type)
+      systems/lorenz63/ablation/A4_coefficients/variants/zero/a_prime/mean_weight: 2.15e-11 -> 2.15e-11 rel 4.07e-15 (same device type)
+      systems/rossler/H2c/A4_minus_A1/relative: 0.0149 -> 0.0149 rel 1.17e-16 (same device type)
+      systems/rossler/ablation/A4_coefficients/variants/refit/b_prime/ci_mc_se/[1]: 1.1e-10 -> 1.1e-10 rel 1.01e-06 (same device type)
+      systems/rossler/scores/A4/regret/2LT: 0.00344 -> 0.00344 rel 2.52e-16 (same device type)
+  [FAIL] T0: bitwise (class int): 2 leaves
+      systems/chua/Q-N/deployable/w_zero_indicator/n_pred_outside_unit/four: 79 -> 71
+      systems/chua/Q-N/deployable/w_zero_indicator/n_pred_outside_unit/three: 71 -> 70
+10x rule (ROADMAP; classes per note M2):
+  class (a): 51 leaves, max rel 0.219 at systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/leave_one_out/R/ci/[1] -> declared 1e+01; O3 FINDING: above 1e-4
+  class (b) to (g): 44 leaves, max rel 15.5 at systems/chua/ablation/profile_conditions/deployable/w_zero_indicator/r2_by_subset/RO -> declared 1e+03; 38 leaves in the default class (g); O3 FINDING: above 1e-4
+RESULT: FAIL (exit 1): 2 leaf failures or findings; O3: a declared tolerance exceeds 1e-4
