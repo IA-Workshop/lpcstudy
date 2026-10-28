@@ -962,41 +962,91 @@ def test_k1_report_only_needs_the_stored_budget(
         assert sorted(p.name for p in path.parent.iterdir()) == ["results.json"]
 
 
-# WU-0003.7b: --states-dump.  Reference: the contract of the plan (B2 row .7b,
-# b6) and of the knob it copies (``--estimator-refine-steps``): opt-in, refused
-# with the sealed flag before the sealed seed is read, refused with --report-
-# only, one provenance leaf and nothing else when on. Exact (exit codes,
-# strings, dict equality); the study is faked.
+# WU-0003.7b: --states-dump.  Reference: the contract of the plan (B2 row .7b)
+# and the owner's ruling O6 (ledger seq 51, phase J DC-3, WU-0054): opt-in,
+# accepted with the sealed flag, refused with --report-only, one provenance
+# leaf and nothing else when on. Exact (exit codes, strings, dict equality);
+# the study is faked.
 DUMP_FLAG = "--states-dump"
 
 
 @pytest.mark.parametrize("order", ["flag-first", "flag-last"])
-def test_states_dump_with_the_sealed_flag_is_refused_before_the_sealed_seed(
+def test_states_dump_with_the_sealed_flag_is_accepted_and_writes_no_seed(
     order: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """O6 (DC-3): the sealed flag with the dump runs, in either order.
+
+    Reference: the ruling (a sealed run may write the dump) and the synthetic
+    seed literal with a throwaway ledger built by ``ledger_with``. The faked
+    run completes (``run_with_fakes`` asserts exit 0), the study is handed a
+    ``StateDump``, the one provenance leaf ``states_dump`` is set, git is read
+    before the seed, and the seed and salt appear in no save apart from the
+    fake's own ``seed_seen`` echo. Tolerance: none (exact).
+    """
+    monkeypatch.setenv("LPC_CONF_SEED", str(SEED))
+    monkeypatch.setenv("LPC_CONF_SALT", SALT)
+    created: list[_FakeStudy] = []
+    original = _FakeStudy.__init__
+    monkeypatch.setattr(_FakeStudy, "dump", None, raising=False)
+    monkeypatch.setattr(
+        _FakeStudy,
+        "__init__",
+        lambda self, config, out_dir: (
+            original(self, config, out_dir),
+            created.append(self),
+        )[0],
+    )
+    calls = spy_calls(monkeypatch)
+    argv = [FLAG, DUMP_FLAG] if order == "flag-first" else [DUMP_FLAG, FLAG]
+    saves = run_with_fakes(
+        ["--preset", "smoke", *argv],
+        tmp_path,
+        monkeypatch,
+        ledger_path=ledger_with(tmp_path / "l.jsonl", SEED),
+    )
+    root = provenance.ROOT
+    assert calls == [("git", root), "seed", "collect", ("git", root)]
+    assert isinstance(created[0].dump, StateDump)
+    last = saves[-1]
+    assert last["provenance"]["states_dump"] is True
+    assert last["provenance"]["seed_kind"] == "confirmatory"
+    assert last["config"]["seed"] is None and last["config"]["seed_id"] == "CONF-1"
+    text = (tmp_path / "out" / "smoke" / "results.json").read_text()
+    assert text.count(str(SEED)) == 1  # only the fake's own 'seed_seen' echo
+    del last["systems"]
+    assert str(SEED) not in json.dumps(last) and SALT not in text
+
+
+def test_states_dump_with_the_sealed_flag_on_a_dirty_tree_meets_the_tree_guard(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """b6: the sealed flag with the dump gives 64 in either order, one line,
-    nothing created.
+    """With the dump accepted, a sealed request on a dirty tree is refused by
+    the clean-tree guard (B8): exit 64, its exact line, the seed never read.
 
-    The ledger path does not exist and valid-looking variables are set: if the
-    sealed seed were read first, the refusal would be about the ledger; the line
-    must name the dump flag and say why, and the seed and salt must not appear
-    in it.
+    Reference: the hand-written ``DIRTY_LINE`` of the B8 tests below.
     """
     monkeypatch.setenv("LPC_CONF_SEED", str(SEED))
     monkeypatch.setenv("LPC_CONF_SALT", SALT)
-    argv = [FLAG, DUMP_FLAG] if order == "flag-first" else [DUMP_FLAG, FLAG]
+    calls = spy_calls(monkeypatch)
+    monkeypatch.setattr(
+        provenance,
+        "git_state",
+        lambda root: (calls.append(("git", root)), (CLEAN_COMMIT, True, None))[
+            1
+        ],
+    )
     out = tmp_path / "out"
     code = main(
-        [*argv, "--out", str(out)],
-        ledger_path=tmp_path / "missing_ledger.jsonl",
+        [FLAG, DUMP_FLAG, "--out", str(out)],
+        ledger_path=ledger_with(tmp_path / "l.jsonl", SEED),
     )
     err = capsys.readouterr().err
-    assert code == 64 and len(err.splitlines()) == 1 and err.startswith(PREFIX)
-    assert DUMP_FLAG in err and "confirmatory flag" in err
-    assert str(SEED) not in err and SALT not in err and not out.exists()
+    assert code == 64 and err == DIRTY_LINE + "\n"
+    assert calls == [("git", provenance.ROOT)] and not out.exists()
 
 
 def test_states_dump_with_report_only_is_refused(
@@ -1262,7 +1312,9 @@ def test_development_run_on_a_dirty_tree_is_unchanged(
     ("flags", "named"),
     [
         (["--estimator-refine-steps", "30"], "--estimator-refine-steps"),
-        (["--states-dump"], "--states-dump"),
+        # The --states-dump case left this list with the owner's ruling O6
+        # (DC-3, WU-0054): the dump is accepted with the sealed flag, and its
+        # dirty-tree case is tested above.
     ],
 )
 def test_existing_sealed_guards_still_come_first_on_a_dirty_tree(
@@ -1272,7 +1324,7 @@ def test_existing_sealed_guards_still_come_first_on_a_dirty_tree(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """A5: the knob and dump refusals keep their own line; git is not even read.
+    """A5: the knob refusal keeps its own line; git is not even read.
 
     Reference: the existing contract (their guards run before the seed guard).
     On a dirty tree the line must still name the flag and say "confirmatory

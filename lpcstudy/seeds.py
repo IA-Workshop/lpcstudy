@@ -6,9 +6,10 @@ makes a run repeatable. This module decides which master seed a run may use.
 * A development run names a registered seed by id (``DEV-0``, ``DEV-1``, ...).
   The ids and their values live in ``seeds/development_seeds.json``. A raw
   integer is never accepted from the command line.
-* A confirmatory run (the one final test of the hypotheses) takes its seed and
-  a secret "salt" from environment variables. The seed is accepted only if its
-  SHA-256 hash (a one-way fingerprint) matches the commitment that was
+* A confirmatory run (a final test of the hypotheses) names a sealed id
+  (``CONF-1``, ``CONF-2``, ...) and takes its seed and a secret "salt" from
+  environment variables. The seed is accepted only if its SHA-256 hash (a
+  one-way fingerprint) matches the latest commitment for that id that was
   recorded in the governance ledger before any data were seen. This proves the
   seed was fixed in advance without revealing it.
 
@@ -39,6 +40,7 @@ LEDGER_PATH = REPO_ROOT / "docs" / "agent" / "governance" / "ledger.jsonl"
 # carry the confirmatory seed and its salt.
 SEED_LIMIT = 2**64
 SEED_ID_PATTERN = re.compile(r"DEV-(0|[1-9][0-9]*)")
+SEALED_ID_PATTERN = re.compile(r"CONF-[1-9][0-9]*")
 SEED_VARIABLE = "LPC_CONF_SEED"
 SALT_VARIABLE = "LPC_CONF_SALT"
 
@@ -127,6 +129,17 @@ def load_registry(path: Path) -> dict[str, int]:
     return registry
 
 
+def _shown_id(seed_id: str) -> str:
+    """Return ``seed_id`` if it is safe to echo, else ``"<value>"``.
+
+    Only a short ``letters-digits`` token is echoed, so a raw integer seed
+    passed as an id never appears in a refusal.
+    """
+    if re.fullmatch(r"[A-Za-z]{1,8}-[0-9]{1,4}", seed_id):
+        return seed_id
+    return "<value>"
+
+
 def resolve_dev_seed(seed_id: str, registry: Mapping[str, int]) -> int:
     """Look up the master seed registered for a development id.
 
@@ -148,11 +161,7 @@ def resolve_dev_seed(seed_id: str, registry: Mapping[str, int]) -> int:
         If ``seed_id`` is not of the form ``DEV-n`` or is not in the registry.
     """
     if not SEED_ID_PATTERN.fullmatch(seed_id):
-        shown = (
-            seed_id
-            if re.fullmatch(r"[A-Za-z]{1,8}-[0-9]{1,4}", seed_id)
-            else "<value>"
-        )
+        shown = _shown_id(seed_id)
         raise SeedRefusal(
             f"seed id {shown} is not of the form DEV-n; a raw integer seed is "
             f"never accepted "
@@ -242,15 +251,27 @@ def check_commitment(
         )
 
 
-def confirmatory_seed(environ: Mapping[str, str], ledger_path: Path) -> int:
+def confirmatory_seed(
+    environ: Mapping[str, str],
+    ledger_path: Path,
+    seed_id: str = "CONF-1",
+) -> int:
     """Read the confirmatory seed and salt from the environment and verify them.
+
+    The id is checked first, before the environment is read: it must be of
+    the form ``CONF-n`` (n >= 1, no leading zero). The pair is then checked
+    against the latest ledger commitment for that id (``check_commitment``),
+    never against another id's.
 
     Parameters
     ----------
     environ : Mapping[str, str]
         The environment, holding ``LPC_CONF_SEED`` and ``LPC_CONF_SALT``.
     ledger_path : Path
-        The ledger file holding the ``CONF-1`` commitment.
+        The ledger file holding the commitment for ``seed_id``.
+    seed_id : str
+        The sealed id, ``CONF-n`` (default ``CONF-1``, the first sealed
+        seed).
 
     Returns
     -------
@@ -260,8 +281,14 @@ def confirmatory_seed(environ: Mapping[str, str], ledger_path: Path) -> int:
     Raises
     ------
     SeedRefusal
-        If a variable is missing or malformed, or the commitment check fails.
+        If the id is not ``CONF-n``, a variable is missing or malformed, or
+        the commitment check fails.
     """
+    if not SEALED_ID_PATTERN.fullmatch(seed_id):
+        raise SeedRefusal(
+            f"seed id {_shown_id(seed_id)} is not a sealed id of the form "
+            "CONF-n; the confirmatory flag accepts only CONF-n"
+        )
     missing = [
         name for name in (SEED_VARIABLE, SALT_VARIABLE) if not environ.get(name)
     ]
@@ -281,7 +308,7 @@ def confirmatory_seed(environ: Mapping[str, str], ledger_path: Path) -> int:
             f"{SALT_VARIABLE} must be a non-empty lowercase hexadecimal string"
         )
     seed = int(seed_text)
-    check_commitment(seed, salt_hex, ledger_path)
+    check_commitment(seed, salt_hex, ledger_path, seed_id)
     return seed
 
 
@@ -293,7 +320,7 @@ def with_seed(config: StudyConfig, seed_id: str, seed: int) -> StudyConfig:
     config : StudyConfig
         The preset to copy.
     seed_id : str
-        The seed id to record (``DEV-n`` or ``CONF-1``).
+        The seed id to record (``DEV-n`` or ``CONF-n``).
     seed : int
         The master seed.
 

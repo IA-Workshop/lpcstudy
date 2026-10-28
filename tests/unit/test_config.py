@@ -23,10 +23,12 @@ def test_every_preset_seed_pair_is_a_registry_entry() -> None:
     Reference: the test reads ``seeds/development_seeds.json`` with
     ``json.load`` (not with ``load_registry``), so the check does not depend on
     the code under test. Tolerance: none (exact integer and string equality).
+    The preset ``phasej`` (WU-0051a) is added by the owner's ruling in ledger
+    entry 49 ("Proceed as recommended").
     """
     with REGISTRY_PATH.open() as handle:
         registry = {e["id"]: e["value"] for e in json.load(handle)["seeds"]}
-    assert set(PRESETS) == {"full", "pilot", "smoke"}
+    assert set(PRESETS) == {"full", "phasej", "pilot", "smoke"}
     for name, preset in PRESETS.items():
         assert preset.seed_id == "DEV-0", name
         assert registry[preset.seed_id] == preset.seed == 20261005, name
@@ -99,3 +101,33 @@ def test_k_rule_candidates_cover_eight() -> None:
     assert [
         k for k in smoke.regime_counts if k <= smoke.regime_max_primary
     ] == [2, 3, 4]
+
+
+def test_phasej_differs_from_full_only_in_n_test() -> None:
+    """``phasej`` is ``full`` with ``n_test`` = 4000 and nothing else changed.
+
+    Every field of ``StudyConfig`` is compared, so a later edit that changes
+    another setting of ``phasej`` (or of ``full`` alone) fails here.
+
+    Reference: the WU-0051a plan, written out here: name ``phasej``, ``n_test``
+    4000, construction 2000, calibration 1000, test sweep 1000, and seed and
+    seed id as ``full``. ``FULL`` is the class defaults (``StudyConfig()``),
+    built here without the preset table. Tolerance: none (exact equality of
+    every field, floats and tuples included).
+    """
+    full, phasej = StudyConfig(), PRESETS["phasej"]
+    differing = {
+        f.name
+        for f in dataclasses.fields(StudyConfig)
+        if getattr(phasej, f.name) != getattr(full, f.name)
+    }
+    assert differing == {"name", "n_test"}
+    assert (phasej.name, phasej.n_test) == ("phasej", 4000)
+    assert (full.name, full.n_test) == ("full", 1000)
+    assert (
+        phasej.n_construction,
+        phasej.n_calibration,
+        phasej.n_test_sweep,
+    ) == (2000, 1000, 1000)
+    assert (phasej.seed, phasej.seed_id) == (20261005, "DEV-0")
+    assert PRESETS["full"] == full

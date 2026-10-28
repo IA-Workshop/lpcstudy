@@ -295,3 +295,45 @@ Status lines of 2026-10-18 (freeze records, WU-0004.9; they belong to the defect
 - DEF-0022, status line (2026-10-22, claude-sonnet-5-5, main session; owner ruling DEC-0041, ledger seq 32, quote "Accept, and propose new intervals to improve the quality of the results"; **supersedes** the status line of 2026-10-18 "open (tracked, not blocking)"): **power finding accepted as a known limitation (option 1 of `docs/agent/notes/2026-10-21-def0022-proposal.md`); closed for the promotion.** Reference corrected (db82ac5). The qualitative finding, that H2a(ii) can be refuted but essentially cannot pass, is anticipated in v3 section 7 (line 363); its projected margin ("within about 0.01 of zero") is not reproduced part by part at full size (the full-size report of WU-0003, lines 143-152), development evidence and not a result of the sealed run. It is carried as a known limitation in the promoted report (INTPR.10, LPC.PC.14) and in section 10 of the preliminary findings document. The sealed run (CONF-1, unpromoted) shows six non-pass H2a(ii) parts: two fail, four inconclusive. v3 is frozen and is not changed; no verdict, band or level changes. Proposals for better intervals are WU-0032 (post hoc, exploratory, development evidence only).
 - DEF-0001, status line (2026-10-22, claude-sonnet-5-5, main session; ledger seq 33, `waiver`, source "audit M1", quote "results were spot checked for agreement"; supplements the line of 2026-10-18 "open only for the owner's code review (checklist item 3)"): **the owner's code review is waived (ledger seq 33); DEF-0001 is not resolved by that waiver and stays open until the owner closes it.** The quote speaks of spot-checking results, not of reading the code. Code side unchanged: confirmed by the pre-freeze audit of 2026-10-18 (294 hits of the V4 pattern classified, none silent) and by the independent agent reviews of each unit. The promoted report states: "owner code review waived (ledger seq 33); results spot-checked by the owner; code covered by independent agent reviews".
 - DEF-0001, status line (2026-10-23, claude-sonnet-5-5, main session, recording the owner's approval "approve all" of 2026-10-23): **closed by the owner's waivers.** The owner's code review is waived for the promotion of CONF-1 (ledger seq 33) and for the extension verdict-reporting code (ledger seq 43). The code was covered by independent agent reviews; the owner spot-checked the results. The residues named in the status lines of 2026-10-18 and 2026-10-22 stay as known limitations in the findings document (section 10); this line closes the defect for the study, it does not state that the counters were found complete by an owner review.
+
+**DEF-0030: the docstring of `allocation.pooled_floor_count` states a per-state curvature floor, `c_i >= rho^2 / k > 0` "under P1(a)", that the data does not meet** (found by the applied-mathematician in WU-0045, phase J math spec)
+- **Blocking:** no.
+- **Affects:** documentation only. The function counts horizons whose pooled sum `sum_i c_i` is below `1e-300`. That test is correct, and no computed result, CONF-1 included, depends on the stated per-state bound.
+- **Description.** The bound needs a hypothesis the docstring does not state: the expectation must include the library noise. The smallest per-state curvature in the DEV-2 prototype data is 0.012 rho^2.
+- **Resolution:** known documentation defect, not fixed (owner, 2026-10-27, "Proceed with 2 and 3 as recommended"). `lpcstudy/` stays byte-identical to `freeze-1`, so `git diff --quiet freeze-1 -- lpcstudy/` keeps returning 0. Fix it if the pipeline is ever reopened.
+- 2026-10-27: opened and resolved as accepted (claude-opus-5-5, main session).
+- DEF-0030, correction (2026-10-27, claude-opus-5-5, main session; the entry above is not edited): the resolution's reason is wrong. `lpcstudy/` is no longer byte-identical to `freeze-1`. `git diff --stat freeze-1 main -- lpcstudy/` shows 3 files (the extension code), and on develop 16 files (the extension and phase J). Leaving the docstring unchanged therefore preserves no equality. The decision goes back to the owner, with the corrected recommendation: fix the docstring in the code change a confirmatory phase J round needs anyway. Until the owner decides, the status is open (documentation only, not blocking).
+
+**DEF-0031: V1 fails on Chua for about 5% of seeds because its central difference straddles a diode breakpoint** (found by the main session's diagnosis of the phase J held-out runs, `docs/agent/notes/2026-10-27-chua-v1-diagnosis.md`)
+- **Blocking:** no for development. In a sealed run a V1 failure is a gate failure, so the rule for handling one must be fixed before any seal.
+- **Description.**
+  - V1 compares the automatic delay-map Jacobian with a central difference at h = 1e-6 × scale on 10 test states.
+  - On Chua, about 0.5% of states (62 of 12,000, DEV-5, DEV-6 and DEV-9, CPU) lie within h of a breakpoint crossing of the numerical flow map. There the central difference averages two slopes, while one one-sided difference agrees with the automatic Jacobian to rounding error.
+  - Per seed this is a failure probability of about 5%.
+  - It explains the V1 failures of DEV-7 (7.05e-4) and DEV-8 (7.76e-4). Both are reproduced bitwise and show this signature.
+  - The Jacobian is correct.
+  - This sits beside DEF-0026 (V6, about 4.6% per seed on Chua).
+- **Resolution:** pending the owner. V1's bar and recipe are unchanged; any change is the owner's alone. The phase J confirmatory plan (DC-5) proposes how a gate failure on a sealed seed is handled.
+- 2026-10-27: opened (claude-opus-5-5, main session).
+
+**DEF-0032: on the GPU, Chua's Lyapunov exponent can differ by one unit in the last place between runs, which changes the whole orbit** (same note, finding 3)
+- **Blocking:** no for development. It bears on any plan that expects bitwise GPU regeneration (phase I decision 4; the phase J confirmatory DC-4).
+- **Description.**
+  - λ_max does not depend on the seed. It was 0.4408520035546001 in the DEV-7 `phasej` run and 0.4408520035546002 in eight other phase J GPU runs.
+  - The step interval follows from λ_max and changed in its last digit, so the chaotic orbit and every Chua test state of that run differ from a rerun.
+  - A GPU rebuild with the run's cached `lyapunov.json` reproduces it bitwise; one without the cache does not.
+  - Rate seen: 1 in 9 runs on Chua. Lorenz-63 and Rössler had the same λ_max in all 9 runs.
+- **Resolution:** pending the owner. Candidate measure, no code change: pre-populate each sealed run's cache with one pinned `lyapunov.json`, with its hash in the pre-registration. Not yet tested as a measure.
+- 2026-10-27: opened (claude-opus-5-5, main session).
+
+**DEF-0033: on the GPU, the state estimator's ν̂ can differ between runs on a few entries, which moves both seed-proxy fits and the deployable profile by about 1e-9** (WU-0055 rehearsal, `docs/agent/notes/2026-10-27-phase-j-rehearsal.md`)
+- **Blocking:** no for development. It blocks the WU-0055 criterion (a bitwise GPU regeneration with the pinned cache) and so DC-4 as written.
+- **Description.**
+  - A GPU rerun of DEV-5 at `phasej` with the pinned `lyapunov.json` built the same orbits, oracle seeds, growth proxy and noise sensitivity, bitwise.
+  - On 9 of 16,000 Lorenz-63 test entries, ν̂ at the estimated state differed. The proxy coefficients of all three systems changed by about 1e-9 relative, and on Chua and Rössler `least_squares` stopped at a different nfev and status.
+  - Downstream, results.json differs on 420 of 20,846 leaves (up to 1.6% relative on a Chua Shapley interval bound), and 16 Chua deployable readings flip. None is a pre-registered row.
+  - DEV-6 reran bitwise. The rate is not known.
+- **Resolution:** pending the owner (regeneration rule of the phase J confirmatory round). Candidates: accept a non-bitwise GPU regeneration and report the readings that differ; test XLA's deterministic-ops mode first; or use the CPU as the official device, as for CONF-1.
+- 2026-10-27: opened (claude-opus-5-5, main session).
+- 2026-10-27: resolution (owner, "choose recommendation A", ledger seq 54). Accepted for the phase J confirmatory round: the GPU stays the official device, the bitwise regeneration expectation is dropped, and the regeneration comparison reports every differing leaf and every claim row whose reading differs (pre-registration §5, §8 item 7). The cause is not fixed; status accepted (claude-opus-5-5, main session).
+- DEF-0031, note (2026-10-27, claude-opus-5-5, main session): the owner lifted the provisional label on Chua for DEV-7 and DEV-8 on the basis of this diagnosis (ledger seq 55, "Lift the provisional labels"; phase J report §10). V1's bar and recipe are unchanged, and a V1 failure on a sealed seed still makes that system's rows absent (DC-5). The resolution of the defect itself stays pending.

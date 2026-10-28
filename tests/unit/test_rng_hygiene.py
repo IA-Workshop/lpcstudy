@@ -75,6 +75,12 @@ PAIRINGS = {
         ("analysis.py", "h2b_knob_response"),
         ("clip_sensitivity.py", "h2b_library_part"),
     },
+    ("bootstrap", "Q-N"): {
+        ("analysis.py", "qn_noise_redundancy"),
+        ("ablation.py", "profile_ablation"),
+        ("contribution.py", "qn_cross_check"),
+    },  # WU-0039b: the profile ablation draws Q-N's resamples (drop-N is Q-N);
+    # WU-0048 test (g) recomputes those rows from the dump with the same draws
 }
 """Literal label tuples that two or more ``make_rng`` sites share on purpose.
 
@@ -83,7 +89,9 @@ the clip-sensitivity recomputation. That recomputation must draw the SAME
 resamples as the verdict it re-reads, otherwise its flags measure resampling
 noise. The pairings are: the H1b CP and PLP resamples; the three H2c
 differences; H2a(ii) with its Lambda_fin variant and its clip recomputation;
-H2b(i) and H2b(ii) with their clip recomputations.
+H2b(i) and H2b(ii) with their clip recomputations; and Q-N with the profile
+ablation of WU-0039b, whose drop-N row must reproduce Q-N bitwise and whose
+other rows share Q-N's resamples (pre-registration draft section 7.1).
 
 Every other pairing (H1c, Q-N, the directions across scales, the oracle pool,
 the estimator and allocator streams) shares by calling ONE site more than once,
@@ -126,7 +134,9 @@ SEED_CONSUMERS = frozenset(
         "_h3b_trees",
         "fit_regime_tree",
         "qn_regressor",
+        "make_estimator",  # WU-0048: the phase J learner, like qn_regressor
         "qn_profile_block",
+        "profile_ablation_block",
         "with_seed",
         "resolve_dev_seed",
         "int",
@@ -145,9 +155,15 @@ PASS_THROUGH = frozenset(
         ("analysis.py", "h2a_initial_segments"),
         ("analysis.py", "h2a_part_ii"),
         ("analysis.py", "qn_profile_block"),
+        ("ablation.py", "profile_ablation_block"),
+        ("contribution.py", "analyze_system"),
     }
 )
 """Functions whose ``seed``/``boot_seed`` parameter is forwarded.
+
+``contribution.analyze_system`` (WU-0048) forwards the master seed to its
+``Learner`` (which only calls ``sklearn_seed``) and to
+``bootstrap_generator`` (which only calls ``make_rng``).
 
 The parameter is a Generator (or the master seed of ``qn_regressor``); callers
 pass a ``make_rng(...)`` generator (checked below)."""
@@ -162,6 +178,7 @@ BOOTSTRAP_SEED_ARGUMENT = {
     "h2a_part_ii": (None, "seed"),
     "h2a_initial_segments": (None, "seed"),
     "qn_profile_block": (None, "boot_seed"),
+    "profile_ablation_block": (None, "boot_seed"),
 }
 """Position and keyword of the generator argument of the bootstrap helpers.
 

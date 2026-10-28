@@ -36,6 +36,22 @@ Development work on development seeds is internal (LPC.PC.5), and broad verifica
    - new hypotheses, systems or rules not in the v3 design.
 
    An agent that finds such work necessary records it as a note (SIMPL.3) and refers it.
+
+   **Scoped exception: the follow-on extension study** (amendment of 2026-10-25, owner ruling "proceed as recommended"). The extension systems S1 to S6 of ROADMAP.md phase H (`rossler_hyper`, `lorenz63_r166`, `rossler_z`, `hindmarsh_rose`, `hyper_jha`, and `lorenz96_4`, the four-variable Lorenz-96 system) are in scope for one pre-registered confirmatory follow-on study under ROADMAP.md phase I, with its own pre-registration, freeze and sealed seeds. Inside that study:
+   - the v3 hypotheses, criteria, bands, levels and rules apply unchanged, per system, with no overall verdict;
+   - the two ablation studies of phase I (the four profile conditions R, O, I and N, and the four coefficients a, b, a′ and b′ of A4) enter as pre-specified estimate rows, which carry no verdict;
+   - the Lorenz-96 exclusion above applies to every Lorenz-96 configuration other than `lorenz96_4`; transfer experiments, a misspecified-model arm and Lean formalization stay out of scope;
+   - the sealed CONF-1 result and its documents are not changed.
+
+   **Scoped exception: the LPC contribution study** (amendment of 2026-10-26, owner rulings "Proceed" and "I approve, proceed"). The analyses of ROADMAP.md phase J (`docs/agent/notes/2026-10-26-phase-j-lpc-contribution-plan.md`) are in scope on Lorenz-63, Rössler and Chua: the contribution of each profile condition R, O, I and N, their pairwise interactions, one profile informing both allocation and horizon, the incremental value over simpler and empirical predictors with oracle against deployable profiles, and explanatory analyses of H2a, H2e and H3c. Inside that study:
+   - it is development work on registered development seeds, with estimates and readings and no verdict, until a later pre-registered confirmatory round, which the owner intends to promote when confirmed and which needs its own pre-registration, freeze and sealed seeds;
+   - new allocation or horizon models fitted for these analyses are analysis instruments, not new rules of the v3 design;
+   - the extension systems, transfer experiments, a misspecified-model arm and Lean formalization stay out of scope;
+   - the sealed CONF-1 result and its documents are not changed, and no development number is set beside it;
+   - (amendment of 2026-10-27, owner ruling "proceed with B as recommended") the v3 hypothesis words that the sealed runs of its confirmatory round (CONF-5 to CONF-9) compute on Lorenz-63, Rössler and Chua may be reported as a pre-registered secondary description:
+     - per seed, with an agreement count across the five seeds;
+     - with the run's departures from v3 stated (n_test 4000, GPU device, robustness sweep skipped, pinned time unit);
+     - never as the v3 test, never combined into a verdict, and never changing, confirming or replacing the CONF-1 result.
 2. **LPC.PC.2 Roles** (PRIN.1, PRIME.1).
    - **The PI is the human owner** and performs every act PRIME.1 and GOV.50 reserve.
    - **The student is the study's primary author** and an actor on the project. The student reviews results and proposes interpretations. Promotion stays with the human owner.

@@ -58,6 +58,51 @@ RULE_LABELS: dict[str, str] = {
 }
 
 
+def log_scale_fit(
+    columns: list[np.ndarray], seed_sq: np.ndarray
+) -> tuple[np.ndarray, int, int]:
+    """Fit ``seed^2 ~ sum_j c_j columns[j]`` by robust log-scale least squares.
+
+    This is the fit of :class:`SeedProxy` (v3 section 5), for any number of
+    non-negative terms. The coefficients are ``c = exp(x)``, so they stay
+    positive; ``x`` minimizes the ``soft_l1`` loss of the residuals
+    ``ln(sum_j c_j columns[j]) - ln(seed^2)``, both sides divided by the median
+    of ``seed^2``. The start is the non-negative least squares solution,
+    floored at ``1e-6`` under its logarithm (a starting value, not data
+    handling). With the two columns of a proxy it is the long-standing fit
+    (same operations, so bitwise the same result); with one column it is the
+    refit of a proxy with one term removed (WU-0039b, ablation (a)).
+
+    A coefficient whose term the data do not support is driven towards 0,
+    which ``exp(x)`` reaches only in the limit, so it comes out as a small
+    positive number (1e-16 to 1e-7 in WU-0036), not as an exact 0.
+
+    Parameters
+    ----------
+    columns : list[np.ndarray]
+        Design columns, each of shape ``(n,)`` and positive.
+    seed_sq : np.ndarray
+        Oracle squared seed per state, shape ``(n,)``.
+
+    Returns
+    -------
+    tuple[np.ndarray, int, int]
+        The coefficients (shape ``(len(columns),)``), and the ``nfev`` and
+        ``status`` of the ``least_squares`` call.
+    """
+    scale = np.median(seed_sq)
+    design = np.column_stack(columns) / scale
+    coef, _ = nnls(design, seed_sq / scale)
+    start = np.log(np.maximum(coef, 1e-6))
+    log_seed = np.log(seed_sq / scale)
+
+    def residual(log_coef: np.ndarray) -> np.ndarray:
+        return np.log(design @ np.exp(log_coef) + 1e-300) - log_seed
+
+    sol = least_squares(residual, start, loss="soft_l1")
+    return np.exp(sol.x), int(sol.nfev), int(sol.status)
+
+
 @dataclass
 class SeedProxy:
     """A deployable estimate of a "seed" (an error source) from observables.
@@ -125,22 +170,14 @@ class SeedProxy:
         SeedProxy
             The fitted proxy.
         """
-        scale = np.median(seed_sq)
-        design = np.column_stack([feature_sq, floor_sq]) / scale
-        coef, _ = nnls(design, seed_sq / scale)
-        start = np.log(np.maximum(coef, 1e-6))
-        log_seed = np.log(seed_sq / scale)
-
-        def residual(log_coef: np.ndarray) -> np.ndarray:
-            return np.log(design @ np.exp(log_coef) + 1e-300) - log_seed
-
-        sol = least_squares(residual, start, loss="soft_l1")
-        slope, floor = np.exp(sol.x)
+        (slope, floor), nfev, status = log_scale_fit(
+            [feature_sq, floor_sq], seed_sq
+        )
         return cls(
             slope=float(slope),
             floor=float(floor),
-            nfev=int(sol.nfev),
-            status=int(sol.status),
+            nfev=nfev,
+            status=status,
         )
 
     def predict(
@@ -391,8 +428,12 @@ def pooled_floor_count(
     This applies to A2 (:func:`global_weight`, all states) and to the regime
     weights (:func:`regime_weight`, the given members). The denominator is
     ``sum_i c_i`` per horizon, the same expression those functions use.
-    Under P1(a) every ``c_i >= rho^2 / k > 0``, so a nonzero count is a
-    warning sign.
+    The pooled weight divides by that sum, so a sum below the floor would
+    leave the weight undefined at that horizon. No per-state lower bound on
+    ``c_i`` is claimed: a bound such as ``c_i >= rho^2 / k`` needs the
+    expectation to include the library noise, a hypothesis not established
+    here, and the smallest per-state curvature in the DEV-2 prototype data
+    is ``0.012 rho^2`` (DEF-0030). A nonzero count is a warning sign.
 
     Parameters
     ----------

@@ -288,6 +288,61 @@ def lorenz96_ring_field(
     )
 
 
+ESTIMATOR_STARTS: tuple[str, ...] = ("network", "pair", "continuation")
+"""Known starts of the state-estimator refinement (WU-0039).
+
+* ``network``: the network's estimate of the window-start state (the frozen
+  pipeline's only start).
+* ``pair``: the whitened window-start state of the estimator training pair
+  whose noise-free delay vector is nearest to the noisy input (F1).
+* ``continuation``: the network start refined on the ``m + 1`` oldest delay
+  coordinates, then one more coordinate per stage (F2).
+"""
+
+SINGLE_START: tuple[str, ...] = ("network",)
+"""The default: the network start only (the frozen pipeline)."""
+
+F1_STARTS: tuple[str, ...] = ("network", "pair")
+"""Fix F1 of the V7 diagnosis (note 2026-10-25, section 6): two starts."""
+
+F2_STARTS: tuple[str, ...] = ("network", "pair", "continuation")
+"""Fix F2 (off by default): F1 plus the window-continuation start."""
+
+
+def check_starts(starts: tuple[str, ...]) -> tuple[str, ...]:
+    """Check a tuple of estimator starts and return it.
+
+    Parameters
+    ----------
+    starts : tuple[str, ...]
+        Names from ``ESTIMATOR_STARTS``. The first must be ``"network"`` (it
+        wins ties), and no name may repeat.
+
+    Returns
+    -------
+    tuple[str, ...]
+        ``starts`` unchanged.
+
+    Raises
+    ------
+    ValueError
+        If ``starts`` is not a tuple, is empty, does not begin with
+        ``"network"``, repeats a name or holds an unknown name.
+    """
+    if not isinstance(starts, tuple) or not starts:
+        raise ValueError(f"starts must be a non-empty tuple, got {starts!r}")
+    unknown = [name for name in starts if name not in ESTIMATOR_STARTS]
+    if unknown:
+        raise ValueError(
+            f"unknown estimator starts {unknown}; known: {ESTIMATOR_STARTS}"
+        )
+    if starts[0] != "network":
+        raise ValueError(f"the first start must be 'network', got {starts!r}")
+    if len(set(starts)) != len(starts):
+        raise ValueError(f"estimator starts repeat a name: {starts!r}")
+    return starts
+
+
 @dataclass(frozen=True)
 class SystemSpec:
     """Static description of one dynamical system.
@@ -322,6 +377,15 @@ class SystemSpec:
         Lyapunov exponent (``data.lyapunov_record``). The default 100 000 is
         the value of the three frozen systems; an extension system may need a
         longer run for a standard error of about 1% (WU-0021).
+    estimator_starts : tuple[str, ...]
+        Starts of the Levenberg-Marquardt refinement of the state estimator
+        (``estimation.StateEstimator.starts``; WU-0039, fixes F1 and F2 of
+        the V7 diagnosis note 2026-10-25). The default ``("network",)`` is
+        the single network start of the frozen pipeline, and it compiles the
+        unchanged estimator. ``("network", "pair")`` is F1 and
+        ``("network", "pair", "continuation")`` is F2: the refinement runs
+        from each start and keeps the lowest final cost (ties go to the
+        network). Only the extension systems S2, S4, S5 and S6 set F1.
     """
 
     name: str
@@ -333,6 +397,11 @@ class SystemSpec:
     max_dt: float
     orbit_bound: float | None = None
     lyapunov_steps: int = 100_000
+    estimator_starts: tuple[str, ...] = ("network",)
+
+    def __post_init__(self) -> None:
+        """Refuse an invalid ``estimator_starts`` (see ``check_starts``)."""
+        check_starts(self.estimator_starts)
 
 
 SYSTEMS: dict[str, SystemSpec] = {
@@ -372,6 +441,8 @@ SYSTEMS: dict[str, SystemSpec] = {
     # re-specification of the review R1 (note 2026-10-20-math-extension-specs-2,
     # section 11): RK4 is stable only for h |x| < 2.785 and |x| reaches 304, so
     # max_dt 0.005 (stable to |x| = 563) and a bound of 460 (below that limit).
+    # WU-0039: S2, S4, S5 and S6 set estimator_starts to F1 (two-start LM, V7
+    # diagnosis note 2026-10-25); S1 and S3 keep the single network start.
     "rossler_hyper": SystemSpec(
         name="rossler_hyper",
         field_fn=rossler_hyper_field,
@@ -393,6 +464,7 @@ SYSTEMS: dict[str, SystemSpec] = {
         max_dt=0.002,
         orbit_bound=185.0,
         lyapunov_steps=4_000_000,
+        estimator_starts=F1_STARTS,
     ),
     "rossler_z": SystemSpec(
         name="rossler_z",
@@ -425,6 +497,7 @@ SYSTEMS: dict[str, SystemSpec] = {
         max_dt=0.0025,
         orbit_bound=5.0,
         lyapunov_steps=2_000_000,
+        estimator_starts=F1_STARTS,
     ),
     "hyper_jha": SystemSpec(
         name="hyper_jha",
@@ -436,6 +509,7 @@ SYSTEMS: dict[str, SystemSpec] = {
         max_dt=0.0025,
         orbit_bound=80.0,
         lyapunov_steps=2_000_000,
+        estimator_starts=F1_STARTS,
     ),
     "lorenz96_4": SystemSpec(
         name="lorenz96_4",
@@ -447,6 +521,7 @@ SYSTEMS: dict[str, SystemSpec] = {
         max_dt=0.005,
         orbit_bound=60.0,
         lyapunov_steps=1_000_000,
+        estimator_starts=F1_STARTS,
     ),
 }
 

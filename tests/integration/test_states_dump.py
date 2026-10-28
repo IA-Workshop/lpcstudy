@@ -10,7 +10,11 @@ process: once without and once with ``--states-dump``. Each run is a preset, so
 the file is run only when the preset slot is free. The numbering b1 to b7
 follows the plan (B2 row .7b). Check b1 (dump off against the .7a tip: 0
 changed, 0 removed, 0 added) needs a run of that older commit and is done by
-hand with ``tools/leafdiff.py``; it is in the unit Log.
+hand with ``tools/leafdiff.py``; it is in the unit Log. Both sides of such a
+hand leafdiff need the same environment, ``PJRT_NPROC`` and ``NPROC``
+included: ``tools/run_tests.sh`` sets them to 4, a plain shell leaves them
+unset, and the XLA thread pools change the A3 training and the leaves that
+depend on it (WU-0046b).
 
 * b2: the ``results.json`` files of the two runs are bitwise equal (floats
   compared by their IEEE bytes), except that the dump run's ``provenance`` block
@@ -52,6 +56,13 @@ hand with ``tools/leafdiff.py``; it is in the unit Log.
 * b5: the median of the per-state V4 half-widths at ``H_ref`` equals the V4
   leaf, bitwise.
 * b7: the file size is printed (the Log records it).
+* Schema /3 (WU-0046), ``test_schema3_*``: criterion (iv), the dumped
+  construction arrays are what the fit used, bitwise: A2 recomputed from the
+  dumped full-grid construction moments equals the dumped A2 weight, and A3
+  retrained from the dumped ``a3_train/`` arrays with the production generator
+  labels has the run's ``allocator_digest``. The oracle profile is recomputed
+  from the dumped ``eps_s``, ``delta``, ``Lambda_bar`` and ``N``; the test split
+  lines up with Q-N, ``core/`` and the sweep groups.
 """
 
 from __future__ import annotations
@@ -235,7 +246,7 @@ def test_b3_the_production_summaries_of_the_dumped_arrays_reproduce_their_leaves
     from lpcstudy.data import make_rng
     from lpcstudy.statistics import bootstrap_values
 
-    assert str(a["meta/schema"]) == "lpcstudy.states/2"
+    assert str(a["meta/schema"]) == "lpcstudy.states/3"
     for name in ("PLP", "CP"):
         block = h1c_ratio_block(
             a[f"h1c/{name}/ratio"][a[f"h1c/{name}/eligible"]],
@@ -391,3 +402,295 @@ def test_b7_the_dump_size_is_reported(runs) -> None:
         f"states dump size at smoke: {path.stat().st_size} bytes, {len(runs['arrays'])} arrays"
     )
     assert 0 < path.stat().st_size < 5_000_000
+
+
+def test_schema3_construction_moments_and_a3_arrays_are_what_the_fit_used(
+    runs,
+) -> None:
+    """Criterion (iv) of WU-0046: the dumped construction data are bitwise
+    what A2 and A3 were fitted on.
+
+    A3 trains on per-draw errors (the first ``K`` oracle draws at the
+    allocator grid), not on moments; the moments of the construction split are
+    what A2 (and the A5 targets) are fitted on. So (iv) is checked twice:
+
+    * A2: ``clip(sum(E_P - C) / max(sum(E_C + E_P - 2 C), 1e-300), 0, 1)``
+      over the dumped construction states at every allocator-grid horizon (the
+      pooled minimizer, written here) equals the dumped A2 weight of the test
+      draws at ``H_ref`` (one weight for all draws) and is the same number at
+      the grid columns of the full-grid copy as at the grid itself.
+    * A3: ``ErrorPredictor.fit`` on the dumped ``a3_train/`` arrays, the dumped
+      grid, the core noise, width 64, the preset's epochs and the production
+      generator ``make_rng(seed, system, D, "allocator")`` gives a network whose
+      ``weights_digest`` is the run's ``fitted/allocator_digest`` (SHA-256 of
+      the weights: any differing bit of the inputs would change it).
+
+    Tolerance: exact (the same operations on the same float64 arrays, CPU).
+    """
+    from lpcstudy.allocation import ErrorPredictor
+    from lpcstudy.config import SMOKE
+    from lpcstudy.data import make_rng
+
+    a, res = runs["arrays"], runs["results"]["on"]["systems"][SYSTEM]
+    grid = a["meta/allocator_grid"]
+    ref = int(a["meta/reference_horizon"])
+    assert ref in grid.tolist()
+    con = "split/construction"
+    e_c, e_p, cross = a[f"{con}/E_C"], a[f"{con}/E_P"], a[f"{con}/C"]
+    assert e_c.shape == (SMOKE.n_construction, SMOKE.horizon_max)
+    numerator = np.sum(e_p - cross, axis=0)
+    denominator = np.sum(e_c + e_p - 2.0 * cross, axis=0)
+    a2 = np.clip(numerator / np.maximum(denominator, 1e-300), 0.0, 1.0)
+    dumped = a["core/weight_href/A2"]
+    assert np.all(dumped == dumped.flat[0])
+    assert a2[ref - 1].tobytes() == dumped.flat[0].tobytes()
+    kept = {
+        k: a[f"{con}/a3_train/{k}"] for k in ("inputs", "cp_err", "plp_err")
+    }
+    assert kept["cp_err"].shape == (
+        SMOKE.n_construction,
+        SMOKE.allocator_draws,
+        len(grid),
+    )
+    assert kept["inputs"].shape == (
+        SMOKE.n_construction,
+        SMOKE.allocator_draws,
+        SMOKE.embedding_dim,
+    )
+    predictor = ErrorPredictor.fit(
+        kept["inputs"],
+        kept["cp_err"],
+        kept["plp_err"],
+        grid,
+        float(a["meta/core_noise"]),
+        width=64,
+        epochs=SMOKE.allocator_epochs,
+        rng=make_rng(SMOKE.seed, SYSTEM, SMOKE.embedding_dim, "allocator"),
+    )
+    assert (
+        predictor.network.weights_digest() == res["fitted"]["allocator_digest"]
+    )
+
+
+def test_schema3_oracle_profile_horizon_and_alignment_on_the_smoke_dump(
+    runs,
+) -> None:
+    """The ``split/`` group of the smoke dump is consistent with the run.
+
+    References (independent of ``lpcstudy.dump``):
+
+    * the oracle profile ``(ln eps_s/rho, ln delta/rho, Lambda_bar x 30,
+      ln(N + 0.01))`` written here from the dumped columns, per split;
+    * Q-N's own test arrays: ``qn/oracle/x_test`` and ``exp`` of
+      ``qn/oracle/log_t`` (the profile and the horizon Q-N used);
+    * ``core/E_C``, ``E_P``, ``C`` at the evaluation columns, and the sweep
+      view of the core cell at ``H_ref`` for the first ``nS`` test states;
+    * ``core/profile`` for the deployable test profile;
+    * the evaluation inputs minus the clean delay vector, divided by ``rho``,
+      are the standard normal query noise: every ``|z| < 6`` and the sample
+      standard deviation is in [0.9, 1.1] (``n = 260 x 7`` values: the
+      standard error of the s.d. is ``1/sqrt(2n) = 0.017``, so the band is
+      six of them; ``P(|z| > 6) = 2e-9`` per value). This checks that
+      ``delay_clean`` is the noise-free ``X_t`` of the same state, in the
+      units of the inputs.
+
+    Tolerance: exact except the noise band (Monte Carlo, stated above).
+    """
+    from lpcstudy.config import SMOKE
+
+    a = runs["arrays"]
+    rho = float(a["meta/core_noise"])
+    assert rho == SMOKE.core_noise
+    lt = int(a["meta/steps_per_lyapunov"])
+    sizes = {
+        "construction": SMOKE.n_construction,
+        "calibration": SMOKE.n_calibration,
+        "test": SMOKE.n_test,
+    }
+    z_all = []
+    for split, n_s in sizes.items():
+        g = f"split/{split}"
+        assert a[f"{g}/state_index"].shape == (n_s,)
+        assert np.all(np.diff(a[f"{g}/state_index"]) > 0)
+        hand = np.column_stack(
+            [
+                np.log(a[f"{g}/eps_s"] / rho),
+                np.log(a[f"{g}/delta"] / rho),
+                a[f"{g}/Lambda_bar"] * lt,
+                np.log(a[f"{g}/N"] + 0.01),
+            ]
+        )
+        assert np.array_equal(a[f"{g}/profile_oracle"], hand), split
+        t, censored = a[f"{g}/T"], a[f"{g}/T_censored"]
+        assert np.all((t >= 1) & (t <= SMOKE.horizon_max))
+        assert np.all(t[censored] == SMOKE.horizon_max)
+        z = (a[f"{g}/delay_eval"] - a[f"{g}/delay_clean"][:, None, :]) / rho
+        z_all.append(z.ravel())
+    z = np.concatenate(z_all)
+    assert np.all(np.abs(z) < 6.0) and 0.9 <= z.std() <= 1.1
+    test = "split/test"
+    assert np.array_equal(a[f"{test}/profile_oracle"], a["qn/oracle/x_test"])
+    assert np.array_equal(np.log(a[f"{test}/T"]), a["qn/oracle/log_t"])
+    assert np.array_equal(a[f"{test}/profile_deployable"], a["core/profile"])
+    cols = a["core/horizons"] - 1
+    for name in ("E_C", "E_P", "C"):
+        assert np.array_equal(a[f"{test}/{name}"][:, cols], a[f"core/{name}"])
+        sweep = f"sweep/rho={rho:g}|n_lib={SMOKE.core_library}/{name}"
+        ref = int(a["meta/reference_horizon"])
+        n_sweep = int(a["meta/n_test_sweep"])
+        assert np.array_equal(a[f"{test}/{name}"][:n_sweep, ref - 1], a[sweep])
+    assert a[f"{test}/a3_weight"].shape == (
+        SMOKE.n_test,
+        SMOKE.n_eval_draws,
+        len(SMOKE.eval_horizons),
+    )
+
+
+def test_schema3_state_mse_is_recomputed_from_the_per_draw_errors_and_weights(
+    runs,
+) -> None:
+    """Criterion (vi) of WU-0046b on the smoke dump (M-8, test (f1)).
+
+    ``core/state_mse/<rule>`` is recomputed from the dumped per-draw errors
+    against the noise-free truth (``split/test/cp_err``, ``plp_err``) and the
+    dumped weights: A0 (weight 1) and A1 (weight 0), A2, A3 and A4
+    (``split/test/<rule>_weight``) at every evaluation horizon, and A5 at
+    ``H_ref`` (``core/weight_href/A5``). The formula
+    ``(1/E) sum_j (w e_C + (1 - w) e_P)^2`` is written here. This is a
+    dump-fidelity check: the stored values come from the same run, and the
+    ``H_ref`` column of each is the score the verdicts use (checked bitwise by
+    ``collect``, and against the results leaf by b3).
+
+    Also checked, exactly: the shapes; the full-grid errors at the evaluation
+    columns are the short arrays; the weights agree with the ``/2`` keys
+    ``core/weight_href/<rule>`` at ``H_ref``, A2 is one number per horizon and
+    A4 one per (state, draw); the full-grid half-draw moments at the
+    evaluation columns are ``core/E_C_A`` and the others.
+
+    Tolerance: ``1e-12`` relative, the criterion of the plan. The round-off of
+    the recomputation is a few ulps (a blend, a square and a mean of ``E``
+    terms: about ``(E + 3) 2**-53``, under ``1e-15`` at smoke), far below it.
+    """
+    from lpcstudy.config import SMOKE
+
+    a = runs["arrays"]
+    n, n_cal, e = SMOKE.n_test, SMOKE.n_calibration, SMOKE.n_eval_draws
+    k, h_max = len(SMOKE.eval_horizons), SMOKE.horizon_max
+    cols = a["core/horizons"] - 1
+    ref_index = int(a["core/ref_index"])
+    for split, n_s in (("test", n), ("calibration", n_cal)):
+        for name in ("cp_err", "plp_err"):
+            assert a[f"split/{split}/{name}"].shape == (n_s, e, k), split
+            assert a[f"split/{split}/{name}"].dtype == np.float64, split
+    for name in ("cp_err", "plp_err"):
+        full = a[f"split/test/{name}_full"]
+        assert full.shape == (n, e, h_max) and full.dtype == np.float64
+        assert np.array_equal(full[:, :, cols], a[f"split/test/{name}"])
+    weights = {
+        rule: a[f"split/test/{rule.lower()}_weight"]
+        for rule in ("A2", "A3", "A4")
+    }
+    for rule, w in weights.items():
+        assert w.shape == (n, e, k) and w.dtype == np.float64, rule
+        assert np.array_equal(
+            w[:, :, ref_index], a[f"core/weight_href/{rule}"]
+        ), rule
+    assert np.all(weights["A2"] == weights["A2"][:1, :1, :])
+    assert np.all(weights["A4"] == weights["A4"][:, :, :1])
+    for name in ("E_C", "E_P", "C"):
+        for tag in ("A", "B"):
+            full = a[f"split/test/{name}_{tag}"]
+            assert full.shape == (n, h_max), (name, tag)
+            assert np.array_equal(full[:, cols], a[f"core/{name}_{tag}"])
+
+    e_c, e_p = a["split/test/cp_err"], a["split/test/plp_err"]
+    weights |= {"A0": np.ones_like(e_c), "A1": np.zeros_like(e_c)}
+    for rule, w in weights.items():
+        recomputed = ((w * e_c + (1.0 - w) * e_p) ** 2).mean(axis=1)
+        np.testing.assert_allclose(
+            recomputed, a[f"core/state_mse/{rule}"], rtol=1e-12, atol=0.0
+        )
+    w5 = a["core/weight_href/A5"]
+    recomputed = (
+        (w5 * e_c[:, :, ref_index] + (1.0 - w5) * e_p[:, :, ref_index]) ** 2
+    ).mean(axis=1)
+    np.testing.assert_allclose(
+        recomputed, a["core/state_mse/A5"][:, ref_index], rtol=1e-12, atol=0.0
+    )
+
+
+def test_schema3_realized_horizons_are_recomputed_from_the_dumped_draws(
+    runs,
+) -> None:
+    """The dumped full-grid draws reproduce the run's realized horizons.
+
+    For A0 (weight 1), A1 (weight 0), A2 and A4 the blend
+    ``w e_C + (1 - w) e_P`` of ``split/test/cp_err_full`` and
+    ``plp_err_full``, minus ``split/test/verify_noise``, is the error against
+    the noisy truth; ``oracle.realized_horizon`` at ``meta/horizon_threshold``
+    gives the first passage of every (state, draw). The run stores only
+    aggregates of these: per rule, the Kaplan-Meier median and restricted mean
+    (``scores/<rule>/km_median_lyapunov``, ``rmst_lyapunov``, in Lyapunov
+    times) and the survival curve (``km_curves/<rule>``). Those three are
+    recomputed here with the production ``statistics.kaplan_meier`` and must
+    be equal exactly. This is a dump-fidelity check, like b3: the reference
+    is the production statistic applied to the dumped arrays.
+
+    Full-grid weights: the dump has A2 and A4 at the five evaluation horizons
+    only. A4 does not depend on the horizon (checked on the five columns), so
+    its first column is broadcast. A2 on ``1..H_max`` is the pooled minimizer
+    ``clip(sum(E_P - C) / max(sum(E_C + E_P - 2 C), 1e-300), 0, 1)`` over the
+    dumped construction moments, written here; it must equal the dumped
+    ``a2_weight`` bitwise at the five columns.
+
+    Tolerance: exact (the same float64 operations on the same arrays; the
+    JSON floats round-trip exactly).
+    """
+    from lpcstudy.config import SMOKE
+    from lpcstudy.oracle import realized_horizon
+    from lpcstudy.statistics import kaplan_meier
+
+    a = runs["arrays"]
+    res = runs["results"]["on"]["systems"][SYSTEM]
+    n, e, h_max = SMOKE.n_test, SMOKE.n_eval_draws, SMOKE.horizon_max
+    noise = a["split/test/verify_noise"]
+    assert noise.shape == (n, e, h_max) and noise.dtype == np.float64
+    e_c, e_p = a["split/test/cp_err_full"], a["split/test/plp_err_full"]
+    horizons = a["meta/horizons_full"]
+    theta = float(a["meta/horizon_threshold"])
+    lt = int(a["meta/steps_per_lyapunov"])
+    cols = a["core/horizons"] - 1
+
+    con = "split/construction"
+    a2 = np.clip(
+        np.sum(a[f"{con}/E_P"] - a[f"{con}/C"], axis=0)
+        / np.maximum(
+            np.sum(
+                a[f"{con}/E_C"] + a[f"{con}/E_P"] - 2.0 * a[f"{con}/C"],
+                axis=0,
+            ),
+            1e-300,
+        ),
+        0.0,
+        1.0,
+    )
+    a2_dumped = a["split/test/a2_weight"]
+    assert np.array_equal(
+        np.broadcast_to(a2[cols], a2_dumped.shape), a2_dumped
+    )
+    a4_dumped = a["split/test/a4_weight"]
+    assert np.all(a4_dumped == a4_dumped[:, :, :1])
+    weights = {
+        "A0": np.ones_like(e_c),
+        "A1": np.zeros_like(e_c),
+        "A2": np.broadcast_to(a2, e_c.shape),
+        "A4": np.broadcast_to(a4_dumped[:, :, :1], e_c.shape),
+    }
+    for rule, w in weights.items():
+        blend = w * e_c + (1 - w) * e_p
+        durations, events = realized_horizon(blend - noise, horizons, theta)
+        curve = kaplan_meier(durations, events, len(horizons))
+        stored = res["scores"][rule]
+        assert curve.median() / lt == stored["km_median_lyapunov"], rule
+        assert curve.restricted_mean() / lt == stored["rmst_lyapunov"], rule
+        assert curve.survival.tolist() == res["km_curves"][rule], rule

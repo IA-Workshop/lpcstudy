@@ -44,7 +44,25 @@
       "Bash(git worktree *)",
       "Bash(pgrep *)",
       "Bash(tail *)",
-      "Bash(nohup flock -n /tmp/lpcstudy-gpu.lock env JAX_PLATFORMS=cuda XLA_PYTHON_CLIENT_PREALLOCATE=false timeout 12h python -m lpcstudy --preset *)"
+      "Bash(nohup flock -n /tmp/lpcstudy-gpu.lock env JAX_PLATFORMS=cuda XLA_PYTHON_CLIENT_PREALLOCATE=false timeout 12h python -m lpcstudy --preset *)",
+      "Bash(git tag -l*)",
+      "Bash(python3 -m lpcstudy --report-only *)",
+      "Bash(python -m lpcstudy --report-only *)",
+      "Bash(python3 tools/compare_runs.py *)",
+      "Bash(python3 tools/leafdiff.py *)",
+      "Bash(python3 tools/rehearsal_report.py *)",
+      "Bash(python3 tools/rehearsal_diagnostics.py *)",
+      "Bash(python3 tools/compare_pilot.py *)",
+      "Bash(python3 tools/findings_build.py *)",
+      "Bash(python3 -I tools/gpu_hours.py *)",
+      "Bash(sha256sum *)",
+      "Bash(cmp *)",
+      "Edit(/ROADMAP.md)",
+      "Edit(/README.md)",
+      "Edit(/.claude/CLAUDE.md)",
+      "Edit(/.claude/rules/**)",
+      "Edit(/.claude/skills/**)",
+      "Edit(/.claude/agents/**)"
     ],
     "ask": [
       "Bash(pip install *)",
@@ -59,7 +77,9 @@
       "Edit(/docs/study/**)",
       "Edit(/seeds/**)",
       "Edit(/requirements.txt)",
-      "Edit(/.claude/**)"
+      "Edit(/.claude/settings.json)",
+      "Edit(/.claude/hooks/**)",
+      "Edit(/promoted/**)"
     ],
     "deny": [
       "Bash(git push *)",

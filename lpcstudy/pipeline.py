@@ -302,6 +302,7 @@ class Study:
             network=network,
             model_step=model_step,
             refine_steps=self.config.estimator_refine_steps,
+            starts=ctx.spec.estimator_starts,
         )
         self._setups[key] = ForecastSetup(
             ctx=ctx,
@@ -474,13 +475,15 @@ class Study:
             ``schema``, ``cells``, ``oracles``, ``fitting``,
             ``result_counts`` and ``totals`` (every counter of
             ``ALL_COUNTERS`` as an int, the sum over cells, their evaluation
-            sub-blocks, the oracles and the fit).
+            sub-blocks, the oracles and the fit). A system with several
+            estimator starts also has ``lm_starts`` (``start_blocks``); the
+            single-start systems have no such key.
         """
         cells = dict(self._records.get((system, "main"), {}))
         oracles = self._oracle_blocks(system, main=True)
         fitting = self._fit_records.get(system) or empty_fit_block()
         totals = sum_totals([*cells.values(), *oracles.values(), fitting])
-        return {
+        block = {
             "schema": HANDLING_SCHEMA,
             "cells": cells,
             "oracles": oracles,
@@ -488,6 +491,54 @@ class Study:
             "result_counts": dict(result_counts),
             "totals": totals,
         }
+        starts = self.start_blocks(system, main=True)
+        if starts:
+            block["lm_starts"] = starts
+        return block
+
+    def start_blocks(self, system: str, main: bool) -> dict[str, dict]:
+        """Return the start-selection tallies of a system's estimators.
+
+        One entry per forecast setup whose estimator has several starts
+        (WU-0039, F1 and F2), keyed by the setup key ``(system, D, delay,
+        rho, misspec, n_analogs)`` as text, with the value of
+        ``StateEstimator.start_record``. It pools every estimate the setup
+        made in the run (all cells and kinds at that noise level). The
+        counts are report-only: no verdict reads them, and they are not in
+        ``totals`` (PRIME.4: reported, never silent).
+
+        Parameters
+        ----------
+        system : str
+            System name.
+        main : bool
+            ``True`` for the setups of the main analysis (the main embedding
+            dimension, no misspecification, one analog); ``False`` for the
+            robustness variants (every other setup). The robustness variants
+            never call a main setup's estimator, so each tally is complete
+            when its block is written.
+
+        Returns
+        -------
+        dict[str, dict]
+            Empty for a single-start system.
+        """
+        out: dict[str, dict] = {}
+        for key, setup in self._setups.items():
+            estimator = setup.estimator
+            if key[0] != system or len(estimator.starts) < 2:
+                continue
+            _, dim, _, _, misspec, n_analogs = key
+            base = (
+                dim == self.config.embedding_dim
+                and misspec == 0.0
+                and n_analogs == 1
+            )
+            if base != main:
+                continue
+            out[str(key)] = estimator.start_record()
+            LOG.info("lm starts %s %s: %s", system, key, out[str(key)])
+        return out
 
     def robustness_handling(
         self, system: str, result_counts: dict[str, int]
@@ -501,16 +552,21 @@ class Study:
         dict
             ``cells`` (variant cells, each with its ``evaluation`` and
             ``fitting``), ``oracles`` (variant embedding dimensions),
-            ``result_counts`` and ``totals``.
+            ``result_counts`` and ``totals``; ``lm_starts`` for a system with
+            several estimator starts (``start_blocks``).
         """
         cells = dict(self._records.get((system, "robustness"), {}))
         oracles = self._oracle_blocks(system, main=False)
-        return {
+        block = {
             "cells": cells,
             "oracles": oracles,
             "result_counts": dict(result_counts),
             "totals": sum_totals([*cells.values(), *oracles.values()]),
         }
+        starts = self.start_blocks(system, main=False)
+        if starts:
+            block["lm_starts"] = starts
+        return block
 
     # ------------------------------------------------------------------ cells
     def run_cell(
@@ -804,20 +860,16 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
     t_target = np.log(
         state_horizon_target(con_moments, noise, config.primary_threshold)
     )
-    regimes: dict[int, RegimeMap] = {}
-    for n_reg in config.regime_counts:
-        tree = fit_regime_tree(
-            con_profile, w_target, t_target, n_reg, config.seed
-        )
-        regimes[n_reg] = calibrate_regimes(
-            tree,
-            cal_profile,
-            cal_moments,
-            cal_evals,
-            config.primary_threshold,
-            a2,
-        )
-    chosen = _choose_regimes(regimes, cal_profile, cal_moments, config)
+    regimes, chosen = fit_regime_maps(
+        con_profile,
+        cal_profile,
+        w_target,
+        t_target,
+        cal_moments,
+        cal_evals,
+        a2,
+        config,
+    )
     return FittedRules(
         proxies=proxies,
         global_weights=a2,
@@ -831,6 +883,63 @@ def fit_rules(cells: list[Cell], config: StudyConfig) -> FittedRules:
             constant_target_count(w_target, t_target),
         ),
     )
+
+
+def fit_regime_maps(
+    con_profile: np.ndarray,
+    cal_profile: np.ndarray,
+    w_target: np.ndarray,
+    t_target: np.ndarray,
+    cal_moments: EnsembleMoments,
+    cal_evals: EvaluationDraws,
+    fallback: np.ndarray,
+    config: StudyConfig,
+) -> tuple[dict[int, RegimeMap], int]:
+    """Fit and calibrate the A5 regime maps for every ``K``, and choose ``K``.
+
+    One tree per ``K`` of ``config.regime_counts`` is fitted on the
+    construction profiles (:func:`fit_regime_tree`), its leaf weights are set
+    on calibration (:func:`calibrate_regimes`) and ``K`` is chosen by the v3
+    rule (:func:`_choose_regimes`). :func:`fit_rules` calls it with the four
+    deployable coordinates; ablation (b3) of WU-0039b calls it with three.
+
+    Parameters
+    ----------
+    con_profile, cal_profile : np.ndarray
+        Deployable profiles of the construction and calibration splits,
+        shape ``(n, E, p)``.
+    w_target, t_target : np.ndarray
+        Tree targets per construction state: ``w*(H_ref)`` and the log
+        characteristic horizon.
+    cal_moments : EnsembleMoments
+        Calibration oracle moments.
+    cal_evals : EvaluationDraws
+        Calibration evaluation draws.
+    fallback : np.ndarray
+        Weights of an empty regime (A2), shape ``(nH,)``.
+    config : StudyConfig
+        Study configuration.
+
+    Returns
+    -------
+    tuple[dict[int, RegimeMap], int]
+        The calibrated maps by ``K`` and the chosen ``K``.
+    """
+    regimes: dict[int, RegimeMap] = {}
+    for n_reg in config.regime_counts:
+        tree = fit_regime_tree(
+            con_profile, w_target, t_target, n_reg, config.seed
+        )
+        regimes[n_reg] = calibrate_regimes(
+            tree,
+            cal_profile,
+            cal_moments,
+            cal_evals,
+            config.primary_threshold,
+            fallback,
+        )
+    chosen = _choose_regimes(regimes, cal_profile, cal_moments, config)
+    return regimes, chosen
 
 
 FIT_COUNTERS: tuple[str, ...] = (

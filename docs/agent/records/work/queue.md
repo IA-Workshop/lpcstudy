@@ -230,3 +230,39 @@ Decision DEC-0044; note `docs/agent/notes/2026-10-23-promotion-closeout.md`. Rem
 | WU-0026 | done: .1 manifest lines and GPU tally (`week=2026-W43 gpu_hours=6.8125 runs=9`), .2 gate and completeness table in the unit file |
 
 Frozen-pipeline regression reference `lpcstudy-wt/run/ext-ref-fc49d5f` (leafdiff 0 different). Results summary `docs/agent/notes/2026-10-23-extension-ensemble-summary.md`. Gate: ensemble all pass; extension S1 passes, S2 to S6 fail V7 (provisional).
+
+## Added 2026-10-26: phase J, LPC contribution study (claude-opus-5-5, main session; ROADMAP.md §10; ledger seq 47)
+
+Phase I P3 to P6 (WU-0040 to WU-0043) are paused behind phase J (DV-1). Plan and acceptance criteria: `docs/agent/notes/2026-10-26-phase-j-lpc-contribution-plan.md` §5.
+
+| Unit | Title | Depends on | Status (2026-10-26) |
+| --- | --- | --- | --- |
+| WU-0045 | Analysis specification M-1 to M-8 (applied-mathematician) | — | in progress |
+| WU-0046 | Dump schema /3 (developer) | — | in progress |
+| WU-0047 | Register DEV-5 to DEV-9; exploration runs DEV-1, DEV-3, DEV-4 (GPU) | WU-0046 | planned |
+| WU-0048a | Quick look on the DEV-2 dumps (prototype, old code) | — | in progress |
+| WU-0048 | Analysis library: experiments A, B, D | WU-0045, WU-0046 | planned |
+| WU-0049 | Experiments C, E | WU-0048 | planned |
+| WU-0050 | Exploration report | WU-0047, WU-0049 | planned |
+| WU-0051 | Freeze analysis and replication rule; replication runs DEV-5 to DEV-9 | WU-0050 | done |
+| WU-0052 | Replication analysis and phase J report | WU-0051 | done |
+
+- 2026-10-26 (later), claude-opus-5-5 (main session): phase J status.
+  - Done: WU-0045 (with addenda R1–R3 and S1–S4), WU-0046 and WU-0046b (dump /3), WU-0047 (DEV-5 to DEV-9 registered; exploration runs DEV-1, DEV-3, DEV-4), WU-0048a, WU-0048, WU-0049, WU-0049b, WU-0050 (exploration report), WU-0051a (`phasej` preset; hook amendment seq 50 on develop, active once on main), WU-0051b and WU-0051c (replication tool, r measurement).
+  - WU-0051: analysis frozen at tag `phasej-freeze` (0929a9a, `docs/agent/notes/2026-10-26-phase-j-freeze.md`); DEV-5 to DEV-9 running at `phasej` from `lpcstudy-wt/run/phj-freeze`.
+  - Next: WU-0052, the replication analysis (run once) and the phase J report.
+
+- 2026-10-26 (end of day), claude-opus-5-5 (main session): phase J complete on development seeds.
+  - WU-0051 done: DEV-5 to DEV-9 at `phasej`, all exit 0; Chua fails V1 on DEV-7 and DEV-8 (provisional, not redrawn).
+  - WU-0052 done: frozen analysis once per seed, replication rule once (1421 replicated, 3 point, 56 contradicted, 1805 not replicated of 3285). One departure, an `--abd` path in the freeze note's command, recorded there. Report `docs/agent/notes/2026-10-26-phase-j-report.md`. DEV-5 to DEV-9 marked used.
+  - Owner decisions: confirmatory round (which claims); optional Chua V1 diagnosis; `pooled_floor_count` docstring. The lock-hook fix (seq 50) goes to main with the next merge (owner, 2026-10-26).
+
+- 2026-10-27, claude-opus-5-5 (main session): phase J confirmatory round (plan `docs/agent/notes/2026-10-27-phase-j-confirmatory-plan.md`, ROADMAP §10.1).
+  - Done: Chua V1 diagnosis (DEF-0031, DEF-0032); WU-0053 pre-registration draft `docs/study/preregistration_phase_j.md` (P-1 to P-3, P-6, P-7 pending); WU-0054 merged (54975c7).
+  - WU-0055 rehearsal: chain runs end to end (all exit 0, evaluator 48 rows), but the bitwise GPU regeneration criterion fails on DEV-5 (DEF-0033; DEV-6 bitwise). Note `docs/agent/notes/2026-10-27-phase-j-rehearsal.md`. Needs the owner's regeneration ruling.
+  - Freeze gate `freeze-j` on develop: unit 2234 passed, integration 31 passed; slow and gpu tiers next.
+- 2026-10-27 (later), claude-opus-5-5 (main session): phase J confirmatory round, ready for the owner.
+  - Owner ruling seq 54 ("choose recommendation A"): GPU regeneration not expected bitwise; differing leaves and claim rows reported (pre-registration §5, §8 item 7). DEF-0033 accepted. WU-0055 closed; P-1 and P-2 closed.
+  - Freeze gate `freeze-j` on develop 632c332, all tiers once with `LPC_GATE=freeze-j`: unit `2234 passed in 160.22s`; integration `31 passed in 557.32s`; slow `210 passed, 14 warnings in 2286.98s` (the Option C ROADMAP-bound records, not asserted by design); gpu `1 passed in 311.25s` (smoke DEV-0 twice, T0 bitwise, 0 differing leaves). After the gate, only documents and the ledger changed (merge of `wu/0055-regen`).
+  - Owner acts pending: P-6, P-7; approval of the pre-registration (sha256 of the three files); merge develop → main with the lock-hook amendment (seq 50) and tag `freeze-j` (P-3, WU-0056); seal CONF-5 to CONF-9; official and regeneration runs (WU-0057).
+- 2026-10-27 (later), claude-opus-5-5 (main session): owner ruling seq 55 lifts the provisional label on Chua DEV-7 and DEV-8 (phase J report §10; DEF-0031 note). No reading changes.
