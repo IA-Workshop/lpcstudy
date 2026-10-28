@@ -1,0 +1,2831 @@
+{
+ "label": "PHASE J CONFIRMATORY (CONF-5, CONF-6, CONF-7, CONF-8, CONF-9): pre-registered verdicts, UNPROMOTED",
+ "mode": "sealed",
+ "ignore_gate": false,
+ "seeds": [
+  "CONF-5",
+  "CONF-6",
+  "CONF-7",
+  "CONF-8",
+  "CONF-9"
+ ],
+ "minimum": 4,
+ "analysis_commit": "c19ad486b93a2ee96d64ce069ec42fd440428211",
+ "analysis_dirty": false,
+ "preset": "phasej",
+ "c1_rows_checked": [
+  240,
+  240,
+  240,
+  240,
+  240
+ ],
+ "rule": "Per row: confirmed if the claim is implied by the reading on at least 4 seeds among those present and no two present seeds have jointly unsatisfiable interval claims; contradicted if some such pair exists; not confirmable if fewer than 4 seeds are present (gate failures make a system's rows absent for that seed, DC-5); otherwise not confirmed. Per claim and system: confirmed if every row of that system is confirmed; contradicted if any is contradicted; not confirmable if any is not confirmable and none is contradicted; otherwise not confirmed. Rows of J-I1 and J-C2 are read by reading_tables; their claims enter the same rule.",
+ "claims": {
+  "path": "../../docs/study/preregistration_phase_j/claims.json",
+  "sha256": "9d1a34bf3e72a478599b3290bbc2a8aa792728f8a72bead8964f3b19fa522648"
+ },
+ "pinned_lyapunov": {
+  "path": "../../docs/study/preregistration_phase_j/lyapunov.json",
+  "sha256": "852ce1f67cdcc55275f388c72817348b1b83e2146b4751c8c8aedc7a85453417"
+ },
+ "inputs": [
+  {
+   "seed_id": "CONF-5",
+   "dir": "phasej-CONF-5/contrib-j",
+   "run": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/conf-j/runs/confirmatory/phasej-CONF-5/phasej",
+   "sha256": {
+    "contrib.json": "3ded6295b5373cc160e5a83d1b084bcfd090c5bf591914055f9ca226aff59543",
+    "ce.json": "30416f6f803e59216b7ed9030d8d204dd713751ff5e1cd7e536347c26454da4d",
+    "results.json": "2b786201608ab5ff691bb5b7e09c6c7f8af9477c6593d9980d0fa4bd5b798dbf",
+    "lyapunov.json": "852ce1f67cdcc55275f388c72817348b1b83e2146b4751c8c8aedc7a85453417"
+   },
+   "lyapunov_matches_pinned": true,
+   "gate_pass": {
+    "lorenz63": true,
+    "rossler": true,
+    "chua": true
+   }
+  },
+  {
+   "seed_id": "CONF-6",
+   "dir": "phasej-CONF-6/contrib-j",
+   "run": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/conf-j/runs/confirmatory/phasej-CONF-6/phasej",
+   "sha256": {
+    "contrib.json": "8f0df0ee163c526ad20edb49d70c3fe390adce779ec1efd3d9f3d16489dca481",
+    "ce.json": "38accf009add27b062095feaf871b0a5b41768331007a571339e13dbcf2acc17",
+    "results.json": "63a2b9f44ffff3115a2efbfa7444c4f418825d88f547a0d228b0867b87e957e4",
+    "lyapunov.json": "852ce1f67cdcc55275f388c72817348b1b83e2146b4751c8c8aedc7a85453417"
+   },
+   "lyapunov_matches_pinned": true,
+   "gate_pass": {
+    "lorenz63": true,
+    "rossler": true,
+    "chua": true
+   }
+  },
+  {
+   "seed_id": "CONF-7",
+   "dir": "phasej-CONF-7/contrib-j",
+   "run": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/conf-j/runs/confirmatory/phasej-CONF-7/phasej",
+   "sha256": {
+    "contrib.json": "ea0977b556e34c47d5bf47562279cfb28fd93a1203a41a064e2ddcf7156cfb04",
+    "ce.json": "2376e93dfb8115e05ad5c06ec41bc87c982187c84feb47871753b29e157825c2",
+    "results.json": "f856838d38e920e7abe9dc5d88d94532f7393501d6f92cd313db1024455ccff2",
+    "lyapunov.json": "852ce1f67cdcc55275f388c72817348b1b83e2146b4751c8c8aedc7a85453417"
+   },
+   "lyapunov_matches_pinned": true,
+   "gate_pass": {
+    "lorenz63": true,
+    "rossler": true,
+    "chua": true
+   }
+  },
+  {
+   "seed_id": "CONF-8",
+   "dir": "phasej-CONF-8/contrib-j",
+   "run": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/conf-j/runs/confirmatory/phasej-CONF-8/phasej",
+   "sha256": {
+    "contrib.json": "c1df485a26b52f382c17cc124c690e23d5db40d5507dc958ce8fe7f0ab5f2117",
+    "ce.json": "bacefdeda55ae47375d1538a126b15f50056cf43d970670516f9f35d5bb704a6",
+    "results.json": "6aec5c2a9507f3aa0a10931b6f8bab96a00e28336a968247bdc56b87d04d35cc",
+    "lyapunov.json": "852ce1f67cdcc55275f388c72817348b1b83e2146b4751c8c8aedc7a85453417"
+   },
+   "lyapunov_matches_pinned": true,
+   "gate_pass": {
+    "lorenz63": true,
+    "rossler": true,
+    "chua": true
+   }
+  },
+  {
+   "seed_id": "CONF-9",
+   "dir": "phasej-CONF-9/contrib-j",
+   "run": "/home/brianm/projects/physics/chaos/lpcstudy-wt/run/conf-j/runs/confirmatory/phasej-CONF-9/phasej",
+   "sha256": {
+    "contrib.json": "b389d2d25aab6cc1d364f1a47cca50b15c930d592399d656b776084233a14ffc",
+    "ce.json": "40a9f661ad48f764b157e69fc1b0161e9db855431032bebc9fce3cde8a4ad4da",
+    "results.json": "2cfb2fd8eef1360c69424fdc01f8b40a10d47dfc275653c27f93dba6e95788ec",
+    "lyapunov.json": "852ce1f67cdcc55275f388c72817348b1b83e2146b4751c8c8aedc7a85453417"
+   },
+   "lyapunov_matches_pinned": true,
+   "gate_pass": {
+    "lorenz63": true,
+    "rossler": true,
+    "chua": true
+   }
+  }
+ ],
+ "tool": {
+  "commit": "c19ad486b93a2ee96d64ce069ec42fd440428211",
+  "dirty": false
+ },
+ "row_summary": {
+  "confirmed": 47,
+  "contradicted": 0,
+  "not confirmable": 0,
+  "not confirmed": 1
+ },
+ "rows": [
+  {
+   "claim_id": "J-H1",
+   "family": "A drop-one",
+   "system": "chua",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "drop I: pinball ratio",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H1",
+   "family": "A drop-one",
+   "system": "chua",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "drop I: pinball ratio",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H1",
+   "family": "A drop-one",
+   "system": "lorenz63",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "drop I: pinball ratio",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H1",
+   "family": "A drop-one",
+   "system": "lorenz63",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "drop I: pinball ratio",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H1",
+   "family": "A drop-one",
+   "system": "rossler",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "drop I: pinball ratio",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H1",
+   "family": "A drop-one",
+   "system": "rossler",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "drop I: pinball ratio",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H2",
+   "family": "A drop-one",
+   "system": "chua",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "drop O: pinball ratio",
+   "claim": "ratio > 1",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H2",
+   "family": "A drop-one",
+   "system": "chua",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "drop O: pinball ratio",
+   "claim": "ratio > 1",
+   "readings": [
+    "substantial",
+    "needed, size not determined",
+    "needed, size not determined",
+    "needed, size not determined",
+    "needed, size not determined"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1"
+    ],
+    [
+     "ratio > 1"
+    ],
+    [
+     "ratio > 1"
+    ],
+    [
+     "ratio > 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H2",
+   "family": "A drop-one",
+   "system": "lorenz63",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "drop O: pinball ratio",
+   "claim": "ratio > 1",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H2",
+   "family": "A drop-one",
+   "system": "lorenz63",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "drop O: pinball ratio",
+   "claim": "ratio > 1",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H2",
+   "family": "A drop-one",
+   "system": "rossler",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "drop O: pinball ratio",
+   "claim": "ratio > 1",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H2",
+   "family": "A drop-one",
+   "system": "rossler",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "drop O: pinball ratio",
+   "claim": "ratio > 1",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H3",
+   "family": "A drop-one",
+   "system": "chua",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "drop N: pinball ratio",
+   "claim": "ratio <= 1.05",
+   "readings": [
+    "negligible",
+    "negligible",
+    "negligible",
+    "negligible",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H3",
+   "family": "A drop-one",
+   "system": "chua",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "drop N: pinball ratio",
+   "claim": "ratio <= 1.05",
+   "readings": [
+    "negligible",
+    "negligible",
+    "negligible",
+    "negligible",
+    "small"
+   ],
+   "reading_claims": [
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio > 1",
+     "ratio <= 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H3",
+   "family": "A drop-one",
+   "system": "lorenz63",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "drop N: pinball ratio",
+   "claim": "ratio <= 1.05",
+   "readings": [
+    "negligible",
+    "lowers",
+    "negligible",
+    "negligible",
+    "negligible"
+   ],
+   "reading_claims": [
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H3",
+   "family": "A drop-one",
+   "system": "lorenz63",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "drop N: pinball ratio",
+   "claim": "ratio <= 1.05",
+   "readings": [
+    "negligible",
+    "negligible",
+    "negligible",
+    "negligible",
+    "negligible"
+   ],
+   "reading_claims": [
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H3",
+   "family": "A drop-one",
+   "system": "rossler",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "drop N: pinball ratio",
+   "claim": "ratio <= 1.05",
+   "readings": [
+    "negligible",
+    "negligible",
+    "negligible",
+    "negligible",
+    "negligible"
+   ],
+   "reading_claims": [
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H3",
+   "family": "A drop-one",
+   "system": "rossler",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "drop N: pinball ratio",
+   "claim": "ratio <= 1.05",
+   "readings": [
+    "small",
+    "negligible",
+    "negligible",
+    "small",
+    "small"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1",
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio > 1",
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio > 1",
+     "ratio <= 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H4",
+   "family": "B pair",
+   "system": "chua",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "log T OI: Delta",
+   "claim": "delta > 0",
+   "readings": [
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected"
+   ],
+   "reading_claims": [
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H4",
+   "family": "B pair",
+   "system": "chua",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "log T OI: Delta",
+   "claim": "delta > 0",
+   "readings": [
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected"
+   ],
+   "reading_claims": [
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H4",
+   "family": "B pair",
+   "system": "lorenz63",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "log T OI: Delta",
+   "claim": "delta > 0",
+   "readings": [
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected"
+   ],
+   "reading_claims": [
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H4",
+   "family": "B pair",
+   "system": "lorenz63",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "log T OI: Delta",
+   "claim": "delta > 0",
+   "readings": [
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected"
+   ],
+   "reading_claims": [
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H4",
+   "family": "B pair",
+   "system": "rossler",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "log T OI: Delta",
+   "claim": "delta > 0",
+   "readings": [
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected"
+   ],
+   "reading_claims": [
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H4",
+   "family": "B pair",
+   "system": "rossler",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "log T OI: Delta",
+   "claim": "delta > 0",
+   "readings": [
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected",
+    "interaction gain detected"
+   ],
+   "reading_claims": [
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ],
+    [
+     "delta > 0"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H5",
+   "family": "D vs full",
+   "system": "chua",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "lyapunov: pinball ratio vs F",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H5",
+   "family": "D vs full",
+   "system": "chua",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "lyapunov: pinball ratio vs F",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H5",
+   "family": "D vs full",
+   "system": "lorenz63",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "lyapunov: pinball ratio vs F",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H5",
+   "family": "D vs full",
+   "system": "lorenz63",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "lyapunov: pinball ratio vs F",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H5",
+   "family": "D vs full",
+   "system": "rossler",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "lyapunov: pinball ratio vs F",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H5",
+   "family": "D vs full",
+   "system": "rossler",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "lyapunov: pinball ratio vs F",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H6",
+   "family": "D vs full",
+   "system": "chua",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "X+F: pinball ratio vs F",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H6",
+   "family": "D vs full",
+   "system": "chua",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "X+F: pinball ratio vs F",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H6",
+   "family": "D vs full",
+   "system": "lorenz63",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "X+F: pinball ratio vs F",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H6",
+   "family": "D vs full",
+   "system": "lorenz63",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "X+F: pinball ratio vs F",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H6",
+   "family": "D vs full",
+   "system": "rossler",
+   "profile": "deployable",
+   "horizon": "T_c",
+   "item": "X+F: pinball ratio vs F",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-H6",
+   "family": "D vs full",
+   "system": "rossler",
+   "profile": "oracle",
+   "horizon": "T_c",
+   "item": "X+F: pinball ratio vs F",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-A1",
+   "family": "A drop-one",
+   "system": "rossler",
+   "profile": "oracle",
+   "horizon": "H=30 (1.00 LT)",
+   "item": "drop R: MSE ratio",
+   "claim": "ratio > 1.05",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ],
+    [
+     "ratio > 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-A2",
+   "family": "D vs full",
+   "system": "rossler",
+   "profile": "deployable",
+   "horizon": "H=30 (1.00 LT)",
+   "item": "none: mse ratio vs F",
+   "claim": "ratio <= 1.05",
+   "readings": [
+    "negligible",
+    "negligible",
+    "negligible",
+    "negligible",
+    "negligible"
+   ],
+   "reading_claims": [
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio <= 1.05"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-A3",
+   "family": "A vs separation",
+   "system": "chua",
+   "profile": "deployable",
+   "horizon": "H=120 (4.00 LT)",
+   "item": "none: MSE(F)/MSE(sep)",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-A3",
+   "family": "A vs separation",
+   "system": "chua",
+   "profile": "oracle",
+   "horizon": "H=120 (4.00 LT)",
+   "item": "none: MSE(F)/MSE(sep)",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "negligible",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 4,
+   "implying": [
+    true,
+    false,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-A3",
+   "family": "A vs separation",
+   "system": "lorenz63",
+   "profile": "deployable",
+   "horizon": "H=120 (4.00 LT)",
+   "item": "none: MSE(F)/MSE(sep)",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-A3",
+   "family": "A vs separation",
+   "system": "lorenz63",
+   "profile": "oracle",
+   "horizon": "H=120 (4.00 LT)",
+   "item": "none: MSE(F)/MSE(sep)",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-A3",
+   "family": "A vs separation",
+   "system": "rossler",
+   "profile": "deployable",
+   "horizon": "H=120 (4.00 LT)",
+   "item": "none: MSE(F)/MSE(sep)",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-A3",
+   "family": "A vs separation",
+   "system": "rossler",
+   "profile": "oracle",
+   "horizon": "H=120 (4.00 LT)",
+   "item": "none: MSE(F)/MSE(sep)",
+   "claim": "ratio < 1",
+   "readings": [
+    "lowers",
+    "lowers",
+    "lowers",
+    "negligible",
+    "lowers"
+   ],
+   "reading_claims": [
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio <= 1.05"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 4,
+   "implying": [
+    true,
+    true,
+    true,
+    false,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-A4",
+   "family": "D vs full",
+   "system": "lorenz63",
+   "profile": "deployable",
+   "horizon": "H=30 (1.00 LT)",
+   "item": "X: mse ratio vs F",
+   "claim": "ratio < 1",
+   "readings": [
+    "undetermined",
+    "lowers",
+    "undetermined",
+    "lowers",
+    "lowers"
+   ],
+   "reading_claims": [
+    [],
+    [
+     "ratio < 1"
+    ],
+    [],
+    [
+     "ratio < 1"
+    ],
+    [
+     "ratio < 1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "not confirmed",
+   "n_present": 5,
+   "n_implying": 3,
+   "implying": [
+    false,
+    true,
+    false,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-I1",
+   "family": "pipeline results.json",
+   "system": "lorenz63",
+   "profile": "deployable",
+   "horizon": "",
+   "item": "drop I: Delta R^2 on logit w* (Q-N procedure)",
+   "source": "pipeline results.json",
+   "path": "systems/lorenz63/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/I",
+   "claim": "delta_r2 > 0",
+   "readings": [
+    "reduces",
+    "distinct but small",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "delta_r2 < 0.05"
+    ],
+    [
+     "delta_r2 > 0",
+     "delta_r2 < 0.05"
+    ],
+    [
+     "delta_r2 > 0"
+    ],
+    [
+     "delta_r2 > 0"
+    ],
+    [
+     "delta_r2 > 0"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 4,
+   "implying": [
+    false,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-I1",
+   "family": "pipeline results.json",
+   "system": "chua",
+   "profile": "deployable",
+   "horizon": "",
+   "item": "drop I: Delta R^2 on logit w* (Q-N procedure)",
+   "source": "pipeline results.json",
+   "path": "systems/chua/ablation/profile_conditions/deployable/logit_w_interior/leave_one_out/I",
+   "claim": "delta_r2 > 0",
+   "readings": [
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial",
+    "substantial"
+   ],
+   "reading_claims": [
+    [
+     "delta_r2 > 0"
+    ],
+    [
+     "delta_r2 > 0"
+    ],
+    [
+     "delta_r2 > 0"
+    ],
+    [
+     "delta_r2 > 0"
+    ],
+    [
+     "delta_r2 > 0"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  },
+  {
+   "claim_id": "J-C2",
+   "family": "ce.json",
+   "system": "rossler",
+   "profile": "deployable",
+   "horizon": "",
+   "item": "C3 full deployable system: realized false-trust rate",
+   "source": "ce.json",
+   "path": "systems/rossler/C3/policies/g(F-hat) + h(F-hat)/false_trust_realized",
+   "claim": "false_trust > 0.10",
+   "readings": [
+    "above target",
+    "above target",
+    "above target",
+    "above target",
+    "above target"
+   ],
+   "reading_claims": [
+    [
+     "false_trust > 0.1"
+    ],
+    [
+     "false_trust > 0.1"
+    ],
+    [
+     "false_trust > 0.1"
+    ],
+    [
+     "false_trust > 0.1"
+    ],
+    [
+     "false_trust > 0.1"
+    ]
+   ],
+   "absent": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ],
+   "verdict": "confirmed",
+   "n_present": 5,
+   "n_implying": 5,
+   "implying": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "contradicting_pairs": []
+  }
+ ],
+ "verdicts": [
+  {
+   "claim_id": "J-H1",
+   "system": "chua",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H1",
+   "system": "lorenz63",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H1",
+   "system": "rossler",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H2",
+   "system": "chua",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H2",
+   "system": "lorenz63",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H2",
+   "system": "rossler",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H3",
+   "system": "chua",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H3",
+   "system": "lorenz63",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H3",
+   "system": "rossler",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H4",
+   "system": "chua",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H4",
+   "system": "lorenz63",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H4",
+   "system": "rossler",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H5",
+   "system": "chua",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H5",
+   "system": "lorenz63",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H5",
+   "system": "rossler",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H6",
+   "system": "chua",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H6",
+   "system": "lorenz63",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-H6",
+   "system": "rossler",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-A1",
+   "system": "rossler",
+   "verdict": "confirmed",
+   "rows": 1,
+   "row_verdicts": {
+    "confirmed": 1
+   }
+  },
+  {
+   "claim_id": "J-A2",
+   "system": "rossler",
+   "verdict": "confirmed",
+   "rows": 1,
+   "row_verdicts": {
+    "confirmed": 1
+   }
+  },
+  {
+   "claim_id": "J-A3",
+   "system": "chua",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-A3",
+   "system": "lorenz63",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-A3",
+   "system": "rossler",
+   "verdict": "confirmed",
+   "rows": 2,
+   "row_verdicts": {
+    "confirmed": 2
+   }
+  },
+  {
+   "claim_id": "J-A4",
+   "system": "lorenz63",
+   "verdict": "not confirmed",
+   "rows": 1,
+   "row_verdicts": {
+    "not confirmed": 1
+   }
+  },
+  {
+   "claim_id": "J-I1",
+   "system": "lorenz63",
+   "verdict": "confirmed",
+   "rows": 1,
+   "row_verdicts": {
+    "confirmed": 1
+   }
+  },
+  {
+   "claim_id": "J-I1",
+   "system": "chua",
+   "verdict": "confirmed",
+   "rows": 1,
+   "row_verdicts": {
+    "confirmed": 1
+   }
+  },
+  {
+   "claim_id": "J-C2",
+   "system": "rossler",
+   "verdict": "confirmed",
+   "rows": 1,
+   "row_verdicts": {
+    "confirmed": 1
+   }
+  }
+ ]
+}
