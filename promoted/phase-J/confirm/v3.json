@@ -1,0 +1,618 @@
+{
+ "label": "SECONDARY DESCRIPTION: v3 words of the sealed runs under the phase J configuration; not the v3 test; does not change, confirm or replace CONF-1",
+ "seeds": [
+  "CONF-5",
+  "CONF-6",
+  "CONF-7",
+  "CONF-8",
+  "CONF-9"
+ ],
+ "departures": [
+  "n_test is 4000, not v3's 1000, so the intervals are narrower than v3 sized them",
+  "the device is the GPU, where v3 section 9 makes the CPU official",
+  "the robustness sweep is skipped (it is reported-only in v3)",
+  "the time unit is pinned (pre-registration section 5)"
+ ],
+ "n_missing": 0,
+ "rows": [
+  {
+   "row": "H1a",
+   "system": "lorenz63",
+   "words": [
+    "inconclusive",
+    "pass",
+    "pass",
+    "inconclusive",
+    "inconclusive"
+   ],
+   "count": {
+    "inconclusive": 3,
+    "pass": 2
+   }
+  },
+  {
+   "row": "H1a",
+   "system": "rossler",
+   "words": [
+    "pass",
+    "inconclusive",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 4,
+    "inconclusive": 1
+   }
+  },
+  {
+   "row": "H1a",
+   "system": "chua",
+   "words": [
+    "pass",
+    "fail",
+    "pass",
+    "pass",
+    "inconclusive"
+   ],
+   "count": {
+    "pass": 3,
+    "fail": 1,
+    "inconclusive": 1
+   }
+  },
+  {
+   "row": "H1b",
+   "system": "lorenz63",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H1b",
+   "system": "rossler",
+   "words": [
+    "fail",
+    "fail",
+    "fail",
+    "fail",
+    "fail"
+   ],
+   "count": {
+    "fail": 5
+   }
+  },
+  {
+   "row": "H1b",
+   "system": "chua",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H1c",
+   "system": "lorenz63",
+   "words": [
+    "fail",
+    "fail",
+    "fail",
+    "fail",
+    "fail"
+   ],
+   "count": {
+    "fail": 5
+   }
+  },
+  {
+   "row": "H1c",
+   "system": "rossler",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H1c",
+   "system": "chua",
+   "words": [
+    "fail",
+    "fail",
+    "fail",
+    "fail",
+    "fail"
+   ],
+   "count": {
+    "fail": 5
+   }
+  },
+  {
+   "row": "H1d",
+   "system": "lorenz63",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H1d",
+   "system": "rossler",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H1d",
+   "system": "chua",
+   "words": [
+    "inconclusive",
+    "inconclusive",
+    "fail",
+    "inconclusive",
+    "inconclusive"
+   ],
+   "count": {
+    "inconclusive": 4,
+    "fail": 1
+   }
+  },
+  {
+   "row": "Q-N",
+   "system": "lorenz63",
+   "words": [
+    "distinct but small",
+    "reduces",
+    "distinct but small",
+    "distinct but small",
+    "reduces"
+   ],
+   "count": {
+    "distinct but small": 3,
+    "reduces": 2
+   }
+  },
+  {
+   "row": "Q-N",
+   "system": "rossler",
+   "words": [
+    "reduces",
+    "distinct but small",
+    "reduces",
+    "reduces",
+    "distinct but small"
+   ],
+   "count": {
+    "reduces": 3,
+    "distinct but small": 2
+   }
+  },
+  {
+   "row": "Q-N",
+   "system": "chua",
+   "words": [
+    "reduces",
+    "reduces",
+    "reduces",
+    "reduces",
+    "reduces"
+   ],
+   "count": {
+    "reduces": 5
+   }
+  },
+  {
+   "row": "H2a",
+   "system": "lorenz63",
+   "words": [
+    "fail",
+    "inconclusive",
+    "fail",
+    "fail",
+    "fail"
+   ],
+   "count": {
+    "fail": 4,
+    "inconclusive": 1
+   }
+  },
+  {
+   "row": "H2a",
+   "system": "rossler",
+   "words": [
+    "fail",
+    "fail",
+    "fail",
+    "fail",
+    "fail"
+   ],
+   "count": {
+    "fail": 5
+   }
+  },
+  {
+   "row": "H2a",
+   "system": "chua",
+   "words": [
+    "fail",
+    "fail",
+    "fail",
+    "fail",
+    "fail"
+   ],
+   "count": {
+    "fail": 5
+   }
+  },
+  {
+   "row": "H2b",
+   "system": "lorenz63",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H2b",
+   "system": "rossler",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H2b",
+   "system": "chua",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H2c",
+   "system": "lorenz63",
+   "words": [
+    "fail",
+    "fail",
+    "fail",
+    "fail",
+    "fail"
+   ],
+   "count": {
+    "fail": 5
+   }
+  },
+  {
+   "row": "H2c",
+   "system": "rossler",
+   "words": [
+    "fail",
+    "fail",
+    "fail",
+    "fail",
+    "fail"
+   ],
+   "count": {
+    "fail": 5
+   }
+  },
+  {
+   "row": "H2c",
+   "system": "chua",
+   "words": [
+    "inconclusive",
+    "inconclusive",
+    "inconclusive",
+    "inconclusive",
+    "inconclusive"
+   ],
+   "count": {
+    "inconclusive": 5
+   }
+  },
+  {
+   "row": "H2d",
+   "system": "lorenz63",
+   "words": [
+    "fail",
+    "fail",
+    "fail",
+    "fail",
+    "fail"
+   ],
+   "count": {
+    "fail": 5
+   }
+  },
+  {
+   "row": "H2d",
+   "system": "rossler",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H2d",
+   "system": "chua",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H2e",
+   "system": "lorenz63",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H2e",
+   "system": "rossler",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H2e",
+   "system": "chua",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "gain_bound",
+   "system": "lorenz63",
+   "words": [
+    "reported",
+    "reported",
+    "reported",
+    "reported",
+    "reported"
+   ],
+   "count": {
+    "reported": 5
+   }
+  },
+  {
+   "row": "gain_bound",
+   "system": "rossler",
+   "words": [
+    "reported",
+    "reported",
+    "reported",
+    "reported",
+    "reported"
+   ],
+   "count": {
+    "reported": 5
+   }
+  },
+  {
+   "row": "gain_bound",
+   "system": "chua",
+   "words": [
+    "reported",
+    "reported",
+    "reported",
+    "reported",
+    "reported"
+   ],
+   "count": {
+    "reported": 5
+   }
+  },
+  {
+   "row": "H3a",
+   "system": "lorenz63",
+   "words": [
+    "inconclusive",
+    "inconclusive",
+    "inconclusive",
+    "inconclusive",
+    "inconclusive"
+   ],
+   "count": {
+    "inconclusive": 5
+   }
+  },
+  {
+   "row": "H3a",
+   "system": "rossler",
+   "words": [
+    "inconclusive",
+    "inconclusive",
+    "inconclusive",
+    "inconclusive",
+    "inconclusive"
+   ],
+   "count": {
+    "inconclusive": 5
+   }
+  },
+  {
+   "row": "H3a",
+   "system": "chua",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H3b",
+   "system": "lorenz63",
+   "words": [
+    "inconclusive",
+    "fail",
+    "inconclusive",
+    "inconclusive",
+    "inconclusive"
+   ],
+   "count": {
+    "inconclusive": 4,
+    "fail": 1
+   }
+  },
+  {
+   "row": "H3b",
+   "system": "rossler",
+   "words": [
+    "inconclusive",
+    "inconclusive",
+    "inconclusive",
+    "pass",
+    "inconclusive"
+   ],
+   "count": {
+    "inconclusive": 4,
+    "pass": 1
+   }
+  },
+  {
+   "row": "H3b",
+   "system": "chua",
+   "words": [
+    "inconclusive",
+    "inconclusive",
+    "inconclusive",
+    "inconclusive",
+    "inconclusive"
+   ],
+   "count": {
+    "inconclusive": 5
+   }
+  },
+  {
+   "row": "H3c",
+   "system": "lorenz63",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H3c",
+   "system": "rossler",
+   "words": [
+    "pass",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "pass": 5
+   }
+  },
+  {
+   "row": "H3c",
+   "system": "chua",
+   "words": [
+    "inconclusive",
+    "pass",
+    "pass",
+    "pass",
+    "pass"
+   ],
+   "count": {
+    "inconclusive": 1,
+    "pass": 4
+   }
+  }
+ ]
+}
