@@ -3,9 +3,13 @@
 #
 # Run from the root of a clean worktree checked out at tag freeze-j:
 #   bash docs/study/preregistration_phase_j/run_sealed.sh
+# or, to check a stored copy of the seeds against the ledger of the current tree and start
+# nothing (any commit, e.g. develop right after sealing):
+#   bash docs/study/preregistration_phase_j/run_sealed.sh --check
 #
-# 1. Asks for the seed and salt of CONF-5 to CONF-9 (hidden input) and checks each pair
-#    against its ledger commitment before anything runs. Nothing is written to disk.
+# 1. Asks for the five lines "CONF-n <seed> <salt>" (one paste, hidden input, any order) and
+#    checks each pair against its ledger commitment before anything runs. Nothing is
+#    written to disk.
 # 2. Detaches (setsid nohup), takes the GPU lock once and holds it for the whole session,
 #    then runs the five official runs and the five regeneration runs, one at a time:
 #      runs/confirmatory/phasej-CONF-n        official
@@ -30,25 +34,40 @@ refuse() { echo "run_sealed: $*" >&2; exit "${2:-64}"; }
 
 if [ "${_LPC_PHJ_STAGE:-}" != run ]; then
     # ---- Foreground: checks and seed entry ----
-    [ -f "$pinned" ] && [ -d lpcstudy ] || refuse "run from the root of the freeze-j worktree"
-    [ "$(git describe --exact-match --tags HEAD 2>/dev/null)" = freeze-j ] \
-        || refuse "HEAD is not tag freeze-j"
-    [ -z "$(git status --porcelain --untracked-files=no)" ] || refuse "the working tree is not clean"
-    [ "$(sha256sum "$pinned" | cut -d' ' -f1)" = "$pinned_sha" ] || refuse "pinned lyapunov.json hash differs"
+    check=0
+    case "${1:-}" in
+        "") ;;
+        --check) check=1 ;;
+        *) refuse "usage: run_sealed.sh [--check]" ;;
+    esac
+    [ -f "$pinned" ] && [ -d lpcstudy ] || refuse "run from the root of a worktree of this repository"
     "$py" -c 'import lpcstudy' 2>/dev/null || refuse "cannot import lpcstudy with $py (set LPC_PYTHON)"
-    for id in "${ids[@]}"; do
-        for suffix in "" -regen; do
-            [ ! -e "runs/confirmatory/phasej-$id$suffix" ] \
-                || refuse "runs/confirmatory/phasej-$id$suffix exists; never overwritten"
+    if [ "$check" -eq 0 ]; then
+        [ "$(git describe --exact-match --tags HEAD 2>/dev/null)" = freeze-j ] \
+            || refuse "HEAD is not tag freeze-j"
+        [ -z "$(git status --porcelain --untracked-files=no)" ] || refuse "the working tree is not clean"
+        [ "$(sha256sum "$pinned" | cut -d' ' -f1)" = "$pinned_sha" ] || refuse "pinned lyapunov.json hash differs"
+        for id in "${ids[@]}"; do
+            for suffix in "" -regen; do
+                [ ! -e "runs/confirmatory/phasej-$id$suffix" ] \
+                    || refuse "runs/confirmatory/phasej-$id$suffix exists; never overwritten"
+            done
         done
-    done
-    pgrep -f "lpcstudy --preset" >/dev/null && refuse "a preset run is active" 75
-    flock -n "$lock" true || refuse "the GPU lock is held" 75
+        pgrep -f "lpcstudy --preset" >/dev/null && refuse "a preset run is active" 75
+        flock -n "$lock" true || refuse "the GPU lock is held" 75
+    fi
 
-    for id in "${ids[@]}"; do
+    echo "Paste the five lines 'CONF-n <seed> <salt>' (input hidden; press Enter after the last line):"
+    declare -A seen=()
+    while [ "${#seen[@]}" -lt "${#ids[@]}" ]; do
+        IFS= read -rs line || [ -n "$line" ] \
+            || refuse "input ended after ${#seen[@]} of ${#ids[@]} lines; nothing was started"
+        read -r id seed salt extra <<<"$line"
+        [ -n "${id:-}" ] || continue
+        [[ " ${ids[*]} " == *" $id "* ]] || refuse "a line does not start with one of ${ids[*]}; nothing was started"
+        [ -z "${seen[$id]:-}" ] || refuse "$id was given twice; nothing was started"
+        [ -n "${salt:-}" ] && [ -z "${extra:-}" ] || refuse "$id: expected '$id <seed> <salt>'; nothing was started"
         var="${id/-/}"
-        read -rsp "$id seed: " seed; echo
-        read -rsp "$id salt: " salt; echo
         if ! LPC_CONF_SEED="$seed" LPC_CONF_SALT="$salt" "$py" -c '
 import os, sys
 from lpcstudy.seeds import LEDGER_PATH, SeedRefusal, confirmatory_seed
@@ -60,9 +79,14 @@ except SeedRefusal as exc:
             refuse "$id: seed or salt rejected; nothing was started"
         fi
         export "${var}_SEED=$seed" "${var}_SALT=$salt"
+        seen[$id]=1
         echo "$id: matches its ledger commitment"
     done
-    unset seed salt
+    unset line seed salt
+    if [ "$check" -eq 1 ]; then
+        echo "All ${#ids[@]} seeds match their ledger commitments. Nothing was started."
+        exit 0
+    fi
 
     mkdir -p runs/confirmatory
     export _LPC_PHJ_STAGE=run
