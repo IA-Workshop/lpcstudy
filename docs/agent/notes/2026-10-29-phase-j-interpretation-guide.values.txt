@@ -1,0 +1,60 @@
+J-H1: Dropping instability (I) raises the horizon loss by more than 5%; readings {'substantial': 30}
+   chua      deployable confirmed      points 1.219 to 1.233; lowest lower bound 1.186; highest upper bound 1.265
+   chua      oracle     confirmed      points 1.23 to 1.255; lowest lower bound 1.193; highest upper bound 1.298
+   lorenz63  deployable confirmed      points 1.209 to 1.287; lowest lower bound 1.172; highest upper bound 1.337
+   lorenz63  oracle     confirmed      points 1.219 to 1.263; lowest lower bound 1.173; highest upper bound 1.312
+   rossler   deployable confirmed      points 1.218 to 1.239; lowest lower bound 1.184; highest upper bound 1.276
+   rossler   oracle     confirmed      points 1.211 to 1.257; lowest lower bound 1.179; highest upper bound 1.299
+J-H2: Dropping separation (O) raises the horizon loss; readings {'substantial': 26, 'needed, size not determined': 4}
+   chua      deployable confirmed      points 1.078 to 1.086; lowest lower bound 1.062; highest upper bound 1.103
+   chua      oracle     confirmed      points 1.05 to 1.069; lowest lower bound 1.032; highest upper bound 1.087
+   lorenz63  deployable confirmed      points 1.075 to 1.108; lowest lower bound 1.055; highest upper bound 1.134
+   lorenz63  oracle     confirmed      points 1.072 to 1.104; lowest lower bound 1.052; highest upper bound 1.129
+   rossler   deployable confirmed      points 1.119 to 1.13; lowest lower bound 1.095; highest upper bound 1.154
+   rossler   oracle     confirmed      points 1.085 to 1.119; lowest lower bound 1.062; highest upper bound 1.141
+J-H3: Dropping noise (N) changes the horizon loss by at most 5%; readings {'negligible': 24, 'lowers': 2, 'small': 4}
+   chua      deployable confirmed      points 0.9929 to 0.9999; lowest lower bound 0.9869; highest upper bound 1.007
+   chua      oracle     confirmed      points 0.9968 to 1.009; lowest lower bound 0.9899; highest upper bound 1.018
+   lorenz63  deployable confirmed      points 0.9916 to 1.007; lowest lower bound 0.9834; highest upper bound 1.015
+   lorenz63  oracle     confirmed      points 0.9947 to 1.007; lowest lower bound 0.9786; highest upper bound 1.021
+   rossler   deployable confirmed      points 0.997 to 1.007; lowest lower bound 0.9908; highest upper bound 1.013
+   rossler   oracle     confirmed      points 1.004 to 1.014; lowest lower bound 0.9907; highest upper bound 1.024
+J-H4: O and I interact in the horizon; readings {'interaction gain detected': 30}
+   chua      deployable confirmed      points 0.007331 to 0.008564; lowest lower bound 0.005148; highest upper bound 0.01079
+   chua      oracle     confirmed      points 0.005221 to 0.007942; lowest lower bound 0.002809; highest upper bound 0.01071
+   lorenz63  deployable confirmed      points 0.01498 to 0.01854; lowest lower bound 0.0114; highest upper bound 0.02248
+   lorenz63  oracle     confirmed      points 0.01457 to 0.01646; lowest lower bound 0.01022; highest upper bound 0.02119
+   rossler   deployable confirmed      points 0.01011 to 0.01087; lowest lower bound 0.008228; highest upper bound 0.01298
+   rossler   oracle     confirmed      points 0.006575 to 0.008303; lowest lower bound 0.004632; highest upper bound 0.0107
+J-H5: The four-condition profile predicts the horizon better than the Lyapunov rank by more than 5%; readings {'substantial': 30}
+   chua      deployable confirmed      points 1.573 to 1.651; lowest lower bound 1.515; highest upper bound 1.716
+   chua      oracle     confirmed      points 1.562 to 1.655; lowest lower bound 1.499; highest upper bound 1.725
+   lorenz63  deployable confirmed      points 1.864 to 2.056; lowest lower bound 1.774; highest upper bound 2.171
+   lorenz63  oracle     confirmed      points 1.916 to 2.056; lowest lower bound 1.828; highest upper bound 2.169
+   rossler   deployable confirmed      points 1.423 to 1.468; lowest lower bound 1.377; highest upper bound 1.522
+   rossler   oracle     confirmed      points 1.365 to 1.404; lowest lower bound 1.319; highest upper bound 1.459
+J-H6: Adding the raw delay vector to the profile lowers the horizon loss; readings {'lowers': 30}
+   chua      deployable confirmed      points 0.8475 to 0.8681; lowest lower bound 0.8259; highest upper bound 0.8878
+   chua      oracle     confirmed      points 0.8385 to 0.8498; lowest lower bound 0.8144; highest upper bound 0.8721
+   lorenz63  deployable confirmed      points 0.8754 to 0.9099; lowest lower bound 0.8545; highest upper bound 0.9314
+   lorenz63  oracle     confirmed      points 0.8579 to 0.8874; lowest lower bound 0.8315; highest upper bound 0.9097
+   rossler   deployable confirmed      points 0.7591 to 0.7819; lowest lower bound 0.7353; highest upper bound 0.8029
+   rossler   oracle     confirmed      points 0.7542 to 0.7767; lowest lower bound 0.7326; highest upper bound 0.8005
+J-A1: Rossler, oracle, 1 LT: dropping R raises the allocation MSE by more than 5%; readings {'substantial': 5}
+   rossler   oracle     confirmed      points 1.086 to 1.126; lowest lower bound 1.061; highest upper bound 1.148
+J-A2: Rossler, deployable, 1 LT: the profile improves the allocation MSE over a fitted constant by at most 5%; readings {'negligible': 5}
+   rossler   deployable confirmed      points 0.9924 to 1.014; lowest lower bound 0.971; highest upper bound 1.032
+J-A3: 4 LT: a fitted constant weight has a lower MSE than the separation formula; readings {'lowers': 28, 'negligible': 2}
+   chua      deployable confirmed      points 0.9566 to 0.966; lowest lower bound 0.9428; highest upper bound 0.9794
+   chua      oracle     confirmed      points 0.9732 to 0.9873; lowest lower bound 0.9614; highest upper bound 1.001
+   lorenz63  deployable confirmed      points 0.9435 to 0.9581; lowest lower bound 0.9311; highest upper bound 0.9712
+   lorenz63  oracle     confirmed      points 0.9234 to 0.9465; lowest lower bound 0.9072; highest upper bound 0.9611
+   rossler   deployable confirmed      points 0.933 to 0.9608; lowest lower bound 0.9196; highest upper bound 0.9759
+   rossler   oracle     confirmed      points 0.9526 to 0.9859; lowest lower bound 0.9387; highest upper bound 1.003
+J-A4: Lorenz-63, deployable, 1 LT: the raw delay vector alone has a lower allocation MSE than the profile; readings {'undetermined': 2, 'lowers': 3}
+   lorenz63  deployable not confirmed  points 0.742 to 0.8943; lowest lower bound 0.5705; highest upper bound 1.106
+J-I1: Instability adds information about the logit weight given R, O and N (deployable profile); readings {'reduces': 1, 'distinct but small': 1, 'substantial': 8}
+   lorenz63  deployable confirmed      points 0.008989 to 0.05107; lowest lower bound -0.01507; highest upper bound 0.08086
+   chua      deployable confirmed      points 0.04633 to 0.07615; lowest lower bound 0.02409; highest upper bound 0.0989
+J-C2: Rossler: the full deployable system's realized false-trust rate is above the 10% target; readings {'above target': 5}
+   rossler   deployable confirmed      points 0.1341 to 0.1427; lowest lower bound 0.1275; highest upper bound 0.1501
